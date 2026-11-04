@@ -36,6 +36,8 @@
 	<string>enV uses the camera only when you start a QR/barcode scan or a live video music performance recording. Scanning is processed on this device.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>enV uses the microphone only when you start an audio recording or record a music practice take. Recordings are processed locally and exported only when you choose.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>enV saves Camera Studio photos and videos to your Photos library when you capture media.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>enV uses your local network and nearby devices only while you activate Instant Contact Exchange.</string>
 	<key>NSBonjourServices</key>

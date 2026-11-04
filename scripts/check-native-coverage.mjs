@@ -17,6 +17,7 @@ const platformRuntimeExtensions = [
   { id: 'song-metadata-analyzer', status: 'active', category: 'audio', engine: { type: 'audio' } },
   { id: 'a-book', status: 'active', category: 'productivity', engine: { type: 'custom' } },
   { id: 'zip-any-file', status: 'active', category: 'productivity', engine: { type: 'custom' } },
+  { id: 'camera-studio', status: 'active', category: 'photography', engine: { type: 'custom' } },
 ];
 for (const tool of platformRuntimeExtensions) {
   if (!catalog.some((item) => item.id === tool.id)) catalog.push(tool);

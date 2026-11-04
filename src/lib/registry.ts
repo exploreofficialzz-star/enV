@@ -147,6 +147,29 @@ const retiredDesignBuildCalculatorIds = new Set([
   "math-exp-sum-business-sum-design-effort-build-effort-delivery-effort-333-c",
 ]);
 
+const cameraStudioTool: ToolMeta = {
+  id: "camera-studio",
+  name: "Camera Studio",
+  slug: "camera-studio",
+  description: "Take photos and record videos with a familiar camera, color filters, front/rear switching, device-aware quality controls and local downloads.",
+  category: "photography",
+  subcategory: "Camera",
+  keywords: ["camera", "camera studio", "photo", "photography", "video", "selfie", "front camera", "rear camera", "filters", "creator", "recording", "capture", "zoom", "exposure"],
+  tags: ["camera", "photo", "video", "creator"],
+  icon: "Camera",
+  iconBackground: "#171b1e",
+  iconAccent: "#2ec4b6",
+  popularity: 1200,
+  featured: true,
+  clientSide: true,
+  requiresBackend: false,
+  requiresAuth: false,
+  status: "active",
+  related: [],
+  engine: { type: "custom", id: "camera-studio" },
+  isNew: true,
+};
+
 const allTools: ToolMeta[] = [
   // The browser has real dispatchers for both families. The generated catalogue is
   // shared with native clients, so expose these web-ready records as active here
@@ -179,6 +202,7 @@ const allTools: ToolMeta[] = [
   ...(!catalogTools.some((tool) => tool.id === songMetadataAnalyzerTool.id) ? [songMetadataAnalyzerTool] : []),
   ...(!catalogTools.some((tool) => tool.id === aBookTool.id) ? [aBookTool] : []),
   ...(!catalogTools.some((tool) => tool.id === zipAnyFileTool.id) ? [zipAnyFileTool] : []),
+  ...(!catalogTools.some((tool) => tool.id === cameraStudioTool.id) ? [cameraStudioTool] : []),
 ];
 
 const byId = new Map(allTools.map((t) => [t.id, t]));

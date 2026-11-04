@@ -59,6 +59,7 @@ const ABookEngine = lazy(() => import("@/components/engines/a-book-engine").then
 const MusicDownloaderEngine = lazy(() => import("@/components/engines/music-downloader-engine").then((m) => ({ default: m.MusicDownloaderEngine })));
 const AiMusicDataSandbox = lazy(() => import("@/components/engines/ai-music-data-sandbox").then((m) => ({ default: m.AiMusicDataSandbox })));
 const ZipArchiveEngine = lazy(() => import("@/components/engines/zip-archive-engine").then((m) => ({ default: m.ZipArchiveEngine })));
+const CameraStudioEngine = lazy(() => import("@/components/engines/camera-studio-engine").then((m) => ({ default: m.CameraStudioEngine })));
 import { isEventTemplateTool } from "@/lib/events/event-templates";
 import { developerActionForLegacySlug, developerModeForLegacySlug, developerStudioForLegacySlug } from "@/lib/developer-studios-catalog";
 
@@ -75,6 +76,7 @@ function ToolEngineView({ tool, initialMode, initialAction, initialOp }: ToolEng
 
   // Mockups are backed by the shared mockup engine, including catalog entries that
   // were previously marked planned. The catalog remains the compatibility index.
+  if (tool.id === "camera-studio") return <CameraStudioEngine />;
   if (tool.category === "mockups") return <MockupsCategoryEngine toolId={tool.id} />;
   // Every Screenshot-category tool is rendered by the shared screenshot studio.
   if (tool.category === "screenshots") return <ScreenshotEngine toolId={tool.id} />;

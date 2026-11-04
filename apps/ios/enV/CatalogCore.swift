@@ -152,7 +152,7 @@ struct Tool: Decodable, Identifiable, Hashable {
         return description.lowercased().hasPrefix("works offline") ? description : "Works offline. \(description)"
     }
     var isUnderProduction: Bool {
-        !["a-book", "zip-any-file"].contains(id.lowercased()) &&
+        !["a-book", "zip-any-file", "camera-studio"].contains(id.lowercased()) &&
         !["accessibility", "audio", "business", "calculators", "datetime", "developer", "design", "ecommerce", "qr", "video"].contains(category.lowercased())
     }
     var searchText: String {
@@ -357,6 +357,43 @@ extension Catalog {
 }
 
 extension Catalog {
+    /// Adds Camera Studio as a native on-device tool.
+    func includingCameraStudio() -> Catalog {
+        guard !tools.contains(where: { $0.id == "camera-studio" }) else { return self }
+        let tool = Tool(
+            id: "camera-studio",
+            name: "Camera Studio",
+            slug: "camera-studio",
+            description: "Take photos and record videos with your phone camera. Switch front/rear cameras and save captures locally.",
+            category: "photography",
+            subcategory: "Camera",
+            keywords: ["camera", "camera studio", "photo", "photography", "video", "selfie", "front camera", "rear camera", "recording", "capture", "flash", "torch"],
+            tags: ["camera", "photo", "video", "creator"],
+            icon: "Camera",
+            popularity: 1200,
+            featured: true,
+            clientSide: true,
+            requiresBackend: false,
+            requiresAuth: false,
+            status: "active",
+            disclaimer: nil,
+            related: [],
+            engine: ToolEngine(type: "custom", id: "camera-studio", op: nil, configuration: [:])
+        )
+        return Catalog(
+            schemaVersion: schemaVersion,
+            catalogVersion: catalogVersion,
+            counts: CatalogCounts(total: counts.total + 1, active: counts.active + 1, planned: counts.planned, categories: counts.categories),
+            categories: categories,
+            tools: (tools + [tool]).sorted {
+                let leftCategory = $0.category.lowercased()
+                let rightCategory = $1.category.lowercased()
+                return leftCategory == rightCategory ? ($0.name.lowercased() < $1.name.lowercased()) : leftCategory < rightCategory
+            },
+            relatedReferenceTools: relatedReferenceTools
+        )
+    }
+
     /// Registers local ZIP64 compression and extraction as a native tool.
     func includingZipArchive() -> Catalog {
         guard !tools.contains(where: { $0.id == "zip-any-file" }) else { return self }
@@ -492,7 +529,7 @@ enum CatalogLoader {
         let data = try Data(contentsOf: url)
         let catalog = try JSONDecoder().decode(Catalog.self, from: data)
         guard !catalog.tools.isEmpty else { throw CocoaError(.fileReadCorruptFile) }
-        return catalog.nativeFacing().includingMusicDownloader().includingSongMetadataAnalyzer().includingABook().includingZipArchive().includingDateTimeExtensions()
+        return catalog.nativeFacing().includingMusicDownloader().includingSongMetadataAnalyzer().includingABook().includingZipArchive().includingCameraStudio().includingDateTimeExtensions()
     }
 }
 
