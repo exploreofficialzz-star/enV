@@ -116,7 +116,7 @@ export async function prepareOfflineToolPackage(input: {
       : { open: false, status: "not-installed", message: "This browser cannot load this tool's saved offline package." };
   }
 
-  const worker = await activeWorker(true);
+  const worker = await activeWorker(true, true);
   if (!worker) {
     return online
       ? { open: true, status: "unsupported" }
