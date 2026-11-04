@@ -29,6 +29,7 @@ export async function registerEnVServiceWorker(): Promise<ServiceWorkerRegistrat
       try {
         const existing = await navigator.serviceWorker.getRegistration("/");
         const registration = existing ?? await navigator.serviceWorker.register("/env-sw.js", { scope: "/", updateViaCache: "none" });
+        if (navigator.onLine && existing) await registration.update().catch(() => undefined);
         await navigator.serviceWorker.ready;
         return registration;
       } catch {
@@ -90,6 +91,10 @@ async function sendWorkerMessage<T extends WorkerReply>(
     };
     worker.postMessage({ type, ...payload }, [channel.port2]);
   });
+}
+
+export async function prepareEnVOfflineShell(): Promise<void> {
+  await activeWorker(true);
 }
 
 export async function prepareOfflineToolPackage(input: {
