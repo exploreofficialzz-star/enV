@@ -3263,14 +3263,16 @@ html[data-env-view-mode="tablet"] .env-app-shell {
 }
 
 
-/* Embedded editor header remains visible below the global navigation. */
+/* Keep the embedded Studio as one viewport-bounded stack.
+   Header and canvas footer stay in normal flow, so short screens cannot stack
+   the sticky editor header on top of the canvas footer or the global nav. */
 .ux-ui-studio:not(.is-expanded) {
-  overflow:visible !important;
+  overflow:hidden !important;
 }
 .ux-ui-studio:not(.is-expanded) > .uxui-topbar {
-  position:sticky !important;
-  top:64px !important;
-  z-index:50 !important;
+  position:relative !important;
+  top:auto !important;
+  z-index:31 !important;
   flex-wrap:nowrap !important;
   align-items:center !important;
   justify-content:space-between !important;
