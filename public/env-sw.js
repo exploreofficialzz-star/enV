@@ -95,21 +95,6 @@ function isCacheableAsset(request, url) {
     url.pathname.startsWith("/assets/");
 }
 
-async function rememberAsset(session, request, cacheName) {
-  const cache = await caches.open(cacheName);
-  await cache.put(request, await fetch(request));
-  const db = await openPackageDb();
-  try {
-    const record = await readRow(db, "packages", session.toolId);
-    if (!record || record.version !== session.version) return;
-    const assets = Array.isArray(record.assets) ? record.assets : [];
-    if (!assets.includes(request.url)) assets.push(request.url);
-    await writeRow(db, "packages", { ...record, assets, updatedAt: new Date().toISOString() });
-  } finally {
-    db.close();
-  }
-}
-
 async function handleAssetRequest(event) {
   const request = event.request;
   const session = await getSession(event.clientId);
@@ -144,8 +129,6 @@ async function handleAssetRequest(event) {
         } finally {
           db.close();
         }
-      } else {
-        await coreCache.put(request, response.clone());
       }
     } catch {
       // The requested asset was delivered; a quota failure only prevents offline readiness.
