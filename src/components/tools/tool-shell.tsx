@@ -38,6 +38,7 @@ export function ToolShell({
   const storageError = usePrefs((s) => s.storageError);
   const saved = favorites.includes(tool.id);
   const toolInterfaceRef = useRef<HTMLDivElement | null>(null);
+  const [isOffline, setIsOffline] = useState(false);
   const toolStartedRef = useRef(false);
   const toolFinishedRef = useRef(false);
   const toolAbandonmentRecordedRef = useRef(false);
@@ -79,6 +80,18 @@ export function ToolShell({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isCssFullscreen, setIsCssFullscreen] = useState(false);
   const isMusicSandbox = ["song-metadata-analyzer", "audio-analyze-studio"].includes(tool.id);
+
+  useEffect(() => {
+    const updateNetworkState = () => setIsOffline(!navigator.onLine);
+    updateNetworkState();
+    window.addEventListener("online", updateNetworkState);
+    window.addEventListener("offline", updateNetworkState);
+    return () => {
+      window.removeEventListener("online", updateNetworkState);
+      window.removeEventListener("offline", updateNetworkState);
+    };
+  }, []);
+
 
   useEffect(() => {
     if (isFullscreen && isMusicSandbox) window.dispatchEvent(new Event("env-music-sandbox-fullscreen"));
@@ -246,6 +259,11 @@ export function ToolShell({
       {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
 
       {note ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
+      {isOffline ? (
+        <p className="mt-4 rounded-lg border border-border bg-surface-2 px-3 py-3 text-sm text-muted" role="status">
+          Offline mode: the operations marked as local can run on this device. Account sync, community features, remote lookups and server processing need an internet connection.
+        </p>
+      ) : null}
       <section
         ref={toolInterfaceRef}
         data-env-tool-id={tool.id}
@@ -265,7 +283,9 @@ export function ToolShell({
             startToolExecution("action_button");
           }
         }}
-        onSubmitCapture={() => startToolExecution("form_submit")}
+        onSubmitCapture={() => {
+          startToolExecution("form_submit");
+        }}
       >
         <ToolExecutionTelemetryContext.Provider value={executionTelemetry}>
         {isMusicSandbox ? (

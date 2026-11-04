@@ -8,7 +8,7 @@ import {
 import eligibleTools from "../../data/offline-eligible-tools.json";
 import { recordAnalyticsEvent } from "../analytics/client";
 
-type EligibleToolsIndex = { pricingVersion: string; toolCount: number; profiles: { toolId: string; billingKey: string; subunitsPerUnit: number }[] };
+type EligibleToolsIndex = { pricingVersion: string; toolCount: number; profiles: { toolId: string; billingKey: string; subunitsPerUnit: number; platforms: ("web" | "android" | "ios")[] }[] };
 const offlineEligibleTools = eligibleTools as EligibleToolsIndex;
 const offlineEligibleById = new Map(offlineEligibleTools.profiles.map((entry) => [entry.toolId, entry]));
 
@@ -139,15 +139,23 @@ export async function listLocalWebOfflineAllowances() {
  * this journal until their execution boundary is explicitly wired and audited. */
 export async function runOfflineMeteredOperationIfSelected<T>(input: { toolId: string }, operation: () => T | Promise<T>): Promise<T> {
   const profile = offlineEligibleById.get(input.toolId);
-  if (!profile || profile.billingKey !== "local.calculator") return await operation();
+  if (!profile || !profile.billingKey.startsWith("local.") || !profile.platforms.includes("web")) {
+    // Monetization is deliberately being wired after the offline feature rollout.
+    // A missing billing profile must not block a verified device-local tool action.
+    return await operation();
+  }
   const selectedAllowanceId = getSelectedWebOfflineAllowanceId();
-  if (!selectedAllowanceId) return await operation();
+  if (!selectedAllowanceId) {
+    // The pre-monetization offline release makes local execution available first.
+    // No token is deducted here; per-tool metering is integrated in the monetization phase.
+    return await operation();
+  }
   const db = await openDb();
   const allowance = await getRow<StoredAllowance>(db, "allowances", selectedAllowanceId);
   db.close();
   if (!allowance || !["issued", "syncing"].includes(allowance.status) ||
       allowance.pricingVersion !== offlineEligibleTools.pricingVersion || Date.parse(allowance.expiresAt) <= Date.now()) {
-    throw new OfflineClientError("OFFLINE_ALLOWANCE_UNAVAILABLE", "The selected calculator budget is expired or requires recovery. This calculator did not run; open the wallet and review the allowance.");
+    throw new OfflineClientError("OFFLINE_ALLOWANCE_UNAVAILABLE", "The selected enV token allowance is expired or requires recovery. This operation did not run; open the wallet and review the allowance.");
   }
   const result = await runOfflineMeteredOperation({ allowanceId: selectedAllowanceId, toolId: input.toolId, unitCount: 1 }, operation);
   if (typeof navigator !== "undefined" && navigator.onLine) {

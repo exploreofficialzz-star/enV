@@ -113,7 +113,9 @@
     "test:world-lab": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/world-lab/*.test.ts",
     "test:music-data-sandbox": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/engines/music-sandbox.test.ts src/lib/engines/music-sandbox-analysis.test.ts src/lib/registry-music-sandbox.test.ts",
     "audit:music-data-sandbox:browser": "node --experimental-strip-types scripts/audit-ai-music-data-sandbox-browser.mjs",
-    "audit:zip-any-file:browser": "node scripts/audit-zip-any-file-browser.mjs"
+    "audit:zip-any-file:browser": "node scripts/audit-zip-any-file-browser.mjs",
+    "generate:offline-capabilities": "node --experimental-strip-types scripts/generate-offline-capabilities.mjs",
+    "check:offline-capabilities": "node --test scripts/offline/offline-capabilities.test.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",

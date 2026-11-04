@@ -1,6 +1,6 @@
 import type { ABookPdfInfo } from "./pdf.ts";
 import type { ABookPdfInput } from "./pdf.ts";
-import type { ABookPdfWorkerResponse, ABookPdfWorkerTask } from "./pdf-worker-types.ts";
+import type { ABookPdfWorkerRequest, ABookPdfWorkerResponse, ABookPdfWorkerTask } from "./pdf-worker-types.ts";
 
 let requestSequence = 0;
 
@@ -117,4 +117,39 @@ export async function rotateSelectedPdfsInWorker(files: ABookPdfInput[], angle: 
 
 export async function mergePdfsInWorker(files: Blob[], signal?: AbortSignal): Promise<Uint8Array> {
   return outputBytes(await runInWorker({ action: "merge", files }, signal));
+}
+
+
+/** Start and stop the real A book module worker once so its complete worker-side
+ * dependency graph is fetched into the current tool's Service Worker package session. */
+export async function warmABookPdfWorker(): Promise<string> {
+  if (typeof window === "undefined" || typeof Worker === "undefined") {
+    throw new Error("A book offline preparation requires module Web Worker support.");
+  }
+  const workerUrl = new URL("./pdf.worker.ts", import.meta.url);
+  await new Promise<void>((resolve, reject) => {
+    const worker = new Worker(workerUrl, {
+      type: "module",
+      name: "enV-a-book-offline-package-check",
+    });
+    const timer = window.setTimeout(() => {
+      worker.terminate();
+      reject(new Error("A book's PDF worker did not finish its offline package check."));
+    }, 15_000);
+    worker.onmessage = (event: MessageEvent<ABookPdfWorkerResponse>) => {
+      const response = event.data;
+      if (!response || response.requestId !== "a-book-offline-precache") return;
+      window.clearTimeout(timer);
+      worker.terminate();
+      if (response.ok && typeof response.value === "object" && response.value !== null && "ready" in response.value) resolve();
+      else reject(new Error("A book's PDF worker dependencies could not be verified."));
+    };
+    worker.onerror = (event) => {
+      window.clearTimeout(timer);
+      worker.terminate();
+      reject(new Error(event.message || "A book's PDF worker could not be prepared."));
+    };
+    worker.postMessage({ action: "warmup", requestId: "a-book-offline-precache" } satisfies ABookPdfWorkerRequest);
+  });
+  return workerUrl.href;
 }

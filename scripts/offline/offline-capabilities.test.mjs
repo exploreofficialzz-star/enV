@@ -5,47 +5,94 @@ import { canSpendTokensOffline, classifyOfflineToolRecord, OFFLINE_CAPABILITY_PO
 function tool(overrides = {}) {
   return {
     id: "test-tool",
+    category: "developer",
     clientSide: true,
     requiresBackend: false,
     requiresAuth: false,
     status: "active",
-    engine: { type: "text", config: {} },
+    engine: { type: "text", op: "format" },
     ...overrides,
   };
 }
 
-test("allows only audited deterministic client-side engines", () => {
-  for (const type of ["calculator", "converter", "datetime", "text", "codec", "color", "qr", "barcode", "generator"]) {
-    const result = classifyOfflineToolRecord(tool({ engine: { type, config: {} } }));
+test("all audited local engine families are eligible, not only calculators", () => {
+  for (const type of [
+    "calculator", "converter", "datetime", "text", "codec", "color", "qr", "barcode",
+    "generator", "image", "cssgen", "mockup", "post", "device", "seo", "file-converter",
+    "developer", "pdf", "mime", "security", "creator", "business", "audio", "network",
+    "ai", "video", "document",
+  ]) {
+    const result = classifyOfflineToolRecord(tool({ engine: { type, op: "local-operation" } }));
     assert.equal(result.execution, "device-local", type);
     assert.equal(result.mayRunWithoutNetwork, true, type);
-    assert.equal(result.tokenPolicy, "no-offline-spend", type);
+    assert.equal(result.tokenPolicy, "monetization-pending", type);
   }
 });
-test("requires the network for server, auth, backend and remote engine dependencies", () => {
-  for (const overrides of [
-    { clientSide: false },
-    { requiresBackend: true },
-    { requiresAuth: true },
-    { engine: { type: "ai", config: {} } },
-    { engine: { type: "network", config: {} } },
-  ]) {
-    const result = classifyOfflineToolRecord(tool(overrides));
-    assert.equal(result.execution, "online-required");
-    assert.equal(result.mayRunWithoutNetwork, false);
-    assert.equal(result.tokenPolicy, "server-verified-only");
-  }
-});
-test("does not assume unknown client-side engines are offline-safe", () => {
-  const result = classifyOfflineToolRecord(tool({ engine: { type: "custom", config: {} } }));
-  assert.equal(result.execution, "not-verified");
+
+
+test("remote music downloading remains online-only", () => {
+  const result = classifyOfflineToolRecord(tool({
+    id: "music-downloader",
+    category: "audio",
+    engine: { type: "custom", id: "music-downloader" },
+  }));
+  assert.notEqual(result.execution, "device-local");
   assert.equal(result.mayRunWithoutNetwork, false);
 });
-test("keeps planned tools unavailable", () => {
-  const result = classifyOfflineToolRecord(tool({ status: "planned" }));
-  assert.equal(result.execution, "unavailable");
+
+test("local custom tool categories are eligible while unknown custom engines fail closed", () => {
+  for (const category of ["accessibility", "business", "communication", "ecommerce", "events", "marketing", "personal", "productivity", "social", "travel", "webdesign"]) {
+    const result = classifyOfflineToolRecord(tool({ category, engine: { type: "custom", id: "local-workflow" } }));
+    assert.equal(result.execution, "device-local", category);
+  }
+  const unknown = classifyOfflineToolRecord(tool({ category: "unknown", engine: { type: "custom", id: "unknown" } }));
+  assert.equal(unknown.execution, "not-verified");
+  assert.equal(unknown.mayRunWithoutNetwork, false);
 });
-test("offline token spend remains hard-disabled", () => {
+
+test("hybrid document engine allows its implemented local operations only", () => {
+  const local = classifyOfflineToolRecord(tool({
+    id: "pdf-merger", category: "pdf", clientSide: false, requiresBackend: true,
+    engine: { type: "document-backend", op: "pdf-merger" },
+  }));
+  assert.equal(local.execution, "device-local");
+  const remote = classifyOfflineToolRecord(tool({
+    id: "docx-comparison-tool", category: "pdf", clientSide: false, requiresBackend: true,
+    engine: { type: "document-backend", op: "docx-comparison-tool" },
+  }));
+  assert.equal(remote.execution, "online-required");
+});
+
+test("server-backed operations stay online even when the shared engine supports local operations", () => {
+  for (const [id, engine, op] of [
+    ["audio-to-mp3-server", "audio", "server-mp3"],
+    ["audio-merger", "audio", "server-merge"],
+    ["video-merger", "video", "video-merge"],
+    ["video-to-mp4", "video", "video-to-mp4"],
+    ["audio-to-text", "custom", "transcription"],
+  ]) {
+    const result = classifyOfflineToolRecord(tool({ id, engine: { type: engine, op } }));
+    assert.equal(result.execution, "online-required", id);
+    assert.equal(result.mayRunWithoutNetwork, false, id);
+  }
+});
+
+test("backend, auth, remote URL and planned tools are never classified as local", () => {
+  for (const overrides of [
+    { requiresBackend: true },
+    { requiresAuth: true },
+    { clientSide: false },
+    { engine: { type: "url-media", provider: "youtube" } },
+    { engine: { type: "url-media-info", provider: "youtube" } },
+    { status: "planned" },
+  ]) {
+    const result = classifyOfflineToolRecord(tool(overrides));
+    assert.notEqual(result.execution, "device-local");
+    assert.equal(result.mayRunWithoutNetwork, false);
+  }
+});
+
+test("local tools are available before billing is wired, but offline token spending stays disabled", () => {
   assert.equal(canSpendTokensOffline(), false);
-  assert.equal(OFFLINE_CAPABILITY_POLICY_VERSION, "2026-10-30.v1");
+  assert.equal(OFFLINE_CAPABILITY_POLICY_VERSION, "2026-11-04.v3");
 });

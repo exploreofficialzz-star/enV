@@ -39,6 +39,7 @@ const profiles = source.profiles
     toolId: profile.toolId,
     billingKey: profile.billingKey,
     subunitsPerUnit: profile.provisionalSubunitsPerUnit,
+    platforms: ["web", "android", "ios"],
   }))
   .sort((a, b) => a.toolId.localeCompare(b.toolId));
 const uniqueIds = new Set(profiles.map((profile) => profile.toolId));

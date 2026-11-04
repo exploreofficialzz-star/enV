@@ -1,6 +1,7 @@
 import type { ABookPdfInfo, ABookPdfInput } from "./pdf.ts";
 
 export type ABookPdfWorkerTask =
+  | { action: "warmup" }
   | { action: "inspect"; blob: Blob }
   | { action: "extract-one"; blob: Blob; pages: number[] }
   | { action: "extract-batch"; files: ABookPdfInput[]; pageRange: string }
@@ -12,5 +13,5 @@ export type ABookPdfWorkerTask =
 export type ABookPdfWorkerRequest = ABookPdfWorkerTask & { requestId: string };
 
 export type ABookPdfWorkerResponse =
-  | { requestId: string; ok: true; value: ABookPdfInfo | ArrayBuffer }
+  | { requestId: string; ok: true; value: ABookPdfInfo | ArrayBuffer | { ready: true } }
   | { requestId: string; ok: false; error: string };
