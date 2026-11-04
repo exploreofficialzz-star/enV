@@ -704,15 +704,13 @@ private struct DiscoveryToolCard: View {
         VStack(alignment: .leading, spacing: 0) {
             iconTile(tool)
             enVCharacterSpacedText(tool.name).font(.envScaled(size: 14, weight: .semibold)).foregroundStyle(Color.envInk).padding(.top, 12)
-            enVCharacterSpacedText(tool.description).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(2).lineSpacing(2).padding(.top, 4)
+            enVCharacterSpacedText(tool.offlineDescription).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(2).lineSpacing(2).padding(.top, 4)
             if tool.isUnderProduction {
                 enVCharacterSpacedText("Under production").font(.envScaled(size: 10, weight: .medium)).foregroundStyle(Color.envSubtle).padding(.top, 10)
             } else if tool.isPlanned {
                 enVCharacterSpacedText("Coming soon").font(.envScaled(size: 10, weight: .medium)).foregroundStyle(Color.envSubtle).padding(.top, 10)
             } else if NativeCopy.isWebRuntimeOnly(tool.id) {
                 enVCharacterSpacedText("WEB ONLY").font(.envScaled(size: 10, weight: .medium)).tracking(0.5).foregroundStyle(Color.envSubtle).padding(.top, 10)
-            } else if tool.clientSide {
-                enVCharacterSpacedText("IN-BROWSER").font(.envScaled(size: 10, weight: .medium)).tracking(0.5).foregroundStyle(Color.envSubtle).padding(.top, 10)
             }
             HStack { Spacer(); EnVIcon(name: "ArrowRight", size: 16, tint: .primary) }.padding(.top, 12)
         }
@@ -753,7 +751,7 @@ private struct WebHomeSearchSuggestion: View {
                     else if tool.isPlanned { enVCharacterSpacedText("Coming soon").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
                     else if NativeCopy.isWebRuntimeOnly(tool.id) { enVCharacterSpacedText("Web only").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
                 }
-                enVCharacterSpacedText(tool.description).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(1)
+                enVCharacterSpacedText(tool.offlineDescription).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(1)
             }
             Spacer(minLength: 4)
             EnVIcon(name: "ArrowRight", size: 16, tint: .envInk).accessibilityHidden(true)
@@ -999,7 +997,7 @@ struct ToolsView: View {
                                                         if tool.isPlanned { enVCharacterSpacedText("Coming soon").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
                                                         else if NativeCopy.isWebRuntimeOnly(tool.id) { enVCharacterSpacedText("Web only").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
                                                     }
-                                                    enVCharacterSpacedText(tool.description).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(1)
+                                                    enVCharacterSpacedText(tool.offlineDescription).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(1)
                                                 }
                                                 .frame(maxWidth: .infinity, alignment: .leading)
                                                 .padding(.horizontal, 12)
