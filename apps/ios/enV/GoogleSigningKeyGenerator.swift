@@ -123,7 +123,7 @@ android {
         create("release") {
             storeFile = file(System.getenv("ANDROID_KEYSTORE_FILE") ?? "upload-keystore.jks")
             storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
-            keyAlias = "\(input.alias)"
+            keyAlias = System.getenv("ANDROID_KEY_ALIAS") ?? "\(input.alias)"
             keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
         }
     }
@@ -138,7 +138,7 @@ android {
         release {
             storeFile file(System.getenv("ANDROID_KEYSTORE_FILE") ?? "upload-keystore.jks")
             storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
-            keyAlias "\(input.alias)"
+            keyAlias System.getenv("ANDROID_KEY_ALIAS") ?? "\(input.alias)"
             keyPassword System.getenv("ANDROID_KEY_PASSWORD")
         }
     }
