@@ -147,7 +147,7 @@ android {
     }
 
     private static func makeCertificate(privateKey: SecKey, publicKey: Data, subject: [(String, String)], notBefore: Date, notAfter: Date) throws -> Data {
-        var serialValue = Data(randomData(count: 16).enumerated().map { index, byte in index == 0 ? byte & 0x7f : byte })
+        var serialValue = Data(try randomData(count: 16).enumerated().map { index, byte in index == 0 ? byte & 0x7f : byte })
         if serialValue.allSatisfy({ $0 == 0 }) { serialValue[serialValue.count - 1] = 1 }
         let keyUsage = sequence(oid("2.5.29.15"), der(0x01, Data([0xff])), octet(bitString(Data([0xa0]), unusedBits: 5)))
         let basicConstraints = sequence(oid("2.5.29.19"), der(0x01, Data([0xff])), octet(sequence()))
@@ -169,7 +169,7 @@ android {
 
     private static func protectPrivateKey(_ pkcs8: Data, password: String) throws -> Data {
         let passwordBytes = utf16BE(password)
-        let salt = randomData(count: 20)
+        let salt = try randomData(count: 20)
         var previous = salt
         var encrypted = Data(count: pkcs8.count)
         let source = [UInt8](pkcs8)
@@ -216,10 +216,12 @@ android {
         guard bytes.count <= 65_535 else { throw failure("Key alias is too long.") }
         return Data([UInt8(bytes.count >> 8), UInt8(bytes.count & 0xff)]) + bytes
     }
-    private static func randomData(count: Int) -> Data {
+    private static func randomData(count: Int) throws -> Data {
         var bytes = [UInt8](repeating: 0, count: count)
         let status = SecRandomCopyBytes(kSecRandomDefault, count, &bytes)
-        if status != errSecSuccess { for index in bytes.indices { bytes[index] = UInt8.random(in: 0...255) } }
+        guard status == errSecSuccess else {
+            throw failure("Secure random generation failed (OSStatus \\(status)).")
+        }
         return Data(bytes)
     }
     private static func data32(_ value: UInt32) -> Data { Data([UInt8(value >> 24), UInt8((value >> 16) & 0xff), UInt8((value >> 8) & 0xff), UInt8(value & 0xff)]) }
