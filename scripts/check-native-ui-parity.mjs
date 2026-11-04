@@ -14,6 +14,7 @@ const webToolShell = readFileSync("src/components/tools/tool-shell.tsx", "utf8")
 const webToolCard = readFileSync("src/components/tools/tool-card.tsx", "utf8");
 const webToolEngine = readFileSync("src/components/tools/tool-engine.tsx", "utf8");
 const webOfflineCapabilities = readFileSync("src/lib/offline/capabilities.ts", "utf8");
+const webToolRoute = readFileSync("src/routes/tools/$category/$slug.tsx", "utf8");
 const webStore = readFileSync("src/lib/storage.ts", "utf8");
 const themeHook = readFileSync("src/hooks/use-theme.ts", "utf8");
 const iosAssistant = readFileSync("apps/ios/enV/AssistantChat.swift", "utf8");
@@ -70,6 +71,8 @@ assert.match(webOfflineCapabilities, /export function offlineAwareToolDescriptio
 assert.match(webToolCard, /offlineAwareToolDescription\(tool\)/, "Web tool cards must show Works offline in their description");
 assert.match(webToolShell, /offlineAwareToolDescription\(tool\)/, "Web tool detail headers must show offline capability");
 assert.match(webToolEngine, /<Suspense fallback=\{null\}>/, "Tool engine must not show a loading screen while lazy modules open");
+assert.match(webToolRoute, /return \{ communityFeed: null \}/, "Tool routes must mount without waiting for the community feed");
+assert.doesNotMatch(webToolRoute, /await loadPublicCommunityToolFeed/, "Community preload must not delay opening the tool");
 assert.doesNotMatch(webToolEngine, /Loading \{props\.tool\.name\}|Preparing \{tool\.name\}|Offline package ready on this device|OfflineToolUnavailable/, "Offline package state must not gate or decorate the tool screen");
 assert.doesNotMatch(android, /StatusPill\("ON DEVICE"/, "Android cards must not show a separate offline-ready badge");
 assert.match(androidTheme, /CompositionLocalProvider\(LocalDensity provides scaledDensity\)/);
