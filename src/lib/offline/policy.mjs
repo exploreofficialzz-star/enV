@@ -19,7 +19,7 @@ export function classifyOfflineToolRecord(tool) {
         : "This engine depends on a network service.", policyVersion: OFFLINE_CAPABILITY_POLICY_VERSION };
   }
   if (auditedLocalEngineTypes.has(engineType)) {
-    return { toolId: tool.id, execution: "device-local", tokenPolicy: "no-offline-spend", mayRunWithoutNetwork: true,
+    return { toolId: tool.id, execution: "device-local", tokenPolicy: "offline-allowance-required", mayRunWithoutNetwork: true,
       reason: "This deterministic engine is approved for local execution; network sync and server-side account actions remain unavailable offline.",
       policyVersion: OFFLINE_CAPABILITY_POLICY_VERSION };
   }
