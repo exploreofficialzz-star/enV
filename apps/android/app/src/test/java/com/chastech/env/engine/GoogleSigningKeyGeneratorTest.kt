@@ -4,6 +4,7 @@ import java.io.ByteArrayInputStream
 import java.security.KeyStore
 import java.security.Signature
 import java.security.cert.X509Certificate
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -38,7 +39,21 @@ class GoogleSigningKeyGeneratorTest {
         assertTrue(signature.verify(signed))
         assertTrue(result.certificatePem.startsWith("-----BEGIN CERTIFICATE-----"))
         assertEquals(20, result.sha1.split(":").size)
-        assertEquals(32, result.sha256.split(":").size)
+        assertArrayEquals(result.keystore, java.util.Base64.getDecoder().decode(result.keystoreBase64))
+        assertTrue(result.githubSecrets.contains("ANDROID_KEYSTORE_BASE64=" + result.keystoreBase64))
+        assertTrue(result.githubSecrets.contains("ANDROID_KEYSTORE_PASSWORD=" + storePassword))
+        assertTrue(result.githubSecrets.contains("ANDROID_KEY_ALIAS=upload"))
+        assertTrue(result.githubSecrets.contains("ANDROID_KEY_PASSWORD=" + keyPassword))
+        assertTrue(!result.githubSecrets.contains("\\n"))
+        assertTrue(result.githubActionsWorkflow.contains("secrets.ANDROID_KEYSTORE_BASE64"))
+        assertTrue(result.githubActionsWorkflow.contains("secrets.ANDROID_KEY_ALIAS"))
+        assertTrue(result.githubActionsWorkflow.contains("bundleRelease"))
+        assertTrue(result.githubActionsWorkflow.contains("base64 --decode"))
+        assertTrue(result.githubActionsWorkflow.contains("rm -f"))
+        assertTrue(result.gradleKotlin.contains("ANDROID_KEYSTORE_FILE"))
+        assertTrue(result.gradleKotlin.contains("ANDROID_KEY_ALIAS"))
+        assertTrue(result.signingInfo.contains("SHA-256:"))
+        assertTrue(result.handoutReadme.contains("Settings > Secrets and variables > Actions"))
     }
 
     @Test fun rejectsWeakPasswordsAndUnsafeKeySettings() {
