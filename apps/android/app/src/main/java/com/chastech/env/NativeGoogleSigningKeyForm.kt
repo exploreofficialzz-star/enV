@@ -38,10 +38,7 @@ import com.chastech.env.engine.GoogleSigningKeyGenerator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
 import java.text.DateFormat
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 
 @Composable
 internal fun NativeGoogleSigningKeyForm() {
@@ -82,26 +79,6 @@ internal fun NativeGoogleSigningKeyForm() {
     fun copy(value: String, label: String) {
         context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText(label, value))
         message = "$label copied."
-    }
-
-    fun makeZip(result: GoogleSigningKeyGenerator.Artifacts): ByteArray {
-        val output = ByteArrayOutputStream()
-        ZipOutputStream(output).use { zip ->
-            fun add(name: String, value: ByteArray) {
-                zip.putNextEntry(ZipEntry(name)); zip.write(value); zip.closeEntry()
-            }
-            add("upload-keystore.jks", result.keystore)
-            add("upload-keystore.base64.txt", (result.keystoreBase64 + "\n").toByteArray(Charsets.US_ASCII))
-            add("upload_certificate.pem", result.certificatePem.toByteArray(Charsets.US_ASCII))
-            add("github-secrets.txt", result.githubSecrets.toByteArray(Charsets.UTF_8))
-            add("signing-info.txt", result.signingInfo.toByteArray(Charsets.UTF_8))
-            add("release-signing.gradle.kts", result.gradleKotlin.toByteArray(Charsets.UTF_8))
-            add("release-signing.gradle", result.gradleGroovy.toByteArray(Charsets.UTF_8))
-            add(".github/workflows/android-release.yml", result.githubActionsWorkflow.toByteArray(Charsets.UTF_8))
-            add(".gitignore-signing-example", ".android-signing/\n/upload-keystore.jks\n/*.jks\n/*.keystore\n".toByteArray(Charsets.UTF_8))
-            add("README.md", result.handoutReadme.toByteArray(Charsets.UTF_8))
-        }
-        return output.toByteArray()
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
@@ -189,7 +166,7 @@ internal fun NativeGoogleSigningKeyForm() {
                 Text("Files ready", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text("${result.alias} · RSA $keySize · ${DateFormat.getDateInstance(DateFormat.MEDIUM).format(result.validUntil)}", style = MaterialTheme.typography.bodySmall)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    Button(onClick = { pendingFile = makeZip(result); fileSaver.launch("android-upload-key-package.zip") }, modifier = Modifier.weight(1f)) { Text("Save ZIP") }
+                    Button(onClick = { pendingFile = GoogleSigningKeyGenerator.createHandoutZip(result); fileSaver.launch("android-signing-full-handout.zip") }, modifier = Modifier.weight(1f)) { Text("Save ZIP") }
                     OutlinedButton(onClick = { pendingFile = result.keystore; fileSaver.launch("upload-keystore.jks") }, modifier = Modifier.weight(1f)) { Text("Save JKS") }
                 }
                 OutlinedButton(onClick = { pendingFile = result.certificatePem.toByteArray(Charsets.US_ASCII); fileSaver.launch("upload_certificate.pem") }, modifier = Modifier.fillMaxWidth()) { Text("Save public certificate") }
