@@ -1,7 +1,7 @@
 import type { ToolMeta } from "@/types/tool";
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { isOfflineLocalTool } from "@/lib/offline/capabilities";
-import { prepareOfflineToolPackage, completeOfflineToolPackage, type ToolPackageInstallStatus } from "@/lib/offline/tool-package-client";
+import { prepareOfflineToolPackage, completeOfflineToolPackage, endOfflineToolPackage, type ToolPackageInstallStatus } from "@/lib/offline/tool-package-client";
 import { OfflineToolUnavailable } from "@/components/tools/offline-tool-unavailable";
 const CalculatorEngine = lazy(() => import("@/components/engines/calculator-engine").then((m) => ({ default: m.CalculatorEngine })));
 const ConverterEngine = lazy(() => import("@/components/engines/converter-engine").then((m) => ({ default: m.ConverterEngine })));
@@ -198,7 +198,14 @@ function LegacyDeveloperStudioLink({ tool }: { tool: ToolMeta }) {
 function OfflinePackageReadySignal({ toolId, onReady }: { toolId: string; onReady: (ready: boolean) => void }) {
   useEffect(() => {
     let mounted = true;
-    void completeOfflineToolPackage(toolId).then((ready) => { if (mounted) onReady(ready); });
+    void (async () => {
+      if (toolId === "a-book") {
+        const pdfWorker = await import("@/lib/a-book/pdf-worker-client");
+        await pdfWorker.warmABookPdfWorker();
+      }
+      const ready = await completeOfflineToolPackage(toolId);
+      if (mounted) onReady(ready);
+    })().catch(() => { if (mounted) onReady(false); });
     return () => { mounted = false; };
   }, [toolId, onReady]);
   return null;
@@ -227,6 +234,7 @@ export function ToolEngine(props: ToolEngineProps) {
 
   useEffect(() => {
     let active = true;
+    let packageSessionStarted = false;
     setPackageState("checking");
     setMayRenderEngine(false);
     void prepareOfflineToolPackage({
@@ -234,7 +242,11 @@ export function ToolEngine(props: ToolEngineProps) {
       pathname: window.location.pathname,
       offlineEligible,
     }).then((result) => {
-      if (!active) return;
+      packageSessionStarted = result.status === "preparing" || result.status === "ready";
+      if (!active) {
+        if (packageSessionStarted) void endOfflineToolPackage();
+        return;
+      }
       setPackageState(result.status);
       setMayRenderEngine(result.open);
     }).catch(() => {
@@ -242,7 +254,10 @@ export function ToolEngine(props: ToolEngineProps) {
       setPackageState(navigator.onLine ? "unsupported" : "not-installed");
       setMayRenderEngine(navigator.onLine);
     });
-    return () => { active = false; };
+    return () => {
+      active = false;
+      if (packageSessionStarted) void endOfflineToolPackage();
+    };
   }, [tool.id, offlineEligible]);
 
   const handlePackageReady = useCallback((ready: boolean) => {
