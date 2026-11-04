@@ -49,7 +49,23 @@ async function activeWorker(): Promise<ServiceWorker | null> {
       new Promise<void>((resolve) => window.setTimeout(resolve, 5_000)),
     ]);
   }
-  return navigator.serviceWorker.controller ?? registration.active ?? null;
+  const controller = navigator.serviceWorker.controller;
+  if (controller) {
+    const assets = performance.getEntriesByType("resource")
+      .map((entry) => entry.name)
+      .filter((name) => {
+        try {
+          const url = new URL(name);
+          return url.origin === window.location.origin &&
+            /\\.(?:m?js|css|wasm|woff2?|ttf|otf|svg|png|jpe?g|webp|avif)$/i.test(url.pathname);
+        } catch { return false; }
+      })
+      .slice(0, 300);
+    if (assets.length) {
+      await sendWorkerMessage(controller, "CACHE_CORE_ASSETS", { assets }).catch(() => undefined);
+    }
+  }
+  return controller ?? null;
 }
 
 async function sendWorkerMessage<T extends WorkerReply>(
