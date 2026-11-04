@@ -23,9 +23,9 @@ export function classifyOfflineToolRecord(tool) {
     return {
       toolId: tool.id,
       execution: "device-local",
-      tokenPolicy: "offline-allowance-required",
+      tokenPolicy: "monetization-pending",
       mayRunWithoutNetwork: true,
-      reason: "This operation runs on the device. A valid enV token allowance is still required before it can execute offline.",
+      reason: "This operation runs on the device. Per-tool enV Token metering is pending the monetization rollout.",
       policyVersion: OFFLINE_CAPABILITY_POLICY_VERSION,
     };
   }
