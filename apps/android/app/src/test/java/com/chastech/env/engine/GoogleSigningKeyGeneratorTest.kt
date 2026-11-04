@@ -55,6 +55,25 @@ class GoogleSigningKeyGeneratorTest {
         assertTrue(result.gradleKotlin.contains("ANDROID_KEY_ALIAS"))
         assertTrue(result.signingInfo.contains("SHA-256:"))
         assertTrue(result.handoutReadme.contains("Settings > Secrets and variables > Actions"))
+        val zipFiles = mutableMapOf<String, ByteArray>()
+        ZipInputStream(ByteArrayInputStream(GoogleSigningKeyGenerator.createHandoutZip(result))).use { zip ->
+            var entry = zip.nextEntry
+            while (entry != null) {
+                zipFiles[entry.name] = zip.readBytes()
+                zip.closeEntry()
+                entry = zip.nextEntry
+            }
+        }
+        assertArrayEquals(result.keystore, zipFiles["upload-keystore.jks"])
+        assertEquals(result.keystoreBase64, zipFiles["upload-keystore.base64.txt"]?.toString(Charsets.US_ASCII)?.trim())
+        assertEquals(result.githubSecrets, zipFiles["github-secrets.txt"]?.toString(Charsets.UTF_8))
+        assertTrue(zipFiles.keys.contains("upload_certificate.pem"))
+        assertTrue(zipFiles.keys.contains("signing-info.txt"))
+        assertTrue(zipFiles.keys.contains("release-signing.gradle.kts"))
+        assertTrue(zipFiles.keys.contains(".github/workflows/android-release.yml"))
+        assertTrue(zipFiles.keys.contains("README.md"))
+        assertTrue(zipFiles[".gitignore-signing-example"]?.toString(Charsets.UTF_8)?.contains("\n") == true)
+        assertTrue(zipFiles[".gitignore-signing-example"]?.toString(Charsets.UTF_8)?.contains("\\n") == false)
         val entries = ZipInputStream(ByteArrayInputStream(GoogleSigningKeyGenerator.createHandoutZip(result))).use { zip ->
             val names = linkedSetOf<String>()
             var entry = zip.nextEntry
