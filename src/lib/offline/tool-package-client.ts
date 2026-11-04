@@ -162,23 +162,10 @@ export async function completeOfflineToolPackage(toolId: string): Promise<boolea
   }
 }
 
-/** Stop attributing new resource requests to the tool when its route is left. */
+/** Stop attributing later resource requests to the tool when its route is left. */
 export async function endOfflineToolPackage(): Promise<void> {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
   const worker = await activeWorker();
   if (!worker) return;
-  const clientId = await new Promise<string | null>((resolve) => {
-    const controller = navigator.serviceWorker.controller;
-    if (!controller) return resolve(null);
-    const channel = new MessageChannel();
-    const timer = window.setTimeout(() => { channel.port1.close(); resolve(null); }, 1_500);
-    channel.port1.onmessage = (event) => {
-      window.clearTimeout(timer);
-      channel.port1.close();
-      resolve(typeof event.data?.clientId === "string" ? event.data.clientId : null);
-    };
-    controller.postMessage({ type: "GET_CLIENT_ID" }, [channel.port2]);
-  });
-  if (!clientId) return;
-  await sendWorkerMessage(worker, "END_TOOL_PACKAGE", { clientId }).catch(() => undefined);
+  await sendWorkerMessage(worker, "END_TOOL_PACKAGE", {}).catch(() => undefined);
 }
