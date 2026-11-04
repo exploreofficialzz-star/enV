@@ -250,7 +250,7 @@ self.addEventListener("message", (event) => {
         for (const value of assets) {
           try {
             const url = new URL(value);
-            if (url.origin !== self.location.origin || !/\\.(?:m?js|css|wasm|woff2?|ttf|otf|svg|png|jpe?g|webp|avif)$/i.test(url.pathname)) continue;
+            if (url.origin !== self.location.origin || !/\.(?:m?js|css|wasm|woff2?|ttf|otf|svg|png|jpe?g|webp|avif)$/i.test(url.pathname)) continue;
             const request = new Request(url.href, { credentials: "same-origin" });
             const response = await fetch(request);
             if (response.ok) { await cache.put(request, response.clone()); cached += 1; }
