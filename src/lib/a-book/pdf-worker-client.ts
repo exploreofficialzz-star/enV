@@ -1,6 +1,6 @@
 import type { ABookPdfInfo } from "./pdf.ts";
 import type { ABookPdfInput } from "./pdf.ts";
-import type { ABookPdfWorkerResponse, ABookPdfWorkerTask } from "./pdf-worker-types.ts";
+import type { ABookPdfWorkerRequest, ABookPdfWorkerResponse, ABookPdfWorkerTask } from "./pdf-worker-types.ts";
 
 let requestSequence = 0;
 
