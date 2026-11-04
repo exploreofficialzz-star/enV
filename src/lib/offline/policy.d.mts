@@ -1,5 +1,5 @@
 export type OfflineExecutionClass = "device-local" | "online-required" | "not-verified" | "unavailable";
-export type OfflineTokenPolicy = "offline-allowance-required" | "server-verified-only";
+export type OfflineTokenPolicy = "monetization-pending" | "server-verified-only";
 export interface OfflineToolCapability {
   toolId: string;
   execution: OfflineExecutionClass;
