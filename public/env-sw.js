@@ -112,15 +112,21 @@ async function rememberAsset(session, request, cacheName) {
 
 async function handleAssetRequest(event) {
   const request = event.request;
-  const url = new URL(request.url);
   const session = await getSession(event.clientId);
-  const toolCacheName = session ? packageCacheName(session.toolId, session.version) : null;
-  const toolCache = toolCacheName ? await caches.open(toolCacheName) : null;
+  const toolCache = session ? await caches.open(packageCacheName(session.toolId, session.version)) : null;
   const coreCache = await caches.open(CORE_CACHE);
-
+  let response;
   try {
-    const response = await fetch(request);
-    if (response && response.ok) {
+    response = await fetch(request);
+  } catch (networkError) {
+    const cached = (toolCache && await toolCache.match(request)) || await coreCache.match(request);
+    if (cached) return cached;
+    throw networkError;
+  }
+
+  if (response && response.ok) {
+    // Storage quota/cache failures must never break an online tool operation.
+    try {
       if (session && toolCache) {
         await toolCache.put(request, response.clone());
         const db = await openPackageDb();
@@ -141,13 +147,11 @@ async function handleAssetRequest(event) {
       } else {
         await coreCache.put(request, response.clone());
       }
+    } catch {
+      // The requested asset was delivered; a quota failure only prevents offline readiness.
     }
-    return response;
-  } catch (error) {
-    const cached = (toolCache && await toolCache.match(request)) || await coreCache.match(request);
-    if (cached) return cached;
-    throw error;
   }
+  return response;
 }
 
 async function findReadyPackageForPath(pathname) {
@@ -173,19 +177,18 @@ async function shellResponse() {
     });
 }
 
+function offlineUnavailableResponse() {
+  return new Response("<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>Tool not available offline · enV</title><main style=\"font-family:system-ui,sans-serif;max-width:38rem;margin:12vh auto;padding:1.5rem\"><h1>Tool not available offline</h1><p>This tool has not been prepared on this device. Connect to the internet and visit it once; enV will automatically install its offline package.</p><p><a href=\"/\">Return to enV</a></p></main></html>", {
+    headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
+    status: 503,
+  });
+}
+
 async function handleNavigation(request) {
   const url = new URL(request.url);
+  let response;
   try {
-    const response = await fetch(request);
-    if (response && response.ok && (url.pathname === "/" || url.pathname.startsWith("/tools/"))) {
-      const cache = await caches.open(NAVIGATION_CACHE);
-      await cache.put(request, response.clone());
-      if (url.pathname === "/") {
-        const shell = await caches.open(CORE_CACHE);
-        await shell.put(new URL("/", self.location.origin).href, response.clone());
-      }
-    }
-    return response;
+    response = await fetch(request);
   } catch {
     if (url.pathname.startsWith("/tools/")) {
       const installed = await findReadyPackageForPath(url.pathname);
@@ -194,9 +197,25 @@ async function handleNavigation(request) {
         const exact = await pages.match(request, { ignoreSearch: true });
         if (exact) return exact;
       }
+      return offlineUnavailableResponse();
     }
-    return await shellResponse();
+    if (url.pathname === "/") return await shellResponse();
+    return offlineUnavailableResponse();
   }
+
+  if (response && response.ok && (url.pathname === "/" || url.pathname.startsWith("/tools/"))) {
+    try {
+      const cache = await caches.open(NAVIGATION_CACHE);
+      await cache.put(request, response.clone());
+      if (url.pathname === "/") {
+        const shell = await caches.open(CORE_CACHE);
+        await shell.put(new URL("/", self.location.origin).href, response.clone());
+      }
+    } catch {
+      // Page delivery remains online even when browser storage is full.
+    }
+  }
+  return response;
 }
 
 self.addEventListener("install", (event) => {
@@ -224,6 +243,23 @@ self.addEventListener("message", (event) => {
   const reply = (value) => { if (port) port.postMessage(value); };
   event.waitUntil((async () => {
     try {
+      if (data.type === "CACHE_CURRENT_NAVIGATION") {
+        const url = new URL(data.url);
+        if (url.origin !== self.location.origin || !(url.pathname === "/" || url.pathname.startsWith("/tools/"))) {
+          return reply({ ok: false, message: "This navigation is not eligible for offline caching." });
+        }
+        const request = new Request(url.href, { credentials: "same-origin" });
+        const response = await fetch(request);
+        if (!response.ok) return reply({ ok: false, message: "The current page could not be saved for offline navigation." });
+        const pages = await caches.open(NAVIGATION_CACHE);
+        await pages.put(request, response.clone());
+        if (url.pathname === "/") {
+          const shell = await caches.open(CORE_CACHE);
+          await shell.put(new URL("/", self.location.origin).href, response.clone());
+        }
+        return reply({ ok: true, cached: true });
+      }
+
       if (data.type === "CACHE_CORE_ASSETS") {
         const cache = await caches.open(CORE_CACHE);
         const assets = Array.isArray(data.assets) ? data.assets.slice(0, 300) : [];
