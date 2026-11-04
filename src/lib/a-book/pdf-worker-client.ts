@@ -83,6 +83,7 @@ function runInWorker(task: ABookPdfWorkerTask, signal?: AbortSignal): Promise<un
         : "The selected PDFs could not be passed to the local worker."));
     }
   });
+  return workerUrl.href;
 }
 
 function outputBytes(value: unknown): Uint8Array {
@@ -122,12 +123,13 @@ export async function mergePdfsInWorker(files: Blob[], signal?: AbortSignal): Pr
 
 /** Start and stop the real A book module worker once so its complete worker-side
  * dependency graph is fetched into the current tool's Service Worker package session. */
-export async function warmABookPdfWorker(): Promise<void> {
+export async function warmABookPdfWorker(): Promise<string> {
   if (typeof window === "undefined" || typeof Worker === "undefined") {
     throw new Error("A book offline preparation requires module Web Worker support.");
   }
+  const workerUrl = new URL("./pdf.worker.ts", import.meta.url);
   await new Promise<void>((resolve, reject) => {
-    const worker = new Worker(new URL("./pdf.worker.ts", import.meta.url), {
+    const worker = new Worker(workerUrl, {
       type: "module",
       name: "enV-a-book-offline-package-check",
     });
