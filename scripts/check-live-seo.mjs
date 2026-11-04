@@ -180,7 +180,7 @@ async function waitForHomepageDeployment() {
   // Wait for a page-level build marker before evaluating production metadata,
   // otherwise a fast smoke can accidentally inspect the previous deployment.
   let last = { status: 0, title: "", url: ORIGIN + "/" };
-  for (let attempt = 1; attempt <= 12; attempt += 1) {
+  for (let attempt = 1; attempt <= 36; attempt += 1) {
     try {
       const response = await fetch(ORIGIN + "/", {
         redirect: "follow",
@@ -200,7 +200,7 @@ async function waitForHomepageDeployment() {
     } catch (error) {
       last = { status: 0, title: "", url: ORIGIN + "/", error: String(error) };
     }
-    if (attempt < 12) await new Promise((resolve) => setTimeout(resolve, 5_000));
+    if (attempt < 36) await new Promise((resolve) => setTimeout(resolve, 5_000));
   }
   failures.push(
     "production did not serve the current homepage build within 180 seconds (expected title="
