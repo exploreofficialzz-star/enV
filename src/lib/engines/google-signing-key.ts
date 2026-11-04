@@ -190,7 +190,7 @@ function createGitHubActionsWorkflow(): string {
     "        uses: actions/setup-java@v4",
     "        with:",
     "          distribution: temurin",
-    "          java-version: \"17\"",
+    "          java-version: \"21\"",
     "      - name: Set up Gradle",
     "        uses: gradle/actions/setup-gradle@v4",
     "      - name: Restore upload keystore",
