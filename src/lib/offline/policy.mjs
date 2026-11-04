@@ -4,8 +4,8 @@ export const OFFLINE_CAPABILITY_POLICY_VERSION = "2026-11-04.v3";
 
 /**
  * Package eligibility describes where an operation can execute, not whether the
- * operation is free. Every local tool remains subject to enV token authorization.
- * Server operations inside hybrid engines are excluded by operation ID.
+ * operation is free. Local execution is available ahead of monetization; billing
+ * enforcement is a separate rollout. Server operations inside hybrid engines are excluded by operation ID.
  */
 export function classifyOfflineToolRecord(tool) {
   if (!tool || tool.status === "planned") {
