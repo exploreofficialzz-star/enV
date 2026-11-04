@@ -77,6 +77,7 @@ assert.ok(engine.includes('aria-label="Add elements"') && engine.includes("openT
 assert.ok(engine.includes('className="uxui-home-projects"') && engine.includes('className="uxui-draft-list"'), "The project home uses a bounded drafts region");
 assert.ok(engine.includes("setAvailableHomeHeight") && engine.includes("--uxui-home-height"), "Project home measures the visible viewport rather than growing with the draft count");
 assert.ok(engine.includes("setHomeScrolled(event.currentTarget.scrollTop > 12)") && engine.includes("is-compact"), "Scrolling drafts animates the Add project card into its compact state");
+assert.ok(/function returnToProjects\(\)\s*\{\s*setHomeScrolled\(false\)/.test(engine), "Returning to projects restores the full-size Add project card");
 assert.ok(!engine.includes("Your blank canvas is ready.") && !engine.includes("Tap + to add your first element"), "Starting a blank project does not show a throwaway canvas announcement");
 assert.ok(!engine.includes("setShowAdvancedContext"), "Removed visual dock has no stale state setter references");
 assert.ok(!engine.includes("Local-first editor · Exact pixel dimensions"), "Redundant Studio footer removed");
