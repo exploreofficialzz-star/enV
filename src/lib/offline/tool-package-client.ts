@@ -65,6 +65,7 @@ async function activeWorker(captureCurrentPage = false, captureShellAssets = fal
     if (assets.length) {
       await sendWorkerMessage(controller, "CACHE_CORE_ASSETS", { assets }).catch(() => undefined);
     }
+    performance.clearResourceTimings();
   }
   if (controller && captureCurrentPage && navigator.onLine) {
     await sendWorkerMessage(controller, "CACHE_CURRENT_NAVIGATION", { url: window.location.href }).catch(() => undefined);
@@ -116,7 +117,7 @@ export async function prepareOfflineToolPackage(input: {
       : { open: false, status: "not-installed", message: "This browser cannot load this tool's saved offline package." };
   }
 
-  const worker = await activeWorker(true, true);
+  const worker = await activeWorker(true, false);
   if (!worker) {
     return online
       ? { open: true, status: "unsupported" }
@@ -170,8 +171,10 @@ export async function completeOfflineToolPackage(toolId: string, additionalAsset
       version: buildVersion(),
       assets: requiredAssets,
     }, 90_000);
+    performance.clearResourceTimings();
     return result.ready === true;
   } catch {
+    performance.clearResourceTimings();
     return false;
   }
 }
