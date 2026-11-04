@@ -35,9 +35,8 @@ function integer(value: bigint): Uint8Array {
 }
 function integerBytes(value: Uint8Array): Uint8Array {
   let first = 0; while (first < value.length - 1 && value[first] === 0) first++;
-  let body = value.slice(first);
-  if (body[0] & 0x80) body = concat(Uint8Array.of(0), body);
-  return tlv(0x02, body);
+  const body = value.slice(first);
+  return tlv(0x02, body[0] & 0x80 ? concat(Uint8Array.of(0), body) : body);
 }
 function base128(value: number): number[] {
   const out = [value & 0x7f];
@@ -88,8 +87,13 @@ function name(fields: Array<[string, string]>): Uint8Array {
   const mapping: Record<string, string> = { CN: "2.5.4.3", OU: "2.5.4.11", O: "2.5.4.10", L: "2.5.4.7", ST: "2.5.4.8", C: "2.5.4.6" };
   return sequence(...fields.filter(([, value]) => value).map(([key, value]) => setOf(sequence(oid(mapping[key]), key === "C" ? tlv(0x13, encoder.encode(value)) : utf8(value)))));
 }
-async function digest(algorithm: "SHA-1" | "SHA-256", data: Uint8Array): Promise<Uint8Array> {
-  return new Uint8Array(await crypto.subtle.digest(algorithm, data));
+function webCryptoBuffer(data: Uint8Array): ArrayBuffer {
+  const owned = new Uint8Array(data.byteLength);
+  owned.set(data);
+  return owned.buffer;
+}
+async function digest(algorithm: "SHA-1" | "SHA-256", data: Uint8Array): Promise<Uint8Array<ArrayBuffer>> {
+  return new Uint8Array(await crypto.subtle.digest(algorithm, webCryptoBuffer(data)));
 }
 function pem(label: string, bytes: Uint8Array): string {
   let binary = ""; for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -123,7 +127,7 @@ function writeKeyEntry(alias: string, protectedKey: Uint8Array, certificate: Uin
 async function protectPrivateKey(pkcs8: Uint8Array, password: string): Promise<Uint8Array> {
   const passwordBytes = utf16be(password);
   const salt = crypto.getRandomValues(new Uint8Array(20));
-  let previous = salt;
+  let previous: Uint8Array<ArrayBuffer> = new Uint8Array(salt);
   const encrypted = new Uint8Array(pkcs8.length);
   for (let offset = 0; offset < pkcs8.length; offset += 20) {
     previous = await digest("SHA-1", concat(passwordBytes, previous));
@@ -147,7 +151,7 @@ async function makeCertificate(privateKey: CryptoKey, publicSpki: Uint8Array, dn
     tlv(0xa0, integer(2n)), integerBytes(serial), algId("1.2.840.113549.1.1.11"), name(dn),
     sequence(certificateTime(notBefore), certificateTime(notAfter)), name(dn), publicSpki, extensions,
   );
-  const signature = new Uint8Array(await crypto.subtle.sign("RSASSA-PKCS1-v1_5", privateKey, tbs));
+  const signature = new Uint8Array(await crypto.subtle.sign("RSASSA-PKCS1-v1_5", privateKey, webCryptoBuffer(tbs)));
   return sequence(tbs, algId("1.2.840.113549.1.1.11"), bitString(signature));
 }
 export type GoogleSigningKeyInput = {

@@ -180,7 +180,7 @@ export function GoogleSigningKeyGenerator() {
           <div className="grid grid-cols-2 gap-2">
             <Button type="button" onClick={() => zipBytes && downloadFile("android-upload-key-package.zip", zipBytes, "application/zip")} className="min-h-10"><Archive className="mr-2 size-4" />ZIP</Button>
             <Button type="button" variant="outline" onClick={() => void shareZip()} className="min-h-10"><Share2 className="mr-2 size-4" />More apps</Button>
-            <Button type="button" variant="outline" onClick={() => downloadFile("upload-keystore.jks", artifacts.keystore, "application/octet-stream")} className="min-h-10"><Download className="mr-2 size-4" />JKS</Button>
+            <Button type="button" variant="outline" onClick={() => downloadFile("upload-keystore.jks", new Uint8Array(artifacts.keystore).buffer, "application/octet-stream")} className="min-h-10"><Download className="mr-2 size-4" />JKS</Button>
             <Button type="button" variant="outline" onClick={() => downloadFile("upload_certificate.pem", artifacts.certificatePem, "application/x-pem-file")} className="min-h-10"><Download className="mr-2 size-4" />PEM</Button>
           </div>
           <p className="text-xs text-muted">Your device shows available storage apps with their official icons.</p>
