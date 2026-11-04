@@ -1,8 +1,7 @@
 import type { ToolMeta } from "@/types/tool";
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { isOfflineLocalTool } from "@/lib/offline/capabilities";
-import { prepareOfflineToolPackage, completeOfflineToolPackage, endOfflineToolPackage, type ToolPackageInstallStatus } from "@/lib/offline/tool-package-client";
-import { OfflineToolUnavailable } from "@/components/tools/offline-tool-unavailable";
+import { prepareOfflineToolPackage, completeOfflineToolPackage, endOfflineToolPackage } from "@/lib/offline/tool-package-client";
 const CalculatorEngine = lazy(() => import("@/components/engines/calculator-engine").then((m) => ({ default: m.CalculatorEngine })));
 const ConverterEngine = lazy(() => import("@/components/engines/converter-engine").then((m) => ({ default: m.ConverterEngine })));
 const ColorEngine = lazy(() => import("@/components/engines/color-engine").then((m) => ({ default: m.ColorEngine })));
@@ -195,49 +194,42 @@ function LegacyDeveloperStudioLink({ tool }: { tool: ToolMeta }) {
   </div>;
 }
 
-function OfflinePackageReadySignal({ toolId, onReady }: { toolId: string; onReady: (ready: boolean) => void }) {
+function OfflinePackageReadySignal({ toolId }: { toolId: string }) {
   useEffect(() => {
-    let mounted = true;
     void (async () => {
       const additionalAssets: string[] = [];
       if (toolId === "a-book") {
         const pdfWorker = await import("@/lib/a-book/pdf-worker-client");
         additionalAssets.push(await pdfWorker.warmABookPdfWorker());
       }
-      const ready = await completeOfflineToolPackage(toolId, additionalAssets);
-      if (mounted) onReady(ready);
-    })().catch(() => { if (mounted) onReady(false); });
-    return () => { mounted = false; };
-  }, [toolId, onReady]);
+      await completeOfflineToolPackage(toolId, additionalAssets);
+    })().catch(() => undefined);
+  }, [toolId]);
   return null;
 }
 
-function ToolEngineContent(props: ToolEngineProps & {
-  completePackage: boolean;
-  onPackageReady: (ready: boolean) => void;
-}) {
+function ToolEngineContent(props: ToolEngineProps & { completePackage: boolean }) {
   return (
-    <Suspense fallback={<div className="rounded-lg bg-surface-2 px-4 py-6 text-sm text-muted" role="status">Loading {props.tool.name}…</div>}>
+    <Suspense fallback={null}>
       <ToolEngineView {...props} />
-      {props.completePackage ? <OfflinePackageReadySignal toolId={props.tool.id} onReady={props.onPackageReady} /> : null}
+      {props.completePackage ? <OfflinePackageReadySignal toolId={props.tool.id} /> : null}
     </Suspense>
   );
 }
 
-type PackageUiState = "checking" | ToolPackageInstallStatus;
-
 export function ToolEngine(props: ToolEngineProps) {
   const { tool } = props;
-  const [packageState, setPackageState] = useState<PackageUiState>("checking");
-  const [mayRenderEngine, setMayRenderEngine] = useState(false);
+  const [completePackage, setCompletePackage] = useState(false);
   const offlineEligible = isOfflineLocalTool(tool.id);
   const needsStudioLink = tool.category === "developer" && tool.engine.type !== "developer" && !tool.tags.includes("developer-studio");
 
   useEffect(() => {
     let active = true;
     let packageSessionStarted = false;
-    setPackageState("checking");
-    setMayRenderEngine(false);
+    setCompletePackage(false);
+    if (!offlineEligible) return () => { active = false; };
+
+    // Offline caching runs in the background and never gates tool access.
     void prepareOfflineToolPackage({
       toolId: tool.id,
       pathname: window.location.pathname,
@@ -248,42 +240,17 @@ export function ToolEngine(props: ToolEngineProps) {
         if (packageSessionStarted) void endOfflineToolPackage();
         return;
       }
-      setPackageState(result.status);
-      setMayRenderEngine(result.open);
-    }).catch(() => {
-      if (!active) return;
-      setPackageState(navigator.onLine ? "unsupported" : "not-installed");
-      setMayRenderEngine(navigator.onLine);
-    });
+      setCompletePackage(result.status === "preparing");
+    }).catch(() => undefined);
+
     return () => {
       active = false;
       if (packageSessionStarted) void endOfflineToolPackage();
     };
   }, [tool.id, offlineEligible]);
 
-  const handlePackageReady = useCallback((ready: boolean) => {
-    if (ready) setPackageState("ready");
-    else setPackageState((current) => current === "preparing" ? "failed" : current);
-  }, []);
-
-  if (!mayRenderEngine) {
-    if (packageState === "checking") {
-      return <div className="rounded-lg bg-surface-2 px-4 py-6 text-sm text-muted" role="status">Preparing {tool.name}…</div>;
-    }
-    return <OfflineToolUnavailable toolName={tool.name} message={packageState === "not-installed"
-      ? "This tool has not been prepared on this device yet. Open it once while online; enV will automatically download and install its offline package."
-      : "This tool depends on an online service or does not have a complete, verified offline package."} />;
-  }
-
-  const engine = <ToolEngineContent {...props} completePackage={packageState === "preparing"} onPackageReady={handlePackageReady} />;
-  return (
-    <div className="space-y-2">
-      {packageState === "preparing" ? <p className="text-xs text-muted" role="status">Preparing this tool for offline use automatically…</p> : null}
-      {packageState === "ready" ? <p className="text-xs text-muted" role="status">Offline package ready on this device.</p> : null}
-      {packageState === "failed" ? <p className="text-xs text-muted" role="status">This tool is available online. Its offline package could not be completed and will be retried on your next visit.</p> : null}
-      {needsStudioLink
-        ? <div className="space-y-4"><LegacyDeveloperStudioLink tool={tool} />{engine}</div>
-        : engine}
-    </div>
-  );
+  const engine = <ToolEngineContent {...props} completePackage={completePackage} />;
+  return needsStudioLink
+    ? <div className="space-y-4"><LegacyDeveloperStudioLink tool={tool} />{engine}</div>
+    : engine;
 }
