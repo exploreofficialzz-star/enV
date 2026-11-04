@@ -88,7 +88,7 @@ try {
     mimeType: "application/zip",
     buffer: singleZip,
   });
-  await page.getByText("single-test.zip", { exact: true }).waitFor();
+  await page.getByText("single-test.zip", { exact: true }).first().waitFor();
   const extractedDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Extract files" }).click();
   const extractedDownload = await extractedDownloadPromise;
