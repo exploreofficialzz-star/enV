@@ -10,8 +10,9 @@ import type { OfflineToolCapability } from "./policy.mjs";
 export { OFFLINE_CAPABILITY_POLICY_VERSION };
 export type { OfflineToolCapability };
 
+// The execution policy also needs category to classify audited local custom engines.
 export function classifyOfflineTool(tool: Pick<ToolMeta,
-  "id" | "clientSide" | "requiresBackend" | "requiresAuth" | "status" | "engine"
+  "id" | "category" | "clientSide" | "requiresBackend" | "requiresAuth" | "status" | "engine"
 >): OfflineToolCapability {
   return classifyOfflineToolRecord(tool);
 }
