@@ -52,6 +52,7 @@ try {
   const response = await page.goto(baseUrl + "/tools/productivity/zip-any-file", { waitUntil: "networkidle" });
   assert.equal(response?.status(), 200, "Zip any file route returns HTTP 200");
   await page.getByRole("heading", { name: "Zip any file" }).first().waitFor();
+  await page.waitForFunction(() => document.documentElement.dataset.envToolHydrated === "zip-any-file");
   await page.getByRole("tab", { name: "Compress" }).waitFor();
   await page.getByText("Private and on-device", { exact: true }).waitFor();
   localWriteRequests.length = 0;
