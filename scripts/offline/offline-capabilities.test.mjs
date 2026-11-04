@@ -19,7 +19,7 @@ test("allows only audited deterministic client-side engines", () => {
     const result = classifyOfflineToolRecord(tool({ engine: { type, config: {} } }));
     assert.equal(result.execution, "device-local", type);
     assert.equal(result.mayRunWithoutNetwork, true, type);
-    assert.equal(result.tokenPolicy, "no-offline-spend", type);
+    assert.equal(result.tokenPolicy, "offline-allowance-required", type);
   }
 });
 test("requires the network for server, auth, backend and remote engine dependencies", () => {
@@ -45,7 +45,7 @@ test("keeps planned tools unavailable", () => {
   const result = classifyOfflineToolRecord(tool({ status: "planned" }));
   assert.equal(result.execution, "unavailable");
 });
-test("offline token spend remains hard-disabled", () => {
+test("local offline execution is token-metered and spend remains disabled without a verified allowance", () => {
   assert.equal(canSpendTokensOffline(), false);
   assert.equal(OFFLINE_CAPABILITY_POLICY_VERSION, "2026-10-30.v1");
 });
