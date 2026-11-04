@@ -15,6 +15,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 /** Creates a developer-held Android upload key entirely in memory. No key material is sent over a network. */
 object GoogleSigningKeyGenerator {
@@ -217,6 +219,28 @@ object GoogleSigningKeyGenerator {
             storePassword.fill('\u0000')
             keyPassword.fill('\u0000')
         }
+    }
+
+    fun createHandoutZip(artifacts: Artifacts): ByteArray {
+        val output = ByteArrayOutputStream()
+        ZipOutputStream(output).use { zip ->
+            fun add(name: String, value: ByteArray) {
+                zip.putNextEntry(ZipEntry(name))
+                zip.write(value)
+                zip.closeEntry()
+            }
+            add("upload-keystore.jks", artifacts.keystore)
+            add("upload-keystore.base64.txt", (artifacts.keystoreBase64 + "\n").toByteArray(Charsets.US_ASCII))
+            add("upload_certificate.pem", artifacts.certificatePem.toByteArray(Charsets.US_ASCII))
+            add("github-secrets.txt", artifacts.githubSecrets.toByteArray(Charsets.UTF_8))
+            add("signing-info.txt", artifacts.signingInfo.toByteArray(Charsets.UTF_8))
+            add("release-signing.gradle.kts", artifacts.gradleKotlin.toByteArray(Charsets.UTF_8))
+            add("release-signing.gradle", artifacts.gradleGroovy.toByteArray(Charsets.UTF_8))
+            add(".github/workflows/android-release.yml", artifacts.githubActionsWorkflow.toByteArray(Charsets.UTF_8))
+            add(".gitignore-signing-example", ".android-signing/\\n/upload-keystore.jks\\n/*.jks\\n/*.keystore\\n".toByteArray(Charsets.UTF_8))
+            add("README.md", artifacts.handoutReadme.toByteArray(Charsets.UTF_8))
+        }
+        return output.toByteArray()
     }
 
     private fun createCertificate(
