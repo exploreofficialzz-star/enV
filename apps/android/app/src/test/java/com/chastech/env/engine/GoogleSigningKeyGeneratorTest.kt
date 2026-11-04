@@ -4,6 +4,7 @@ import java.io.ByteArrayInputStream
 import java.security.KeyStore
 import java.security.Signature
 import java.security.cert.X509Certificate
+import java.util.zip.ZipInputStream
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -54,6 +55,23 @@ class GoogleSigningKeyGeneratorTest {
         assertTrue(result.gradleKotlin.contains("ANDROID_KEY_ALIAS"))
         assertTrue(result.signingInfo.contains("SHA-256:"))
         assertTrue(result.handoutReadme.contains("Settings > Secrets and variables > Actions"))
+        val entries = ZipInputStream(ByteArrayInputStream(GoogleSigningKeyGenerator.createHandoutZip(result))).use { zip ->
+            val names = linkedSetOf<String>()
+            var entry = zip.nextEntry
+            while (entry != null) {
+                names += entry.name
+                entry = zip.nextEntry
+            }
+            names
+        }
+        assertTrue(entries.contains("upload-keystore.jks"))
+        assertTrue(entries.contains("upload-keystore.base64.txt"))
+        assertTrue(entries.contains("upload_certificate.pem"))
+        assertTrue(entries.contains("github-secrets.txt"))
+        assertTrue(entries.contains("signing-info.txt"))
+        assertTrue(entries.contains(".github/workflows/android-release.yml"))
+        assertTrue(entries.contains("release-signing.gradle.kts"))
+        assertTrue(entries.contains("README.md"))
     }
 
     @Test fun rejectsWeakPasswordsAndUnsafeKeySettings() {
