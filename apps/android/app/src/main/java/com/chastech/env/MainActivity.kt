@@ -1147,7 +1147,7 @@ private fun ToolDetail(
                 }
                 if (compact && !isFullscreen) {
                     Text(
-                        tool.description,
+                        tool.offlineDescription(),
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 20.sp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.fillMaxWidth().padding(start = if (compact) 56.dp else 0.dp),
