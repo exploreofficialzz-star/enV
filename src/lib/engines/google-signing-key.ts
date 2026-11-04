@@ -267,6 +267,22 @@ export type GoogleSigningKeyArtifacts = {
   sha1: string; sha256: string; alias: string; validFrom: string; validUntil: string;
   gradleGroovy: string; gradleKotlin: string;
 };
+
+export function createGoogleSigningKeyHandoutFiles(artifacts: GoogleSigningKeyArtifacts): Record<string, Uint8Array> {
+  const textFile = (value: string) => encoder.encode(value);
+  return {
+    "upload-keystore.jks": artifacts.keystore,
+    "upload-keystore.base64.txt": textFile(artifacts.keystoreBase64 + "\n"),
+    "upload_certificate.pem": textFile(artifacts.certificatePem),
+    "github-secrets.txt": textFile(artifacts.githubSecrets),
+    "signing-info.txt": textFile(artifacts.signingInfo),
+    "release-signing.gradle.kts": textFile(artifacts.gradleKotlin),
+    "release-signing.gradle": textFile(artifacts.gradleGroovy),
+    ".github/workflows/android-release.yml": textFile(artifacts.githubActionsWorkflow),
+    ".gitignore-signing-example": textFile(".android-signing/\n/upload-keystore.jks\n/*.jks\n/*.keystore\n"),
+    "README.md": textFile(artifacts.handoutReadme),
+  };
+}
 export async function generateGoogleSigningKey(input: GoogleSigningKeyInput): Promise<GoogleSigningKeyArtifacts> {
   if (!globalThis.crypto?.subtle) throw new Error("Secure cryptography is not available. Open enV in a supported HTTPS browser or the native app.");
   if (!/^[A-Za-z0-9._-]{1,64}$/.test(input.alias)) throw new Error("Alias must be 1–64 characters using letters, numbers, dots, underscores, or hyphens.");
