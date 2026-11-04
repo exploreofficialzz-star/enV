@@ -315,7 +315,7 @@ export async function generateGoogleSigningKey(input: GoogleSigningKeyInput): Pr
     `ANDROID_KEYSTORE_PASSWORD=${input.storePassword}`,
     `ANDROID_KEY_ALIAS=${input.alias}`,
     `ANDROID_KEY_PASSWORD=${input.keyPassword}`,
-  ].join("\\n") + "\\n";
+  ].join("\n") + "\n";
   const signingInfo = [
     "Android upload-key certificate",
     `Alias: ${input.alias}`,
@@ -324,7 +324,7 @@ export async function generateGoogleSigningKey(input: GoogleSigningKeyInput): Pr
     `Valid until: ${until.toISOString()}`,
     `SHA-1: ${sha1}`,
     `SHA-256: ${sha256}`,
-  ].join("\\n") + "\\n";
+  ].join("\n") + "\n";
   const githubActionsWorkflow = createGitHubActionsWorkflow();
   const handoutReadme = createHandoutReadme(input.alias, sha1, sha256, until.toISOString());
   return {keystore, keystoreBase64, githubSecrets, githubActionsWorkflow, handoutReadme, signingInfo,
