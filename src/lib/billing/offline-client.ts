@@ -141,12 +141,14 @@ export async function runOfflineMeteredOperationIfSelected<T>(input: { toolId: s
   const offline = typeof navigator !== "undefined" && !navigator.onLine;
   const profile = offlineEligibleById.get(input.toolId);
   if (!profile || !profile.billingKey.startsWith("local.") || !profile.platforms.includes("web")) {
-    if (offline) throw new OfflineClientError("OFFLINE_TOOL_NOT_ELIGIBLE", "This operation has no approved local Web billing profile. It did not run.");
+    // Monetization is deliberately being wired after the offline feature rollout.
+    // A missing billing profile must not block a verified device-local tool action.
     return await operation();
   }
   const selectedAllowanceId = getSelectedWebOfflineAllowanceId();
   if (!selectedAllowanceId) {
-    if (offline) throw new OfflineClientError("OFFLINE_ALLOWANCE_NOT_SELECTED", "Select a reserved enV token allowance before running local tools offline. This operation did not run.");
+    // The pre-monetization offline release makes local execution available first.
+    // No token is deducted here; per-tool metering is integrated in the monetization phase.
     return await operation();
   }
   const db = await openDb();
