@@ -36,7 +36,7 @@ const isAudioLike = (tool) => tool.category === "audio" || tool.engine?.type ===
 const isVideoLike = (tool) => tool.category === "video" || tool.engine?.type === "video";
 
 function profile(tool) {
-  const local = tool.clientSide && !tool.requiresBackend;
+  const local = isOfflineLocalToolRecord(tool);
   let billingKey;
   let classificationReason;
   let meteringDimensions = ["operation-count"];
@@ -103,7 +103,9 @@ function profile(tool) {
       meteringDimensions = ["operation-count", "input-size-if-relevant", "duration-if-relevant"];
     } else {
       billingKey = "local.general";
-      classificationReason = "Local execution metadata; general local utility fallback pending individual review.";
+      classificationReason = OFFLINE_LOCAL_DOCUMENT_TOOL_IDS.has(tool.id)
+        ? "Explicitly implemented local document operation in DocumentToolsEngine; the legacy tool-level backend flag is retained for hybrid routing."
+        : "Local execution metadata; general local utility fallback pending individual review.";
     }
   }
 
