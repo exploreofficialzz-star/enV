@@ -24,7 +24,7 @@ import { parseUxUiStudioChartData } from "@/lib/engines/ux-ui-studio-chart";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import {
-  ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, CircleHelp, Copy, Download, FileJson, FileOutput, ImagePlus, Maximize2, Minimize2, Redo2, Undo2,
+  ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, CircleHelp, Copy, Download, FileJson, FileOutput, ImagePlus, LogOut, Maximize2, Minimize2, Redo2, Undo2,
   Grid2X2, Layers, LayoutTemplate, Monitor, Palette, Plus, Search, Shapes, Smartphone, Tablet, Type,
   Trash2, X, ZoomIn, ZoomOut, RotateCw,
 } from "lucide-react";
@@ -1125,10 +1125,13 @@ export function UxUiStudioEngine() {
   const [iconError, setIconError] = useState("");
   const [showGrid, setShowGrid] = useState(false);
   const [zoom, setZoom] = useState(100);
+  const [homeScrolled, setHomeScrolled] = useState(false);
+  const [availableHomeHeight, setAvailableHomeHeight] = useState(0);
   const [canvasStageSize, setCanvasStageSize] = useState({ width: 0, height: 0 });
   const [availableEditorHeight, setAvailableEditorHeight] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [notice, setNotice] = useState("");
+  const homeRootRef = useRef<HTMLElement | null>(null);
   const artboardRef = useRef<SVGSVGElement | null>(null);
   const toolkitContentRef = useRef<HTMLDivElement | null>(null);
   const canvasStageRef = useRef<HTMLDivElement | null>(null);
@@ -1158,6 +1161,31 @@ export function UxUiStudioEngine() {
     try { window.localStorage.setItem(DEVICE_TARGET_STORAGE_KEY, preferredTarget); }
     catch { /* The editor remains usable when preferences cannot be persisted. */ }
   }, [preferredTarget, devicePreferenceLoaded]);
+
+  useEffect(() => {
+    if (!onboarding) return;
+    const home = homeRootRef.current;
+    if (!home) return;
+    let frame = 0;
+    const measure = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+        const remaining = viewportHeight - home.getBoundingClientRect().top - 16;
+        setAvailableHomeHeight(Math.max(280, Math.min(960, Math.floor(remaining))));
+      });
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    window.visualViewport?.addEventListener("resize", measure);
+    window.visualViewport?.addEventListener("scroll", measure);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", measure);
+      window.visualViewport?.removeEventListener("resize", measure);
+      window.visualViewport?.removeEventListener("scroll", measure);
+    };
+  }, [onboarding]);
 
   useEffect(() => {
     if (!showToolsPanel) return;
@@ -1529,9 +1557,9 @@ export function UxUiStudioEngine() {
     replaceResponsiveDesign(created.elements, nextTarget, size); setResponsiveEditMode("shared"); setSelectedId(created.elements[0]?.id || "");
     setUndoStack([]); setRedoStack([]); setLeftTab("toolkits"); setToolkitSearch("");
     closeToolkit(); setShowExportPanel(false);
-    setZoom(100); setActiveDraftId(""); setSavedProject(null); setOnboarding(false);
+    setZoom(100); setHomeScrolled(false); setActiveDraftId(""); setSavedProject(null); setOnboarding(false);
     setPreferredTarget(nextTarget); setIsExpanded(true); setShowInspector(false); setPrototypePreview(false);
-    setNotice(created.elements.length ? "Design ready. Tap an element to edit it." : "Your blank canvas is ready. Tap + to add your first element.");
+    setNotice("");
   }
 
   function continueSaved(draft: SavedProject | null = savedProject) {
@@ -2495,12 +2523,21 @@ export function UxUiStudioEngine() {
     } catch (error) { setNotice(error instanceof Error ? error.message : "The Artboard could not be sent to the 3D Studio."); }
   }
 
+  const visibleDrafts = drafts.filter((draft) =>
+    ((draft.name + " " + (draft.description || "") + " " + (draft.category || "")).toLowerCase().includes(draftSearch.trim().toLowerCase()))
+    && (!draftFavoritesOnly || draft.isFavorite)
+  );
+
   if (onboarding) {
     return (
-      <section className="uxui-home mx-auto w-full max-w-5xl space-y-7 rounded-2xl border border-border bg-surface p-4 sm:p-8">
+      <section
+        ref={homeRootRef}
+        style={{ "--uxui-home-height": availableHomeHeight > 0 ? `${availableHomeHeight}px` : "calc(100dvh - 160px)" } as CSSProperties}
+        className="uxui-home mx-auto w-full max-w-7xl rounded-2xl border border-border bg-surface"
+      >
         <header className="uxui-home-heading text-center">
           <h2 className="text-2xl font-extrabold tracking-tight text-fg sm:text-3xl">UX/UI Studio</h2>
-          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted">Bring your idea to life. Start with a clean mockup, then add and style anything by tapping it.</p>
+          <p className="mx-auto max-w-xl text-sm leading-6 text-muted">Bring your idea to life. Start with a clean mockup, then add and style anything by tapping it.</p>
         </header>
         <div className="uxui-home-device-picker">
           <span className="uxui-home-device-picker-label">Start with</span>
@@ -2510,38 +2547,43 @@ export function UxUiStudioEngine() {
             <button type="button" aria-label="Start with Desktop" aria-pressed={preferredTarget === "desktop"} onClick={() => chooseStartingTarget("desktop")} className={preferredTarget === "desktop" ? "is-active" : ""}><Monitor size={17} /><span>Desktop</span></button>
           </div>
         </div>
-        <div className="uxui-home-create-wrap flex justify-center">
-          <button type="button" onClick={() => startDesign(preferredTarget)} aria-label="Add project" className="uxui-new-project-card group flex w-full max-w-sm flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-surface-2 px-6 py-8 text-center transition hover:border-accent hover:bg-accent/5 focus-visible:outline-2 focus-visible:outline-accent">
-            <span className="uxui-new-project-plus grid size-20 place-items-center rounded-full border-2 border-current transition group-hover:scale-105"><Plus size={38} strokeWidth={1.8} /></span>
-            <strong className="text-lg font-extrabold text-fg">Add project</strong>
-            <span className="text-sm text-muted">Start with a blank design</span>
-          </button>
-        </div>
-        <section className="uxui-drafts space-y-3" aria-labelledby="uxui-drafts-title">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div><h3 id="uxui-drafts-title" className="text-lg font-bold text-fg">Projects & drafts</h3><span className="text-xs text-muted">{drafts.length ? drafts.length + (drafts.length === 1 ? " project" : " projects") : "Projects are stored locally in this browser"}</span></div>
-            <div className="flex min-w-0 gap-2"><input type="search" aria-label="Search projects" placeholder="Search projects…" value={draftSearch} onChange={(event)=>setDraftSearch(event.target.value)} className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg"/><button type="button" onClick={()=>setDraftFavoritesOnly((value)=>!value)} aria-pressed={draftFavoritesOnly} className={"rounded-lg border px-3 py-2 text-xs font-semibold " + (draftFavoritesOnly ? "border-accent bg-accent/10 text-accent" : "border-border text-fg")}>{draftFavoritesOnly ? "★ Favorites" : "☆ Favorites"}</button></div>
+        <div className="uxui-home-projects">
+          <div className={"uxui-home-create-wrap" + (homeScrolled ? " is-compact" : "")}>
+            <button type="button" onClick={() => startDesign(preferredTarget)} aria-label="Add project" className="uxui-new-project-card group rounded-2xl border border-dashed border-border bg-surface-2 text-left transition hover:border-accent hover:bg-accent/5 focus-visible:outline-2 focus-visible:outline-accent">
+              <span className="uxui-new-project-plus grid place-items-center rounded-full border-2 border-current transition group-hover:scale-105"><Plus size={26} strokeWidth={1.8} /></span>
+              <span className="uxui-new-project-copy"><strong className="text-base font-extrabold text-fg">Add project</strong><span className="text-sm text-muted">Start with a blank design</span></span>
+            </button>
           </div>
-          {drafts.filter((draft)=>((draft.name+" "+(draft.description||"")+" "+(draft.category||"")).toLowerCase().includes(draftSearch.trim().toLowerCase()))&&(!draftFavoritesOnly||draft.isFavorite)).length ? <div className="grid gap-3 sm:grid-cols-2">
-            {drafts.filter((draft)=>((draft.name+" "+(draft.description||"")+" "+(draft.category||"")).toLowerCase().includes(draftSearch.trim().toLowerCase()))&&(!draftFavoritesOnly||draft.isFavorite)).map((draft, index) => <article key={draft.id || draft.name + index} className="uxui-draft-card min-w-0 rounded-xl border border-border p-3 transition hover:border-accent">
-              <button type="button" onClick={() => continueSaved(draft)} className="flex w-full min-w-0 items-center gap-3 text-left focus-visible:outline-2 focus-visible:outline-accent">
-                <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-surface-2 text-fg"><LayoutTemplate size={22} /></span>
-                <span className="min-w-0 flex-1"><strong className="block truncate text-sm text-fg">{draft.name || "Untitled design"}</strong><span className="mt-1 block text-xs text-muted">{draft.screens?.length || 1} {((draft.screens?.length || 1)===1?"screen":"screens")} · {draft.elements.length} layers · {draft.target}</span><span className="mt-1 block truncate text-[10px] text-muted">{draft.description || "No project description"}</span></span>
-                <ArrowRight size={17} className="shrink-0 text-muted" />
-              </button>
-              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-2">
-                <label className="min-w-0 flex-1"><span className="sr-only">Rename project {draft.name}</span><input aria-label={"Rename project "+draft.name} value={draft.name || ""} maxLength={100} onChange={(event)=>setDrafts((previous)=>previous.map((item)=>item.id===draft.id?{...item,name:event.target.value}:item))} onBlur={(event)=>renameDraft(draft.id || "",event.target.value)} onKeyDown={(event)=>{if(event.key==="Enter"){event.currentTarget.blur();}}} className="w-full min-w-0 rounded-md border border-border bg-surface px-2 py-1 text-xs text-fg"/></label>
-                <button type="button" aria-label={(draft.isFavorite?"Remove favorite ":"Add favorite ")+draft.name} aria-pressed={!!draft.isFavorite} onClick={()=>toggleDraftFavorite(draft.id || "")} className="rounded-md border border-border px-2 py-1 text-xs text-fg">{draft.isFavorite ? "★" : "☆"}</button>
-                <button type="button" onClick={()=>duplicateDraft(draft.id || "")} className="rounded-md border border-border px-2 py-1 text-xs text-fg">Duplicate</button>
-                <button type="button" onClick={()=>deleteDraft(draft.id || "")} className="rounded-md border border-border px-2 py-1 text-xs text-red-600">Delete</button>
+          <section className="uxui-drafts" aria-labelledby="uxui-drafts-title">
+            <div className="uxui-drafts-header">
+              <div className="min-w-0"><h3 id="uxui-drafts-title" className="text-lg font-bold text-fg">Projects &amp; drafts</h3><span className="text-xs text-muted">{drafts.length ? drafts.length + (drafts.length === 1 ? " project" : " projects") : "Projects are stored locally in this browser"}</span></div>
+              <div className="uxui-drafts-filter">
+                <input type="search" aria-label="Search projects" placeholder="Search projects…" value={draftSearch} onChange={(event)=>setDraftSearch(event.target.value)} className="min-w-0 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-fg"/>
+                <button type="button" onClick={()=>setDraftFavoritesOnly((value)=>!value)} aria-pressed={draftFavoritesOnly} className={"rounded-lg border px-3 py-2 text-xs font-semibold " + (draftFavoritesOnly ? "border-accent bg-accent/10 text-accent" : "border-border text-fg")}>{draftFavoritesOnly ? "★ Favorites" : "☆ Favorites"}</button>
               </div>
-            </article>)}
-          </div> : <div className="uxui-empty-drafts rounded-xl border border-border px-5 py-8 text-center">
-            <span className="mx-auto grid size-12 place-items-center rounded-full bg-surface-2 text-muted"><Layers size={22} /></span>
-            <p className="mt-3 text-sm font-semibold text-fg">No drafts yet</p>
-            <p className="mt-1 text-sm text-muted">Your designs will appear here as you work.</p>
-          </div>}
-        </section>
+            </div>
+            <div className="uxui-draft-list" role="region" aria-label="Saved project drafts" tabIndex={0} onScroll={(event)=>setHomeScrolled(event.currentTarget.scrollTop > 12)}>
+              {visibleDrafts.length ? <div className="uxui-draft-grid">
+                {visibleDrafts.map((draft, index) => <article key={draft.id || draft.name + index} className="uxui-draft-card min-w-0 rounded-xl border border-border p-3 transition hover:border-accent">
+                  <button type="button" onClick={() => continueSaved(draft)} className="uxui-draft-open w-full min-w-0 text-left focus-visible:outline-2 focus-visible:outline-accent">
+                    <span className="grid place-items-center rounded-xl bg-surface-2 text-fg"><LayoutTemplate size={20} /></span>
+                    <span className="uxui-draft-details min-w-0"><strong className="block truncate text-sm text-fg">{draft.name || "Untitled design"}</strong><span className="block text-xs text-muted">{draft.screens?.length || 1} {((draft.screens?.length || 1)===1?"screen":"screens")} · {draft.elements.length} layers · {draft.target}</span><span className="uxui-draft-description block truncate text-[10px] text-muted">{draft.description || "No project description"}</span></span>
+                  </button>
+                  <div className="uxui-draft-actions">
+                    <label className="min-w-0"><span className="sr-only">Rename project {draft.name}</span><input aria-label={"Rename project "+draft.name} value={draft.name || ""} maxLength={100} onChange={(event)=>setDrafts((previous)=>previous.map((item)=>item.id===draft.id?{...item,name:event.target.value}:item))} onBlur={(event)=>renameDraft(draft.id || "",event.target.value)} onKeyDown={(event)=>{if(event.key==="Enter"){event.currentTarget.blur();}}} className="uxui-draft-rename w-full min-w-0 rounded-md border border-border bg-surface px-2 py-1 text-xs text-fg"/></label>
+                    <button type="button" aria-label={(draft.isFavorite?"Remove favorite ":"Add favorite ")+draft.name} aria-pressed={!!draft.isFavorite} onClick={()=>toggleDraftFavorite(draft.id || "")} className="rounded-md border border-border px-2 py-1 text-xs text-fg">{draft.isFavorite ? "★" : "☆"}</button>
+                    <button type="button" aria-label={"Duplicate "+draft.name} onClick={()=>duplicateDraft(draft.id || "")} className="rounded-md border border-border px-2 py-1 text-xs text-fg">Duplicate</button>
+                    <button type="button" aria-label={"Delete "+draft.name} onClick={()=>deleteDraft(draft.id || "")} className="rounded-md border border-border px-2 py-1 text-xs text-fg">Delete</button>
+                  </div>
+                </article>)}
+              </div> : <div className="uxui-empty-drafts rounded-xl border border-border px-5 py-8 text-center">
+                <span className="mx-auto grid size-12 place-items-center rounded-full bg-surface-2 text-muted"><Layers size={22} /></span>
+                <p className="mt-3 text-sm font-semibold text-fg">No drafts yet</p>
+                <p className="mt-1 text-sm text-muted">Your designs will appear here as you work.</p>
+              </div>}
+            </div>
+          </section>
+        </div>
       </section>
     );
   }
@@ -2844,18 +2886,17 @@ export function UxUiStudioEngine() {
           <Logo size="hero" className="uxui-fullscreen-logo" />
         </div>
         <div className="uxui-topbar-left">
+          <button type="button" className="uxui-header-zoom" onClick={() => setZoom((value) => Math.max(50, value - 10))} aria-label="Zoom out" title="Zoom out" disabled={prototypePreview || zoom <= 50}><ZoomOut size={17} /></button>
           <div className="uxui-target-switch" role="group" aria-label="Preview device">
             <button type="button" aria-label="Mobile" onClick={() => changeTarget("mobile")} aria-pressed={target === "mobile"} className={target === "mobile" ? "is-active" : ""}><Smartphone size={17} /><span>Mobile</span></button>
             <button type="button" aria-label="Tablet" onClick={() => changeTarget("tablet")} aria-pressed={target === "tablet"} className={target === "tablet" ? "is-active" : ""}><Tablet size={17} /><span>Tablet</span></button>
             <button type="button" aria-label="Desktop" onClick={() => changeTarget("desktop")} aria-pressed={target === "desktop"} className={target === "desktop" ? "is-active" : ""}><Monitor size={17} /><span>Desktop</span></button>
           </div>
+          <button type="button" className="uxui-header-zoom" onClick={() => setZoom((value) => Math.min(150, value + 10))} aria-label="Zoom in" title="Zoom in" disabled={prototypePreview || zoom >= 150}><ZoomIn size={17} /></button>
         </div>
         <div className="uxui-topbar-actions">
-          <button type="button" onClick={undoLayout} disabled={!undoStack.length} aria-label="Undo" title="Undo" className="uxui-icon-button"><Undo2 size={18} /></button>
-          <button type="button" onClick={redoLayout} disabled={!redoStack.length} aria-label="Redo" title="Redo" className="uxui-icon-button"><Redo2 size={18} /></button>
-          <button type="button" onClick={() => setHelpOpen((value) => !value)} aria-label="Studio help" title="How to use the studio" className="uxui-icon-button"><CircleHelp size={20} /></button>
-          <button type="button" aria-label="Export" title="Export design" onClick={() => { setShowInspector(false); setShowExportPanel((value) => !value); }} aria-expanded={showExportPanel} className="uxui-export-trigger"><FileOutput size={17} /><span>Export</span></button>
-          <button type="button" onClick={returnToProjects} className="uxui-projects-trigger" aria-label="Back to projects" title="Back to projects"><ArrowLeft size={16} /><span>Projects</span></button>
+          <button type="button" aria-label="Export" title="Export design" onClick={() => { setShowInspector(false); setShowExportPanel((value) => !value); }} aria-expanded={showExportPanel} className="uxui-export-trigger"><Download size={17} /><span>Export</span></button>
+          <button type="button" onClick={returnToProjects} className="uxui-projects-trigger" aria-label="Exit Studio" title="Exit Studio"><LogOut size={17} /><span>Exit</span></button>
         </div>
         {showExportPanel && <div className="uxui-export-menu" role="dialog" aria-label="Export design handoff">
           <div className="uxui-export-menu-title">Export your design</div>
@@ -2870,13 +2911,6 @@ export function UxUiStudioEngine() {
         </div>}
       </header>
 
-      {!prototypePreview && <div className="uxui-responsive-scope" role="group" aria-label="Responsive editing scope">
-        <button type="button" className="uxui-primary-text" aria-label="Add text" onClick={() => { addLayer("text"); setEditTool("text"); }}><Type size={18} /><span>Text</span></button>
-        <label><span>Layer edits</span><select aria-label="Apply layer edits to" value={responsiveEditMode} onChange={event => setResponsiveEditMode(event.target.value as ResponsiveEditMode)}><option value="shared">All devices</option><option value="device">This device only</option></select></label>
-        <span className="uxui-responsive-status">{responsiveEditMode === "shared" ? "Shared design" : target + " fixes"}</span>
-        <button type="button" onClick={resetDeviceOverrides} disabled={!hasResponsiveOverrides(responsiveRef.current, target)}>Reset device fixes</button>
-      </div>}
-
       {prototypePreview && <div className="uxui-prototype-toolbar" role="status" aria-live="polite">
         <span>Prototype preview · {screens.find((screen) => screen.id === activeScreenId)?.name || "Current screen"}</span>
         <div>
@@ -2888,15 +2922,6 @@ export function UxUiStudioEngine() {
         {showToolsPanel && renderToolkit()}
 
         <main className="uxui-canvas-panel min-w-0 overflow-hidden">
-          <div className="uxui-canvas-heading">
-            <div className="uxui-canvas-zoom" role="toolbar" aria-label="Canvas view controls">
-              {!prototypePreview && <button type="button" onClick={startPrototypePreview} disabled={!hasPrototypeLinks} aria-label="Preview connected screen flow" title="Preview connected screen flow" className="rounded-lg border border-border p-2 text-xs font-semibold text-fg disabled:opacity-40"><LayoutTemplate size={16} /></button>}
-              <button type="button" onClick={() => setZoom((value) => Math.max(50, value - 10))} aria-label="Zoom out" title="Zoom out" disabled={prototypePreview}><ZoomOut size={16} /></button>
-              <span aria-label={"Zoom " + zoom + "%"} title={"Zoom " + zoom + "%"}>{zoom}%</span>
-              <button type="button" onClick={() => setZoom((value) => Math.min(150, value + 10))} aria-label="Zoom in" title="Zoom in"><ZoomIn size={16} /></button>
-              <button type="button" onClick={() => setShowGrid((value) => !value)} aria-pressed={showGrid} aria-label="Toggle alignment grid" title="Alignment grid" className={showGrid ? "is-active" : ""}><Grid2X2 size={16} /></button>
-            </div>
-          </div>
           <div ref={canvasStageRef} className="uxui-canvas-stage" role="region" aria-label={projectName + " design canvas"} tabIndex={0}>
             <div className="uxui-device-positioner">
               <div
@@ -2991,6 +3016,8 @@ export function UxUiStudioEngine() {
           </div>
           <div className="uxui-bottom-toolbar">
             <div className="uxui-bottom-group">
+              <button type="button" onClick={startPrototypePreview} disabled={!hasPrototypeLinks || prototypePreview} aria-label="Preview connected screen flow" title="Preview connected screen flow"><LayoutTemplate size={20} /></button>
+              <button type="button" onClick={() => setShowGrid((value) => !value)} aria-pressed={showGrid} aria-label="Toggle alignment grid" title="Alignment grid" className={showGrid ? "is-active" : ""}><Grid2X2 size={20} /></button>
               <button type="button" onClick={undoLayout} disabled={!undoStack.length} aria-label="Undo" title="Undo"><Undo2 size={22} /></button>
               <button type="button" onClick={redoLayout} disabled={!redoStack.length} aria-label="Redo" title="Redo"><Redo2 size={22} /></button>
             </div>
