@@ -138,7 +138,7 @@ struct Tool: Decodable, Identifiable, Hashable {
     var isPlanned: Bool { status.lowercased() == "planned" }
     var isOfflineCapable: Bool {
         ["active", "beta"].contains(status.lowercased()) && !isUnderProduction &&
-        clientSide && !requiresBackend && !requiresAuth && engine.type != "ai" && id != "music-downloader" &&
+        clientSide && !requiresBackend && !requiresAuth && id != "music-downloader" &&
         !NativeCopy.isWebRuntimeOnly(id)
     }
     var offlineDescription: String {
