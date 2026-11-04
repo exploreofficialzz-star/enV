@@ -261,14 +261,9 @@ self.addEventListener("message", (event) => {
         return reply({ ok: true, cached });
       }
 
-      if (data.type === "GET_CLIENT_ID") {
-        const clientId = event.source && event.source.id;
-        return reply({ ok: true, clientId: clientId || null });
-      }
-
       if (data.type === "END_TOOL_PACKAGE") {
         const sourceClientId = event.source && event.source.id;
-        if (!sourceClientId || data.clientId !== sourceClientId) return reply({ ok: false, message: "The package session does not belong to this browser tab." });
+        if (!sourceClientId) return reply({ ok: false, message: "The package session could not be identified." });
         await removeSession(sourceClientId);
         return reply({ ok: true });
       }
