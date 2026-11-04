@@ -137,9 +137,15 @@ struct Tool: Decodable, Identifiable, Hashable {
 
     var isPlanned: Bool { status.lowercased() == "planned" }
     var isOfflineCapable: Bool {
-        ["active", "beta"].contains(status.lowercased()) && !isUnderProduction &&
-        clientSide && !requiresBackend && !requiresAuth && id != "music-downloader" &&
-        !NativeCopy.isWebRuntimeOnly(id)
+        let nativeDocumentOperations: Set<String> = [
+            "pdf-metadata-viewer", "pdf-metadata-tool", "pdf-page-extractor", "pdf-splitter",
+            "pdf-rotator", "pdf-merger", "pdf-text-extractor", "docx-text-extractor"
+        ]
+        let hasNativeDocumentEngine = nativeDocumentOperations.contains(id) && !requiresAuth
+        let hasLocalToolEngine = clientSide && !requiresBackend && !requiresAuth
+        return ["active", "beta"].contains(status.lowercased()) && !isUnderProduction &&
+            (hasNativeDocumentEngine || hasLocalToolEngine) && id != "music-downloader" &&
+            !NativeCopy.isWebRuntimeOnly(id)
     }
     var offlineDescription: String {
         guard isOfflineCapable else { return description }
