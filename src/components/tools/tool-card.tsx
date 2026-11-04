@@ -8,6 +8,7 @@ import { ToolAppIcon } from "@/components/tools/tool-app-icon";
 import { UnderProductionDialog } from "@/components/tools/under-production";
 import { isToolUnderProduction } from "@/lib/production-notice";
 import { useState } from "react";
+import { offlineAwareToolDescription } from "@/lib/offline/capabilities";
 
 export function ToolCard({
   tool,
@@ -30,17 +31,13 @@ export function ToolCard({
       <span className="mt-3 text-sm font-semibold tracking-tight text-fg group-hover:text-accent">
         {tool.name}
       </span>
-      <span className="mt-1 line-clamp-2 text-xs leading-5 text-muted">{tool.description}</span>
+      <span className="mt-1 line-clamp-2 text-xs leading-5 text-muted">{offlineAwareToolDescription(tool)}</span>
       {underProduction ? (
         <span className="mt-3 inline-flex w-fit rounded-full bg-surface-2 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted">
           Under production
         </span>
       ) : planned ? (
         <span className="mt-3"><ComingSoonBadge /></span>
-      ) : tool.clientSide ? (
-        <span className="mt-3 text-[11.1px] font-medium uppercase tracking-wide text-subtle">
-          In-browser
-        </span>
       ) : null}
       <span className="mt-auto flex justify-end pt-3">
         <ArrowRight className="size-4 text-black transition-transform group-hover:translate-x-0.5 dark:text-white" aria-hidden="true" />
