@@ -1,0 +1,293 @@
+/* enV visit-triggered offline tool packages. Only assets requested during an eligible
+   tool visit enter that tool's cache. The app shell and navigation are cached separately. */
+const CORE_CACHE = "env-web-shell-v1";
+const NAVIGATION_CACHE = "env-web-navigation-v1";
+const TOOL_CACHE_PREFIX = "env-tool-package-";
+const PACKAGE_DB = "env-tool-package-registry";
+const PACKAGE_DB_VERSION = 1;
+
+function openPackageDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(PACKAGE_DB, PACKAGE_DB_VERSION);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains("packages")) db.createObjectStore("packages", { keyPath: "toolId" });
+      if (!db.objectStoreNames.contains("sessions")) db.createObjectStore("sessions", { keyPath: "clientId" });
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error("Offline package database unavailable."));
+  });
+}
+
+function readRow(db, storeName, key) {
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(storeName, "readonly").objectStore(storeName).get(key);
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error || new Error("Offline package read failed."));
+  });
+}
+
+function writeRow(db, storeName, value) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, "readwrite");
+    tx.objectStore(storeName).put(value);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error("Offline package write failed."));
+    tx.onabort = () => reject(tx.error || new Error("Offline package write aborted."));
+  });
+}
+
+function deleteRow(db, storeName, key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, "readwrite");
+    tx.objectStore(storeName).delete(key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error("Offline package delete failed."));
+    tx.onabort = () => reject(tx.error || new Error("Offline package delete aborted."));
+  });
+}
+
+async function getPackage(toolId) {
+  const db = await openPackageDb();
+  try { return await readRow(db, "packages", toolId); }
+  finally { db.close(); }
+}
+
+async function getSession(clientId) {
+  if (!clientId) return null;
+  const db = await openPackageDb();
+  try { return await readRow(db, "sessions", clientId); }
+  finally { db.close(); }
+}
+
+async function setPackage(record) {
+  const db = await openPackageDb();
+  try { await writeRow(db, "packages", record); }
+  finally { db.close(); }
+}
+
+async function setSession(record) {
+  const db = await openPackageDb();
+  try { await writeRow(db, "sessions", record); }
+  finally { db.close(); }
+}
+
+async function removeSession(clientId) {
+  const db = await openPackageDb();
+  try { await deleteRow(db, "sessions", clientId); }
+  finally { db.close(); }
+}
+
+function packageCacheName(toolId, version) {
+  return TOOL_CACHE_PREFIX + encodeURIComponent(toolId) + "-" + encodeURIComponent(version);
+}
+
+function validToolId(value) {
+  return typeof value === "string" && /^[A-Za-z0-9._-]{1,160}$/.test(value);
+}
+
+function isCacheableAsset(request, url) {
+  if (request.method !== "GET" || url.origin !== self.location.origin) return false;
+  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/_serverFn/")) return false;
+  if (request.mode === "navigate") return false;
+  return ["script", "style", "worker", "font", "image"].includes(request.destination) ||
+    /\.(?:m?js|css|wasm|woff2?|ttf|otf|svg|png|jpe?g|webp|avif)$/i.test(url.pathname) ||
+    url.pathname.startsWith("/assets/");
+}
+
+async function rememberAsset(session, request, cacheName) {
+  const cache = await caches.open(cacheName);
+  await cache.put(request, await fetch(request));
+  const db = await openPackageDb();
+  try {
+    const record = await readRow(db, "packages", session.toolId);
+    if (!record || record.version !== session.version) return;
+    const assets = Array.isArray(record.assets) ? record.assets : [];
+    if (!assets.includes(request.url)) assets.push(request.url);
+    await writeRow(db, "packages", { ...record, assets, updatedAt: new Date().toISOString() });
+  } finally {
+    db.close();
+  }
+}
+
+async function handleAssetRequest(event) {
+  const request = event.request;
+  const url = new URL(request.url);
+  const session = await getSession(event.clientId);
+  const toolCacheName = session ? packageCacheName(session.toolId, session.version) : null;
+  const toolCache = toolCacheName ? await caches.open(toolCacheName) : null;
+  const coreCache = await caches.open(CORE_CACHE);
+
+  try {
+    const response = await fetch(request);
+    if (response && response.ok) {
+      if (session && toolCache) {
+        await toolCache.put(request, response.clone());
+        const db = await openPackageDb();
+        try {
+          const record = await readRow(db, "packages", session.toolId);
+          if (record && record.version === session.version) {
+            const assets = Array.isArray(record.assets) ? record.assets : [];
+            if (!assets.includes(request.url)) assets.push(request.url);
+            await writeRow(db, "packages", { ...record, assets, updatedAt: new Date().toISOString() });
+          }
+        } finally {
+          db.close();
+        }
+      } else {
+        await coreCache.put(request, response.clone());
+      }
+    }
+    return response;
+  } catch (error) {
+    const cached = (toolCache && await toolCache.match(request)) || await coreCache.match(request);
+    if (cached) return cached;
+    throw error;
+  }
+}
+
+async function findReadyPackageForPath(pathname) {
+  const db = await openPackageDb();
+  try {
+    const rows = await new Promise((resolve, reject) => {
+      const request = db.transaction("packages", "readonly").objectStore("packages").getAll();
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error || new Error("Offline package listing failed."));
+    });
+    return rows.find((item) => item && item.status === "ready" && item.pathname === pathname) || null;
+  } finally {
+    db.close();
+  }
+}
+
+async function shellResponse() {
+  const cache = await caches.open(CORE_CACHE);
+  return await cache.match(new URL("/", self.location.origin).href) ||
+    new Response("<!doctype html><title>enV offline</title><main><h1>enV</h1><p>The offline application shell is not available yet. Reconnect and open enV once.</p></main>", {
+      headers: { "content-type": "text/html; charset=utf-8" },
+      status: 503,
+    });
+}
+
+async function handleNavigation(request) {
+  const url = new URL(request.url);
+  try {
+    const response = await fetch(request);
+    if (response && response.ok && (url.pathname === "/" || url.pathname.startsWith("/tools/"))) {
+      const cache = await caches.open(NAVIGATION_CACHE);
+      await cache.put(request, response.clone());
+      if (url.pathname === "/") {
+        const shell = await caches.open(CORE_CACHE);
+        await shell.put(new URL("/", self.location.origin).href, response.clone());
+      }
+    }
+    return response;
+  } catch {
+    if (url.pathname.startsWith("/tools/")) {
+      const installed = await findReadyPackageForPath(url.pathname);
+      if (installed) {
+        const pages = await caches.open(NAVIGATION_CACHE);
+        const exact = await pages.match(request, { ignoreSearch: true });
+        if (exact) return exact;
+      }
+    }
+    return await shellResponse();
+  }
+}
+
+self.addEventListener("install", (event) => {
+  event.waitUntil((async () => {
+    try {
+      const response = await fetch(new URL("/", self.location.origin));
+      if (response.ok) {
+        const cache = await caches.open(CORE_CACHE);
+        await cache.put(new URL("/", self.location.origin).href, response.clone());
+      }
+    } catch {
+      // Installation may still succeed; the online shell will be cached on the next visit.
+    }
+    await self.skipWaiting();
+  })());
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener("message", (event) => {
+  const data = event.data || {};
+  const port = event.ports && event.ports[0];
+  const reply = (value) => { if (port) port.postMessage(value); };
+  event.waitUntil((async () => {
+    try {
+      if (data.type === "GET_TOOL_PACKAGE") {
+        if (!validToolId(data.toolId) || typeof data.version !== "string") return reply({ ok: false, message: "Invalid tool package request." });
+        const record = await getPackage(data.toolId);
+        return reply({ ok: true, ready: Boolean(record && record.status === "ready" && record.version === data.version && record.pathname === data.pathname), status: record?.status || "missing", assetCount: record?.assets?.length || 0 });
+      }
+
+      if (data.type === "BEGIN_TOOL_PACKAGE" || data.type === "OPEN_TOOL_PACKAGE") {
+        if (!validToolId(data.toolId) || typeof data.version !== "string" || !/^\/tools\/[A-Za-z0-9._~-]+\/[A-Za-z0-9._~-]+$/.test(data.pathname || "")) {
+          return reply({ ok: false, message: "The tool package identity is invalid." });
+        }
+        const clientId = event.source && event.source.id;
+        if (!clientId) return reply({ ok: false, message: "The active enV tab could not be identified." });
+        const existing = await getPackage(data.toolId);
+        if (data.type === "OPEN_TOOL_PACKAGE") {
+          if (!existing || existing.status !== "ready" || existing.version !== data.version || existing.pathname !== data.pathname) {
+            return reply({ ok: false, ready: false, message: "This tool has no complete offline package for the current enV build." });
+          }
+          await setSession({ clientId, toolId: data.toolId, version: data.version, openedAt: new Date().toISOString() });
+          return reply({ ok: true, ready: true, status: "ready", assetCount: existing.assets?.length || 0 });
+        }
+        const keepReady = existing && existing.status === "ready" && existing.version === data.version && existing.pathname === data.pathname;
+        await setPackage({
+          toolId: data.toolId,
+          pathname: data.pathname,
+          version: data.version,
+          status: keepReady ? "ready" : "installing",
+          assets: keepReady ? (existing.assets || []) : [],
+          updatedAt: new Date().toISOString(),
+        });
+        await setSession({ clientId, toolId: data.toolId, version: data.version, openedAt: new Date().toISOString() });
+        return reply({ ok: true, ready: Boolean(keepReady), status: keepReady ? "ready" : "installing", assetCount: keepReady ? existing.assets?.length || 0 : 0 });
+      }
+
+      if (data.type === "COMPLETE_TOOL_PACKAGE") {
+        if (!validToolId(data.toolId) || typeof data.version !== "string") return reply({ ok: false, message: "Invalid tool package completion." });
+        const clientId = event.source && event.source.id;
+        if (!clientId) return reply({ ok: false, message: "The active enV tab could not be identified." });
+        const session = await getSession(clientId);
+        if (!session || session.toolId !== data.toolId || session.version !== data.version) return reply({ ok: false, message: "The tool installation session is no longer active." });
+        const record = await getPackage(data.toolId);
+        const cache = await caches.open(packageCacheName(data.toolId, data.version));
+        const keys = await cache.keys();
+        const assets = record?.assets || [];
+        const ready = Boolean(record && record.version === data.version && keys.length > 0 && assets.length > 0);
+        if (record) {
+          await setPackage({ ...record, status: ready ? "ready" : "failed", assetCount: keys.length, completedAt: new Date().toISOString() });
+        }
+        await removeSession(clientId);
+        return reply({ ok: true, ready, status: ready ? "ready" : "failed", assetCount: keys.length, message: ready ? "Offline tool package installed." : "No complete tool asset set was captured; this tool remains online-only." });
+      }
+
+      return reply({ ok: false, message: "Unknown offline package command." });
+    } catch (error) {
+      reply({ ok: false, message: error instanceof Error ? error.message : "Offline package operation failed." });
+    }
+  })());
+});
+
+self.addEventListener("fetch", (event) => {
+  const request = event.request;
+  if (request.method !== "GET") return;
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+  if (request.mode === "navigate") {
+    event.respondWith(handleNavigation(request));
+    return;
+  }
+  if (isCacheableAsset(request, url)) {
+    event.respondWith(handleAssetRequest(event));
+  }
+});
