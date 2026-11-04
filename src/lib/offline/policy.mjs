@@ -1,7 +1,8 @@
-export const OFFLINE_CAPABILITY_POLICY_VERSION = "2026-10-30.v1";
+export const OFFLINE_CAPABILITY_POLICY_VERSION = "2026-11-04.v2";
 const auditedLocalEngineTypes = new Set([
-  "calculator", "converter", "datetime", "text", "codec", "color", "qr", "barcode", "generator",
+  "calculator", "converter", "datetime", "text", "codec", "color", "qr", "barcode", "generator", "image", "pdf",
 ]);
+const auditedLocalToolIds = new Set(["a-book", "zip-any-file", "qr-payload-inspector"]);
 const explicitlyOnlineEngineTypes = new Set([
   "ai", "network", "url-media", "url-media-info", "document-backend", "seo",
 ]);
@@ -18,9 +19,9 @@ export function classifyOfflineToolRecord(tool) {
         : tool.requiresBackend || !tool.clientSide ? "This tool depends on an enV server service."
         : "This engine depends on a network service.", policyVersion: OFFLINE_CAPABILITY_POLICY_VERSION };
   }
-  if (auditedLocalEngineTypes.has(engineType)) {
+  if (auditedLocalToolIds.has(tool.id) || auditedLocalEngineTypes.has(engineType)) {
     return { toolId: tool.id, execution: "device-local", tokenPolicy: "offline-allowance-required", mayRunWithoutNetwork: true,
-      reason: "This deterministic engine is approved for local execution; network sync and server-side account actions remain unavailable offline.",
+      reason: "This tool has an audited local execution path; token-consuming actions still require a verified offline allowance, and network sync remains unavailable offline.",
       policyVersion: OFFLINE_CAPABILITY_POLICY_VERSION };
   }
   return { toolId: tool.id, execution: "not-verified", tokenPolicy: "server-verified-only", mayRunWithoutNetwork: false,
