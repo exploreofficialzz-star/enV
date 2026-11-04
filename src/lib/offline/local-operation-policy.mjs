@@ -74,13 +74,15 @@ const REMOTE_ENGINE_TYPES = new Set(["url-media", "url-media-info"]);
  * @param {OfflineToolRecord | null | undefined} tool
  */
 export function offlineRemoteOperationReason(tool) {
+  const toolId = typeof tool?.id === "string" ? tool.id : "";
   const engine = tool?.engine ?? {};
+  const engineType = typeof engine.type === "string" ? engine.type : "";
   const op = typeof engine.op === "string" ? engine.op : "";
-  if (SERVER_TOOL_IDS.has(tool?.id)) return "This tool operation is served by an enV backend or external media resolver.";
-  if (engine.type === "audio" && SERVER_AUDIO_OPERATIONS.has(op)) return "This audio operation uploads its file to the configured enV media processor.";
-  if (engine.type === "video" && SERVER_VIDEO_OPERATIONS.has(op)) return "This video operation uploads its file to the configured enV media processor.";
-  if (REMOTE_ENGINE_TYPES.has(engine.type)) return "This tool reads or processes remote media URLs and requires a network service.";
-  if (engine.type === "document-backend" && !OFFLINE_LOCAL_DOCUMENT_TOOL_IDS.has(tool?.id)) {
+  if (SERVER_TOOL_IDS.has(toolId)) return "This tool operation is served by an enV backend or external media resolver.";
+  if (engineType === "audio" && SERVER_AUDIO_OPERATIONS.has(op)) return "This audio operation uploads its file to the configured enV media processor.";
+  if (engineType === "video" && SERVER_VIDEO_OPERATIONS.has(op)) return "This video operation uploads its file to the configured enV media processor.";
+  if (REMOTE_ENGINE_TYPES.has(engineType)) return "This tool reads or processes remote media URLs and requires a network service.";
+  if (engineType === "document-backend" && !OFFLINE_LOCAL_DOCUMENT_TOOL_IDS.has(toolId)) {
     return "This document operation requires the enV document-processing backend.";
   }
   return null;
@@ -98,7 +100,7 @@ export function isOfflineLocalToolRecord(tool) {
   if (offlineRemoteOperationReason(tool)) return false;
   if (tool.requiresAuth || tool.requiresBackend || tool.clientSide !== true) return false;
 
-  const engineType = tool.engine?.type ?? "unknown";
+  const engineType = typeof tool.engine?.type === "string" ? tool.engine.type : "unknown";
   if (LOCAL_ENGINE_TYPES.has(engineType)) return true;
   if (engineType === "custom") {
     return LOCAL_NAMED_CUSTOM_TOOLS.has(tool.id) || LOCAL_CUSTOM_CATEGORIES.has(tool.category);
