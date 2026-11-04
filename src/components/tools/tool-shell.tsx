@@ -283,7 +283,7 @@ export function ToolShell({
             startToolExecution("action_button");
           }
         }}
-        onSubmitCapture={(event) => {
+        onSubmitCapture={() => {
           startToolExecution("form_submit");
         }}
       >
