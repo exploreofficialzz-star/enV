@@ -108,7 +108,6 @@ class NativeCommunicationEngineTest {
     @Test fun unknownActionsDoNotFallThroughToGenericText() {
         assertThrows(IllegalArgumentException::class.java) { NativeCommunicationEngine.parse("email-translator") }
     }
-}
 
 
     @Test fun calendarExportUsesTheEnteredIanaZoneAndEscapesEventText() {
@@ -183,6 +182,8 @@ class NativeCommunicationEngineTest {
         val checks = NativeCommunicationEngine.checks("email-builder", values, output).joinToString(" ")
         assertTrue(checks.contains("control characters"))
     
+    }
+
     @Test fun calendarUidIsStableAndPortableAcrossPlatforms() {
         val ics = NativeCommunicationEngine.calendarIcs("meeting-builder", mapOf(
             "subject" to "Roadmap, review; draft",
