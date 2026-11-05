@@ -361,6 +361,26 @@ final class NativeAiMicroEngineTests: XCTestCase {
         XCTAssertTrue(output.contains("Subscribe for the next lesson"))
     }
 
+    func testLineBasedInputsKeepCommasInsideEachItem() throws {
+        let faq = try NativeAiMicroEngine.generate(toolID: "faq-generator", values: [
+            "topic":"Safety", "points":"Is this safe, for everyone?",
+            "answers":"Is this safe, for everyone? | Check the product's stated limits before use."
+        ])
+        XCTAssertTrue(faq.contains("Q: Is this safe, for everyone?"))
+        XCTAssertTrue(faq.contains("A: Check the product's stated limits before use."))
+
+        let benefits = try NativeAiMicroEngine.generate(toolID: "feature-benefit-generator", values: [
+            "topic":"Search", "benefit":"Fast search, with filters", "outcomes":"Find matching records more quickly"
+        ])
+        XCTAssertTrue(benefits.contains("Feature: Fast search, with filters"))
+        XCTAssertTrue(benefits.contains("Customer outcome: Find matching records more quickly"))
+
+        let agenda = try NativeAiMicroEngine.generate(toolID: "ai-meeting-agenda-generator", values: [
+            "duration":"20", "topics":"Review risks, costs and scope\nChoose next step"
+        ])
+        XCTAssertTrue(agenda.contains("1. Review risks, costs and scope — 10 min"))
+    }
+
     func testYouTubeTitlesRespectOneHundredCharacterLimit() throws {
         let output = try NativeAiMicroEngine.generate(toolID: "youtube-title-helper", values: [
             "topic":"Learning SQL", "audience":"analysts", "keyword":"SQL reporting",
