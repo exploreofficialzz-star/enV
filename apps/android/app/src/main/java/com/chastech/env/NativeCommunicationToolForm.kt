@@ -29,7 +29,6 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.ResolverStyle
-import java.util.UUID
 
 internal data class CommunicationField(val key: String, val label: String, val multiline: Boolean = false)
 
@@ -322,7 +321,11 @@ internal object NativeCommunicationEngine {
             value("name").takeIf { it.isNotBlank() }?.let { "Audience / attendees: " + it },
         ).filterNotNull().joinToString("\n\n")
         val uidSource = listOf(kind, title, value("date"), zoneName, value("name")).joinToString("|")
-        val uid = UUID.nameUUIDFromBytes(uidSource.toByteArray(Charsets.UTF_8)).toString() + "@envtools.store"
+        var uidHash = -3750763034362895579L
+        for (byte in uidSource.toByteArray(Charsets.UTF_8)) {
+            uidHash = (uidHash xor (byte.toLong() and 0xffL)) * 1099511628211L
+        }
+        val uid = java.lang.Long.toUnsignedString(uidHash, 16).padStart(16, '0') + "@envtools.store"
         val lines = listOf(
             "BEGIN:VCALENDAR", "PRODID:-//enV//Communication Tools//EN", "VERSION:2.0", "CALSCALE:GREGORIAN",
             "METHOD:PUBLISH", "BEGIN:VEVENT", "UID:" + uid, "DTSTAMP:" + calendarUtcFormatter.format(Instant.now()),
