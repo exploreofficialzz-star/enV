@@ -18,8 +18,12 @@ import androidx.camera.view.PreviewView
 import androidx.camera.core.CameraSelector
 import androidx.camera.view.video.AudioConfig
 import androidx.camera.video.FileOutputOptions
+import androidx.camera.video.FallbackStrategy
+import androidx.camera.video.Quality
+import androidx.camera.video.QualitySelector
 import androidx.camera.video.Recording
 import androidx.camera.video.VideoRecordEvent
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -54,9 +58,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -75,6 +81,8 @@ import androidx.compose.runtime.livedata.observeAsState
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
@@ -83,6 +91,14 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
 }
 
 private enum class NativeCameraMode { PHOTO, VIDEO }
+
+private data class NativeCameraQuality(val label: String, val quality: Quality)
+
+private val nativeCameraQualities = listOf(
+    NativeCameraQuality("720p", Quality.HD),
+    NativeCameraQuality("1080p", Quality.FHD),
+    NativeCameraQuality("4K", Quality.UHD),
+)
 
 @Composable
 fun NativeCameraStudioScreen() {
@@ -94,6 +110,9 @@ fun NativeCameraStudioScreen() {
             setEnabledUseCases(CameraController.IMAGE_CAPTURE or CameraController.VIDEO_CAPTURE)
             setPinchToZoomEnabled(true)
             setTapToFocusEnabled(true)
+            setVideoCaptureQualitySelector(
+                QualitySelector.from(Quality.FHD, FallbackStrategy.lowerQualityOrHigherThan(Quality.SD))
+            )
         }
     }
     val zoomState = controller.zoomState.observeAsState().value
@@ -108,6 +127,11 @@ fun NativeCameraStudioScreen() {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
     }
     var mode by remember { mutableStateOf(NativeCameraMode.PHOTO) }
+    var timerSeconds by remember { mutableStateOf(0) }
+    var countdown by remember { mutableStateOf<Int?>(null) }
+    var gridEnabled by remember { mutableStateOf(false) }
+    var videoQuality by remember { mutableStateOf("1080p") }
+    val captureScope = rememberCoroutineScope()
     var usingFrontCamera by remember { mutableStateOf(false) }
     var recording by remember { mutableStateOf<Recording?>(null) }
     var recordingActive by remember { mutableStateOf(false) }
@@ -263,6 +287,38 @@ fun NativeCameraStudioScreen() {
         })
     }
 
+    fun capturePhotoWithTimer() {
+        if (countdown != null || recordingActive || !cameraGranted) return
+        if (timerSeconds == 0) {
+            capturePhoto()
+            return
+        }
+        captureScope.launch {
+            for (remaining in timerSeconds downTo 1) {
+                countdown = remaining
+                delay(1_000)
+            }
+            countdown = null
+            capturePhoto()
+        }
+    }
+
+    fun applyVideoQuality(label: String) {
+        val selected = nativeCameraQualities.firstOrNull { it.label == label } ?: return
+        if (recordingActive) return
+        runCatching {
+            controller.setVideoCaptureQualitySelector(
+                QualitySelector.from(selected.quality, FallbackStrategy.lowerQualityOrHigherThan(Quality.SD))
+            )
+        }.onSuccess {
+            videoQuality = label
+            status = "Requested $label video. The phone will use its closest supported recording quality."
+            error = null
+        }.onFailure {
+            error = "That video quality is not available on this camera."
+        }
+    }
+
     fun startVideo() {
         if (!cameraGranted || recordingActive) return
         if (!microphoneGranted && ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
@@ -333,6 +389,19 @@ fun NativeCameraStudioScreen() {
                         update = { it.controller = controller }
                     )
                 }
+                if (gridEnabled) {
+                    Canvas(modifier = Modifier.matchParentSize()) {
+                        val thirdX = size.width / 3f
+                        val thirdY = size.height / 3f
+                        for (index in 1..2) {
+                            drawLine(Color.White.copy(alpha = 0.55f), Offset(thirdX * index, 0f), Offset(thirdX * index, size.height), strokeWidth = 1.dp.toPx())
+                            drawLine(Color.White.copy(alpha = 0.55f), Offset(0f, thirdY * index), Offset(size.width, thirdY * index), strokeWidth = 1.dp.toPx())
+                        }
+                    }
+                }
+                if (countdown != null) {
+                    Text("$countdown", modifier = Modifier.align(Alignment.Center), color = Color.White, style = MaterialTheme.typography.displayLarge)
+                }
                 if (recordingActive) {
                     Surface(modifier = Modifier.align(Alignment.TopStart).padding(12.dp), color = Color(0xCC991B1B), shape = CircleShape) {
                         Text("● REC", modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), color = Color.White, style = MaterialTheme.typography.labelMedium)
@@ -389,8 +458,8 @@ fun NativeCameraStudioScreen() {
                 modifier = Modifier
                     .size(76.dp)
                     .border(4.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                    .clickable(enabled = cameraGranted && (!recordingActive || mode == NativeCameraMode.VIDEO)) {
-                        if (mode == NativeCameraMode.PHOTO) capturePhoto()
+                    .clickable(enabled = cameraGranted && countdown == null && (!recordingActive || mode == NativeCameraMode.VIDEO)) {
+                        if (mode == NativeCameraMode.PHOTO) capturePhotoWithTimer()
                         else if (recordingActive) recording?.stop()
                         else startVideo()
                     }
@@ -432,6 +501,29 @@ fun NativeCameraStudioScreen() {
                 }
             } else {
                 Spacer(Modifier.size(48.dp))
+            }
+        }
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { gridEnabled = !gridEnabled }, enabled = cameraGranted && !recordingActive, modifier = Modifier.weight(1f)) {
+                Text(if (gridEnabled) "Hide grid" else "Grid")
+            }
+            OutlinedButton(onClick = { timerSeconds = if (timerSeconds == 0) 3 else if (timerSeconds == 3) 10 else 0 }, enabled = mode == NativeCameraMode.PHOTO && !recordingActive, modifier = Modifier.weight(1f)) {
+                Text(if (timerSeconds == 0) "Timer off" else "Timer ${timerSeconds}s")
+            }
+        }
+
+        if (mode == NativeCameraMode.VIDEO) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Video quality · requested $videoQuality", style = MaterialTheme.typography.labelMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    nativeCameraQualities.forEach { option ->
+                        OutlinedButton(onClick = { applyVideoQuality(option.label) }, enabled = !recordingActive, modifier = Modifier.weight(1f)) {
+                            Text(option.label)
+                        }
+                    }
+                }
+                Text("The phone may choose a lower quality when its camera does not support the selected option.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
