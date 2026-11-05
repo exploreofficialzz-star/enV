@@ -410,12 +410,13 @@ internal object NativeCommunicationEngine {
 fun NativeCommunicationToolForm(toolId: String) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
-    var values by remember(toolId) { mutableStateOf(mapOf("timezone" to java.util.TimeZone.getDefault().id, "tone" to "professional")) }
+    val (kind, action) = NativeCommunicationEngine.parse(toolId)
+    val defaultDuration = when (kind) { "invitation" -> "60"; "reminder" -> "15"; else -> "30" }
+    var values by remember(toolId) { mutableStateOf(mapOf("timezone" to java.util.TimeZone.getDefault().id, "tone" to "professional", "duration" to defaultDuration)) }
     var output by remember(toolId) { mutableStateOf("") }
     var error by remember(toolId) { mutableStateOf("") }
     var checks by remember(toolId) { mutableStateOf(emptyList<String>()) }
     var calendarOutput by remember(toolId) { mutableStateOf("") }
-    val (kind, action) = NativeCommunicationEngine.parse(toolId)
     val calendarSaveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/calendar")) { uri ->
         if (uri != null) runCatching {
             val stream = context.contentResolver.openOutputStream(uri) ?: throw IllegalStateException("Unable to open the selected calendar file.")
@@ -456,7 +457,7 @@ fun NativeCommunicationToolForm(toolId: String) {
                     }
                     .onFailure { output = ""; checks = emptyList(); error = it.message ?: "Could not create the draft." }
             }) { Text(if (action == "formatter") "Format" else if (action == "template") "Use template" else "Generate") }
-            OutlinedButton(onClick = { values = mapOf("timezone" to java.util.TimeZone.getDefault().id, "tone" to "professional"); output = ""; checks = emptyList(); error = "" }) { Text("Reset") }
+            OutlinedButton(onClick = { values = mapOf("timezone" to java.util.TimeZone.getDefault().id, "tone" to "professional", "duration" to defaultDuration); output = ""; checks = emptyList(); error = "" }) { Text("Reset") }
         }
         if (error.isNotEmpty()) Text(error, color = MaterialTheme.colorScheme.error)
         checks.forEach { check ->
