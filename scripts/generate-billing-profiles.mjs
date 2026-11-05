@@ -3,6 +3,7 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isOfflineLocalToolRecord, OFFLINE_LOCAL_DOCUMENT_TOOL_IDS } from "../src/lib/offline/local-operation-policy.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const { tools: catalogTools } = await import("../src/data/catalog.ts");
