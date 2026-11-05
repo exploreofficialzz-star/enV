@@ -109,3 +109,77 @@ class NativeCommunicationEngineTest {
         assertThrows(IllegalArgumentException::class.java) { NativeCommunicationEngine.parse("email-translator") }
     }
 }
+
+
+    @Test fun calendarExportUsesTheEnteredIanaZoneAndEscapesEventText() {
+        val ics = NativeCommunicationEngine.calendarIcs("meeting-builder", mapOf(
+            "subject" to "Roadmap, review; draft",
+            "date" to "2026-11-05T10:00",
+            "timezone" to "Africa/Lagos",
+            "duration" to "45",
+            "place" to "Room A",
+            "details" to "First line\nSecond line",
+        ))
+        assertTrue(ics.contains("VERSION:2.0"))
+        assertTrue(ics.contains("SUMMARY:Roadmap\\, review\\; draft"))
+        assertTrue(ics.contains("DESCRIPTION:First line\\nSecond line"))
+        assertTrue(ics.contains("DTSTART:20261105T090000Z"))
+        assertTrue(ics.contains("DTEND:20261105T094500Z"))
+        assertTrue(ics.contains("BEGIN:VALARM"))
+        ics.split("\r\n").filter { it.isNotEmpty() }.forEach {
+            assertTrue("iCalendar lines must stay within 75 UTF-8 octets", it.toByteArray(Charsets.UTF_8).size <= 75)
+        }
+    }
+
+    @Test fun calendarExportRejectsDaylightSavingGapsAndRepeatedTimes() {
+        assertThrows(IllegalArgumentException::class.java) {
+            NativeCommunicationEngine.calendarIcs("meeting-builder", mapOf(
+                "date" to "2026-03-08T02:30", "timezone" to "America/New_York", "duration" to "30",
+            ))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            NativeCommunicationEngine.calendarIcs("meeting-builder", mapOf(
+                "date" to "2026-11-01T01:30", "timezone" to "America/New_York", "duration" to "30",
+            ))
+        }
+    }
+
+    @Test fun invitationRsvpMustPrecedeTheEvent() {
+        assertThrows(IllegalArgumentException::class.java) {
+            NativeCommunicationEngine.calendarIcs("invitation-builder", mapOf(
+                "date" to "2026-11-05T10:00",
+                "rsvpBy" to "2026-11-05T10:00",
+                "timezone" to "Africa/Lagos",
+            ))
+        }
+    }
+
+    @Test fun smartPunctuationGetsANonDestructiveGsm7Alternative() {
+        val safe = NativeCommunicationEngine.gsm7Alternative("“Price”—it’s ready… now")
+        assertEquals("\"Price\"-it's ready... now", safe)
+        assertTrue(NativeCommunicationEngine.smsMetrics(safe).first)
+    }
+
+    @Test fun emailChecksDetectDuplicateToCcAndBccRecipients() {
+        val values = mapOf(
+            "email" to "alex@example.com",
+            "subject" to "Update",
+            "details" to "The plan is ready.",
+            "cc" to "team@example.com; Alex@example.com",
+            "bcc" to "hidden@example.com",
+        )
+        val checks = NativeCommunicationEngine.checks("email-builder", values, NativeCommunicationEngine.generate("email-builder", values)).joinToString(" ")
+        assertTrue(checks.contains("more than once across To, Cc and Bcc"))
+    }
+
+    @Test fun emailHeaderLineBreaksAreRemovedFromGeneratedHeaders() {
+        val values = mapOf(
+            "email" to "alex@example.com",
+            "subject" to "Update\r\nBcc: victim@example.com",
+            "details" to "The plan is ready.",
+        )
+        val output = NativeCommunicationEngine.generate("email-builder", values)
+        assertTrue(!output.contains("\r\nBcc: victim@example.com"))
+        val checks = NativeCommunicationEngine.checks("email-builder", values, output).joinToString(" ")
+        assertTrue(checks.contains("control characters"))
+    }
