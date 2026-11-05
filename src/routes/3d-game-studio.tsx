@@ -12,7 +12,7 @@ const GameStudio = lazy(loadGameStudio);
 
 export const Route = createFileRoute("/3d-game-studio")({
   loader: async () => {
-    await loadGameStudio().catch(() => undefined);
+    if (typeof window !== "undefined") await loadGameStudio().catch(() => undefined);
     return null;
   },
   component: GameStudioPage,
