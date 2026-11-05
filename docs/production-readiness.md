@@ -69,7 +69,7 @@ The Render service has an aggregate request-body limit as well as per-file valid
 - `X-Frame-Options: SAMEORIGIN`
 - `Referrer-Policy: strict-origin-when-cross-origin`
 - `Strict-Transport-Security: max-age=31536000; includeSubDomains`
-- `Permissions-Policy: camera=(), geolocation=(), microphone=(self)`
+- `Permissions-Policy: camera=(self), geolocation=(), microphone=(self)`
 
 Static `/assets/*` responses receive immutable one-year caching.
 
