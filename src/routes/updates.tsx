@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { Bell, CalendarDays } from "lucide-react";
 import { recordAnalyticsEvent } from "@/lib/analytics/client";
 
@@ -98,7 +98,7 @@ function UpdatesPage() {
           </div>
         </>
       )}
-      <div className="mt-8"><Link to="/" className="text-sm font-semibold text-accent underline underline-offset-4">Back to enV home</Link></div>
+      <div className="mt-8"><a href="https://envtools.store/" className="text-sm font-semibold text-accent underline underline-offset-4">Back to enV home</a></div>
     </main>
   );
 }
