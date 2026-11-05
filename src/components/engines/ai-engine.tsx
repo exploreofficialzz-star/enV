@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FieldGrid, type UiField } from "@/components/engines/fields";
 import { ErrorBanner } from "@/components/tools/error-banner";
-import { CodeResult } from "@/components/engines/result-panel";
+import { CopyButton } from "@/components/tools/copy-button";
+import { downloadText } from "@/lib/utils";
 import { initialValues } from "@/components/engines/initial-values";
 import { generateAiMicroTool, isAiMicroOperation } from "@/lib/ai/micro-tools";
 
@@ -159,16 +160,36 @@ export function AiEngine({ op }: { op: string }) {
   const fields = useMemo(() => fieldsFor(op), [op]);
   const [values, setValues] = useState(() => initialValues(fields));
   const [out, setOut] = useState("");
+  const [generated, setGenerated] = useState("");
   const [error, setError] = useState<string | null>(null);
   const runTool = () => {
-    try { setError(null); setOut(run(op, values)); }
+    try { setError(null); const next = run(op, values); setOut(next); setGenerated(next); }
     catch (e) { setError(e instanceof Error ? e.message : "Could not run AI micro-tool."); }
   };
   return <div className="space-y-4">
-    <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-subtle">The Generate button here runs locally with deterministic templates. It does not send your text anywhere and does not claim to be an LLM.</div>
+    <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-subtle">Runs on this device with deterministic templates. Your text stays here; this is not a cloud LLM.</div>
     <FieldGrid fields={fields} values={values} onChange={(name, value) => setValues((x) => ({ ...x, [name]: value }))} />
-    <div className="flex flex-wrap gap-2"><Button type="button" onClick={runTool}>Generate</Button><Button type="button" variant="ghost" onClick={() => { setOut(""); setError(null); }}>Clear</Button></div>
+    <div className="flex flex-wrap gap-2">
+      <Button type="button" onClick={runTool}>Generate</Button>
+      {out && out !== generated ? <Button type="button" variant="outline" onClick={() => setOut(generated)}>Reset edits</Button> : null}
+      <Button type="button" variant="ghost" onClick={() => { setOut(""); setGenerated(""); setError(null); }}>Clear</Button>
+    </div>
     <ErrorBanner message={error} />
-    <CodeResult code={out} filename={`env-ai-${op}.txt`} />
+    {out ? <section className="space-y-2" aria-label="Generated draft">
+      <label htmlFor="ai-micro-editable-draft" className="text-sm font-medium">Editable draft</label>
+      <textarea
+        id="ai-micro-editable-draft"
+        aria-label="Editable draft"
+        value={out}
+        onChange={(event) => setOut(event.target.value)}
+        rows={12}
+        spellCheck
+        className="w-full min-h-56 resize-y rounded-lg border border-border bg-surface px-3 py-2 text-sm leading-6 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      />
+      <div className="flex flex-wrap gap-2">
+        <CopyButton text={out} />
+        <Button type="button" variant="outline" onClick={() => downloadText(out, `env-ai-${op}.txt`)}>Download</Button>
+      </div>
+    </section> : null}
   </div>;
 }
