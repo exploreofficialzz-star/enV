@@ -12,7 +12,6 @@ function loadWorldLabWorkspace(): Promise<WorldLabWorkspaceModule> {
 
 /** Warm the workspace while the entry surface is visible, never after Enter is tapped. */
 export async function preloadWorldLabWorkspace(): Promise<void> {
-  if (typeof window === "undefined") return;
   await loadWorldLabWorkspace();
 }
 
