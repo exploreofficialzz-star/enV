@@ -1,4 +1,4 @@
-import { lazy } from "react";
+import { lazy, Suspense } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/layout/app-shell";
 
@@ -19,5 +19,5 @@ export const Route = createFileRoute("/3d-game-studio")({
 });
 
 function GameStudioPage() {
-  return <AppShell><GameStudio /></AppShell>;
+  return <AppShell><Suspense fallback={null}><GameStudio /></Suspense></AppShell>;
 }
