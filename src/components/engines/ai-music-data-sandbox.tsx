@@ -13,6 +13,7 @@ import {
   HardDrive,
   Headphones,
   LayoutDashboard,
+  LoaderCircle,
   MoreHorizontal,
   Plus,
   Search,
