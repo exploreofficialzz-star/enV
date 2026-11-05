@@ -14,6 +14,10 @@ const webToolShell = readFileSync("src/components/tools/tool-shell.tsx", "utf8")
 const webToolCard = readFileSync("src/components/tools/tool-card.tsx", "utf8");
 const webToolEngine = readFileSync("src/components/tools/tool-engine.tsx", "utf8");
 const webScreenshotEngine = readFileSync("src/components/engines/screenshot-engine.tsx", "utf8");
+const webABookEngine = readFileSync("src/components/engines/a-book-engine.tsx", "utf8");
+const webMusicSandbox = readFileSync("src/components/engines/ai-music-data-sandbox.tsx", "utf8");
+const webWorldLabEntry = readFileSync("src/components/world-lab/world-lab-entry.tsx", "utf8");
+const webGameStudioRoute = readFileSync("src/routes/3d-game-studio.tsx", "utf8");
 const webOfflineCapabilities = readFileSync("src/lib/offline/capabilities.ts", "utf8");
 const webToolRoute = readFileSync("src/routes/tools/$category/$slug.tsx", "utf8");
 const webStore = readFileSync("src/lib/storage.ts", "utf8");
@@ -77,6 +81,15 @@ assert.doesNotMatch(webToolRoute, /await loadPublicCommunityToolFeed/, "Communit
 assert.doesNotMatch(webToolEngine, /Loading \{props\.tool\.name\}|Preparing \{tool\.name\}|Offline package ready on this device|OfflineToolUnavailable/, "Offline package state must not gate or decorate the tool screen");
 assert.doesNotMatch(webScreenshotEngine, /Loading the editor|fallback=\{loading\}/, "Screenshot tools must not show an entry loading state");
 assert.match(webScreenshotEngine, /<Suspense fallback=\{null\}>/, "Screenshot editor chunks must load beneath the tool interface");
+assert.doesNotMatch(webABookEngine, /Opening your private local library|Checking local library|Opening local library/, "A Book must show its entry UI while local storage opens in the background");
+assert.match(webABookEngine, /if \(showWelcome \|\| !libraryReady\)/, "A Book must keep its safe welcome UI visible until the correct local profile is ready");
+assert.match(webABookEngine, /disabled=\{!libraryReady\}/, "A Book must prevent library actions until the active local profile is loaded");
+assert.doesNotMatch(webMusicSandbox, /Opening your workspace|className="ms-loading"/, "Music Sandbox must not show an entry loading indicator");
+assert.match(webMusicSandbox, /canEnter=\{ready && !error\}/, "Music Sandbox entry must wait silently for local data and surface actual storage failures");
+assert.match(webWorldLabEntry, /<Suspense fallback=\{null\}>/, "World Lab workspace chunks must load beneath its entry surface");
+assert.doesNotMatch(webWorldLabEntry, /Opening The World Lab|world-lab-entry__loading/, "World Lab must not show a workspace-opening loader");
+assert.match(webGameStudioRoute, /<Suspense fallback=\{null\}>/, "3D Game Studio route chunks must load without a visible entry fallback");
+assert.doesNotMatch(webGameStudioRoute, /Loading 3D Game Studio/, "3D Game Studio must not show a route-opening loader");
 assert.doesNotMatch(android, /StatusPill\("ON DEVICE"/, "Android cards must not show a separate offline-ready badge");
 assert.match(androidTheme, /CompositionLocalProvider\(LocalDensity provides scaledDensity\)/);
 assert.match(webStyles, /--text-base: 1\.11rem/);
