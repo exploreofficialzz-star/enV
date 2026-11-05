@@ -157,20 +157,6 @@ async function handleAssetRequest(event) {
   return response;
 }
 
-async function findReadyPackageForPath(pathname) {
-  const db = await openPackageDb();
-  try {
-    const rows = await new Promise((resolve, reject) => {
-      const request = db.transaction("packages", "readonly").objectStore("packages").getAll();
-      request.onsuccess = () => resolve(request.result || []);
-      request.onerror = () => reject(request.error || new Error("Offline package listing failed."));
-    });
-    return rows.find((item) => item && item.status === "ready" && item.pathname === pathname) || null;
-  } finally {
-    db.close();
-  }
-}
-
 async function shellResponse() {
   const cache = await caches.open(CORE_CACHE);
   return await cache.match(new URL("/", self.location.origin).href) ||
@@ -194,13 +180,14 @@ async function handleNavigation(request) {
     response = await fetch(request);
   } catch {
     if (url.pathname.startsWith("/tools/")) {
-      const installed = await findReadyPackageForPath(url.pathname);
-      if (installed) {
-        const pages = await caches.open(NAVIGATION_CACHE);
-        const exact = await pages.match(request);
-        if (exact) return exact;
-      }
-      return offlineUnavailableResponse();
+      // A tool URL is still an enV route while offline. Prefer its exact cached
+      // navigation when available; otherwise serve the same application shell and
+      // let the client router render the tool page. Never replace a tool with a
+      // standalone "not available offline" page.
+      const pages = await caches.open(NAVIGATION_CACHE);
+      const exact = await pages.match(request);
+      if (exact) return exact;
+      return await shellResponse();
     }
     if (url.pathname === "/") return await shellResponse();
     return offlineUnavailableResponse();
