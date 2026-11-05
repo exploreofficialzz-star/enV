@@ -72,7 +72,7 @@ object NativeAiMicroEngine {
                 "What is one thing you would change about $topic? " + clean(values["cta"], "What would you add?"),
             ), count)
             "blog-outline" -> {
-                val keyPoints = splitList(values["keyPoints"].orEmpty())
+                val keyPoints = splitLines(values["keyPoints"].orEmpty())
                 listOf(
                     "CONTENT BRIEF\nTopic: $topic\nAudience: $audience\nGoal: " + clean(values["goal"], "Help the reader understand the topic and take a useful next step") + "\nEditorial angle: " + clean(values["angle"], "Explain the practical problem before presenting the solution"),
                     "OUTLINE\n1. Opening: name the reader's problem and why it matters\n2. The essentials: define $topic in plain language\n3. The decision: explain the main choices, trade-offs or criteria\n4. Practical walkthrough: arrange the steps in the order a reader should use them\n5. Example or evidence: use a real example, source or supplied detail\n6. Common mistakes: explain what to check before acting\n7. Recap: summarise the useful points and answer the opening question\n8. Next step: " + clean(values["cta"], "[Add one relevant next step for the reader]"),
@@ -100,7 +100,7 @@ object NativeAiMicroEngine {
                 ).joinToString("\n\n")
             }
             "faq" -> {
-                val questions = splitList(values["points"].orEmpty())
+                val questions = splitLines(values["points"].orEmpty())
                 if (questions.isEmpty()) "Add one question per line, then generate the FAQ."
                 else {
                     val answers = values["answers"].orEmpty().lines().mapNotNull { line ->
@@ -113,21 +113,21 @@ object NativeAiMicroEngine {
                         if (answer.isNullOrBlank()) missing += question
                         "Q: $question\nA: " + (answer ?: "[Add a verified answer before publishing.]")
                     }.joinToString("\n\n")
-                    output + if (missing.isNotEmpty()) "\n\nNEEDS AN ANSWER\n" + missing.joinToString("\n") { "• $it" } + "\n\nOnly publish answers confirmed by your product, policy or source material." else ""
+                    "FAQ: $topic\\nAudience: $audience\\n\\n" + output + if (missing.isNotEmpty()) "\n\nNEEDS AN ANSWER\n" + missing.joinToString("\n") { "• $it" } + "\n\nOnly publish answers confirmed by your product, policy or source material." else ""
                 }
             }
             "feature-benefit" -> {
-                val features = splitList(values["benefit"].orEmpty())
+                val features = splitLines(values["benefit"].orEmpty())
                 if (features.isEmpty()) "Add one product feature per line."
                 else {
-                    val outcomes = splitList(values["outcomes"].orEmpty())
-                    features.mapIndexed { index, feature ->
+                    val outcomes = splitLines(values["outcomes"].orEmpty())
+                    "VALUE MAPPING\\nProduct / service: $topic\\nAudience: $audience\\n\\n" + features.mapIndexed { index, feature ->
                         "Feature: $feature\nCustomer outcome: " + (outcomes.getOrNull(index) ?: "[Add the specific result this feature creates.]") + "\nEvidence to support the claim: [Add a measured result, user example or verified product detail.]"
                     }.joinToString("\n\n") + if (outcomes.size > features.size) "\n\nNote: extra outcome entries were not matched to a feature and were left out." else ""
                 }
             }
             "agenda" -> {
-                val points = splitList(clean(values["topics"], "Progress\nBlockers\nDecisions\nNext steps"))
+                val points = splitLines(clean(values["topics"], "Progress\nBlockers\nDecisions\nNext steps")).take(100)
                 val requested = values["duration"]?.toIntOrNull() ?: 30
                 val duration = requested.coerceIn(points.size.coerceAtLeast(1), 600)
                 val base = duration / points.size
@@ -159,9 +159,9 @@ object NativeAiMicroEngine {
                 numbered(listOf(if (benefit.isNotEmpty()) "$keyword — $benefit" else "$keyword: A practical guide", "The $keyword guide$suffix", "$keyword: Features, uses and key details", "Getting started with $keyword", "A closer look at $keyword", "$keyword: What to know before you choose"), 6)
             }
             "pros-cons" -> {
-                val upsides = splitList(values["upsides"].orEmpty())
-                val risks = splitList(values["risks"].orEmpty())
-                val criteria = splitList(values["criteria"].orEmpty())
+                val upsides = splitLines(values["upsides"].orEmpty())
+                val risks = splitLines(values["risks"].orEmpty())
+                val criteria = splitLines(values["criteria"].orEmpty())
                 listOf(
                     "DECISION: " + clean(values["option"], "the option being considered"),
                     "UPSIDE TO VERIFY\n" + (if (upsides.isNotEmpty()) upsides.joinToString("\n") { "• $it" } else "• [Add observed advantages or expected benefits.]"),
@@ -177,8 +177,8 @@ object NativeAiMicroEngine {
             }
             "yt-desc" -> {
                 val points = splitList(values["points"].orEmpty())
-                val links = splitList(values["links"].orEmpty())
-                val chapters = splitList(values["chapters"].orEmpty())
+                val links = splitLines(values["links"].orEmpty())
+                val chapters = splitLines(values["chapters"].orEmpty())
                 val parts = mutableListOf(
                     topic,
                     "This video covers " + topic + (if (audience.isNotEmpty()) " for $audience" else "") + ". The description uses a $style tone and only relies on the details supplied here.",
@@ -236,4 +236,5 @@ object NativeAiMicroEngine {
     }
     private fun numbered(lines: List<String>, count: Int): String = lines.take(count.coerceIn(1, lines.size)).mapIndexed { index, line -> "${index + 1}. $line" }.joinToString("\n\n")
     private fun splitList(value: String): List<String> = value.split(Regex("[\n,]")).map { it.trim() }.filter { it.isNotEmpty() }
+    private fun splitLines(value: String): List<String> = value.split(Regex("\\r?\\n")).map { it.trim() }.filter { it.isNotEmpty() }
 }
