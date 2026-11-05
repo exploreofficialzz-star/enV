@@ -223,7 +223,10 @@ internal object NativeCommunicationEngine {
                     require(rsvp.isBefore(start)) { "The RSVP deadline must be earlier than the event." }
                 }
             }.onFailure { result += (it.message ?: "Check the event date, time and time zone.") }
-            if (value("duration").isNotBlank() && value("duration").toIntOrNull()?.let { it !in 5..480 } == true) result += "Set an event duration between 5 and 480 minutes."
+            if (value("duration").isNotBlank()) {
+                val parsedDuration = value("duration").toIntOrNull()
+                if (parsedDuration == null || parsedDuration !in 5..480) result += "Set an event duration between 5 and 480 minutes."
+            }
             if (kind in setOf("meeting", "agenda") && value("duration").isBlank()) result += "Set a duration so agenda timeboxes can be checked."
         }
         return result.distinct()
@@ -475,6 +478,14 @@ fun NativeCommunicationToolForm(toolId: String) {
                     }) { Text("Save calendar") }
                 }
                 if (gsm7 != null) OutlinedButton(onClick = { clipboard.setText(AnnotatedString(gsm7)) }) { Text("Copy GSM-7 version") }
+            }
+            if (kind == "sms") {
+                val metrics = NativeCommunicationEngine.smsMetrics(output)
+                Text(
+                    (if (metrics.first) "GSM-7" else "UCS-2") + " · " + metrics.second + " units · " + metrics.third + " segment(s)",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             Text(output, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
         }
