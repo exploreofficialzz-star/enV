@@ -7812,7 +7812,7 @@ enum NativeAiMicroEngine {
                 "What is one thing you would change about \(topic)? \(clean(values["cta"], "What would you add?"))"
             ], count: count)
         case "blog-outline":
-            let keyPoints = splitList(values["keyPoints"] ?? "")
+            let keyPoints = splitLines(values["keyPoints"] ?? "")
             return [
                 "CONTENT BRIEF\nTopic: \(topic)\nAudience: \(audience)\nGoal: \(clean(values["goal"], "Help the reader understand the topic and take a useful next step"))\nEditorial angle: \(clean(values["angle"], "Explain the practical problem before presenting the solution"))",
                 "OUTLINE\n1. Opening: name the reader's problem and why it matters\n2. The essentials: define \(topic) in plain language\n3. The decision: explain the main choices, trade-offs or criteria\n4. Practical walkthrough: arrange the steps in the order a reader should use them\n5. Example or evidence: use a real example, source or supplied detail\n6. Common mistakes: explain what to check before acting\n7. Recap: summarise the useful points and answer the opening question\n8. Next step: \(clean(values["cta"], "[Add one relevant next step for the reader]"))",
@@ -7837,7 +7837,7 @@ enum NativeAiMicroEngine {
                 "EDITORIAL NOTE\nReplace every bracketed prompt with verified, relevant detail. This local expansion scaffold does not invent supporting facts."
             ].joined(separator: "\n\n")
         case "faq":
-            let questions = splitList(values["points"] ?? "")
+            let questions = splitLines(values["points"] ?? "")
             guard !questions.isEmpty else { return "Add one question per line, then generate the FAQ." }
             var answers = [String: String]()
             for line in (values["answers"] ?? "").components(separatedBy: .newlines) {
@@ -7852,17 +7852,17 @@ enum NativeAiMicroEngine {
                 if answer == nil { missing.append(question) }
                 return "Q: \(question)\nA: \(answer ?? "[Add a verified answer before publishing.]")"
             }.joined(separator: "\n\n")
-            return output + (missing.isEmpty ? "" : "\n\nNEEDS AN ANSWER\n" + missing.map { "• " + $0 }.joined(separator: "\n") + "\n\nOnly publish answers confirmed by your product, policy or source material.")
+            return "FAQ: \(topic)\nAudience: \(audience)\n\n" + output + (missing.isEmpty ? "" : "\n\nNEEDS AN ANSWER\n" + missing.map { "• " + $0 }.joined(separator: "\n") + "\n\nOnly publish answers confirmed by your product, policy or source material.")
         case "feature-benefit":
-            let features = splitList(values["benefit"] ?? "")
+            let features = splitLines(values["benefit"] ?? "")
             guard !features.isEmpty else { return "Add one product feature per line." }
-            let outcomes = splitList(values["outcomes"] ?? "")
-            let output = features.enumerated().map { index, feature in
+            let outcomes = splitLines(values["outcomes"] ?? "")
+            let output = "VALUE MAPPING\nProduct / service: \(topic)\nAudience: \(audience)\n\n" + features.enumerated().map { index, feature in
                 "Feature: \(feature)\nCustomer outcome: \(index < outcomes.count ? outcomes[index] : "[Add the specific result this feature creates.]")\nEvidence to support the claim: [Add a measured result, user example or verified product detail.]"
             }.joined(separator: "\n\n")
             return output + (outcomes.count > features.count ? "\n\nNote: extra outcome entries were not matched to a feature and were left out." : "")
         case "agenda":
-            let points = splitList(clean(values["topics"], "Progress\nBlockers\nDecisions\nNext steps"))
+            let points = splitLines(clean(values["topics"], "Progress\nBlockers\nDecisions\nNext steps")).prefix(100).map { $0 }
             let requested = Int(values["duration"] ?? "30") ?? 30
             let duration = min(600, max(points.count, requested))
             let base = duration / points.count
@@ -7899,9 +7899,9 @@ enum NativeAiMicroEngine {
             ]
             return numbered(titles, count: 6)
         case "pros-cons":
-            let upsides = splitList(values["upsides"] ?? "")
-            let risks = splitList(values["risks"] ?? "")
-            let criteria = splitList(values["criteria"] ?? "")
+            let upsides = splitLines(values["upsides"] ?? "")
+            let risks = splitLines(values["risks"] ?? "")
+            let criteria = splitLines(values["criteria"] ?? "")
             return [
                 "DECISION: \(clean(values["option"], "the option being considered"))",
                 "UPSIDE TO VERIFY\n" + (upsides.isEmpty ? "• [Add observed advantages or expected benefits.]" : upsides.map { "• " + $0 }.joined(separator: "\n")),
@@ -7914,9 +7914,9 @@ enum NativeAiMicroEngine {
             guard !text.isEmpty else { return "Add the text you want to shorten." }
             return shortenExtractively(text, requestedWords: Int(values["count"] ?? "60") ?? 60)
         case "yt-desc":
-            let points = splitList(values["points"] ?? "")
-            let links = splitList(values["links"] ?? "")
-            let chapters = splitList(values["chapters"] ?? "")
+            let points = splitLines(values["points"] ?? "")
+            let links = splitLines(values["links"] ?? "")
+            let chapters = splitLines(values["chapters"] ?? "")
             var sections = [
                 topic,
                 "This video covers \(topic)\(audience.isEmpty ? "" : " for \(audience)"). The description uses a \(style) tone and only relies on the details supplied here.",
@@ -7939,6 +7939,7 @@ enum NativeAiMicroEngine {
     private static func tonePhrase(_ tone: String) -> String { ["professional":"clear and professional", "bold":"confident and direct", "playful":"light and playful", "friendly":"warm and friendly"][tone] ?? "natural and conversational" }
     private static func numbered(_ lines: [String], count: Int) -> String { lines.prefix(min(lines.count, max(1, count))).enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n\n") }
     private static func splitList(_ value: String) -> [String] { value.components(separatedBy: CharacterSet.newlines.union(CharacterSet(charactersIn: ","))).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty } }
+    private static func splitLines(_ value: String) -> [String] { value.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty } }
 
     private static func boundedYouTubeTitle(_ value: String) -> String {
         let text = value.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
