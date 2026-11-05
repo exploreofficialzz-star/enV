@@ -64,10 +64,19 @@ test("local tools remain interactive in the pre-monetization offline rollout", (
     "local operations without an allowance remain runnable while monetization is pending");
 });
 
-test("first offline document boot resolves its installed tool package before the UI message handshake", () => {
-  assert.match(serviceWorker, /findReadyPackageForClient/);
-  assert.match(serviceWorker, /self\.clients\.get\(clientId\)/);
-  assert.match(serviceWorker, /installedCache\.match\(request\)/);
+const toolRoute = readFileSync(new URL("../../src/routes/tools/$category/$slug.tsx", import.meta.url), "utf8");
+
+test("offline tool navigation opens the requested destination package before resolving engine assets", () => {
+  assert.ok(toolRoute.includes('pathname: `/tools/${category}/${slug}`,'),
+    "offline package lookup must use the route destination, not the previous window location");
+  const packageOpen = toolRoute.indexOf("await prepareOfflineToolPackage({");
+  const engineLoad = toolRoute.indexOf("await preloadToolEngine(matchedTool)");
+  assert.ok(packageOpen >= 0 && engineLoad > packageOpen,
+    "the requested tool package must be opened before its lazy engine chunk is loaded");
+  assert.match(serviceWorker, /if \(data\.type === "OPEN_TOOL_PACKAGE"\)/);
+  assert.match(serviceWorker, /await setSession\(\{ clientId, toolId, version,/);
+  assert.doesNotMatch(serviceWorker, /findReadyPackageForClient/,
+    "offline assets must use the explicit destination route handshake, not a stale client URL lookup");
 });
 
 test("package installation verifies every captured same-origin tool asset", () => {
