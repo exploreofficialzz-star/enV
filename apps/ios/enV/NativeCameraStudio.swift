@@ -360,7 +360,9 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
         recentCaptures.removeAll { $0 == url }
         recentCaptures.insert(url, at: 0)
         if recentCaptures.count > 8 {
-            let expired = recentCaptures.suffix(from: 8)
+            let expired = Array(recentCaptures.dropFirst(8))
+            if let latestPhotoURL, expired.contains(latestPhotoURL) { self.latestPhotoURL = nil }
+            if let latestVideoURL, expired.contains(latestVideoURL) { self.latestVideoURL = nil }
             expired.forEach { try? FileManager.default.removeItem(at: $0) }
             recentCaptures = Array(recentCaptures.prefix(8))
         }
