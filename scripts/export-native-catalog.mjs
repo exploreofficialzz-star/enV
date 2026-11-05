@@ -83,7 +83,7 @@ const runtimeCatalogExtensions = [
     id: "camera-studio",
     name: "Camera Studio",
     slug: "camera-studio",
-    description: "Take photos and record videos. Switch between the front and rear cameras, apply color filters, and adjust supported camera settings.",
+    description: "Take photos and record videos with your phone camera. Switch front/rear cameras and save captures locally.",
     category: "photography",
     subcategory: "Camera",
     keywords: ["camera", "camera studio", "photo", "photography", "video", "selfie", "front camera", "rear camera", "recording", "capture", "flash", "torch"],
