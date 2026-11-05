@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { AI_MICRO_TOOL_OPERATION, generateAiMicroTool, isAiMicroToolId, operationForAiMicroTool } from "./micro-tools.ts";
 
-test("AI micro-tools expose exactly the 13 previously Web-only routes", () => {
+test("AI micro-tools expose exactly the 13 category routes", () => {
   assert.equal(Object.keys(AI_MICRO_TOOL_OPERATION).length, 13);
   assert.equal(isAiMicroToolId("blog-outline-generator"), true);
   assert.equal(isAiMicroToolId("blog-outline-generator-extra"), false);
@@ -10,62 +10,109 @@ test("AI micro-tools expose exactly the 13 previously Web-only routes", () => {
   assert.equal(operationForAiMicroTool("title-generator"), undefined);
 });
 
-test("blog outline preserves the Web wording and multiline user inputs", () => {
-  assert.equal(generateAiMicroTool("blog-outline", { topic: "Gardening", audience: "new growers", goal: "Build confidence" }), "Title: Gardening\nAudience: new growers\nGoal: Build confidence\n\nOutline\n1. Introduction — the problem and why it matters\n2. What Gardening means\n3. The key ideas new growers should understand\n4. Practical steps or examples\n5. Common mistakes to avoid\n6. Checklist / next steps\n7. Conclusion and CTA");
+test("blog outline uses the audience, goal, editorial angle and supplied evidence", () => {
+  const output = generateAiMicroTool("blog-outline", {
+    topic: "Urban gardening", audience: "apartment renters", goal: "Help readers grow herbs",
+    angle: "Low-cost methods that work in small spaces", keyPoints: "Use containers\nCheck sunlight", cta: "Start with one herb pot",
+  });
+  assert.match(output, /CONTENT BRIEF/);
+  assert.match(output, /Low-cost methods that work in small spaces/);
+  assert.match(output, /Use containers\nCheck sunlight/);
+  assert.match(output, /Start with one herb pot/);
+  assert.match(output, /do not present assumptions as evidence/);
 });
 
-test("call-to-action tool emits the five deterministic options", () => {
-  assert.equal(generateAiMicroTool("cta", { topic: "Meal prep" }), "1. Get started with Meal prep\n\n2. Try Meal prep today\n\n3. See how Meal prep can help\n\n4. Learn more about Meal prep\n\n5. Start creating with Meal prep");
+test("CTA generator uses the requested action and never invents a benefit", () => {
+  const output = generateAiMicroTool("cta", { topic: "Meal prep", audience: "busy students", action: "Download the planner", benefit: "plan meals in one place" });
+  assert.match(output, /Download the planner to plan meals in one place/);
+  const cautious = generateAiMicroTool("cta", { topic: "Meal prep" });
+  assert.match(cautious, /Add a specific, supportable benefit/);
 });
 
-test("expand helper preserves the existing suffix and blank fallback", () => {
-  assert.equal(generateAiMicroTool("expand", { text: "A useful idea" }), "A useful idea.\n\nKey context: explain why this matters, who it affects, and what should happen next. Add one practical example and finish with a clear next step.");
-  assert.match(generateAiMicroTool("expand", { text: "   " }), /^Your notes\./);
+test("expand helper uses a supplied context and makes missing facts explicit", () => {
+  const output = generateAiMicroTool("expand", { text: "A useful idea", audience: "new growers", context: "Small spaces make growing food feel difficult.", example: "A pot of basil beside a bright window.", nextStep: "Choose one herb to grow." });
+  assert.match(output, /WHY IT MATTERS\nSmall spaces make growing food feel difficult/);
+  assert.match(output, /WHO IT AFFECTS\nWrite for: new growers/);
+  assert.match(output, /A pot of basil beside a bright window/);
+  assert.match(output, /Choose one herb to grow/);
+  assert.doesNotMatch(output, /explain why this matters/);
+  assert.match(generateAiMicroTool("expand", { text: " " }), /Add the text or notes/);
 });
 
-test("FAQ generator splits and trims newline/comma-separated points", () => {
-  assert.equal(generateAiMicroTool("faq", { topic: "Meal prep", audience: "students", points: "Storage\n, Cost, " }), "Q: Storage about Meal prep?\nA: Explain storage in a concise, factual way for students.\n\nQ: Cost about Meal prep?\nA: Explain cost in a concise, factual way for students.");
+test("FAQ uses answers supplied for each exact question and flags missing answers", () => {
+  const output = generateAiMicroTool("faq", {
+    topic: "Meal prep", audience: "students", points: "How long does it keep?\nCan I freeze it?",
+    answers: "How long does it keep? | Refrigerated meals should be used within the safe storage window for their ingredients.",
+  });
+  assert.match(output, /A: Refrigerated meals should be used within the safe storage window/);
+  assert.match(output, /Can I freeze it\?\nA: \[Add a verified answer before publishing\.\]/);
+  assert.match(output, /NEEDS AN ANSWER/);
 });
 
-test("feature-benefit generator creates a pair for every comma or newline item", () => {
-  assert.equal(generateAiMicroTool("feature-benefit", { audience: "teams", benefit: "Shared workspace,Fast search\nVersion history" }), "Feature: Shared workspace\nBenefit: Helps teams get a clearer result with less friction.\n\nFeature: Fast search\nBenefit: Helps teams get a clearer result with less friction.\n\nFeature: Version history\nBenefit: Helps teams get a clearer result with less friction.");
+test("feature-benefit pairs supplied outcomes with features and flags unsupported claims", () => {
+  const output = generateAiMicroTool("feature-benefit", {
+    audience: "teams", benefit: "Shared workspace\nFast search", outcomes: "Everyone works from the same project view",
+  });
+  assert.match(output, /Customer outcome: Everyone works from the same project view/);
+  assert.match(output, /Feature: Fast search\nCustomer outcome: \[Add the specific result/);
+  assert.match(output, /Evidence to support the claim/);
 });
 
-test("agenda generator numbers topics and preserves the close-out reminder", () => {
-  assert.equal(generateAiMicroTool("agenda", { goal: "Choose a launch date", topics: "Progress\nBlockers, Decision" }), "Meeting goal: Choose a launch date\n\nAgenda\n1. Progress\n2. Blockers\n3. Decision\n\nClose with owners, deadlines, and unresolved questions.");
+test("agenda time-boxes topics and preserves a closing review", () => {
+  const output = generateAiMicroTool("agenda", { goal: "Choose a launch date", duration: "30", topics: "Progress\nDecision" });
+  assert.match(output, /Planned duration: 30 minutes/);
+  assert.match(output, /1\. Progress — 15 min\n2\. Decision — 15 min/);
+  assert.match(output, /Confirm decisions, owners, deadlines/);
 });
 
-test("meeting action items retain blank lines only as separators and number the owners", () => {
-  assert.equal(generateAiMicroTool("actions", { notes: "Sam — draft\n\nLee — review" }), "Action items\n1. Sam — draft\n2. Lee — review\n\nBefore sharing, confirm each owner and deadline.");
+test("action items parse owner, action, due date and priority without inventing status", () => {
+  const output = generateAiMicroTool("actions", { notes: "Sam | Draft launch brief | Friday | High\nLee | Review pricing | Monday | Medium" });
+  assert.match(output, /Owner: Sam \| Action: Draft launch brief \| Due: Friday \| Priority: High/);
+  assert.match(output, /Status has not been inferred/);
+  const incomplete = generateAiMicroTool("actions", { notes: "Finish the landing page" });
+  assert.match(incomplete, /\[Assign owner\]/);
+  assert.match(incomplete, /\[Add due date\]/);
 });
 
-test("product title generator uses the benefit and returns its five title formats", () => {
-  assert.equal(generateAiMicroTool("product-title", { topic: "Focus app", benefit: "Plan a calmer day" }), "1. Focus app — Plan a calmer day\n\n2. Focus app: Plan a calmer day\n\n3. The Focus app Starter Guide\n\n4. Focus app Made Simple\n\n5. Focus app Toolkit");
+test("product-title generator uses the keyword, benefit and target customer", () => {
+  const output = generateAiMicroTool("product-title", { topic: "Focus app", keyword: "Daily planner", benefit: "Plan a calmer day", audience: "remote teams" });
+  assert.match(output, /Daily planner — Plan a calmer day/);
+  assert.match(output, /The Daily planner guide for remote teams/);
 });
 
-test("pros-cons worksheet is explicit that outcomes need verification", () => {
-  const output = generateAiMicroTool("pros-cons", { topic: "Pilot a new workflow", option: "Launch now vs wait" });
-  assert.match(output, /^Decision worksheet: Launch now vs wait/);
-  assert.match(output, /Potential upside: Pilot a new workflow may help achieve the stated goal\./);
-  assert.match(output, /What is the smallest useful test\?/);
-  assert.match(output, /What would make you stop or change direction\?/);
+test("pros-cons worksheet only treats supplied details as evidence", () => {
+  const output = generateAiMicroTool("pros-cons", { option: "Launch now vs wait", upsides: "Reach early users", risks: "Support load may increase", criteria: "Weekly active use" });
+  assert.match(output, /UPSIDE TO VERIFY\n• Reach early users/);
+  assert.match(output, /RISKS \/ COSTS TO CHECK\n• Support load may increase/);
+  assert.match(output, /DECISION CRITERIA\n• Weekly active use/);
+  assert.match(output, /Separate measured results from assumptions/);
+  assert.match(generateAiMicroTool("pros-cons", { option: "A or B" }), /\[Add known risks, costs or trade-offs\]/);
 });
 
-test("shorten helper cuts only after 28 whitespace-separated words and preserves Unicode", () => {
-  const words = Array.from({ length: 29 }, (_, index) => `word${index + 1}`).join(" ");
-  assert.equal(generateAiMicroTool("shorten", { text: words }), `${Array.from({ length: 28 }, (_, index) => `word${index + 1}`).join(" ")}…`);
-  assert.equal(generateAiMicroTool("shorten", { text: "Café déjà vu" }), "Café déjà vu");
+test("shorten helper honors a target and keeps sentence boundaries when available", () => {
+  const source = "Our tool helps teams manage projects. It keeps deadlines visible. It stores files securely. It sends weekly reminders.";
+  assert.equal(generateAiMicroTool("shorten", { text: source, count: "10" }), "Our tool helps teams manage projects. It keeps deadlines visible…");
+  assert.equal(generateAiMicroTool("shorten", { text: "Café déjà vu", count: "60" }), "Café déjà vu");
+  assert.match(generateAiMicroTool("shorten", { text: "   " }), /Add the text you want to shorten/);
 });
 
-test("TikTok caption helper honors the selected variant count", () => {
-  assert.equal(generateAiMicroTool("tt-caption", { topic: "Quiet mornings", audience: "students", count: "2" }), "1. Quiet mornings made simple. Save this for later.\n\n2. If you're into Quiet mornings, this one is for you.");
+test("TikTok caption helper uses a selected count and supplied hook and CTA", () => {
+  const output = generateAiMicroTool("tt-caption", { topic: "Quiet mornings", audience: "students", hook: "One habit to try", cta: "Save this checklist", count: "2" });
+  assert.equal(output.split("\n\n").length, 2);
+  assert.match(output, /One habit to try: Quiet mornings\. Save this checklist/);
 });
 
-test("YouTube description uses topic, audience, tone and parsed key points", () => {
-  assert.equal(generateAiMicroTool("yt-desc", { topic: "Urban gardening", audience: "beginners", tone: "professional", points: "Tools\nPlanning,Harvest" }), "Urban gardening\n\nIn this video, we break down Urban gardening for beginners in a clear and professional way.\n\nWhat you'll cover:\n• Tools\n• Planning\n• Harvest\n\nIf you found this useful, save it for later and share it with someone working on the same goal.");
+test("YouTube description builds optional chapters and links from supplied content", () => {
+  const output = generateAiMicroTool("yt-desc", { topic: "Urban gardening", audience: "beginners", tone: "professional", points: "Tools\nPlanning", chapters: "0:00 Introduction\n1:20 Choose a container", links: "https://example.com/guide", cta: "Subscribe for the next lesson" });
+  assert.match(output, /WHAT YOU'LL LEARN/);
+  assert.match(output, /CHAPTERS\n0:00 Introduction\n1:20 Choose a container/);
+  assert.match(output, /LINKS \/ RESOURCES\nhttps:\/\/example.com\/guide/);
+  assert.match(output, /Subscribe for the next lesson/);
 });
 
-test("YouTube title helper limits variants and falls back safely for invalid counts", () => {
-  assert.equal(generateAiMicroTool("yt-title", { topic: "Learning SQL", audience: "analysts", count: "2" }), "1. Learning SQL: What analysts Should Know\n\n2. How to Get Better Results With Learning SQL");
-  assert.equal(generateAiMicroTool("yt-title", { topic: "SQL", audience: "learners", count: "not-a-number" }).split("\n\n").length, 5);
+test("YouTube titles are capped at the official 100-character limit", () => {
+  const output = generateAiMicroTool("yt-title", { topic: "Learning SQL", audience: "analysts", angle: "a practical guide to advanced reporting", keyword: "SQL reporting", count: "8" });
+  const titles = output.split("\n\n").map((line) => line.replace(/^\d+\.\s/u, ""));
+  assert.equal(titles.length, 8);
+  assert.ok(titles.every((title) => title.length <= 100));
 });
