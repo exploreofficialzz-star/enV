@@ -110,6 +110,24 @@ test("YouTube description builds optional chapters and links from supplied conte
   assert.match(output, /Subscribe for the next lesson/);
 });
 
+test("line-based inputs keep commas inside each item", () => {
+  const faq = generateAiMicroTool("faq", {
+    topic: "Safety", points: "Is this safe, for everyone?",
+    answers: "Is this safe, for everyone? | Check the product's stated limits before use.",
+  });
+  assert.match(faq, /Q: Is this safe, for everyone\?/);
+  assert.match(faq, /A: Check the product's stated limits before use\./);
+
+  const benefits = generateAiMicroTool("feature-benefit", {
+    topic: "Search", benefit: "Fast search, with filters", outcomes: "Find matching records more quickly",
+  });
+  assert.match(benefits, /Feature: Fast search, with filters/);
+  assert.match(benefits, /Customer outcome: Find matching records more quickly/);
+
+  const agenda = generateAiMicroTool("agenda", { duration: "20", topics: "Review risks, costs and scope\nChoose next step" });
+  assert.match(agenda, /1\. Review risks, costs and scope — 10 min/);
+});
+
 test("YouTube titles are capped at the official 100-character limit", () => {
   const output = generateAiMicroTool("yt-title", { topic: "Learning SQL", audience: "analysts", angle: "a practical guide to advanced reporting", keyword: "SQL reporting", count: "8" });
   const titles = output.split("\n\n").map((line) => line.replace(/^\d+\.\s/u, ""));
