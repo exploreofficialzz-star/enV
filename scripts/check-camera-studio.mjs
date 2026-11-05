@@ -25,6 +25,9 @@ const billingProfiles = JSON.parse(read("src/data/billing-profile-runtime-extens
 
 assert.match(engine, /navigator\.mediaDevices\?\.getUserMedia/);
 assert.match(engine, /isSecureCaptureContext/);
+assert.match(engine, /initialCameraRequestRef/);
+assert.match(engine, /void requestCamera\("environment"\)/);
+assert.doesNotMatch(engine, /Your camera preview will appear here|Allow camera access when your browser asks|Start camera/);
 assert.match(engine, /getSettings\(\)\.facingMode/);
 assert.match(engine, /facingMode: \{ ideal: nextFacing \}/);
 assert.match(engine, /VIDEO_QUALITIES/);
@@ -66,6 +69,10 @@ assert.match(registry, /engine: \{ type: "custom", id: "camera-studio" \}/);
 assert.match(registry, /status: "active"/);
 
 assert.match(androidCamera, /LifecycleCameraController/);
+assert.match(androidCamera, /LaunchedEffect\(Unit\)/);
+assert.match(androidCamera, /requestCameraAccess\(\)/);
+assert.match(androidCamera, /Settings\.ACTION_APPLICATION_DETAILS_SETTINGS/);
+assert.doesNotMatch(androidCamera, /Your camera preview appears here|Allow camera access to begin|Enable camera/);
 assert.match(androidCamera, /import androidx\.compose\.runtime\.livedata\.observeAsState/);
 assert.match(androidCamera, /DisposableEffect\(controller, lifecycleOwner, cameraGranted\)/);
 assert.match(androidCamera, /if \(cameraGranted\) controller\.bindToLifecycle\(lifecycleOwner\)/);
@@ -97,6 +104,9 @@ assert.match(androidCatalog, /fun Catalog\.withCameraStudio\(\)/);
 assert.match(androidCatalogTests, /runtimeCameraStudioAdditionIsUniqueAndSearchable/);
 
 assert.match(iosCamera, /AVCaptureSession/);
+assert.match(iosCamera, /onAppear \{ capture\.start\(\) \}/);
+assert.match(iosCamera, /UIApplication\.openSettingsURLString/);
+assert.doesNotMatch(iosCamera, /Allow camera access to start|Button\("Start camera"\)/);
 assert.match(iosCamera, /AVCapturePhotoOutput/);
 assert.match(iosCamera, /AVCaptureMovieFileOutput/);
 assert.match(iosCamera, /AVCaptureSessionWasInterrupted/);
