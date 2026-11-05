@@ -17,7 +17,7 @@ test("blog outline uses the audience, goal, editorial angle and supplied evidenc
   });
   assert.match(output, /CONTENT BRIEF/);
   assert.match(output, /Low-cost methods that work in small spaces/);
-  assert.match(output, /Use containers\nCheck sunlight/);
+  assert.match(output, /• Use containers\n• Check sunlight/);
   assert.match(output, /Start with one herb pot/);
   assert.match(output, /do not present assumptions as evidence/);
 });
