@@ -153,7 +153,7 @@ struct Tool: Decodable, Identifiable, Hashable {
     }
     var isUnderProduction: Bool {
         !["a-book", "zip-any-file", "camera-studio"].contains(id.lowercased()) &&
-        !["accessibility", "audio", "business", "calculators", "communication", "datetime", "developer", "design", "ecommerce", "qr", "video"].contains(category.lowercased())
+        !["accessibility", "audio", "business", "calculators", "communication", "datetime", "developer", "design", "ecommerce", "ai", "qr", "video"].contains(category.lowercased())
     }
     var searchText: String {
         ([id, slug, name, description, category, subcategory ?? "", keywords.joined(separator: " "), tags.joined(separator: " ")].joined(separator: " ")).lowercased()
