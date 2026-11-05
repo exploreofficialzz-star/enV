@@ -198,7 +198,7 @@ internal object NativeCommunicationEngine {
             val all = (listOf(to) + cc + bcc).filter { it.isNotBlank() }.map { it.lowercase() }
             if (all.size != all.toSet().size) result += "An address appears more than once across To, Cc and Bcc; review recipient visibility."
             if (listOf("email", "cc", "bcc", "subject").any { key ->
-                values[key].orEmpty().any { ch -> ch == '\\r' || ch == '\\n' || ch.code < 32 || ch.code == 127 }
+                values[key].orEmpty().any { ch -> ch == '\r' || ch == '\n' || ch.code < 32 || ch.code == 127 }
             }) result += "Remove line breaks and control characters from email headers before using this draft."
         }
         if (kind == "sms" && output.isNotBlank()) {
@@ -269,9 +269,9 @@ internal object NativeCommunicationEngine {
     }
 
     private fun escapeIcs(value: String): String = value
-        .replace("\\\\", "\\\\\\\\")
-        .replace("\\r\\n", "\\\\n").replace("\\r", "\\\\n").replace("\\n", "\\\\n")
-        .replace(";", "\\\\;").replace(",", "\\\\,")
+        .replace("\\", "\\\\")
+        .replace("\r\n", "\\n").replace("\r", "\\n").replace("\n", "\\n")
+        .replace(";", "\\;").replace(",", "\\,")
 
     private fun foldIcsLine(line: String): String {
         val result = mutableListOf<String>()
@@ -284,7 +284,7 @@ internal object NativeCommunicationEngine {
             } else current += character
         }
         result += current
-        return result.joinToString("\\r\\n")
+        return result.joinToString("\r\n")
     }
 
     fun calendarIcs(toolId: String, values: Map<String, String>): String {
@@ -311,13 +311,13 @@ internal object NativeCommunicationEngine {
         val description = listOf(
             value("purpose").takeIf { it.isNotBlank() }?.let { "Purpose: " + it },
             value("details").takeIf { it.isNotBlank() },
-            value("items").takeIf { it.isNotBlank() }?.let { "Agenda:\\n" + it },
-            value("decisions").takeIf { it.isNotBlank() }?.let { "Decisions:\\n" + it },
-            value("actionItems").takeIf { it.isNotBlank() }?.let { "Action items:\\n" + it },
+            value("items").takeIf { it.isNotBlank() }?.let { "Agenda:\n" + it },
+            value("decisions").takeIf { it.isNotBlank() }?.let { "Decisions:\n" + it },
+            value("actionItems").takeIf { it.isNotBlank() }?.let { "Action items:\n" + it },
             value("nextStep").takeIf { it.isNotBlank() }?.let { "Next step / RSVP: " + it },
             value("rsvpBy").takeIf { it.isNotBlank() }?.let { "RSVP by: " + it },
             value("name").takeIf { it.isNotBlank() }?.let { "Audience / attendees: " + it },
-        ).filterNotNull().joinToString("\\n\\n")
+        ).filterNotNull().joinToString("\n\n")
         val uidSource = listOf(kind, title, value("date"), zoneName, value("name")).joinToString("|")
         val uid = UUID.nameUUIDFromBytes(uidSource.toByteArray(Charsets.UTF_8)).toString() + "@envtools.store"
         val lines = listOf(
