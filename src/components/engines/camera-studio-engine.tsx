@@ -479,6 +479,10 @@ export function CameraStudioEngine() {
       return;
     }
     if (countdown !== null) return;
+    if (dualStreamRef.current && (!dualVideoRef.current || dualVideoRef.current.readyState < HTMLMediaElement.HAVE_CURRENT_DATA)) {
+      setCameraError("The second camera is still starting. Try again in a moment.");
+      return;
+    }
     setCameraError(null);
     try {
       if (timerSeconds > 0) {
@@ -577,6 +581,10 @@ export function CameraStudioEngine() {
     const currentStream = streamRef.current;
     if (!currentStream || !currentStream.getVideoTracks().some((track) => track.readyState === "live")) {
       setCameraError("Turn on the camera before recording.");
+      return;
+    }
+    if (dualBusy || (dualStreamRef.current && (!dualVideoRef.current || dualVideoRef.current.readyState < HTMLMediaElement.HAVE_CURRENT_DATA))) {
+      setCameraError("The second camera is still starting. Try again in a moment.");
       return;
     }
     if (typeof MediaRecorder === "undefined") {
@@ -909,7 +917,7 @@ export function CameraStudioEngine() {
               <button
                 type="button"
                 aria-label={isRecording ? "Stop video recording" : mode === "photo" ? "Take photo" : "Start video recording"}
-                disabled={!cameraStream || cameraBusy || countdown !== null}
+                disabled={!cameraStream || cameraBusy || dualBusy || countdown !== null}
                 onClick={() => {
                   if (isRecording) stopRecording();
                   else if (mode === "photo") void capturePhoto();
