@@ -282,7 +282,7 @@ private fun CatalogFailureScreen(darkMode: Boolean, onRetry: () -> Unit) {
     }
 }
 
-private val productionExemptCategories = setOf("accessibility", "audio", "business", "calculators", "communication", "datetime", "developer", "design", "ecommerce", "qr", "video")
+private val productionExemptCategories = setOf("accessibility", "audio", "business", "calculators", "communication", "datetime", "developer", "design", "ecommerce", "ai", "qr", "video")
 private val productionExemptToolIds = setOf("a-book", "zip-any-file", "camera-studio")
 
 private fun ToolRecord.isUnderProduction(): Boolean =
