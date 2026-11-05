@@ -3,7 +3,7 @@ import test from "node:test";
 import { isToolUnderProduction } from "./production-notice.ts";
 
 test("explicitly available categories stay accessible", () => {
-  for (const category of ["accessibility", "audio", "business", "calculators", "communication", "creators", "datetime", "developer", "design", "ecommerce", "qr", "video"] as const) {
+  for (const category of ["accessibility", "audio", "business", "calculators", "communication", "creators", "datetime", "developer", "design", "ecommerce", "ai", "qr", "video"] as const) {
     assert.equal(isToolUnderProduction({ id: `test-${category}`, category }), false, `${category} should be exempt`);
   }
 });
