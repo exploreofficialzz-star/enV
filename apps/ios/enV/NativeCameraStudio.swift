@@ -10,6 +10,9 @@ private enum NativeCameraLook: String, CaseIterable, Identifiable {
     case cool = "Cool"
     case mono = "Mono"
     case vivid = "Vivid"
+    case fade = "Fade"
+    case sunset = "Sunset"
+    case glow = "Glow"
 
     var id: String { rawValue }
 }
@@ -23,6 +26,15 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
     @Published private(set) var zoomMaximum: CGFloat = 1
     @Published private(set) var exposureBias = 0.0
     @Published private(set) var exposureBiasRange: ClosedRange<Double>?
+    @Published private(set) var manualISORange: ClosedRange<Double>?
+    @Published private(set) var manualShutterRange: ClosedRange<Double>?
+    @Published private(set) var manualISO = 100.0
+    @Published private(set) var manualShutterDuration = 1.0 / 60.0
+    @Published private(set) var supportsManualExposure = false
+    @Published private(set) var supportsFocusLock = false
+    @Published private(set) var focusLocked = false
+    @Published private(set) var whiteBalanceSelection = "Auto"
+    @Published private(set) var recentCaptures: [URL] = []
     @Published private(set) var actualQuality = "Camera starting…"
     @Published private(set) var latestPhotoURL: URL?
     @Published private(set) var latestVideoURL: URL?
@@ -239,19 +251,137 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
                         device.exposureMode = .continuousAutoExposure
                     }
                 }
+                if device.isFocusModeSupported(.continuousAutoFocus) { device.focusMode = .continuousAutoFocus }
                 device.unlockForConfiguration()
-                Task { @MainActor in self.message = "Focus and exposure metering updated." }
+                Task { @MainActor in
+                    self.focusLocked = false
+                    self.message = "Focus and exposure metering updated."
+                }
             } catch {
                 Task { @MainActor in self.error = "Tap-to-focus is unavailable on this camera." }
             }
         }
     }
 
+    func setFocusLocked(_ locked: Bool) {
+        guard let device = videoInput?.device, device.isFocusModeSupported(.locked), !recording else { return }
+        do {
+            try device.lockForConfiguration()
+            device.focusMode = locked ? .locked : .continuousAutoFocus
+            device.unlockForConfiguration()
+            focusLocked = locked
+            message = locked ? "Focus locked." : "Continuous autofocus restored."
+        } catch {
+            self.error = "Focus lock is unavailable on this camera."
+        }
+    }
+
+    func setWhiteBalance(_ preset: String) {
+        guard let device = videoInput?.device, !recording else { return }
+        do {
+            try device.lockForConfiguration()
+            if preset == "Auto" {
+                guard device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) else {
+                    device.unlockForConfiguration()
+                    message = "Automatic white balance is unavailable on this camera."
+                    return
+                }
+                device.whiteBalanceMode = .continuousAutoWhiteBalance
+            } else {
+                guard device.isWhiteBalanceModeSupported(.locked) else {
+                    device.unlockForConfiguration()
+                    message = "White balance presets are unavailable on this camera."
+                    return
+                }
+                let temperature: Float
+                switch preset {
+                case "Daylight": temperature = 5_500
+                case "Cloudy": temperature = 6_500
+                case "Warm": temperature = 3_200
+                default: temperature = 5_000
+                }
+                let values = AVCaptureWhiteBalanceTemperatureAndTintValues(temperature: temperature, tint: 0)
+                var gains = device.deviceWhiteBalanceGains(for: values)
+                let maximum = device.maxWhiteBalanceGain
+                gains.redGain = min(max(1, gains.redGain), maximum)
+                gains.greenGain = min(max(1, gains.greenGain), maximum)
+                gains.blueGain = min(max(1, gains.blueGain), maximum)
+                device.setWhiteBalanceModeLocked(with: gains, completionHandler: nil)
+            }
+            device.unlockForConfiguration()
+            whiteBalanceSelection = preset
+            message = preset == "Auto" ? "Automatic white balance restored." : "\(preset) white balance selected."
+        } catch {
+            self.error = "White balance could not be changed on this camera."
+        }
+    }
+
+    func setManualExposure(iso: Double, shutterDuration: Double) {
+        guard let device = videoInput?.device, device.isExposureModeSupported(.custom), !recording else { return }
+        let format = device.activeFormat
+        let boundedISO = min(max(Float(iso), format.minISO), format.maxISO)
+        let minimumDuration = CMTimeGetSeconds(format.minExposureDuration)
+        let maximumDuration = CMTimeGetSeconds(format.maxExposureDuration)
+        let boundedDuration = min(max(shutterDuration, minimumDuration), maximumDuration)
+        do {
+            try device.lockForConfiguration()
+            let duration = CMTimeMakeWithSeconds(boundedDuration, preferredTimescale: 1_000_000_000)
+            device.setExposureModeCustom(duration: duration, iso: boundedISO, completionHandler: nil)
+            device.unlockForConfiguration()
+            manualISO = Double(boundedISO)
+            manualShutterDuration = boundedDuration
+            exposureBias = 0
+        } catch {
+            self.error = "Manual ISO and shutter controls are unavailable at those settings."
+        }
+    }
+
+    func resetToAuto() {
+        guard let device = videoInput?.device, !recording else { return }
+        do {
+            try device.lockForConfiguration()
+            if device.isFocusModeSupported(.continuousAutoFocus) { device.focusMode = .continuousAutoFocus }
+            if device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
+            if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) { device.whiteBalanceMode = .continuousAutoWhiteBalance }
+            device.unlockForConfiguration()
+            focusLocked = false
+            whiteBalanceSelection = "Auto"
+            exposureBias = 0
+            manualISO = Double(device.iso)
+            manualShutterDuration = CMTimeGetSeconds(device.exposureDuration)
+            message = "Focus, exposure and white balance reset to automatic."
+        } catch {
+            self.error = "Automatic camera settings could not be restored."
+        }
+    }
+
+    @MainActor
+    private func rememberCapture(_ url: URL) {
+        recentCaptures.removeAll { $0 == url }
+        recentCaptures.insert(url, at: 0)
+        if recentCaptures.count > 8 {
+            let expired = recentCaptures.suffix(from: 8)
+            expired.forEach { try? FileManager.default.removeItem(at: $0) }
+            recentCaptures = Array(recentCaptures.prefix(8))
+        }
+    }
+
+    func deleteCapture(_ url: URL) {
+        recentCaptures.removeAll { $0 == url }
+        if latestPhotoURL == url { latestPhotoURL = nil }
+        if latestVideoURL == url { latestVideoURL = nil }
+        try? FileManager.default.removeItem(at: url)
+    }
+
     func capturePhoto(look: NativeCameraLook) {
         guard ready, !recording else { return }
         let settings = AVCapturePhotoSettings()
-        if let device = videoInput?.device, device.hasFlash {
+        let device = videoInput?.device
+        if let device, device.hasFlash {
             settings.flashMode = flashEnabled ? .on : .off
+        }
+        if device?.exposureMode == .custom {
+            settings.photoQualityPrioritization = .speed
         }
         settings.isHighResolutionPhotoEnabled = true
         let delegate = PhotoDelegate(owner: self, look: look, uniqueID: settings.uniqueID)
@@ -370,6 +500,21 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
             exposureBiasRange = nil
             exposureBias = 0
         }
+        supportsFocusLock = device.isFocusModeSupported(.locked)
+        supportsManualExposure = device.isExposureModeSupported(.custom)
+        if supportsManualExposure {
+            let minimumISO = Double(device.activeFormat.minISO)
+            let maximumISO = Double(device.activeFormat.maxISO)
+            let minimumShutter = CMTimeGetSeconds(device.activeFormat.minExposureDuration)
+            let maximumShutter = CMTimeGetSeconds(device.activeFormat.maxExposureDuration)
+            manualISORange = maximumISO > minimumISO ? minimumISO...maximumISO : nil
+            manualShutterRange = maximumShutter > minimumShutter && minimumShutter > 0 ? minimumShutter...maximumShutter : nil
+            manualISO = Double(device.iso)
+            manualShutterDuration = max(minimumShutter, CMTimeGetSeconds(device.exposureDuration))
+        } else {
+            manualISORange = nil
+            manualShutterRange = nil
+        }
         let dimensions = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
         let fps = device.activeFormat.videoSupportedFrameRateRanges.map { Int($0.maxFrameRate) }.max() ?? 30
         actualQuality = "\(dimensions.width) × \(dimensions.height) · up to \(fps) fps"
@@ -435,6 +580,7 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
                 try data.write(to: url, options: .atomic)
                 Task { @MainActor in
                     owner.latestPhotoURL = url
+                    owner.rememberCapture(url)
                     owner.message = "Photo captured."
                     owner.releasePhotoDelegate(self.uniqueID)
                 }
@@ -454,6 +600,13 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
         case .warm: filtered = source.applyingFilter("CISepiaTone", parameters: [kCIInputIntensityKey: 0.22])
         case .cool: filtered = source.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0.92, kCIInputContrastKey: 1.04, kCIInputBrightnessKey: 0.01])
         case .vivid: filtered = source.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 1.25, kCIInputContrastKey: 1.08, kCIInputBrightnessKey: 0.0])
+        case .fade: filtered = source.applyingFilter("CIPhotoEffectFade")
+        case .sunset:
+            let warm = source.applyingFilter("CISepiaTone", parameters: [kCIInputIntensityKey: 0.18])
+            filtered = warm.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 1.22, kCIInputContrastKey: 1.02, kCIInputBrightnessKey: 0.02])
+        case .glow:
+            let bright = source.applyingFilter("CIExposureAdjust", parameters: [kCIInputEVKey: 0.25])
+            filtered = bright.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 1.12, kCIInputContrastKey: 0.96, kCIInputBrightnessKey: 0.01])
         }
         guard let cgImage = context.createCGImage(filtered, from: filtered.extent),
               let jpeg = UIImage(cgImage: cgImage).jpegData(compressionQuality: 0.94) else { return data }
@@ -468,6 +621,7 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
                 latestVideoURL = nil
             } else {
                 latestVideoURL = outputFileURL
+                rememberCapture(outputFileURL)
                 message = "Video recording complete."
                 saveVideoToLibrary(outputFileURL)
             }
@@ -543,6 +697,8 @@ struct NativeCameraStudioView: View {
     @State private var torchOn = false
     @State private var zoom = 1.0
     @State private var countdown: Int?
+    @State private var gridEnabled = false
+    @State private var showAdvancedControls = false
 
     private var latestURL: URL? { mode == "Photo" ? capture.latestPhotoURL : capture.latestVideoURL }
 
@@ -560,6 +716,22 @@ struct NativeCameraStudioView: View {
                 RoundedRectangle(cornerRadius: 12).fill(Color.black)
                 if capture.ready {
                     NativeCameraPreview(session: capture.session, onFocus: { capture.focus(at: $0) })
+                    if gridEnabled {
+                        GeometryReader { geometry in
+                            Path { path in
+                                let thirdX = geometry.size.width / 3
+                                let thirdY = geometry.size.height / 3
+                                for index in 1...2 {
+                                    path.move(to: CGPoint(x: thirdX * CGFloat(index), y: 0))
+                                    path.addLine(to: CGPoint(x: thirdX * CGFloat(index), y: geometry.size.height))
+                                    path.move(to: CGPoint(x: 0, y: thirdY * CGFloat(index)))
+                                    path.addLine(to: CGPoint(x: geometry.size.width, y: thirdY * CGFloat(index)))
+                                }
+                            }
+                            .stroke(Color.white.opacity(0.55), lineWidth: 1)
+                        }
+                        .allowsHitTesting(false)
+                    }
                     if let countdown {
                         Text("\(countdown)")
                             .font(.system(size: 64, weight: .bold, design: .rounded))
@@ -582,6 +754,9 @@ struct NativeCameraStudioView: View {
                 Spacer()
                 Button { capture.switchCamera() } label: { Image(systemName: "camera.rotate") }
                     .buttonStyle(.bordered).disabled(!capture.ready || capture.recording)
+                Button { gridEnabled.toggle() } label: { Image(systemName: "grid") }
+                    .buttonStyle(.bordered).tint(gridEnabled ? Color.envAccent : Color.envSurface2)
+                    .accessibilityLabel(gridEnabled ? "Hide framing grid" : "Show framing grid")
                 if capture.hasTorch {
                     Button { capture.toggleFlash(); torchOn.toggle() } label: { Image(systemName: torchOn ? "flashlight.on.fill" : "flashlight.off.fill") }
                         .buttonStyle(.bordered).disabled(capture.recording)
@@ -642,6 +817,46 @@ struct NativeCameraStudioView: View {
                 }
             }
 
+            DisclosureGroup("Advanced controls", isExpanded: $showAdvancedControls) {
+                VStack(alignment: .leading, spacing: 12) {
+                    if capture.supportsFocusLock {
+                        Toggle("Lock focus", isOn: Binding(get: { capture.focusLocked }, set: { capture.setFocusLocked($0) }))
+                            .font(.envScaled(size: 12, weight: .medium))
+                    }
+                    HStack {
+                        Text("White balance").font(.envScaled(size: 12, weight: .medium)).foregroundStyle(Color.envInk)
+                        Spacer()
+                        Picker("White balance", selection: Binding(get: { capture.whiteBalanceSelection }, set: { capture.setWhiteBalance($0) })) {
+                            Text("Auto").tag("Auto")
+                            Text("Daylight").tag("Daylight")
+                            Text("Cloudy").tag("Cloudy")
+                            Text("Warm").tag("Warm")
+                        }.pickerStyle(.menu)
+                    }
+                    if capture.supportsManualExposure, let isoRange = capture.manualISORange, let shutterRange = capture.manualShutterRange {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("ISO").font(.envScaled(size: 12, weight: .medium)).foregroundStyle(Color.envInk)
+                                Spacer()
+                                Text("\(capture.manualISO, specifier: "%.0f")").font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.envMuted)
+                            }
+                            Slider(value: Binding(get: { capture.manualISO }, set: { capture.setManualExposure(iso: $0, shutterDuration: capture.manualShutterDuration) }), in: isoRange)
+                            HStack {
+                                Text("Shutter").font(.envScaled(size: 12, weight: .medium)).foregroundStyle(Color.envInk)
+                                Spacer()
+                                Text("1/\(max(1, Int((1 / capture.manualShutterDuration).rounded()))) s").font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.envMuted)
+                            }
+                            Slider(value: Binding(get: { capture.manualShutterDuration }, set: { capture.setManualExposure(iso: capture.manualISO, shutterDuration: $0) }), in: shutterRange)
+                        }
+                    } else {
+                        Text("Manual ISO and shutter are not available on this camera.").font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
+                    }
+                    Button("Reset to auto") { capture.resetToAuto() }.buttonStyle(.bordered)
+                }
+                .padding(.top, 8)
+            }
+            .font(.envScaled(size: 12, weight: .medium))
+
             HStack {
                 Text("Photo timer").font(.envScaled(size: 12, weight: .medium)).foregroundStyle(Color.envInk)
                 Spacer()
@@ -682,6 +897,21 @@ struct NativeCameraStudioView: View {
                     ShareLink(item: video) { Label("Share video", systemImage: "square.and.arrow.up") }
                 }
                 Spacer()
+            }
+            if !capture.recentCaptures.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Recent captures").font(.envScaled(size: 12, weight: .semibold)).foregroundStyle(Color.envInk)
+                    ForEach(capture.recentCaptures, id: \.self) { url in
+                        HStack {
+                            Text(url.lastPathComponent).font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(1)
+                            Spacer(minLength: 4)
+                            ShareLink(item: url) { Image(systemName: "square.and.arrow.up") }
+                                .accessibilityLabel("Share \(url.lastPathComponent)")
+                            Button(role: .destructive) { capture.deleteCapture(url) } label: { Image(systemName: "trash") }
+                                .accessibilityLabel("Remove \(url.lastPathComponent) from recent captures")
+                        }
+                    }
+                }
             }
         }
         .onAppear { capture.start() }
