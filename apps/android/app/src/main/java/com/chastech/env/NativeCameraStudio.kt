@@ -21,6 +21,8 @@ import androidx.camera.video.FileOutputOptions
 import androidx.camera.video.Recording
 import androidx.camera.video.VideoRecordEvent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,9 +34,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cameraswitch
+import androidx.compose.material.icons.filled.FlashOff
+import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -357,24 +365,60 @@ fun NativeCameraStudioScreen() {
             OutlinedButton(onClick = { mode = NativeCameraMode.VIDEO }, enabled = !recordingActive, modifier = Modifier.weight(1f)) { Text("Video") }
         }
 
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedButton(onClick = { switchCamera() }, enabled = cameraGranted && !recordingActive, modifier = Modifier.weight(1f)) { Text("Switch camera") }
-            Button(
-                onClick = {
-                    if (mode == NativeCameraMode.PHOTO) capturePhoto()
-                    else if (recordingActive) recording?.stop()
-                    else startVideo()
-                },
-                enabled = cameraGranted && (!recordingActive || mode == NativeCameraMode.VIDEO),
-                modifier = Modifier.weight(1f)
-            ) { Text(if (mode == NativeCameraMode.PHOTO) "Take photo" else if (recordingActive) "Stop recording" else "Record video") }
-        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            IconButton(
+                onClick = { switchCamera() },
+                enabled = cameraGranted && !recordingActive
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Cameraswitch,
+                    contentDescription = "Switch camera",
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            }
 
-        if (cameraGranted && !recordingActive && controller.cameraInfo?.hasFlashUnit() == true) {
-            OutlinedButton(onClick = {
-                flashEnabled = !flashEnabled
-                controller.enableTorch(flashEnabled)
-            }, modifier = Modifier.fillMaxWidth()) { Text(if (flashEnabled) "Turn flash off" else "Turn flash on") }
+            Box(
+                modifier = Modifier
+                    .size(76.dp)
+                    .border(4.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                    .clickable(enabled = cameraGranted && (!recordingActive || mode == NativeCameraMode.VIDEO)) {
+                        if (mode == NativeCameraMode.PHOTO) capturePhoto()
+                        else if (recordingActive) recording?.stop()
+                        else startVideo()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(if (recordingActive) 28.dp else 54.dp)
+                        .background(
+                            color = if (mode == NativeCameraMode.VIDEO) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                            shape = CircleShape
+                        )
+                )
+            }
+
+            if (cameraGranted && controller.cameraInfo?.hasFlashUnit() == true) {
+                IconButton(
+                    onClick = {
+                        flashEnabled = !flashEnabled
+                        controller.enableTorch(flashEnabled)
+                    },
+                    enabled = !recordingActive
+                ) {
+                    Icon(
+                        imageVector = if (flashEnabled) Icons.Filled.FlashOff else Icons.Filled.FlashOn,
+                        contentDescription = if (flashEnabled) "Turn flash off" else "Turn flash on",
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            } else {
+                Spacer(Modifier.size(48.dp))
+            }
         }
 
         if (cameraGranted && zoomState != null && zoomState.maxZoomRatio > zoomState.minZoomRatio) {
