@@ -214,7 +214,8 @@ internal object NativeCommunicationEngine {
         if (kind == "signature" && listOf("email", "phone", "website").all { value(it).isBlank() }) result += "Add at least one contact method."
         if (kind in calendarKinds) {
             if (value("date").isBlank()) result += "Add the event date and local time."
-            else runCatching {
+            if (value("timezone").isBlank()) result += "Add the time zone so recipients see the intended local time."
+            if (value("date").isNotBlank() && value("timezone").isNotBlank()) runCatching {
                 val zone = ZoneId.of(value("timezone"))
                 val start = localEventInstant(value("date"), zone, "Event date and time")
                 if (kind == "invitation" && value("rsvpBy").isNotBlank()) {
@@ -222,7 +223,6 @@ internal object NativeCommunicationEngine {
                     require(rsvp.isBefore(start)) { "The RSVP deadline must be earlier than the event." }
                 }
             }.onFailure { result += (it.message ?: "Check the event date, time and time zone.") }
-            if (value("timezone").isBlank()) result += "Add the time zone so recipients see the intended local time."
             if (value("duration").isNotBlank() && value("duration").toIntOrNull()?.let { it !in 5..480 } == true) result += "Set an event duration between 5 and 480 minutes."
             if (kind in setOf("meeting", "agenda") && value("duration").isBlank()) result += "Set a duration so agenda timeboxes can be checked."
         }
