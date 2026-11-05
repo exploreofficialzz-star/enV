@@ -782,7 +782,7 @@ export function ABookEngine() {
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3">
         <div className="flex min-w-0 flex-col gap-1">
-          {storageMessage ? {storageMessage ? <span className="text-xs text-muted" role="status">{storageMessage}</span> : null} : null}
+          {storageMessage ? <span className="text-xs text-muted" role="status">{storageMessage}</span> : null}
           {storageNotice ? <span className={storageNotice.warning ? "text-xs text-amber-700 dark:text-amber-300" : "text-xs text-muted"}>{storageNotice.message}</span> : null}
         </div>
         <Button type="button" size="sm" variant="outline" disabled={!libraryReady} onClick={() => importInput.current?.click()}>Restore a local backup</Button>
@@ -799,7 +799,7 @@ export function ABookEngine() {
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" size="sm" variant="outline" onClick={() => void returnToEntry()}>A book home</Button>
         <div className="flex min-w-0 flex-col gap-1">
-          <span className="text-xs text-muted" role="status">{storageMessage}</span>
+          {storageMessage ? <span className="text-xs text-muted" role="status">{storageMessage}</span> : null}
           {storageNotice ? <span className={storageNotice.warning ? "max-w-sm text-xs text-amber-700 dark:text-amber-300" : "max-w-sm text-xs text-muted"}>{storageNotice.message}</span> : null}
         </div>
         <Button type="button" variant="outline" onClick={exportNotesJson}>Export backup</Button>
