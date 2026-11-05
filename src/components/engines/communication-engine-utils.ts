@@ -413,14 +413,14 @@ export function communicationQualityChecks(input: CommunicationInput, output: st
     if (!clean(input.email) && !clean(input.name) && !clean(input.audience)) checks.push("Add a recipient before using this email.");
     if (clean(input.email) && !/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(clean(input.email))) checks.push("Check the recipient email address; it does not look complete.");
     if (!clean(input.subject)) checks.push("Add a specific subject so the email is easy to find later.");
-    const addressPattern = /^[^\\s@,;]+@[^\\s@,;]+\\.[^\\s@,;]+$/;
+    const addressPattern = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
     const ccAddresses = addressList(input.cc);
     const bccAddresses = addressList(input.bcc);
     if ([...ccAddresses, ...bccAddresses].some((address) => !addressPattern.test(address))) checks.push("Check every Cc and Bcc address; separate addresses with commas or semicolons.");
     const toAddress = clean(input.email) || (addressPattern.test(clean(input.name)) ? clean(input.name) : "");
     const allAddresses = [toAddress, ...ccAddresses, ...bccAddresses].filter(Boolean).map((address) => address.toLowerCase());
     if (new Set(allAddresses).size !== allAddresses.length) checks.push("An address appears more than once across To, Cc and Bcc; review recipient visibility.");
-    if ([input.email, input.cc, input.bcc, input.subject].some((value) => /[\\r\\n\\u0000-\\u001f\\u007f]/.test(String(value ?? "")))) checks.push("Remove line breaks and control characters from email headers before using this draft.");
+    if ([input.email, input.cc, input.bcc, input.subject].some((value) => /[\r\n\u0000-\u001f\u007f]/.test(String(value ?? "")))) checks.push("Remove line breaks and control characters from email headers before using this draft.");
   }
   if (kind === "sms" && output.trim()) {
     const metrics = getSmsMetrics(output);
