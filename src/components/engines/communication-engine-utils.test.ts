@@ -211,3 +211,13 @@ test("email headers cannot inject extra header lines", () => {
   assert.doesNotMatch(output, /\r\nBcc: victim@example\.com/);
   assert.match(communicationQualityChecks(input, output).join(" "), /control characters/);
 });
+
+
+test("calendar UID remains stable across platform implementations", () => {
+  const input = {
+    kind: "meeting", action: "builder", subject: "Roadmap, review; draft",
+    date: "2026-11-05T10:00", timezone: "Africa/Lagos", duration: "45",
+  } as const;
+  const ics = buildCommunicationCalendarIcs(input);
+  assert.match(ics, /UID:8734b83babcc1f0d@envtools\.store/);
+});
