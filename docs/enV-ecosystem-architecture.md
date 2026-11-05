@@ -99,3 +99,12 @@ The private developer workspace is available at `/developer` and links the feedb
 ## Native analytics and aggregate history
 
 Android and iOS now include independent opt-in consent surfaces and metadata-only event queues. Android uses local app-private preferences and network capability classification; iOS stores the analytics subject key in Keychain and maintains a bounded local queue. Both call the same API directly over HTTPS, and opt-out takes effect locally immediately with server revocation retried when connectivity returns. Native build flags remain disabled by default. Daily aggregate snapshots are captured before raw event retention and retained for up to 730 days without subject or session identifiers; the private dashboard can display up to 365 days of aggregate trends.
+
+
+## Subdomain implementation state — 5 November 2026
+
+The five host mappings are mirrored in both Vercel and TanStack Router. Input rewrites preserve the requested host while mapping the public roots to their route-tree pages; output rewrites keep generated links and browser history on the intended public URL. The feedback and updates hosts expose `/admin` while using the existing signed developer-workspace session internally. Deep tool URLs are not rewritten. The Android/iOS handoff landing pages and updates page link back to the canonical `https://envtools.store/` host explicitly.
+
+Regression coverage lives in `scripts/check-subdomain-routing.mjs` and the **Subdomain routing verification** GitHub Actions workflow. The manual **enV subdomain live smoke** workflow verifies the public landing pages and the unauthenticated analytics boundary after the production domains are attached.
+
+**Still required outside source code:** attach each hostname to its intended production Vercel project, add the exact DNS records Vercel requests at Namecheap, verify Vercel domain ownership and TLS, configure the required production environment variables, run the reviewed PostgreSQL migrations, and execute the live smoke workflow. The analytics host must be isolated behind deployment-level access protection (for example, a separately protected Vercel project); do not enable project-wide protection on the shared public project because that would also block public product hosts. Keep service flags disabled until their individual release gates pass.
