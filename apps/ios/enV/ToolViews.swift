@@ -1320,6 +1320,7 @@ enum NativeCommunicationEngine {
     private static func icsTimestamp(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
         formatter.dateFormat = "yyyyMMdd'T'HHmmss'Z'"
         return formatter.string(from: date)
@@ -1556,6 +1557,11 @@ private struct NativeCommunicationToolView: View {
                         Button("Save HTML") { exportHTML = true; exportCalendar = false; showExporter = true }.buttonStyle(.bordered)
                     }
                     ShareLink(item: output) { Text("Share") }.buttonStyle(.bordered)
+                }
+                if parsed.kind == "sms" {
+                    let metrics = NativeCommunicationEngine.smsMetrics(output)
+                    Text(metrics.encoding + " · " + String(metrics.units) + " units · " + String(metrics.segments) + " segment(s)")
+                        .font(.caption).foregroundStyle(Color.envMuted)
                 }
                 Text(output).font(.system(.footnote, design: .monospaced)).foregroundStyle(Color.envInk)
                     .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
