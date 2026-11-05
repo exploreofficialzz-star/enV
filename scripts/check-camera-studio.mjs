@@ -26,6 +26,31 @@ const iosCoverage = read("apps/ios/native-tool-coverage.txt");
 const inventory = JSON.parse(read("apps/shared/native-engine-inventory.json"));
 const billingProfiles = JSON.parse(read("src/data/billing-profile-runtime-extensions.json"));
 
+
+// Camera Studio parity upgrade: true second-device browser capture and native controls.
+assert.match(engine, /const startDualCamera/);
+assert.match(engine, /enumerateDevices\(\)/);
+assert.match(engine, /dualStreamRef\.current/);
+assert.match(engine, /drawCover\(recordingContext/);
+assert.match(engine, /setDualLayout\("pip"\)/);
+assert.match(engine, /setDualLayout\("split"\)/);
+assert.match(engine, /Second camera preview/);
+assert.match(androidCamera, /timerSeconds/);
+assert.match(androidCamera, /capturePhotoWithTimer/);
+assert.match(androidCamera, /gridEnabled/);
+assert.match(androidCamera, /QualitySelector\.from/);
+assert.match(androidCamera, /FallbackStrategy\.lowerQualityOrHigherThan/);
+assert.match(iosCamera, /func setFocusLocked/);
+assert.match(iosCamera, /func setWhiteBalance/);
+assert.match(iosCamera, /func setManualExposure/);
+assert.match(iosCamera, /setExposureModeCustom/);
+assert.match(iosCamera, /manualISORange/);
+assert.match(iosCamera, /manualShutterRange/);
+assert.match(iosCamera, /recentCaptures/);
+assert.match(iosCamera, /case fade = "Fade"/);
+assert.match(iosCamera, /case sunset = "Sunset"/);
+assert.match(iosCamera, /case glow = "Glow"/);
+
 assert.match(engine, /navigator\.mediaDevices\?\.getUserMedia/);
 const cameraDescription = "Take photos and record videos. Switch between the front and back cameras, zoom in or out, adjust brightness, apply color filters, and save your captures to your device.";
 assert.ok(registry.includes(`description: "${cameraDescription}"`), "Web catalogue uses direct, user-facing Camera Studio copy");
@@ -156,4 +181,4 @@ assert.ok(billingProfiles.profiles.some((profile) => profile.toolId === "camera-
 const androidBuild = read("apps/android/app/build.gradle.kts");
 assert.match(androidBuild, /androidx\.compose\.runtime:runtime-livedata/);
 
-console.log("Camera Studio checks passed: browser capture, Android CameraX, iOS AVFoundation, native catalogue routes, dual-platform coverage manifests, billing profile and runtime inventory.");
+console.log("Camera Studio checks passed: web single/dual-camera capture, Android CameraX timer/grid/quality controls, iOS AVFoundation manual controls and gallery, native catalogue routes, coverage, billing and runtime inventory.");
