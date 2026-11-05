@@ -225,7 +225,6 @@ object NativeAiMicroEngine {
     private fun topic() = NativeAiMicroField("topic", "Topic / subject", "AI tools for creators")
     private fun audience() = NativeAiMicroField("audience", "Audience", "creators and small businesses")
 
-    private fun audience() = NativeAiMicroField("audience", "Audience", "creators and small businesses")
     private fun clean(value: String?, fallback: String): String = value?.trim()?.takeIf { it.isNotEmpty() } ?: fallback
     private fun tonePhrase(tone: String): String = when (tone) {
         "professional" -> "clear and professional"
