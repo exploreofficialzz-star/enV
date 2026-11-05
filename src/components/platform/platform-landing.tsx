@@ -17,9 +17,9 @@ export function PlatformLanding({ platform }: { platform: "android" | "ios" }) {
         <Link to="/tools" search={{ q: "" }} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white">
           Browse tools <ArrowRight className="size-4" />
         </Link>
-        <Link to="/" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-fg">
+        <a href="https://envtools.store/" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-fg">
           <Globe className="size-4" /> enV home
-        </Link>
+        </a>
       </div>
     </main>
   );
