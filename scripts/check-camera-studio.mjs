@@ -27,7 +27,7 @@ const inventory = JSON.parse(read("apps/shared/native-engine-inventory.json"));
 const billingProfiles = JSON.parse(read("src/data/billing-profile-runtime-extensions.json"));
 
 assert.match(engine, /navigator\.mediaDevices\?\.getUserMedia/);
-const cameraDescription = "Take photos and record videos. Switch between the front and rear cameras, apply color filters, and adjust supported camera settings.";
+const cameraDescription = "Take photos and record videos. Switch between the front and back cameras, zoom in or out, adjust brightness, apply color filters, and save your captures to your device.";
 assert.ok(registry.includes(`description: "${cameraDescription}"`), "Web catalogue uses direct, user-facing Camera Studio copy");
 assert.ok(androidCatalog.includes(`description = "${cameraDescription}"`), "Android catalogue uses the same Camera Studio copy");
 assert.ok(iosCatalog.includes(`description: "${cameraDescription}"`), "iOS catalogue uses the same Camera Studio copy");
