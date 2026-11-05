@@ -389,45 +389,63 @@ export function CameraStudioEngine() {
       return;
     }
     if (isRecording || cameraBusy || dualBusy) return;
-    const primarySettings = primary.getSettings();
-    const primaryDeviceId = primarySettings.deviceId;
-    const desiredFacing = primarySettings.facingMode === "user" ? "environment" : "user";
+    const primaryDeviceId = primary.getSettings().deviceId;
+    const desiredFacing: FacingMode = facing === "user" ? "environment" : "user";
     setDualBusy(true);
     setCameraError(null);
     setDualUnavailable(false);
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
       const cameras = devices.filter((device) => device.kind === "videoinput" && device.deviceId !== primaryDeviceId);
-      const matchingFacing = cameras.find((device) => {
-        const label = device.label.toLowerCase();
+      const isDesiredFacingLabel = (label: string) => {
+        const normalized = label.toLowerCase();
         return desiredFacing === "user"
-          ? /front|user|selfie|facetime/.test(label)
-          : /back|rear|environment|world/.test(label);
-      });
-      const secondary = matchingFacing ?? cameras[0];
-      if (!secondary) {
+          ? /front|user|selfie|facetime/.test(normalized)
+          : /back|rear|environment|world/.test(normalized);
+      };
+      const orderedCameras = cameras.slice().sort((left, right) =>
+        Number(isDesiredFacingLabel(right.label)) - Number(isDesiredFacingLabel(left.label))
+      );
+      let stream: MediaStream | null = null;
+      let lastCameraError: unknown = null;
+      for (const device of orderedCameras) {
+        try {
+          const candidateStream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+              deviceId: { exact: device.deviceId },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+              frameRate: { ideal: 30 },
+            },
+          });
+          const candidateTrack = candidateStream.getVideoTracks()[0];
+          const actualFacing = candidateTrack?.getSettings().facingMode;
+          if (!candidateTrack || candidateTrack.readyState !== "live" ||
+              (actualFacing && actualFacing !== desiredFacing) ||
+              (!actualFacing && !isDesiredFacingLabel(device.label))) {
+            candidateStream.getTracks().forEach((track) => track.stop());
+            continue;
+          }
+          stream = candidateStream;
+          break;
+        } catch (error) {
+          lastCameraError = error;
+        }
+      }
+      if (!stream) {
         setDualUnavailable(true);
-        setNotice("This browser did not expose a second camera. Single-camera capture is still available.");
+        setNotice("A separate front/rear camera could not be opened at the same time. Single-camera capture is still available.");
+        if (lastCameraError instanceof Error) {
+          setCameraError(`Dual camera is not supported by this browser or phone: ${lastCameraError.message}`);
+        }
         return;
       }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: {
-          deviceId: { exact: secondary.deviceId },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          frameRate: { ideal: 30 },
-        },
-      });
       if (!mountedRef.current || streamRef.current !== activePrimary) {
         stream.getTracks().forEach((track) => track.stop());
         return;
       }
       const secondTrack = stream.getVideoTracks()[0];
-      if (!secondTrack || secondTrack.readyState !== "live") {
-        stream.getTracks().forEach((track) => track.stop());
-        throw new Error("The second camera did not provide a live video stream.");
-      }
       dualStreamRef.current = stream;
       setDualStream(stream);
       setDualUnavailable(false);
@@ -446,7 +464,7 @@ export function CameraStudioEngine() {
     } finally {
       if (mountedRef.current) setDualBusy(false);
     }
-  }, [cameraBusy, cameraStream, dualBusy, isRecording, stopDualCamera]);
+  }, [cameraBusy, cameraStream, dualBusy, facing, isRecording, stopDualCamera]);
 
   const addToGallery = useCallback((kind: MediaKind, blob: Blob) => {
     const extension = kind === "photo" ? "jpg" : (blob.type.includes("mp4") ? "mp4" : "webm");
