@@ -1274,7 +1274,7 @@ enum NativeCommunicationEngine {
     }
 
     private static func eventInstant(_ value: String, timeZoneName: String, fieldLabel: String) throws -> Date {
-        let pattern = "^(\\\\d{4})-(\\\\d{2})-(\\\\d{2})T(\\\\d{2}):(\\\\d{2})$"
+        let pattern = "^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2})$"
         guard let regex = try? NSRegularExpression(pattern: pattern),
               let match = regex.firstMatch(in: value, range: NSRange(value.startIndex..., in: value)),
               match.range.location == 0, match.range.length == (value as NSString).length else {
