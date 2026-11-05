@@ -422,8 +422,11 @@ export function communicationQualityChecks(input: CommunicationInput, output: st
     const bccAddresses = addressList(input.bcc);
     if ([...ccAddresses, ...bccAddresses].some((address) => !addressPattern.test(address))) checks.push("Check every Cc and Bcc address; separate addresses with commas or semicolons.");
     const toAddress = clean(input.email) || (addressPattern.test(clean(input.name)) ? clean(input.name) : "");
+    const ccSet = new Set(ccAddresses.map((address) => address.toLowerCase()));
+    const ccBccOverlap = bccAddresses.some((address) => ccSet.has(address.toLowerCase()));
+    if (ccBccOverlap) checks.push("An address appears in both Cc and Bcc; review recipient visibility.");
     const allAddresses = [toAddress, ...ccAddresses, ...bccAddresses].filter(Boolean).map((address) => address.toLowerCase());
-    if (new Set(allAddresses).size !== allAddresses.length) checks.push("An address appears more than once across To, Cc and Bcc; review recipient visibility.");
+    if (!ccBccOverlap && new Set(allAddresses).size !== allAddresses.length) checks.push("An address appears more than once across To, Cc and Bcc; review recipient visibility.");
     if ([input.name, input.audience, input.email, input.cc, input.bcc, input.subject].some((value) => /[\r\n\u0000-\u001f\u007f]/.test(String(value ?? "")))) checks.push("Remove line breaks and control characters from email headers before using this draft.");
   }
   if (kind === "sms" && output.trim()) {
