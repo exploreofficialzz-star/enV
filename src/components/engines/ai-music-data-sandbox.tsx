@@ -13,7 +13,6 @@ import {
   HardDrive,
   Headphones,
   LayoutDashboard,
-  LoaderCircle,
   MoreHorizontal,
   Plus,
   Search,
@@ -103,7 +102,7 @@ function SandboxModal({
     </dialog>
   );
 }
-function SandboxSplash({ onEnter }: { onEnter: () => void }) {
+function SandboxSplash({ onEnter, canEnter, error }: { onEnter: () => void; canEnter: boolean; error: string }) {
   const [interactive, setInteractive] = useState(false);
   useEffect(() => setInteractive(true), []);
   return (
@@ -114,7 +113,7 @@ function SandboxSplash({ onEnter }: { onEnter: () => void }) {
         <Headphones className="ms-splash-headset" aria-hidden="true" />
         <h1 className="ms-splash-title">AI Music Data Sandbox.</h1>
         <div className="ms-splash-entry">
-          <Button size="lg" disabled={!interactive} onClick={onEnter}>
+          <Button size="lg" disabled={!interactive || !canEnter} onClick={onEnter}>
             Enter sandbox <ArrowRight aria-hidden="true" />
           </Button>
         </div>
@@ -169,6 +168,7 @@ export function AiMusicDataSandbox() {
       .catch((e) => {
         if (active) {
           setError(errorText(e));
+          setReady(true);
         }
       });
     return () => {
@@ -187,10 +187,12 @@ export function AiMusicDataSandbox() {
     return () => window.removeEventListener("beforeunload", warn);
   }, []);
   useEffect(() => {
-    const enterWorkspace = () => setSplash(false);
+    const enterWorkspace = () => {
+      if (ready) setSplash(false);
+    };
     window.addEventListener("env-music-sandbox-fullscreen", enterWorkspace);
     return () => window.removeEventListener("env-music-sandbox-fullscreen", enterWorkspace);
-  }, []);
+  }, [ready]);
   // Refresh after changes from another tab without reading any audio blobs into memory.
   useEffect(() => {
     const refresh = () => {
@@ -543,17 +545,12 @@ export function AiMusicDataSandbox() {
   const editing = workspace?.tracks.find((t) => t.key === editorId);
   return (
     <section ref={sandboxRoot} className={`music-sandbox view-${view}${editing && !splash ? " is-editing" : ""}`} aria-label="AI Music Data Sandbox">
-      {splash ? <SandboxSplash onEnter={() => {
+      {splash ? <SandboxSplash canEnter={ready} error={error} onEnter={() => {
         setSplash(false);
         if (!sandboxRoot.current?.closest(".env-tool-fullscreen"))
           requestAnimationFrame(() => sandboxRoot.current?.scrollIntoView({ block: "start" }));
       }} /> : null}
       <div hidden={splash}>
-        {!ready && !error ? (
-          <div className="ms-loading">
-            <LoaderCircle size={22} className="ms-spin" /> Opening your workspace…
-          </div>
-        ) : null}
         {workspace ? (
           <>
             <header className="ms-header">
