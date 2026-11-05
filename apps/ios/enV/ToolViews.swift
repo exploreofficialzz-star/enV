@@ -1083,7 +1083,7 @@ enum NativeCommunicationEngine {
             NativeCommunicationField(key: "subject", label: ["meeting", "agenda", "minutes"].contains(kind) ? "Meeting title" : (kind == "signature" ? "Role" : "Subject / title"))
         ]
         if ["meeting", "agenda", "minutes", "invitation", "reminder", "announcement", "follow-up"].contains(kind) {
-            result.append(.init(key: "date", label: "Date and time"))
+            result.append(.init(key: "date", label: "Date and time (YYYY-MM-DDTHH:mm)"))
         }
         if ["meeting", "agenda", "minutes", "invitation", "reminder"].contains(kind) {
             result.append(.init(key: "place", label: "Location / meeting link"))
@@ -1091,10 +1091,10 @@ enum NativeCommunicationEngine {
         if kind == "email" { result += [.init(key: "email", label: "Recipient email"), .init(key: "cc", label: "Cc"), .init(key: "bcc", label: "Bcc")] }
         if ["message", "sms"].contains(kind) { result.append(.init(key: "channel", label: "Channel")) }
         if ["meeting", "agenda", "minutes", "invitation", "reminder"].contains(kind) {
-            if ["meeting", "agenda"].contains(kind) { result.append(.init(key: "duration", label: "Duration (minutes)")) }
+            if ["meeting", "agenda", "invitation", "reminder"].contains(kind) { result.append(.init(key: "duration", label: "Duration (minutes)")) }
             result.append(.init(key: "timezone", label: "Time zone"))
         }
-        if kind == "invitation" { result.append(.init(key: "rsvpBy", label: "RSVP deadline")) }
+        if kind == "invitation" { result.append(.init(key: "rsvpBy", label: "RSVP deadline (YYYY-MM-DDTHH:mm)")) }
         if kind == "signature" { result += [.init(key: "company", label: "Company"), .init(key: "email", label: "Email"), .init(key: "phone", label: "Phone"), .init(key: "website", label: "Website")] }
         if action != "formatter" && action != "template" && kind != "signature" { result.append(.init(key: "purpose", label: "Purpose / context", multiline: true)) }
         if kind == "agenda" || kind == "minutes" { result.append(.init(key: "items", label: "Agenda items (one per line)", multiline: true)) }
@@ -1120,7 +1120,13 @@ enum NativeCommunicationEngine {
             let current = values[key]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             return current.isEmpty ? fallback : current
         }
-        let recipient = value("name", "[Recipient]"), subject = value("subject", kind.replacingOccurrences(of: "-", with: " ").capitalized)
+        func safeHeader(_ text: String) -> String {
+            text.components(separatedBy: .controlCharacters).joined(separator: " ").components(separatedBy: .whitespacesAndNewlines)
+                .filter { !$0.isEmpty }.joined(separator: " ")
+        }
+        let recipient = kind == "email" ? safeHeader(value("name", "[Recipient]")) : value("name", "[Recipient]")
+        let rawSubject = value("subject", kind.replacingOccurrences(of: "-", with: " ").capitalized)
+        let subject = kind == "email" ? safeHeader(rawSubject) : rawSubject
         let purpose = value("purpose"), details = value("details", purpose), date = value("date", "[Date / time]")
         let place = value("place", "[Location]"), next = value("nextStep")
         let items = value("items").components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
@@ -1130,15 +1136,15 @@ enum NativeCommunicationEngine {
 
         switch kind {
         case "email":
-            let displayName = value("name")
+            let displayName = safeHeader(value("name"))
             let greetingName = displayName.isEmpty ? "there" : displayName
             let greeting = ["friendly", "warm"].contains(value("tone")) ? "Hi " + greetingName + "," : "Hello " + greetingName + ","
-            let emailAddress = value("email")
+            let emailAddress = safeHeader(value("email"))
             let toRecipient = emailAddress.isEmpty ? recipient : (displayName.isEmpty ? emailAddress : displayName + " <" + emailAddress + ">")
             let headers = [
                 "To: " + toRecipient,
-                value("cc").isEmpty ? "" : "Cc: " + value("cc"),
-                value("bcc").isEmpty ? "" : "Bcc: " + value("bcc"),
+                value("cc").isEmpty ? "" : "Cc: " + safeHeader(value("cc")),
+                value("bcc").isEmpty ? "" : "Bcc: " + safeHeader(value("bcc")),
                 "Subject: " + subject
             ].filter { !$0.isEmpty }
             return (action == "builder" ? headers.joined(separator: "\n") + "\n\n" : "Subject: " + subject + "\n\n") + greeting + "\n\n" +
@@ -1206,15 +1212,37 @@ enum NativeCommunicationEngine {
             let cc = value("cc").components(separatedBy: CharacterSet(charactersIn: ",;")).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
             let bcc = value("bcc").components(separatedBy: CharacterSet(charactersIn: ",;")).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
             if (cc + bcc).contains(where: { $0.range(of: emailPattern, options: .regularExpression) == nil }) { result.append("Check every Cc and Bcc address; separate addresses with commas or semicolons.") }
-            if !Set(cc.map { $0.lowercased() }).isDisjoint(with: Set(bcc.map { $0.lowercased() })) { result.append("An address appears in both Cc and Bcc; review recipient visibility.") }
+            let to = email.isEmpty ? (value("name").range(of: emailPattern, options: .regularExpression) != nil ? value("name") : "") : email
+            let allAddresses = ([to] + cc + bcc).filter { !$0.isEmpty }.map { $0.lowercased() }
+            if Set(allAddresses).count != allAddresses.count { result.append("An address appears more than once across To, Cc and Bcc; review recipient visibility.") }
+            if ["email", "cc", "bcc", "subject"].contains(where: { key in
+                values[key]?.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) ?? false
+            }) { result.append("Remove line breaks and control characters from email headers before using this draft.") }
         }
         if kind == "sms" && !output.isEmpty {
             let metrics = smsMetrics(output)
             if metrics.segments > 3 { result.append("This draft uses " + String(metrics.segments) + " SMS segments; shorten it or check provider pricing.") }
             if metrics.encoding == "UCS-2" { result.append("Unicode characters change the encoding and reduce the single-message limit to 70 units.") }
         }
-        if ["meeting", "agenda", "invitation", "reminder"].contains(kind) && value("timezone").isEmpty { result.append("Add the time zone so recipients see the intended local time.") }
-        if ["meeting", "agenda", "reminder"].contains(kind) && value("date").isEmpty { result.append("Add the date and time.") }
+        if ["meeting", "agenda", "invitation", "reminder"].contains(kind) {
+            if value("date").isEmpty { result.append("Add the event date and local time.") }
+            if value("timezone").isEmpty { result.append("Add the time zone so recipients see the intended local time.") }
+            if !value("date").isEmpty && !value("timezone").isEmpty {
+                do {
+                    let start = try eventInstant(value("date"), timeZoneName: value("timezone"), fieldLabel: "Event date and time")
+                    if kind == "invitation" && !value("rsvpBy").isEmpty {
+                        let rsvp = try eventInstant(value("rsvpBy"), timeZoneName: value("timezone"), fieldLabel: "RSVP deadline")
+                        if rsvp >= start { result.append("The RSVP deadline must be earlier than the event.") }
+                    }
+                } catch { result.append(error.localizedDescription) }
+            }
+            if !value("duration").isEmpty, let duration = Int(value("duration")), !(5...480).contains(duration) {
+                result.append("Set an event duration between 5 and 480 minutes.")
+            } else if !value("duration").isEmpty && Int(value("duration")) == nil {
+                result.append("Event duration must be a whole number of minutes.")
+            }
+            if ["meeting", "agenda"].contains(kind) && value("duration").isEmpty { result.append("Set a duration so agenda timeboxes can be checked.") }
+        }
         if kind == "invitation" && value("rsvpBy").isEmpty { result.append("Set an RSVP deadline.") }
         if kind == "minutes" && value("actionItems").isEmpty && value("items").isEmpty { result.append("Add action owners and due dates.") }
         if kind == "minutes" && value("nextStep").isEmpty { result.append("Add the next review date or review owner.") }
@@ -1231,6 +1259,146 @@ enum NativeCommunicationEngine {
         let limit = isGSM ? 160 : 70, concatenated = isGSM ? 153 : 67
         let segments = units == 0 ? 0 : (units <= limit ? 1 : Int(ceil(Double(units) / Double(concatenated))))
         return (isGSM ? "GSM-7" : "UCS-2", units, segments)
+    }
+
+    static func gsm7Alternative(_ text: String) -> String {
+        let replacements: [Character: String] = [
+            "\u{2018}": "'", "\u{2019}": "'", "\u{201A}": "'", "\u{201B}": "'",
+            "\u{201C}": "\"", "\u{201D}": "\"", "\u{201E}": "\"", "\u{201F}": "\"",
+            "\u{2013}": "-", "\u{2014}": "-", "\u{2212}": "-", "\u{2011}": "-",
+            "\u{2026}": "...", "\u{2022}": "-", "\u{00A0}": " ", "\u{2007}": " ",
+            "\u{2009}": " ", "\u{202F}": " ", "\u{200B}": "", "\u{200C}": "",
+            "\u{200D}": "", "\u{FEFF}": "", "\u{00AD}": ""
+        ]
+        return text.reduce(into: "") { result, character in result += replacements[character] ?? String(character) }
+    }
+
+    private static func eventInstant(_ value: String, timeZoneName: String, fieldLabel: String) throws -> Date {
+        let pattern = "^(\\\\d{4})-(\\\\d{2})-(\\\\d{2})T(\\\\d{2}):(\\\\d{2})$"
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: value, range: NSRange(value.startIndex..., in: value)),
+              match.range.location == 0, match.range.length == (value as NSString).length else {
+            throw NSError(domain: "enV.Communication", code: 1, userInfo: [NSLocalizedDescriptionKey: fieldLabel + " must use YYYY-MM-DDTHH:mm."])
+        }
+        func part(_ index: Int) -> Int {
+            guard let range = Range(match.range(at: index), in: value) else { return -1 }
+            return Int(value[range]) ?? -1
+        }
+        let year = part(1), month = part(2), day = part(3), hour = part(4), minute = part(5)
+        guard year >= 1970, (1...12).contains(month), (1...31).contains(day), (0...23).contains(hour), (0...59).contains(minute) else {
+            throw NSError(domain: "enV.Communication", code: 2, userInfo: [NSLocalizedDescriptionKey: "Enter a real calendar date and time."])
+        }
+        guard let zone = TimeZone(identifier: timeZoneName) else {
+            throw NSError(domain: "enV.Communication", code: 3, userInfo: [NSLocalizedDescriptionKey: "Choose a valid IANA time zone, such as Africa/Lagos or Europe/London."])
+        }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        var dayComponents = DateComponents()
+        dayComponents.year = year; dayComponents.month = month; dayComponents.day = day
+        guard let dayStart = calendar.date(from: dayComponents) else {
+            throw NSError(domain: "enV.Communication", code: 4, userInfo: [NSLocalizedDescriptionKey: "Enter a real calendar date and time."])
+        }
+        var matchComponents = DateComponents()
+        matchComponents.year = year; matchComponents.month = month; matchComponents.day = day
+        matchComponents.hour = hour; matchComponents.minute = minute; matchComponents.second = 0
+        let searchStart = dayStart.addingTimeInterval(-1)
+        let first = calendar.nextDate(after: searchStart, matching: matchComponents, matchingPolicy: .strict, repeatedTimePolicy: .first, direction: .forward)
+        let last = calendar.nextDate(after: searchStart, matching: matchComponents, matchingPolicy: .strict, repeatedTimePolicy: .last, direction: .forward)
+        guard let first else {
+            throw NSError(domain: "enV.Communication", code: 5, userInfo: [NSLocalizedDescriptionKey: fieldLabel + " does not exist at that local clock time. Choose another time."])
+        }
+        if let last, abs(last.timeIntervalSince(first)) > 60 {
+            throw NSError(domain: "enV.Communication", code: 6, userInfo: [NSLocalizedDescriptionKey: fieldLabel + " occurs twice because clocks change. Choose a time outside the repeated hour."])
+        }
+        let actual = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: first)
+        guard actual.year == year, actual.month == month, actual.day == day, actual.hour == hour, actual.minute == minute else {
+            throw NSError(domain: "enV.Communication", code: 7, userInfo: [NSLocalizedDescriptionKey: "Enter a real calendar date and time."])
+        }
+        return first
+    }
+
+    private static func icsTimestamp(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyyMMdd'T'HHmmss'Z'"
+        return formatter.string(from: date)
+    }
+
+    private static func escapeICSText(_ value: String) -> String {
+        value.replacingOccurrences(of: "\\\\", with: "\\\\\\\\")
+            .replacingOccurrences(of: "\\r\\n", with: "\\\\n")
+            .replacingOccurrences(of: "\\r", with: "\\\\n")
+            .replacingOccurrences(of: "\\n", with: "\\\\n")
+            .replacingOccurrences(of: ";", with: "\\\\;")
+            .replacingOccurrences(of: ",", with: "\\\\,")
+    }
+
+    private static func foldICSLine(_ line: String) -> String {
+        var result: [String] = []
+        var current = ""
+        for character in line {
+            if !current.isEmpty && (current + String(character)).utf8.count > 75 {
+                result.append(current)
+                current = " " + String(character)
+            } else { current += String(character) }
+        }
+        result.append(current)
+        return result.joined(separator: "\\r\\n")
+    }
+
+    static func calendarICS(_ toolID: String, values: [String: String]) throws -> String {
+        let kind = parse(toolID).kind
+        guard ["meeting", "agenda", "invitation", "reminder"].contains(kind) else {
+            throw NSError(domain: "enV.Communication", code: 8, userInfo: [NSLocalizedDescriptionKey: "Calendar export is available for meetings, agendas, invitations and reminders."])
+        }
+        func value(_ key: String) -> String { values[key]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "" }
+        guard !value("timezone").isEmpty else {
+            throw NSError(domain: "enV.Communication", code: 9, userInfo: [NSLocalizedDescriptionKey: "Choose a time zone before exporting the event."])
+        }
+        let start = try eventInstant(value("date"), timeZoneName: value("timezone"), fieldLabel: "Event date and time")
+        let duration: Int
+        if !value("duration").isEmpty {
+            guard let parsed = Int(value("duration")), (5...480).contains(parsed) else {
+                throw NSError(domain: "enV.Communication", code: 10, userInfo: [NSLocalizedDescriptionKey: "Set an event duration between 5 and 480 minutes."])
+            }
+            duration = parsed
+        } else if kind == "invitation" { duration = 60 }
+        else if kind == "reminder" { duration = 15 }
+        else { duration = 30 }
+        if kind == "invitation" && !value("rsvpBy").isEmpty {
+            let rsvp = try eventInstant(value("rsvpBy"), timeZoneName: value("timezone"), fieldLabel: "RSVP deadline")
+            guard rsvp < start else {
+                throw NSError(domain: "enV.Communication", code: 11, userInfo: [NSLocalizedDescriptionKey: "The RSVP deadline must be earlier than the event."])
+            }
+        }
+        let end = start.addingTimeInterval(TimeInterval(duration * 60))
+        let title = value("subject").isEmpty ? kind.replacingOccurrences(of: "-", with: " ").capitalized : value("subject")
+        let descriptionParts = [
+            value("purpose").isEmpty ? "" : "Purpose: " + value("purpose"),
+            value("details"),
+            value("items").isEmpty ? "" : "Agenda:\\n" + value("items"),
+            value("decisions").isEmpty ? "" : "Decisions:\\n" + value("decisions"),
+            value("actionItems").isEmpty ? "" : "Action items:\\n" + value("actionItems"),
+            value("nextStep").isEmpty ? "" : "Next step / RSVP: " + value("nextStep"),
+            value("rsvpBy").isEmpty ? "" : "RSVP by: " + value("rsvpBy"),
+            value("name").isEmpty ? "" : "Audience / attendees: " + value("name")
+        ].filter { !$0.isEmpty }
+        let uidSource = [kind, title, value("date"), value("timezone"), value("name")].joined(separator: "|")
+        let hash = Data(uidSource.utf8).reduce(UInt64(14695981039346656037)) { ($0 ^ UInt64($1)) &* UInt64(1099511628211) }
+        let uid = String(format: "%016llx@envtools.store", hash)
+        let lines = [
+            "BEGIN:VCALENDAR", "PRODID:-//enV//Communication Tools//EN", "VERSION:2.0", "CALSCALE:GREGORIAN",
+            "METHOD:PUBLISH", "BEGIN:VEVENT", "UID:" + uid, "DTSTAMP:" + icsTimestamp(Date()),
+            "DTSTART:" + icsTimestamp(start), "DTEND:" + icsTimestamp(end),
+            "X-WR-TIMEZONE:" + escapeICSText(value("timezone")),
+            "SUMMARY:" + escapeICSText(title),
+            "DESCRIPTION:" + escapeICSText(descriptionParts.joined(separator: "\\n\\n")),
+            "LOCATION:" + escapeICSText(value("place")), "STATUS:CONFIRMED", "TRANSP:OPAQUE",
+            "BEGIN:VALARM", "ACTION:DISPLAY", "TRIGGER:-PT15M", "DESCRIPTION:" + escapeICSText(title),
+            "END:VALARM", "END:VEVENT", "END:VCALENDAR"
+        ]
+        return lines.map { foldICSLine($0) }.joined(separator: "\\r\\n") + "\\r\\n"
     }
 
     static func signatureHTML(_ toolID: String, values: [String: String]) -> String {
@@ -1327,6 +1495,8 @@ private struct NativeCommunicationToolView: View {
     @State private var checks: [String] = []
     @State private var showExporter = false
     @State private var exportHTML = false
+    @State private var exportCalendar = false
+    @State private var calendarOutput = ""
 
     private var parsed: (kind: String, action: String) { NativeCommunicationEngine.parse(tool.id) }
 
@@ -1369,9 +1539,21 @@ private struct NativeCommunicationToolView: View {
                 Divider().overlay(Color.envBorder)
                 HStack(spacing: 8) {
                     Button("Copy") { UIPasteboard.general.string = output }.buttonStyle(.bordered)
-                    Button("Save text") { exportHTML = false; showExporter = true }.buttonStyle(.bordered)
+                    Button("Save text") { exportHTML = false; exportCalendar = false; showExporter = true }.buttonStyle(.bordered)
+                    if ["meeting", "agenda", "invitation", "reminder"].contains(parsed.kind) {
+                        Button("Save calendar") {
+                            do {
+                                calendarOutput = try NativeCommunicationEngine.calendarICS(tool.id, values: values)
+                                exportCalendar = true; exportHTML = false; showExporter = true; error = nil
+                            } catch { error = error.localizedDescription }
+                        }.buttonStyle(.bordered)
+                    }
+                    let gsm7 = parsed.kind == "sms" ? NativeCommunicationEngine.gsm7Alternative(output) : output
+                    if parsed.kind == "sms" && gsm7 != output && NativeCommunicationEngine.smsMetrics(gsm7).encoding == "GSM-7" {
+                        Button("Copy GSM-7 version") { UIPasteboard.general.string = gsm7 }.buttonStyle(.bordered)
+                    }
                     if parsed.kind == "signature" && parsed.action != "template" && parsed.action != "formatter" {
-                        Button("Save HTML") { exportHTML = true; showExporter = true }.buttonStyle(.bordered)
+                        Button("Save HTML") { exportHTML = true; exportCalendar = false; showExporter = true }.buttonStyle(.bordered)
                     }
                     ShareLink(item: output) { Text("Share") }.buttonStyle(.bordered)
                 }
@@ -1381,9 +1563,9 @@ private struct NativeCommunicationToolView: View {
         }
         .fileExporter(
             isPresented: $showExporter,
-            document: NativeBackendExportDocument(data: exportHTML ? Data(NativeCommunicationEngine.signatureHTML(tool.id, values: values).utf8) : Data(output.utf8)),
-            contentType: exportHTML ? .html : .plainText,
-            defaultFilename: exportHTML ? "env-email-signature.html" : "env-communication.txt"
+            document: NativeBackendExportDocument(data: exportCalendar ? Data(calendarOutput.utf8) : (exportHTML ? Data(NativeCommunicationEngine.signatureHTML(tool.id, values: values).utf8) : Data(output.utf8))),
+            contentType: exportCalendar ? (UTType(filenameExtension: "ics") ?? .data) : (exportHTML ? .html : .plainText),
+            defaultFilename: exportCalendar ? "env-communication-event.ics" : (exportHTML ? "env-email-signature.html" : "env-communication.txt")
         ) { result in
             if case .failure(let caughtError) = result { error = caughtError.localizedDescription }
         }
