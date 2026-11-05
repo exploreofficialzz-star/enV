@@ -433,7 +433,8 @@ export function communicationQualityChecks(input: CommunicationInput, output: st
   if (kind === "minutes" && !clean(input.nextStep)) checks.push("Add the next review date or review owner.");
   if (EVENT_KINDS.has(kind)) {
     if (!clean(input.date)) checks.push("Add the event date and local time.");
-    else {
+    if (!clean(input.timezone)) checks.push("Add the time zone so people in different regions see the intended local time.");
+    if (clean(input.date) && clean(input.timezone)) {
       try {
         const start = getCommunicationEventInstant(clean(input.date), clean(input.timezone));
         if (kind === "invitation" && clean(input.rsvpBy)) {
@@ -444,7 +445,6 @@ export function communicationQualityChecks(input: CommunicationInput, output: st
         checks.push(error instanceof Error ? error.message : "Check the event date, time and time zone.");
       }
     }
-    if (!clean(input.timezone)) checks.push("Add the time zone so people in different regions see the intended local time.");
     const duration = clean(input.duration);
     if (duration && (!Number.isInteger(Number(duration)) || Number(duration) < 5 || Number(duration) > 480)) checks.push("Set an event duration between 5 and 480 minutes.");
     if ((kind === "meeting" || kind === "agenda") && !duration) checks.push("Set a duration so agenda timeboxes can be checked.");
