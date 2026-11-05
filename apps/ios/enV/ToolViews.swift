@@ -1398,7 +1398,7 @@ enum NativeCommunicationEngine {
             "BEGIN:VALARM", "ACTION:DISPLAY", "TRIGGER:-PT15M", "DESCRIPTION:" + escapeICSText(title),
             "END:VALARM", "END:VEVENT", "END:VCALENDAR"
         ]
-        return lines.map { foldICSLine($0) }.joined(separator: "\r\n") + "\\r\\n"
+        return lines.map { foldICSLine($0) }.joined(separator: "\r\n") + "\r\n"
     }
 
     static func signatureHTML(_ toolID: String, values: [String: String]) -> String {
