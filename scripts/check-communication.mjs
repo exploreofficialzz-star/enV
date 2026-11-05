@@ -14,6 +14,7 @@ const errors = [];
 if (tools.length !== 55) errors.push(`Expected 55 Communication tools, found ${tools.length}`);
 for (const tool of tools) {
   if (tool.status !== "active") errors.push(`${tool.id}: must be active`);
+  if (!tool.clientSide || tool.requiresBackend || tool.requiresAuth) errors.push(`${tool.id}: must remain an account-free local tool`);
   if (tool.engine?.type !== "custom" || tool.engine?.id !== tool.id) errors.push(`${tool.id}: must route to CommunicationEngine with its own id`);
   const action = actions.find((candidate) => tool.id.endsWith(`-${candidate}`));
   if (!action) errors.push(`${tool.id}: unsupported action`);

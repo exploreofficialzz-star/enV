@@ -282,7 +282,7 @@ private fun CatalogFailureScreen(darkMode: Boolean, onRetry: () -> Unit) {
     }
 }
 
-private val productionExemptCategories = setOf("accessibility", "audio", "business", "calculators", "datetime", "developer", "design", "ecommerce", "qr", "video")
+private val productionExemptCategories = setOf("accessibility", "audio", "business", "calculators", "communication", "datetime", "developer", "design", "ecommerce", "qr", "video")
 private val productionExemptToolIds = setOf("a-book", "zip-any-file", "camera-studio")
 
 private fun ToolRecord.isUnderProduction(): Boolean =
@@ -1019,7 +1019,7 @@ private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme:
     }
 }
 
-private fun nativeSupported(tool: ToolRecord): Boolean = !NativeCopy.isWebRuntimeOnly(tool.id) && when { tool.id == "camera-studio" -> true; tool.id == "music-downloader" -> true; NativeBackendEngine.supports(tool) -> false; tool.status == "planned" -> false; NativeAudioEngine.supports(tool) -> true; else -> when (tool.engine.type) {
+private fun nativeSupported(tool: ToolRecord): Boolean = !NativeCopy.isWebRuntimeOnly(tool.id) && when { tool.category == "communication" -> true; tool.id == "camera-studio" -> true; tool.id == "music-downloader" -> true; NativeBackendEngine.supports(tool) -> false; tool.status == "planned" -> false; NativeAudioEngine.supports(tool) -> true; else -> when (tool.engine.type) {
     "business" -> NativeBusinessEngine.supports(tool)
     "custom" -> NativeProductivityEngine.supports(tool.id) || NativeAccessibilityEngine.supports(tool.id, tool.category) || NativeEventEngine.supports(tool.id) || NativeEcommerceEngine.supports(tool)
     "ai" -> NativeAiEngine.supports(tool)
@@ -1253,6 +1253,7 @@ private fun NativeToolInterfaceContent(
     }
     CompositionLocalProvider(LocalNativeToolExecutionTelemetry provides telemetry) {
         when {
+            tool.category == "communication" -> NativeCommunicationToolForm(tool.id)
             backend -> NativeBackendToolForm(tool, true)
             supported -> NativeToolForm(tool, onRelatedTool, startInWorkspace)
             tool.status == "planned" -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

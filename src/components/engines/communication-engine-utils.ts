@@ -1,90 +1,348 @@
-export type Kind = "email" | "message" | "sms" | "meeting" | "agenda" | "minutes" | "signature" | "invitation" | "announcement" | "thank-you" | "follow-up" | "reminder";
+export type Kind =
+  | "email" | "message" | "sms" | "meeting" | "agenda" | "minutes"
+  | "signature" | "invitation" | "announcement" | "thank-you" | "follow-up" | "reminder";
 export type Action = "generator" | "template" | "builder" | "planner" | "formatter";
 
+export type CommunicationInput = {
+  kind: Kind;
+  action: Action;
+  name?: string;
+  audience?: string;
+  subject?: string;
+  date?: string;
+  place?: string;
+  purpose?: string;
+  details?: string;
+  tone?: string;
+  items?: string;
+  email?: string;
+  cc?: string;
+  bcc?: string;
+  channel?: string;
+  duration?: string | number;
+  timezone?: string;
+  rsvpBy?: string;
+  role?: string;
+  company?: string;
+  phone?: string;
+  website?: string;
+  decisions?: string;
+  actionItems?: string;
+  nextStep?: string;
+};
+
+export type SmsMetrics = {
+  encoding: "GSM-7" | "UCS-2";
+  characters: number;
+  units: number;
+  segments: number;
+  singleMessageLimit: number;
+  concatenatedLimit: number;
+};
+
+const ACTIONS: Action[] = ["generator", "template", "builder", "planner", "formatter"];
+const KINDS: Kind[] = [
+  "thank-you", "follow-up", "email", "message", "sms", "meeting", "agenda",
+  "minutes", "signature", "invitation", "announcement", "reminder",
+];
+
+const GSM_BASIC = new Set(Array.from(
+  "@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞ\u001bÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà",
+));
+const GSM_EXTENSION = new Set(["\f", "^", "{", "}", "\\", "[", "~", "]", "|", "€"]);
+
+const clean = (value?: string | number) => String(value ?? "").trim();
+const lines = (value?: string) => String(value ?? "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+
 export function parseToolId(toolId: string): { kind: Kind; action: Action } {
-  const actions: Action[] = ["generator", "template", "builder", "planner", "formatter"];
-  const action = actions.find((candidate) => toolId.endsWith(`-${candidate}`));
-  if (!action) throw new Error(`Unsupported communication action: ${toolId}`);
+  const action = ACTIONS.find((candidate) => toolId.endsWith("-" + candidate));
+  if (!action) throw new Error("Unsupported communication action: " + toolId);
   const prefix = toolId.slice(0, -(action.length + 1));
-  const kinds: Kind[] = ["thank-you", "follow-up", "email", "message", "sms", "meeting", "agenda", "minutes", "signature", "invitation", "announcement", "reminder"];
-  const kind = kinds.find((candidate) => prefix === candidate);
-  if (!kind) throw new Error(`Unsupported communication type: ${toolId}`);
+  const kind = KINDS.find((candidate) => candidate === prefix);
+  if (!kind) throw new Error("Unsupported communication type: " + toolId);
   return { kind, action };
 }
 
 export function kindLabel(kind: Kind) {
-  return kind === "thank-you" ? "Thank You" : kind === "follow-up" ? "Follow Up" : kind[0].toUpperCase() + kind.slice(1);
+  const labels: Record<Kind, string> = {
+    email: "Email", message: "Message", sms: "SMS", meeting: "Meeting", agenda: "Agenda",
+    minutes: "Meeting minutes", signature: "Email signature", invitation: "Invitation",
+    announcement: "Announcement", "thank-you": "Thank-you note", "follow-up": "Follow-up",
+    reminder: "Reminder",
+  };
+  return labels[kind];
 }
 
-export function buildCommunication(input: {
-  kind: Kind; action: Action; name: string; subject: string; date: string; place: string;
-  purpose: string; details: string; tone: string; items: string;
-}) {
-  const { kind, action, name, subject, date, place, purpose, details, tone, items } = input;
-  const recipient = name.trim() || "[Recipient]";
-  const title = subject.trim() || `${kindLabel(kind)}`;
-  const context = purpose.trim() || "[Purpose / context]";
-  const body = details.trim() || "[Add the main details here.]";
-  const dateLine = date.trim() || "[Date / time]";
-  const placeLine = place.trim() || "[Location / channel]";
-  const lines = items.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
-
-  if (action === "formatter") return formatCommunication(body, kind);
-  if (action === "template") return templateFor(kind);
-
-  if (kind === "email") return action === "planner"
-    ? `EMAIL PLAN\n\nSubject: ${title}\nRecipient: ${recipient}\nPurpose: ${context}\nTone: ${tone}\n\nStructure:\n1. Greeting\n2. Purpose in the first paragraph\n3. Supporting details\n4. Clear request or next step\n5. Closing and signature`
-    : `To: ${recipient}\nSubject: ${title}\n\nHello ${recipient},\n\n${body}\n\n${action === "builder" ? `Next step: ${context}.\n\n` : ""}Best regards,\n[Your name]`;
-
-  if (kind === "message" || kind === "sms") return action === "planner"
-    ? `${kindLabel(kind).toUpperCase()} PLAN\n\nAudience: ${recipient}\nPurpose: ${context}\nTone: ${tone}\n\nKey points:\n${lines.map((x, i) => `${i + 1}. ${x}`).join("\n") || "1. Main point\n2. Required action"}`
-    : `${action === "builder" ? `To: ${recipient}\n` : ""}${action === "builder" ? `Purpose: ${context}\n\n` : ""}${body}`;
-
-  if (kind === "meeting") return action === "planner"
-    ? `MEETING PLAN\n\n${title}\nDate/time: ${dateLine}\nLocation: ${placeLine}\nPurpose: ${context}\n\nAgenda:\n${lines.map((x, i) => `${i + 1}. ${x}`).join("\n")}`
-    : `MEETING: ${title}\nDate/time: ${dateLine}\nLocation: ${placeLine}\nAttendee: ${recipient}\nPurpose: ${context}\n\n${body}`;
-
-  if (kind === "agenda" || kind === "minutes") {
-    const heading = kind === "agenda" ? "AGENDA" : "MEETING MINUTES";
-    return `${heading}\n${title}\nDate/time: ${dateLine}\nLocation: ${placeLine}\n\n${lines.map((x, i) => `${i + 1}. ${x}`).join("\n") || `1. ${body}`}\n\nNotes: ${body}`;
+export function getSmsMetrics(value: string): SmsMetrics {
+  const characters = Array.from(value).length;
+  const chars = Array.from(value);
+  const gsm = chars.every((character) => GSM_BASIC.has(character) || GSM_EXTENSION.has(character));
+  if (gsm) {
+    const units = chars.reduce((sum, character) => sum + (GSM_EXTENSION.has(character) ? 2 : 1), 0);
+    const segments = units === 0 ? 0 : units <= 160 ? 1 : Math.ceil(units / 153);
+    return { encoding: "GSM-7", characters, units, segments, singleMessageLimit: 160, concatenatedLimit: 153 };
   }
+  const units = chars.reduce((sum, character) => sum + (character.codePointAt(0)! > 0xffff ? 2 : 1), 0);
+  const segments = units === 0 ? 0 : units <= 70 ? 1 : Math.ceil(units / 67);
+  return { encoding: "UCS-2", characters, units, segments, singleMessageLimit: 70, concatenatedLimit: 67 };
+}
 
-  if (kind === "signature") return action === "planner"
-    ? `SIGNATURE PLAN\n\nName: ${recipient}\nRole/context: ${context}\n\nInclude:\n• Full name\n• Role or organization\n• Contact method\n• Optional website or social link\n• Optional legal/disclaimer line`
-    : `${recipient}\n${context}\n${body}`;
+function formatCommunication(value: string, kind: Kind) {
+  const cleaned = value
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => line.replace(/[ \t]+$/g, "").trimStart())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  if (!cleaned) return kindLabel(kind) + " formatter\n\nPaste your content above to format it.";
+  return cleaned.split("\n\n").map((paragraph) => paragraph.split("\n").join("\n")).join("\n\n");
+}
 
-  if (kind === "invitation") return `YOU'RE INVITED\n\n${title}\n\nWhen: ${dateLine}\nWhere: ${placeLine}\n\n${body}\n\nPlease confirm your attendance.`;
-  if (kind === "announcement") return `ANNOUNCEMENT\n\n${title}\n\n${body}\n\nEffective: ${dateLine}\nNext step: ${context}`;
-  if (kind === "thank-you") return `Dear ${recipient},\n\nThank you for ${context}. ${body}\n\nI truly appreciate your time and support.\n\nWarm regards,\n[Your name]`;
-  if (kind === "follow-up") return `Subject: Follow-up — ${title}\n\nHello ${recipient},\n\nI am following up regarding ${context}. ${body}\n\nPlease let me know the next step when convenient.\n\nBest regards,\n[Your name]`;
-  if (kind === "reminder") return `REMINDER\n\n${title}\nFor: ${recipient}\nWhen: ${dateLine}\nWhere: ${placeLine}\n\n${body}\n\nAction needed: ${context}`;
+function agendaLines(value: string, durationValue: string | number) {
+  const items = lines(value);
+  if (!items.length) return ["1. Welcome and objectives", "2. Main discussion", "3. Decisions and next steps"].join("\n");
+  const duration = Math.max(5, Math.min(480, Number(durationValue) || 30));
+  const base = Math.floor(duration / items.length);
+  let remainder = duration % items.length;
+  let elapsed = 0;
+  return items.map((item, index) => {
+    const minutes = base + (remainder-- > 0 ? 1 : 0);
+    const start = elapsed;
+    elapsed += minutes;
+    const stamp = (minute: number) => String(Math.floor(minute / 60)).padStart(2, "0") + ":" + String(minute % 60).padStart(2, "0");
+    return (index + 1) + ". " + stamp(start) + "–" + stamp(elapsed) + "  " + item;
+  }).join("\n");
+}
 
-  return body;
+function actionItemLines(value: string) {
+  const parsed = lines(value).map((line, index) => {
+    const [owner = "", task = "", due = ""] = line.split("|").map((part) => part.trim());
+    return (index + 1) + ". " + (task || owner) + (owner && task ? " — Owner: " + owner : "") + (due ? " — Due: " + due : " — Due: Not set");
+  });
+  return parsed.length ? parsed.join("\n") : "1. [Owner] — [Action] — [Due date]";
 }
 
 function templateFor(kind: Kind) {
   const templates: Record<Kind, string> = {
-    email: "To: [Recipient]\nSubject: [Subject]\n\nHello [Name],\n\n[Purpose and key details]\n\n[Requested action / next step]\n\nBest regards,\n[Your name]",
-    message: "Hello [Name],\n\n[Main message]\n\n[Next step]",
-    sms: "[Name], [short message]. [Action or next step].",
-    meeting: "MEETING: [Title]\nDate/time: [Date]\nLocation: [Location]\nPurpose: [Purpose]\n\n[Key details]",
-    agenda: "AGENDA — [Meeting]\n\n1. Welcome\n2. [Topic]\n3. [Topic]\n4. Questions\n5. Decisions and next steps",
-    minutes: "MEETING MINUTES — [Meeting]\nDate: [Date]\n\nAttendees: [Names]\n\nDiscussion:\n[Notes]\n\nDecisions:\n[Decisions]\n\nAction items:\n[Owner — task — deadline]",
-    signature: "[Full name]\n[Role / organization]\n[Phone or email]\n[Website]\n[Optional disclaimer]",
-    invitation: "YOU'RE INVITED\n\n[Event title]\nWhen: [Date/time]\nWhere: [Location]\n\n[Event details]\n\nPlease RSVP by [Date].",
-    announcement: "ANNOUNCEMENT\n\n[Headline]\n\n[What is changing / happening]\n\nEffective: [Date]\nNext step: [Action]",
-    "thank-you": "Dear [Name],\n\nThank you for [reason].\n\n[Personal detail or appreciation]\n\nWarm regards,\n[Your name]",
-    "follow-up": "Subject: Follow-up — [Topic]\n\nHello [Name],\n\nI am following up regarding [topic].\n\n[Question / next step]\n\nBest regards,\n[Your name]",
-    reminder: "REMINDER\n\n[Task / event]\nWhen: [Date/time]\nWhere: [Location]\n\n[Important details]\nAction needed: [Action]",
+    email: "To: [Name] <[email]>\nCc: [optional]\nSubject: [Specific subject]\n\nHello [Name],\n\n[Purpose in the first sentence]\n[Essential context and details]\n\n[Clear request or next step, with a date if relevant]\n\nBest regards,\n[Your name]",
+    message: "To: [Person / group]\nChannel: [WhatsApp / Slack / Teams / other]\n\n[One clear update]\n[Context the reader needs]\n\nNext step: [Owner + action + timing]",
+    sms: "[Name], [one clear message]. [Action and deadline].",
+    meeting: "MEETING BRIEF\n[Meeting title]\nDate/time: [Date + time zone]\nDuration: [Minutes]\nLocation/link: [Place or meeting link]\nPurpose: [Outcome required]\nAttendees: [Names]\nPreparation: [Pre-read or materials]",
+    agenda: "MEETING AGENDA\n[Meeting title] · [Date/time]\nObjective: [Decision or outcome]\n\n1. Welcome and context — [Owner] — [Minutes]\n2. [Topic] — [Owner] — [Minutes]\n3. [Topic] — [Owner] — [Minutes]\n4. Decisions and actions — [Owner] — [Minutes]",
+    minutes: "MEETING MINUTES\nMeeting: [Title] · Date: [Date/time]\nAttendees: [Names]\n\nKey discussion\n[Concise outcome-focused notes]\n\nDecisions\n[Decision — rationale — decision owner]\n\nAction register\n[Owner] | [Action] | [Due date]\n\nNext review: [Date/time]",
+    signature: "[Full name]\n[Role] · [Company]\n[Email] · [Phone]\n[Website]\n[Optional short disclaimer]",
+    invitation: "YOU'RE INVITED\n[Event name]\nWhen: [Date, time and time zone]\nWhere: [Venue or link]\n\n[What guests can expect]\n\nPlease RSVP by [Date] via [Contact / link].\nAccess notes: [Optional]",
+    announcement: "[Clear headline]\n\nWhat is happening: [Change / news]\nWho is affected: [Audience]\nWhen it takes effect: [Date/time]\nWhat you need to do: [Action]\nQuestions: [Contact / channel]",
+    "thank-you": "Hello [Name],\n\nThank you for [specific reason]. [A personal detail that shows why it mattered].\n\n[Next step or continued appreciation, if relevant]\n\nWarm regards,\n[Your name]",
+    "follow-up": "Subject: Follow-up — [Topic]\n\nHello [Name],\n\nI am following up on [previous conversation / date]. [Brief recap].\n\nCould you [specific next step] by [date]? Please let me know if another time works better.\n\nBest regards,\n[Your name]",
+    reminder: "REMINDER — [Task / event]\nWhen: [Date, time and time zone]\nWhere: [Location / link]\n\n[Essential details]\nAction needed: [Action]\nBy: [Deadline]\nContact: [Name / channel]",
   };
   return templates[kind];
 }
 
-function formatCommunication(text: string, kind: Kind) {
-  const cleaned = text.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
-  if (!cleaned) return `${kindLabel(kind)} Formatter\n\nPaste text above to format it.`;
-  const sentences = cleaned.replace(/\s+/g, " ").split(/(?<=[.!?])\s+/).filter(Boolean);
-  if (kind === "email") return `SUBJECT: [Add subject]\n\n${sentences.join(" ")}\n\nNEXT STEP: [Add requested action]\n\nSIGN-OFF: [Your name]`;
-  if (kind === "meeting" || kind === "agenda" || kind === "minutes") return `${kindLabel(kind).toUpperCase()}\n\n${sentences.map((s, i) => `${i + 1}. ${s}`).join("\n")}`;
-  return sentences.join("\n\n");
+function planFor(input: CommunicationInput, title: string, recipient: string) {
+  const purpose = clean(input.purpose) || "[Define the outcome]";
+  const items = lines(input.items);
+  switch (input.kind) {
+    case "email":
+      return "EMAIL PLAN\n\nAudience: " + recipient + "\nSubject: " + title + "\nGoal: " + purpose +
+        "\n\nBefore sending\n1. Confirm every recipient and remove anyone who should not see the thread.\n2. Put the main point in the first two lines.\n3. Separate background from the request.\n4. State one owner and a specific response date.\n5. Check links, attachments and confidential information.";
+    case "message":
+      return "MESSAGE PLAN\n\nChannel: " + (clean(input.channel) || "Choose the right channel") + "\nAudience: " + recipient +
+        "\nGoal: " + purpose + "\n\n1. Decide whether this belongs in a shared thread or a private message.\n2. Lead with the update or question.\n3. Include only context the audience needs.\n4. Mention only people who need to act.\n5. End with an owner or next step.";
+    case "sms": {
+      const sample = clean(input.details) || clean(input.purpose);
+      const metrics = getSmsMetrics(sample);
+      return "SMS PLAN\n\nAudience: " + recipient + "\nGoal: " + purpose +
+        "\n\n1. Put the essential information first.\n2. Use one clear action and deadline.\n3. Remove links or details the recipient does not need.\n4. Confirm the recipient and consent before sending.\n5. Preview encoding and segment count before using an SMS provider.\n\nCurrent draft: " +
+        (metrics.units ? metrics.encoding + " · " + metrics.units + " units · " + metrics.segments + " segment(s)" : "No draft text yet.");
+    }
+    case "meeting":
+    case "agenda":
+      return "MEETING PLAN\n\n" + title + "\nOutcome: " + purpose +
+        "\nDate/time: " + (clean(input.date) || "[Set date and time]") +
+        "\nDuration: " + (clean(input.duration) || "30") + " minutes\n\nPreparation\n1. Invite only people needed for the outcome.\n2. Share the agenda and pre-read in advance.\n3. Give each topic an owner and timebox.\n4. Reserve time for decisions and risks.\n5. End with named actions and deadlines.\n\nAgenda\n" + agendaLines(input.items || "", input.duration || 30);
+    case "minutes":
+      return "MINUTES PLAN\n\nMeeting: " + title + "\nPurpose: " + purpose +
+        "\n\nCapture only the record people need:\n1. Attendance and apologies.\n2. Concise discussion summary by agenda item.\n3. Decisions, rationale and decision owner.\n4. Action items with owner and due date.\n5. Next review date and unresolved issues.\n\nAction item format: Owner | Task | Due date\n" + (items.length ? items.join("\n") : "[Add action items]");
+    case "signature":
+      return "SIGNATURE PLAN\n\n1. Use the same professional name and role used in your correspondence.\n2. Add one reliable contact route and one useful website.\n3. Keep the design compact and readable on mobile.\n4. Use a short disclaimer only when it is actually required.\n5. Test both the HTML and plain-text versions.";
+    case "invitation":
+      return "INVITATION PLAN\n\nEvent: " + title + "\nAudience: " + recipient +
+        "\nPurpose: " + purpose +
+        "\n\n1. State the event and who should attend.\n2. Confirm the exact date, local time and time zone.\n3. Include venue or working meeting link and access notes.\n4. Give an RSVP deadline and response route.\n5. Send a reminder only through a connected, consented service.";
+    case "announcement":
+      return "ANNOUNCEMENT PLAN\n\nSubject: " + title + "\nAudience: " + recipient + "\nPurpose: " + purpose +
+        "\n\n1. Put the change or news in the headline.\n2. Explain who is affected and what changes.\n3. State the effective date and any transition period.\n4. Give the required action and support contact.\n5. Use one source of truth for later updates.";
+    case "thank-you":
+      return "THANK-YOU PLAN\n\nRecipient: " + recipient + "\nReason: " + purpose +
+        "\n\n1. Name the specific contribution.\n2. Explain its real impact.\n3. Add a personal detail rather than generic praise.\n4. Offer a meaningful next step only when appropriate.\n5. Keep the message timely and sincere.";
+    case "follow-up":
+      return "FOLLOW-UP PLAN\n\nRecipient: " + recipient + "\nTopic: " + title + "\nGoal: " + purpose +
+        "\n\n1. Refer to the prior exchange and date.\n2. Summarize the open point in one sentence.\n3. Ask one answerable question.\n4. Offer a reasonable deadline or alternative.\n5. Track the next follow-up so the recipient is not repeatedly chased.";
+    case "reminder":
+      return "REMINDER PLAN\n\nFor: " + recipient + "\nTask: " + title + "\nGoal: " + purpose +
+        "\n\n1. Confirm the correct date, time zone and location.\n2. Put the action or preparation first.\n3. Include any materials or access link.\n4. Choose a sensible notice period.\n5. Schedule delivery only in a connected calendar or messaging service.";
+  }
+}
+
+export function buildCommunication(input: CommunicationInput) {
+  const kind = input.kind;
+  const action = input.action;
+  const recipient = clean(input.name) || clean(input.audience) || "[Recipient]";
+  const title = clean(input.subject) || kindLabel(kind);
+  const purpose = clean(input.purpose);
+  const details = clean(input.details) || purpose;
+  const date = clean(input.date) || "[Date / time]";
+  const place = clean(input.place) || "[Location / channel]";
+  const tone = clean(input.tone) || "professional";
+
+  if (action === "template") return templateFor(kind);
+  if (action === "formatter") return formatCommunication(input.details || input.purpose || "", kind);
+  if (action === "planner") return planFor(input, title, recipient);
+
+  switch (kind) {
+    case "email": {
+      const displayName = clean(input.name) || clean(input.audience);
+      const emailAddress = clean(input.email);
+      const greetingName = displayName || "there";
+      const greeting = tone === "friendly" || tone === "warm" ? "Hi " + greetingName + "," : "Hello " + greetingName + ",";
+      const closing = tone === "warm" ? "With appreciation," : tone === "friendly" ? "Thanks," : "Best regards,";
+      const toRecipient = emailAddress ? (displayName ? displayName + " <" + emailAddress + ">" : emailAddress) : recipient;
+      const headers = [
+        "To: " + toRecipient,
+        clean(input.cc) ? "Cc: " + clean(input.cc) : "",
+        clean(input.bcc) ? "Bcc: " + clean(input.bcc) : "",
+        "Subject: " + title,
+      ].filter(Boolean);
+      const body = details || "[Add the main information]";
+      const next = clean(input.nextStep) ? "\n\nNext step: " + clean(input.nextStep) : "";
+      return (action === "builder" ? headers.join("\n") + "\n\n" : "Subject: " + title + "\n\n") +
+        greeting + "\n\n" + body + next + "\n\n" + closing + "\n[Your name]";
+    }
+    case "message": {
+      const message = details || "[Write the update or question]";
+      const next = clean(input.nextStep) ? "\n\nNext step: " + clean(input.nextStep) : "";
+      if (action === "builder") {
+        return "To: " + recipient + "\nChannel: " + (clean(input.channel) || "General") +
+          "\nTopic: " + title + "\n\n" + message + next;
+      }
+      return message + next;
+    }
+    case "sms": {
+      const greeting = recipient !== "[Recipient]" ? recipient + ", " : "";
+      const message = details || "[Write one clear message]";
+      return greeting + message + (clean(input.nextStep) ? " " + clean(input.nextStep) : "");
+    }
+    case "meeting":
+      return "MEETING BRIEF\n" + title + "\n\nDate/time: " + date +
+        (clean(input.timezone) ? " (" + clean(input.timezone) + ")" : "") +
+        "\nDuration: " + (clean(input.duration) || "30") + " minutes\nLocation/link: " + place +
+        "\nAttendee(s): " + recipient + "\nPurpose / outcome: " + (purpose || "[State the decision or outcome]") +
+        "\nPreparation: " + (details || "[Add pre-read or preparation notes]");
+    case "agenda":
+      return "AGENDA\n" + title + "\nDate/time: " + date + (clean(input.timezone) ? " (" + clean(input.timezone) + ")" : "") + "\nLocation: " + place +
+        "\nObjective: " + (purpose || "[Outcome required]") + "\n\n" +
+        agendaLines(input.items || details, input.duration || 30) +
+        "\n\nClose: confirm decisions, owners and due dates.";
+    case "minutes":
+      return "MEETING MINUTES\n" + title + "\nDate/time: " + date + (clean(input.timezone) ? " (" + clean(input.timezone) + ")" : "") +
+        "\nLocation: " + place + "\nAttendees: " + recipient +
+        "\n\nDiscussion summary\n" + (details || "[Summarize outcomes by agenda item]") +
+        "\n\nDecisions\n" + (lines(input.decisions).map((item, index) => (index + 1) + ". " + item).join("\n") || "[Record each decision and its owner]") +
+        "\n\nAction register\n" + actionItemLines(input.actionItems || input.items || "") +
+        "\n\nNext review: " + (clean(input.nextStep) || "[Date / owner]");
+    case "signature": {
+      const identity = [recipient, clean(input.role), clean(input.company)].filter(Boolean).join(" · ");
+      const contacts = [clean(input.email), clean(input.phone), clean(input.website)].filter(Boolean);
+      return [identity, ...contacts, clean(input.details)].filter(Boolean).join("\n");
+    }
+    case "invitation":
+      return "YOU'RE INVITED\n" + title + "\n\nWhen: " + date +
+        (clean(input.timezone) ? " (" + clean(input.timezone) + ")" : "") +
+        "\nWhere: " + place + "\n\n" + (details || "[What guests can expect]") +
+        "\n\nPlease RSVP by: " + (clean(input.rsvpBy) || "[RSVP deadline]") +
+        (clean(input.nextStep) ? "\nRSVP: " + clean(input.nextStep) : "\nRSVP: [Response link or contact]") +
+        "\n\nPlease share any access or dietary requirements with the organiser.";
+    case "announcement":
+      return "ANNOUNCEMENT\n" + title + "\n\nWhat is happening\n" + (details || "[Explain the update]") +
+        "\n\nWho is affected\n" + recipient +
+        "\n\nEffective date\n" + date +
+        "\n\nWhat to do next\n" + (clean(input.nextStep) || purpose || "[State the required action]") +
+        (clean(input.place) ? "\n\nQuestions / channel\n" + clean(input.place) : "");
+    case "thank-you":
+      return (tone === "friendly" ? "Hi " : "Dear ") + recipient + ",\n\nThank you for " +
+        (purpose || "[the specific contribution]") + ".\n\n" +
+        (details || "[Describe why it mattered and the impact it had.]") +
+        (clean(input.nextStep) ? "\n\n" + clean(input.nextStep) : "") +
+        "\n\n" + (tone === "professional" ? "With sincere thanks," : "Warm regards,") + "\n[Your name]";
+    case "follow-up":
+      return "Subject: Follow-up — " + title + "\n\nHello " + recipient + "," +
+        "\n\nI am following up on " + (purpose || "[our previous conversation / topic]") + "." +
+        "\n\n" + (details || "[Briefly recap the open point.]") +
+        "\n\nCould you " + (clean(input.nextStep) || "[confirm the next step]") +
+        (date !== "[Date / time]" ? " by " + date : " when convenient") +
+        "?\n\nBest regards,\n[Your name]";
+    case "reminder":
+      return "REMINDER — " + title + "\nFor: " + recipient + "\nWhen: " + date +
+        (clean(input.timezone) ? " (" + clean(input.timezone) + ")" : "") +
+        "\nWhere: " + place + "\n\n" + (details || "[Essential details]") +
+        "\n\nAction needed: " + (clean(input.nextStep) || purpose || "[State the action]") +
+        "\n\nPlease contact the organiser if anything has changed.";
+  }
+}
+
+export function communicationQualityChecks(input: CommunicationInput, output: string): string[] {
+  const checks: string[] = [];
+  const kind = input.kind;
+  if (kind !== "signature" && input.action !== "template" && input.action !== "formatter" && input.action !== "planner" && !clean(input.details) && !clean(input.purpose)) {
+    checks.push("Add the message details or purpose so the draft contains your real information.");
+  }
+  if (kind === "email") {
+    if (!clean(input.email) && !clean(input.name) && !clean(input.audience)) checks.push("Add a recipient before using this email.");
+    if (clean(input.email) && !/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(clean(input.email))) checks.push("Check the recipient email address; it does not look complete.");
+    if (!clean(input.subject)) checks.push("Add a specific subject so the email is easy to find later.");
+    const addressPattern = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
+    const ccAddresses = clean(input.cc).split(/[;,]/).map((address) => address.trim()).filter(Boolean);
+    const bccAddresses = clean(input.bcc).split(/[;,]/).map((address) => address.trim()).filter(Boolean);
+    if ([...ccAddresses, ...bccAddresses].some((address) => !addressPattern.test(address))) checks.push("Check every Cc and Bcc address; separate addresses with commas or semicolons.");
+    const ccSet = new Set(ccAddresses.map((address) => address.toLowerCase()));
+    if (bccAddresses.some((address) => ccSet.has(address.toLowerCase()))) checks.push("An address appears in both Cc and Bcc; review recipient visibility.");
+  }
+  if (kind === "sms" && output.trim()) {
+    const metrics = getSmsMetrics(output);
+    if (metrics.segments > 3) checks.push("This draft uses " + metrics.segments + " SMS segments. Shorten it or confirm the provider's segment and cost rules.");
+    if (metrics.encoding === "UCS-2") checks.push("This message uses UCS-2 because of its characters; the single-message limit is 70 units instead of 160 GSM-7 units.");
+  }
+  if ((kind === "meeting" || kind === "agenda") && !clean(input.date)) checks.push("Add the meeting date and time.");
+  if ((kind === "meeting" || kind === "agenda") && !clean(input.duration)) checks.push("Set a duration so agenda timeboxes can be checked.");
+  if (kind === "minutes" && !clean(input.actionItems) && !clean(input.items)) checks.push("Add named owners and due dates to the action register.");
+  if (kind === "minutes" && !clean(input.nextStep)) checks.push("Add the next review date or review owner.");
+  if (["meeting", "agenda", "invitation", "reminder"].includes(kind) && !clean(input.timezone)) checks.push("Add the time zone so people in different regions see the intended time.");
+  if (kind === "invitation") {
+    if (!clean(input.date)) checks.push("Add the event date and time.");
+    if (!clean(input.rsvpBy)) checks.push("Set an RSVP deadline.");
+  }
+  if (kind === "reminder" && !clean(input.date)) checks.push("Add the reminder date and time; this draft will not schedule itself.");
+  if (kind === "signature" && !clean(input.email) && !clean(input.phone) && !clean(input.website)) checks.push("Add at least one way for people to contact you.");
+  if (kind === "signature" && clean(input.email) && !/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(clean(input.email))) checks.push("Check the email address in this signature.");
+  if (kind === "announcement" && !clean(input.date)) checks.push("Add the effective date, or state that the change takes effect immediately.");
+  if (kind === "announcement" && !clean(input.nextStep)) checks.push("State what the audience should do next, or explicitly say no action is required.");
+  return [...new Set(checks)];
+}
+
+export function buildSignatureHtml(input: CommunicationInput) {
+  const entities: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" };
+  const escape = (value: string) => value.replace(/[&<>"']/g, (character) => entities[character] ?? character);
+  const values = [
+    clean(input.name) || clean(input.audience),
+    [clean(input.role), clean(input.company)].filter(Boolean).join(" · "),
+    clean(input.email), clean(input.phone), clean(input.website), clean(input.details),
+  ].filter(Boolean);
+  return "<!doctype html>\n<html><head><meta charset=\"utf-8\"><title>Email signature</title></head><body>\n" +
+    "<table cellpadding=\"0\" cellspacing=\"0\" role=\"presentation\"><tr><td>" +
+    values.map((value, index) => "<div style=\"font-family:Arial,sans-serif;color:#222;line-height:1.5;" +
+      (index === 0 ? "font-weight:700;" : "") + "\">" + escape(value) + "</div>").join("\n") +
+    "</td></tr></table>\n</body></html>";
 }
