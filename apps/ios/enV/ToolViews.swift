@@ -1326,12 +1326,12 @@ enum NativeCommunicationEngine {
     }
 
     private static func escapeICSText(_ value: String) -> String {
-        value.replacingOccurrences(of: "\\\\", with: "\\\\\\\\")
-            .replacingOccurrences(of: "\\r\\n", with: "\\\\n")
-            .replacingOccurrences(of: "\\r", with: "\\\\n")
-            .replacingOccurrences(of: "\\n", with: "\\\\n")
-            .replacingOccurrences(of: ";", with: "\\\\;")
-            .replacingOccurrences(of: ",", with: "\\\\,")
+        value.replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\r\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\n")
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: ";", with: "\\;")
+            .replacingOccurrences(of: ",", with: "\\,")
     }
 
     private static func foldICSLine(_ line: String) -> String {
@@ -1344,7 +1344,7 @@ enum NativeCommunicationEngine {
             } else { current += String(character) }
         }
         result.append(current)
-        return result.joined(separator: "\\r\\n")
+        return result.joined(separator: "\r\n")
     }
 
     static func calendarICS(_ toolID: String, values: [String: String]) throws -> String {
@@ -1377,9 +1377,9 @@ enum NativeCommunicationEngine {
         let descriptionParts = [
             value("purpose").isEmpty ? "" : "Purpose: " + value("purpose"),
             value("details"),
-            value("items").isEmpty ? "" : "Agenda:\\n" + value("items"),
-            value("decisions").isEmpty ? "" : "Decisions:\\n" + value("decisions"),
-            value("actionItems").isEmpty ? "" : "Action items:\\n" + value("actionItems"),
+            value("items").isEmpty ? "" : "Agenda:\n" + value("items"),
+            value("decisions").isEmpty ? "" : "Decisions:\n" + value("decisions"),
+            value("actionItems").isEmpty ? "" : "Action items:\n" + value("actionItems"),
             value("nextStep").isEmpty ? "" : "Next step / RSVP: " + value("nextStep"),
             value("rsvpBy").isEmpty ? "" : "RSVP by: " + value("rsvpBy"),
             value("name").isEmpty ? "" : "Audience / attendees: " + value("name")
@@ -1393,12 +1393,12 @@ enum NativeCommunicationEngine {
             "DTSTART:" + icsTimestamp(start), "DTEND:" + icsTimestamp(end),
             "X-WR-TIMEZONE:" + escapeICSText(value("timezone")),
             "SUMMARY:" + escapeICSText(title),
-            "DESCRIPTION:" + escapeICSText(descriptionParts.joined(separator: "\\n\\n")),
+            "DESCRIPTION:" + escapeICSText(descriptionParts.joined(separator: "\n\n")),
             "LOCATION:" + escapeICSText(value("place")), "STATUS:CONFIRMED", "TRANSP:OPAQUE",
             "BEGIN:VALARM", "ACTION:DISPLAY", "TRIGGER:-PT15M", "DESCRIPTION:" + escapeICSText(title),
             "END:VALARM", "END:VEVENT", "END:VCALENDAR"
         ]
-        return lines.map { foldICSLine($0) }.joined(separator: "\\r\\n") + "\\r\\n"
+        return lines.map { foldICSLine($0) }.joined(separator: "\r\n") + "\\r\\n"
     }
 
     static func signatureHTML(_ toolID: String, values: [String: String]) -> String {
