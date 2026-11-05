@@ -9,6 +9,7 @@ import { isEventTemplateTool } from "@/lib/events/event-templates";
  * one navigation. The matching imports are shared with React.lazy in ToolEngine.
  */
 export async function preloadToolEngine(tool: ToolMeta): Promise<void> {
+  if (typeof window === "undefined") return;
   let pending: Promise<unknown> | null = null;
 
   if (tool.id === "camera-studio") {
