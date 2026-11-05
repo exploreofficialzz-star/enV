@@ -8195,6 +8195,7 @@ private struct NativeAiMicroToolView: View {
     let tool: Tool
     @State private var values: [String: String]
     @State private var output = ""
+    @State private var generatedOutput = ""
     @State private var error = ""
 
     init(tool: Tool) {
@@ -8234,11 +8235,15 @@ private struct NativeAiMicroToolView: View {
             }
             HStack {
                 Button("Generate") {
-                    do { output = try NativeAiMicroEngine.generate(toolID: tool.id, values: values); error = "" }
-                    catch { output = ""; self.error = error.localizedDescription }
+                    do { output = try NativeAiMicroEngine.generate(toolID: tool.id, values: values); generatedOutput = output; error = "" }
+                    catch { output = ""; generatedOutput = ""; self.error = error.localizedDescription }
                 }
                 .buttonStyle(.borderedProminent)
-                Button("Clear") { output = ""; error = "" }
+                if !output.isEmpty && output != generatedOutput {
+                    Button("Reset edits") { output = generatedOutput }
+                        .buttonStyle(.bordered)
+                }
+                Button("Clear") { output = ""; generatedOutput = ""; error = "" }
                     .buttonStyle(.bordered)
                 if !output.isEmpty {
                     Button("Copy output") { UIPasteboard.general.string = output }
@@ -8246,7 +8251,8 @@ private struct NativeAiMicroToolView: View {
                 }
             }
             if !output.isEmpty {
-                TextEditor(text: .constant(output))
+                Text("Editable draft").font(.caption).foregroundStyle(.secondary)
+                TextEditor(text: $output)
                     .frame(minHeight: 150)
                     .textSelection(.enabled)
                     .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envTeal.opacity(0.3)))
