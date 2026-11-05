@@ -113,7 +113,7 @@ object NativeAiMicroEngine {
                         if (answer.isNullOrBlank()) missing += question
                         "Q: $question\nA: " + (answer ?: "[Add a verified answer before publishing.]")
                     }.joinToString("\n\n")
-                    "FAQ: $topic\\nAudience: $audience\\n\\n" + output + if (missing.isNotEmpty()) "\n\nNEEDS AN ANSWER\n" + missing.joinToString("\n") { "• $it" } + "\n\nOnly publish answers confirmed by your product, policy or source material." else ""
+                    "FAQ: $topic\nAudience: $audience\n\n" + output + if (missing.isNotEmpty()) "\n\nNEEDS AN ANSWER\n" + missing.joinToString("\n") { "• $it" } + "\n\nOnly publish answers confirmed by your product, policy or source material." else ""
                 }
             }
             "feature-benefit" -> {
@@ -121,7 +121,7 @@ object NativeAiMicroEngine {
                 if (features.isEmpty()) "Add one product feature per line."
                 else {
                     val outcomes = splitLines(values["outcomes"].orEmpty())
-                    "VALUE MAPPING\\nProduct / service: $topic\\nAudience: $audience\\n\\n" + features.mapIndexed { index, feature ->
+                    "VALUE MAPPING\nProduct / service: $topic\nAudience: $audience\n\n" + features.mapIndexed { index, feature ->
                         "Feature: $feature\nCustomer outcome: " + (outcomes.getOrNull(index) ?: "[Add the specific result this feature creates.]") + "\nEvidence to support the claim: [Add a measured result, user example or verified product detail.]"
                     }.joinToString("\n\n") + if (outcomes.size > features.size) "\n\nNote: extra outcome entries were not matched to a feature and were left out." else ""
                 }
