@@ -158,4 +158,25 @@ class NativeAiMicroEngineTest {
         assertEquals(8, titles.size)
         assertTrue(titles.all { it.length <= 100 })
     }
+
+    @Test fun lineBasedInputsKeepCommasInsideEntries() {
+        val faq = NativeAiMicroEngine.generate("faq-generator", mapOf(
+            "topic" to "Safety", "points" to "Is this safe, for everyone?",
+            "answers" to "Is this safe, for everyone? | Check the product's stated limits before use.",
+        ))
+        assertTrue(faq.contains("Q: Is this safe, for everyone?"))
+        assertTrue(faq.contains("A: Check the product's stated limits before use."))
+
+        val benefits = NativeAiMicroEngine.generate("feature-benefit-generator", mapOf(
+            "topic" to "Search", "benefit" to "Fast search, with filters", "outcomes" to "Find matching records more quickly",
+        ))
+        assertTrue(benefits.contains("Feature: Fast search, with filters"))
+        assertTrue(benefits.contains("Customer outcome: Find matching records more quickly"))
+
+        val agenda = NativeAiMicroEngine.generate("ai-meeting-agenda-generator", mapOf(
+            "duration" to "20", "topics" to "Review risks, costs and scope\nChoose next step",
+        ))
+        assertTrue(agenda.contains("1. Review risks, costs and scope — 10 min"))
+    }
+
 }
