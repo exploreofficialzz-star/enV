@@ -179,7 +179,7 @@ export function CameraStudioEngine() {
     if (!videoRef.current || !cameraStream) return;
     videoRef.current.srcObject = cameraStream;
     void videoRef.current.play().catch(() => {
-      if (mountedRef.current) setCameraError("Camera preview could not start. Try again.");
+      if (mountedRef.current) setCameraError("The camera could not start. Try again.");
     });
   }, [cameraStream]);
 
@@ -349,7 +349,7 @@ export function CameraStudioEngine() {
   const capturePhoto = useCallback(async () => {
     const video = videoRef.current;
     if (!cameraStream || !video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !video.videoWidth || !video.videoHeight) {
-      setCameraError("Wait for the camera preview to become clear, then try again.");
+      setCameraError("The camera is still starting. Try again in a moment.");
       return;
     }
     if (countdown !== null) return;
@@ -427,7 +427,7 @@ export function CameraStudioEngine() {
   const startRecording = useCallback(async () => {
     const currentStream = streamRef.current;
     if (!currentStream || !currentStream.getVideoTracks().some((track) => track.readyState === "live")) {
-      setCameraError("Start the camera before recording.");
+      setCameraError("Turn on the camera before recording.");
       return;
     }
     if (typeof MediaRecorder === "undefined") {
@@ -452,7 +452,7 @@ export function CameraStudioEngine() {
 
       const preview = videoRef.current;
       if (!preview || preview.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !preview.videoWidth || !preview.videoHeight) {
-        throw new Error("Wait for the camera preview to become clear before recording.");
+        throw new Error("The camera is still starting. Try recording again in a moment.");
       }
       if (typeof HTMLCanvasElement.prototype.captureStream !== "function") {
         throw new Error("Filtered video recording is not supported by this browser. Use the Natural look or a current Chrome, Edge or Safari browser.");
@@ -775,14 +775,14 @@ export function CameraStudioEngine() {
               </div>
               {cameraSettings ? (
                 <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-                  <div><dt className="text-xs text-muted">Preview size</dt><dd className="font-medium text-fg">{cameraSettings.width ?? "—"} × {cameraSettings.height ?? "—"}</dd></div>
+                  <div><dt className="text-xs text-muted">Resolution</dt><dd className="font-medium text-fg">{cameraSettings.width ?? "—"} × {cameraSettings.height ?? "—"}</dd></div>
                   <div><dt className="text-xs text-muted">Frame rate</dt><dd className="font-medium text-fg">{cameraSettings.frameRate ? `${Math.round(cameraSettings.frameRate)} fps` : "Automatic"}</dd></div>
                   <div><dt className="text-xs text-muted">Camera</dt><dd className="font-medium text-fg">{facing === "user" ? "Front" : "Rear"}</dd></div>
                 </dl>
               ) : (
-                <p className="text-sm text-muted">Start the camera to see the settings reported by this device.</p>
+                <p className="text-sm text-muted">Turn on the camera to view its current settings.</p>
               )}
-              <p className="mt-3 text-xs leading-relaxed text-muted">These are the settings reported by the active camera stream. Available resolutions, focus, flash and frame rates depend on your device.</p>
+              <p className="mt-3 text-xs leading-relaxed text-muted">Available camera settings vary by device. Some phones may not support every resolution, frame rate, zoom or flash option.</p>
             </div>
           )}
         </section>
@@ -797,7 +797,7 @@ export function CameraStudioEngine() {
             <div className="mt-4 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="camera-quality" className="mb-2 block text-sm font-medium text-fg">Resolution target</label>
+                  <label htmlFor="camera-quality" className="mb-2 block text-sm font-medium text-fg">Video quality</label>
                   <select
                     id="camera-quality"
                     value={videoQuality}
@@ -811,7 +811,7 @@ export function CameraStudioEngine() {
                   </select>
                 </div>
                 <div>
-                  <label htmlFor="camera-frame-rate" className="mb-2 block text-sm font-medium text-fg">Frame rate target</label>
+                  <label htmlFor="camera-frame-rate" className="mb-2 block text-sm font-medium text-fg">Frame rate</label>
                   <select
                     id="camera-frame-rate"
                     value={frameRate}
