@@ -115,3 +115,77 @@ export async function preloadToolEngine(tool: ToolMeta): Promise<void> {
 
   if (pending) await pending;
 }
+
+
+// Warm the shared engine library after the platform paints. This is deliberately
+// background work: it gives the service worker one common set of engine chunks
+// for all tool routes, including tools whose *operations* still need a backend.
+const ALL_TOOL_ENGINE_MODULES: Array<() => Promise<unknown>> = [
+  () => import("@/components/engines/calculator-engine"),
+  () => import("@/components/engines/converter-engine"),
+  () => import("@/components/engines/color-engine"),
+  () => import("@/components/engines/cssgen-engine"),
+  () => import("@/components/engines/image-engine"),
+  () => import("@/components/engines/mockup-engine"),
+  () => import("@/components/engines/qr-engine"),
+  () => import("@/components/engines/barcode-reader-engine"),
+  () => import("@/components/engines/io-engines"),
+  () => import("@/components/engines/document-engine"),
+  () => import("@/components/engines/file-converter-engine"),
+  () => import("@/components/engines/developer-engine"),
+  () => import("@/components/engines/developer-studio-engine"),
+  () => import("@/components/engines/ux-ui-studio-engine"),
+  () => import("@/components/engines/pdf-engine"),
+  () => import("@/components/engines/mime-engine"),
+  () => import("@/components/engines/security-engine"),
+  () => import("@/components/engines/productivity-engine"),
+  () => import("@/components/engines/personal-engine"),
+  () => import("@/components/engines/communication-engine"),
+  () => import("@/components/engines/streaming-engine"),
+  () => import("@/components/engines/marketing-engine"),
+  () => import("@/components/engines/accessibility-engine"),
+  () => import("@/components/engines/creator-engine"),
+  () => import("@/components/engines/business-engine"),
+  () => import("@/components/engines/audio-engine"),
+  () => import("@/components/engines/network-engine"),
+  () => import("@/components/engines/ai-engine"),
+  () => import("@/components/engines/video-engine"),
+  () => import("@/components/engines/url-media-engine"),
+  () => import("@/components/engines/url-media-info-engine"),
+  () => import("@/components/engines/webdesign-engine"),
+  () => import("@/components/engines/ecommerce-engine"),
+  () => import("@/components/engines/career-engine"),
+  () => import("@/components/engines/relationship-engine"),
+  () => import("@/components/engines/interactive-engine"),
+  () => import("@/components/engines/gaming-engine"),
+  () => import("@/components/engines/screenshot-engine"),
+  () => import("@/components/screenshots/screenshot-studio"),
+  () => import("@/components/engines/mockups-category-engine"),
+  () => import("@/components/engines/social-engine"),
+  () => import("@/components/engines/planned-local-engine"),
+  () => import("@/components/engines/transcription-engine"),
+  () => import("@/components/engines/image-tools-engine"),
+  () => import("@/components/engines/document-tools-engine"),
+  () => import("@/components/engines/backend-tool-engine"),
+  () => import("@/components/engines/event-template-engine"),
+  () => import("@/components/engines/a-book-engine"),
+  () => import("@/components/engines/music-downloader-engine"),
+  () => import("@/components/engines/ai-music-data-sandbox"),
+  () => import("@/components/engines/zip-archive-engine"),
+  () => import("@/components/engines/camera-studio-engine"),
+  () => import("@/components/world-lab/world-lab"),
+  () => import("@/components/game-studio/game-studio"),
+];
+
+/** Preload all route engines without gating the platform or showing progress UI. */
+export async function preloadAllToolEngineModules(): Promise<void> {
+  if (typeof window === "undefined" || !navigator.onLine) return;
+  let next = 0;
+  const workers = Array.from({ length: 4 }, async () => {
+    while (next < ALL_TOOL_ENGINE_MODULES.length) {
+      const load = ALL_TOOL_ENGINE_MODULES[next++];
+      try { await load(); } catch { /* A failed optional chunk is retried when its tool is opened. */ }
+    }
+  });
+  await Promise.all(workers);
+}
