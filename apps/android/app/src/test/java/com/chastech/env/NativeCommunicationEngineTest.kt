@@ -182,4 +182,15 @@ class NativeCommunicationEngineTest {
         assertTrue(!output.contains("\r\nBcc: victim@example.com"))
         val checks = NativeCommunicationEngine.checks("email-builder", values, output).joinToString(" ")
         assertTrue(checks.contains("control characters"))
+    
+    @Test fun calendarUidIsStableAndPortableAcrossPlatforms() {
+        val ics = NativeCommunicationEngine.calendarIcs("meeting-builder", mapOf(
+            "subject" to "Roadmap, review; draft",
+            "date" to "2026-11-05T10:00",
+            "timezone" to "Africa/Lagos",
+            "duration" to "45",
+        ))
+        assertTrue(ics.contains("UID:8734b83babcc1f0d@envtools.store"))
     }
+
+}
