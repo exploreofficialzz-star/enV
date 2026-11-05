@@ -147,23 +147,39 @@ fun NativeCameraStudioScreen() {
 
     val savePicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/jpeg")) { target ->
         val source = pendingFile
-        if (target != null && source != null) {
-            runCatching { copyCameraFile(context, source, target) }
-                .onSuccess { status = "Photo saved to your selected location." }
-                .onFailure { error = it.message ?: "Could not save this photo." }
+        if (source == null) return@rememberLauncherForActivityResult
+        if (target == null) {
+            status = "Save canceled. Your photo is still ready to save."
+            return@rememberLauncherForActivityResult
         }
-        pendingFile?.delete()
-        pendingFile = null
+        runCatching { copyCameraFile(context, source, target) }
+            .onSuccess {
+                status = "Photo saved to your selected location."
+                error = null
+                source.delete()
+                if (pendingFile == source) pendingFile = null
+            }
+            .onFailure {
+                error = it.message ?: "Could not save this photo. Your capture is still available to retry."
+            }
     }
     val saveVideoPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("video/mp4")) { target ->
         val source = pendingFile
-        if (target != null && source != null) {
-            runCatching { copyCameraFile(context, source, target) }
-                .onSuccess { status = "Video saved to your selected location." }
-                .onFailure { error = it.message ?: "Could not save this video." }
+        if (source == null) return@rememberLauncherForActivityResult
+        if (target == null) {
+            status = "Save canceled. Your video is still ready to save."
+            return@rememberLauncherForActivityResult
         }
-        pendingFile?.delete()
-        pendingFile = null
+        runCatching { copyCameraFile(context, source, target) }
+            .onSuccess {
+                status = "Video saved to your selected location."
+                error = null
+                source.delete()
+                if (pendingFile == source) pendingFile = null
+            }
+            .onFailure {
+                error = it.message ?: "Could not save this video. Your capture is still available to retry."
+            }
     }
     val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         cameraGranted = granted
@@ -590,13 +606,23 @@ fun NativeCameraStudioScreen() {
         }
 
         if (pendingFile != null && !recordingActive) {
-            Button(
-                onClick = {
-                    if (pendingMime == "video/mp4") saveVideoPicker.launch("enV-camera-video.mp4")
-                    else savePicker.launch("enV-camera-photo.jpg")
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) { Text(if (pendingMime == "video/mp4") "Save video" else "Save photo") }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = {
+                        if (pendingMime == "video/mp4") saveVideoPicker.launch("enV-camera-video.mp4")
+                        else savePicker.launch("enV-camera-photo.jpg")
+                    },
+                    modifier = Modifier.weight(1f)
+                ) { Text(if (pendingMime == "video/mp4") "Save video" else "Save photo") }
+                OutlinedButton(
+                    onClick = {
+                        pendingFile?.delete()
+                        pendingFile = null
+                        status = "Capture discarded."
+                        error = null
+                    }
+                ) { Text("Discard") }
+            }
         }
 
         if (cameraGranted && error != null) {
