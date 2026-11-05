@@ -298,4 +298,15 @@ final class CatalogCoreTests: XCTestCase {
         XCTAssertTrue(checks.contains("control characters"))
     }
 
+
+    func testCommunicationCalendarUIDIsStableAndPortableAcrossPlatforms() throws {
+        let ics = try NativeCommunicationEngine.calendarICS("meeting-builder", values: [
+            "subject": "Roadmap, review; draft",
+            "date": "2026-11-05T10:00",
+            "timezone": "Africa/Lagos",
+            "duration": "45"
+        ])
+        XCTAssertTrue(ics.contains("UID:8734b83babcc1f0d@envtools.store"))
+    }
+
 }
