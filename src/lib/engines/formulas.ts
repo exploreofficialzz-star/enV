@@ -35,6 +35,12 @@ function pos(v: unknown, label = "value"): number {
   if (x <= 0) throw new CalcInputError(`${label} must be greater than 0.`, label);
   return x;
 }
+
+function nonneg(v: unknown, label = "value"): number {
+  const x = n(v, label);
+  if (x < 0) throw new CalcInputError(`${label} must be 0 or greater.`, label);
+  return x;
+}
 function list(v: unknown): number[] {
   return readList(v);
 }
