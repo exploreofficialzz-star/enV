@@ -236,7 +236,7 @@ export function generateAiMicroTool(operation: AiMicroOperation, values: AiMicro
     const cta = clean(values.cta, "[Add one clear viewer action.]");
     const sections = [
       topic,
-      "In this video, " + (audience ? "we cover " + topic + " for " + audience : "we cover " + topic) + ". " + style + " and focused on the details supplied below.",
+      "This video covers " + topic + (audience ? " for " + audience : "") + ". The description uses a " + style + " tone and only relies on the details supplied here.",
       points.length ? "WHAT YOU'LL LEARN\n" + points.map((point) => "• " + point).join("\n") : "WHAT YOU'LL LEARN\n[Add the key points covered in the video.]",
       chapters.length ? "CHAPTERS\n" + chapters.join("\n") : "",
       links.length ? "LINKS / RESOURCES\n" + links.join("\n") : "",
