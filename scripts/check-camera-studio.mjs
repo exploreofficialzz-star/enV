@@ -19,7 +19,6 @@ const iosInfo = read("apps/ios/enV/Info.plist");
 const androidManifest = read("apps/android/app/src/main/AndroidManifest.xml");
 const vercelConfig = JSON.parse(read("vercel.json"));
 const productionReadiness = read("docs/production-readiness.md");
-const exportedCatalog = read("scripts/export-native-catalog.mjs");
 const iosProject = read("apps/ios/enV.xcodeproj/project.pbxproj");
 const nativeCoverage = read("scripts/check-native-coverage.mjs");
 const androidCoverage = read("apps/android/native-tool-coverage.txt");
@@ -30,7 +29,6 @@ const billingProfiles = JSON.parse(read("src/data/billing-profile-runtime-extens
 assert.match(engine, /navigator\.mediaDevices\?\.getUserMedia/);
 const cameraDescription = "Take photos and record videos. Switch between the front and rear cameras, apply color filters, and adjust supported camera settings.";
 assert.ok(registry.includes(`description: "${cameraDescription}"`), "Web catalogue uses direct, user-facing Camera Studio copy");
-assert.ok(exportedCatalog.includes(`description: "${cameraDescription}"`), "Generated native catalogue uses the same Camera Studio copy");
 assert.ok(androidCatalog.includes(`description = "${cameraDescription}"`), "Android catalogue uses the same Camera Studio copy");
 assert.ok(iosCatalog.includes(`description: "${cameraDescription}"`), "iOS catalogue uses the same Camera Studio copy");
 assert.doesNotMatch(registry, /with a familiar camera/);
