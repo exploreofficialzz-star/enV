@@ -66,10 +66,10 @@ internal object NativeCommunicationEngine {
         }
         if (kind in setOf("message", "sms")) fields += CommunicationField("channel", "Channel")
         if (kind in setOf("meeting", "agenda", "invitation", "reminder")) {
-            if (kind in setOf("meeting", "agenda")) fields += CommunicationField("duration", "Duration (minutes)")
+            if (kind in setOf("meeting", "agenda", "invitation", "reminder")) fields += CommunicationField("duration", "Duration (minutes)")
             fields += CommunicationField("timezone", "Time zone")
         }
-        if (kind == "invitation") fields += CommunicationField("rsvpBy", "RSVP deadline")
+        if (kind == "invitation") fields += CommunicationField("rsvpBy", "RSVP deadline (YYYY-MM-DDTHH:mm)")
         if (kind == "signature") {
             fields += CommunicationField("company", "Company")
             fields += CommunicationField("email", "Email")
