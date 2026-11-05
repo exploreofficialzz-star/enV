@@ -197,7 +197,7 @@ internal object NativeCommunicationEngine {
             val to = value("email").ifBlank { value("name").takeIf { emailPattern.matches(it) }.orEmpty() }
             val all = (listOf(to) + cc + bcc).filter { it.isNotBlank() }.map { it.lowercase() }
             if (all.size != all.toSet().size) result += "An address appears more than once across To, Cc and Bcc; review recipient visibility."
-            if (listOf("email", "cc", "bcc", "subject").any { key ->
+            if (listOf("name", "email", "cc", "bcc", "subject").any { key ->
                 values[key].orEmpty().any { ch -> ch == '\r' || ch == '\n' || ch.code < 32 || ch.code == 127 }
             }) result += "Remove line breaks and control characters from email headers before using this draft."
         }
