@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { chromium } from "playwright";
 
-const argument = (name, fallback) => process.argv.find((arg) => arg.startsWith(\`--\${name}=\`))?.slice(name.length + 3) ?? fallback;
+const argument = (name, fallback) => process.argv.find((arg) => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const baseUrl = argument("base-url", "http://127.0.0.1:8080").replace(/\/$/, "");
 const reportPath = argument("report", "");
 const browser = await chromium.launch({
@@ -134,7 +134,7 @@ try {
   for (const testCase of cases) {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
     try {
-      await page.goto(\`\${baseUrl}/tools/ai/\${testCase.id}\`, { waitUntil: "networkidle" });
+      await page.goto(`${baseUrl}/tools/ai/${testCase.id}`, { waitUntil: "networkidle" });
       for (const [label, value] of Object.entries(testCase.inputs)) {
         const control = page.getByLabel(label, { exact: true });
         if (label === "Tone") await control.selectOption(value.toLowerCase());
@@ -144,9 +144,9 @@ try {
       const output = page.locator("pre").last();
       await output.waitFor({ state: "visible" });
       const text = await output.innerText();
-      assert.ok(text.includes(testCase.includes), \`\${testCase.id}: output did not include \${JSON.stringify(testCase.includes)}\`);
-      for (const expected of testCase.includesAll ?? []) assert.ok(text.includes(expected), \`\${testCase.id}: output did not include \${JSON.stringify(expected)}\`);
-      if (testCase.excludes) assert.ok(!text.includes(testCase.excludes), \`\${testCase.id}: output unexpectedly included \${JSON.stringify(testCase.excludes)}\`);
+      assert.ok(text.includes(testCase.includes), `${testCase.id}: output did not include ${JSON.stringify(testCase.includes)}`);
+      for (const expected of testCase.includesAll ?? []) assert.ok(text.includes(expected), `${testCase.id}: output did not include ${JSON.stringify(expected)}`);
+      if (testCase.excludes) assert.ok(!text.includes(testCase.excludes), `${testCase.id}: output unexpectedly included ${JSON.stringify(testCase.excludes)}`);
       if (testCase.id === "youtube-title-helper") {
         const titles = text.split("\n\n").map((line) => line.replace(/^\d+\.\s/u, ""));
         assert.ok(titles.every((title) => title.length <= 100), "YouTube titles must be <= 100 characters");
@@ -172,7 +172,7 @@ const report = {
 };
 if (reportPath) {
   await fs.mkdir(path.dirname(reportPath), { recursive: true });
-  await fs.writeFile(reportPath, \`\${JSON.stringify(report, null, 2)}\n\`);
+  await fs.writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
 }
 console.log(JSON.stringify(report, null, 2));
 if (report.failed > 0) process.exitCode = 1;
