@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Camera,
-  CameraOff,
   Check,
   Download,
   Flashlight,
   FlashlightOff,
   Grid2X2,
   Image as ImageIcon,
-  Mic,
   Settings2,
   SwitchCamera,
   Video,
@@ -146,6 +144,7 @@ export function CameraStudioEngine() {
   const chunksRef = useRef<Blob[]>([]);
   const galleryRef = useRef<StudioMediaItem[]>([]);
   const requestIdRef = useRef(0);
+  const initialCameraRequestRef = useRef(false);
   const recordingStartedRef = useRef<number | null>(null);
   const recordingTimerRef = useRef<number | null>(null);
   const recordingCanvasFrameRef = useRef<number | null>(null);
@@ -180,7 +179,7 @@ export function CameraStudioEngine() {
     if (!videoRef.current || !cameraStream) return;
     videoRef.current.srcObject = cameraStream;
     void videoRef.current.play().catch(() => {
-      if (mountedRef.current) setNotice("Tap Start camera again if the preview does not appear.");
+      if (mountedRef.current) setCameraError("Camera preview could not start. Try again.");
     });
   }, [cameraStream]);
 
@@ -297,7 +296,6 @@ export function CameraStudioEngine() {
           ? "environment"
           : nextFacing;
       setFacing(activeFacing);
-      setNotice(activeFacing === "user" ? "Front camera ready." : "Rear camera ready.");
       videoTrack?.addEventListener("ended", () => {
         if (mountedRef.current && requestId === requestIdRef.current) {
           setCameraError("The camera stopped. The active recording was stopped so the clip can be finalized.");
@@ -317,6 +315,12 @@ export function CameraStudioEngine() {
       if (requestId === requestIdRef.current && mountedRef.current) setCameraBusy(false);
     }
   }, [frameRate, isRecording, videoQuality]);
+
+  useEffect(() => {
+    if (initialCameraRequestRef.current || cameraStream || cameraBusy) return;
+    initialCameraRequestRef.current = true;
+    void requestCamera("environment");
+  }, [requestCamera, cameraStream, cameraBusy]);
 
   const addToGallery = useCallback((kind: MediaKind, blob: Blob) => {
     const extension = kind === "photo" ? "jpg" : (blob.type.includes("mp4") ? "mp4" : "webm");
@@ -634,9 +638,6 @@ export function CameraStudioEngine() {
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-xl font-semibold tracking-tight text-fg">Camera Studio</h2>
-          <p className="mt-1 max-w-2xl text-sm text-muted">
-            A simple camera for everyday photos and videos, with useful creator controls when you need them.
-          </p>
         </div>
         <div className="flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-muted">
           <span className={`size-2 rounded-full ${cameraStream ? "bg-ok" : "bg-subtle"}`} />
@@ -706,20 +707,7 @@ export function CameraStudioEngine() {
                     <span className="absolute bottom-3 left-3 rounded-md bg-black/60 px-2 py-1 text-xs text-white">{look.label}</span>
                   )}
                 </>
-              ) : (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 text-center text-white">
-                  <span className="grid size-16 place-items-center rounded-full border border-white/20 bg-white/10">
-                    <CameraOff size={28} />
-                  </span>
-                  <div>
-                    <p className="font-medium">Your camera preview will appear here</p>
-                    <p className="mt-1 text-sm text-white/65">Allow camera access when your browser asks.</p>
-                  </div>
-                  <Button type="button" variant="outline" size="lg" disabled={cameraBusy} onClick={() => void requestCamera(facing)} className="border-white/30 bg-white text-[#16181d] hover:bg-white/90">
-                    {cameraBusy ? "Opening camera…" : "Start camera"}
-                  </Button>
-                </div>
-              )}
+              ) : null}
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-3 py-3 sm:px-4">
@@ -763,9 +751,14 @@ export function CameraStudioEngine() {
           </div>
 
           {cameraError && (
-            <div role="alert" className="flex items-start gap-2 rounded-lg border border-danger/30 bg-danger/5 px-3 py-2.5 text-sm text-danger">
-              <X size={17} className="mt-0.5 shrink-0" />
-              <span>{cameraError}</span>
+            <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-danger/30 bg-danger/5 px-3 py-2.5 text-sm text-danger">
+              <span className="flex min-w-0 items-start gap-2">
+                <X size={17} className="mt-0.5 shrink-0" />
+                <span>{cameraError}</span>
+              </span>
+              <Button type="button" variant="outline" size="sm" onClick={() => void requestCamera(facing)}>
+                Try again
+              </Button>
             </div>
           )}
           {notice && !cameraError && (
@@ -832,7 +825,6 @@ export function CameraStudioEngine() {
                   </select>
                 </div>
               </div>
-              <p className="text-xs leading-relaxed text-muted">These are requested targets. The active camera details show the resolution and frame rate it actually provides. Higher settings can use more battery and warm the phone.</p>
               {zoomRange && (
                 <div>
                   <div className="mb-2 flex items-center justify-between gap-2">
@@ -850,7 +842,6 @@ export function CameraStudioEngine() {
                     disabled={!cameraStream || cameraBusy || isRecording}
                     className="h-2 w-full cursor-pointer accent-[var(--color-accent)] disabled:opacity-40"
                   />
-                  <p className="mt-1 text-xs text-muted">Uses the zoom range reported by the active camera.</p>
                 </div>
               )}
 
@@ -871,7 +862,6 @@ export function CameraStudioEngine() {
                     disabled={!cameraStream || cameraBusy || isRecording}
                     className="h-2 w-full cursor-pointer accent-[var(--color-accent)] disabled:opacity-40"
                   />
-                  <p className="mt-1 text-xs text-muted">Shown only when the camera exposes exposure compensation.</p>
                 </div>
               )}
 
@@ -901,31 +891,11 @@ export function CameraStudioEngine() {
                     </button>
                   ))}
                 </div>
-                <p className="mt-2 text-xs leading-relaxed text-muted">Looks apply to the live preview, saved photos and video recordings. These are color filters, not face-tracking masks.</p>
               </div>
 
-              <div className="rounded-lg bg-surface-2 px-3 py-3">
-                <p className="text-sm font-medium text-fg">Device-aware capture</p>
-                <p className="mt-1 text-xs leading-relaxed text-muted">Resolution, frame rate, zoom, exposure, flash and microphone access depend on your phone and browser. Unsupported controls stay unavailable instead of pretending to work.</p>
-              </div>
             </div>
           </section>
 
-          <section className="rounded-xl border border-border bg-surface p-3 shadow-[var(--shadow-border)] sm:p-4">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-fg">Before you record</h3>
-              <Mic size={17} className="text-muted" />
-            </div>
-            <ul className="mt-3 space-y-2 text-xs leading-relaxed text-muted">
-              <li>• Keep the lens clean and use steady light where possible.</li>
-              <li>• Allow microphone access when you want sound in a video.</li>
-              <li>• Longer clips use more storage and can warm up your phone.</li>
-              <li>• Keep enV open until the recording is stopped and saved.</li>
-            </ul>
-            <p className="mt-3 border-t border-border pt-3 text-xs leading-relaxed text-muted">
-              Dual front-and-rear recording and face-tracking AR masks are not enabled in this browser-first release. They need separate native/device compatibility work.
-            </p>
-          </section>
         </aside>
       </div>
 
@@ -969,9 +939,6 @@ export function CameraStudioEngine() {
         </section>
       )}
 
-      <p className="px-1 text-xs leading-relaxed text-muted">
-        Privacy: camera and microphone access begin only after you request them. Captures are processed in this session and are not uploaded to enV.
-      </p>
     </div>
   );
 }
