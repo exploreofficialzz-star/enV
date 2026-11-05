@@ -181,7 +181,7 @@ object NativeAiMicroEngine {
                 val chapters = splitList(values["chapters"].orEmpty())
                 val parts = mutableListOf(
                     topic,
-                    "In this video, we cover " + topic + (if (audience.isNotEmpty()) " for $audience" else "") + ". $style and focused on the details supplied below.",
+                    "This video covers " + topic + (if (audience.isNotEmpty()) " for $audience" else "") + ". The description uses a $style tone and only relies on the details supplied here.",
                     if (points.isNotEmpty()) "WHAT YOU'LL LEARN\n" + points.joinToString("\n") { "• $it" } else "WHAT YOU'LL LEARN\n[Add the key points covered in the video.]",
                 )
                 if (chapters.isNotEmpty()) parts += "CHAPTERS\n" + chapters.joinToString("\n")
