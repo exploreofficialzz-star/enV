@@ -1215,7 +1215,7 @@ enum NativeCommunicationEngine {
             let to = email.isEmpty ? (value("name").range(of: emailPattern, options: .regularExpression) != nil ? value("name") : "") : email
             let allAddresses = ([to] + cc + bcc).filter { !$0.isEmpty }.map { $0.lowercased() }
             if Set(allAddresses).count != allAddresses.count { result.append("An address appears more than once across To, Cc and Bcc; review recipient visibility.") }
-            if ["email", "cc", "bcc", "subject"].contains(where: { key in
+            if ["name", "email", "cc", "bcc", "subject"].contains(where: { key in
                 values[key]?.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) ?? false
             }) { result.append("Remove line breaks and control characters from email headers before using this draft.") }
         }
