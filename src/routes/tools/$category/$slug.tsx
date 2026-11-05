@@ -5,6 +5,7 @@ import { ToolViewAnalytics } from "@/components/tools/tool-view-analytics";
 import { ToolShell } from "@/components/tools/tool-shell";
 import { ToolEngine } from "@/components/tools/tool-engine";
 import { preloadToolEngine } from "@/lib/tool-engine-preload";
+import { prepareOfflineToolPackage } from "@/lib/offline/tool-package-client";
 import { preloadWorldLabWorkspace } from "@/components/world-lab/world-lab-entry";
 import { getToolByPath, getToolById, getSearchableTools, getToolsByCategory } from "@/lib/registry";
 import { businessStudioAnchorSlug, businessStudioDefaultMode, businessStudioModeAllowed } from "@/lib/business-studios-catalog";
@@ -36,6 +37,16 @@ export const Route = createFileRoute("/tools/$category/$slug")({
     // Legacy developer URLs redirect to their consolidated Studio; do not preload
     // the compatibility engine that will never be rendered.
     if (category === "developer" && !matchedTool.tags.includes("developer-studio")) return { communityFeed: null };
+
+    // In offline mode, open this tool's previously saved UI package before
+    // requesting its engine chunk. This lets the service worker resolve the
+    // right per-tool cache even while the browser is still on the previous route.
+    if (typeof window !== "undefined" && !navigator.onLine) {
+      await prepareOfflineToolPackage({
+        toolId: matchedTool.id,
+        pathname: window.location.pathname,
+      }).catch(() => undefined);
+    }
 
     // Resolve the selected engine before the route is committed. There is no
     // loading route or overlay: the current platform stays visible and the new
