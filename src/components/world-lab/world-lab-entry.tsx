@@ -14,13 +14,7 @@ export function WorldLabEntry() {
 
   if (hasEntered) {
     return (
-      <Suspense
-        fallback={
-          <div className="world-lab-entry__loading" role="status" aria-label="Opening The World Lab">
-            <span className="world-lab-entry__loading-mark" aria-hidden="true" />
-          </div>
-        }
-      >
+      <Suspense fallback={null}>
         <WorldLabWorkspace />
       </Suspense>
     );
