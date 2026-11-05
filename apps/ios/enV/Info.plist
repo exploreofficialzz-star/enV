@@ -33,9 +33,9 @@
 	<key>ENV_ANALYTICS_ENABLED</key>
 	<false/>
 	<key>NSCameraUsageDescription</key>
-	<string>enV uses the camera only when you start a QR/barcode scan or a live video music performance recording. Scanning is processed on this device.</string>
+	<string>enV uses the camera when you scan a QR code, take a photo, record a video, or start a live video performance.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>enV uses the microphone only when you start an audio recording or record a music practice take. Recordings are processed locally and exported only when you choose.</string>
+	<string>enV uses the microphone when you record audio or video with sound. Recording starts only when you choose to record.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>enV saves Camera Studio photos and videos to your Photos library when you capture media.</string>
 	<key>NSLocalNetworkUsageDescription</key>
