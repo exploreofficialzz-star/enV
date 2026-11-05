@@ -8,6 +8,7 @@ import android.content.Intent
 import android.net.Uri
 import android.content.pm.PackageManager
 import android.provider.Settings
+import android.util.Range
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.CameraController
@@ -131,6 +132,7 @@ fun NativeCameraStudioScreen() {
     var countdown by remember { mutableStateOf<Int?>(null) }
     var gridEnabled by remember { mutableStateOf(false) }
     var videoQuality by remember { mutableStateOf("1080p") }
+    var videoFrameRate by remember { mutableStateOf(30) }
     val captureScope = rememberCoroutineScope()
     var usingFrontCamera by remember { mutableStateOf(false) }
     var recording by remember { mutableStateOf<Recording?>(null) }
@@ -300,6 +302,19 @@ fun NativeCameraStudioScreen() {
             }
             countdown = null
             capturePhoto()
+        }
+    }
+
+    fun applyVideoFrameRate(fps: Int) {
+        if (recordingActive) return
+        runCatching {
+            controller.setVideoCaptureTargetFrameRate(Range(fps, fps))
+        }.onSuccess {
+            videoFrameRate = fps
+            status = "Requested $fps fps. The phone will use its closest supported frame rate."
+            error = null
+        }.onFailure {
+            error = "That frame rate is not available on this camera."
         }
     }
 
@@ -523,7 +538,15 @@ fun NativeCameraStudioScreen() {
                         }
                     }
                 }
-                Text("The phone may choose a lower quality when its camera does not support the selected option.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Frame rate · requested $videoFrameRate fps", style = MaterialTheme.typography.labelMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(24, 30, 60).forEach { fps ->
+                        OutlinedButton(onClick = { applyVideoFrameRate(fps) }, enabled = !recordingActive, modifier = Modifier.weight(1f)) {
+                            Text("$fps fps")
+                        }
+                    }
+                }
+                Text("The phone may choose lower resolution or frame rate when its camera and encoder do not support the selected option.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
