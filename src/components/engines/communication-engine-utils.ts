@@ -300,7 +300,9 @@ function planFor(input: CommunicationInput, title: string, recipient: string) {
 export function buildCommunication(input: CommunicationInput) {
   const kind = input.kind;
   const action = input.action;
-  const recipient = clean(input.name) || clean(input.audience) || "[Recipient]";
+  const recipient = input.kind === "email"
+    ? cleanHeader(input.name) || cleanHeader(input.audience) || "[Recipient]"
+    : clean(input.name) || clean(input.audience) || "[Recipient]";
   const title = clean(input.subject) || kindLabel(kind);
   const purpose = clean(input.purpose);
   const details = clean(input.details) || purpose;
