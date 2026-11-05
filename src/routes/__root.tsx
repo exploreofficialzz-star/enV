@@ -1,7 +1,7 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { AssistantStateProvider } from "@/components/assistant/assistant-state";
 import { useEffect } from "react";
-import { prepareEnVOfflineShell } from "@/lib/offline/tool-package-client";
+import { prepareEnVOfflineShell, registerEnVServiceWorker } from "@/lib/offline/tool-package-client";
 import appCss from "../styles.css?url";
 import { webmasterVerificationMeta, websiteSchema, isIndexableTool } from "@/lib/seo-metadata";
 import { getToolByPath, getToolsByCategory } from "@/lib/registry";
@@ -56,7 +56,16 @@ const INITIAL_THEME_SCRIPT = `(() => {
 
 function RootDocument() {
   useEffect(() => {
-    void prepareEnVOfflineShell();
+    let active = true;
+    // Start the worker registration immediately, but let the full tool engine
+    // library warm in the background after the first platform paint.
+    void registerEnVServiceWorker().catch(() => undefined);
+    void (async () => {
+      const { preloadAllToolEngineModules } = await import("@/lib/tool-engine-preload");
+      await preloadAllToolEngineModules();
+      if (active) await prepareEnVOfflineShell();
+    })().catch(() => undefined);
+    return () => { active = false; };
   }, []);
 
   return (
