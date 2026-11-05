@@ -21,6 +21,7 @@ type MediaKind = "photo" | "video";
 type NumericRange = { min: number; max: number; step?: number };
 type VideoQuality = "720p" | "1080p" | "4k";
 type FrameRate = 24 | 30 | 60;
+type DualCameraLayout = "pip" | "split";
 
 const VIDEO_QUALITIES: Record<VideoQuality, { width: number; height: number; label: string }> = {
   "720p": { width: 1280, height: 720, label: "HD" },
@@ -49,6 +50,32 @@ const LOOKS: { id: LookId; label: string; css: string }[] = [
 ];
 
 const MAX_GALLERY_ITEMS = 12;
+
+function drawCover(
+  context: CanvasRenderingContext2D,
+  video: HTMLVideoElement,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  mirror = false,
+) {
+  if (!video.videoWidth || !video.videoHeight || width <= 0 || height <= 0) return;
+  const scale = Math.max(width / video.videoWidth, height / video.videoHeight);
+  const sourceWidth = width / scale;
+  const sourceHeight = height / scale;
+  const sourceX = (video.videoWidth - sourceWidth) / 2;
+  const sourceY = (video.videoHeight - sourceHeight) / 2;
+  context.save();
+  if (mirror) {
+    context.translate(x + width, y);
+    context.scale(-1, 1);
+    context.drawImage(video, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, width, height);
+  } else {
+    context.drawImage(video, sourceX, sourceY, sourceWidth, sourceHeight, x, y, width, height);
+  }
+  context.restore();
+}
 
 function formatTime(seconds: number) {
   const value = Math.max(0, Math.floor(seconds));
@@ -116,6 +143,10 @@ export function CameraStudioEngine() {
   const [mode, setMode] = useState<CaptureMode>("photo");
   const [facing, setFacing] = useState<FacingMode>("environment");
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [dualStream, setDualStream] = useState<MediaStream | null>(null);
+  const [dualLayout, setDualLayout] = useState<DualCameraLayout>("pip");
+  const [dualBusy, setDualBusy] = useState(false);
+  const [dualUnavailable, setDualUnavailable] = useState(false);
   const [cameraBusy, setCameraBusy] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -138,6 +169,8 @@ export function CameraStudioEngine() {
   const [lastCaptureId, setLastCaptureId] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const dualVideoRef = useRef<HTMLVideoElement | null>(null);
+  const dualStreamRef = useRef<MediaStream | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const microphoneRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -170,6 +203,8 @@ export function CameraStudioEngine() {
         recordingCanvasStreamRef.current = null;
       }
       streamRef.current?.getTracks().forEach((track) => track.stop());
+      dualStreamRef.current?.getTracks().forEach((track) => track.stop());
+      dualStreamRef.current = null;
       microphoneRef.current?.getTracks().forEach((track) => track.stop());
       galleryRef.current.forEach((item) => URL.revokeObjectURL(item.url));
     };
@@ -182,6 +217,14 @@ export function CameraStudioEngine() {
       if (mountedRef.current) setCameraError("The camera could not start. Try again.");
     });
   }, [cameraStream]);
+
+  useEffect(() => {
+    if (!dualVideoRef.current || !dualStream) return;
+    dualVideoRef.current.srcObject = dualStream;
+    void dualVideoRef.current.play().catch(() => {
+      if (mountedRef.current) setNotice("The second camera could not start. Turn dual camera off and try again.");
+    });
+  }, [dualStream]);
 
   useEffect(() => {
     if (!cameraStream) {
@@ -245,6 +288,10 @@ export function CameraStudioEngine() {
     const current = streamRef.current;
     streamRef.current = null;
     current?.getTracks().forEach((track) => track.stop());
+    dualStreamRef.current?.getTracks().forEach((track) => track.stop());
+    dualStreamRef.current = null;
+    setDualStream(null);
+    setDualUnavailable(false);
     setCameraStream(null);
     setTorchEnabled(false);
     setCameraBusy(false);
@@ -264,6 +311,9 @@ export function CameraStudioEngine() {
       return;
     }
 
+    dualStreamRef.current?.getTracks().forEach((track) => track.stop());
+    dualStreamRef.current = null;
+    setDualStream(null);
     const requestId = ++requestIdRef.current;
     setCameraBusy(true);
     setCameraError(null);
@@ -322,6 +372,82 @@ export function CameraStudioEngine() {
     void requestCamera("environment");
   }, [requestCamera, cameraStream, cameraBusy]);
 
+  const stopDualCamera = useCallback(() => {
+    dualStreamRef.current?.getTracks().forEach((track) => track.stop());
+    dualStreamRef.current = null;
+    setDualStream(null);
+    setDualUnavailable(false);
+    setDualBusy(false);
+  }, []);
+
+  const startDualCamera = useCallback(async () => {
+    if (dualStreamRef.current) return;
+    const activePrimary = streamRef.current;
+    const primary = activePrimary?.getVideoTracks()[0];
+    if (!primary || !cameraStream) {
+      setCameraError("Start the main camera before enabling dual camera.");
+      return;
+    }
+    if (isRecording || cameraBusy || dualBusy) return;
+    const primarySettings = primary.getSettings();
+    const primaryDeviceId = primarySettings.deviceId;
+    const desiredFacing = primarySettings.facingMode === "user" ? "environment" : "user";
+    setDualBusy(true);
+    setCameraError(null);
+    setDualUnavailable(false);
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cameras = devices.filter((device) => device.kind === "videoinput" && device.deviceId !== primaryDeviceId);
+      const matchingFacing = cameras.find((device) => {
+        const label = device.label.toLowerCase();
+        return desiredFacing === "user"
+          ? /front|user|selfie|facetime/.test(label)
+          : /back|rear|environment|world/.test(label);
+      });
+      const secondary = matchingFacing ?? cameras[0];
+      if (!secondary) {
+        setDualUnavailable(true);
+        setNotice("This browser did not expose a second camera. Single-camera capture is still available.");
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          deviceId: { exact: secondary.deviceId },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 },
+        },
+      });
+      if (!mountedRef.current || streamRef.current !== activePrimary) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      const secondTrack = stream.getVideoTracks()[0];
+      if (!secondTrack || secondTrack.readyState !== "live") {
+        stream.getTracks().forEach((track) => track.stop());
+        throw new Error("The second camera did not provide a live video stream.");
+      }
+      dualStreamRef.current = stream;
+      setDualStream(stream);
+      setDualUnavailable(false);
+      setNotice("Both cameras are active. Photos and recordings will include both views.");
+      secondTrack.addEventListener("ended", () => {
+        if (dualStreamRef.current === stream && mountedRef.current) {
+          stopDualCamera();
+          setNotice("The second camera disconnected. Single-camera capture is still available.");
+        }
+      }, { once: true });
+    } catch (error) {
+      setDualUnavailable(true);
+      setCameraError(error instanceof Error
+        ? `Dual camera is not supported by this browser or phone: ${error.message}`
+        : "This phone or browser could not start both cameras at once.");
+    } finally {
+      if (mountedRef.current) setDualBusy(false);
+    }
+  }, [cameraBusy, cameraStream, dualBusy, isRecording, stopDualCamera]);
+
   const addToGallery = useCallback((kind: MediaKind, blob: Blob) => {
     const extension = kind === "photo" ? "jpg" : (blob.type.includes("mp4") ? "mp4" : "webm");
     const filename = `env-camera-${new Date().toISOString().replace(/[:.]/g, "-")}.${extension}`;
@@ -374,7 +500,30 @@ export function CameraStudioEngine() {
         context.scale(-1, 1);
       }
       context.filter = look.css;
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const secondaryVideo = dualVideoRef.current;
+      const activeSecondary = dualStreamRef.current;
+      if (activeSecondary && secondaryVideo && secondaryVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        if (dualLayout === "split") {
+          const half = canvas.width / 2;
+          drawCover(context, video, 0, 0, half, canvas.height, facing === "user");
+          const secondaryFacing = activeSecondary.getVideoTracks()[0]?.getSettings().facingMode;
+          drawCover(context, secondaryVideo, half, 0, canvas.width - half, canvas.height, secondaryFacing === "user");
+        } else {
+          drawCover(context, video, 0, 0, canvas.width, canvas.height, facing === "user");
+          const insetWidth = canvas.width * 0.32;
+          const insetHeight = insetWidth * (secondaryVideo.videoHeight / secondaryVideo.videoWidth);
+          const insetX = canvas.width - insetWidth - canvas.width * 0.035;
+          const insetY = canvas.height - insetHeight - canvas.height * 0.035;
+          const secondaryFacing = activeSecondary.getVideoTracks()[0]?.getSettings().facingMode;
+          drawCover(context, secondaryVideo, insetX, insetY, insetWidth, insetHeight, secondaryFacing === "user");
+          context.filter = "none";
+          context.strokeStyle = "#ffffff";
+          context.lineWidth = Math.max(2, canvas.width * 0.004);
+          context.strokeRect(insetX, insetY, insetWidth, insetHeight);
+        }
+      } else {
+        drawCover(context, video, 0, 0, canvas.width, canvas.height, facing === "user");
+      }
       const blob = await new Promise<Blob>((resolve, reject) => {
         canvas.toBlob((value) => value ? resolve(value) : reject(new Error("The photo could not be saved.")), "image/jpeg", 0.94);
       });
@@ -385,7 +534,7 @@ export function CameraStudioEngine() {
     } finally {
       if (mountedRef.current) setCountdown(null);
     }
-  }, [addToGallery, cameraStream, countdown, facing, look.css, timerSeconds]);
+  }, [addToGallery, cameraStream, countdown, dualLayout, facing, look.css, timerSeconds]);
 
   const stopRecording = useCallback(() => {
     const recorder = recorderRef.current;
@@ -468,12 +617,31 @@ export function CameraStudioEngine() {
         if (!mountedRef.current && !recorderRef.current) return;
         if (preview.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
           recordingContext.save();
-          if (facing === "user") {
-            recordingContext.translate(recordingCanvas.width, 0);
-            recordingContext.scale(-1, 1);
-          }
           recordingContext.filter = look.css;
-          recordingContext.drawImage(preview, 0, 0, recordingCanvas.width, recordingCanvas.height);
+          const secondaryVideo = dualVideoRef.current;
+          const activeSecondary = dualStreamRef.current;
+          if (activeSecondary && secondaryVideo && secondaryVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+            if (dualLayout === "split") {
+              const half = recordingCanvas.width / 2;
+              drawCover(recordingContext, preview, 0, 0, half, recordingCanvas.height, facing === "user");
+              const secondaryFacing = activeSecondary.getVideoTracks()[0]?.getSettings().facingMode;
+              drawCover(recordingContext, secondaryVideo, half, 0, recordingCanvas.width - half, recordingCanvas.height, secondaryFacing === "user");
+            } else {
+              drawCover(recordingContext, preview, 0, 0, recordingCanvas.width, recordingCanvas.height, facing === "user");
+              const insetWidth = recordingCanvas.width * 0.32;
+              const insetHeight = insetWidth * (secondaryVideo.videoHeight / secondaryVideo.videoWidth);
+              const insetX = recordingCanvas.width - insetWidth - recordingCanvas.width * 0.035;
+              const insetY = recordingCanvas.height - insetHeight - recordingCanvas.height * 0.035;
+              const secondaryFacing = activeSecondary.getVideoTracks()[0]?.getSettings().facingMode;
+              drawCover(recordingContext, secondaryVideo, insetX, insetY, insetWidth, insetHeight, secondaryFacing === "user");
+              recordingContext.filter = "none";
+              recordingContext.strokeStyle = "#ffffff";
+              recordingContext.lineWidth = Math.max(2, recordingCanvas.width * 0.004);
+              recordingContext.strokeRect(insetX, insetY, insetWidth, insetHeight);
+            }
+          } else {
+            drawCover(recordingContext, preview, 0, 0, recordingCanvas.width, recordingCanvas.height, facing === "user");
+          }
           recordingContext.restore();
         }
         recordingCanvasFrameRef.current = window.requestAnimationFrame(drawRecordingFrame);
@@ -540,7 +708,7 @@ export function CameraStudioEngine() {
     } finally {
       if (mountedRef.current) setCameraBusy(false);
     }
-  }, [addToGallery, facing, frameRate, look.css]);
+  }, [addToGallery, dualLayout, facing, frameRate, look.css]);
 
   const applyVideoQuality = useCallback(async (quality: VideoQuality, fps: FrameRate) => {
     const track = streamRef.current?.getVideoTracks()[0];
@@ -605,13 +773,14 @@ export function CameraStudioEngine() {
   }, [torchAvailable, torchEnabled]);
 
   const switchCamera = useCallback(async () => {
+    stopDualCamera();
     const previous = facing;
     const next = previous === "user" ? "environment" : "user";
     await requestCamera(next);
     if (streamRef.current === null && mountedRef.current) {
       setFacing(previous);
     }
-  }, [facing, requestCamera]);
+  }, [facing, requestCamera, stopDualCamera]);
 
   const removeFromGallery = useCallback((id: string) => {
     const removed = gallery.find((item) => item.id === id);
@@ -683,9 +852,21 @@ export function CameraStudioEngine() {
                     playsInline
                     muted
                     aria-label="Live camera preview"
-                    className="absolute inset-0 size-full object-cover"
+                    className={dualStream && dualLayout === "split" ? "absolute inset-y-0 left-0 h-full w-1/2 object-cover" : "absolute inset-0 size-full object-cover"}
                     style={{ filter: previewFilter, transform: facing === "user" ? "scaleX(-1)" : undefined }}
                   />
+                  {dualStream && (
+                    <video
+                      ref={dualVideoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      aria-label="Second camera preview"
+                      className={dualLayout === "split"
+                        ? "absolute inset-y-0 right-0 h-full w-1/2 object-cover"
+                        : "absolute bottom-3 right-3 aspect-[4/3] w-[32%] rounded-lg border-2 border-white object-cover shadow-lg"}
+                    />
+                  )}
                   {gridVisible && (
                     <div className="pointer-events-none absolute inset-0 grid grid-cols-3 grid-rows-3">
                       {Array.from({ length: 9 }, (_, index) => (
@@ -769,6 +950,29 @@ export function CameraStudioEngine() {
 
           {showCameraInfo && (
             <div className="rounded-lg border border-border bg-surface p-3">
+              <div className="mb-3 border-b border-border pb-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium text-fg">Dual camera</p>
+                    <p className="mt-1 text-xs text-muted">Uses two separate camera devices when the phone and browser allow them to run together.</p>
+                  </div>
+                  {dualStream ? (
+                    <Button type="button" size="sm" variant="outline" onClick={stopDualCamera} disabled={isRecording}>Turn off</Button>
+                  ) : (
+                    <Button type="button" size="sm" variant="outline" onClick={() => void startDualCamera()} disabled={!cameraStream || dualBusy || isRecording}>
+                      {dualBusy ? "Starting…" : "Enable"}
+                    </Button>
+                  )}
+                </div>
+                {dualStream && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button type="button" size="sm" variant={dualLayout === "pip" ? "default" : "outline"} onClick={() => setDualLayout("pip")} disabled={isRecording}>Picture in picture</Button>
+                    <Button type="button" size="sm" variant={dualLayout === "split" ? "default" : "outline"} onClick={() => setDualLayout("split")} disabled={isRecording}>Split view</Button>
+                  </div>
+                )}
+                {dualUnavailable && <p className="mt-2 text-xs text-muted">This device did not start a second camera. Normal camera capture remains available.</p>}
+                {dualStream && <p className="mt-2 text-xs text-muted">Photos and videos are composited from both live camera feeds. The feeds are not duplicated or simulated.</p>}
+              </div>
               <div className="mb-2 flex items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold text-fg">Camera details</h3>
                 <Button type="button" variant="ghost" size="sm" onClick={() => setShowCameraInfo(false)}>Close</Button>
