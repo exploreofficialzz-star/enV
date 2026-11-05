@@ -34,6 +34,7 @@ const clean = (value: string | undefined, fallback: string) => (value ?? "").tri
 const tonePhrase = (tone: string) => tone === "professional" ? "clear and professional" : tone === "bold" ? "confident and direct" : tone === "playful" ? "light and playful" : tone === "friendly" ? "warm and friendly" : "natural and conversational";
 const numbered = (lines: string[], count: number) => lines.slice(0, Math.max(1, Math.min(count, lines.length))).map((line, index) => (index + 1) + ". " + line).join("\n\n");
 const splitList = (value: string) => value.split(/\r?\n|,/u).map((line) => line.trim()).filter(Boolean);
+const splitLines = (value: string) => value.split(/\r?\n/u).map((line) => line.trim()).filter(Boolean);
 const wordsIn = (value: string) => value.trim() ? value.trim().split(/\s+/u).length : 0;
 
 function shortenExtractively(value: string, requestedWords: number): string {
@@ -115,7 +116,7 @@ export function generateAiMicroTool(operation: AiMicroOperation, values: AiMicro
   if (operation === "blog-outline") {
     const goal = clean(values.goal, "Help the reader understand the topic and take a useful next step");
     const angle = clean(values.angle, "Explain the practical problem before presenting the solution");
-    const keyPoints = splitList(values.keyPoints ?? "");
+    const keyPoints = splitLines(values.keyPoints ?? "");
     const cta = clean(values.cta, "[Add one relevant next step for the reader]");
     return [
       "CONTENT BRIEF\nTopic: " + topic + "\nAudience: " + audience + "\nGoal: " + goal + "\nEditorial angle: " + angle,
@@ -154,7 +155,7 @@ export function generateAiMicroTool(operation: AiMicroOperation, values: AiMicro
     ].join("\n\n");
   }
   if (operation === "faq") {
-    const questions = splitList(values.points ?? "");
+    const questions = splitLines(values.points ?? "");
     if (!questions.length) return "Add one question per line, then generate the FAQ.";
     const verifiedAnswers = parseQuestionAnswers(values.answers ?? "");
     const missing: string[] = [];
@@ -163,20 +164,20 @@ export function generateAiMicroTool(operation: AiMicroOperation, values: AiMicro
       if (!answer) missing.push(question);
       return "Q: " + question + "\nA: " + (answer ?? "[Add a verified answer before publishing.]");
     });
-    return output.join("\n\n") + (missing.length ? "\n\nNEEDS AN ANSWER\n" + missing.map((question) => "• " + question).join("\n") + "\n\nOnly publish answers confirmed by your product, policy or source material." : "");
+    return "FAQ: " + topic + "\nAudience: " + audience + "\n\n" + output.join("\n\n") + (missing.length ? "\n\nNEEDS AN ANSWER\n" + missing.map((question) => "• " + question).join("\n") + "\n\nOnly publish answers confirmed by your product, policy or source material." : "");
   }
   if (operation === "feature-benefit") {
-    const features = splitList(values.benefit ?? "");
+    const features = splitLines(values.benefit ?? "");
     if (!features.length) return "Add one product feature per line.";
-    const outcomes = splitList(values.outcomes ?? "");
-    return features.map((feature, index) => {
+    const outcomes = splitLines(values.outcomes ?? "");
+    return "VALUE MAPPING\nProduct / service: " + topic + "\nAudience: " + audience + "\n\n" + features.map((feature, index) => {
       const outcome = outcomes[index];
       return "Feature: " + feature + "\nCustomer outcome: " + (outcome ?? "[Add the specific result this feature creates.]") + "\nEvidence to support the claim: [Add a measured result, user example or verified product detail.]";
     }).join("\n\n") + (outcomes.length > features.length ? "\n\nNote: extra outcome entries were not matched to a feature and were left out." : "");
   }
   if (operation === "agenda") {
     const goal = clean(values.goal, "Make a clear decision");
-    const points = splitList(clean(values.topics, "Progress\nBlockers\nDecisions\nNext steps"));
+    const points = splitLines(clean(values.topics, "Progress\nBlockers\nDecisions\nNext steps")).slice(0, 100);
     const requestedDuration = Number(values.duration || 30);
     const duration = Number.isFinite(requestedDuration) ? Math.max(points.length, Math.min(600, Math.trunc(requestedDuration))) : Math.max(30, points.length);
     const base = Math.floor(duration / points.length);
@@ -212,9 +213,9 @@ export function generateAiMicroTool(operation: AiMicroOperation, values: AiMicro
   }
   if (operation === "pros-cons") {
     const option = clean(values.option, "the option being considered");
-    const upsides = splitList(values.upsides ?? "");
-    const risks = splitList(values.risks ?? "");
-    const criteria = splitList(values.criteria ?? "");
+    const upsides = splitLines(values.upsides ?? "");
+    const risks = splitLines(values.risks ?? "");
+    const criteria = splitLines(values.criteria ?? "");
     return [
       "DECISION: " + option,
       "UPSIDE TO VERIFY\n" + (upsides.length ? upsides.map((item) => "• " + item).join("\n") : "• [Add observed advantages or expected benefits.]"),
@@ -230,9 +231,9 @@ export function generateAiMicroTool(operation: AiMicroOperation, values: AiMicro
     return shortenExtractively(text, Number.isFinite(parsedTarget) ? parsedTarget : 60);
   }
   if (operation === "yt-desc") {
-    const points = splitList(values.points ?? "");
-    const links = splitList(values.links ?? "");
-    const chapters = splitList(values.chapters ?? "");
+    const points = splitLines(values.points ?? "");
+    const links = splitLines(values.links ?? "");
+    const chapters = splitLines(values.chapters ?? "");
     const cta = clean(values.cta, "[Add one clear viewer action.]");
     const sections = [
       topic,
