@@ -535,6 +535,7 @@ private struct NativeCameraPreview: UIViewRepresentable {
 }
 
 struct NativeCameraStudioView: View {
+    @Environment(\.openURL) private var openURL
     @StateObject private var capture = NativeCameraCapture()
     @State private var mode = "Photo"
     @State private var look = NativeCameraLook.natural
@@ -548,10 +549,7 @@ struct NativeCameraStudioView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Camera Studio").font(.envScaled(size: 20, weight: .semibold)).foregroundStyle(Color.envInk)
-                    Text("A simple camera for everyday photos and videos.").font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted)
-                }
+                Text("Camera Studio").font(.envScaled(size: 20, weight: .semibold)).foregroundStyle(Color.envInk)
                 Spacer()
                 Text(capture.ready ? "Camera ready" : "Camera off")
                     .font(.envScaled(size: 10, weight: .medium))
@@ -573,13 +571,6 @@ struct NativeCameraStudioView: View {
                             Spacer()
                         }.padding(12)
                     }
-                } else {
-                    VStack(spacing: 10) {
-                        Image(systemName: "camera").font(.system(size: 30)).foregroundStyle(.white.opacity(0.8))
-                        Text(capture.error ?? "Allow camera access to start.")
-                            .font(.envScaled(size: 13, weight: .medium)).foregroundStyle(.white).multilineTextAlignment(.center)
-                        Button("Start camera") { capture.start() }.buttonStyle(.borderedProminent)
-                    }.padding(20)
                 }
             }
             .aspectRatio(4.0 / 3.0, contentMode: .fit)
@@ -666,14 +657,22 @@ struct NativeCameraStudioView: View {
                     ForEach(NativeCameraLook.allCases) { item in Text(item.rawValue).tag(item) }
                 }.pickerStyle(.menu)
             }
-            Text("Color looks are applied to saved photos. Native video is recorded clean in this first release.")
-                .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
-
             if let message = capture.message {
                 Text(message).font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.envMuted)
             }
             if let error = capture.error {
-                Text(error).font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.red)
+                HStack(alignment: .center, spacing: 10) {
+                    Text(error).font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.red)
+                    Spacer(minLength: 0)
+                    if AVCaptureDevice.authorizationStatus(for: .video) == .denied {
+                        Button("Settings") {
+                            if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                                openURL(settingsURL)
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
             }
             HStack {
                 if let photo = capture.latestPhotoURL {
@@ -683,11 +682,7 @@ struct NativeCameraStudioView: View {
                     ShareLink(item: video) { Label("Share video", systemImage: "square.and.arrow.up") }
                 }
                 Spacer()
-                Text("Captures stay on this device unless you choose to share them.")
-                    .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
             }
-            Text("Simultaneous front/rear capture and face-tracking AR masks are not included in this release; both require separate device capability checks.")
-                .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
         }
         .onAppear { capture.start() }
         .onDisappear { capture.stop() }
