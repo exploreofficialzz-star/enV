@@ -20,6 +20,8 @@ const webWorldLabEntry = readFileSync("src/components/world-lab/world-lab-entry.
 const webGameStudioRoute = readFileSync("src/routes/3d-game-studio.tsx", "utf8");
 const webOfflineCapabilities = readFileSync("src/lib/offline/capabilities.ts", "utf8");
 const webToolRoute = readFileSync("src/routes/tools/$category/$slug.tsx", "utf8");
+const webToolEnginePreload = readFileSync("src/lib/tool-engine-preload.ts", "utf8");
+const webOfflineWorker = readFileSync("public/env-sw.js", "utf8");
 const webStore = readFileSync("src/lib/storage.ts", "utf8");
 const themeHook = readFileSync("src/hooks/use-theme.ts", "utf8");
 const iosAssistant = readFileSync("apps/ios/enV/AssistantChat.swift", "utf8");
@@ -77,6 +79,12 @@ assert.match(webToolCard, /offlineAwareToolDescription\(tool\)/, "Web tool cards
 assert.match(webToolShell, /offlineAwareToolDescription\(tool\)/, "Web tool detail headers must show offline capability");
 assert.match(webToolEngine, /<Suspense fallback=\{null\}>/, "Tool engine must not show a loading screen while lazy modules open");
 assert.match(webToolRoute, /return \{ communityFeed: null \}/, "Tool routes must mount without waiting for the community feed");
+assert.match(webToolRoute, /await preloadToolEngine\(matchedTool\)/, "Tool routes must prepare the selected engine before committing the page");
+assert.match(webToolEnginePreload, /export async function preloadToolEngine/, "Every tool engine must expose route-time preload");
+assert.match(webToolEnginePreload, /tool\.engine\.type/, "Engine preload must cover the catalog engine type dispatch");
+assert.match(webOfflineWorker, /if \(url\.pathname\.startsWith\("\/tools\/"\)\)[\s\S]*?return await shellResponse\(\)/, "Offline tool URLs must render through the regular enV app shell");
+assert.match(webWorldLabEntry, /preloadWorldLabWorkspace\(\)/, "World Lab must warm its workspace before Enter is selected");
+assert.match(webGameStudioRoute, /await loadGameStudio\(\)/, "3D Game Studio must prepare its engine before route commit");
 assert.doesNotMatch(webToolRoute, /await loadPublicCommunityToolFeed/, "Community preload must not delay opening the tool");
 assert.doesNotMatch(webToolEngine, /Loading \{props\.tool\.name\}|Preparing \{tool\.name\}|Offline package ready on this device|OfflineToolUnavailable/, "Offline package state must not gate or decorate the tool screen");
 assert.doesNotMatch(webScreenshotEngine, /Loading the editor|fallback=\{loading\}/, "Screenshot tools must not show an entry loading state");
