@@ -1005,7 +1005,7 @@ enum NativeCoverage {
         case "converter": return NativeConverterEngine.operation(for: tool) != nil
         case "calculator": return NativeAudioEngine.supports(tool) || NativeCalculatorEngine.operation(for: tool.id) != nil || NativeExpansionCalculatorEngine.operation(for: tool.id) != nil || NativeMathExerciseEngine.operation(for: tool.id) != nil
         case "generator", "network", "seo", "developer", "cssgen": return NativeUtilityEngine.supports(tool)
-        case "custom": return tool.id == "a-book" || tool.id == "camera-studio" || NativeProductivityEngine.supports(tool.id) || NativeAccessibilityEngine.supports(tool) || NativeEventEngine.supports(tool.id) || NativeEcommerceEngine.supports(tool)
+        case "custom": return tool.id == "a-book" || tool.id == "camera-studio" || NativeProductivityEngine.supports(tool.id) || tool.category == "communication" || NativeAccessibilityEngine.supports(tool) || NativeEventEngine.supports(tool.id) || NativeEcommerceEngine.supports(tool)
         default: return false
         }
     }
@@ -1050,11 +1050,355 @@ struct NativeFamilyToolView: View {
             case "calculator": if NativeAudioEngine.supports(tool) { NativeAudioToolView(tool: tool) } else if NativeCalculatorEngine.operation(for: tool.id) != nil { NativeCalculatorToolView(tool: tool) } else if NativeExpansionCalculatorEngine.operation(for: tool.id) != nil { NativeExpansionCalculatorToolView(tool: tool) } else if NativeMathExerciseEngine.operation(for: tool.id) != nil { NativeMathExerciseToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "generator", "network", "seo", "cssgen": if NativeUtilityEngine.supports(tool) { NativeUtilityToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "developer": if NativeUtilityEngine.supports(tool) { NativeDeveloperToolView(tool: tool, initialMode: initialDeveloperMode, initialAction: initialDeveloperAction) } else { NativeUnavailableToolView(tool: tool, backend: false) }
-            case "custom": if tool.id == "camera-studio" { NativeCameraStudioView() } else if tool.id == "a-book" { NativeABookView() } else if NativeProductivityEngine.supports(tool.id) { NativeProductivityToolView(tool: tool) } else if NativeAccessibilityEngine.supports(tool) { NativeAccessibilityToolView(tool: tool) } else if NativeEventEngine.supports(tool.id) { NativeEventToolView(tool: tool) } else if NativeEcommerceEngine.supports(tool) { NativeEcommerceToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
+            case "custom": if tool.category == "communication" { NativeCommunicationToolView(tool: tool) } else if tool.id == "camera-studio" { NativeCameraStudioView() } else if tool.id == "a-book" { NativeABookView() } else if NativeProductivityEngine.supports(tool.id) { NativeProductivityToolView(tool: tool) } else if NativeAccessibilityEngine.supports(tool) { NativeAccessibilityToolView(tool: tool) } else if NativeEventEngine.supports(tool.id) { NativeEventToolView(tool: tool) } else if NativeEcommerceEngine.supports(tool) { NativeEcommerceToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             default: NativeUnavailableToolView(tool: tool, backend: NativeBackendEngine.supports(tool))
             }
         }
         .environment(\.nativeToolExecutionTracker, executionTracker)
+    }
+}
+
+struct NativeCommunicationField: Identifiable {
+    let key: String
+    let label: String
+    var multiline = false
+    var id: String { key }
+}
+
+enum NativeCommunicationEngine {
+    static let kinds: Set<String> = ["email", "message", "sms", "meeting", "agenda", "minutes", "signature", "invitation", "announcement", "thank-you", "follow-up", "reminder"]
+    static let actions = ["generator", "template", "builder", "planner", "formatter"]
+
+    static func parse(_ toolID: String) -> (kind: String, action: String) {
+        guard let action = actions.first(where: { toolID.hasSuffix("-" + $0) }) else { return ("", "") }
+        let kind = String(toolID.dropLast(action.count + 1))
+        return kinds.contains(kind) ? (kind, action) : ("", "")
+    }
+
+    static func fields(for toolID: String) -> [NativeCommunicationField] {
+        let parsed = parse(toolID), kind = parsed.kind, action = parsed.action
+        guard !kind.isEmpty, !action.isEmpty else { return [] }
+        var result = [
+            NativeCommunicationField(key: "name", label: kind == "signature" ? "Full name" : (["meeting", "agenda", "minutes"].contains(kind) ? "Attendees" : "Recipient / audience")),
+            NativeCommunicationField(key: "subject", label: ["meeting", "agenda", "minutes"].contains(kind) ? "Meeting title" : (kind == "signature" ? "Role" : "Subject / title"))
+        ]
+        if ["meeting", "agenda", "minutes", "invitation", "reminder", "announcement", "follow-up"].contains(kind) {
+            result.append(.init(key: "date", label: "Date and time"))
+        }
+        if ["meeting", "agenda", "minutes", "invitation", "reminder"].contains(kind) {
+            result.append(.init(key: "place", label: "Location / meeting link"))
+        }
+        if kind == "email" { result += [.init(key: "email", label: "Recipient email"), .init(key: "cc", label: "Cc"), .init(key: "bcc", label: "Bcc")] }
+        if ["message", "sms"].contains(kind) { result.append(.init(key: "channel", label: "Channel")) }
+        if ["meeting", "agenda", "minutes", "invitation", "reminder"].contains(kind) {
+            if ["meeting", "agenda"].contains(kind) { result.append(.init(key: "duration", label: "Duration (minutes)")) }
+            result.append(.init(key: "timezone", label: "Time zone"))
+        }
+        if kind == "invitation" { result.append(.init(key: "rsvpBy", label: "RSVP deadline")) }
+        if kind == "signature" { result += [.init(key: "company", label: "Company"), .init(key: "email", label: "Email"), .init(key: "phone", label: "Phone"), .init(key: "website", label: "Website")] }
+        if action != "formatter" && action != "template" && kind != "signature" { result.append(.init(key: "purpose", label: "Purpose / context", multiline: true)) }
+        if kind == "agenda" || kind == "minutes" { result.append(.init(key: "items", label: "Agenda items (one per line)", multiline: true)) }
+        if kind == "minutes" { result += [.init(key: "decisions", label: "Decisions (one per line)", multiline: true), .init(key: "actionItems", label: "Action items · Owner | Task | Due date", multiline: true)] }
+        result.append(.init(key: "details", label: action == "formatter" ? "Text to format" : (kind == "signature" ? "Optional short note" : "Details / message"), multiline: true))
+        if ["email", "message", "sms", "invitation", "announcement", "follow-up", "reminder", "minutes"].contains(kind) {
+            let label: String
+            switch kind {
+            case "invitation": label = "RSVP method / link"
+            case "minutes": label = "Next review date / owner"
+            case "sms": label = "Action / deadline"
+            default: label = "Next step / call to action"
+            }
+            result.append(.init(key: "nextStep", label: label, multiline: true))
+        }
+        if kind != "signature" && action != "formatter" && action != "template" { result.append(.init(key: "tone", label: "Tone")) }
+        return result
+    }
+
+    static func generate(_ toolID: String, values: [String: String]) -> String {
+        let parsed = parse(toolID), kind = parsed.kind, action = parsed.action
+        func value(_ key: String, _ fallback: String = "") -> String {
+            let current = values[key]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return current.isEmpty ? fallback : current
+        }
+        let recipient = value("name", "[Recipient]"), subject = value("subject", kind.replacingOccurrences(of: "-", with: " ").capitalized)
+        let purpose = value("purpose"), details = value("details", purpose), date = value("date", "[Date / time]")
+        let place = value("place", "[Location]"), next = value("nextStep")
+        let items = value("items").components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        if action == "template" { return template(kind) }
+        if action == "formatter" { return format(value("details"), kind: kind) }
+        if action == "planner" { return planner(kind, recipient, subject, purpose, value("duration", "30"), items) }
+
+        switch kind {
+        case "email":
+            let displayName = value("name")
+            let greetingName = displayName.isEmpty ? "there" : displayName
+            let greeting = ["friendly", "warm"].contains(value("tone")) ? "Hi " + greetingName + "," : "Hello " + greetingName + ","
+            let emailAddress = value("email")
+            let toRecipient = emailAddress.isEmpty ? recipient : (displayName.isEmpty ? emailAddress : displayName + " <" + emailAddress + ">")
+            let headers = [
+                "To: " + toRecipient,
+                value("cc").isEmpty ? "" : "Cc: " + value("cc"),
+                value("bcc").isEmpty ? "" : "Bcc: " + value("bcc"),
+                "Subject: " + subject
+            ].filter { !$0.isEmpty }
+            return (action == "builder" ? headers.joined(separator: "\n") + "\n\n" : "Subject: " + subject + "\n\n") + greeting + "\n\n" +
+                (details.isEmpty ? "[Add the main information]" : details) + (next.isEmpty ? "" : "\n\nNext step: " + next) +
+                "\n\n" + (value("tone") == "warm" ? "With appreciation," : "Best regards,") + "\n[Your name]"
+        case "message":
+            let prefix = action == "builder" ? "To: " + recipient + "\nChannel: " + value("channel", "General") + "\nTopic: " + subject + "\n\n" : ""
+            return prefix + (details.isEmpty ? "[Write the update or question]" : details) + (next.isEmpty ? "" : "\n\nNext step: " + next)
+        case "sms":
+            return (recipient == "[Recipient]" ? "" : recipient + ", ") + (details.isEmpty ? "[Write one clear message]" : details) + (next.isEmpty ? "" : " " + next)
+        case "meeting":
+            return "MEETING BRIEF\n" + subject + "\n\nDate/time: " + date + (value("timezone").isEmpty ? "" : " (" + value("timezone") + ")") +
+                "\nDuration: " + value("duration", "30") + " minutes\nLocation/link: " + place + "\nAttendees: " + recipient +
+                "\nPurpose / outcome: " + (purpose.isEmpty ? "[State the decision or outcome]" : purpose) +
+                "\nPreparation: " + (details.isEmpty ? "[Add pre-read or preparation notes]" : details)
+        case "agenda":
+            return "AGENDA\n" + subject + "\nDate/time: " + date + (value("timezone").isEmpty ? "" : " (" + value("timezone") + ")") + "\nLocation: " + place + "\nObjective: " +
+                (purpose.isEmpty ? "[Outcome required]" : purpose) + "\n\n" + agenda(items.isEmpty ? details.components(separatedBy: .newlines).filter { !$0.isEmpty } : items, value("duration", "30")) +
+                "\n\nClose: confirm decisions, owners and due dates."
+        case "minutes":
+            let decisions = value("decisions").components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+            let decisionText = decisions.isEmpty ? "[Record each decision and its owner]" : decisions.enumerated().map { String($0.offset + 1) + ". " + $0.element }.joined(separator: "\n")
+            return "MEETING MINUTES\n" + subject + "\nDate/time: " + date + (value("timezone").isEmpty ? "" : " (" + value("timezone") + ")") + "\nLocation: " + place + "\nAttendees: " + recipient +
+                "\n\nDiscussion summary\n" + (details.isEmpty ? "[Summarize outcomes by agenda item]" : details) +
+                "\n\nDecisions\n" + decisionText + "\n\nAction register\n" + actionRegister(value("actionItems", value("items"))) +
+                "\n\nNext review: " + (next.isEmpty ? "[Date / owner]" : next)
+        case "signature":
+            let identity = [recipient, [value("subject"), value("company")].filter { !$0.isEmpty }.joined(separator: " · ")].filter { !$0.isEmpty }
+            return (identity + [value("email"), value("phone"), value("website"), value("details")].filter { !$0.isEmpty }).joined(separator: "\n")
+        case "invitation":
+            return "YOU'RE INVITED\n" + subject + "\n\nWhen: " + date + (value("timezone").isEmpty ? "" : " (" + value("timezone") + ")") +
+                "\nWhere: " + place + "\n\n" + (details.isEmpty ? "[What guests can expect]" : details) +
+                "\n\nPlease RSVP by: " + value("rsvpBy", "[RSVP deadline]") + "\nRSVP: " + (next.isEmpty ? "[Response link or contact]" : next) +
+                "\n\nPlease share any access or dietary requirements with the organiser."
+        case "announcement":
+            return "ANNOUNCEMENT\n" + subject + "\n\nWhat is happening\n" + (details.isEmpty ? "[Explain the update]" : details) +
+                "\n\nWho is affected\n" + recipient + "\n\nEffective date\n" + date + "\n\nWhat to do next\n" +
+                (next.isEmpty ? (purpose.isEmpty ? "[State the required action]" : purpose) : next)
+        case "thank-you":
+            return "Hello " + recipient + ",\n\nThank you for " + (purpose.isEmpty ? "[the specific contribution]" : purpose) + ".\n\n" +
+                (details.isEmpty ? "[Describe why it mattered and the impact it had.]" : details) + (next.isEmpty ? "" : "\n\n" + next) + "\n\nWarm regards,\n[Your name]"
+        case "follow-up":
+            return "Subject: Follow-up — " + subject + "\n\nHello " + recipient + ",\n\nI am following up on " +
+                (purpose.isEmpty ? "[our previous conversation / topic]" : purpose) + ".\n\n" +
+                (details.isEmpty ? "[Briefly recap the open point.]" : details) + "\n\nCould you " +
+                (next.isEmpty ? "[confirm the next step]" : next) + (date == "[Date / time]" ? " when convenient" : " by " + date) +
+                "?\n\nBest regards,\n[Your name]"
+        default:
+            return "REMINDER — " + subject + "\nFor: " + recipient + "\nWhen: " + date +
+                (value("timezone").isEmpty ? "" : " (" + value("timezone") + ")") + "\nWhere: " + place +
+                "\n\n" + (details.isEmpty ? "[Essential details]" : details) + "\n\nAction needed: " +
+                (next.isEmpty ? (purpose.isEmpty ? "[State the action]" : purpose) : next) + "\n\nPlease contact the organiser if anything has changed."
+        }
+    }
+
+    static func checks(_ toolID: String, values: [String: String], output: String) -> [String] {
+        let kind = parse(toolID).kind
+        func value(_ key: String) -> String { values[key]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "" }
+        var result: [String] = []
+        if kind == "email" {
+            let email = value("email")
+            let emailPattern = "^[^\\s@,;]+@[^\\s@,;]+\\.[^\\s@,;]+$"
+            if !email.isEmpty && email.range(of: emailPattern, options: .regularExpression) == nil { result.append("Check the recipient email address.") }
+            if value("subject").isEmpty { result.append("Add a specific subject so the email is easy to find.") }
+            let cc = value("cc").components(separatedBy: CharacterSet(charactersIn: ",;")).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+            let bcc = value("bcc").components(separatedBy: CharacterSet(charactersIn: ",;")).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+            if (cc + bcc).contains(where: { $0.range(of: emailPattern, options: .regularExpression) == nil }) { result.append("Check every Cc and Bcc address; separate addresses with commas or semicolons.") }
+            if !Set(cc.map { $0.lowercased() }).isDisjoint(with: Set(bcc.map { $0.lowercased() })) { result.append("An address appears in both Cc and Bcc; review recipient visibility.") }
+        }
+        if kind == "sms" && !output.isEmpty {
+            let metrics = smsMetrics(output)
+            if metrics.segments > 3 { result.append("This draft uses " + String(metrics.segments) + " SMS segments; shorten it or check provider pricing.") }
+            if metrics.encoding == "UCS-2" { result.append("Unicode characters change the encoding and reduce the single-message limit to 70 units.") }
+        }
+        if ["meeting", "agenda", "invitation", "reminder"].contains(kind) && value("timezone").isEmpty { result.append("Add the time zone so recipients see the intended local time.") }
+        if ["meeting", "agenda", "reminder"].contains(kind) && value("date").isEmpty { result.append("Add the date and time.") }
+        if kind == "invitation" && value("rsvpBy").isEmpty { result.append("Set an RSVP deadline.") }
+        if kind == "minutes" && value("actionItems").isEmpty && value("items").isEmpty { result.append("Add action owners and due dates.") }
+        if kind == "minutes" && value("nextStep").isEmpty { result.append("Add the next review date or review owner.") }
+        if kind == "signature" && ["email", "phone", "website"].allSatisfy({ value($0).isEmpty }) { result.append("Add at least one contact method.") }
+        return result
+    }
+
+    static func smsMetrics(_ text: String) -> (encoding: String, units: Int, segments: Int) {
+        let basic = Set("@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞ\u{001B}ÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà")
+        let extended = Set("\u{000C}^{}\\[~]|€")
+        let characters = Array(text)
+        let isGSM = characters.allSatisfy { basic.contains($0) || extended.contains($0) }
+        let units = isGSM ? characters.reduce(0) { $0 + (extended.contains($1) ? 2 : 1) } : text.utf16.count
+        let limit = isGSM ? 160 : 70, concatenated = isGSM ? 153 : 67
+        let segments = units == 0 ? 0 : (units <= limit ? 1 : Int(ceil(Double(units) / Double(concatenated))))
+        return (isGSM ? "GSM-7" : "UCS-2", units, segments)
+    }
+
+    static func signatureHTML(_ toolID: String, values: [String: String]) -> String {
+        let output = generate(toolID, values: values)
+        let escaped = output.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;").replacingOccurrences(of: "\"", with: "&quot;").replacingOccurrences(of: "'", with: "&#39;")
+        return "<!doctype html><html><head><meta charset=\"utf-8\"><title>Email signature</title></head><body><div style=\"font-family:Arial,sans-serif;line-height:1.5;color:#222;white-space:pre-line\">" + escaped + "</div></body></html>"
+    }
+
+    private static func format(_ input: String, kind: String) -> String {
+        let text = input.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
+        var normalized = text.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.joined(separator: "\n")
+        while normalized.contains("\n\n\n") { normalized = normalized.replacingOccurrences(of: "\n\n\n", with: "\n\n") }
+        return normalized.isEmpty ? kind + " formatter\n\nPaste your content above to format it." : normalized
+    }
+
+    private static func agenda(_ input: [String], _ duration: String) -> String {
+        let items = input.isEmpty ? ["Welcome and objectives", "Main discussion", "Decisions and next steps"] : input
+        let total = max(5, min(480, Int(duration) ?? 30)), base = total / items.count
+        var remainder = total % items.count, elapsed = 0
+        return items.enumerated().map { index, item in
+            let span = base + (remainder > 0 ? 1 : 0)
+            remainder = max(0, remainder - 1)
+            let start = elapsed
+            elapsed += span
+            return String(index + 1) + ". " + String(format: "%02d:%02d–%02d:%02d", start / 60, start % 60, elapsed / 60, elapsed % 60) + "  " + item
+        }.joined(separator: "\n")
+    }
+
+    private static func actionRegister(_ input: String) -> String {
+        let rows = input.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+        if rows.isEmpty { return "1. [Owner] — [Action] — [Due date]" }
+        return rows.enumerated().map { index, row in
+            let parts = row.components(separatedBy: "|").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            let owner = parts.first ?? "", task = parts.count > 1 ? parts[1] : "", due = parts.count > 2 ? parts[2] : ""
+            return String(index + 1) + ". " + (task.isEmpty ? owner : task) + (owner.isEmpty || task.isEmpty ? "" : " — Owner: " + owner) + " — Due: " + (due.isEmpty ? "Not set" : due)
+        }.joined(separator: "\n")
+    }
+
+    private static func planner(_ kind: String, _ recipient: String, _ subject: String, _ purpose: String, _ duration: String, _ items: [String]) -> String {
+        let goal = purpose.isEmpty ? "[Define the outcome]" : purpose
+        switch kind {
+        case "email":
+            return "EMAIL PLAN\nAudience: " + recipient + "\nSubject: " + subject + "\nGoal: " + goal + "\n\n1. Confirm recipients and visibility.\n2. Put the main point first.\n3. Separate context from the request.\n4. State an owner and response date.\n5. Check links, attachments and confidential information."
+        case "message":
+            return "MESSAGE PLAN\nAudience: " + recipient + "\nGoal: " + goal + "\n\n1. Choose a shared thread or private message.\n2. Lead with the update or question.\n3. Include only useful context.\n4. Mention only people who need to act.\n5. End with an owner or next step."
+        case "sms":
+            let metrics = smsMetrics(purpose)
+            return "SMS PLAN\nAudience: " + recipient + "\nGoal: " + goal + "\n\n1. Put essential information first.\n2. Use one clear action and deadline.\n3. Remove unnecessary detail.\n4. Confirm recipient consent before sending.\n5. Check encoding and segment count.\n\nCurrent text: " + String(metrics.units) + " units · " + String(metrics.segments) + " segment(s)"
+        case "meeting", "agenda":
+            return "MEETING PLAN\n" + subject + "\nOutcome: " + goal + "\nDuration: " + duration + " minutes\n\n1. Invite only people needed.\n2. Share agenda and pre-read.\n3. Give each topic an owner and timebox.\n4. Reserve time for decisions and risks.\n5. End with named actions and deadlines.\n\nAgenda\n" + agenda(items, duration)
+        case "minutes":
+            return "MINUTES PLAN\nMeeting: " + subject + "\nPurpose: " + goal + "\n\n1. Record attendance.\n2. Summarize discussion by agenda item.\n3. Capture decisions, rationale and owners.\n4. Add actions with owners and due dates.\n5. Record the next review date.\n\nAction format: Owner | Task | Due date"
+        case "signature":
+            return "SIGNATURE PLAN\n1. Use your professional name and role.\n2. Add a reliable contact route and website.\n3. Keep it compact and mobile-readable.\n4. Include a disclaimer only when required.\n5. Test text and HTML versions."
+        case "invitation":
+            return "INVITATION PLAN\nEvent: " + subject + "\nAudience: " + recipient + "\n\n1. State who should attend and why.\n2. Confirm date, local time and time zone.\n3. Include venue/link and access notes.\n4. Give an RSVP deadline and response route.\n5. Send reminders only through a connected service."
+        case "announcement":
+            return "ANNOUNCEMENT PLAN\nSubject: " + subject + "\nAudience: " + recipient + "\n\n1. Put the news in the headline.\n2. Explain who is affected and what changes.\n3. State the effective date.\n4. Give the required action and contact.\n5. Keep one source of truth for updates."
+        case "thank-you":
+            return "THANK-YOU PLAN\nRecipient: " + recipient + "\nReason: " + goal + "\n\n1. Name the contribution.\n2. Explain its real impact.\n3. Add a personal detail.\n4. Offer a next step only if appropriate.\n5. Keep it timely and sincere."
+        case "follow-up":
+            return "FOLLOW-UP PLAN\nRecipient: " + recipient + "\nTopic: " + subject + "\nGoal: " + goal + "\n\n1. Refer to the prior exchange and date.\n2. Summarize the open point.\n3. Ask one answerable question.\n4. Offer a deadline or alternative.\n5. Track the next follow-up."
+        default:
+            return "REMINDER PLAN\nFor: " + recipient + "\nTask: " + subject + "\nGoal: " + goal + "\n\n1. Confirm date, time zone and location.\n2. Put the action first.\n3. Include materials or access link.\n4. Choose a sensible notice period.\n5. Schedule delivery in a connected service."
+        }
+    }
+
+    private static func template(_ kind: String) -> String {
+        let templates: [String: String] = [
+            "email": "To: [Name] <[email]>\nCc: [optional]\nSubject: [Specific subject]\n\nHello [Name],\n\n[Purpose and context]\n[Essential details]\n\n[Clear request and date]\n\nBest regards,\n[Your name]",
+            "message": "To: [Person / group]\nChannel: [WhatsApp / Slack / Teams]\n\n[One clear update]\n[Context the reader needs]\n\nNext step: [Owner + action + timing]",
+            "sms": "[Name], [one clear message]. [Action and deadline].",
+            "meeting": "MEETING BRIEF\n[Title]\nDate/time: [Date + time zone]\nDuration: [Minutes]\nLocation/link: [Place]\nPurpose: [Outcome]\nAttendees: [Names]\nPreparation: [Pre-read]",
+            "agenda": "MEETING AGENDA\n[Title] · [Date/time]\nObjective: [Decision or outcome]\n\n1. Welcome — [Owner] — [Minutes]\n2. [Topic] — [Owner] — [Minutes]\n3. Decisions and actions — [Owner] — [Minutes]",
+            "minutes": "MEETING MINUTES\nMeeting: [Title] · Date: [Date/time]\nAttendees: [Names]\n\nDiscussion\n[Outcome-focused notes]\n\nDecisions\n[Decision — rationale — owner]\n\nAction register\n[Owner] | [Action] | [Due date]\n\nNext review: [Date/time]",
+            "signature": "[Full name]\n[Role] · [Company]\n[Email] · [Phone]\n[Website]",
+            "invitation": "YOU'RE INVITED\n[Event]\nWhen: [Date, time and time zone]\nWhere: [Venue or link]\n\n[What guests can expect]\n\nPlease RSVP by [Date] via [Contact / link].\nAccess notes: [Optional]",
+            "announcement": "[Headline]\n\nWhat is happening: [Change]\nWho is affected: [Audience]\nWhen: [Effective date]\nWhat to do: [Action]\nQuestions: [Contact]",
+            "thank-you": "Hello [Name],\n\nThank you for [specific reason]. [Why it mattered].\n\n[Next step, if relevant]\n\nWarm regards,\n[Your name]",
+            "follow-up": "Subject: Follow-up — [Topic]\n\nHello [Name],\n\nI am following up on [previous conversation / date]. [Brief recap].\n\nCould you [specific next step] by [date]?\n\nBest regards,\n[Your name]",
+            "reminder": "REMINDER — [Task / event]\nWhen: [Date, time and time zone]\nWhere: [Location / link]\n\n[Essential details]\nAction needed: [Action]\nBy: [Deadline]\nContact: [Name / channel]"
+        ]
+        return templates[kind] ?? "Communication template"
+    }
+}
+
+private struct NativeCommunicationToolView: View {
+    let tool: Tool
+    @Environment(\.nativeToolExecutionTracker) private var executionTracker
+    @State private var values: [String: String] = [:]
+    @State private var output = ""
+    @State private var error: String?
+    @State private var checks: [String] = []
+    @State private var showExporter = false
+    @State private var exportHTML = false
+
+    private var parsed: (kind: String, action: String) { NativeCommunicationEngine.parse(tool.id) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Runs on this device. Your draft is not sent, scheduled or recorded.")
+                .font(.footnote).foregroundStyle(Color.envMuted)
+            ForEach(NativeCommunicationEngine.fields(for: tool.id)) { field in
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(field.label).font(.subheadline.weight(.medium)).foregroundStyle(Color.envInk)
+                    if field.key == "tone" {
+                        Picker(field.label, selection: binding(for: field)) {
+                            ForEach(["professional", "friendly", "warm", "concise", "direct", "empathetic"], id: \.self) { tone in
+                                Text(tone.capitalized).tag(tone)
+                            }
+                        }.pickerStyle(.menu)
+                    } else if field.multiline {
+                        TextEditor(text: binding(for: field)).frame(minHeight: 92).padding(6)
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
+                    } else {
+                        TextField(field.label, text: binding(for: field)).textFieldStyle(.roundedBorder)
+                            .textInputAutocapitalization(field.key == "email" ? .never : .sentences)
+                            .autocorrectionDisabled(field.key == "email" || field.key == "website")
+                    }
+                }
+            }
+            HStack(spacing: 10) {
+                Button(parsed.action == "formatter" ? "Format" : (parsed.action == "template" ? "Use template" : "Generate")) {
+                    executionTracker?.start()
+                    output = NativeCommunicationEngine.generate(tool.id, values: values)
+                    checks = NativeCommunicationEngine.checks(tool.id, values: values, output: output)
+                    error = nil
+                    executionTracker?.finish(success: true)
+                }.buttonStyle(.borderedProminent)
+                Button("Reset") { values = ["timezone": TimeZone.current.identifier, "tone": "professional"]; output = ""; checks = []; error = nil }.buttonStyle(.bordered)
+            }
+            if let error { Text(error).font(.footnote).foregroundStyle(.red) }
+            ForEach(checks, id: \.self) { check in Text("Review: " + check).font(.footnote).foregroundStyle(Color.envMuted) }
+            if !output.isEmpty {
+                Divider().overlay(Color.envBorder)
+                HStack(spacing: 8) {
+                    Button("Copy") { UIPasteboard.general.string = output }.buttonStyle(.bordered)
+                    Button("Save text") { exportHTML = false; showExporter = true }.buttonStyle(.bordered)
+                    if parsed.kind == "signature" && parsed.action != "template" && parsed.action != "formatter" {
+                        Button("Save HTML") { exportHTML = true; showExporter = true }.buttonStyle(.bordered)
+                    }
+                    ShareLink(item: output) { Text("Share") }.buttonStyle(.bordered)
+                }
+                Text(output).font(.system(.footnote, design: .monospaced)).foregroundStyle(Color.envInk)
+                    .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .fileExporter(
+            isPresented: $showExporter,
+            document: NativeBackendExportDocument(data: exportHTML ? Data(NativeCommunicationEngine.signatureHTML(tool.id, values: values).utf8) : Data(output.utf8)),
+            contentType: exportHTML ? .html : .plainText,
+            defaultFilename: exportHTML ? "env-email-signature.html" : "env-communication.txt"
+        ) { result in
+            if case .failure(let caughtError) = result { error = caughtError.localizedDescription }
+        }
+        .accessibilityElement(children: .contain)
+        .onAppear {
+            if values["timezone"] == nil { values["timezone"] = TimeZone.current.identifier }
+            if values["tone"] == nil { values["tone"] = "professional" }
+        }
+    }
+
+    private func binding(for field: NativeCommunicationField) -> Binding<String> {
+        Binding(
+            get: { values[field.key] ?? (field.key == "tone" ? "professional" : (field.key == "timezone" ? TimeZone.current.identifier : "")) },
+            set: { values[field.key] = $0 }
+        )
     }
 }
 
@@ -6874,7 +7218,7 @@ enum NativeBackendEngine {
     static let backendIDs:Set<String> = ["youtube-audio-extractor","facebook-video-downloader","instagram-video-downloader","video-mute","video-audio-replacer","tiktok-video-downloader","url-media-inspector","video-audio-volume","video-bitrate","video-crop","video-fps","video-merger","video-resize","video-resolution-presets","video-rotate","video-to-avi","video-to-gif","video-to-mov","video-to-mp3","video-to-mp4","video-to-webm","video-url-downloader","x-video-downloader","youtube-video-downloader"]
     // Must match server/routes/api/backend/tool.post.ts CUSTOM_CATEGORIES exactly.
     // Unsupported tools must not appear executable in the native app.
-    static let categoryBackend:Set<String> = ["personal","marketing","communication","accessibility","career","ecommerce","relationships","interactive","gaming","social","streaming","webdesign","education","network","security","creator","creators"]
+    static let categoryBackend:Set<String> = ["personal","marketing","accessibility","career","ecommerce","relationships","interactive","gaming","social","streaming","webdesign","education","network","security","creator","creators"]
     static func supports(_ tool:Tool)->Bool {
         // Audio routes have local engines or specific server adapters on the web;
         // don't falsely advertise generic /api/backend/media as a universal native fallback.

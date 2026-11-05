@@ -1,0 +1,31 @@
+// Keep the full 55-tool Communication set native-local on both mobile platforms.
+import fs from "node:fs";
+import assert from "node:assert/strict";
+import { parseGeneratedCatalog } from "./catalog-reader.mjs";
+
+const catalog = parseGeneratedCatalog(fs.readFileSync(new URL("../src/data/catalog.ts", import.meta.url), "utf8"));
+const tools = catalog.filter((tool) => tool.category === "communication");
+const expected = tools.map((tool) => tool.id).sort();
+assert.equal(expected.length, 55, "all 55 Communication tools remain catalogued");
+const read = (path) => fs.readFileSync(new URL("../" + path, import.meta.url), "utf8");
+const webPolicy = read("src/lib/production-notice.ts");
+const android = read("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt");
+const androidBackend = read("apps/android/app/src/main/java/com/chastech/env/NativeBackendEngine.kt");
+const androidCommunication = read("apps/android/app/src/main/java/com/chastech/env/NativeCommunicationToolForm.kt");
+const ios = read("apps/ios/enV/CatalogCore.swift");
+const iosViews = read("apps/ios/enV/ToolViews.swift");
+const iosBackend = iosViews.slice(iosViews.indexOf("enum NativeBackendEngine"), iosViews.indexOf("enum NativeImageEngine"));
+const familyIds = (platform) => read("apps/" + platform + "/native-family-coverage/communication.txt").split(/\r?\n/).map((item) => item.trim()).filter(Boolean).sort();
+for (const platform of ["android", "ios"]) assert.deepEqual(familyIds(platform), expected, platform + " local native coverage includes every Communication tool");
+assert.match(webPolicy, /"communication"/);
+assert.match(android, /"communication"/);
+assert.match(ios, /"communication"/);
+assert.ok(android.includes('tool.category == "communication" -> NativeCommunicationToolForm(tool.id)'), "Android launches its native communication form");
+assert.ok(androidCommunication.includes('CommunicationField("nextStep"') && iosViews.includes('.init(key: "nextStep"'), "Mobile builders expose next-step and review ownership fields");
+assert.ok(iosViews.includes("NativeCommunicationToolView(tool: tool)"), "iOS launches its native Swift communication view");
+assert.ok(iosViews.includes("tool.category == " + '"communication"') && iosViews.includes("enum NativeCommunicationEngine"), "iOS uses a native communication engine");
+assert.ok(!androidBackend.includes('"communication"'), "Android must not route Communication through the generic category backend");
+assert.ok(!iosBackend.includes('"communication"'), "iOS must not route Communication through the generic category backend");
+assert.ok(!iosBackend.includes('"communication","accessibility"'));
+assert.ok(android.includes('tool.category == "communication" ->') && android.indexOf('tool.category == "communication" ->') < android.indexOf("backend -> NativeBackendToolForm"), "Android local handler wins over backend dispatch");
+console.log("Native Communication audit PASS: 55 tools mapped to local Kotlin and Swift engines, outside generic backend routing.");

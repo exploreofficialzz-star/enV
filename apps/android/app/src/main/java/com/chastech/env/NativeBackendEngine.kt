@@ -20,7 +20,7 @@ object NativeBackendEngine {
     private val explicit = setOf("youtube-audio-extractor","facebook-video-downloader","instagram-video-downloader","video-mute","video-audio-replacer","tiktok-video-downloader","url-media-inspector","video-audio-volume","video-bitrate","video-crop","video-fps","video-merger","video-resize","video-resolution-presets","video-rotate","video-to-avi","video-to-gif","video-to-mov","video-to-mp3","video-to-mp4","video-to-webm","video-url-downloader","x-video-downloader","youtube-video-downloader")
     // Must match server/routes/api/backend/tool.post.ts CUSTOM_CATEGORIES exactly.
     // The previous broad set made unsupported tools look executable and return fabricated output.
-    private val categoryBackend = setOf("personal","marketing","communication","accessibility","career","ecommerce","relationships","interactive","gaming","social","streaming","webdesign","education","network","security","creator","creators")
+    private val categoryBackend = setOf("personal","marketing","accessibility","career","ecommerce","relationships","interactive","gaming","social","streaming","webdesign","education","network","security","creator","creators")
 
     fun supports(tool:ToolRecord):Boolean {
         if (NativeAccessibilityEngine.supports(tool.id, tool.category)) return false
