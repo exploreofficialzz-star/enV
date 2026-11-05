@@ -13,6 +13,7 @@ const webSearchBox = readFileSync("src/components/tools/search-box.tsx", "utf8")
 const webToolShell = readFileSync("src/components/tools/tool-shell.tsx", "utf8");
 const webToolCard = readFileSync("src/components/tools/tool-card.tsx", "utf8");
 const webToolEngine = readFileSync("src/components/tools/tool-engine.tsx", "utf8");
+const webScreenshotEngine = readFileSync("src/components/engines/screenshot-engine.tsx", "utf8");
 const webOfflineCapabilities = readFileSync("src/lib/offline/capabilities.ts", "utf8");
 const webToolRoute = readFileSync("src/routes/tools/$category/$slug.tsx", "utf8");
 const webStore = readFileSync("src/lib/storage.ts", "utf8");
@@ -74,6 +75,8 @@ assert.match(webToolEngine, /<Suspense fallback=\{null\}>/, "Tool engine must no
 assert.match(webToolRoute, /return \{ communityFeed: null \}/, "Tool routes must mount without waiting for the community feed");
 assert.doesNotMatch(webToolRoute, /await loadPublicCommunityToolFeed/, "Community preload must not delay opening the tool");
 assert.doesNotMatch(webToolEngine, /Loading \{props\.tool\.name\}|Preparing \{tool\.name\}|Offline package ready on this device|OfflineToolUnavailable/, "Offline package state must not gate or decorate the tool screen");
+assert.doesNotMatch(webScreenshotEngine, /Loading the editor|fallback=\{loading\}/, "Screenshot tools must not show an entry loading state");
+assert.match(webScreenshotEngine, /<Suspense fallback=\{null\}>/, "Screenshot editor chunks must load beneath the tool interface");
 assert.doesNotMatch(android, /StatusPill\("ON DEVICE"/, "Android cards must not show a separate offline-ready badge");
 assert.match(androidTheme, /CompositionLocalProvider\(LocalDensity provides scaledDensity\)/);
 assert.match(webStyles, /--text-base: 1\.11rem/);
