@@ -194,8 +194,11 @@ internal object NativeCommunicationEngine {
             val bcc = value("bcc").split(Regex("[,;]")).map { it.trim() }.filter { it.isNotBlank() }
             if ((cc + bcc).any { !emailPattern.matches(it) }) result += "Check every Cc and Bcc address; separate addresses with commas or semicolons."
             val to = value("email").ifBlank { value("name").takeIf { emailPattern.matches(it) }.orEmpty() }
+            val ccSet = cc.map { it.lowercase() }.toSet()
+            val ccBccOverlap = bcc.any { ccSet.contains(it.lowercase()) }
+            if (ccBccOverlap) result += "An address appears in both Cc and Bcc; review recipient visibility."
             val all = (listOf(to) + cc + bcc).filter { it.isNotBlank() }.map { it.lowercase() }
-            if (all.size != all.toSet().size) result += "An address appears more than once across To, Cc and Bcc; review recipient visibility."
+            if (!ccBccOverlap && all.size != all.toSet().size) result += "An address appears more than once across To, Cc and Bcc; review recipient visibility."
             if (listOf("name", "email", "cc", "bcc", "subject").any { key ->
                 values[key].orEmpty().any { ch -> ch == '\r' || ch == '\n' || ch.code < 32 || ch.code == 127 }
             }) result += "Remove line breaks and control characters from email headers before using this draft."
