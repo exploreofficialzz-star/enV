@@ -1532,7 +1532,11 @@ private struct NativeCommunicationToolView: View {
                     error = nil
                     executionTracker?.finish(success: true)
                 }.buttonStyle(.borderedProminent)
-                Button("Reset") { values = ["timezone": TimeZone.current.identifier, "tone": "professional"]; output = ""; checks = []; error = nil }.buttonStyle(.bordered)
+                Button("Reset") {
+                    let defaultDuration = parsed.kind == "invitation" ? "60" : (parsed.kind == "reminder" ? "15" : "30")
+                    values = ["timezone": TimeZone.current.identifier, "tone": "professional", "duration": defaultDuration]
+                    output = ""; checks = []; error = nil
+                }.buttonStyle(.bordered)
             }
             if let error { Text(error).font(.footnote).foregroundStyle(.red) }
             ForEach(checks, id: \.self) { check in Text("Review: " + check).font(.footnote).foregroundStyle(Color.envMuted) }
@@ -1579,6 +1583,9 @@ private struct NativeCommunicationToolView: View {
         .onAppear {
             if values["timezone"] == nil { values["timezone"] = TimeZone.current.identifier }
             if values["tone"] == nil { values["tone"] = "professional" }
+            if values["duration"] == nil {
+                values["duration"] = parsed.kind == "invitation" ? "60" : (parsed.kind == "reminder" ? "15" : "30")
+            }
         }
     }
 
