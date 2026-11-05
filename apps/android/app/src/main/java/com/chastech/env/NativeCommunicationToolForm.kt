@@ -338,7 +338,7 @@ internal object NativeCommunicationEngine {
             "BEGIN:VALARM", "ACTION:DISPLAY", "TRIGGER:-PT15M", "DESCRIPTION:" + escapeIcs(title),
             "END:VALARM", "END:VEVENT", "END:VCALENDAR",
         )
-        return lines.joinToString("\\r\\n") { foldIcsLine(it) } + "\\r\\n"
+        return lines.joinToString("\r\n") { foldIcsLine(it) } + "\r\n"
     }
 
     private fun format(value: String, kind: String): String =
