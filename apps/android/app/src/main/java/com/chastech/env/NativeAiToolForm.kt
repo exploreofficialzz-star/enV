@@ -246,7 +246,7 @@ private fun NativeAiMicroToolForm(toolId: String) {
                     modifier = Modifier.fillMaxWidth(),
                     minLines = if (field.multiline) 3 else 1,
                     maxLines = if (field.multiline) 6 else 1,
-                    keyboardOptions = KeyboardOptions(keyboardType = if (field.name == "count") KeyboardType.Number else KeyboardType.Text),
+                    keyboardOptions = KeyboardOptions(keyboardType = if (field.name in setOf("count", "duration")) KeyboardType.Number else KeyboardType.Text),
                 )
             }
         }
