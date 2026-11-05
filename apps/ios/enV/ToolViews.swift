@@ -7919,7 +7919,7 @@ enum NativeAiMicroEngine {
             let chapters = splitList(values["chapters"] ?? "")
             var sections = [
                 topic,
-                "In this video, we cover \(topic)\(audience.isEmpty ? "" : " for \(audience)"). \(style) and focused on the details supplied below.",
+                "This video covers \(topic)\(audience.isEmpty ? "" : " for \(audience)"). The description uses a \(style) tone and only relies on the details supplied here.",
                 points.isEmpty ? "WHAT YOU'LL LEARN\n[Add the key points covered in the video.]" : "WHAT YOU'LL LEARN\n" + points.map { "• " + $0 }.joined(separator: "\n")
             ]
             if !chapters.isEmpty { sections.append("CHAPTERS\n" + chapters.joined(separator: "\n")) }
