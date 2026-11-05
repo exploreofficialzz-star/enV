@@ -35,7 +35,7 @@ class NativeAiMicroEngineTest {
         ))
         assertTrue(output.contains("CONTENT BRIEF"))
         assertTrue(output.contains("Low-cost methods for small spaces"))
-        assertTrue(output.contains("Use containers\nCheck sunlight"))
+        assertTrue(output.contains("• Use containers\n• Check sunlight"))
         assertTrue(output.contains("Start with one herb pot"))
         assertTrue(output.contains("do not present assumptions as evidence"))
     }
