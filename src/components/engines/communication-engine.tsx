@@ -10,9 +10,11 @@ import { downloadText } from "@/lib/utils";
 
 import {
   buildCommunication,
+  buildCommunicationCalendarIcs,
   buildSignatureHtml,
   communicationQualityChecks,
   getSmsMetrics,
+  suggestGsm7Text,
   kindLabel,
   parseToolId,
   type Action,
@@ -20,12 +22,18 @@ import {
   type Kind,
 } from "./communication-engine-utils";
 
-function Output({ text, filename, html }: { text: string; filename: string; html?: string }) {
+function Output({ text, filename, html, calendar, gsm7 }: { text: string; filename: string; html?: string; calendar?: string; gsm7?: string }) {
   return <div className="space-y-3">
     <div className="flex flex-wrap gap-2">
       <CopyButton text={text} />
       <Button type="button" variant="outline" size="sm" onClick={() => downloadText(text, filename)}>Download</Button>
       {html ? <Button type="button" variant="outline" size="sm" onClick={() => downloadText(html, filename.replace(/\.txt$/, ".html"), "text/html")}>Download HTML</Button> : null}
+      {calendar ? <Button type="button" variant="outline" size="sm" onClick={() => downloadText(calendar, filename.replace(/\.txt$/, ".ics"), "text/calendar")}>Save calendar (.ics)</Button> : null}
+      {gsm7 ? <>
+        <CopyButton text={gsm7} />
+        <Button type="button" variant="outline" size="sm" onClick={() => downloadText(gsm7, filename.replace(/\.txt$/, "-gsm7.txt"))}>Download GSM-7 version</Button>
+        <span className="self-center text-xs text-muted">GSM-7 compatible alternative · {getSmsMetrics(gsm7).segments} segment(s)</span>
+      </> : null}
     </div>
     <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-xl bg-ink p-4 font-mono text-xs leading-5 text-bg">{text}</pre>
   </div>;
@@ -94,6 +102,12 @@ function BaseForm({ kind, action }: { kind: Kind; action: Action }) {
   );
   const sms = kind === "sms" && output ? getSmsMetrics(output) : null;
   const signatureHtml = isSignature && action !== "template" && action !== "formatter" && output ? buildSignatureHtml(input) : undefined;
+  const calendar = useMemo(() => {
+    if (!["meeting", "agenda", "invitation", "reminder"].includes(kind) || !output) return undefined;
+    try { return buildCommunicationCalendarIcs(input); } catch { return undefined; }
+  }, [actionItems, date, decisions, details, duration, items, kind, name, nextStep, place, purpose, rsvpBy, subject, timezone]);
+  const smsCandidate = kind === "sms" && output ? suggestGsm7Text(output) : "";
+  const gsm7 = smsCandidate && smsCandidate !== output && getSmsMetrics(smsCandidate).encoding === "GSM-7" ? smsCandidate : undefined;
   const title = kindLabel(kind) + " " + action;
 
   const reset = () => {
@@ -124,7 +138,7 @@ function BaseForm({ kind, action }: { kind: Kind; action: Action }) {
       </Field>
 
       {["meeting", "agenda", "minutes", "invitation", "reminder", "announcement", "follow-up"].includes(kind) ? <Field label="Date / time">
-        <Input value={date} onChange={(event) => setDate(event.target.value)} placeholder="e.g. 2026-11-05 10:00" />
+        <Input type="datetime-local" value={date} onChange={(event) => setDate(event.target.value)} />
       </Field> : null}
       {["meeting", "agenda", "minutes", "invitation", "reminder"].includes(kind) || kind === "message" || kind === "sms" ? <Field label={kind === "message" || kind === "sms" ? "Channel" : "Location / meeting link"}>
         {kind === "message" || kind === "sms"
@@ -145,9 +159,9 @@ function BaseForm({ kind, action }: { kind: Kind; action: Action }) {
         <Field label="Phone"><Input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="Optional phone number" /></Field>
         <Field label="Website"><Input value={website} onChange={(event) => setWebsite(event.target.value)} placeholder="https://example.com" /></Field>
       </> : null}
-      {kind === "meeting" || kind === "agenda" ? <Field label="Duration (minutes)"><Input inputMode="numeric" value={duration} onChange={(event) => setDuration(event.target.value.replace(/[^\d]/g, ""))} placeholder="30" /></Field> : null}
+      {["meeting", "agenda", "invitation", "reminder"].includes(kind) ? <Field label="Duration (minutes)"><Input inputMode="numeric" value={duration} onChange={(event) => setDuration(event.target.value.replace(/[^\d]/g, ""))} placeholder="30" /></Field> : null}
       {kind === "meeting" || kind === "agenda" || kind === "minutes" || kind === "invitation" || kind === "reminder" ? <Field label="Time zone"><Input value={timezone} onChange={(event) => setTimezone(event.target.value)} placeholder="e.g. Africa/Lagos" /></Field> : null}
-      {kind === "invitation" ? <Field label="RSVP deadline"><Input value={rsvpBy} onChange={(event) => setRsvpBy(event.target.value)} placeholder="Date guests should respond by" /></Field> : null}
+      {kind === "invitation" ? <Field label="RSVP deadline"><Input type="datetime-local" value={rsvpBy} onChange={(event) => setRsvpBy(event.target.value)} /></Field> : null}
 
       {kind !== "signature" && action !== "formatter" && action !== "template" ? <Field label="Purpose / context" full>
         <Input value={purpose} onChange={(event) => setPurpose(event.target.value)} placeholder="What should the reader understand or do?" />
@@ -189,7 +203,7 @@ function BaseForm({ kind, action }: { kind: Kind; action: Action }) {
     <div className="flex flex-wrap gap-2">
       <Button type="button" variant="ghost" onClick={reset}>Reset</Button>
     </div>
-    {output ? <Output text={output} filename={"env-" + kind + "-" + action + ".txt"} html={signatureHtml} /> :
+    {output ? <Output text={output} filename={"env-" + kind + "-" + action + ".txt"} html={signatureHtml} calendar={calendar} gsm7={gsm7} /> :
       <div className="rounded-xl border border-dashed border-border p-5 text-sm text-muted">Your result will appear here when you add the information for this {kindLabel(kind).toLowerCase()}.</div>}
     <p className="text-xs text-muted">Runs on this device. enV does not send messages, schedule reminders, record meetings, collect RSVP responses or apply legal signatures.</p>
   </div>;
