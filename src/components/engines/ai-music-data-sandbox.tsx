@@ -113,6 +113,7 @@ function SandboxSplash({ onEnter, canEnter, error }: { onEnter: () => void; canE
         <img className="ms-splash-logo ms-logo-dark" src="/logo-home-dark.png" alt="" />
         <Headphones className="ms-splash-headset" aria-hidden="true" />
         <h1 className="ms-splash-title">AI Music Data Sandbox.</h1>
+        {error ? <p className="ms-splash-error" role="alert">{error}</p> : null}
         <div className="ms-splash-entry">
           <Button size="lg" disabled={!interactive || !canEnter} onClick={onEnter}>
             Enter sandbox <ArrowRight aria-hidden="true" />
@@ -546,7 +547,7 @@ export function AiMusicDataSandbox() {
   const editing = workspace?.tracks.find((t) => t.key === editorId);
   return (
     <section ref={sandboxRoot} className={`music-sandbox view-${view}${editing && !splash ? " is-editing" : ""}`} aria-label="AI Music Data Sandbox">
-      {splash ? <SandboxSplash canEnter={ready} error={error} onEnter={() => {
+      {splash ? <SandboxSplash canEnter={ready && !error} error={error} onEnter={() => {
         setSplash(false);
         if (!sandboxRoot.current?.closest(".env-tool-fullscreen"))
           requestAnimationFrame(() => sandboxRoot.current?.scrollIntoView({ block: "start" }));
