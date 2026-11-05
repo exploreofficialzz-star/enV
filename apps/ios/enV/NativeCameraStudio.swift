@@ -300,7 +300,7 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
                 case "Warm": temperature = 3_200
                 default: temperature = 5_000
                 }
-                let values = AVCaptureWhiteBalanceTemperatureAndTintValues(temperature: temperature, tint: 0)
+                let values = AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: temperature, tint: 0)
                 var gains = device.deviceWhiteBalanceGains(for: values)
                 let maximum = device.maxWhiteBalanceGain
                 gains.redGain = min(max(1, gains.redGain), maximum)
