@@ -1,9 +1,13 @@
 package com.chastech.env
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
 import android.net.Uri
 import android.content.pm.PackageManager
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.CameraController
@@ -38,6 +42,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,12 +54,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.runtime.livedata.observeAsState
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
 
 private enum class NativeCameraMode { PHOTO, VIDEO }
 
@@ -76,6 +90,8 @@ fun NativeCameraStudioScreen() {
     var cameraGranted by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
     }
+    var cameraPermissionDenied by remember { mutableStateOf(false) }
+    var cameraPermissionNeedsSettings by remember { mutableStateOf(false) }
     var microphoneGranted by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
     }
@@ -85,7 +101,7 @@ fun NativeCameraStudioScreen() {
     var recordingActive by remember { mutableStateOf(false) }
     var pendingFile by remember { mutableStateOf<File?>(null) }
     var pendingMime by remember { mutableStateOf("image/jpeg") }
-    var status by remember { mutableStateOf("Allow camera access to start taking photos and videos.") }
+    var status by remember { mutableStateOf("Camera ready.") }
     var error by remember { mutableStateOf<String?>(null) }
     var flashEnabled by remember { mutableStateOf(false) }
     val latestRecording = rememberUpdatedState(recording)
@@ -113,12 +129,45 @@ fun NativeCameraStudioScreen() {
     }
     val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         cameraGranted = granted
+        cameraPermissionDenied = !granted
+        cameraPermissionNeedsSettings = !granted && context.findActivity()?.let {
+            !ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.CAMERA)
+        } == true
         if (granted) {
             error = null
             status = "Camera ready."
         } else {
-            error = "Camera permission is required to take photos or videos. Enable it in Android settings to continue."
+            error = if (cameraPermissionNeedsSettings) {
+                "Camera access is disabled for enV. Enable it in app settings to continue."
+            } else {
+                "Camera access is needed to take photos and videos."
+            }
         }
+    }
+
+    val requestCameraAccess = {
+        cameraPermission.launch(Manifest.permission.CAMERA)
+    }
+
+    LaunchedEffect(Unit) {
+        if (!cameraGranted) requestCameraAccess()
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                cameraGranted = granted
+                if (granted) {
+                    cameraPermissionDenied = false
+                    cameraPermissionNeedsSettings = false
+                    error = null
+                    status = "Camera ready."
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
     val microphonePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         microphoneGranted = granted
@@ -252,10 +301,7 @@ fun NativeCameraStudioScreen() {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text("Camera Studio", style = MaterialTheme.typography.titleLarge)
-                Text("A simple camera for photos and videos.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+            Text("Camera Studio", style = MaterialTheme.typography.titleLarge)
             Surface(shape = CircleShape, color = if (cameraGranted) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant) {
                 Text(if (cameraGranted) "Camera ready" else "Camera off", modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp), style = MaterialTheme.typography.labelSmall)
             }
@@ -274,17 +320,34 @@ fun NativeCameraStudioScreen() {
                         },
                         update = { it.controller = controller }
                     )
-                } else {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("Your camera preview appears here", color = Color.White, style = MaterialTheme.typography.titleMedium)
-                        Text("Allow camera access to begin.", color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
-                        Button(onClick = { cameraPermission.launch(Manifest.permission.CAMERA) }) { Text("Enable camera") }
-                    }
                 }
                 if (recordingActive) {
                     Surface(modifier = Modifier.align(Alignment.TopStart).padding(12.dp), color = Color(0xCC991B1B), shape = CircleShape) {
                         Text("● REC", modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), color = Color.White, style = MaterialTheme.typography.labelMedium)
                     }
+                }
+            }
+        }
+
+        if (!cameraGranted && cameraPermissionDenied) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(error ?: "Camera access is needed.", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                OutlinedButton(onClick = {
+                    if (cameraPermissionNeedsSettings) {
+                        val settingsIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = Uri.fromParts("package", context.packageName, null)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(settingsIntent)
+                    } else {
+                        requestCameraAccess()
+                    }
+                }) {
+                    Text(if (cameraPermissionNeedsSettings) "Open settings" else "Try again")
                 }
             }
         }
@@ -298,12 +361,11 @@ fun NativeCameraStudioScreen() {
             OutlinedButton(onClick = { switchCamera() }, enabled = cameraGranted && !recordingActive, modifier = Modifier.weight(1f)) { Text("Switch camera") }
             Button(
                 onClick = {
-                    if (!cameraGranted) cameraPermission.launch(Manifest.permission.CAMERA)
-                    else if (mode == NativeCameraMode.PHOTO) capturePhoto()
+                    if (mode == NativeCameraMode.PHOTO) capturePhoto()
                     else if (recordingActive) recording?.stop()
                     else startVideo()
                 },
-                enabled = !recordingActive || mode == NativeCameraMode.VIDEO,
+                enabled = cameraGranted && (!recordingActive || mode == NativeCameraMode.VIDEO),
                 modifier = Modifier.weight(1f)
             ) { Text(if (mode == NativeCameraMode.PHOTO) "Take photo" else if (recordingActive) "Stop recording" else "Record video") }
         }
@@ -364,12 +426,11 @@ fun NativeCameraStudioScreen() {
             ) { Text(if (pendingMime == "video/mp4") "Save video" else "Save photo") }
         }
 
-        if (error != null) {
+        if (cameraGranted && error != null) {
             Text(error!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-        } else {
+        } else if (cameraGranted) {
             Text(status, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         }
-        Text("Tap the preview to focus and meter. Pinch or use Zoom and Exposure when your camera supports them. Captures stay on this device until you choose a save location.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
     }
 }
 
