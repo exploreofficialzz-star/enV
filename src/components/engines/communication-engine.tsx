@@ -71,7 +71,8 @@ function BaseForm({ kind, action }: { kind: Kind; action: Action }) {
   const [cc, setCc] = useState("");
   const [bcc, setBcc] = useState("");
   const [channel, setChannel] = useState(kind === "sms" ? "SMS" : "WhatsApp");
-  const [duration, setDuration] = useState("30");
+  const defaultDuration = kind === "invitation" ? "60" : kind === "reminder" ? "15" : "30";
+  const [duration, setDuration] = useState(defaultDuration);
   const [timezone, setTimezone] = useState("");
   useEffect(() => { setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || ""); }, []);
   const [rsvpBy, setRsvpBy] = useState("");
@@ -113,7 +114,7 @@ function BaseForm({ kind, action }: { kind: Kind; action: Action }) {
   const reset = () => {
     setName(""); setSubject(""); setDate(""); setPlace(""); setPurpose(""); setDetails("");
     setTone("professional"); setItems(""); setEmail(""); setCc(""); setBcc("");
-    setChannel(kind === "sms" ? "SMS" : "WhatsApp"); setDuration("30");
+    setChannel(kind === "sms" ? "SMS" : "WhatsApp"); setDuration(defaultDuration);
     setTimezone("");
     setRsvpBy(""); setRole(""); setCompany(""); setPhone(""); setWebsite("");
     setDecisions(""); setActionItems(""); setNextStep("");
