@@ -92,7 +92,7 @@ export function ABookEngine() {
   const [showTrash, setShowTrash] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<"notes" | "editor">("notes");
   const [showWelcome, setShowWelcome] = useState(true);
-  const [storageMessage, setStorageMessage] = useState("Saved on this device");
+  const [storageMessage, setStorageMessage] = useState("");
   const [storageNotice, setStorageNotice] = useState<ABookStorageNotice>(null);
   const [error, setError] = useState("");
   const [pdfInfo, setPdfInfo] = useState("");
@@ -220,7 +220,6 @@ export function ABookEngine() {
     window.clearTimeout(saveTimer.current);
     setIsReady(false);
     setStorageNotice(null);
-    setStorageMessage(authPending ? "Checking local library…" : "Opening local library…");
 
     void (async () => {
       try {
@@ -658,23 +657,22 @@ export function ABookEngine() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not restore this revision."); }
   }
 
-  // Hide the previous library on the very first render after an account switch,
-  // before the profile-loading effect gets a chance to run.
-  if (authPending || !isReady || loadedProfileId !== activeProfileId) {
+  // Local database/profile preparation must never replace the tool's entry UI.
+  // A profile mismatch still keeps the previous account's notes out of view.
+  const libraryReady = !authPending && isReady && loadedProfileId === activeProfileId;
+  if (!libraryReady && profileSwitchError) {
     return <section className="rounded-xl border border-border bg-surface p-6 text-sm text-muted" aria-live="polite">
-      {profileSwitchError ? (
-        <div className="space-y-3">
-          <p role="alert" className="text-danger">{profileSwitchError}</p>
-          <p>Your current library remains closed while the draft is protected. Retry after local storage is available.</p>
-          <Button size="sm" onClick={() => { setProfileSwitchError(""); setProfileSwitchRetry((value) => value + 1); }}>
-            Retry secure local save
-          </Button>
-        </div>
-      ) : "Opening your private local library…"}
+      <div className="space-y-3">
+        <p role="alert" className="text-danger">{profileSwitchError}</p>
+        <p>Your current library remains closed while the draft is protected. Retry after local storage is available.</p>
+        <Button size="sm" onClick={() => { setProfileSwitchError(""); setProfileSwitchRetry((value) => value + 1); }}>
+          Retry secure local save
+        </Button>
+      </div>
     </section>;
   }
 
-  if (showWelcome) return (
+  if (showWelcome || !libraryReady) return (
     <section className="mx-auto w-full max-w-5xl space-y-6 py-2" aria-label="A book start page" data-local-only="true">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -705,8 +703,8 @@ export function ABookEngine() {
             Write notes, keep useful documents close, and work with PDFs in one calm workspace designed for everyday use.
           </p>
           <div className="mt-7 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-            <Button type="button" size="lg" onClick={() => void createNewNote()} className="min-h-12">Create a note</Button>
-            <Button type="button" size="lg" variant="outline" onClick={openLibrary} className="min-h-12">
+            <Button type="button" size="lg" onClick={() => void createNewNote()} disabled={!libraryReady} className="min-h-12">Create a note</Button>
+            <Button type="button" size="lg" variant="outline" onClick={openLibrary} disabled={!libraryReady} className="min-h-12">
               Open my library <span className="ml-1 text-muted">({notes.length})</span>
             </Button>
           </div>
@@ -754,7 +752,7 @@ export function ABookEngine() {
             <h3 id="a-book-recent-heading" className="text-base font-semibold text-foreground">Pick up where you left off</h3>
             <p className="mt-1 text-xs text-muted">{notes.length} active {notes.length === 1 ? "note" : "notes"} in this local library</p>
           </div>
-          {notes.length ? <button type="button" onClick={openLibrary} className="text-sm font-medium text-accent underline-offset-4 hover:underline">View library</button> : null}
+          {notes.length ? <button type="button" onClick={openLibrary} disabled={!libraryReady} className="text-sm font-medium text-accent underline-offset-4 hover:underline disabled:opacity-50">View library</button> : null}
         </div>
         {notes.length ? (
           <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search your local library" aria-label="Search your local library" className="min-h-11 w-full rounded-xl border border-border bg-surface px-4 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring" />
@@ -776,18 +774,18 @@ export function ABookEngine() {
           </div>
         ) : (
           <div className="rounded-2xl border border-dashed border-border bg-surface p-5">
-            <p className="text-sm font-medium text-foreground">Your library is ready for its first note.</p>
-            <p className="mt-1 text-sm text-muted">Create a note to get started, or restore a backup saved on this device.</p>
+            <p className="text-sm font-medium text-foreground">{libraryReady ? "Your library is ready for its first note." : "Your local notes stay private on this device."}</p>
+            <p className="mt-1 text-sm text-muted">{libraryReady ? "Create a note to get started, or restore a backup saved on this device." : "Your recent notes will appear here when available."}</p>
           </div>
         )}
       </section>
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3">
         <div className="flex min-w-0 flex-col gap-1">
-          <span className="text-xs text-muted" role="status">{storageMessage}</span>
+          {storageMessage ? {storageMessage ? <span className="text-xs text-muted" role="status">{storageMessage}</span> : null} : null}
           {storageNotice ? <span className={storageNotice.warning ? "text-xs text-amber-700 dark:text-amber-300" : "text-xs text-muted"}>{storageNotice.message}</span> : null}
         </div>
-        <Button type="button" size="sm" variant="outline" onClick={() => importInput.current?.click()}>Restore a local backup</Button>
+        <Button type="button" size="sm" variant="outline" disabled={!libraryReady} onClick={() => importInput.current?.click()}>Restore a local backup</Button>
       </div>
     </section>
   );
