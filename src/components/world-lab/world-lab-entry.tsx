@@ -2,7 +2,21 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import "./world-lab-entry.css";
 
-const WorldLabWorkspace = lazy(() => import("./world-lab"));
+type WorldLabWorkspaceModule = typeof import("./world-lab");
+let worldLabWorkspacePromise: Promise<WorldLabWorkspaceModule> | null = null;
+
+function loadWorldLabWorkspace(): Promise<WorldLabWorkspaceModule> {
+  worldLabWorkspacePromise ??= import("./world-lab");
+  return worldLabWorkspacePromise;
+}
+
+/** Warm the workspace while the entry surface is visible, never after Enter is tapped. */
+export async function preloadWorldLabWorkspace(): Promise<void> {
+  if (typeof window === "undefined") return;
+  await loadWorldLabWorkspace();
+}
+
+const WorldLabWorkspace = lazy(loadWorldLabWorkspace);
 
 export function WorldLabEntry() {
   const [hasEntered, setHasEntered] = useState(false);
@@ -10,6 +24,7 @@ export function WorldLabEntry() {
 
   useEffect(() => {
     setIsHydrated(true);
+    void preloadWorldLabWorkspace().catch(() => undefined);
   }, []);
 
   if (hasEntered) {
