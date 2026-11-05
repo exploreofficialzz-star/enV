@@ -22,6 +22,7 @@ const webOfflineCapabilities = readFileSync("src/lib/offline/capabilities.ts", "
 const webToolRoute = readFileSync("src/routes/tools/$category/$slug.tsx", "utf8");
 const webToolEnginePreload = readFileSync("src/lib/tool-engine-preload.ts", "utf8");
 const webOfflineWorker = readFileSync("public/env-sw.js", "utf8");
+const webOfflinePackageClient = readFileSync("src/lib/offline/tool-package-client.ts", "utf8");
 const webStore = readFileSync("src/lib/storage.ts", "utf8");
 const themeHook = readFileSync("src/hooks/use-theme.ts", "utf8");
 const iosAssistant = readFileSync("apps/ios/enV/AssistantChat.swift", "utf8");
@@ -83,12 +84,17 @@ assert.match(webToolRoute, /await preloadToolEngine\(matchedTool\)/, "Tool route
 assert.match(webToolEnginePreload, /export async function preloadToolEngine/, "Every tool engine must expose route-time preload");
 assert.match(webToolEnginePreload, /tool\.engine\.type/, "Engine preload must cover the catalog engine type dispatch");
 assert.match(webOfflineWorker, /if \(url\.pathname\.startsWith\("\/tools\/"\)\)[\s\S]*?return await shellResponse\(\)/, "Offline tool URLs must render through the regular enV app shell");
+assert.ok(webToolRoute.indexOf("await prepareOfflineToolPackage(") < webToolRoute.indexOf("await preloadToolEngine(matchedTool)"), "Offline route must open the target tool package before requesting its engine chunk");
+assert.doesNotMatch(webOfflinePackageClient, /offlineEligible/, "Tool UI caching must not depend on local-operation eligibility");
+assert.doesNotMatch(webToolEngine, /isOfflineLocalTool|offlineEligible/, "Every visited tool interface must be packaged regardless of its operation execution mode");
+assert.match(webToolEngine, /Cache every visited tool interface/, "All visited tools must quietly prepare their page and interface assets");
 assert.match(webWorldLabEntry, /preloadWorldLabWorkspace\(\)/, "World Lab must warm its workspace before Enter is selected");
 assert.match(webGameStudioRoute, /await loadGameStudio\(\)/, "3D Game Studio must prepare its engine before route commit");
 assert.doesNotMatch(webToolRoute, /await loadPublicCommunityToolFeed/, "Community preload must not delay opening the tool");
 assert.doesNotMatch(webToolEngine, /Loading \{props\.tool\.name\}|Preparing \{tool\.name\}|Offline package ready on this device|OfflineToolUnavailable/, "Offline package state must not gate or decorate the tool screen");
 assert.doesNotMatch(webScreenshotEngine, /Loading the editor|fallback=\{loading\}/, "Screenshot tools must not show an entry loading state");
-assert.match(webScreenshotEngine, /<Suspense fallback=\{null\}>/, "Screenshot editor chunks must load beneath the tool interface");
+assert.match(webScreenshotEngine, /import \{ ScreenshotStudio \}/, "Screenshot editor must be part of the selected engine preload");
+assert.doesNotMatch(webScreenshotEngine, /lazy\(|Suspense/, "Screenshot editor must not perform a second delayed module load");
 assert.doesNotMatch(webABookEngine, /Opening your private local library|Checking local library|Opening local library/, "A Book must show its entry UI while local storage opens in the background");
 assert.match(webABookEngine, /if \(showWelcome \|\| !libraryReady\)/, "A Book must keep its safe welcome UI visible until the correct local profile is ready");
 assert.match(webABookEngine, /disabled=\{!libraryReady\}/, "A Book must prevent library actions until the active local profile is loaded");
