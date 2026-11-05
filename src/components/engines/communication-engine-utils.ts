@@ -87,6 +87,116 @@ export function getSmsMetrics(value: string): SmsMetrics {
   return { encoding: "UCS-2", characters, units, segments, singleMessageLimit: 70, concatenatedLimit: 67 };
 }
 
+
+const EVENT_KINDS = new Set<Kind>(["meeting", "agenda", "invitation", "reminder"]);
+const GSM_SAFE_REPLACEMENTS: Record<string, string> = {
+  "\u2018": "'", "\u2019": "'", "\u201A": "'", "\u201B": "'",
+  "\u201C": "\"", "\u201D": "\"", "\u201E": "\"", "\u201F": "\"",
+  "\u2013": "-", "\u2014": "-", "\u2212": "-", "\u2011": "-",
+  "\u2026": "...", "\u2022": "-", "\u00A0": " ", "\u2007": " ",
+  "\u2009": " ", "\u202F": " ", "\u200B": "", "\u200C": "",
+  "\u200D": "", "\uFEFF": "", "\u00AD": "",
+};
+export function suggestGsm7Text(value: string): string {
+  return Array.from(value, (character) => GSM_SAFE_REPLACEMENTS[character] ?? character).join("");
+}
+type LocalDateTimeParts = { year: number; month: number; day: number; hour: number; minute: number };
+function parseLocalDateTime(value: string): LocalDateTimeParts {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value.trim());
+  if (!match) throw new Error("Use a local date and time in YYYY-MM-DDTHH:mm format.");
+  const parts = { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]), hour: Number(match[4]), minute: Number(match[5]) };
+  if (parts.year < 1970 || parts.year > 9999 || parts.month < 1 || parts.month > 12 || parts.day < 1 || parts.day > 31 || parts.hour > 23 || parts.minute > 59) throw new Error("Enter a real calendar date and time.");
+  const check = new Date(Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute));
+  if (check.getUTCFullYear() !== parts.year || check.getUTCMonth() + 1 !== parts.month || check.getUTCDate() !== parts.day || check.getUTCHours() !== parts.hour || check.getUTCMinutes() !== parts.minute) throw new Error("Enter a real calendar date and time.");
+  return parts;
+}
+function zonedPartsAt(instantMs: number, timeZone: string): LocalDateTimeParts {
+  const formatter = new Intl.DateTimeFormat("en-GB", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  const values = Object.fromEntries(formatter.formatToParts(new Date(instantMs)).filter((part) => part.type !== "literal").map((part) => [part.type, Number(part.value)]));
+  return { year: values.year, month: values.month, day: values.day, hour: values.hour, minute: values.minute };
+}
+export function getCommunicationEventInstant(value: string, timeZone: string): Date {
+  const parts = parseLocalDateTime(value);
+  if (!timeZone.trim()) throw new Error("Choose a time zone before exporting the event.");
+  const wallClockAsUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute);
+  const offsets = new Set<number>();
+  try {
+    for (let hours = -48; hours <= 48; hours += 3) {
+      const instantMs = wallClockAsUtc + hours * 60 * 60 * 1000;
+      const local = zonedPartsAt(instantMs, timeZone);
+      offsets.add(Math.round((Date.UTC(local.year, local.month - 1, local.day, local.hour, local.minute) - instantMs) / 60000));
+    }
+  } catch {
+    throw new Error("Choose a valid IANA time zone, such as Africa/Lagos or Europe/London.");
+  }
+  const matches = [...offsets].map((offset) => wallClockAsUtc - offset * 60000).filter((candidate) => {
+    const actual = zonedPartsAt(candidate, timeZone);
+    return actual.year === parts.year && actual.month === parts.month && actual.day === parts.day && actual.hour === parts.hour && actual.minute === parts.minute;
+  });
+  if (matches.length === 0) throw new Error("That local time does not exist because the clocks change in this time zone. Choose another time.");
+  if (matches.length > 1) throw new Error("That local time occurs twice because the clocks change in this time zone. Choose a time outside the repeated hour.");
+  return new Date(matches[0]);
+}
+function escapeIcsText(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/\r\n|\r|\n/g, "\\n").replace(/;/g, "\\;").replace(/,/g, "\\,");
+}
+function foldIcsLine(line: string): string {
+  const encoder = new TextEncoder();
+  const folded: string[] = [];
+  let current = "";
+  for (const character of line) {
+    if (current && encoder.encode(current + character).length > 75) { folded.push(current); current = " " + character; }
+    else current += character;
+  }
+  folded.push(current);
+  return folded.join("\r\n");
+}
+function stableCalendarUid(value: string): string {
+  let hash = 2166136261;
+  for (const character of value) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
+  return (hash >>> 0).toString(16) + "@envtools.store";
+}
+export function buildCommunicationCalendarIcs(input: CommunicationInput): string {
+  if (!EVENT_KINDS.has(input.kind)) throw new Error("Calendar export is available for meetings, agendas, invitations and reminders.");
+  const start = getCommunicationEventInstant(clean(input.date), clean(input.timezone));
+  const requestedDuration = clean(input.duration);
+  const duration = requestedDuration ? Number(requestedDuration) : input.kind === "invitation" ? 60 : input.kind === "reminder" ? 15 : 30;
+  if (!Number.isInteger(duration) || duration < 5 || duration > 480) throw new Error("Set an event duration between 5 and 480 minutes.");
+  if (input.kind === "invitation" && clean(input.rsvpBy)) {
+    const rsvp = getCommunicationEventInstant(clean(input.rsvpBy), clean(input.timezone));
+    if (rsvp.getTime() >= start.getTime()) throw new Error("The RSVP deadline must be earlier than the event.");
+  }
+  const end = new Date(start.getTime() + duration * 60000);
+  const title = clean(input.subject) || kindLabel(input.kind);
+  const description = [
+    clean(input.purpose) ? "Purpose: " + clean(input.purpose) : "", clean(input.details),
+    clean(input.items) ? "Agenda:\n" + clean(input.items) : "",
+    clean(input.decisions) ? "Decisions:\n" + clean(input.decisions) : "",
+    clean(input.actionItems) ? "Action items:\n" + clean(input.actionItems) : "",
+    clean(input.nextStep) ? "Next step / RSVP: " + clean(input.nextStep) : "",
+    clean(input.rsvpBy) ? "RSVP by: " + clean(input.rsvpBy) : "",
+    clean(input.name) ? "Audience / attendees: " + clean(input.name) : "",
+  ].filter(Boolean).join("\n\n");
+  const utc = (date: Date) => date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const uid = stableCalendarUid([input.kind, title, clean(input.date), clean(input.timezone), clean(input.name)].join("|"));
+  const lines = [
+    "BEGIN:VCALENDAR", "PRODID:-//enV//Communication Tools//EN", "VERSION:2.0", "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH", "BEGIN:VEVENT", "UID:" + uid, "DTSTAMP:" + utc(new Date()), "DTSTART:" + utc(start),
+    "DTEND:" + utc(end), "X-WR-TIMEZONE:" + escapeIcsText(clean(input.timezone)),
+    "SUMMARY:" + escapeIcsText(title), "DESCRIPTION:" + escapeIcsText(description),
+    "LOCATION:" + escapeIcsText(clean(input.place)), "STATUS:CONFIRMED", "TRANSP:OPAQUE",
+    "BEGIN:VALARM", "ACTION:DISPLAY", "TRIGGER:-PT15M", "DESCRIPTION:" + escapeIcsText(title),
+    "END:VALARM", "END:VEVENT", "END:VCALENDAR",
+  ];
+  return lines.map(foldIcsLine).join("\r\n") + "\r\n";
+}
+function cleanHeader(value?: string): string {
+  return clean(value).replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s{2,}/g, " ").trim();
+}
+function addressList(value?: string): string[] {
+  return clean(value).split(/[;,]/).map((address) => address.trim()).filter(Boolean);
+}
+
 function formatCommunication(value: string, kind: Kind) {
   const cleaned = value
     .replace(/\r\n?/g, "\n")
@@ -204,17 +314,17 @@ export function buildCommunication(input: CommunicationInput) {
 
   switch (kind) {
     case "email": {
-      const displayName = clean(input.name) || clean(input.audience);
-      const emailAddress = clean(input.email);
+      const displayName = cleanHeader(input.name) || cleanHeader(input.audience);
+      const emailAddress = cleanHeader(input.email);
       const greetingName = displayName || "there";
       const greeting = tone === "friendly" || tone === "warm" ? "Hi " + greetingName + "," : "Hello " + greetingName + ",";
       const closing = tone === "warm" ? "With appreciation," : tone === "friendly" ? "Thanks," : "Best regards,";
       const toRecipient = emailAddress ? (displayName ? displayName + " <" + emailAddress + ">" : emailAddress) : recipient;
       const headers = [
         "To: " + toRecipient,
-        clean(input.cc) ? "Cc: " + clean(input.cc) : "",
-        clean(input.bcc) ? "Bcc: " + clean(input.bcc) : "",
-        "Subject: " + title,
+        clean(input.cc) ? "Cc: " + cleanHeader(input.cc) : "",
+        clean(input.bcc) ? "Bcc: " + cleanHeader(input.bcc) : "",
+        "Subject: " + cleanHeader(title),
       ].filter(Boolean);
       const body = details || "[Add the main information]";
       const next = clean(input.nextStep) ? "\n\nNext step: " + clean(input.nextStep) : "";
@@ -303,28 +413,41 @@ export function communicationQualityChecks(input: CommunicationInput, output: st
     if (!clean(input.email) && !clean(input.name) && !clean(input.audience)) checks.push("Add a recipient before using this email.");
     if (clean(input.email) && !/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(clean(input.email))) checks.push("Check the recipient email address; it does not look complete.");
     if (!clean(input.subject)) checks.push("Add a specific subject so the email is easy to find later.");
-    const addressPattern = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
-    const ccAddresses = clean(input.cc).split(/[;,]/).map((address) => address.trim()).filter(Boolean);
-    const bccAddresses = clean(input.bcc).split(/[;,]/).map((address) => address.trim()).filter(Boolean);
+    const addressPattern = /^[^\\s@,;]+@[^\\s@,;]+\\.[^\\s@,;]+$/;
+    const ccAddresses = addressList(input.cc);
+    const bccAddresses = addressList(input.bcc);
     if ([...ccAddresses, ...bccAddresses].some((address) => !addressPattern.test(address))) checks.push("Check every Cc and Bcc address; separate addresses with commas or semicolons.");
-    const ccSet = new Set(ccAddresses.map((address) => address.toLowerCase()));
-    if (bccAddresses.some((address) => ccSet.has(address.toLowerCase()))) checks.push("An address appears in both Cc and Bcc; review recipient visibility.");
+    const toAddress = clean(input.email) || (addressPattern.test(clean(input.name)) ? clean(input.name) : "");
+    const allAddresses = [toAddress, ...ccAddresses, ...bccAddresses].filter(Boolean).map((address) => address.toLowerCase());
+    if (new Set(allAddresses).size !== allAddresses.length) checks.push("An address appears more than once across To, Cc and Bcc; review recipient visibility.");
+    if ([input.email, input.cc, input.bcc, input.subject].some((value) => /[\\r\\n\\u0000-\\u001f\\u007f]/.test(String(value ?? "")))) checks.push("Remove line breaks and control characters from email headers before using this draft.");
   }
   if (kind === "sms" && output.trim()) {
     const metrics = getSmsMetrics(output);
     if (metrics.segments > 3) checks.push("This draft uses " + metrics.segments + " SMS segments. Shorten it or confirm the provider's segment and cost rules.");
     if (metrics.encoding === "UCS-2") checks.push("This message uses UCS-2 because of its characters; the single-message limit is 70 units instead of 160 GSM-7 units.");
   }
-  if ((kind === "meeting" || kind === "agenda") && !clean(input.date)) checks.push("Add the meeting date and time.");
-  if ((kind === "meeting" || kind === "agenda") && !clean(input.duration)) checks.push("Set a duration so agenda timeboxes can be checked.");
   if (kind === "minutes" && !clean(input.actionItems) && !clean(input.items)) checks.push("Add named owners and due dates to the action register.");
   if (kind === "minutes" && !clean(input.nextStep)) checks.push("Add the next review date or review owner.");
-  if (["meeting", "agenda", "invitation", "reminder"].includes(kind) && !clean(input.timezone)) checks.push("Add the time zone so people in different regions see the intended time.");
-  if (kind === "invitation") {
-    if (!clean(input.date)) checks.push("Add the event date and time.");
-    if (!clean(input.rsvpBy)) checks.push("Set an RSVP deadline.");
+  if (EVENT_KINDS.has(kind)) {
+    if (!clean(input.date)) checks.push("Add the event date and local time.");
+    else {
+      try {
+        const start = getCommunicationEventInstant(clean(input.date), clean(input.timezone));
+        if (kind === "invitation" && clean(input.rsvpBy)) {
+          const rsvp = getCommunicationEventInstant(clean(input.rsvpBy), clean(input.timezone));
+          if (rsvp.getTime() >= start.getTime()) checks.push("The RSVP deadline must be earlier than the event.");
+        }
+      } catch (error) {
+        checks.push(error instanceof Error ? error.message : "Check the event date, time and time zone.");
+      }
+    }
+    if (!clean(input.timezone)) checks.push("Add the time zone so people in different regions see the intended local time.");
+    const duration = clean(input.duration);
+    if (duration && (!Number.isInteger(Number(duration)) || Number(duration) < 5 || Number(duration) > 480)) checks.push("Set an event duration between 5 and 480 minutes.");
+    if ((kind === "meeting" || kind === "agenda") && !duration) checks.push("Set a duration so agenda timeboxes can be checked.");
   }
-  if (kind === "reminder" && !clean(input.date)) checks.push("Add the reminder date and time; this draft will not schedule itself.");
+  if (kind === "invitation" && !clean(input.rsvpBy)) checks.push("Set an RSVP deadline.");
   if (kind === "signature" && !clean(input.email) && !clean(input.phone) && !clean(input.website)) checks.push("Add at least one way for people to contact you.");
   if (kind === "signature" && clean(input.email) && !/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(clean(input.email))) checks.push("Check the email address in this signature.");
   if (kind === "announcement" && !clean(input.date)) checks.push("Add the effective date, or state that the change takes effect immediately.");
