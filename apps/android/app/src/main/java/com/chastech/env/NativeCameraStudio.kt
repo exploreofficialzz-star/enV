@@ -123,7 +123,7 @@ fun NativeCameraStudioScreen() {
         val source = pendingFile
         if (target != null && source != null) {
             runCatching { copyCameraFile(context, source, target) }
-                .onSuccess { status = "Photo saved to the location you selected." }
+                .onSuccess { status = "Photo saved to your selected location." }
                 .onFailure { error = it.message ?: "Could not save this photo." }
         }
         pendingFile?.delete()
@@ -133,7 +133,7 @@ fun NativeCameraStudioScreen() {
         val source = pendingFile
         if (target != null && source != null) {
             runCatching { copyCameraFile(context, source, target) }
-                .onSuccess { status = "Video saved to the location you selected." }
+                .onSuccess { status = "Video saved to your selected location." }
                 .onFailure { error = it.message ?: "Could not save this video." }
         }
         pendingFile?.delete()
@@ -184,7 +184,7 @@ fun NativeCameraStudioScreen() {
     val microphonePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         microphoneGranted = granted
         startNativeCameraVideo(context, controller, granted,
-            onRecording = { next -> recording = next; recordingActive = true; error = null; status = if (granted) "Recording video with microphone audio." else "Recording video without microphone audio." },
+            onRecording = { next -> recording = next; recordingActive = true; error = null; status = if (granted) "Recording video with sound." else "Recording video without sound. Allow microphone access to record audio." },
             onFinalized = { file, message ->
                 val disposing = disposeAfterRecording.get()
                 recording = null

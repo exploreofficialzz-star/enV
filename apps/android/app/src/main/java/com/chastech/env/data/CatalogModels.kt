@@ -268,7 +268,7 @@ fun Catalog.withCameraStudio(): Catalog {
         id = "camera-studio",
         name = "Camera Studio",
         slug = "camera-studio",
-        description = "Take photos and record videos using your phone camera. Switch front/rear cameras and save captures locally.",
+        description = "Take photos and record videos. Switch between the front and back cameras, zoom in or out, adjust brightness, apply color filters, and save your captures to your device.",
         category = "photography",
         keywords = listOf("camera", "camera studio", "photo", "photography", "video", "selfie", "front camera", "rear camera", "recording", "capture", "flash", "torch"),
         tags = listOf("camera", "photo", "video", "creator"),

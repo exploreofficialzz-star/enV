@@ -151,7 +151,7 @@ const cameraStudioTool: ToolMeta = {
   id: "camera-studio",
   name: "Camera Studio",
   slug: "camera-studio",
-  description: "Take photos and record videos with a familiar camera, color filters, front/rear switching, device-aware quality controls and local downloads.",
+  description: "Take photos and record videos. Switch between the front and back cameras, zoom in or out, adjust brightness, apply color filters, and save your captures to your device.",
   category: "photography",
   subcategory: "Camera",
   keywords: ["camera", "camera studio", "photo", "photography", "video", "selfie", "front camera", "rear camera", "filters", "creator", "recording", "capture", "zoom", "exposure"],
