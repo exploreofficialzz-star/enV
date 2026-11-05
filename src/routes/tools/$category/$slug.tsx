@@ -4,6 +4,8 @@ import { WorldLabEntry } from "@/components/world-lab/world-lab-entry";
 import { ToolViewAnalytics } from "@/components/tools/tool-view-analytics";
 import { ToolShell } from "@/components/tools/tool-shell";
 import { ToolEngine } from "@/components/tools/tool-engine";
+import { preloadToolEngine } from "@/lib/tool-engine-preload";
+import { preloadWorldLabWorkspace } from "@/components/world-lab/world-lab-entry";
 import { getToolByPath, getToolById, getSearchableTools, getToolsByCategory } from "@/lib/registry";
 import { businessStudioAnchorSlug, businessStudioDefaultMode, businessStudioModeAllowed } from "@/lib/business-studios-catalog";
 import { developerActionForLegacySlug, developerModeForLegacySlug, developerStudioForLegacySlug } from "@/lib/developer-studios-catalog";
@@ -21,14 +23,27 @@ export const Route = createFileRoute("/tools/$category/$slug")({
   loader: async ({ params }) => {
     const { category, slug } = params;
     // Keep known legacy entry points routable; all unknown tool URLs are true 404s.
-    if (category === "developer" && (slug === "artboard-studio" || slug === "the-world-lab")) return { communityFeed: null };
+    if (category === "developer" && slug === "artboard-studio") return { communityFeed: null };
+    if (category === "developer" && slug === "the-world-lab") {
+      await preloadWorldLabWorkspace().catch(() => undefined);
+      return { communityFeed: null };
+    }
     if ((category === "business" || category === "calculators") && slug === "break-even-calculator") return { communityFeed: null };
     const anchorSlug = category === "business" ? businessStudioAnchorSlug(slug) : undefined;
     const matchedTool = getToolByPath(category, slug) ?? (anchorSlug ? getToolByPath("business", anchorSlug) : undefined);
     if (!matchedTool) throw notFound();
     if (isToolUnderProduction(matchedTool) || !isIndexableTool(matchedTool)) return { communityFeed: null };
+    // Legacy developer URLs redirect to their consolidated Studio; do not preload
+    // the compatibility engine that will never be rendered.
+    if (category === "developer" && !matchedTool.tags.includes("developer-studio")) return { communityFeed: null };
+
+    // Resolve the selected engine before the route is committed. There is no
+    // loading route or overlay: the current platform stays visible and the new
+    // page plus its actual tool interface appear together when this is ready.
+    await preloadToolEngine(matchedTool).catch(() => undefined);
+
     // Engagement loads in ToolCommunityPanel after the tool interface mounts.
-    // Do not delay navigation while waiting for a non-essential server feed.
+    // It is independent of the engine and never blocks navigation.
     return { communityFeed: null };
   },
   validateSearch: (search: Record<string, unknown>) => ({ mode: typeof search.mode === "string" ? search.mode : undefined, action: search.action === "decode" || search.action === "encode" ? search.action as "decode" | "encode" : undefined, op: typeof search.op === "string" ? search.op : undefined }),
