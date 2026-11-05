@@ -102,15 +102,12 @@ export async function prepareEnVOfflineShell(): Promise<void> {
 export async function prepareOfflineToolPackage(input: {
   toolId: string;
   pathname: string;
-  offlineEligible: boolean;
 }): Promise<ToolPackagePreparation> {
   if (typeof window === "undefined") return { open: true, status: "unsupported" };
   const online = navigator.onLine;
-  if (!input.offlineEligible) {
-    return online
-      ? { open: true, status: "online-only" }
-      : { open: false, status: "not-installed", message: "This tool requires an online service or has not passed enV's local-execution audit." };
-  }
+  // This package caches the tool page and interface assets, not permission
+  // to execute remote operations offline. Every visited tool gets the same UI
+  // when reopened; each engine still enforces its own online/local execution policy.
   if (!("serviceWorker" in navigator) || !("caches" in window) || !("indexedDB" in window)) {
     return online
       ? { open: true, status: "unsupported" }
