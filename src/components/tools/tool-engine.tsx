@@ -1,6 +1,5 @@
 import type { ToolMeta } from "@/types/tool";
 import { lazy, Suspense, useEffect, useState } from "react";
-import { isOfflineLocalTool } from "@/lib/offline/capabilities";
 import { prepareOfflineToolPackage, completeOfflineToolPackage, endOfflineToolPackage } from "@/lib/offline/tool-package-client";
 const CalculatorEngine = lazy(() => import("@/components/engines/calculator-engine").then((m) => ({ default: m.CalculatorEngine })));
 const ConverterEngine = lazy(() => import("@/components/engines/converter-engine").then((m) => ({ default: m.ConverterEngine })));
@@ -222,20 +221,17 @@ function ToolEngineContent(props: ToolEngineProps & { completePackage: boolean }
 export function ToolEngine(props: ToolEngineProps) {
   const { tool } = props;
   const [completePackage, setCompletePackage] = useState(false);
-  const offlineEligible = isOfflineLocalTool(tool.id);
   const needsStudioLink = tool.category === "developer" && tool.engine.type !== "developer" && !tool.tags.includes("developer-studio");
 
   useEffect(() => {
     let active = true;
     let packageSessionStarted = false;
     setCompletePackage(false);
-    if (!offlineEligible) return () => { active = false; };
-
-    // Offline caching runs in the background and never gates tool access.
+    // Cache every visited tool interface in the background. Whether its actions
+    // can execute offline remains an independent engine-level policy.
     void prepareOfflineToolPackage({
       toolId: tool.id,
       pathname: window.location.pathname,
-      offlineEligible,
     }).then((result) => {
       packageSessionStarted = result.status === "preparing" || result.status === "ready";
       if (!active) {
@@ -249,7 +245,7 @@ export function ToolEngine(props: ToolEngineProps) {
       active = false;
       if (packageSessionStarted) void endOfflineToolPackage();
     };
-  }, [tool.id, offlineEligible]);
+  }, [tool.id]);
 
   const engine = <ToolEngineContent {...props} completePackage={completePackage} />;
   return needsStudioLink
