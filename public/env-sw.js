@@ -95,19 +95,6 @@ function isCacheableAsset(request, url) {
     url.pathname.startsWith("/assets/");
 }
 
-async function findReadyPackageForClient(clientId) {
-  if (!clientId) return null;
-  try {
-    const client = await self.clients.get(clientId);
-    if (!client || !client.url) return null;
-    const url = new URL(client.url);
-    if (url.origin !== self.location.origin || !url.pathname.startsWith("/tools/")) return null;
-    return await findReadyPackageForPath(url.pathname);
-  } catch {
-    return null;
-  }
-}
-
 async function handleAssetRequest(event) {
   const request = event.request;
   const session = await getSession(event.clientId);
@@ -117,14 +104,7 @@ async function handleAssetRequest(event) {
   try {
     response = await fetch(request);
   } catch (networkError) {
-    let cached = (toolCache && await toolCache.match(request)) || await coreCache.match(request);
-    if (!cached && event.clientId) {
-      const installed = await findReadyPackageForClient(event.clientId);
-      if (installed) {
-        const installedCache = await caches.open(packageCacheName(installed.toolId, installed.version));
-        cached = await installedCache.match(request);
-      }
-    }
+    const cached = (toolCache && await toolCache.match(request)) || await coreCache.match(request);
     if (cached) return cached;
     throw networkError;
   }
