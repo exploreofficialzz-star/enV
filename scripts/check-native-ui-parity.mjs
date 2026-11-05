@@ -23,6 +23,7 @@ const webToolRoute = readFileSync("src/routes/tools/$category/$slug.tsx", "utf8"
 const webToolEnginePreload = readFileSync("src/lib/tool-engine-preload.ts", "utf8");
 const webOfflineWorker = readFileSync("public/env-sw.js", "utf8");
 const webOfflinePackageClient = readFileSync("src/lib/offline/tool-package-client.ts", "utf8");
+const webRootRoute = readFileSync("src/routes/__root.tsx", "utf8");
 const webStore = readFileSync("src/lib/storage.ts", "utf8");
 const themeHook = readFileSync("src/hooks/use-theme.ts", "utf8");
 const iosAssistant = readFileSync("apps/ios/enV/AssistantChat.swift", "utf8");
@@ -82,6 +83,8 @@ assert.match(webToolEngine, /<Suspense fallback=\{null\}>/, "Tool engine must no
 assert.match(webToolRoute, /return \{ communityFeed: null \}/, "Tool routes must mount without waiting for the community feed");
 assert.match(webToolRoute, /await preloadToolEngine\(matchedTool\)/, "Tool routes must prepare the selected engine before committing the page");
 assert.match(webToolEnginePreload, /export async function preloadToolEngine/, "Every tool engine must expose route-time preload");
+assert.match(webToolEnginePreload, /export async function preloadAllToolEngineModules/, "All shipped tool modules must warm in the background after platform paint");
+assert.match(webRootRoute, /preloadAllToolEngineModules[\s\S]*prepareEnVOfflineShell/, "The app shell must cache the complete warmed engine library for offline routes");
 assert.match(webToolEnginePreload, /tool\.engine\.type/, "Engine preload must cover the catalog engine type dispatch");
 assert.match(webOfflineWorker, /if \(url\.pathname\.startsWith\("\/tools\/"\)\)[\s\S]*?return await shellResponse\(\)/, "Offline tool URLs must render through the regular enV app shell");
 assert.ok(webToolRoute.indexOf("await prepareOfflineToolPackage(") < webToolRoute.indexOf("await preloadToolEngine(matchedTool)"), "Offline route must open the target tool package before requesting its engine chunk");
