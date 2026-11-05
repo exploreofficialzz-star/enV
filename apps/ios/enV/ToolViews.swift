@@ -1213,8 +1213,11 @@ enum NativeCommunicationEngine {
             let bcc = value("bcc").components(separatedBy: CharacterSet(charactersIn: ",;")).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
             if (cc + bcc).contains(where: { $0.range(of: emailPattern, options: .regularExpression) == nil }) { result.append("Check every Cc and Bcc address; separate addresses with commas or semicolons.") }
             let to = email.isEmpty ? (value("name").range(of: emailPattern, options: .regularExpression) != nil ? value("name") : "") : email
+            let ccSet = Set(cc.map { $0.lowercased() })
+            let ccBccOverlap = bcc.contains { ccSet.contains($0.lowercased()) }
+            if ccBccOverlap { result.append("An address appears in both Cc and Bcc; review recipient visibility.") }
             let allAddresses = ([to] + cc + bcc).filter { !$0.isEmpty }.map { $0.lowercased() }
-            if Set(allAddresses).count != allAddresses.count { result.append("An address appears more than once across To, Cc and Bcc; review recipient visibility.") }
+            if !ccBccOverlap && Set(allAddresses).count != allAddresses.count { result.append("An address appears more than once across To, Cc and Bcc; review recipient visibility.") }
             if ["name", "email", "cc", "bcc", "subject"].contains(where: { key in
                 values[key]?.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) ?? false
             }) { result.append("Remove line breaks and control characters from email headers before using this draft.") }
