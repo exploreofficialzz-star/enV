@@ -7,7 +7,7 @@ export const Route = createFileRoute("/3d-game-studio")({ component: GameStudioP
 function GameStudioPage() {
   return (
     <AppShell>
-      <Suspense fallback={<p className="mx-auto max-w-5xl px-4 py-10">Loading 3D Game Studio…</p>}>
+      <Suspense fallback={null}>
         <GameStudio />
       </Suspense>
     </AppShell>
