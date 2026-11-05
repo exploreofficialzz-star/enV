@@ -38,13 +38,13 @@ export const Route = createFileRoute("/tools/$category/$slug")({
     // the compatibility engine that will never be rendered.
     if (category === "developer" && !matchedTool.tags.includes("developer-studio")) return { communityFeed: null };
 
-    // In offline mode, open this tool's previously saved UI package before
-    // requesting its engine chunk. This lets the service worker resolve the
-    // right per-tool cache even while the browser is still on the previous route.
+    // In offline mode, open this tool's saved UI package before requesting
+    // its engine chunk. Use the requested destination params because
+    // window.location may still represent the previously committed route.
     if (typeof window !== "undefined" && !navigator.onLine) {
       await prepareOfflineToolPackage({
         toolId: matchedTool.id,
-        pathname: window.location.pathname,
+        pathname: `/tools/${category}/${slug}`,
       }).catch(() => undefined);
     }
 
