@@ -422,7 +422,7 @@ export function communicationQualityChecks(input: CommunicationInput, output: st
     const toAddress = clean(input.email) || (addressPattern.test(clean(input.name)) ? clean(input.name) : "");
     const allAddresses = [toAddress, ...ccAddresses, ...bccAddresses].filter(Boolean).map((address) => address.toLowerCase());
     if (new Set(allAddresses).size !== allAddresses.length) checks.push("An address appears more than once across To, Cc and Bcc; review recipient visibility.");
-    if ([input.email, input.cc, input.bcc, input.subject].some((value) => /[\r\n\u0000-\u001f\u007f]/.test(String(value ?? "")))) checks.push("Remove line breaks and control characters from email headers before using this draft.");
+    if ([input.name, input.audience, input.email, input.cc, input.bcc, input.subject].some((value) => /[\r\n\u0000-\u001f\u007f]/.test(String(value ?? "")))) checks.push("Remove line breaks and control characters from email headers before using this draft.");
   }
   if (kind === "sms" && output.trim()) {
     const metrics = getSmsMetrics(output);
