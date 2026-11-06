@@ -7889,7 +7889,8 @@ enum NativeAiMicroEngine {
             }.joined(separator: "\n") + "\n\nFOLLOW-UP\n" + (incomplete > 0 ? "\(incomplete) item(s) need an owner, action or due date confirmed." : "Review owners and dates with the team before sharing.") + "\nStatus has not been inferred; update it after the meeting."
         case "product-title":
             let benefit = values["benefit"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            let keyword = values["keyword"]?.trimmingCharacters(in: .whitespacesAndNewlines).flatMap { $0.isEmpty ? nil : $0 } ?? topic
+            let rawKeyword = values["keyword"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let keyword = rawKeyword.isEmpty ? topic : rawKeyword
             let target = values["audience"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             let suffix = target.isEmpty ? "" : " for " + target
             let titles = [
@@ -7902,13 +7903,18 @@ enum NativeAiMicroEngine {
             let upsides = splitLines(values["upsides"] ?? "")
             let risks = splitLines(values["risks"] ?? "")
             let criteria = splitLines(values["criteria"] ?? "")
-            return [
-                "DECISION: \(clean(values["option"], "the option being considered"))",
-                "UPSIDE TO VERIFY\n" + (upsides.isEmpty ? "• [Add observed advantages or expected benefits.]" : upsides.map { "• " + $0 }.joined(separator: "\n")),
-                "RISKS / COSTS TO CHECK\n" + (risks.isEmpty ? "• [Add known risks, costs or trade-offs.]" : risks.map { "• " + $0 }.joined(separator: "\n")),
-                "DECISION CRITERIA\n" + (criteria.isEmpty ? "• What measurable result would make this worthwhile?\n• What is the smallest safe test?\n• What evidence would make you stop or change course?" : criteria.map { "• " + $0 }.joined(separator: "\n")),
-                "EVIDENCE CHECK\nSeparate measured results from assumptions. Do not treat a blank section as proof that no risk or benefit exists."
-            ].joined(separator: "\n\n")
+            let decisionText = "DECISION: " + clean(values["option"], "the option being considered")
+            let upsideText = upsides.isEmpty
+                ? "UPSIDE TO VERIFY\n• [Add observed advantages or expected benefits.]"
+                : "UPSIDE TO VERIFY\n" + upsides.map { "• " + $0 }.joined(separator: "\n")
+            let riskText = risks.isEmpty
+                ? "RISKS / COSTS TO CHECK\n• [Add known risks, costs or trade-offs.]"
+                : "RISKS / COSTS TO CHECK\n" + risks.map { "• " + $0 }.joined(separator: "\n")
+            let criteriaText = criteria.isEmpty
+                ? "DECISION CRITERIA\n• What measurable result would make this worthwhile?\n• What is the smallest safe test?\n• What evidence would make you stop or change course?"
+                : "DECISION CRITERIA\n" + criteria.map { "• " + $0 }.joined(separator: "\n")
+            let evidenceText = "EVIDENCE CHECK\nSeparate measured results from assumptions. Do not treat a blank section as proof that no risk or benefit exists."
+            return [decisionText, upsideText, riskText, criteriaText, evidenceText].joined(separator: "\n\n")
         case "shorten":
             let text = values["text"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             guard !text.isEmpty else { return "Add the text you want to shorten." }

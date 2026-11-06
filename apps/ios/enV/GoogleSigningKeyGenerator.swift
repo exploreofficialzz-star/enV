@@ -415,140 +415,176 @@ struct NativeGoogleSigningKeyView: View {
     @State private var archiveData: Data?
 
     var body: some View {
+        attachFileExporters(to: formContent)
+    }
+
+    private var formContent: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
-                stepButton("Details", index: 0)
-                stepButton("Protect", index: 1)
-                stepButton("Export", index: 2)
+            stepNavigation
+            stageContent
+            if let errorMessage, stage != 1 {
+                Text(errorMessage).font(.caption).foregroundStyle(.red)
             }
-            if stage == 0 {
+        }
+    }
+
+    private var stepNavigation: some View {
+        HStack(spacing: 6) {
+            stepButton("Details", index: 0)
+            stepButton("Protect", index: 1)
+            stepButton("Export", index: 2)
+        }
+    }
+
+    @ViewBuilder private var stageContent: some View {
+        if stage == 0 {
+            detailsStep
+        } else if stage == 1 {
+            protectStep
+        } else if let artifacts {
+            exportStep(artifacts)
+        }
+    }
+
+    private var detailsStep: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                NativeGoogleSigningKeyInputField(title: "Alias", text: $alias)
+                NativeGoogleSigningKeyInputField(title: "Country", text: $country)
+            }
+            NativeGoogleSigningKeyInputField(title: "Owner / publisher", text: $commonName)
+            HStack(spacing: 8) {
+                Picker("RSA", selection: $keySize) {
+                    Text("2048").tag(2048); Text("3072").tag(3072); Text("4096").tag(4096)
+                }.pickerStyle(.segmented)
+                Picker("Validity", selection: $validityYears) {
+                    ForEach([10, 15, 20, 25, 30], id: \.self) { Text("\($0)y").tag($0) }
+                }.pickerStyle(.menu)
+            }
+            DisclosureGroup("More certificate details", isExpanded: $showMore) {
                 HStack(spacing: 8) {
-                    NativeGoogleSigningKeyInputField(title: "Alias", text: $alias)
-                    NativeGoogleSigningKeyInputField(title: "Country", text: $country)
-                }
-                NativeGoogleSigningKeyInputField(title: "Owner / publisher", text: $commonName)
-                HStack(spacing: 8) {
-                    Picker("RSA", selection: $keySize) {
-                        Text("2048").tag(2048); Text("3072").tag(3072); Text("4096").tag(4096)
-                    }.pickerStyle(.segmented)
-                    Picker("Validity", selection: $validityYears) {
-                        ForEach([10, 15, 20, 25, 30], id: \.self) { Text("\($0)y").tag($0) }
-                    }.pickerStyle(.menu)
-                }
-                DisclosureGroup("More certificate details", isExpanded: $showMore) {
-                    HStack(spacing: 8) {
-                        NativeGoogleSigningKeyInputField(title: "Organization", text: $organization)
-                        NativeGoogleSigningKeyInputField(title: "Unit", text: $organizationalUnit)
-                    }
-                    HStack(spacing: 8) {
-                        NativeGoogleSigningKeyInputField(title: "City", text: $city)
-                        NativeGoogleSigningKeyInputField(title: "State / region", text: $state)
-                    }
-                }
-                Button("Continue") { stage = 1 }.buttonStyle(.borderedProminent)
-                    .disabled(commonName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            } else if stage == 1 {
-                Text("Set two separate passwords (12–128 characters).")
-                    .font(.caption).foregroundStyle(Color.envMuted)
-                HStack(spacing: 8) {
-                    SecureField("Keystore password", text: $storePassword).textContentType(.newPassword).textFieldStyle(.roundedBorder)
-                    SecureField("Confirm", text: $confirmStorePassword).textContentType(.newPassword).textFieldStyle(.roundedBorder)
+                    NativeGoogleSigningKeyInputField(title: "Organization", text: $organization)
+                    NativeGoogleSigningKeyInputField(title: "Unit", text: $organizationalUnit)
                 }
                 HStack(spacing: 8) {
-                    SecureField("Private key password", text: $keyPassword).textContentType(.newPassword).textFieldStyle(.roundedBorder)
-                    SecureField("Confirm", text: $confirmKeyPassword).textContentType(.newPassword).textFieldStyle(.roundedBorder)
+                    NativeGoogleSigningKeyInputField(title: "City", text: $city)
+                    NativeGoogleSigningKeyInputField(title: "State / region", text: $state)
                 }
-                if let errorMessage { Text(errorMessage).font(.caption).foregroundStyle(.red) }
+            }
+            Button("Continue") { stage = 1 }.buttonStyle(.borderedProminent)
+                .disabled(commonName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+    }
+
+    private var protectStep: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Set two separate passwords (12–128 characters).")
+                .font(.caption).foregroundStyle(Color.envMuted)
+            HStack(spacing: 8) {
+                SecureField("Keystore password", text: $storePassword).textContentType(.newPassword).textFieldStyle(.roundedBorder)
+                SecureField("Confirm", text: $confirmStorePassword).textContentType(.newPassword).textFieldStyle(.roundedBorder)
+            }
+            HStack(spacing: 8) {
+                SecureField("Private key password", text: $keyPassword).textContentType(.newPassword).textFieldStyle(.roundedBorder)
+                SecureField("Confirm", text: $confirmKeyPassword).textContentType(.newPassword).textFieldStyle(.roundedBorder)
+            }
+            if let errorMessage { Text(errorMessage).font(.caption).foregroundStyle(.red) }
+            HStack {
+                Button("Back") { stage = 0 }.buttonStyle(.bordered)
+                Button {
+                    generate()
+                } label: {
+                    HStack { if working { ProgressView() }; Text(working ? "Generating…" : "Generate key") }
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(working || commonName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || storePassword.isEmpty || keyPassword.isEmpty)
+            }
+        }
+    }
+
+    private func exportStep(_ artifacts: NativeGoogleSigningKeyArtifacts) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("\(artifacts.alias) · RSA \(keySize) · \(artifacts.validUntil.formatted(date: .abbreviated, time: .omitted))")
+                .font(.caption).foregroundStyle(Color.envMuted)
+            HStack(spacing: 8) {
+                Button { exportArchive = true } label: { Label("Full ZIP", systemImage: "archivebox") }.buttonStyle(.borderedProminent)
+                Button { exportKeystore = true } label: { Label("JKS", systemImage: "key.horizontal") }.buttonStyle(.bordered)
+                Button { exportCertificate = true } label: { Label("PEM", systemImage: "doc.text") }.buttonStyle(.bordered)
+            }
+            HStack(spacing: 8) {
+                Button { exportBase64 = true } label: { Label("Base64", systemImage: "doc.on.doc") }.buttonStyle(.bordered)
+                Button { exportSecrets = true } label: { Label("GitHub secrets", systemImage: "key.fill") }.buttonStyle(.bordered)
+                Button { exportWorkflow = true } label: { Label("Workflow", systemImage: "chevron.left.forwardslash.chevron.right") }.buttonStyle(.bordered)
+            }
+            HStack(spacing: 8) {
+                Button { exportInfo = true } label: { Label("Info", systemImage: "info.circle") }.buttonStyle(.bordered)
+                Button { UIPasteboard.general.string = artifacts.keystoreBase64; notice = "Base64 copied." } label: { Label("Copy Base64", systemImage: "doc.on.doc") }.buttonStyle(.bordered)
+                Button { UIPasteboard.general.string = artifacts.githubSecrets; notice = "GitHub secrets copied. Keep them private." } label: { Label("Copy secrets", systemImage: "key") }.buttonStyle(.bordered)
+            }
+            DisclosureGroup("GitHub secrets") {
+                Text(artifacts.githubSecrets).font(.system(.caption2, design: .monospaced)).textSelection(.enabled)
+                Button("Copy all GitHub secrets") { UIPasteboard.general.string = artifacts.githubSecrets; notice = "GitHub secrets copied. Keep them private." }
+            }
+            DisclosureGroup("Keystore Base64") {
+                Text(artifacts.keystoreBase64).font(.system(.caption2, design: .monospaced)).textSelection(.enabled)
+                Button("Copy Base64") { UIPasteboard.general.string = artifacts.keystoreBase64; notice = "Base64 copied." }
+            }
+            DisclosureGroup("GitHub Actions workflow") {
+                Text(artifacts.githubActionsWorkflow).font(.system(.caption2, design: .monospaced)).textSelection(.enabled)
+                Button("Copy workflow") { UIPasteboard.general.string = artifacts.githubActionsWorkflow; notice = "Workflow copied." }
+            }
+            Text("Full ZIP includes Base64 and both password values. Keep it private; Base64 is not encryption.")
+                .font(.caption2).foregroundStyle(Color.envMuted)
+            DisclosureGroup("Fingerprints") {
                 HStack {
-                    Button("Back") { stage = 0 }.buttonStyle(.bordered)
-                    Button {
-                        generate()
-                    } label: {
-                        HStack { if working { ProgressView() }; Text(working ? "Generating…" : "Generate key") }
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(working || commonName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || storePassword.isEmpty || keyPassword.isEmpty)
+                    Text("SHA-1").font(.caption.weight(.semibold))
+                    Spacer()
+                    Button("Copy") { UIPasteboard.general.string = artifacts.sha1; notice = "Copied." }.font(.caption)
                 }
-            } else if let artifacts {
-                Text("\(artifacts.alias) · RSA \(keySize) · \(artifacts.validUntil.formatted(date: .abbreviated, time: .omitted))")
-                    .font(.caption).foregroundStyle(Color.envMuted)
-                HStack(spacing: 8) {
-                    Button { exportArchive = true } label: { Label("Full ZIP", systemImage: "archivebox") }.buttonStyle(.borderedProminent)
-                    Button { exportKeystore = true } label: { Label("JKS", systemImage: "key.horizontal") }.buttonStyle(.bordered)
-                    Button { exportCertificate = true } label: { Label("PEM", systemImage: "doc.text") }.buttonStyle(.bordered)
+                Text(artifacts.sha1).font(.system(.caption2, design: .monospaced)).textSelection(.enabled).lineLimit(2)
+                HStack {
+                    Text("SHA-256").font(.caption.weight(.semibold))
+                    Spacer()
+                    Button("Copy") { UIPasteboard.general.string = artifacts.sha256; notice = "Copied." }.font(.caption)
                 }
-                HStack(spacing: 8) {
-                    Button { exportBase64 = true } label: { Label("Base64", systemImage: "doc.on.doc") }.buttonStyle(.bordered)
-                    Button { exportSecrets = true } label: { Label("GitHub secrets", systemImage: "key.fill") }.buttonStyle(.bordered)
-                    Button { exportWorkflow = true } label: { Label("Workflow", systemImage: "chevron.left.forwardslash.chevron.right") }.buttonStyle(.bordered)
-                }
-                HStack(spacing: 8) {
-                    Button { exportInfo = true } label: { Label("Info", systemImage: "info.circle") }.buttonStyle(.bordered)
-                    Button { UIPasteboard.general.string = artifacts.keystoreBase64; notice = "Base64 copied." } label: { Label("Copy Base64", systemImage: "doc.on.doc") }.buttonStyle(.bordered)
-                    Button { UIPasteboard.general.string = artifacts.githubSecrets; notice = "GitHub secrets copied. Keep them private." } label: { Label("Copy secrets", systemImage: "key") }.buttonStyle(.bordered)
-                }
-                DisclosureGroup("GitHub secrets") {
-                    Text(artifacts.githubSecrets).font(.system(.caption2, design: .monospaced)).textSelection(.enabled)
-                    Button("Copy all GitHub secrets") { UIPasteboard.general.string = artifacts.githubSecrets; notice = "GitHub secrets copied. Keep them private." }
-                }
-                DisclosureGroup("Keystore Base64") {
-                    Text(artifacts.keystoreBase64).font(.system(.caption2, design: .monospaced)).textSelection(.enabled)
-                    Button("Copy Base64") { UIPasteboard.general.string = artifacts.keystoreBase64; notice = "Base64 copied." }
-                }
-                DisclosureGroup("GitHub Actions workflow") {
-                    Text(artifacts.githubActionsWorkflow).font(.system(.caption2, design: .monospaced)).textSelection(.enabled)
-                    Button("Copy workflow") { UIPasteboard.general.string = artifacts.githubActionsWorkflow; notice = "Workflow copied." }
-                }
-                Text("Full ZIP includes Base64 and both password values. Keep it private; Base64 is not encryption.")
-                    .font(.caption2).foregroundStyle(Color.envMuted)
-                DisclosureGroup("Fingerprints") {
-                    HStack {
-                        Text("SHA-1").font(.caption.weight(.semibold))
-                        Spacer()
-                        Button("Copy") { UIPasteboard.general.string = artifacts.sha1; notice = "Copied." }.font(.caption)
-                    }
-                    Text(artifacts.sha1).font(.system(.caption2, design: .monospaced)).textSelection(.enabled).lineLimit(2)
-                    HStack {
-                        Text("SHA-256").font(.caption.weight(.semibold))
-                        Spacer()
-                        Button("Copy") { UIPasteboard.general.string = artifacts.sha256; notice = "Copied." }.font(.caption)
-                    }
-                    Text(artifacts.sha256).font(.system(.caption2, design: .monospaced)).textSelection(.enabled).lineLimit(2)
-                }
-                DisclosureGroup("Gradle configuration") {
-                    Picker("Format", selection: $showGroovy) { Text("Kotlin DSL").tag(false); Text("Groovy").tag(true) }.pickerStyle(.segmented)
-                    Text(showGroovy ? artifacts.gradleGroovy : artifacts.gradleKotlin)
-                        .font(.system(.caption2, design: .monospaced)).textSelection(.enabled)
-                    Button("Copy Gradle") { UIPasteboard.general.string = showGroovy ? artifacts.gradleGroovy : artifacts.gradleKotlin; notice = "Copied." }
-                }
-                Text("Full ZIP includes the Base64 keystore and both password values. Keep it private. Base64 is not encryption.")
-                    .font(.caption2).foregroundStyle(Color.envMuted)
-                if !notice.isEmpty { Text(notice).font(.caption2).foregroundStyle(Color.envMuted) }
+                Text(artifacts.sha256).font(.system(.caption2, design: .monospaced)).textSelection(.enabled).lineLimit(2)
             }
-            if let errorMessage, stage != 1 { Text(errorMessage).font(.caption).foregroundStyle(.red) }
+            DisclosureGroup("Gradle configuration") {
+                Picker("Format", selection: $showGroovy) { Text("Kotlin DSL").tag(false); Text("Groovy").tag(true) }.pickerStyle(.segmented)
+                Text(showGroovy ? artifacts.gradleGroovy : artifacts.gradleKotlin)
+                    .font(.system(.caption2, design: .monospaced)).textSelection(.enabled)
+                Button("Copy Gradle") { UIPasteboard.general.string = showGroovy ? artifacts.gradleGroovy : artifacts.gradleKotlin; notice = "Copied." }
+            }
+            Text("Full ZIP includes the Base64 keystore and both password values. Keep it private. Base64 is not encryption.")
+                .font(.caption2).foregroundStyle(Color.envMuted)
+            if !notice.isEmpty { Text(notice).font(.caption2).foregroundStyle(Color.envMuted) }
         }
-        .fileExporter(isPresented: $exportArchive, document: archiveData.map { NativeSigningArtifactDocument($0) }, contentType: .zip, defaultFilename: "android-upload-key-package.zip") { result in
-            if case .failure(let error) = result { errorMessage = error.localizedDescription }
-        }
-        .fileExporter(isPresented: $exportKeystore, document: artifacts.map { NativeSigningArtifactDocument($0.keystore) }, contentType: .data, defaultFilename: "upload-keystore.jks") { result in
-            if case .failure(let error) = result { errorMessage = error.localizedDescription }
-        }
-        .fileExporter(isPresented: $exportCertificate, document: artifacts.map { NativeSigningArtifactDocument(Data($0.certificatePEM.utf8)) }, contentType: .data, defaultFilename: "upload_certificate.pem") { result in
-            if case .failure(let error) = result { errorMessage = error.localizedDescription }
-        }
-        .fileExporter(isPresented: $exportBase64, document: artifacts.map { NativeSigningArtifactDocument(Data($0.keystoreBase64.utf8)) }, contentType: .plainText, defaultFilename: "upload-keystore.base64.txt") { result in
-            if case .failure(let error) = result { errorMessage = error.localizedDescription }
-        }
-        .fileExporter(isPresented: $exportSecrets, document: artifacts.map { NativeSigningArtifactDocument(Data($0.githubSecrets.utf8)) }, contentType: .plainText, defaultFilename: "github-secrets.txt") { result in
-            if case .failure(let error) = result { errorMessage = error.localizedDescription }
-        }
-        .fileExporter(isPresented: $exportWorkflow, document: artifacts.map { NativeSigningArtifactDocument(Data($0.githubActionsWorkflow.utf8)) }, contentType: .plainText, defaultFilename: "android-release.yml") { result in
-            if case .failure(let error) = result { errorMessage = error.localizedDescription }
-        }
-        .fileExporter(isPresented: $exportInfo, document: artifacts.map { NativeSigningArtifactDocument(Data($0.signingInfo.utf8)) }, contentType: .plainText, defaultFilename: "signing-info.txt") { result in
-            if case .failure(let error) = result { errorMessage = error.localizedDescription }
-        }
+    }
+
+    private func attachFileExporters<Content: View>(to content: Content) -> some View {
+        content
+            .fileExporter(isPresented: $exportArchive, document: archiveData.map { NativeSigningArtifactDocument($0) }, contentType: .zip, defaultFilename: "android-upload-key-package.zip") { result in
+                if case .failure(let error) = result { errorMessage = error.localizedDescription }
+            }
+            .fileExporter(isPresented: $exportKeystore, document: artifacts.map { NativeSigningArtifactDocument($0.keystore) }, contentType: .data, defaultFilename: "upload-keystore.jks") { result in
+                if case .failure(let error) = result { errorMessage = error.localizedDescription }
+            }
+            .fileExporter(isPresented: $exportCertificate, document: artifacts.map { NativeSigningArtifactDocument(Data($0.certificatePEM.utf8)) }, contentType: .data, defaultFilename: "upload_certificate.pem") { result in
+                if case .failure(let error) = result { errorMessage = error.localizedDescription }
+            }
+            .fileExporter(isPresented: $exportBase64, document: artifacts.map { NativeSigningArtifactDocument(Data($0.keystoreBase64.utf8)) }, contentType: .plainText, defaultFilename: "upload-keystore.base64.txt") { result in
+                if case .failure(let error) = result { errorMessage = error.localizedDescription }
+            }
+            .fileExporter(isPresented: $exportSecrets, document: artifacts.map { NativeSigningArtifactDocument(Data($0.githubSecrets.utf8)) }, contentType: .plainText, defaultFilename: "github-secrets.txt") { result in
+                if case .failure(let error) = result { errorMessage = error.localizedDescription }
+            }
+            .fileExporter(isPresented: $exportWorkflow, document: artifacts.map { NativeSigningArtifactDocument(Data($0.githubActionsWorkflow.utf8)) }, contentType: .plainText, defaultFilename: "android-release.yml") { result in
+                if case .failure(let error) = result { errorMessage = error.localizedDescription }
+            }
+            .fileExporter(isPresented: $exportInfo, document: artifacts.map { NativeSigningArtifactDocument(Data($0.signingInfo.utf8)) }, contentType: .plainText, defaultFilename: "signing-info.txt") { result in
+                if case .failure(let error) = result { errorMessage = error.localizedDescription }
+            }
     }
 
     @ViewBuilder private func stepButton(_ title: String, index: Int) -> some View {
