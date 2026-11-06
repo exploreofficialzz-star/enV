@@ -95,6 +95,7 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.5.3")
     implementation("androidx.camera:camera-video:1.5.3")
     implementation("androidx.camera:camera-view:1.5.3")
+    implementation("androidx.camera:camera-effects:1.5.3")
     // CameraX applies Media3 effects to preview, photo and recorded video frames.
     implementation("androidx.camera.media3:media3-effect:1.0.0-alpha04")
     implementation("androidx.media3:media3-effect:1.5.1")
@@ -106,6 +107,8 @@ dependencies {
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
     // Bundled on-device OCR model; no runtime model download or remote service.
     implementation("com.google.mlkit:text-recognition:16.0.1")
+    // Bundled, on-device face landmarks and tracking for original local camera effects.
+    implementation("com.google.mlkit:face-detection:16.1.7")
     implementation("com.google.android.gms:play-services-nearby:19.3.0")
     // The play preview uses the native Godot runtime, not a WebView.
     implementation("org.godotengine:godot:4.6.3.stable")
