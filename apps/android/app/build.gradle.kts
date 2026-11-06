@@ -95,6 +95,9 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.5.3")
     implementation("androidx.camera:camera-video:1.5.3")
     implementation("androidx.camera:camera-view:1.5.3")
+    // CameraX applies Media3 effects to preview, photo and recorded video frames.
+    implementation("androidx.camera.media3:media3-effect:1.0.0-alpha04")
+    implementation("androidx.media3:media3-effect:1.5.1")
     implementation("androidx.media3:media3-common:1.5.1")
     implementation("androidx.media3:media3-exoplayer:1.5.1")
     implementation("androidx.media3:media3-transformer:1.5.1")
