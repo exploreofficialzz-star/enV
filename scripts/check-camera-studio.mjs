@@ -25,6 +25,8 @@ const androidCoverage = read("apps/android/native-tool-coverage.txt");
 const iosCoverage = read("apps/ios/native-tool-coverage.txt");
 const inventory = JSON.parse(read("apps/shared/native-engine-inventory.json"));
 const billingProfiles = JSON.parse(read("src/data/billing-profile-runtime-extensions.json"));
+const deviceAcceptance = read("docs/camera-studio-device-acceptance.md");
+const androidBuild = read("apps/android/app/build.gradle.kts");
 
 
 // Camera Studio parity upgrade: true second-device browser capture and native controls.
@@ -151,6 +153,16 @@ assert.match(androidCamera, /setPinchToZoomEnabled\(true\)/);
 assert.match(androidCamera, /setTapToFocusEnabled\(true\)/);
 assert.match(androidCamera, /controller\.setLinearZoom\(it\)/);
 assert.match(androidCamera, /setExposureCompensationIndex\(index\)/);
+assert.match(androidCamera, /Media3Effect/);
+assert.match(androidCamera, /CameraEffect\.PREVIEW or CameraEffect\.VIDEO_CAPTURE or CameraEffect\.IMAGE_CAPTURE/);
+assert.match(androidCamera, /cameraEffect\.setEffects\(nativeCameraEffects\(selectedLook\)\)/);
+assert.match(androidCamera, /addEffect\(cameraEffect\)/);
+assert.match(androidCamera, /CameraCharacteristics\.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR/);
+assert.match(androidCamera, /CaptureRequest\.SENSOR_SENSITIVITY/);
+assert.match(androidCamera, /CaptureRequest\.SENSOR_EXPOSURE_TIME/);
+assert.match(androidCamera, /CaptureRequest\.LENS_FOCUS_DISTANCE/);
+assert.match(androidCamera, /CaptureRequest\.CONTROL_AWB_MODE/);
+assert.match(androidCamera, /Reset pro controls/);
 assert.match(androidCamera, /disposeAfterRecording\.set\(true\)/);
 assert.match(androidCamera, /activeRecording\.stop\(\)/);
 assert.match(androidCamera, /rememberUpdatedState\(recording\)/);
@@ -169,7 +181,14 @@ assert.match(iosCamera, /onAppear \{ capture\.start\(\) \}/);
 assert.match(iosCamera, /UIApplication\.openSettingsURLString/);
 assert.doesNotMatch(iosCamera, /Allow camera access to start|Button\("Start camera"\)/);
 assert.match(iosCamera, /AVCapturePhotoOutput/);
-assert.match(iosCamera, /AVCaptureMovieFileOutput/);
+assert.match(iosCamera, /AVCaptureVideoDataOutput/);
+assert.match(iosCamera, /AVAssetWriter/);
+assert.match(iosCamera, /startVideo\(look: NativeCameraLook\)/);
+assert.match(iosCamera, /videoDataOutput\.setSampleBufferDelegate\(self, queue: queue\)/);
+assert.match(iosCamera, /writer\.finishWriting/);
+assert.match(iosCamera, /applyNativeCameraLook/);
+assert.match(iosCamera, /func selectLens\(uniqueID:/);
+assert.match(iosCamera, /builtInUltraWideCamera/);
 assert.match(iosCamera, /AVCaptureSessionWasInterrupted/);
 assert.match(iosCamera, /AVCaptureSessionInterruptionEnded/);
 assert.match(iosCamera, /AVCaptureSessionRuntimeError/);
@@ -196,7 +215,20 @@ assert.ok(inventory.runtimeExtensionIds.includes("camera-studio"), "native runti
 assert.ok(inventory.androidToolIds.includes("camera-studio") && inventory.iosToolIds.includes("camera-studio"), "native runtime inventory records both implementations");
 assert.ok(billingProfiles.profiles.some((profile) => profile.toolId === "camera-studio" && profile.manualAuditRequired === true), "Camera Studio has an auditable local billing profile");
 
-const androidBuild = read("apps/android/app/build.gradle.kts");
 assert.match(androidBuild, /androidx\.compose\.runtime:runtime-livedata/);
+assert.match(androidBuild, /androidx\.camera\.media3:media3-effect:1\.0\.0-alpha04/);
+assert.match(androidBuild, /androidx\.media3:media3-effect:1\.5\.1/);
+assert.ok(deviceAcceptance.includes("NOT RUN — requires real hardware"), "Physical device acceptance must remain explicitly open until real devices are tested.");
+for (const gate of [
+  "Dual-camera capability and graceful fallback",
+  "Front/rear orientation and mirroring",
+  "Microphone permission and audio synchronization",
+  "Low-storage and recording finalization",
+  "System interruptions and app backgrounding",
+  "Thermal and battery behaviour",
+  "Filter preview-to-export parity",
+]) {
+  assert.ok(deviceAcceptance.includes(gate), `Device acceptance matrix includes: ${gate}`);
+}
 
-console.log("Camera Studio checks passed: web dual-camera composition, Android CameraX concurrent recording and pro controls, iOS AVFoundation multi-camera recording and pro controls, native catalogue routes, coverage, billing and runtime inventory.");
+console.log("Camera Studio checks passed: web dual-camera composition, Android CameraX concurrent recording, native live filters and manual controls, iOS AVFoundation filtered recording and optical lenses, plus explicit physical-device release gates.");
