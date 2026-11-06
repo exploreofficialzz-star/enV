@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import "./check-camera-studio-face-effects.mjs";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
