@@ -670,6 +670,7 @@ fun NativeCameraStudioScreen() {
     }
 }
 
+@OptIn(androidx.camera.camera2.interop.ExperimentalCamera2Interop::class)
 @Composable
 private fun NativeDualCameraStudioScreen(
     context: Context,
