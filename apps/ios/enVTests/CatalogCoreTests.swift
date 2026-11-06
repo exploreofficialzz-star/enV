@@ -229,4 +229,84 @@ final class CatalogCoreTests: XCTestCase {
         XCTAssertThrowsError(try parseABookPageGroups("1-6;7-8", pageCount: 5))
     }
 
+
+    func testCommunicationCalendarExportUsesValidatedLocalTimeAndRFC5545Escaping() throws {
+        let ics = try NativeCommunicationEngine.calendarICS("meeting-builder", values: [
+            "subject": "Roadmap, review; draft",
+            "date": "2026-11-05T10:00",
+            "timezone": "Africa/Lagos",
+            "duration": "45",
+            "place": "Room A",
+            "details": "First line\nSecond line"
+        ])
+        XCTAssertTrue(ics.contains("VERSION:2.0"))
+        XCTAssertTrue(ics.contains("SUMMARY:Roadmap\\, review\\; draft"))
+        XCTAssertTrue(ics.contains("DESCRIPTION:First line\\nSecond line"))
+        XCTAssertTrue(ics.contains("DTSTART:20261105T090000Z"))
+        XCTAssertTrue(ics.contains("DTEND:20261105T094500Z"))
+        XCTAssertTrue(ics.contains("BEGIN:VALARM"))
+        for line in ics.components(separatedBy: "\r\n").filter({ !$0.isEmpty }) {
+            XCTAssertLessThanOrEqual(line.lengthOfBytes(using: .utf8), 75)
+        }
+    }
+
+    func testCommunicationCalendarRejectsDaylightSavingGapsAndRepeatedTimes() {
+        XCTAssertThrowsError(try NativeCommunicationEngine.calendarICS("meeting-builder", values: [
+            "date": "2026-03-08T02:30", "timezone": "America/New_York", "duration": "30"
+        ]))
+        XCTAssertThrowsError(try NativeCommunicationEngine.calendarICS("meeting-builder", values: [
+            "date": "2026-11-01T01:30", "timezone": "America/New_York", "duration": "30"
+        ]))
+    }
+
+    func testCommunicationInvitationRequiresRsvpBeforeEvent() {
+        XCTAssertThrowsError(try NativeCommunicationEngine.calendarICS("invitation-builder", values: [
+            "date": "2026-11-05T10:00", "rsvpBy": "2026-11-05T10:00", "timezone": "Africa/Lagos"
+        ]))
+    }
+
+    func testCommunicationGsm7AlternativePreservesOriginalAndNormalizesSmartPunctuation() {
+        let original = "“Price”—it’s ready… now"
+        let safe = NativeCommunicationEngine.gsm7Alternative(original)
+        XCTAssertEqual(safe, "\"Price\"-it's ready... now")
+        XCTAssertEqual(NativeCommunicationEngine.smsMetrics(safe).encoding, "GSM-7")
+        XCTAssertNotEqual(original, safe)
+    }
+
+    func testCommunicationEmailChecksDuplicateRecipientsAcrossToCcAndBcc() {
+        let values = [
+            "email": "alex@example.com",
+            "subject": "Update",
+            "details": "The plan is ready.",
+            "cc": "team@example.com; Alex@example.com",
+            "bcc": "hidden@example.com"
+        ]
+        let output = NativeCommunicationEngine.generate("email-builder", values: values)
+        let checks = NativeCommunicationEngine.checks("email-builder", values: values, output: output).joined(separator: " ")
+        XCTAssertTrue(checks.contains("more than once across To, Cc and Bcc"))
+    }
+
+    func testCommunicationEmailHeadersCannotInjectAdditionalHeaders() {
+        let values = [
+            "email": "alex@example.com",
+            "subject": "Update\r\nBcc: victim@example.com",
+            "details": "The plan is ready."
+        ]
+        let output = NativeCommunicationEngine.generate("email-builder", values: values)
+        XCTAssertFalse(output.contains("\r\nBcc: victim@example.com"))
+        let checks = NativeCommunicationEngine.checks("email-builder", values: values, output: output).joined(separator: " ")
+        XCTAssertTrue(checks.contains("control characters"))
+    }
+
+
+    func testCommunicationCalendarUIDIsStableAndPortableAcrossPlatforms() throws {
+        let ics = try NativeCommunicationEngine.calendarICS("meeting-builder", values: [
+            "subject": "Roadmap, review; draft",
+            "date": "2026-11-05T10:00",
+            "timezone": "Africa/Lagos",
+            "duration": "45"
+        ])
+        XCTAssertTrue(ics.contains("UID:8734b83babcc1f0d@envtools.store"))
+    }
+
 }

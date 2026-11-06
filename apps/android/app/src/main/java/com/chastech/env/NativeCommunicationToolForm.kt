@@ -23,6 +23,12 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.time.format.ResolverStyle
 
 internal data class CommunicationField(val key: String, val label: String, val multiline: Boolean = false)
 
@@ -47,7 +53,7 @@ internal object NativeCommunicationEngine {
         fields += CommunicationField("name", if (kind == "signature") "Full name" else if (kind in setOf("meeting", "agenda", "minutes")) "Attendees" else "Recipient / audience")
         fields += CommunicationField("subject", if (kind in setOf("meeting", "agenda", "minutes")) "Meeting title" else if (kind == "signature") "Role" else "Subject / title")
         if (kind in setOf("meeting", "agenda", "minutes", "invitation", "reminder", "announcement", "follow-up")) {
-            fields += CommunicationField("date", "Date and time")
+            fields += CommunicationField("date", "Date and time (YYYY-MM-DDTHH:mm)")
         }
         if (kind in setOf("meeting", "agenda", "minutes", "invitation", "reminder")) {
             fields += CommunicationField("place", "Location / meeting link")
@@ -59,10 +65,10 @@ internal object NativeCommunicationEngine {
         }
         if (kind in setOf("message", "sms")) fields += CommunicationField("channel", "Channel")
         if (kind in setOf("meeting", "agenda", "invitation", "reminder")) {
-            if (kind in setOf("meeting", "agenda")) fields += CommunicationField("duration", "Duration (minutes)")
+            if (kind in setOf("meeting", "agenda", "invitation", "reminder")) fields += CommunicationField("duration", "Duration (minutes)")
             fields += CommunicationField("timezone", "Time zone")
         }
-        if (kind == "invitation") fields += CommunicationField("rsvpBy", "RSVP deadline")
+        if (kind == "invitation") fields += CommunicationField("rsvpBy", "RSVP deadline (YYYY-MM-DDTHH:mm)")
         if (kind == "signature") {
             fields += CommunicationField("company", "Company")
             fields += CommunicationField("email", "Email")
@@ -92,8 +98,11 @@ internal object NativeCommunicationEngine {
     fun generate(toolId: String, values: Map<String, String>): String {
         val (kind, action) = parse(toolId)
         fun value(key: String, fallback: String = "") = values[key].orEmpty().trim().ifBlank { fallback }
-        val recipient = value("name", "[Recipient]")
-        val subject = value("subject", kind.replace('-', ' ').replaceFirstChar { it.uppercase() })
+        fun header(key: String, fallback: String = "") = value(key, fallback)
+            .replace(Regex("[\\r\\n\\u0000-\\u001f\\u007f]+"), " ")
+            .replace(Regex("\\s{2,}"), " ").trim()
+        val recipient = if (kind == "email") header("name", "[Recipient]") else value("name", "[Recipient]")
+        val subject = header("subject", kind.replace('-', ' ').replaceFirstChar { it.uppercase() })
         val purpose = value("purpose")
         val details = value("details").ifBlank { purpose }
         val date = value("date", "[Date / time]")
@@ -106,18 +115,18 @@ internal object NativeCommunicationEngine {
 
         return when (kind) {
             "email" -> {
-                val displayName = value("name")
+                val displayName = header("name")
                 val greetingName = displayName.ifBlank { "there" }
                 val greeting = if (value("tone") in setOf("friendly", "warm")) "Hi " + greetingName + "," else "Hello " + greetingName + ","
                 val body = details.ifBlank { "[Add the main information]" }
-                val emailAddress = value("email")
+                val emailAddress = header("email")
                 val toRecipient = if (emailAddress.isNotBlank()) {
                     if (displayName.isNotBlank()) displayName + " <" + emailAddress + ">" else emailAddress
                 } else recipient
                 val headers = listOf(
                     "To: " + toRecipient,
-                    if (value("cc").isNotBlank()) "Cc: " + value("cc") else "",
-                    if (value("bcc").isNotBlank()) "Bcc: " + value("bcc") else "",
+                    if (value("cc").isNotBlank()) "Cc: " + header("cc") else "",
+                    if (value("bcc").isNotBlank()) "Bcc: " + header("bcc") else "",
                     "Subject: " + subject,
                 ).filter { it.isNotEmpty() }
                 (if (action == "builder") headers.joinToString("\n") + "\n\n" else "Subject: " + subject + "\n\n") +
@@ -184,7 +193,15 @@ internal object NativeCommunicationEngine {
             val cc = value("cc").split(Regex("[,;]")).map { it.trim() }.filter { it.isNotBlank() }
             val bcc = value("bcc").split(Regex("[,;]")).map { it.trim() }.filter { it.isNotBlank() }
             if ((cc + bcc).any { !emailPattern.matches(it) }) result += "Check every Cc and Bcc address; separate addresses with commas or semicolons."
-            if (cc.map { it.lowercase() }.toSet().intersect(bcc.map { it.lowercase() }.toSet()).isNotEmpty()) result += "An address appears in both Cc and Bcc; review recipient visibility."
+            val to = value("email").ifBlank { value("name").takeIf { emailPattern.matches(it) }.orEmpty() }
+            val ccSet = cc.map { it.lowercase() }.toSet()
+            val ccBccOverlap = bcc.any { ccSet.contains(it.lowercase()) }
+            if (ccBccOverlap) result += "An address appears in both Cc and Bcc; review recipient visibility."
+            val all = (listOf(to) + cc + bcc).filter { it.isNotBlank() }.map { it.lowercase() }
+            if (!ccBccOverlap && all.size != all.toSet().size) result += "An address appears more than once across To, Cc and Bcc; review recipient visibility."
+            if (listOf("name", "email", "cc", "bcc", "subject").any { key ->
+                values[key].orEmpty().any { ch -> ch == '\r' || ch == '\n' || ch.code < 32 || ch.code == 127 }
+            }) result += "Remove line breaks and control characters from email headers before using this draft."
         }
         if (kind == "sms" && output.isNotBlank()) {
             val metrics = smsMetrics(output)
@@ -197,6 +214,23 @@ internal object NativeCommunicationEngine {
         if (kind == "minutes" && value("actionItems").isBlank() && value("items").isBlank()) result += "Add action owners and due dates."
         if (kind == "minutes" && value("nextStep").isBlank()) result += "Add the next review date or review owner."
         if (kind == "signature" && listOf("email", "phone", "website").all { value(it).isBlank() }) result += "Add at least one contact method."
+        if (kind in calendarKinds) {
+            if (value("date").isBlank()) result += "Add the event date and local time."
+            if (value("timezone").isBlank()) result += "Add the time zone so recipients see the intended local time."
+            if (value("date").isNotBlank() && value("timezone").isNotBlank()) runCatching {
+                val zone = ZoneId.of(value("timezone"))
+                val start = localEventInstant(value("date"), zone, "Event date and time")
+                if (kind == "invitation" && value("rsvpBy").isNotBlank()) {
+                    val rsvp = localEventInstant(value("rsvpBy"), zone, "RSVP deadline")
+                    require(rsvp.isBefore(start)) { "The RSVP deadline must be earlier than the event." }
+                }
+            }.onFailure { result += (it.message ?: "Check the event date, time and time zone.") }
+            if (value("duration").isNotBlank()) {
+                val parsedDuration = value("duration").toIntOrNull()
+                if (parsedDuration == null || parsedDuration !in 5..480) result += "Set an event duration between 5 and 480 minutes."
+            }
+            if (kind in setOf("meeting", "agenda") && value("duration").isBlank()) result += "Set a duration so agenda timeboxes can be checked."
+        }
         return result.distinct()
     }
 
@@ -210,6 +244,101 @@ internal object NativeCommunicationEngine {
         val joined = if (gsm) 153 else 67
         val segments = if (units == 0) 0 else if (units <= limit) 1 else (units + joined - 1) / joined
         return Triple(gsm, units, segments)
+    }
+
+
+    private val calendarKinds = setOf("meeting", "agenda", "invitation", "reminder")
+    private val localDateFormatter = DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm").withResolverStyle(ResolverStyle.STRICT)
+    private val calendarUtcFormatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneOffset.UTC)
+
+    private fun localEventInstant(value: String, zone: ZoneId, fieldLabel: String): Instant {
+        val local = try { LocalDateTime.parse(value, localDateFormatter) } catch (_: Exception) {
+            throw IllegalArgumentException(fieldLabel + " must use YYYY-MM-DDTHH:mm.")
+        }
+        val offsets = zone.rules.getValidOffsets(local)
+        if (offsets.isEmpty()) throw IllegalArgumentException(fieldLabel + " falls in a daylight-saving clock gap. Choose another time.")
+        if (offsets.size > 1) throw IllegalArgumentException(fieldLabel + " occurs twice because clocks change. Choose a time outside the repeated hour.")
+        return local.atOffset(offsets.single()).toInstant()
+    }
+
+    fun gsm7Alternative(text: String): String {
+        val replacements = mapOf(
+            '\u2018' to "'", '\u2019' to "'", '\u201a' to "'", '\u201b' to "'",
+            '\u201c' to "\"", '\u201d' to "\"", '\u201e' to "\"", '\u201f' to "\"",
+            '\u2013' to "-", '\u2014' to "-", '\u2212' to "-", '\u2011' to "-",
+            '\u2026' to "...", '\u2022' to "-", '\u00a0' to " ", '\u2007' to " ",
+            '\u2009' to " ", '\u202f' to " ", '\u200b' to "", '\u200c' to "",
+            '\u200d' to "", '\ufeff' to "", '\u00ad' to "",
+        )
+        return buildString { text.forEach { append(replacements[it] ?: it) } }
+    }
+
+    private fun escapeIcs(value: String): String = value
+        .replace("\\", "\\\\")
+        .replace("\r\n", "\\n").replace("\r", "\\n").replace("\n", "\\n")
+        .replace(";", "\\;").replace(",", "\\,")
+
+    private fun foldIcsLine(line: String): String {
+        val result = mutableListOf<String>()
+        var current = ""
+        line.codePoints().forEach { codePoint ->
+            val character = String(Character.toChars(codePoint))
+            if (current.isNotEmpty() && (current + character).toByteArray(Charsets.UTF_8).size > 75) {
+                result += current
+                current = " " + character
+            } else current += character
+        }
+        result += current
+        return result.joinToString("\r\n")
+    }
+
+    fun calendarIcs(toolId: String, values: Map<String, String>): String {
+        val (kind, _) = parse(toolId)
+        require(kind in calendarKinds) { "Calendar export is available for meetings, agendas, invitations and reminders." }
+        fun value(key: String) = values[key].orEmpty().trim()
+        val zoneName = value("timezone")
+        require(zoneName.isNotBlank()) { "Choose a time zone before exporting the event." }
+        val zone = try { ZoneId.of(zoneName) } catch (_: Exception) {
+            throw IllegalArgumentException("Choose a valid IANA time zone, such as Africa/Lagos or Europe/London.")
+        }
+        val start = localEventInstant(value("date"), zone, "Event date and time")
+        val rawDuration = value("duration")
+        val duration = if (rawDuration.isNotBlank()) rawDuration.toIntOrNull()
+            ?: throw IllegalArgumentException("Event duration must be a whole number of minutes.")
+            else if (kind == "invitation") 60 else if (kind == "reminder") 15 else 30
+        require(duration in 5..480) { "Set an event duration between 5 and 480 minutes." }
+        if (kind == "invitation" && value("rsvpBy").isNotBlank()) {
+            val rsvp = localEventInstant(value("rsvpBy"), zone, "RSVP deadline")
+            require(rsvp.isBefore(start)) { "The RSVP deadline must be earlier than the event." }
+        }
+        val title = value("subject").ifBlank { kind.replace('-', ' ').replaceFirstChar { it.uppercase() } }
+        val end = start.plusSeconds(duration.toLong() * 60)
+        val description = listOf(
+            value("purpose").takeIf { it.isNotBlank() }?.let { "Purpose: " + it },
+            value("details").takeIf { it.isNotBlank() },
+            value("items").takeIf { it.isNotBlank() }?.let { "Agenda:\n" + it },
+            value("decisions").takeIf { it.isNotBlank() }?.let { "Decisions:\n" + it },
+            value("actionItems").takeIf { it.isNotBlank() }?.let { "Action items:\n" + it },
+            value("nextStep").takeIf { it.isNotBlank() }?.let { "Next step / RSVP: " + it },
+            value("rsvpBy").takeIf { it.isNotBlank() }?.let { "RSVP by: " + it },
+            value("name").takeIf { it.isNotBlank() }?.let { "Audience / attendees: " + it },
+        ).filterNotNull().joinToString("\n\n")
+        val uidSource = listOf(kind, title, value("date"), zoneName, value("name")).joinToString("|")
+        var uidHash = -3750763034362895579L
+        for (byte in uidSource.toByteArray(Charsets.UTF_8)) {
+            uidHash = (uidHash xor (byte.toLong() and 0xffL)) * 1099511628211L
+        }
+        val uid = java.lang.Long.toUnsignedString(uidHash, 16).padStart(16, '0') + "@envtools.store"
+        val lines = listOf(
+            "BEGIN:VCALENDAR", "PRODID:-//enV//Communication Tools//EN", "VERSION:2.0", "CALSCALE:GREGORIAN",
+            "METHOD:PUBLISH", "BEGIN:VEVENT", "UID:" + uid, "DTSTAMP:" + calendarUtcFormatter.format(Instant.now()),
+            "DTSTART:" + calendarUtcFormatter.format(start), "DTEND:" + calendarUtcFormatter.format(end),
+            "X-WR-TIMEZONE:" + escapeIcs(zoneName), "SUMMARY:" + escapeIcs(title), "DESCRIPTION:" + escapeIcs(description),
+            "LOCATION:" + escapeIcs(value("place")), "STATUS:CONFIRMED", "TRANSP:OPAQUE",
+            "BEGIN:VALARM", "ACTION:DISPLAY", "TRIGGER:-PT15M", "DESCRIPTION:" + escapeIcs(title),
+            "END:VALARM", "END:VEVENT", "END:VCALENDAR",
+        )
+        return lines.joinToString("\r\n") { foldIcsLine(it) } + "\r\n"
     }
 
     private fun format(value: String, kind: String): String =
@@ -287,11 +416,19 @@ internal object NativeCommunicationEngine {
 fun NativeCommunicationToolForm(toolId: String) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
-    var values by remember(toolId) { mutableStateOf(mapOf("timezone" to java.util.TimeZone.getDefault().id, "tone" to "professional")) }
+    val (kind, action) = NativeCommunicationEngine.parse(toolId)
+    val defaultDuration = when (kind) { "invitation" -> "60"; "reminder" -> "15"; else -> "30" }
+    var values by remember(toolId) { mutableStateOf(mapOf("timezone" to java.util.TimeZone.getDefault().id, "tone" to "professional", "duration" to defaultDuration)) }
     var output by remember(toolId) { mutableStateOf("") }
     var error by remember(toolId) { mutableStateOf("") }
     var checks by remember(toolId) { mutableStateOf(emptyList<String>()) }
-    val (_, action) = NativeCommunicationEngine.parse(toolId)
+    var calendarOutput by remember(toolId) { mutableStateOf("") }
+    val calendarSaveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/calendar")) { uri ->
+        if (uri != null) runCatching {
+            val stream = context.contentResolver.openOutputStream(uri) ?: throw IllegalStateException("Unable to open the selected calendar file.")
+            stream.use { it.write(calendarOutput.toByteArray(Charsets.UTF_8)) }
+        }.onFailure { error = it.message ?: "Could not save the calendar file." }
+    }
     val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
         if (uri != null) {
             runCatching {
@@ -326,7 +463,7 @@ fun NativeCommunicationToolForm(toolId: String) {
                     }
                     .onFailure { output = ""; checks = emptyList(); error = it.message ?: "Could not create the draft." }
             }) { Text(if (action == "formatter") "Format" else if (action == "template") "Use template" else "Generate") }
-            OutlinedButton(onClick = { values = mapOf("timezone" to java.util.TimeZone.getDefault().id, "tone" to "professional"); output = ""; checks = emptyList(); error = "" }) { Text("Reset") }
+            OutlinedButton(onClick = { values = mapOf("timezone" to java.util.TimeZone.getDefault().id, "tone" to "professional", "duration" to defaultDuration); output = ""; checks = emptyList(); error = "" }) { Text("Reset") }
         }
         if (error.isNotEmpty()) Text(error, color = MaterialTheme.colorScheme.error)
         checks.forEach { check ->
@@ -334,9 +471,28 @@ fun NativeCommunicationToolForm(toolId: String) {
         }
         if (output.isNotEmpty()) {
             Spacer(Modifier.height(4.dp))
+            val gsm7 = if (kind == "sms") NativeCommunicationEngine.gsm7Alternative(output).takeIf {
+                it != output && NativeCommunicationEngine.smsMetrics(it).first
+            } else null
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { clipboard.setText(AnnotatedString(output)) }) { Text("Copy") }
                 OutlinedButton(onClick = { saveLauncher.launch("env-communication.txt") }) { Text("Save") }
+                if (kind in setOf("meeting", "agenda", "invitation", "reminder")) {
+                    OutlinedButton(onClick = {
+                        runCatching { NativeCommunicationEngine.calendarIcs(toolId, values) }
+                            .onSuccess { calendarOutput = it; calendarSaveLauncher.launch("env-$kind.ics") }
+                            .onFailure { error = it.message ?: "Could not create the calendar file." }
+                    }) { Text("Save calendar") }
+                }
+                if (gsm7 != null) OutlinedButton(onClick = { clipboard.setText(AnnotatedString(gsm7)) }) { Text("Copy GSM-7 version") }
+            }
+            if (kind == "sms") {
+                val metrics = NativeCommunicationEngine.smsMetrics(output)
+                Text(
+                    (if (metrics.first) "GSM-7" else "UCS-2") + " · " + metrics.second + " units · " + metrics.third + " segment(s)",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             Text(output, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
         }

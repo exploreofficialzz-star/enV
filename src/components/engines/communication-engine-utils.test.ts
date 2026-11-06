@@ -2,10 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildCommunication,
+  buildCommunicationCalendarIcs,
   buildSignatureHtml,
   communicationQualityChecks,
+  getCommunicationEventInstant,
   getSmsMetrics,
   parseToolId,
+  suggestGsm7Text,
 } from "./communication-engine-utils.ts";
 
 test("the catalog's 55 Communication tools all resolve to supported workflows", () => {
@@ -137,4 +140,84 @@ test("signature quality check accepts a valid email address", () => {
   const output = buildCommunication(input);
   const checks = communicationQualityChecks(input, output).join(" ");
   assert.doesNotMatch(checks, /email address/);
+});
+
+
+test("calendar export creates interoperable UTC event data and folds long lines", () => {
+  const input = {
+    kind: "meeting", action: "builder", subject: "Roadmap, review; draft",
+    date: "2026-11-05T10:00", timezone: "Africa/Lagos", duration: "45",
+    place: "Room A", details: "First line\nSecond line",
+  } as const;
+  const ics = buildCommunicationCalendarIcs(input);
+  assert.match(ics, /BEGIN:VCALENDAR/);
+  assert.match(ics, /VERSION:2.0/);
+  assert.match(ics, /SUMMARY:Roadmap\\, review\\; draft/);
+  assert.match(ics, /DESCRIPTION:First line\\nSecond line/);
+  assert.match(ics, /DTSTART:20261105T090000Z/);
+  assert.match(ics, /DTEND:20261105T094500Z/);
+  assert.match(ics, /BEGIN:VALARM/);
+  for (const line of ics.split("\r\n").filter(Boolean)) {
+    assert.ok(new TextEncoder().encode(line).length <= 75, "iCalendar content lines stay within 75 UTF-8 octets");
+  }
+});
+
+test("calendar date conversion rejects nonexistent and repeated daylight-saving times", () => {
+  assert.throws(
+    () => getCommunicationEventInstant("2026-03-08T02:30", "America/New_York"),
+    /does not exist/,
+  );
+  assert.throws(
+    () => getCommunicationEventInstant("2026-11-01T01:30", "America/New_York"),
+    /occurs twice/,
+  );
+});
+
+test("calendar exports require a valid timezone and RSVP before the event", () => {
+  assert.throws(() => buildCommunicationCalendarIcs({
+    kind: "invitation", action: "builder", date: "2026-11-05T10:00",
+    timezone: "Not/A_Timezone", rsvpBy: "2026-11-04T10:00",
+  }), /valid IANA time zone/);
+  assert.throws(() => buildCommunicationCalendarIcs({
+    kind: "invitation", action: "builder", date: "2026-11-05T10:00",
+    timezone: "Africa/Lagos", rsvpBy: "2026-11-05T10:00",
+  }), /RSVP deadline must be earlier/);
+});
+
+test("GSM-7 alternative only replaces common smart punctuation and invisible spaces", () => {
+  const original = "“Price”—it’s ready… now";
+  const safe = suggestGsm7Text(original);
+  assert.equal(safe, "\"Price\"-it's ready... now");
+  assert.equal(getSmsMetrics(safe).encoding, "GSM-7");
+  assert.notEqual(original, safe);
+});
+
+test("email quality checks detect duplicate recipients across To, Cc and Bcc", () => {
+  const input = {
+    kind: "email", action: "builder", email: "alex@example.com",
+    cc: "team@example.com; Alex@example.com", bcc: "hidden@example.com",
+    subject: "Update", details: "The plan is ready.",
+  } as const;
+  const checks = communicationQualityChecks(input, buildCommunication(input)).join(" ");
+  assert.match(checks, /more than once across To, Cc and Bcc/);
+});
+
+test("email headers cannot inject extra header lines", () => {
+  const input = {
+    kind: "email", action: "builder", email: "alex@example.com",
+    subject: "Update\r\nBcc: victim@example.com", details: "The plan is ready.",
+  } as const;
+  const output = buildCommunication(input);
+  assert.doesNotMatch(output, /\r\nBcc: victim@example\.com/);
+  assert.match(communicationQualityChecks(input, output).join(" "), /control characters/);
+});
+
+
+test("calendar UID remains stable across platform implementations", () => {
+  const input = {
+    kind: "meeting", action: "builder", subject: "Roadmap, review; draft",
+    date: "2026-11-05T10:00", timezone: "Africa/Lagos", duration: "45",
+  } as const;
+  const ics = buildCommunicationCalendarIcs(input);
+  assert.match(ics, /UID:8734b83babcc1f0d@envtools\.store/);
 });
