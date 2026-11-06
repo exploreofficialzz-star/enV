@@ -1974,7 +1974,7 @@ struct NativeCameraStudioView: View {
                     ForEach(NativeCameraLook.allCases) { item in Text(item.rawValue).tag(item) }
                 }.pickerStyle(.menu)
             }
-            if !dualCameraMode {
+            if !dualCameraMode && mode == "Video" {
                 HStack {
                     Text("Face effects").font(.envScaled(size: 12, weight: .medium)).foregroundStyle(Color.envInk)
                     Spacer()
@@ -2037,6 +2037,12 @@ struct NativeCameraStudioView: View {
         }
         .onChange(of: look) { nextLook in capture.setLook(nextLook) }
         .onChange(of: faceEffect) { nextEffect in capture.setFaceEffect(nextEffect) }
+        .onChange(of: mode) { nextMode in
+            if nextMode == "Photo" {
+                faceEffect = "Off"
+                capture.setFaceEffect("Off")
+            }
+        }
         .onDisappear {
             dualCapture.stop()
             capture.stop()
