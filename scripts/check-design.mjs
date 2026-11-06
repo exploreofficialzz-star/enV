@@ -10,7 +10,7 @@ const expectedIds = [
   "palette-generator", "gradient-generator", "css-shadow-generator", "css-border-generator",
   "glassmorphism-generator", "neumorphism-generator", "css-button-generator", "css-card-generator",
   "blob-generator", "svg-wave-generator", "contrast-checker", "wcag-checker",
-  "color-blindness-simulator", "text-shadow-generator", "noise-generator",
+  "color-blindness-simulator", "text-shadow-generator", "noise-generator", "smartphone-prototype-lab",
 ];
 const ids = design.map((tool) => tool.id);
 const generatedCoreIds = expectedIds.filter((id) => id !== "hex-color-converter");
@@ -28,18 +28,26 @@ const missing = [
   ...(!hexConverterRegistered ? ["hex-color-converter"] : []),
 ];
 const duplicates = ids.filter((id, index) => ids.indexOf(id) !== index);
-const invalid = design.filter((tool) => tool.status === "planned" || !tool.engine?.type || !tool.engine?.op);
+const validCustomDesignIds = new Set(["smartphone-prototype-lab"]);
+const invalid = design.filter((tool) =>
+  tool.status === "planned"
+  || !tool.engine?.type
+  || (!tool.engine?.op && !(tool.engine.type === "custom" && validCustomDesignIds.has(tool.id))),
+);
 // Keep Design a first-class category. Color/CSS Design engines must never leak
 // into Calculators (or any other category), and core Design IDs must stay here.
 const misplacedDesignTools = tools.filter((tool) =>
   (expectedIds.includes(tool.id) || ["color", "cssgen"].includes(tool.engine?.type)) && tool.category !== "design",
 );
-const allowedTypes = new Set(["color", "cssgen"]);
+const allowedTypes = new Set(["color", "cssgen", "custom"]);
 const badType = design.filter((tool) => !allowedTypes.has(tool.engine?.type));
 const allowedColorOps = new Set(["picker", "palette", "contrast"]);
 const allowedCssFamilies = new Set(["avatar", "badge", "blob", "border", "button", "card", "glass", "gradient", "input", "neomorph", "noise", "pattern", "shadow", "wave"]);
 const allowedCssActions = new Set(["builder", "css", "generator", "preset", "preview", "svg", "token"]);
 const unsupportedOps = design.filter((tool) => {
+  if (tool.engine?.type === "custom") {
+    return !(tool.id === "smartphone-prototype-lab" && tool.engine.id === "smartphone-prototype-lab");
+  }
   if (tool.engine?.type === "color") return !allowedColorOps.has(tool.engine?.op);
   if (tool.engine?.type !== "cssgen") return true;
   const [family, action, extra] = String(tool.engine?.op ?? "").split(":");
@@ -99,7 +107,7 @@ const unmappedGeneratedDesignTools = generatedDesignTools.filter((tool) => {
 const checks = [
   ["Design tools are isolated from Calculators and other categories", misplacedDesignTools.length === 0],
   ["Design category search", explorer.includes("Search design tools")],
-  ["Design category filter groups", ["Color & palettes", "Gradients & effects", "SVG & backgrounds", "Accessibility"].every((label) => explorer.includes(label))],
+  ["Design category filter groups", ["Color & palettes", "Gradients & effects", "SVG & backgrounds", "Accessibility", "Product engineering"].every((label) => explorer.includes(label))],
   ["Every core Design tool appears in exactly one explorer group", missingExplorerIds.length === 0 && duplicateExplorerIds.length === 0 && unexpectedExplorerIds.length === 0 && explorerGroupIds.length === expectedIds.length],
   ["Generated Design workflow families are mapped into visible groups", designCatalogGenerator.includes('addCross("design"') && ["gradient", "shadow", "border", "glass", "neomorph", "noise", "button", "card", "badge", "input", "avatar", "pattern", "blob", "wave"].every((family) => explorerUtils.includes(family + ":")) && explorerUtils.includes('engine.type === "color"') && explorerUtilsTests.includes("every generated Design CSS family maps to one visible explorer group")],
   ["Generated tools participate in explorer filtering and result counts", explorer.includes("getGeneratedDesignTools(tools, CORE_TOOL_IDS, group.id)") && explorerUtils.includes("getGeneratedDesignTools") && explorerUtilsTests.includes("generated utilities are grouped once") && explorer.includes("uniqueTools.filter((tool) => !normalizedQuery")],
