@@ -11,14 +11,14 @@ Build a simple camera that feels familiar to anyone who has used a normal phone 
 CURRENT BASELINE
 Camera Studio is integrated across the web app, Android CameraX and iOS AVFoundation. The browser version includes permission-gated preview, front/rear switching, photos, video with microphone fallback, eight color looks, requested 720p/1080p/4K and 24/30/60 fps targets, hardware-reported zoom/exposure/torch, framing grid, timer, a temporary local gallery, download, and recording recovery.
 
-The native applications have separate camera screens. Android includes photo/video capture, contextual permissions, silent-video fallback, front/rear switching, torch, zoom, tap-to-focus, exposure compensation and local document-picker export. The Camera Studio parity upgrade adds a 3/10-second photo timer, framing grid, CameraX video-quality choices (720p/1080p/4K) and 24/30/60 fps targets with device fallback. Requested quality and frame rate are not guaranteed on every phone.
+The native applications have separate camera screens. Android includes photo/video capture, contextual permissions, silent-video fallback, front/rear switching, torch, zoom, tap-to-focus, exposure compensation and local document-picker export. The Camera Studio parity upgrade adds a 3/10-second photo timer, framing grid, CameraX video-quality choices (720p/1080p/4K) and 24/30/60 fps targets with device fallback. A dedicated front + rear video mode now uses CameraX concurrent-camera composition to record one combined clip on supported Android 11+ devices. Unsupported phones retain the normal single-camera path. Requested quality and frame rate are not guaranteed on every phone.
 
 iOS includes photo/video capture, interruption recovery, photo looks, timer, Photos export/share, zoom, torch, tap-to-focus, exposure compensation and actual active-format reporting. The Camera Studio parity upgrade adds all eight photo looks, a framing grid, recent-capture share/remove actions, focus lock, white-balance presets and manual ISO/shutter controls only when the active camera format reports support.
 
 The browser dual-camera upgrade requests a second, distinct camera device only after the user enables it. When the browser and phone permit both streams, the preview and exported photos/videos are composited as picture-in-picture or split view. If the second stream cannot open, the tool reports that condition and retains single-camera use. It never duplicates one stream to simulate two cameras.
 
 Current limits that remain real:
-- Native Android/iOS true simultaneous front/rear recording is not complete in this pass.
+- Native Android concurrent front/rear recording is implemented with capability checks and a composed video output; it still requires physical-device acceptance across supported camera combinations. Native iOS simultaneous front/rear recording remains outstanding.
 - Snapchat-style live face-landmark tracking, AR masks and face-attached effects are not complete. Color looks are not face tracking.
 - Native Android/iOS live-video filters are not complete; iOS looks currently affect photos, not native video.
 - Browser dual-camera availability depends on the browser and actual phone hardware. Physical-device acceptance is still required.
@@ -45,8 +45,8 @@ PHASE 2 — DEVICE-AWARE PRO CAMERA CONTROLS
 
 PHASE 3 — TRUE FRONT + REAR SIMULTANEOUS RECORDING
 This is not the same as switching between cameras.
-1. Android: investigate CameraX ConcurrentCamera. Check FEATURE_CAMERA_CONCURRENT and the available concurrent camera combinations before presenting the feature. Respect platform/device limits, camera resource pressure and supported output resolutions. Provide picture-in-picture or split-screen composition with a clear layout toggle.
-2. iOS: investigate AVCaptureMultiCamSession and check isMultiCamSupported before creating the session. Respect hardwareCost and systemPressureCost; gracefully disable or lower quality when the session exceeds resource limits.
+1. Android: implemented using CameraX concurrent mode. The app checks Android 11+ and FEATURE_CAMERA_CONCURRENT, verifies a front/rear concurrent combination, and binds shared Preview and VideoCapture use cases so CameraX records a single composed stream. The dual-camera path uses an HD target to reduce pressure; actual output and availability remain device-dependent. Physical-device tests are still required. The first release uses CameraX's default concurrent composition layout; an interactive PiP/split layout selector is not yet exposed.
+2. iOS: still to implement using AVCaptureMultiCamSession and isMultiCamSupported. Respect hardwareCost and systemPressureCost; gracefully disable or lower quality when the session exceeds resource limits.
 3. On devices that do not support simultaneous capture, show a clear unavailable state and retain normal single-camera operation.
 4. Test front + rear capture, audio synchronization, orientation, device heat, battery drain, app backgrounding, and recording finalization on real devices.
 5. Do not simulate dual camera by showing the same stream twice, and do not imply that a device supports dual capture just because it has two lenses.
