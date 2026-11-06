@@ -17,6 +17,29 @@ private enum NativeCameraLook: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+private struct NativeCameraLensOption: Identifiable, Hashable {
+    let id: String
+    let title: String
+}
+
+private func applyNativeCameraLook(_ source: CIImage, look: NativeCameraLook) -> CIImage {
+    guard look != .natural else { return source }
+    switch look {
+    case .natural: return source
+    case .mono: return source.applyingFilter("CIPhotoEffectMono")
+    case .warm: return source.applyingFilter("CISepiaTone", parameters: [kCIInputIntensityKey: 0.22])
+    case .cool: return source.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0.92, kCIInputContrastKey: 1.04, kCIInputBrightnessKey: 0.01])
+    case .vivid: return source.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 1.25, kCIInputContrastKey: 1.08, kCIInputBrightnessKey: 0.0])
+    case .fade: return source.applyingFilter("CIPhotoEffectFade")
+    case .sunset:
+        let warm = source.applyingFilter("CISepiaTone", parameters: [kCIInputIntensityKey: 0.18])
+        return warm.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 1.22, kCIInputContrastKey: 1.02, kCIInputBrightnessKey: 0.02])
+    case .glow:
+        let bright = source.applyingFilter("CIExposureAdjust", parameters: [kCIInputEVKey: 0.25])
+        return bright.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 1.12, kCIInputContrastKey: 0.96, kCIInputBrightnessKey: 0.01])
+    }
+}
+
 private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate, AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
     let session = AVCaptureSession()
     @Published private(set) var ready = false
@@ -34,6 +57,8 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
     @Published private(set) var supportsFocusLock = false
     @Published private(set) var focusLocked = false
     @Published private(set) var whiteBalanceSelection = "Auto"
+    @Published private(set) var lensOptions: [NativeCameraLensOption] = []
+    @Published private(set) var selectedLensID = ""
     @Published private(set) var recentCaptures: [URL] = []
     @Published private(set) var actualQuality = "Camera starting…"
     @Published private(set) var latestPhotoURL: URL?
@@ -253,6 +278,56 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
                 Task { @MainActor in self.error = error.localizedDescription }
             }
         }
+    }
+
+    func selectLens(uniqueID: String) {
+        guard ready, !recording, !recordingRequested else { return }
+        queue.async { [weak self] in
+            guard let self else { return }
+            let discovery = AVCaptureDevice.DiscoverySession(
+                deviceTypes: [.builtInUltraWideCamera, .builtInWideAngleCamera, .builtInTelephotoCamera],
+                mediaType: .video,
+                position: self.cameraPosition
+            )
+            guard let nextDevice = discovery.devices.first(where: { $0.uniqueID == uniqueID }) else {
+                Task { @MainActor in self.error = "That lens is no longer available on this device." }
+                return
+            }
+            do {
+                let nextInput = try AVCaptureDeviceInput(device: nextDevice)
+                self.session.beginConfiguration()
+                let previousInput = self.videoInput
+                if let previousInput { self.session.removeInput(previousInput) }
+                guard self.session.canAddInput(nextInput) else {
+                    if let previousInput, self.session.canAddInput(previousInput) { self.session.addInput(previousInput) }
+                    self.session.commitConfiguration()
+                    throw NativeCameraError.message("This lens cannot be selected while the current capture session is active.")
+                }
+                self.session.addInput(nextInput)
+                self.videoInput = nextInput
+                self.session.commitConfiguration()
+                Task { @MainActor in
+                    self.selectedLensID = nextDevice.uniqueID
+                    self.refreshDeviceCapabilities(device: nextDevice)
+                    self.message = "Selected \(self.lensTitle(for: nextDevice))."
+                    self.error = nil
+                }
+            } catch {
+                Task { @MainActor in self.error = error.localizedDescription }
+            }
+        }
+    }
+
+    private func lensTitle(for device: AVCaptureDevice) -> String {
+        switch device.deviceType {
+        case .builtInUltraWideCamera: return "Ultra-wide"
+        case .builtInTelephotoCamera: return "Telephoto"
+        default: return "Wide"
+        }
+    }
+
+    func setLook(_ look: NativeCameraLook) {
+        activeLook = look
     }
 
     func focus(at point: CGPoint) {
@@ -488,6 +563,7 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
         let startWithAudio: (Bool) -> Void = { [weak self] audioAllowed in
             guard let self else { return }
             self.queue.async {
+                guard !self.recordingRequested else { return }
                 var outputURL: URL?
                 do {
                     var useAudio = false
@@ -509,6 +585,15 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
                             if useAudio {
                                 self.audioDataOutput.setSampleBufferDelegate(self, queue: self.queue)
                             }
+                        }
+                    } else {
+                        if self.session.outputs.contains(where: { $0 === self.audioDataOutput }) {
+                            self.audioDataOutput.setSampleBufferDelegate(nil, queue: nil)
+                            self.session.removeOutput(self.audioDataOutput)
+                        }
+                        if let existingAudioInput = self.audioInput {
+                            self.session.removeInput(existingAudioInput)
+                            self.audioInput = nil
                         }
                     }
                     self.session.commitConfiguration()
@@ -669,7 +754,6 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
         activeVideoURL = nil
         writerSessionStarted = false
         writerStartTime = .invalid
-        activeLook = .natural
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
@@ -717,9 +801,17 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
         previewSink = layer
     }
 
+    @MainActor
     private func refreshDeviceCapabilities(device: AVCaptureDevice? = nil) {
         guard let device = device ?? videoInput?.device else { return }
         hasTorch = device.hasTorch
+        let discovery = AVCaptureDevice.DiscoverySession(
+            deviceTypes: [.builtInUltraWideCamera, .builtInWideAngleCamera, .builtInTelephotoCamera],
+            mediaType: .video,
+            position: device.position
+        )
+        lensOptions = discovery.devices.map { NativeCameraLensOption(id: $0.uniqueID, title: lensTitle(for: $0)) }
+        selectedLensID = device.uniqueID
         zoomMaximum = min(device.activeFormat.videoMaxZoomFactor, 6)
         let minimumBias = Double(device.minExposureTargetBias)
         let maximumBias = Double(device.maxExposureTargetBias)
@@ -828,21 +920,7 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
     }
 
     private func applyLook(_ source: CIImage, look: NativeCameraLook) -> CIImage {
-        guard look != .natural else { return source }
-        switch look {
-        case .natural: return source
-        case .mono: return source.applyingFilter("CIPhotoEffectMono")
-        case .warm: return source.applyingFilter("CISepiaTone", parameters: [kCIInputIntensityKey: 0.22])
-        case .cool: return source.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0.92, kCIInputContrastKey: 1.04, kCIInputBrightnessKey: 0.01])
-        case .vivid: return source.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 1.25, kCIInputContrastKey: 1.08, kCIInputBrightnessKey: 0.0])
-        case .fade: return source.applyingFilter("CIPhotoEffectFade")
-        case .sunset:
-            let warm = source.applyingFilter("CISepiaTone", parameters: [kCIInputIntensityKey: 0.18])
-            return warm.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 1.22, kCIInputContrastKey: 1.02, kCIInputBrightnessKey: 0.02])
-        case .glow:
-            let bright = source.applyingFilter("CIExposureAdjust", parameters: [kCIInputEVKey: 0.25])
-            return bright.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 1.12, kCIInputContrastKey: 0.96, kCIInputBrightnessKey: 0.01])
-        }
+        applyNativeCameraLook(source, look: look)
     }
 }
 
@@ -860,6 +938,7 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
     private let frontOutput = AVCaptureVideoDataOutput()
     private let audioOutput = AVCaptureAudioDataOutput()
     private let imageContext = CIContext()
+    private var activeLook: NativeCameraLook = .natural
     private var backInput: AVCaptureDeviceInput?
     private var frontInput: AVCaptureDeviceInput?
     private var microphoneInput: AVCaptureDeviceInput?
@@ -1050,22 +1129,22 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
         }
     }
 
-    func startRecording(completion: @escaping (URL?, String?) -> Void) {
+    func startRecording(look: NativeCameraLook, completion: @escaping (URL?, String?) -> Void) {
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized:
-            beginRecording(includeAudio: true, completion: completion)
+            beginRecording(includeAudio: true, look: look, completion: completion)
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
-                self?.beginRecording(includeAudio: granted, completion: completion)
+                self?.beginRecording(includeAudio: granted, look: look, completion: completion)
             }
         case .denied, .restricted:
-            beginRecording(includeAudio: false, completion: completion)
+            beginRecording(includeAudio: false, look: look, completion: completion)
         @unknown default:
-            beginRecording(includeAudio: false, completion: completion)
+            beginRecording(includeAudio: false, look: look, completion: completion)
         }
     }
 
-    private func beginRecording(includeAudio: Bool, completion: @escaping (URL?, String?) -> Void) {
+    private func beginRecording(includeAudio: Bool, look: NativeCameraLook, completion: @escaping (URL?, String?) -> Void) {
         queue.async { [weak self] in
             guard let self, self.ready, !self.recordingRequested else { return }
             do {
@@ -1132,6 +1211,7 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
                 self.audioWriterInput = audioInput
                 self.pixelBufferAdaptor = adaptor
                 self.writerSessionStarted = false
+                self.activeLook = look
                 self.recordingRequested = true
                 self.recordingCompletion = completion
                 self.latestBackBuffer = nil
@@ -1341,7 +1421,8 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
         let inset = aspectFill(CIImage(cvPixelBuffer: front), into: CGRect(origin: .zero, size: pipRect.size))
             .transformed(by: CGAffineTransform(translationX: pipRect.minX, y: pipRect.minY))
         let composite = inset.composited(over: background).cropped(to: canvas)
-        imageContext.render(composite, to: output, bounds: canvas, colorSpace: CGColorSpaceCreateDeviceRGB())
+        let filteredComposite = applyNativeCameraLook(composite, look: activeLook)
+        imageContext.render(filteredComposite, to: output, bounds: canvas, colorSpace: CGColorSpaceCreateDeviceRGB())
         return output
     }
 
@@ -1577,7 +1658,7 @@ struct NativeCameraStudioView: View {
                         if dualCapture.recording {
                             dualCapture.stopRecording()
                         } else {
-                            dualCapture.startRecording { url, failure in
+                            dualCapture.startRecording(look: look) { url, failure in
                                 if let url { capture.registerExternalVideo(url) }
                                 if let failure { capture.error = failure }
                             }
@@ -1653,6 +1734,22 @@ struct NativeCameraStudioView: View {
 
             DisclosureGroup("Advanced controls", isExpanded: $showAdvancedControls) {
                 VStack(alignment: .leading, spacing: 12) {
+                    if capture.lensOptions.count > 1 {
+                        HStack {
+                            Text("Lens").font(.envScaled(size: 12, weight: .medium)).foregroundStyle(Color.envInk)
+                            Spacer()
+                            Picker("Lens", selection: Binding(
+                                get: { capture.selectedLensID },
+                                set: { capture.selectLens(uniqueID: $0) }
+                            )) {
+                                ForEach(capture.lensOptions) { lens in
+                                    Text(lens.title).tag(lens.id)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .disabled(capture.recording)
+                        }
+                    }
                     if capture.supportsFocusLock {
                         Toggle("Lock focus", isOn: Binding(get: { capture.focusLocked }, set: { capture.setFocusLocked($0) }))
                             .font(.envScaled(size: 12, weight: .medium))
@@ -1748,7 +1845,11 @@ struct NativeCameraStudioView: View {
                 }
             }
         }
-        .onAppear { capture.start() }
+        .onAppear {
+            capture.setLook(look)
+            capture.start()
+        }
+        .onChange(of: look) { _, nextLook in capture.setLook(nextLook) }
         .onDisappear {
             dualCapture.stop()
             capture.stop()
