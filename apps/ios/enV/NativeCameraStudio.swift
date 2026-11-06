@@ -867,10 +867,10 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
             if activeFaceEffect == "Glasses" {
                 let leftPoints = face.landmarks?.leftEye?.normalizedPoints ?? []
                 let rightPoints = face.landmarks?.rightEye?.normalizedPoints ?? []
-                func centerOfEye(_ points: [vector_float2]) -> CGPoint? {
+                func centerOfEye(_ points: [CGPoint]) -> CGPoint? {
                     guard !points.isEmpty else { return nil }
                     let total = points.reduce(CGPoint.zero) { partial, point in
-                        CGPoint(x: partial.x + CGFloat(point.x), y: partial.y + CGFloat(point.y))
+                        CGPoint(x: partial.x + point.x, y: partial.y + point.y)
                     }
                     return CGPoint(
                         x: total.x / CGFloat(points.count),
