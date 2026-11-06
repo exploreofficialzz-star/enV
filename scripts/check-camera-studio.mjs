@@ -57,6 +57,7 @@ assert.ok(androidCamera.includes('Text("Discard")'));
 assert.match(iosCamera, /func setFocusLocked/);
 assert.match(iosCamera, /func setWhiteBalance/);
 assert.match(iosCamera, /func setManualExposure/);
+assert.ok(iosCamera.includes("AVCaptureMultiCamSession"));
 assert.match(iosCamera, /setExposureModeCustom/);
 assert.match(iosCamera, /manualISORange/);
 assert.match(iosCamera, /manualShutterRange/);
