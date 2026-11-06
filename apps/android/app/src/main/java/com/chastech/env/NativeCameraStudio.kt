@@ -7,10 +7,21 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
 import android.content.pm.PackageManager
+import android.graphics.PointF
+import android.graphics.Canvas as AndroidCanvas
+import android.graphics.Matrix as AndroidMatrix
+import android.graphics.Paint
+import android.graphics.Path as AndroidPath
+import android.graphics.RadialGradient
+import android.graphics.RectF
+import android.graphics.Shader
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CaptureRequest
 import android.provider.Settings
 import android.os.Build
+import android.os.Handler
+import android.os.HandlerThread
+import android.os.Looper
 import android.util.Range
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -24,6 +35,8 @@ import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.Camera2CameraControl
 import androidx.camera.camera2.interop.CaptureRequestOptions
 import androidx.camera.core.CameraEffect
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.effects.OverlayEffect
 import androidx.camera.media3.effect.Media3Effect
 import androidx.camera.core.ConcurrentCamera
 import androidx.camera.core.Preview
@@ -98,6 +111,15 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.Brightness
 import androidx.media3.effect.Contrast
 import androidx.media3.effect.HslAdjustment
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.face.Face
+import com.google.mlkit.vision.face.FaceDetection
+import com.google.mlkit.vision.face.FaceDetector
+import com.google.mlkit.vision.face.FaceDetectorOptions
+import com.google.mlkit.vision.face.FaceLandmark
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
+import java.util.function.Consumer
 import androidx.media3.effect.RgbFilter
 import androidx.compose.runtime.livedata.observeAsState
 import java.io.File
@@ -139,6 +161,159 @@ private fun nativeCameraEffects(look: NativeCameraLook): List<Effect> = when (lo
     NativeCameraLook.GLOW -> listOf(Brightness(0.045f), Contrast(-0.04f))
 }
 
+private data class NativeFaceOverlayGeometry(
+    val bounds: RectF,
+    val leftEye: PointF?,
+    val rightEye: PointF?
+)
+
+private fun mlKitPointToSensor(
+    x: Float,
+    y: Float,
+    imageWidth: Int,
+    imageHeight: Int,
+    rotationDegrees: Int,
+    analysisToSensor: AndroidMatrix
+): PointF {
+    val raw = when (((rotationDegrees % 360) + 360) % 360) {
+        90 -> floatArrayOf(y, imageHeight.toFloat() - x)
+        180 -> floatArrayOf(imageWidth.toFloat() - x, imageHeight.toFloat() - y)
+        270 -> floatArrayOf(imageWidth.toFloat() - y, x)
+        else -> floatArrayOf(x, y)
+    }
+    analysisToSensor.mapPoints(raw)
+    return PointF(raw[0], raw[1])
+}
+
+private fun mapNativeFaceToSensor(
+    face: Face,
+    imageWidth: Int,
+    imageHeight: Int,
+    rotationDegrees: Int,
+    analysisToSensor: AndroidMatrix
+): NativeFaceOverlayGeometry {
+    val bounds = face.boundingBox
+    val corners = floatArrayOf(
+        bounds.left.toFloat(), bounds.top.toFloat(),
+        bounds.right.toFloat(), bounds.top.toFloat(),
+        bounds.right.toFloat(), bounds.bottom.toFloat(),
+        bounds.left.toFloat(), bounds.bottom.toFloat()
+    )
+    for (index in corners.indices step 2) {
+        val point = mlKitPointToSensor(
+            corners[index], corners[index + 1],
+            imageWidth, imageHeight, rotationDegrees, analysisToSensor
+        )
+        corners[index] = point.x
+        corners[index + 1] = point.y
+    }
+    val xs = listOf(corners[0], corners[2], corners[4], corners[6])
+    val ys = listOf(corners[1], corners[3], corners[5], corners[7])
+    val sensorBounds = RectF(xs.minOrNull() ?: 0f, ys.minOrNull() ?: 0f, xs.maxOrNull() ?: 0f, ys.maxOrNull() ?: 0f)
+    fun eye(type: Int): PointF? = face.getLandmark(type)?.position?.let { position ->
+        mlKitPointToSensor(
+            position.x, position.y,
+            imageWidth, imageHeight, rotationDegrees, analysisToSensor
+        )
+    }
+    return NativeFaceOverlayGeometry(
+        bounds = sensorBounds,
+        leftEye = eye(FaceLandmark.LEFT_EYE),
+        rightEye = eye(FaceLandmark.RIGHT_EYE)
+    )
+}
+
+private fun drawNativeFaceOverlay(
+    canvas: AndroidCanvas,
+    face: NativeFaceOverlayGeometry,
+    effect: String
+) {
+    val bounds = face.bounds
+    if (bounds.width() <= 0f || bounds.height() <= 0f) return
+    when (effect) {
+        "Glasses" -> {
+            val leftEye = face.leftEye ?: return
+            val rightEye = face.rightEye ?: return
+            val eyeDistance = kotlin.math.hypot(
+                (rightEye.x - leftEye.x).toDouble(),
+                (rightEye.y - leftEye.y).toDouble()
+            ).toFloat()
+            if (eyeDistance < 1f) return
+            val lensWidth = maxOf(eyeDistance * 0.82f, bounds.width() * 0.14f)
+            val lensHeight = lensWidth * 0.52f
+            val leftLens = RectF(
+                leftEye.x - lensWidth / 2, leftEye.y - lensHeight / 2,
+                leftEye.x + lensWidth / 2, leftEye.y + lensHeight / 2
+            )
+            val rightLens = RectF(
+                rightEye.x - lensWidth / 2, rightEye.y - lensHeight / 2,
+                rightEye.x + lensWidth / 2, rightEye.y + lensHeight / 2
+            )
+            val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.argb(175, 9, 27, 39) }
+            val frame = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.rgb(94, 230, 228)
+                style = Paint.Style.STROKE
+                strokeWidth = maxOf(2f, bounds.width() * 0.012f)
+            }
+            canvas.drawRoundRect(leftLens, lensHeight * 0.24f, lensHeight * 0.24f, fill)
+            canvas.drawRoundRect(rightLens, lensHeight * 0.24f, lensHeight * 0.24f, fill)
+            canvas.drawRoundRect(leftLens, lensHeight * 0.24f, lensHeight * 0.24f, frame)
+            canvas.drawRoundRect(rightLens, lensHeight * 0.24f, lensHeight * 0.24f, frame)
+            canvas.drawLine(leftLens.right, leftEye.y, rightLens.left, rightEye.y, frame)
+        }
+        "Crown" -> {
+            val crownWidth = bounds.width() * 0.68f
+            val crownHeight = bounds.height() * 0.24f
+            val left = bounds.centerX() - crownWidth / 2
+            val right = bounds.centerX() + crownWidth / 2
+            val baseY = bounds.top - bounds.height() * 0.035f
+            val topY = baseY - crownHeight
+            val path = AndroidPath().apply {
+                moveTo(left, baseY)
+                lineTo(left + crownWidth * 0.08f, topY + crownHeight * 0.18f)
+                lineTo(left + crownWidth * 0.34f, topY + crownHeight * 0.66f)
+                lineTo(bounds.centerX(), topY)
+                lineTo(left + crownWidth * 0.66f, topY + crownHeight * 0.66f)
+                lineTo(right - crownWidth * 0.08f, topY + crownHeight * 0.18f)
+                lineTo(right, baseY)
+                close()
+            }
+            val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.rgb(255, 195, 48) }
+            val outline = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.rgb(255, 238, 176)
+                style = Paint.Style.STROKE
+                strokeWidth = maxOf(2f, bounds.width() * 0.012f)
+            }
+            canvas.drawPath(path, fill)
+            canvas.drawPath(path, outline)
+        }
+        "Soft glow" -> {
+            val radius = bounds.width() * 0.62f
+            val glow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                shader = RadialGradient(
+                    bounds.centerX(), bounds.centerY(), radius,
+                    intArrayOf(
+                        android.graphics.Color.argb(62, 255, 224, 196),
+                        android.graphics.Color.argb(26, 255, 224, 196),
+                        android.graphics.Color.TRANSPARENT
+                    ),
+                    floatArrayOf(0f, 0.64f, 1f),
+                    Shader.TileMode.CLAMP
+                )
+            }
+            canvas.drawOval(
+                RectF(
+                    bounds.centerX() - radius,
+                    bounds.centerY() - bounds.height() * 0.62f,
+                    bounds.centerX() + radius,
+                    bounds.centerY() + bounds.height() * 0.62f
+                ),
+                glow
+            )
+        }
+    }
+}
+
 private data class NativeCameraQuality(val label: String, val quality: Quality)
 private data class NativeCameraLensOption(val cameraId: String, val focalLengthMm: Float, val label: String)
 
@@ -166,7 +341,85 @@ fun NativeCameraStudioScreen() {
     }
     var dualCameraMode by remember { mutableStateOf(false) }
     var selectedLook by remember { mutableStateOf(NativeCameraLook.NATURAL) }
+    var faceEffectMode by remember { mutableStateOf("Off") }
     var effectError by remember { mutableStateOf<String?>(null) }
+    var faceOverlayError by remember { mutableStateOf<String?>(null) }
+    val faceEffectModeState = rememberUpdatedState(faceEffectMode)
+    val faceFrameResults = remember { ConcurrentHashMap<Long, List<NativeFaceOverlayGeometry>>() }
+    val faceOverlayThread = remember { HandlerThread("enV-camera-face-overlay").apply { start() } }
+    val faceOverlayEffect = remember(faceOverlayThread) {
+        OverlayEffect(
+            CameraEffect.PREVIEW or CameraEffect.VIDEO_CAPTURE,
+            6,
+            Handler(faceOverlayThread.looper),
+            Consumer { failure ->
+                Handler(Looper.getMainLooper()).post {
+                    faceOverlayError = failure.message ?: "Face effects are unavailable on this camera."
+                }
+            }
+        ).apply {
+            setOnDrawListener { frame ->
+                val faces = faceFrameResults.remove(frame.timestampNanos)
+                if (!faces.isNullOrEmpty()) {
+                    val canvas = frame.overlayCanvas
+                    canvas.save()
+                    canvas.setMatrix(frame.sensorToBufferTransform)
+                    faces.forEach { face -> drawNativeFaceOverlay(canvas, face, faceEffectModeState.value) }
+                    canvas.restore()
+                }
+                true
+            }
+        }
+    }
+    val faceDetector = remember {
+        FaceDetection.getClient(
+            FaceDetectorOptions.Builder()
+                .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
+                .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
+                .enableTracking()
+                .build()
+        )
+    }
+    val faceAnalysisExecutor = remember { Executors.newSingleThreadExecutor() }
+    val faceAnalyzer = remember(faceDetector, faceOverlayEffect, faceAnalysisExecutor) {
+        ImageAnalysis.Analyzer { imageProxy ->
+            val mediaImage = imageProxy.image
+            if (mediaImage == null) {
+                imageProxy.close()
+            } else {
+                val timestamp = imageProxy.imageInfo.timestamp
+                val rotation = imageProxy.imageInfo.rotationDegrees
+                val analysisToSensor = AndroidMatrix()
+                if (!imageProxy.imageInfo.sensorToBufferTransformMatrix.invert(analysisToSensor)) {
+                    imageProxy.close()
+                } else {
+                    val input = InputImage.fromMediaImage(mediaImage, rotation)
+                    faceDetector.process(input)
+                        .addOnSuccessListener(faceAnalysisExecutor) { detectedFaces ->
+                            val geometries = detectedFaces.map { face ->
+                                mapNativeFaceToSensor(
+                                    face,
+                                    imageProxy.width,
+                                    imageProxy.height,
+                                    rotation,
+                                    analysisToSensor
+                                )
+                            }
+                            faceFrameResults[timestamp] = geometries
+                            faceOverlayEffect.drawFrameAsync(timestamp)
+                        }
+                        .addOnFailureListener(faceAnalysisExecutor) { failure ->
+                            Handler(Looper.getMainLooper()).post {
+                                faceOverlayError = failure.message ?: "Face tracking could not process this frame."
+                            }
+                        }
+                        .addOnCompleteListener(faceAnalysisExecutor) {
+                            imageProxy.close()
+                        }
+                }
+            }
+        }
+    }
     val cameraEffect = remember(context) {
         Media3Effect(
             context,
@@ -176,14 +429,39 @@ fun NativeCameraStudioScreen() {
             effectError = failure.message ?: "The selected camera filter could not be applied."
         }
     }
-    DisposableEffect(controller, cameraEffect, dualCameraMode) {
-        if (!dualCameraMode) {
+    LaunchedEffect(controller, faceEffectMode, dualCameraMode) {
+        if (dualCameraMode) {
+            runCatching { controller.clearImageAnalysisAnalyzer() }
+            runCatching { controller.setEffects(emptySet()) }
+        } else if (faceEffectMode == "Off") {
+            runCatching { controller.clearImageAnalysisAnalyzer() }
+            runCatching { controller.setEnabledUseCases(CameraController.IMAGE_CAPTURE or CameraController.VIDEO_CAPTURE) }
             runCatching { controller.setEffects(setOf(cameraEffect)) }
                 .onFailure { effectError = it.message ?: "Live camera filters are unavailable on this device." }
         } else {
-            runCatching { controller.setEffects(emptySet()) }
+            runCatching {
+                controller.setEnabledUseCases(
+                    CameraController.IMAGE_CAPTURE or CameraController.VIDEO_CAPTURE or CameraController.IMAGE_ANALYSIS
+                )
+                controller.setImageAnalysisBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                controller.setImageAnalysisAnalyzer(faceAnalysisExecutor, faceAnalyzer)
+                controller.setEffects(setOf(faceOverlayEffect))
+                effectError = null
+            }.onFailure {
+                faceOverlayError = it.message ?: "Face effects are not supported by this camera."
+                faceEffectMode = "Off"
+            }
         }
-        onDispose { runCatching { controller.setEffects(emptySet()) } }
+    }
+    DisposableEffect(faceDetector, faceOverlayEffect, faceAnalysisExecutor, faceOverlayThread, controller) {
+        onDispose {
+            runCatching { controller.clearImageAnalysisAnalyzer() }
+            faceFrameResults.clear()
+            faceDetector.close()
+            faceOverlayEffect.close()
+            faceAnalysisExecutor.shutdown()
+            faceOverlayThread.quitSafely()
+        }
     }
     DisposableEffect(cameraEffect) {
         onDispose { cameraEffect.close() }
@@ -798,6 +1076,32 @@ fun NativeCameraStudioScreen() {
             Text("Filters are applied to the live preview and saved photos/videos.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (effectError != null) {
                 Text(effectError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Face effects", style = MaterialTheme.typography.labelMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("Off", "Glasses", "Crown", "Soft glow").forEach { effect ->
+                    OutlinedButton(
+                        onClick = { faceEffectMode = effect },
+                        enabled = cameraGranted && !recordingActive && !dualCameraMode,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(if (faceEffectMode == effect) "✓ $effect" else effect)
+                    }
+                }
+            }
+            Text(
+                when (faceEffectMode) {
+                    "Off" -> "Face tracking is off."
+                    "Soft glow" -> "Adds a subtle face-tracked light effect. Face analysis stays on this device."
+                    else -> "Tracks facial landmarks and applies the selected mask to the live preview and recorded video. Colour filters pause while a mask is active."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (faceOverlayError != null) {
+                Text(faceOverlayError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
         }
 
