@@ -497,6 +497,9 @@ fun NativeCameraStudioScreen() {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
     }
     var mode by remember { mutableStateOf(NativeCameraMode.PHOTO) }
+    LaunchedEffect(mode) {
+        if (mode == NativeCameraMode.PHOTO && faceEffectMode != "Off") faceEffectMode = "Off"
+    }
     var timerSeconds by remember { mutableStateOf(0) }
     var countdown by remember { mutableStateOf<Int?>(null) }
     var gridEnabled by remember { mutableStateOf(false) }
@@ -1099,7 +1102,7 @@ fun NativeCameraStudioScreen() {
                 listOf("Off", "Glasses", "Crown", "Soft glow").forEach { effect ->
                     OutlinedButton(
                         onClick = { faceEffectMode = effect },
-                        enabled = cameraGranted && !recordingActive && !dualCameraMode,
+                        enabled = cameraGranted && !recordingActive && !dualCameraMode && mode == NativeCameraMode.VIDEO,
                         modifier = Modifier.weight(1f)
                     ) {
                         Text(if (faceEffectMode == effect) "✓ $effect" else effect)
@@ -1108,7 +1111,7 @@ fun NativeCameraStudioScreen() {
             }
             Text(
                 when (faceEffectMode) {
-                    "Off" -> "Face tracking is off."
+                    "Off" -> if (mode == NativeCameraMode.VIDEO) "Face tracking is off." else "Face effects are available in Video mode."
                     "Soft glow" -> "Adds a subtle face-tracked light effect. Face analysis stays on this device."
                     else -> "Tracks facial landmarks and applies the selected mask to the live preview and recorded video. Colour filters pause while a mask is active."
                 },
