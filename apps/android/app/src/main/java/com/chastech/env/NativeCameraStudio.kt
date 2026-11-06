@@ -7,6 +7,8 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
 import android.content.pm.PackageManager
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CaptureRequest
 import android.provider.Settings
 import android.os.Build
 import android.util.Range
@@ -19,6 +21,10 @@ import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
 import androidx.camera.core.CameraSelector
 import androidx.camera.camera2.interop.Camera2CameraInfo
+import androidx.camera.camera2.interop.Camera2CameraControl
+import androidx.camera.camera2.interop.CaptureRequestOptions
+import androidx.camera.core.CameraEffect
+import androidx.camera.media3.effect.Media3Effect
 import androidx.camera.core.ConcurrentCamera
 import androidx.camera.core.Preview
 import androidx.camera.core.UseCaseGroup
@@ -87,6 +93,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.media3.common.Effect
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.effect.Brightness
+import androidx.media3.effect.Contrast
+import androidx.media3.effect.HslAdjustment
+import androidx.media3.effect.RgbFilter
 import androidx.compose.runtime.livedata.observeAsState
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
@@ -103,6 +115,29 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
 }
 
 private enum class NativeCameraMode { PHOTO, VIDEO }
+
+private enum class NativeCameraLook(val label: String) {
+    NATURAL("Natural"),
+    WARM("Warm"),
+    COOL("Cool"),
+    MONO("Mono"),
+    VIVID("Vivid"),
+    FADE("Fade"),
+    SUNSET("Sunset"),
+    GLOW("Glow"),
+}
+
+@OptIn(UnstableApi::class)
+private fun nativeCameraEffects(look: NativeCameraLook): List<Effect> = when (look) {
+    NativeCameraLook.NATURAL -> emptyList()
+    NativeCameraLook.WARM -> listOf(HslAdjustment.Builder().adjustHue(-7f).adjustSaturation(8f).adjustLightness(2f).build())
+    NativeCameraLook.COOL -> listOf(HslAdjustment.Builder().adjustHue(8f).adjustSaturation(-6f).build())
+    NativeCameraLook.MONO -> listOf(RgbFilter.createGrayscaleFilter())
+    NativeCameraLook.VIVID -> listOf(Contrast(0.12f), HslAdjustment.Builder().adjustSaturation(18f).build())
+    NativeCameraLook.FADE -> listOf(Contrast(-0.12f), Brightness(0.035f))
+    NativeCameraLook.SUNSET -> listOf(HslAdjustment.Builder().adjustHue(-15f).adjustSaturation(14f).adjustLightness(2f).build())
+    NativeCameraLook.GLOW -> listOf(Brightness(0.045f), Contrast(-0.04f))
+}
 
 private data class NativeCameraQuality(val label: String, val quality: Quality)
 
@@ -126,6 +161,29 @@ fun NativeCameraStudioScreen() {
                 QualitySelector.from(Quality.FHD, FallbackStrategy.lowerQualityOrHigherThan(Quality.SD))
             )
         }
+    }
+    var selectedLook by remember { mutableStateOf(NativeCameraLook.NATURAL) }
+    var effectError by remember { mutableStateOf<String?>(null) }
+    val cameraEffect = remember(context) {
+        Media3Effect(
+            context,
+            CameraEffect.PREVIEW or CameraEffect.VIDEO_CAPTURE or CameraEffect.IMAGE_CAPTURE,
+            ContextCompat.getMainExecutor(context)
+        ) { failure ->
+            effectError = failure.message ?: "The selected camera filter could not be applied."
+        }
+    }
+    DisposableEffect(controller, cameraEffect) {
+        runCatching { controller.setEffects(setOf(cameraEffect)) }
+            .onFailure { effectError = it.message ?: "Live camera filters are unavailable on this device." }
+        onDispose {
+            runCatching { controller.setEffects(emptySet()) }
+            cameraEffect.close()
+        }
+    }
+    LaunchedEffect(selectedLook) {
+        runCatching { cameraEffect.setEffects(nativeCameraEffects(selectedLook)) }
+            .onFailure { effectError = it.message ?: "The selected camera filter could not be applied." }
     }
     val zoomState = controller.zoomState.observeAsState().value
     val exposureState = controller.cameraInfo?.exposureState
@@ -574,6 +632,27 @@ fun NativeCameraStudioScreen() {
             }
         }
 
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Filters", style = MaterialTheme.typography.labelMedium)
+            NativeCameraLook.entries.chunked(4).forEach { lookRow ->
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    lookRow.forEach { look ->
+                        OutlinedButton(
+                            onClick = { selectedLook = look },
+                            enabled = !recordingActive,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(if (selectedLook == look) "✓ ${look.label}" else look.label)
+                        }
+                    }
+                }
+            }
+            Text("Filters are applied to the live preview and saved photos/videos.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (effectError != null) {
+                Text(effectError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+
         if (mode == NativeCameraMode.VIDEO) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Video quality · requested $videoQuality", style = MaterialTheme.typography.labelMedium)
@@ -670,7 +749,7 @@ fun NativeCameraStudioScreen() {
     }
 }
 
-@OptIn(androidx.camera.camera2.interop.ExperimentalCamera2Interop::class)
+@androidx.annotation.OptIn(androidx.camera.camera2.interop.ExperimentalCamera2Interop::class)
 @Composable
 private fun NativeDualCameraStudioScreen(
     context: Context,
