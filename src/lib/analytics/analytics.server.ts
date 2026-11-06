@@ -112,9 +112,9 @@ export async function createAnalyticsDashboardSession(request: Request, input: u
   const now = Math.floor(Date.now() / 1000);
   const session = issueDashboardSession(secret, now, analyticsDashboardSessionSeconds);
   await sql.query(
-    `insert into product_analytics_dashboard_sessions(session_digest, expires_at)
-     values($1, $2)`,
-    [dashboardSessionDigest(session.sessionId, secret), new Date(session.expiresAt * 1000).toISOString()],
+    `insert into product_analytics_dashboard_sessions(session_digest, created_at, expires_at)
+     values($1, to_timestamp($2), to_timestamp($3))`,
+    [dashboardSessionDigest(session.sessionId, secret), session.issuedAt, session.expiresAt],
   );
   await sql.query("delete from product_analytics_admin_rate_limits where window_minute<$1", [window - 96]);
   return {
@@ -163,6 +163,12 @@ export async function saveAnalyticsConsent(request: Request, input: unknown) {
       return;
     }
 
+    // Lock first, using the same row lock as event ingestion. This ensures a
+    // batch cannot be inserted after the event DELETE but before consent removal.
+    await tx.query(
+      "select subject_digest from product_analytics_consents where subject_digest=$1 for update",
+      [subject],
+    );
     // Withdrawal and raw-event deletion are atomic. Removing the consent row also
     // removes the retained installation-level pseudonymous identifier.
     await tx.query("delete from product_analytics_events where anonymous_subject_digest=$1", [subject]);
