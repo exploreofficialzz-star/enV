@@ -23,6 +23,8 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.Camera2CameraControl
 import androidx.camera.camera2.interop.CaptureRequestOptions
+import androidx.camera.camera2.interop.Camera2CameraControl
+import androidx.camera.camera2.interop.CaptureRequestOptions
 import androidx.camera.core.CameraEffect
 import androidx.camera.media3.effect.Media3Effect
 import androidx.camera.core.ConcurrentCamera
@@ -147,6 +149,7 @@ private val nativeCameraQualities = listOf(
     NativeCameraQuality("4K", Quality.UHD),
 )
 
+@androidx.annotation.OptIn(androidx.camera.camera2.interop.ExperimentalCamera2Interop::class)
 @Composable
 fun NativeCameraStudioScreen() {
     val context = LocalContext.current
@@ -205,6 +208,18 @@ fun NativeCameraStudioScreen() {
     var videoFrameRate by remember { mutableStateOf(30) }
     val captureScope = rememberCoroutineScope()
     var usingFrontCamera by remember { mutableStateOf(false) }
+    var manualSensorSupported by remember { mutableStateOf(false) }
+    var manualIsoRange by remember { mutableStateOf<Range<Int>?>(null) }
+    var manualExposureTimeRange by remember { mutableStateOf<Range<Long>?>(null) }
+    var manualFocusMinimum by remember { mutableStateOf(0f) }
+    var manualExposureEnabled by remember { mutableStateOf(false) }
+    var manualIso by remember { mutableStateOf(100f) }
+    var manualShutterSeconds by remember { mutableStateOf(1f / 60f) }
+    var manualFocusLocked by remember { mutableStateOf(false) }
+    var manualFocusDistance by remember { mutableStateOf(0f) }
+    var whiteBalanceModes by remember { mutableStateOf(emptySet<Int>()) }
+    var selectedWhiteBalance by remember { mutableStateOf(CaptureRequest.CONTROL_AWB_MODE_AUTO) }
+    var advancedControlError by remember { mutableStateOf<String?>(null) }
     var recording by remember { mutableStateOf<Recording?>(null) }
     var recordingActive by remember { mutableStateOf(false) }
     var pendingFile by remember { mutableStateOf<File?>(null) }
@@ -214,6 +229,86 @@ fun NativeCameraStudioScreen() {
     var flashEnabled by remember { mutableStateOf(false) }
     val latestRecording = rememberUpdatedState(recording)
     val disposeAfterRecording = remember(controller) { AtomicBoolean(false) }
+
+    LaunchedEffect(cameraGranted, usingFrontCamera) {
+        if (!cameraGranted) {
+            manualSensorSupported = false
+            manualIsoRange = null
+            manualExposureTimeRange = null
+            manualFocusMinimum = 0f
+            whiteBalanceModes = emptySet()
+            return@LaunchedEffect
+        }
+        repeat(8) {
+            val info = controller.cameraInfo
+            if (info != null) {
+                runCatching {
+                    val camera2Info = Camera2CameraInfo.from(info)
+                    val capabilities = camera2Info.getCameraCharacteristic(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)?.toSet().orEmpty()
+                    manualSensorSupported = capabilities.contains(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR)
+                    manualIsoRange = camera2Info.getCameraCharacteristic(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE)
+                    manualExposureTimeRange = camera2Info.getCameraCharacteristic(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE)
+                    manualFocusMinimum = camera2Info.getCameraCharacteristic(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE) ?: 0f
+                    whiteBalanceModes = camera2Info.getCameraCharacteristic(CameraCharacteristics.CONTROL_AWB_AVAILABLE_MODES)?.toSet().orEmpty()
+                    manualIsoRange?.let { range -> manualIso = manualIso.coerceIn(range.lower.toFloat(), range.upper.toFloat()) }
+                    manualExposureTimeRange?.let { range ->
+                        manualShutterSeconds = manualShutterSeconds.coerceIn(
+                            (range.lower / 1_000_000_000.0).toFloat(),
+                            (range.upper / 1_000_000_000.0).toFloat()
+                        )
+                    }
+                }.onFailure {
+                    advancedControlError = "Advanced camera controls could not be read on this device."
+                }
+                return@LaunchedEffect
+            }
+            delay(150)
+        }
+    }
+
+    fun applyAdvancedCameraSettings() {
+        val cameraControl = controller.cameraControl ?: return
+        runCatching {
+            val options = CaptureRequestOptions.Builder()
+                .setCaptureRequestOption(CaptureRequest.CONTROL_AWB_MODE, selectedWhiteBalance)
+                .apply {
+                    if (manualExposureEnabled && manualSensorSupported && manualIsoRange != null && manualExposureTimeRange != null) {
+                        setCaptureRequestOption(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF)
+                        setCaptureRequestOption(CaptureRequest.SENSOR_SENSITIVITY, manualIso.roundToInt())
+                        setCaptureRequestOption(CaptureRequest.SENSOR_EXPOSURE_TIME, (manualShutterSeconds * 1_000_000_000f).toLong())
+                    } else {
+                        setCaptureRequestOption(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+                        clearCaptureRequestOption(CaptureRequest.SENSOR_SENSITIVITY)
+                        clearCaptureRequestOption(CaptureRequest.SENSOR_EXPOSURE_TIME)
+                    }
+                    if (manualFocusLocked && manualFocusMinimum > 0f) {
+                        setCaptureRequestOption(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_OFF)
+                        setCaptureRequestOption(CaptureRequest.LENS_FOCUS_DISTANCE, manualFocusDistance.coerceIn(0f, manualFocusMinimum))
+                    } else {
+                        setCaptureRequestOption(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
+                        clearCaptureRequestOption(CaptureRequest.LENS_FOCUS_DISTANCE)
+                    }
+                }
+                .build()
+            val future = Camera2CameraControl.from(cameraControl).setCaptureRequestOptions(options)
+            future.addListener({
+                runCatching { future.get() }
+                    .onSuccess { advancedControlError = null }
+                    .onFailure { advancedControlError = "This camera rejected one or more manual settings. Automatic controls remain available." }
+            }, ContextCompat.getMainExecutor(context))
+            controller.setTapToFocusEnabled(!manualFocusLocked)
+        }.onFailure {
+            advancedControlError = it.message ?: "Manual camera controls are unavailable on this device."
+        }
+    }
+
+    fun resetAdvancedCameraSettings() {
+        manualExposureEnabled = false
+        manualFocusLocked = false
+        selectedWhiteBalance = CaptureRequest.CONTROL_AWB_MODE_AUTO
+        controller.setTapToFocusEnabled(true)
+        applyAdvancedCameraSettings()
+    }
 
     val savePicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/jpeg")) { target ->
         val source = pendingFile
@@ -717,6 +812,120 @@ fun NativeCameraStudioScreen() {
                     valueRange = exposureRange.lower.toFloat()..exposureRange.upper.toFloat(),
                     enabled = !recordingActive,
                 )
+            }
+        }
+
+        if (cameraGranted && (manualSensorSupported || whiteBalanceModes.size > 1 || manualFocusMinimum > 0f)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Pro controls", style = MaterialTheme.typography.titleSmall)
+                if (manualSensorSupported && manualIsoRange != null && manualExposureTimeRange != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Manual ISO and shutter", style = MaterialTheme.typography.labelMedium)
+                        OutlinedButton(
+                            onClick = {
+                                manualExposureEnabled = !manualExposureEnabled
+                                applyAdvancedCameraSettings()
+                            },
+                            enabled = !recordingActive
+                        ) { Text(if (manualExposureEnabled) "On" else "Off") }
+                    }
+                    if (manualExposureEnabled) {
+                        val isoRange = manualIsoRange!!
+                        val shutterRange = manualExposureTimeRange!!
+                        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("ISO", style = MaterialTheme.typography.labelSmall)
+                                Text(manualIso.roundToInt().toString(), style = MaterialTheme.typography.labelSmall)
+                            }
+                            Slider(
+                                value = manualIso.coerceIn(isoRange.lower.toFloat(), isoRange.upper.toFloat()),
+                                onValueChange = { manualIso = it },
+                                onValueChangeFinished = { applyAdvancedCameraSettings() },
+                                valueRange = isoRange.lower.toFloat()..isoRange.upper.toFloat(),
+                                enabled = !recordingActive
+                            )
+                        }
+                        val minimumSeconds = (shutterRange.lower / 1_000_000_000.0).toFloat().coerceAtLeast(0.000001f)
+                        val maximumSeconds = (shutterRange.upper / 1_000_000_000.0).toFloat().coerceAtLeast(minimumSeconds + 0.000001f)
+                        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Shutter", style = MaterialTheme.typography.labelSmall)
+                                Text("1/${(1f / manualShutterSeconds.coerceAtLeast(0.000001f)).roundToInt()} s", style = MaterialTheme.typography.labelSmall)
+                            }
+                            Slider(
+                                value = manualShutterSeconds.coerceIn(minimumSeconds, maximumSeconds),
+                                onValueChange = { manualShutterSeconds = it },
+                                onValueChangeFinished = { applyAdvancedCameraSettings() },
+                                valueRange = minimumSeconds..maximumSeconds,
+                                enabled = !recordingActive
+                            )
+                        }
+                    }
+                }
+                val whiteBalanceChoices = listOf(
+                    "Auto" to CaptureRequest.CONTROL_AWB_MODE_AUTO,
+                    "Daylight" to CaptureRequest.CONTROL_AWB_MODE_DAYLIGHT,
+                    "Cloudy" to CaptureRequest.CONTROL_AWB_MODE_CLOUDY_DAYLIGHT,
+                    "Incandescent" to CaptureRequest.CONTROL_AWB_MODE_INCANDESCENT,
+                    "Fluorescent" to CaptureRequest.CONTROL_AWB_MODE_FLUORESCENT
+                ).filter { whiteBalanceModes.contains(it.second) }
+                if (whiteBalanceChoices.size > 1) {
+                    Text("White balance", style = MaterialTheme.typography.labelMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        whiteBalanceChoices.forEach { (label, value) ->
+                            OutlinedButton(
+                                onClick = {
+                                    selectedWhiteBalance = value
+                                    applyAdvancedCameraSettings()
+                                },
+                                enabled = !recordingActive,
+                                modifier = Modifier.weight(1f)
+                            ) { Text(if (selectedWhiteBalance == value) "✓ $label" else label) }
+                        }
+                    }
+                }
+                if (manualFocusMinimum > 0f) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Focus lock", style = MaterialTheme.typography.labelMedium)
+                        OutlinedButton(
+                            onClick = {
+                                manualFocusLocked = !manualFocusLocked
+                                applyAdvancedCameraSettings()
+                            },
+                            enabled = !recordingActive
+                        ) { Text(if (manualFocusLocked) "Locked" else "Auto") }
+                    }
+                    if (manualFocusLocked) {
+                        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Focus distance", style = MaterialTheme.typography.labelSmall)
+                                Text(String.format("%.2f D", manualFocusDistance), style = MaterialTheme.typography.labelSmall)
+                            }
+                            Slider(
+                                value = manualFocusDistance.coerceIn(0f, manualFocusMinimum),
+                                onValueChange = { manualFocusDistance = it },
+                                onValueChangeFinished = { applyAdvancedCameraSettings() },
+                                valueRange = 0f..manualFocusMinimum,
+                                enabled = !recordingActive
+                            )
+                        }
+                    }
+                }
+                OutlinedButton(onClick = { resetAdvancedCameraSettings() }, enabled = !recordingActive, modifier = Modifier.fillMaxWidth()) {
+                    Text("Reset pro controls")
+                }
+                if (advancedControlError != null) {
+                    Text(advancedControlError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+                Text("Manual controls are shown only when the active camera reports hardware support. Manual exposure disables automatic exposure while active.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
