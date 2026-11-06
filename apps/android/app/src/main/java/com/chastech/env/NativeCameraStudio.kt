@@ -8,6 +8,7 @@ import android.content.Intent
 import android.net.Uri
 import android.content.pm.PackageManager
 import android.provider.Settings
+import android.os.Build
 import android.util.Range
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -17,6 +18,12 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ConcurrentCamera
+import androidx.camera.core.Preview
+import androidx.camera.core.UseCaseGroup
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.video.Recorder
+import androidx.camera.video.VideoCapture
 import androidx.camera.view.video.AudioConfig
 import androidx.camera.video.FileOutputOptions
 import androidx.camera.video.FallbackStrategy
@@ -77,12 +84,15 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.runtime.livedata.observeAsState
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {
@@ -128,6 +138,7 @@ fun NativeCameraStudioScreen() {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
     }
     var mode by remember { mutableStateOf(NativeCameraMode.PHOTO) }
+    var dualCameraMode by remember { mutableStateOf(false) }
     var timerSeconds by remember { mutableStateOf(0) }
     var countdown by remember { mutableStateOf<Int?>(null) }
     var gridEnabled by remember { mutableStateOf(false) }
@@ -259,21 +270,23 @@ fun NativeCameraStudioScreen() {
         )
     }
 
-    DisposableEffect(controller, lifecycleOwner, cameraGranted) {
-        if (cameraGranted) controller.bindToLifecycle(lifecycleOwner)
+    DisposableEffect(controller, lifecycleOwner, cameraGranted, dualCameraMode) {
+        if (cameraGranted && !dualCameraMode) controller.bindToLifecycle(lifecycleOwner)
         onDispose {
-            val activeRecording = latestRecording.value
-            if (activeRecording != null) {
-                // CameraX finalizes MP4 asynchronously after stop(). Keep the controller
-                // bound until the Finalize event arrives instead of unbinding mid-write.
-                disposeAfterRecording.set(true)
-                pendingFile?.delete()
-                pendingFile = null
-                runCatching { activeRecording.stop() }
-            } else {
-                runCatching { controller.enableTorch(false) }
-                if (cameraGranted) runCatching { controller.unbind() }
-                pendingFile?.delete()
+            // Entering dual mode disposes this single-camera binding before the concurrent
+            // front/rear session claims the camera devices.
+            if (!dualCameraMode) {
+                val activeRecording = latestRecording.value
+                if (activeRecording != null) {
+                    disposeAfterRecording.set(true)
+                    pendingFile?.delete()
+                    pendingFile = null
+                    runCatching { activeRecording.stop() }
+                } else {
+                    runCatching { controller.enableTorch(false) }
+                    if (cameraGranted) runCatching { controller.unbind() }
+                    pendingFile?.delete()
+                }
             }
         }
     }
@@ -391,6 +404,22 @@ fun NativeCameraStudioScreen() {
         }
     }
 
+    if (dualCameraMode) {
+        NativeDualCameraStudioScreen(
+            context = context,
+            lifecycleOwner = lifecycleOwner,
+            onExit = { dualCameraMode = false },
+            onVideoReady = { file ->
+                pendingFile?.delete()
+                pendingFile = file
+                pendingMime = "video/mp4"
+                status = "Front and rear video saved to a temporary capture. Save it to keep it."
+                error = null
+            },
+            onStatus = { status = it },
+            onError = { error = it }
+        )
+    } else {
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -563,6 +592,12 @@ fun NativeCameraStudioScreen() {
                     }
                 }
                 Text("The phone may choose lower resolution or frame rate when its camera and encoder do not support the selected option.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedButton(
+                    onClick = { dualCameraMode = true },
+                    enabled = cameraGranted && !recordingActive && pendingFile == null,
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Record with front + rear cameras") }
+                Text("This mode is available only on phones that support simultaneous camera capture.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
@@ -629,6 +664,210 @@ fun NativeCameraStudioScreen() {
             Text(error!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         } else if (cameraGranted) {
             Text(status, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+    }
+}
+
+@Composable
+private fun NativeDualCameraStudioScreen(
+    context: Context,
+    lifecycleOwner: LifecycleOwner,
+    onExit: () -> Unit,
+    onVideoReady: (File) -> Unit,
+    onStatus: (String) -> Unit,
+    onError: (String) -> Unit,
+) {
+    var previewView by remember { mutableStateOf<PreviewView?>(null) }
+    var provider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+    var previewUseCase by remember { mutableStateOf<Preview?>(null) }
+    var videoCapture by remember { mutableStateOf<VideoCapture<Recorder>?>(null) }
+    var cameraReady by remember { mutableStateOf(false) }
+    var recording by remember { mutableStateOf<Recording?>(null) }
+    var recordingActive by remember { mutableStateOf(false) }
+    var localStatus by remember { mutableStateOf("Checking whether this phone supports both cameras…") }
+    var localError by remember { mutableStateOf<String?>(null) }
+    val latestRecording = rememberUpdatedState(recording)
+    val disposeAfterRecording = remember { AtomicBoolean(false) }
+
+    LaunchedEffect(previewView) {
+        val targetPreview = previewView ?: return@LaunchedEffect
+        try {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R ||
+                !context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_CONCURRENT)
+            ) {
+                throw IllegalStateException("This phone does not support simultaneous front and rear camera recording.")
+            }
+
+            val cameraProvider = withContext(Dispatchers.IO) {
+                ProcessCameraProvider.getInstance(context.applicationContext).get()
+            }
+            val supportedPair = cameraProvider.availableConcurrentCameraInfos.firstOrNull { cameras ->
+                cameras.size >= 2 &&
+                    cameras.any { it.lensFacing == CameraSelector.LENS_FACING_FRONT } &&
+                    cameras.any { it.lensFacing == CameraSelector.LENS_FACING_BACK }
+            } ?: throw IllegalStateException("This phone cannot run its front and rear cameras at the same time.")
+
+            // CameraX composition mode records both live feeds into one video file.
+            // The same Preview and VideoCapture use cases must be shared by both camera configs.
+            val preview = Preview.Builder().build().also {
+                it.setSurfaceProvider(targetPreview.surfaceProvider)
+            }
+            val recorder = Recorder.Builder()
+                .setQualitySelector(
+                    QualitySelector.from(Quality.HD, FallbackStrategy.lowerQualityOrHigherThan(Quality.SD))
+                )
+                .build()
+            val video = VideoCapture.withOutput(recorder)
+            val group = UseCaseGroup.Builder()
+                .addUseCase(preview)
+                .addUseCase(video)
+                .build()
+
+            cameraProvider.bindToLifecycle(
+                listOf(
+                    ConcurrentCamera.SingleCameraConfig(CameraSelector.DEFAULT_BACK_CAMERA, group, lifecycleOwner),
+                    ConcurrentCamera.SingleCameraConfig(CameraSelector.DEFAULT_FRONT_CAMERA, group, lifecycleOwner)
+                )
+            )
+
+            provider = cameraProvider
+            previewUseCase = preview
+            videoCapture = video
+            cameraReady = true
+            localStatus = "Both cameras are live. Video quality is automatically limited to a supported dual-camera mode."
+            localError = null
+        } catch (failure: Throwable) {
+            cameraReady = false
+            localError = failure.message ?: "Dual-camera recording is unavailable on this phone."
+            localStatus = "Your normal single-camera mode is still available."
+        }
+    }
+
+    fun startDualRecording(includeAudio: Boolean) {
+        val currentVideoCapture = videoCapture
+        if (!cameraReady || currentVideoCapture == null || recordingActive) return
+        val output = File(context.cacheDir, "env-camera-dual-${System.currentTimeMillis()}.mp4")
+        try {
+            val pending = currentVideoCapture.output.prepareRecording(
+                context,
+                FileOutputOptions.Builder(output).build()
+            )
+            val audioAllowed = includeAudio &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+            val configured = if (audioAllowed) pending.withAudioEnabled() else pending
+            val active = configured.start(ContextCompat.getMainExecutor(context)) { event ->
+                when (event) {
+                    is VideoRecordEvent.Start -> {
+                        recordingActive = true
+                        localStatus = "Recording from the front and rear cameras."
+                    }
+                    is VideoRecordEvent.Finalize -> {
+                        recording = null
+                        recordingActive = false
+                        if (disposeAfterRecording.compareAndSet(true, false)) {
+                            output.delete()
+                        } else if (event.hasError()) {
+                            output.delete()
+                            localError = "Dual-camera video could not be finalized (error ${event.error}). Check storage and try again."
+                        } else {
+                            localError = null
+                            onStatus("Front and rear recording complete. Save the video to keep it.")
+                            onVideoReady(output)
+                            onExit()
+                        }
+                    }
+                }
+            }
+            recording = active
+            recordingActive = true
+            localError = null
+            localStatus = if (audioAllowed) "Starting front and rear recording with microphone audio…" else "Starting front and rear recording without audio…"
+        } catch (failure: Throwable) {
+            output.delete()
+            localError = failure.message ?: "The dual-camera recording could not start."
+        }
+    }
+
+    val microphonePermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        // Silent video remains available when microphone access is declined.
+        startDualRecording(granted)
+    }
+
+    DisposableEffect(provider, previewUseCase, videoCapture) {
+        onDispose {
+            val active = latestRecording.value
+            if (active != null) {
+                disposeAfterRecording.set(true)
+                runCatching { active.stop() }
+            } else {
+                val currentProvider = provider
+                val currentPreview = previewUseCase
+                val currentVideo = videoCapture
+                if (currentProvider != null && currentPreview != null && currentVideo != null) {
+                    runCatching { currentProvider.unbind(currentPreview, currentVideo) }
+                }
+            }
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("Dual-camera video", style = MaterialTheme.typography.titleMedium)
+            OutlinedButton(onClick = onExit, enabled = !recordingActive) { Text("Back") }
+        }
+        Card(colors = CardDefaults.cardColors(containerColor = Color.Black)) {
+            Box(modifier = Modifier.fillMaxWidth().aspectRatio(4f / 3f), contentAlignment = Alignment.Center) {
+                AndroidView(
+                    modifier = Modifier.fillMaxWidth().aspectRatio(4f / 3f),
+                    factory = { viewContext ->
+                        PreviewView(viewContext).also {
+                            it.scaleType = PreviewView.ScaleType.FILL_CENTER
+                            previewView = it
+                        }
+                    },
+                    update = {
+                        if (previewView !== it) previewView = it
+                    }
+                )
+                if (!cameraReady && localError == null) {
+                    Text("Preparing cameras…", color = Color.White, style = MaterialTheme.typography.bodyMedium)
+                }
+                if (recordingActive) {
+                    Surface(modifier = Modifier.align(Alignment.TopStart).padding(12.dp), color = Color(0xCC991B1B), shape = CircleShape) {
+                        Text("● REC", modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), color = Color.White, style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            }
+        }
+        Button(
+            onClick = {
+                if (recordingActive) {
+                    recording?.stop()
+                } else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                    startDualRecording(true)
+                } else {
+                    microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
+                }
+            },
+            enabled = cameraReady,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(if (recordingActive) "Stop dual-camera recording" else "Start dual-camera recording")
+        }
+        Text(
+            "Both cameras are recorded into one composed video when the phone supports concurrent capture.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall
+        )
+        if (localError != null) {
+            Text(localError!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+        } else {
+            Text(localStatus, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         }
     }
 }
