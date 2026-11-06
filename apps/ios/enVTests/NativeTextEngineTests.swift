@@ -250,7 +250,7 @@ final class NativeAiMicroEngineTests: XCTestCase {
         ])
         XCTAssertTrue(output.contains("CONTENT BRIEF"))
         XCTAssertTrue(output.contains("Low-cost methods for small spaces"))
-        XCTAssertTrue(output.contains("Use containers\nCheck sunlight"))
+        XCTAssertTrue(output.contains("• Use containers\n• Check sunlight"))
         XCTAssertTrue(output.contains("Start with one herb pot"))
         XCTAssertTrue(output.contains("do not present assumptions as evidence"))
     }
