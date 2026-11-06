@@ -54,22 +54,26 @@ A result without this evidence remains NOT RUN.
 ### Source implementation present — not yet device-accepted
 
 - Browser dual-camera composition from two distinct camera streams, with capability/error handling.
-- Android CameraX concurrent front/rear capture behind the device capability check.
-- iOS `AVCaptureMultiCamSession` front/rear capture with synchronized frame composition.
+- Android CameraX concurrent front/rear capture behind the actual concurrent-camera capability check.
+- iOS `AVCaptureMultiCamSession` front/rear capture with capability, hardware-cost and system-pressure checks.
 - Android CameraX/Media3 color processing for preview, photo and video outputs.
-- iOS Core Image frame processing used by preview and the `AVAssetWriter` export path, including the composed dual-camera clip.
-- Android Camera2-interoperability manual sensor, white-balance and focus-distance controls, shown only when the camera advertises the required capability.
-- iOS manual ISO/shutter, white-balance, focus lock and optical-lens selection, shown only where supported.
-- Single-camera permission recovery, audio-denied silent-video path and recording-finalization handling.
+- iOS Core Image frame processing shared by preview and the `AVAssetWriter` export path.
+- Android Camera2-interoperability manual sensor ISO/shutter, supported white-balance modes, focus lock/focus distance, and rear-lens selection, shown only when reported by the active camera.
+- iOS manual ISO/shutter, white-balance presets, focus lock and optical-lens selection, shown only where the active device supports them.
+- iOS Vision face-landmark detection throttled to 15 updates/second, with original glasses and crown overlays plus subtle face-only softening. The same transformed frame goes to the preview and video writer.
+- Android bundled ML Kit face detection/tracking with timestamp-matched CameraX `OverlayEffect` masks for original glasses, crown and a face-following soft glow. The effect targets preview and video capture; it is disabled in still-photo mode.
+- Face detection and overlays run locally on-device. No face frames or landmark results are sent to enV servers by these implementations.
+- Single-camera permission recovery, audio-denied silent-video path, safe lifecycle cleanup and recording-finalization handling.
 
-These are source-level implementations. A green build still does not prove that a specific physical camera/encoder combination works.
+These are source-level implementations, not device acceptance. A green build still does not prove that a specific physical camera/encoder combination works.
 
-### Not implemented — do not advertise as available
+### Still not implemented — do not advertise as available
 
-- Face-landmark tracking, face-attached AR masks, expression-driven effects and beauty/skin-retouch effects.
-- Any licensed Snapchat Lens or Snap Camera Kit integration.
+- A licensed Snapchat Lens catalogue or Snap Camera Kit integration. The included glasses, crown and soft-light examples are original enV effects and must not be described as Snapchat lenses.
+- Expression-driven blendshape effects, detailed 3D face meshes, occlusion-aware accessories, skin-tone-aware retouching and a full beauty studio. The current iOS Beauty mode is subtle face-only softening; Android Soft glow is a face-following light overlay, not skin smoothing.
+- Face masks during simultaneous front-and-rear recording. Dual-camera mode and face-effect mode are currently separate modes.
 
-The next face-effects implementation must use original enV assets/effects and an explicitly licensed, on-device landmark pipeline. A global color look is not face tracking, and a drawn static overlay is not a tracked AR mask.
+Face detection is off by default. Keep capability/performance fallbacks visible and never claim advanced retouching, proprietary Snapchat effects or device-wide support before further implementation and testing.
 
 ## Safe execution notes
 
