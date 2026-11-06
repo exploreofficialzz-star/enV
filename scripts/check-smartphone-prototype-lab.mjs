@@ -24,6 +24,8 @@ assert.match(engine, /allowFullScreen/);
 assert.match(html, /Smartphone Prototype Lab \| enV/);
 assert.match(html, /babylonjs\.com\/babylon\.js/);
 assert.match(html, /app-loader\.js/);
+assert.match(html, /id="displayArchOled"/);
+assert.match(html, /id="displayArchLcd"/);
 assert.match(css, /\.embedded \.topbar,\.embedded \.footer\{display:none\}/);
 assert.match(loader, /DecompressionStream\("gzip"\)/);
 assert.match(appBundle, /BABYLON\.Engine/);
