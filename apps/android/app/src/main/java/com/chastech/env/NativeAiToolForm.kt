@@ -268,7 +268,14 @@ private fun NativeAiMicroToolForm(toolId: String) {
             OutlinedButton(onClick = { output = ""; generatedOutput = ""; error = "" }) { Text("Clear") }
             if (output.isNotBlank()) OutlinedButton(onClick = { clipboard.setText(AnnotatedString(output)) }) { Text("Copy output") }
         }
-        if (output.isNotBlank()) OutlinedTextField(\n            value = output,\n            onValueChange = { output = it },\n            label = { Text("Editable draft") },\n            modifier = Modifier.fillMaxWidth(),\n            minLines = 6,\n            maxLines = 20,\n            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),\n        )
+        if (output.isNotBlank()) OutlinedTextField(
+            value = output,
+            onValueChange = { output = it },
+            label = { Text("Editable draft") },
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 6,
+            maxLines = 16,
+        )
         if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
     }
 }
