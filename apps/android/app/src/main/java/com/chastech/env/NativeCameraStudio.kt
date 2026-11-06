@@ -176,13 +176,17 @@ fun NativeCameraStudioScreen() {
             effectError = failure.message ?: "The selected camera filter could not be applied."
         }
     }
-    DisposableEffect(controller, cameraEffect) {
-        runCatching { controller.setEffects(setOf(cameraEffect)) }
-            .onFailure { effectError = it.message ?: "Live camera filters are unavailable on this device." }
-        onDispose {
+    DisposableEffect(controller, cameraEffect, dualCameraMode) {
+        if (!dualCameraMode) {
+            runCatching { controller.setEffects(setOf(cameraEffect)) }
+                .onFailure { effectError = it.message ?: "Live camera filters are unavailable on this device." }
+        } else {
             runCatching { controller.setEffects(emptySet()) }
-            cameraEffect.close()
         }
+        onDispose { runCatching { controller.setEffects(emptySet()) } }
+    }
+    DisposableEffect(cameraEffect) {
+        onDispose { cameraEffect.close() }
     }
     LaunchedEffect(selectedLook) {
         runCatching { cameraEffect.setEffects(nativeCameraEffects(selectedLook)) }
@@ -562,6 +566,7 @@ fun NativeCameraStudioScreen() {
         NativeDualCameraStudioScreen(
             context = context,
             lifecycleOwner = lifecycleOwner,
+            cameraEffect = cameraEffect,
             onExit = { dualCameraMode = false },
             onVideoReady = { file ->
                 pendingFile?.delete()
@@ -963,6 +968,7 @@ fun NativeCameraStudioScreen() {
 private fun NativeDualCameraStudioScreen(
     context: Context,
     lifecycleOwner: LifecycleOwner,
+    cameraEffect: CameraEffect,
     onExit: () -> Unit,
     onVideoReady: (File) -> Unit,
     onStatus: (String) -> Unit,
@@ -1024,6 +1030,7 @@ private fun NativeDualCameraStudioScreen(
             val group = UseCaseGroup.Builder()
                 .addUseCase(preview)
                 .addUseCase(video)
+                .addEffect(cameraEffect)
                 .build()
 
             cameraProvider.bindToLifecycle(
