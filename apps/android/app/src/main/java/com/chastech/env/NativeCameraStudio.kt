@@ -23,8 +23,6 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.Camera2CameraControl
 import androidx.camera.camera2.interop.CaptureRequestOptions
-import androidx.camera.camera2.interop.Camera2CameraControl
-import androidx.camera.camera2.interop.CaptureRequestOptions
 import androidx.camera.core.CameraEffect
 import androidx.camera.media3.effect.Media3Effect
 import androidx.camera.core.ConcurrentCamera
@@ -166,6 +164,7 @@ fun NativeCameraStudioScreen() {
             )
         }
     }
+    var dualCameraMode by remember { mutableStateOf(false) }
     var selectedLook by remember { mutableStateOf(NativeCameraLook.NATURAL) }
     var effectError by remember { mutableStateOf<String?>(null) }
     val cameraEffect = remember(context) {
@@ -205,7 +204,6 @@ fun NativeCameraStudioScreen() {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
     }
     var mode by remember { mutableStateOf(NativeCameraMode.PHOTO) }
-    var dualCameraMode by remember { mutableStateOf(false) }
     var timerSeconds by remember { mutableStateOf(0) }
     var countdown by remember { mutableStateOf<Int?>(null) }
     var gridEnabled by remember { mutableStateOf(false) }
@@ -255,7 +253,7 @@ fun NativeCameraStudioScreen() {
             val discovered = provider.availableCameraInfos.mapNotNull { info ->
                 runCatching {
                     val camera2Info = Camera2CameraInfo.from(info)
-                    if (camera2Info.lensFacing != CameraSelector.LENS_FACING_BACK) return@runCatching null
+                    if (camera2Info.getCameraCharacteristic(CameraCharacteristics.LENS_FACING) != CameraCharacteristics.LENS_FACING_BACK) return@runCatching null
                     val focalLengths = camera2Info.getCameraCharacteristic(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
                     val focalLength = focalLengths?.minOrNull() ?: return@runCatching null
                     NativeCameraLensOption(
