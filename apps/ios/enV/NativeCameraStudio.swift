@@ -375,6 +375,7 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
         try? FileManager.default.removeItem(at: url)
     }
 
+    @MainActor
     func registerExternalVideo(_ url: URL) {
         latestVideoURL = url
         rememberCapture(url)
