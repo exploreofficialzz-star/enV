@@ -59,8 +59,8 @@ A daily Vercel cron calls `GET /api/analytics/retention` at 03:00 UTC with `Auth
 5. Apply migration `0018_analytics_dashboard_sessions.sql` as part of the reviewed migration sequence; verify the dashboard session table has RLS enabled and no client policies.
 6. Protect the private dashboard host and configure the dashboard password/session secrets.
 7. Test ingestion, consent denial, withdrawal racing with event ingestion, copied-cookie rejection after sign-out, rate limiting, admin authorization and retention against staging PostgreSQL.
-7. Ensure Apple App Store and Google Play privacy disclosures match actual collection and SDK behavior.
-8. Keep analytics disabled until all applicable checks are complete.
+8. Ensure Apple App Store and Google Play privacy disclosures match actual collection and SDK behavior.
+9. Keep analytics disabled until all applicable checks are complete.
 
 
 ## Developer feedback is a separate purpose
@@ -77,7 +77,7 @@ Comments, replies, selected public display labels, reactions, reports and blocks
 
 ## Private analytics dashboard access
 
-The `userbehavior.envtools.store` dashboard is protected by a server-side password exchange and a short-lived (8-hour) signed `HttpOnly; Secure; SameSite=Strict` cookie. The dashboard password and cookie signing secret are server-only deployment secrets; neither is exposed through `VITE_*` bundles. Failed sign-ins are rate-limited using a keyed digest of a network identifier. The legacy bearer `ANALYTICS_ADMIN_TOKEN` remains server-only and must never be placed in a browser, mobile bundle, query string or local storage. Sign-out clears the browser session cookie. The dashboard displays aggregate, consented data only; it is not a device-level surveillance feed.
+The `userbehavior.envtools.store` dashboard is protected by a server-side password exchange and a short-lived (8-hour) signed `HttpOnly; Secure; SameSite=Strict` cookie. Each cookie is backed by an HMAC-digested server-side session row; the summary route checks the active row, and sign-out revokes it so a copied cookie stops working. The dashboard password and cookie signing secret are server-only deployment secrets; neither is exposed through `VITE_*` bundles. Failed sign-ins are rate-limited using a keyed digest of a network identifier. The optional bearer `ANALYTICS_ADMIN_TOKEN` remains server-only and must never be placed in a browser, mobile bundle, query string or local storage. The dashboard displays aggregate, consented data only; it is not a device-level surveillance feed.
 
 
 ## Aggregate history retention
