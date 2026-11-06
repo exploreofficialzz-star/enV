@@ -18,6 +18,7 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView
 import androidx.camera.core.CameraSelector
+import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.core.ConcurrentCamera
 import androidx.camera.core.Preview
 import androidx.camera.core.UseCaseGroup
@@ -707,6 +708,18 @@ private fun NativeDualCameraStudioScreen(
                     cameras.any { it.lensFacing == CameraSelector.LENS_FACING_FRONT } &&
                     cameras.any { it.lensFacing == CameraSelector.LENS_FACING_BACK }
             } ?: throw IllegalStateException("This phone cannot run its front and rear cameras at the same time.")
+            val backCameraId = Camera2CameraInfo.from(
+                supportedPair.first { it.lensFacing == CameraSelector.LENS_FACING_BACK }
+            ).cameraId
+            val frontCameraId = Camera2CameraInfo.from(
+                supportedPair.first { it.lensFacing == CameraSelector.LENS_FACING_FRONT }
+            ).cameraId
+            val backSelector = CameraSelector.Builder().addCameraFilter { infos ->
+                infos.filter { Camera2CameraInfo.from(it).cameraId == backCameraId }
+            }.build()
+            val frontSelector = CameraSelector.Builder().addCameraFilter { infos ->
+                infos.filter { Camera2CameraInfo.from(it).cameraId == frontCameraId }
+            }.build()
 
             // CameraX composition mode records both live feeds into one video file.
             // The same Preview and VideoCapture use cases must be shared by both camera configs.
@@ -726,8 +739,8 @@ private fun NativeDualCameraStudioScreen(
 
             cameraProvider.bindToLifecycle(
                 listOf(
-                    ConcurrentCamera.SingleCameraConfig(CameraSelector.DEFAULT_BACK_CAMERA, group, lifecycleOwner),
-                    ConcurrentCamera.SingleCameraConfig(CameraSelector.DEFAULT_FRONT_CAMERA, group, lifecycleOwner)
+                    ConcurrentCamera.SingleCameraConfig(backSelector, group, lifecycleOwner),
+                    ConcurrentCamera.SingleCameraConfig(frontSelector, group, lifecycleOwner)
                 )
             )
 
