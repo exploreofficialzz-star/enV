@@ -1553,7 +1553,7 @@ private struct NativeCommunicationToolView: View {
                             do {
                                 calendarOutput = try NativeCommunicationEngine.calendarICS(tool.id, values: values)
                                 exportCalendar = true; exportHTML = false; showExporter = true; error = nil
-                            } catch { error = error.localizedDescription }
+                            } catch { self.error = error.localizedDescription }
                         }.buttonStyle(.bordered)
                     }
                     let gsm7 = parsed.kind == "sms" ? NativeCommunicationEngine.gsm7Alternative(output) : output
