@@ -1849,7 +1849,7 @@ struct NativeCameraStudioView: View {
             capture.setLook(look)
             capture.start()
         }
-        .onChange(of: look) { _, nextLook in capture.setLook(nextLook) }
+        .onChange(of: look) { nextLook in capture.setLook(nextLook) }
         .onDisappear {
             dualCapture.stop()
             capture.stop()
