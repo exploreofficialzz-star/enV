@@ -24,7 +24,8 @@ test("dashboard session tokens round-trip with fixed issuance and expiry", () =>
 test("dashboard session tokens reject altered payloads and signatures", () => {
   const issued = issueDashboardSession(secret, now, 60);
   const [payload, signature] = issued.token.split(".");
-  assert.equal(readDashboardSession(payload + "." + signature.slice(0, -1) + (signature.endsWith("A") ? "B" : "A"), secret, now), null);
+  const tamperedSignature = (signature.startsWith("A") ? "B" : "A") + signature.slice(1);
+  assert.equal(readDashboardSession(payload + "." + tamperedSignature, secret, now), null);
   assert.equal(readDashboardSession(issued.token, secret + "-wrong", now), null);
   assert.equal(readDashboardSession("not-a-session", secret, now), null);
 });
