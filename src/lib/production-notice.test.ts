@@ -3,7 +3,7 @@ import test from "node:test";
 import { isToolUnderProduction } from "./production-notice.ts";
 
 test("explicitly available categories stay accessible", () => {
-  for (const category of ["accessibility", "audio", "business", "calculators", "communication", "creators", "datetime", "developer", "design", "ecommerce", "qr", "video"] as const) {
+  for (const category of ["accessibility", "audio", "business", "calculators", "communication", "creators", "datetime", "developer", "design", "ecommerce", "ai", "qr", "video"] as const) {
     assert.equal(isToolUnderProduction({ id: `test-${category}`, category }), false, `${category} should be exempt`);
   }
 });
@@ -14,7 +14,7 @@ test("A book is accessible without exposing the Productivity category", () => {
 });
 
 test("all other non-exempt categories show the production notice", () => {
-  for (const category of ["ai", "career", "image", "pdf", "productivity"] as const) {
+  for (const category of ["career", "image", "pdf", "productivity"] as const) {
     assert.equal(isToolUnderProduction({ id: `unreleased-${category}`, category }), true, `${category} should be restricted`);
   }
 });

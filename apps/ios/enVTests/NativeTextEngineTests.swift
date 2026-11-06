@@ -224,55 +224,175 @@ final class NativeAiMicroEngineTests: XCTestCase {
         "pros-cons-generator", "shorten-helper", "tiktok-caption-helper", "youtube-description-helper", "youtube-title-helper"
     ]
 
-    func testSupportsExactlyTheThirteenWebOnlyIDs() {
+    func testSupportsExactlyTheThirteenToolIDs() {
         XCTAssertEqual(ids.filter(NativeAiMicroEngine.supports).count, 13)
         XCTAssertFalse(NativeAiMicroEngine.supports("youtube-title-generator"))
         XCTAssertFalse(NativeAiMicroEngine.supports("blog-outline-generator-extra"))
     }
 
-    func testDefaultsAndFieldShapeMatchWeb() {
-        XCTAssertEqual(NativeAiMicroEngine.initialValues("tiktok-caption-helper")["count"], "5")
-        XCTAssertEqual(NativeAiMicroEngine.initialValues("youtube-title-helper")["count"], "8")
-        XCTAssertEqual(NativeAiMicroEngine.initialValues("ai-meeting-agenda-generator")["topics"], "Progress\nBlockers\nDecisions\nNext steps")
+    func testFieldsExposeTheNewSharedInputs() {
+        XCTAssertEqual(NativeAiMicroEngine.initialValues("shorten-helper")["count"], "60")
+        XCTAssertEqual(NativeAiMicroEngine.initialValues("ai-meeting-agenda-generator")["duration"], "30")
         XCTAssertTrue(NativeAiMicroEngine.fields(for: "expand-helper").first?.multiline == true)
+        XCTAssertEqual(NativeAiMicroEngine.initialValues("expand-helper")["audience"], "")
+        XCTAssertEqual(NativeAiMicroEngine.fields(for: "expand-helper").first(where: { $0.name == "audience" })?.label, "Who is this for?")
+        XCTAssertTrue(NativeAiMicroEngine.fields(for: "faq-generator").contains(where: { $0.name == "answers" }))
+        XCTAssertTrue(NativeAiMicroEngine.fields(for: "feature-benefit-generator").contains(where: { $0.name == "outcomes" }))
+        XCTAssertTrue(NativeAiMicroEngine.fields(for: "youtube-description-helper").contains(where: { $0.name == "chapters" }))
         XCTAssertTrue(NativeAiMicroEngine.fields(for: "unknown-tool").isEmpty)
     }
 
-    func testBlogOutlineAndCTAExactTemplates() throws {
-        XCTAssertEqual(try NativeAiMicroEngine.generate(toolID: "blog-outline-generator", values: ["topic":"Gardening", "audience":"new growers", "goal":"Build confidence"]), "Title: Gardening\nAudience: new growers\nGoal: Build confidence\n\nOutline\n1. Introduction — the problem and why it matters\n2. What Gardening means\n3. The key ideas new growers should understand\n4. Practical steps or examples\n5. Common mistakes to avoid\n6. Checklist / next steps\n7. Conclusion and CTA")
-        XCTAssertEqual(try NativeAiMicroEngine.generate(toolID: "call-to-action-generator", values: ["topic":"Meal prep"]), "1. Get started with Meal prep\n\n2. Try Meal prep today\n\n3. See how Meal prep can help\n\n4. Learn more about Meal prep\n\n5. Start creating with Meal prep")
+    func testBlogOutlineUsesBriefAngleAndSuppliedEvidence() throws {
+        let output = try NativeAiMicroEngine.generate(toolID: "blog-outline-generator", values: [
+            "topic":"Urban gardening", "audience":"apartment renters", "goal":"Help readers grow herbs",
+            "angle":"Low-cost methods for small spaces", "keyPoints":"Use containers\nCheck sunlight",
+            "cta":"Start with one herb pot"
+        ])
+        XCTAssertTrue(output.contains("CONTENT BRIEF"))
+        XCTAssertTrue(output.contains("Low-cost methods for small spaces"))
+        XCTAssertTrue(output.contains("• Use containers\n• Check sunlight"))
+        XCTAssertTrue(output.contains("Start with one herb pot"))
+        XCTAssertTrue(output.contains("do not present assumptions as evidence"))
     }
 
-    func testExpandAndFAQTemplateOutputs() throws {
-        XCTAssertEqual(try NativeAiMicroEngine.generate(toolID: "expand-helper", values: ["text":"A useful idea"]), "A useful idea.\n\nKey context: explain why this matters, who it affects, and what should happen next. Add one practical example and finish with a clear next step.")
-        XCTAssertEqual(try NativeAiMicroEngine.generate(toolID: "faq-generator", values: ["topic":"Meal prep", "audience":"students", "points":"Storage\n, Cost, "]), "Q: Storage about Meal prep?\nA: Explain storage in a concise, factual way for students.\n\nQ: Cost about Meal prep?\nA: Explain cost in a concise, factual way for students.")
+    func testCTAUsesRequestedActionAndFlagsMissingBenefits() throws {
+        let output = try NativeAiMicroEngine.generate(toolID: "call-to-action-generator", values: [
+            "topic":"Meal prep", "audience":"busy students", "action":"Download the planner", "benefit":"plan meals in one place"
+        ])
+        XCTAssertTrue(output.contains("Download the planner to plan meals in one place"))
+        XCTAssertTrue(try NativeAiMicroEngine.generate(toolID: "call-to-action-generator", values: ["topic":"Meal prep"]).contains("Add a specific, supportable benefit"))
     }
 
-    func testFeatureBenefitAndAgendaNormalizeLists() throws {
-        XCTAssertEqual(try NativeAiMicroEngine.generate(toolID: "feature-benefit-generator", values: ["audience":"teams", "benefit":"Shared workspace,Fast search\nVersion history"]), "Feature: Shared workspace\nBenefit: Helps teams get a clearer result with less friction.\n\nFeature: Fast search\nBenefit: Helps teams get a clearer result with less friction.\n\nFeature: Version history\nBenefit: Helps teams get a clearer result with less friction.")
-        XCTAssertEqual(try NativeAiMicroEngine.generate(toolID: "ai-meeting-agenda-generator", values: ["goal":"Choose a launch date", "topics":"Progress\nBlockers, Decision"]), "Meeting goal: Choose a launch date\n\nAgenda\n1. Progress\n2. Blockers\n3. Decision\n\nClose with owners, deadlines, and unresolved questions.")
+    func testExpandUsesSuppliedContextAndDoesNotInventExamples() throws {
+        let output = try NativeAiMicroEngine.generate(toolID: "expand-helper", values: [
+            "text":"A useful idea", "audience":"new growers", "context":"Small spaces make growing food feel difficult.",
+            "example":"A pot of basil beside a bright window.", "nextStep":"Choose one herb to grow."
+        ])
+        XCTAssertTrue(output.contains("WHY IT MATTERS\nSmall spaces make growing food feel difficult."))
+        XCTAssertTrue(output.contains("WHO IT AFFECTS\nWrite for: new growers"))
+        XCTAssertTrue(output.contains("A pot of basil beside a bright window."))
+        XCTAssertTrue(output.contains("Choose one herb to grow."))
+        XCTAssertFalse(output.contains("[Add a real example"))
+        XCTAssertTrue(try NativeAiMicroEngine.generate(toolID: "expand-helper", values: ["text":" "]).contains("Add the text or notes"))
     }
 
-    func testMeetingActionsProductTitlesAndProsCons() throws {
-        XCTAssertEqual(try NativeAiMicroEngine.generate(toolID: "meeting-action-items", values: ["notes":"Sam — draft\n\nLee — review"]), "Action items\n1. Sam — draft\n2. Lee — review\n\nBefore sharing, confirm each owner and deadline.")
-        XCTAssertEqual(try NativeAiMicroEngine.generate(toolID: "product-title-generator", values: ["topic":"Focus app", "benefit":"Plan a calmer day"]).components(separatedBy: "\n\n").count, 5)
-        XCTAssertTrue(try NativeAiMicroEngine.generate(toolID: "pros-cons-generator", values: ["topic":"Pilot a new workflow", "option":"Launch now vs wait"]).contains("What would make you stop or change direction?"))
+    func testFAQUsesExactSuppliedAnswersAndFlagsMissingAnswers() throws {
+        let output = try NativeAiMicroEngine.generate(toolID: "faq-generator", values: [
+            "topic":"Meal prep", "audience":"students", "points":"How long does it keep?\nCan I freeze it?",
+            "answers":"How long does it keep? | Refrigerated meals should be used within the safe storage window for their ingredients."
+        ])
+        XCTAssertTrue(output.contains("A: Refrigerated meals should be used within the safe storage window"))
+        XCTAssertTrue(output.contains("Can I freeze it?\nA: [Add a verified answer before publishing.]"))
+        XCTAssertTrue(output.contains("NEEDS AN ANSWER"))
     }
 
-    func testShortenerAndVariantLimits() throws {
-        let words = (1...29).map { "word\($0)" }
-        let expected = words.prefix(28).joined(separator: " ") + "…"
-        XCTAssertEqual(try NativeAiMicroEngine.generate(toolID: "shorten-helper", values: ["text":words.joined(separator: " ")]), expected)
-        XCTAssertEqual(try NativeAiMicroEngine.generate(toolID: "tiktok-caption-helper", values: ["topic":"Quiet mornings", "audience":"students", "count":"2"]).components(separatedBy: "\n\n").count, 2)
-        XCTAssertEqual(try NativeAiMicroEngine.generate(toolID: "youtube-title-helper", values: ["topic":"SQL", "count":"9999999999999999999999999999999999999999999"]).components(separatedBy: "\n\n").count, 8)
+    func testFeatureBenefitsRequireSpecificOutcomesAndEvidence() throws {
+        let output = try NativeAiMicroEngine.generate(toolID: "feature-benefit-generator", values: [
+            "audience":"teams", "benefit":"Shared workspace\nFast search", "outcomes":"Everyone works from the same project view"
+        ])
+        XCTAssertTrue(output.contains("Customer outcome: Everyone works from the same project view"))
+        XCTAssertTrue(output.contains("Feature: Fast search\nCustomer outcome: [Add the specific result"))
+        XCTAssertTrue(output.contains("Evidence to support the claim"))
     }
 
-    func testYouTubeDescriptionMatchesTemplateAndInvalidToolThrows() throws {
-        XCTAssertEqual(try NativeAiMicroEngine.generate(toolID: "youtube-description-helper", values: ["topic":"Urban gardening", "audience":"beginners", "tone":"professional", "points":"Tools\nPlanning,Harvest"]), "Urban gardening\n\nIn this video, we break down Urban gardening for beginners in a clear and professional way.\n\nWhat you'll cover:\n• Tools\n• Planning\n• Harvest\n\nIf you found this useful, save it for later and share it with someone working on the same goal.")
-        XCTAssertThrowsError(try NativeAiMicroEngine.generate(toolID: "unknown-tool", values: [:]))
+    func testAgendaDistributesTimeAcrossTopics() throws {
+        let output = try NativeAiMicroEngine.generate(toolID: "ai-meeting-agenda-generator", values: [
+            "goal":"Choose a launch date", "duration":"30", "topics":"Progress\nDecision"
+        ])
+        XCTAssertTrue(output.contains("Planned duration: 30 minutes"))
+        XCTAssertTrue(output.contains("1. Progress — 15 min\n2. Decision — 15 min"))
+        XCTAssertTrue(output.contains("Confirm decisions, owners, deadlines"))
+    }
+
+    func testMeetingActionsParseOwnersDatesAndPriorityWithoutInventingStatus() throws {
+        let output = try NativeAiMicroEngine.generate(toolID: "meeting-action-items", values: [
+            "notes":"Sam | Draft launch brief | Friday | High\nLee | Review pricing | Monday | Medium"
+        ])
+        XCTAssertTrue(output.contains("Owner: Sam | Action: Draft launch brief | Due: Friday | Priority: High"))
+        XCTAssertTrue(output.contains("Status has not been inferred"))
+        let incomplete = try NativeAiMicroEngine.generate(toolID: "meeting-action-items", values: ["notes":"Finish the landing page"])
+        XCTAssertTrue(incomplete.contains("[Assign owner]"))
+        XCTAssertTrue(incomplete.contains("[Add due date]"))
+    }
+
+    func testProductTitleUsesKeywordBenefitAndCustomer() throws {
+        let output = try NativeAiMicroEngine.generate(toolID: "product-title-generator", values: [
+            "topic":"Focus app", "keyword":"Daily planner", "benefit":"Plan a calmer day", "audience":"remote teams"
+        ])
+        XCTAssertTrue(output.contains("Daily planner — Plan a calmer day"))
+        XCTAssertTrue(output.contains("The Daily planner guide for remote teams"))
+    }
+
+    func testProsConsSeparatesSuppliedEvidenceFromAssumptions() throws {
+        let output = try NativeAiMicroEngine.generate(toolID: "pros-cons-generator", values: [
+            "option":"Launch now vs wait", "upsides":"Reach early users", "risks":"Support load may increase", "criteria":"Weekly active use"
+        ])
+        XCTAssertTrue(output.contains("UPSIDE TO VERIFY\n• Reach early users"))
+        XCTAssertTrue(output.contains("RISKS / COSTS TO CHECK\n• Support load may increase"))
+        XCTAssertTrue(output.contains("DECISION CRITERIA\n• Weekly active use"))
+        XCTAssertTrue(output.contains("Separate measured results from assumptions"))
+    }
+
+    func testShortenHonorsTargetAndPreservesSentenceBoundariesAndUnicode() throws {
+        let source = "Our tool helps teams manage projects. It keeps deadlines visible. It stores files securely. It sends weekly reminders."
+        XCTAssertEqual(
+            try NativeAiMicroEngine.generate(toolID: "shorten-helper", values: ["text":source, "count":"10"]),
+            "Our tool helps teams manage projects. It keeps deadlines visible…"
+        )
+        XCTAssertEqual(try NativeAiMicroEngine.generate(toolID: "shorten-helper", values: ["text":"Café déjà vu", "count":"60"]), "Café déjà vu")
+        XCTAssertTrue(try NativeAiMicroEngine.generate(toolID: "shorten-helper", values: ["text":" "]).contains("Add the text you want to shorten"))
+    }
+
+    func testTikTokCaptionUsesHookCTAAndSelectedCount() throws {
+        let output = try NativeAiMicroEngine.generate(toolID: "tiktok-caption-helper", values: [
+            "topic":"Quiet mornings", "audience":"students", "hook":"One habit to try", "cta":"Save this checklist", "count":"2"
+        ])
+        XCTAssertEqual(output.components(separatedBy: "\n\n").count, 2)
+        XCTAssertTrue(output.contains("One habit to try: Quiet mornings. Save this checklist"))
+    }
+
+    func testYouTubeDescriptionIncludesSuppliedChaptersLinksAndNextStep() throws {
+        let output = try NativeAiMicroEngine.generate(toolID: "youtube-description-helper", values: [
+            "topic":"Urban gardening", "audience":"beginners", "tone":"professional", "points":"Tools\nPlanning",
+            "chapters":"0:00 Introduction\n1:20 Choose a container", "links":"https://example.com/guide",
+            "cta":"Subscribe for the next lesson"
+        ])
+        XCTAssertTrue(output.contains("WHAT YOU'LL LEARN"))
+        XCTAssertTrue(output.contains("CHAPTERS\n0:00 Introduction\n1:20 Choose a container"))
+        XCTAssertTrue(output.contains("LINKS / RESOURCES\nhttps://example.com/guide"))
+        XCTAssertTrue(output.contains("Subscribe for the next lesson"))
+    }
+
+    func testLineBasedInputsKeepCommasInsideEachItem() throws {
+        let faq = try NativeAiMicroEngine.generate(toolID: "faq-generator", values: [
+            "topic":"Safety", "points":"Is this safe, for everyone?",
+            "answers":"Is this safe, for everyone? | Check the product's stated limits before use."
+        ])
+        XCTAssertTrue(faq.contains("Q: Is this safe, for everyone?"))
+        XCTAssertTrue(faq.contains("A: Check the product's stated limits before use."))
+
+        let benefits = try NativeAiMicroEngine.generate(toolID: "feature-benefit-generator", values: [
+            "topic":"Search", "benefit":"Fast search, with filters", "outcomes":"Find matching records more quickly"
+        ])
+        XCTAssertTrue(benefits.contains("Feature: Fast search, with filters"))
+        XCTAssertTrue(benefits.contains("Customer outcome: Find matching records more quickly"))
+
+        let agenda = try NativeAiMicroEngine.generate(toolID: "ai-meeting-agenda-generator", values: [
+            "duration":"20", "topics":"Review risks, costs and scope\nChoose next step"
+        ])
+        XCTAssertTrue(agenda.contains("1. Review risks, costs and scope — 10 min"))
+    }
+
+    func testYouTubeTitlesRespectOneHundredCharacterLimit() throws {
+        let output = try NativeAiMicroEngine.generate(toolID: "youtube-title-helper", values: [
+            "topic":"Learning SQL", "audience":"analysts", "keyword":"SQL reporting",
+            "angle":"a practical guide to advanced reporting", "count":"8"
+        ])
+        let titles = output.components(separatedBy: "\n\n").map { $0.replacingOccurrences(of: "^\\d+\\.\\s", with: "", options: .regularExpression) }
+        XCTAssertEqual(titles.count, 8)
+        XCTAssertTrue(titles.allSatisfy { $0.count <= 100 })
     }
 }
-
 
 final class NativeEventEngineTests: XCTestCase {
     private let agendaIds = [

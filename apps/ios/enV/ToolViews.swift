@@ -7957,18 +7957,19 @@ enum NativeAiMicroEngine {
 
     static func fields(for toolID: String) -> [NativeAiMicroField] {
         switch operation(for: toolID) {
-        case "blog-outline": return [topic(), audience(), field("goal", "Goal", "Educate and give the reader a practical next step")]
-        case "cta": return [topic()]
-        case "expand", "shorten": return [field("text", "Text", "We are launching a new product that helps people create useful content faster.", multiline: true)]
-        case "faq": return [topic(), audience(), field("points", "Key points", "What it is\nWho it is for\nHow it works\nPricing or access", multiline: true)]
-        case "feature-benefit": return [topic(), audience(), field("benefit", "Main benefit", "Save time and get started quickly")]
-        case "agenda": return [field("goal", "Meeting goal", "Plan the next launch"), field("topics", "Topics", "Progress\nBlockers\nDecisions\nNext steps", multiline: true)]
-        case "actions": return [field("notes", "Rough notes", "John — finish landing page by Friday\nAda — confirm pricing\nTeam — test checkout", multiline: true)]
-        case "product-title": return [topic(), field("benefit", "Main benefit", "Save time and get started quickly")]
-        case "pros-cons": return [topic(), field("option", "Option / decision", "Launch now vs wait for more features")]
-        case "tt-caption": return [topic(), audience(), field("count", "Options", "5")]
-        case "yt-desc": return [topic(), audience(), field("tone", "Tone", "natural"), field("points", "Key points", "Problem\nSolution\nPractical examples\nCall to action", multiline: true)]
-        case "yt-title": return [topic(), audience(), field("count", "Options", "8")]
+        case "blog-outline": return [topic(), audience(), field("goal", "Goal", "Help the reader understand the topic and take a useful next step"), field("angle", "Editorial angle", "Explain the practical problem before presenting the solution", multiline: true), field("keyPoints", "Verified facts / points to include", "", multiline: true), field("cta", "Reader next step", "")]
+        case "cta": return [topic(), audience(), field("action", "Action to ask for", "Learn more"), field("benefit", "Specific benefit (optional)", ""), field("tone", "Tone", "natural")]
+        case "expand": return [field("text", "Text / notes to expand", "", multiline: true), field("audience", "Who is this for?", ""), field("context", "Why does it matter?", "", multiline: true), field("example", "Real example / supporting detail", "", multiline: true), field("nextStep", "Next step for the reader", "")]
+        case "shorten": return [field("text", "Text", "We are launching a new product that helps people create useful content faster.", multiline: true), field("count", "Target words", "60")]
+        case "faq": return [topic(), audience(), field("points", "Questions (one per line)", "What it is\nWho it is for\nHow it works\nPricing or access", multiline: true), field("answers", "Verified answers (Question | Answer)", "", multiline: true)]
+        case "feature-benefit": return [topic(), audience(), field("benefit", "Features (one per line)", "Shared workspace\nFast search\nVersion history", multiline: true), field("outcomes", "Actual customer outcomes (same order)", "", multiline: true)]
+        case "agenda": return [field("goal", "Meeting goal", "Plan the next launch"), field("duration", "Meeting duration (minutes)", "30"), field("topics", "Topics", "Progress\nBlockers\nDecisions\nNext steps", multiline: true)]
+        case "actions": return [field("notes", "Action items (Owner | Action | Due date | Priority)", "John | Finish landing page | Friday | High\nAda | Confirm pricing | Thursday | Medium\nTeam | Test checkout | Friday | High", multiline: true)]
+        case "product-title": return [topic(), field("benefit", "Specific product benefit (optional)", ""), field("audience", "Target customer (optional)", ""), field("keyword", "Primary keyword (optional)", "")]
+        case "pros-cons": return [field("option", "Option / decision", "Launch now vs wait for more features"), field("upsides", "Observed upsides (one per line)", "", multiline: true), field("risks", "Known risks / costs (one per line)", "", multiline: true), field("criteria", "Decision criteria (one per line)", "", multiline: true)]
+        case "tt-caption": return [topic(), audience(), field("tone", "Tone", "natural"), field("hook", "Opening angle", "A useful reminder"), field("cta", "Call to action", "What would you add?"), field("count", "Options", "5")]
+        case "yt-desc": return [topic(), audience(), field("tone", "Tone", "natural"), field("points", "Video points (one per line)", "", multiline: true), field("chapters", "Chapters / timestamps (optional)", "", multiline: true), field("links", "Links / resources (optional)", "", multiline: true), field("cta", "Viewer next step", "")]
+        case "yt-title": return [topic(), audience(), field("keyword", "Primary keyword (optional)", ""), field("angle", "Video angle", "a practical guide"), field("count", "Options", "8")]
         default: return []
         }
     }
@@ -7984,31 +7985,154 @@ enum NativeAiMicroEngine {
         let count = parsed.isFinite ? Int(min(20, max(1, parsed))) : 5
 
         switch operation {
-        case "title", "yt-title": return numbered(["\(topic): What \(audience) Should Know", "How to Get Better Results With \(topic)", "The Simple Guide to \(topic)", "I Tried \(topic) — Here’s What I Learned", "\(topic) Explained Without the Jargon", "5 Things \(audience) Should Know About \(topic)", "Before You Start With \(topic), Read This", "A Practical \(topic) Guide for \(audience)"], count: count)
-        case "tt-caption": return numbered(["\(topic) made simple. Save this for later.", "If you're into \(topic), this one is for you.", "A quick reminder for \(audience): you don't need to overcomplicate \(topic).", "Learning \(topic) one step at a time. What would you add?", "Here's the part about \(topic) people usually skip.", "Small steps, better results. That's the goal with \(topic).", "Trying to understand \(topic)? Start here."], count: count)
-        case "blog-outline": return "Title: \(topic)\nAudience: \(audience)\nGoal: \(clean(values["goal"], "Educate the reader"))\n\nOutline\n1. Introduction — the problem and why it matters\n2. What \(topic) means\n3. The key ideas \(audience) should understand\n4. Practical steps or examples\n5. Common mistakes to avoid\n6. Checklist / next steps\n7. Conclusion and CTA"
-        case "cta": return numbered(["Get started with \(topic)", "Try \(topic) today", "See how \(topic) can help", "Learn more about \(topic)", "Start creating with \(topic)"], count: 5)
-        case "expand": return "\(clean(values["text"], "Your notes").appending("."))\n\nKey context: explain why this matters, who it affects, and what should happen next. Add one practical example and finish with a clear next step."
-        case "faq": return splitList(clean(values["points"], "What it is\nHow it works")).map { "Q: \($0) about \(topic)?\nA: Explain \($0.lowercased()) in a concise, factual way for \(audience)." }.joined(separator: "\n\n")
-        case "feature-benefit": return splitList(clean(values["benefit"], "Saves time")).map { "Feature: \($0)\nBenefit: Helps \(audience) get a clearer result with less friction." }.joined(separator: "\n\n")
+        case "title", "yt-title":
+            let keyword = clean(values["keyword"], topic)
+            let angle = clean(values["angle"], "a practical guide")
+            let titles = [
+                "\(keyword): \(angle) for \(audience)",
+                "How \(audience) can get started with \(topic)",
+                "\(topic), explained: \(angle)",
+                "What to know before you try \(topic)",
+                "The \(topic) checklist for \(audience)",
+                "Common \(topic) mistakes and how to avoid them",
+                "A step-by-step guide to \(topic)",
+                "\(topic): key ideas, examples and next steps"
+            ].map { boundedYouTubeTitle($0) }
+            return numbered(Array(NSOrderedSet(array: titles)) as? [String] ?? titles, count: count)
+        case "tt-caption":
+            return numbered([
+                "\(clean(values["hook"], "A useful reminder")): \(topic). \(clean(values["cta"], "What would you add?") )",
+                "A practical note for \(audience): \(topic) is worth exploring one step at a time.",
+                "Save this if \(topic) is on your list. \(clean(values["cta"], "What would you add?"))",
+                "One idea to take away about \(topic): start small, then build on what works.",
+                "For \(audience): here is a fresh way to think about \(topic). \(clean(values["cta"], "What would you add?"))",
+                "Quick breakdown: \(topic). Keep what works for you and test the rest.",
+                "What is one thing you would change about \(topic)? \(clean(values["cta"], "What would you add?"))"
+            ], count: count)
+        case "blog-outline":
+            let keyPoints = splitLines(values["keyPoints"] ?? "")
+            return [
+                "CONTENT BRIEF\nTopic: \(topic)\nAudience: \(audience)\nGoal: \(clean(values["goal"], "Help the reader understand the topic and take a useful next step"))\nEditorial angle: \(clean(values["angle"], "Explain the practical problem before presenting the solution"))",
+                "OUTLINE\n1. Opening: name the reader's problem and why it matters\n2. The essentials: define \(topic) in plain language\n3. The decision: explain the main choices, trade-offs or criteria\n4. Practical walkthrough: arrange the steps in the order a reader should use them\n5. Example or evidence: use a real example, source or supplied detail\n6. Common mistakes: explain what to check before acting\n7. Recap: summarise the useful points and answer the opening question\n8. Next step: \(clean(values["cta"], "[Add one relevant next step for the reader]"))",
+                keyPoints.isEmpty ? "RESEARCH CHECK\nAdd verified facts, examples and sources before making factual claims." : "SUPPLIED FACTS / POINTS TO INCLUDE\n" + keyPoints.map { "• " + $0 }.joined(separator: "\n"),
+                "EDITORIAL CHECK\nKeep each section useful to the stated audience. Remove repeated points and do not present assumptions as evidence."
+            ].joined(separator: "\n\n")
+        case "cta":
+            let action = clean(values["action"], "Learn more")
+            let benefit = values["benefit"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let promise = benefit.isEmpty ? "" : " to " + benefit
+            let candidates = [action + promise, "Ready to explore \(topic)? \(action).", "Take the next step with \(topic): \(action).", "See whether \(topic) fits your needs. \(action).", "\(audience): make your next move on \(topic). \(action)."]
+            return numbered(Array(NSOrderedSet(array: candidates)) as? [String] ?? candidates, count: 5) + (benefit.isEmpty ? "\n\nAdd a specific, supportable benefit before publishing a stronger promise." : "")
+        case "expand":
+            let source = values["text"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !source.isEmpty else { return "Add the text or notes you want to expand, then generate again." }
+            return [
+                source,
+                "WHY IT MATTERS\n\(clean(values["context"], "[Add why this matters. Do not publish this placeholder.]"))",
+                "WHO IT AFFECTS\nWrite for: \(clean(values["audience"], "[Name the reader or audience.]"))",
+                "EXAMPLE / SUPPORTING DETAIL\n\(clean(values["example"], "[Add a real example or remove this section.]"))",
+                "NEXT STEP\n\(clean(values["nextStep"], "[Add the action, decision or response needed.]"))",
+                "EDITORIAL NOTE\nReplace every bracketed prompt with verified, relevant detail. This local expansion scaffold does not invent supporting facts."
+            ].joined(separator: "\n\n")
+        case "faq":
+            let questions = splitLines(values["points"] ?? "")
+            guard !questions.isEmpty else { return "Add one question per line, then generate the FAQ." }
+            var answers = [String: String]()
+            for line in (values["answers"] ?? "").components(separatedBy: .newlines) {
+                guard let separator = line.firstIndex(of: "|") else { continue }
+                let question = String(line[..<separator]).trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                let answer = String(line[line.index(after: separator)...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !question.isEmpty && !answer.isEmpty { answers[question] = answer }
+            }
+            var missing = [String]()
+            let output = questions.map { question -> String in
+                let answer = answers[question.lowercased()]
+                if answer == nil { missing.append(question) }
+                return "Q: \(question)\nA: \(answer ?? "[Add a verified answer before publishing.]")"
+            }.joined(separator: "\n\n")
+            return "FAQ: \(topic)\nAudience: \(audience)\n\n" + output + (missing.isEmpty ? "" : "\n\nNEEDS AN ANSWER\n" + missing.map { "• " + $0 }.joined(separator: "\n") + "\n\nOnly publish answers confirmed by your product, policy or source material.")
+        case "feature-benefit":
+            let features = splitLines(values["benefit"] ?? "")
+            guard !features.isEmpty else { return "Add one product feature per line." }
+            let outcomes = splitLines(values["outcomes"] ?? "")
+            let output = "VALUE MAPPING\nProduct / service: \(topic)\nAudience: \(audience)\n\n" + features.enumerated().map { index, feature in
+                "Feature: \(feature)\nCustomer outcome: \(index < outcomes.count ? outcomes[index] : "[Add the specific result this feature creates.]")\nEvidence to support the claim: [Add a measured result, user example or verified product detail.]"
+            }.joined(separator: "\n\n")
+            return output + (outcomes.count > features.count ? "\n\nNote: extra outcome entries were not matched to a feature and were left out." : "")
         case "agenda":
-            let points = splitList(clean(values["topics"], "Progress\nBlockers\nDecisions\nNext steps"))
-            return "Meeting goal: \(clean(values["goal"], "Make a clear decision"))\n\nAgenda\n\(points.enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n"))\n\nClose with owners, deadlines, and unresolved questions."
+            let points = splitLines(clean(values["topics"], "Progress\nBlockers\nDecisions\nNext steps")).prefix(100).map { $0 }
+            let requested = Int(values["duration"] ?? "30") ?? 30
+            let duration = min(600, max(points.count, requested))
+            let base = duration / points.count
+            let remainder = duration % points.count
+            return "Meeting goal: \(clean(values["goal"], "Make a clear decision"))\nPlanned duration: \(duration) minutes\n\nAGENDA\n" + points.enumerated().map { index, item in
+                "\(index + 1). \(item) — \(base + (index < remainder ? 1 : 0)) min"
+            }.joined(separator: "\n") + "\n\nCLOSE\nConfirm decisions, owners, deadlines and unresolved questions before ending."
         case "actions":
-            let notes = clean(values["notes"], "Person — task — deadline").components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
-            return "Action items\n\(notes.enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n"))\n\nBefore sharing, confirm each owner and deadline."
+            let lines = (values["notes"] ?? "").components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+            guard !lines.isEmpty else { return "Add one action item per line. Use Owner | Action | Due date | Priority where possible." }
+            let parsed = lines.map { line -> [String] in
+                let parts = line.components(separatedBy: "|").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                if parts.count == 1 { return ["[Assign owner]", parts[0], "[Add due date]", "Not set"] }
+                return [
+                    parts.indices.contains(0) && !parts[0].isEmpty ? parts[0] : "[Assign owner]",
+                    parts.indices.contains(1) && !parts[1].isEmpty ? parts[1] : "[Describe action]",
+                    parts.indices.contains(2) && !parts[2].isEmpty ? parts[2] : "[Add due date]",
+                    parts.indices.contains(3) && !parts[3].isEmpty ? parts[3] : "Not set"
+                ]
+            }
+            let incomplete = parsed.filter { $0[0].hasPrefix("[") || $0[1].hasPrefix("[") || $0[2].hasPrefix("[") }.count
+            return "ACTION REGISTER\n" + parsed.enumerated().map { index, row in
+                "\(index + 1). Owner: \(row[0]) | Action: \(row[1]) | Due: \(row[2]) | Priority: \(row[3])"
+            }.joined(separator: "\n") + "\n\nFOLLOW-UP\n" + (incomplete > 0 ? "\(incomplete) item(s) need an owner, action or due date confirmed." : "Review owners and dates with the team before sharing.") + "\nStatus has not been inferred; update it after the meeting."
         case "product-title":
-            let benefit = clean(values["benefit"], "Simple and practical")
-            return numbered(["\(topic) — \(benefit)", "\(topic): \(clean(values["benefit"], "A better way to get started"))", "The \(topic) Starter Guide", "\(topic) Made Simple", "\(topic) Toolkit"], count: 5)
-        case "pros-cons": return "Decision worksheet: \(clean(values["option"], "your option"))\n\nPros\n• Potential upside: \(topic) may help achieve the stated goal.\n• Can be tested with a small, measurable experiment.\n• Creates information for the next decision.\n\nCons / risks\n• Requires time, money, or attention.\n• Results may differ from assumptions.\n• A larger commitment may reduce flexibility.\n\nQuestions to verify\n• What is the smallest useful test?\n• What metric decides whether to continue?\n• What would make you stop or change direction?"
+            let benefit = values["benefit"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let rawKeyword = values["keyword"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let keyword = rawKeyword.isEmpty ? topic : rawKeyword
+            let target = values["audience"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let suffix = target.isEmpty ? "" : " for " + target
+            let titles = [
+                benefit.isEmpty ? "\(keyword): A practical guide" : "\(keyword) — \(benefit)",
+                "The \(keyword) guide\(suffix)", "\(keyword): Features, uses and key details",
+                "Getting started with \(keyword)", "A closer look at \(keyword)", "\(keyword): What to know before you choose"
+            ]
+            return numbered(titles, count: 6)
+        case "pros-cons":
+            let upsides = splitLines(values["upsides"] ?? "")
+            let risks = splitLines(values["risks"] ?? "")
+            let criteria = splitLines(values["criteria"] ?? "")
+            let decisionText = "DECISION: " + clean(values["option"], "the option being considered")
+            let upsideText = upsides.isEmpty
+                ? "UPSIDE TO VERIFY\n• [Add observed advantages or expected benefits.]"
+                : "UPSIDE TO VERIFY\n" + upsides.map { "• " + $0 }.joined(separator: "\n")
+            let riskText = risks.isEmpty
+                ? "RISKS / COSTS TO CHECK\n• [Add known risks, costs or trade-offs.]"
+                : "RISKS / COSTS TO CHECK\n" + risks.map { "• " + $0 }.joined(separator: "\n")
+            let criteriaText = criteria.isEmpty
+                ? "DECISION CRITERIA\n• What measurable result would make this worthwhile?\n• What is the smallest safe test?\n• What evidence would make you stop or change course?"
+                : "DECISION CRITERIA\n" + criteria.map { "• " + $0 }.joined(separator: "\n")
+            let evidenceText = "EVIDENCE CHECK\nSeparate measured results from assumptions. Do not treat a blank section as proof that no risk or benefit exists."
+            return [decisionText, upsideText, riskText, criteriaText, evidenceText].joined(separator: "\n\n")
         case "shorten":
-            let text = clean(values["text"], "Your original text")
-            let words = text.split(whereSeparator: { $0.isWhitespace })
-            return words.count > 28 ? words.prefix(28).joined(separator: " ") + "…" : text
+            let text = values["text"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !text.isEmpty else { return "Add the text you want to shorten." }
+            return shortenExtractively(text, requestedWords: Int(values["count"] ?? "60") ?? 60)
         case "yt-desc":
-            let points = splitList(clean(values["points"], "Key points and practical examples"))
-            return "\(topic)\n\nIn this video, we break down \(topic) for \(audience) in a \(style) way.\n\nWhat you'll cover:\n\(points.map { "• \($0)" }.joined(separator: "\n"))\n\nIf you found this useful, save it for later and share it with someone working on the same goal."
-        default: throw NSError(domain: "NativeAiMicroEngine", code: 2, userInfo: [NSLocalizedDescriptionKey: "Unsupported AI micro-tool operation: \(operation)"])
+            let points = splitLines(values["points"] ?? "")
+            let links = splitLines(values["links"] ?? "")
+            let chapters = splitLines(values["chapters"] ?? "")
+            var sections = [
+                topic,
+                "This video covers \(topic)\(audience.isEmpty ? "" : " for \(audience)"). The description uses a \(style) tone and only relies on the details supplied here.",
+                points.isEmpty ? "WHAT YOU'LL LEARN\n[Add the key points covered in the video.]" : "WHAT YOU'LL LEARN\n" + points.map { "• " + $0 }.joined(separator: "\n")
+            ]
+            if !chapters.isEmpty { sections.append("CHAPTERS\n" + chapters.joined(separator: "\n")) }
+            if !links.isEmpty { sections.append("LINKS / RESOURCES\n" + links.joined(separator: "\n")) }
+            sections.append("NEXT STEP\n\(clean(values["cta"], "[Add one clear viewer action.]"))")
+            sections.append("Check every link, chapter time and factual claim before publishing.")
+            return sections.joined(separator: "\n\n")
+        default:
+            throw NSError(domain: "NativeAiMicroEngine", code: 2, userInfo: [NSLocalizedDescriptionKey: "Unsupported AI micro-tool operation: \(operation)"])
         }
     }
 
@@ -8019,6 +8143,44 @@ enum NativeAiMicroEngine {
     private static func tonePhrase(_ tone: String) -> String { ["professional":"clear and professional", "bold":"confident and direct", "playful":"light and playful", "friendly":"warm and friendly"][tone] ?? "natural and conversational" }
     private static func numbered(_ lines: [String], count: Int) -> String { lines.prefix(min(lines.count, max(1, count))).enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n\n") }
     private static func splitList(_ value: String) -> [String] { value.components(separatedBy: CharacterSet.newlines.union(CharacterSet(charactersIn: ","))).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty } }
+    private static func splitLines(_ value: String) -> [String] { value.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty } }
+
+    private static func boundedYouTubeTitle(_ value: String) -> String {
+        let text = value.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+        if text.count <= 100 { return text }
+        let prefix = String(text.prefix(99))
+        if let boundary = prefix.lastIndex(of: " "), prefix.distance(from: prefix.startIndex, to: boundary) > 45 {
+            return String(prefix[..<boundary]).trimmingCharacters(in: .whitespacesAndNewlines) + "…"
+        }
+        return prefix + "…"
+    }
+
+    private static func shortenExtractively(_ value: String, requestedWords: Int) -> String {
+        let text = value.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+        let target = min(500, max(10, requestedWords))
+        let words = text.split(whereSeparator: { $0.isWhitespace })
+        if words.count <= target { return text }
+        var sentences = [String]()
+        text.enumerateSubstrings(in: text.startIndex..<text.endIndex, options: .bySentences) { part, _, _, _ in
+            if let part, !part.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                sentences.append(part.trimmingCharacters(in: .whitespacesAndNewlines))
+            }
+        }
+        if sentences.count > 1 {
+            var selected = [String]()
+            var total = 0
+            for sentence in sentences {
+                let count = sentence.split(whereSeparator: { $0.isWhitespace }).count
+                if !selected.isEmpty && total + count > target { break }
+                selected.append(sentence)
+                total += count
+                if total >= target { break }
+            }
+            let joined = selected.joined(separator: " ").trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: ".!?…")))
+            return joined + "…"
+        }
+        return words.prefix(target).joined(separator: " ") + "…"
+    }
 }
 
 private enum NativeAiClient {
@@ -8237,6 +8399,7 @@ private struct NativeAiMicroToolView: View {
     let tool: Tool
     @State private var values: [String: String]
     @State private var output = ""
+    @State private var generatedOutput = ""
     @State private var error = ""
 
     init(tool: Tool) {
@@ -8271,16 +8434,20 @@ private struct NativeAiMicroToolView: View {
                 } else {
                     TextField(field.label, text: binding(for: field))
                         .textFieldStyle(.roundedBorder)
-                        .keyboardType(field.name == "count" ? .numberPad : .default)
+                        .keyboardType(["count", "duration"].contains(field.name) ? .numberPad : .default)
                 }
             }
             HStack {
                 Button("Generate") {
-                    do { output = try NativeAiMicroEngine.generate(toolID: tool.id, values: values); error = "" }
-                    catch { output = ""; self.error = error.localizedDescription }
+                    do { output = try NativeAiMicroEngine.generate(toolID: tool.id, values: values); generatedOutput = output; error = "" }
+                    catch { output = ""; generatedOutput = ""; self.error = error.localizedDescription }
                 }
                 .buttonStyle(.borderedProminent)
-                Button("Clear") { output = ""; error = "" }
+                if !output.isEmpty && output != generatedOutput {
+                    Button("Reset edits") { output = generatedOutput }
+                        .buttonStyle(.bordered)
+                }
+                Button("Clear") { output = ""; generatedOutput = ""; error = "" }
                     .buttonStyle(.bordered)
                 if !output.isEmpty {
                     Button("Copy output") { UIPasteboard.general.string = output }
@@ -8288,7 +8455,8 @@ private struct NativeAiMicroToolView: View {
                 }
             }
             if !output.isEmpty {
-                TextEditor(text: .constant(output))
+                Text("Editable draft").font(.caption).foregroundStyle(.secondary)
+                TextEditor(text: $output)
                     .frame(minHeight: 150)
                     .textSelection(.enabled)
                     .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envTeal.opacity(0.3)))

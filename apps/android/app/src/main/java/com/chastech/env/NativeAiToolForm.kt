@@ -209,7 +209,14 @@ fun NativeAiToolForm(tool: ToolRecord) {
             }) { Text(if (working) "Working…" else "Generate") }
             OutlinedButton(onClick = { existingPrompt=if (localImprover) "Write a good social media post about my product." else existingPrompt; topic=when { localCaption || localTitle || localIdea || localHook || localContentBrief || localAdCopy -> "AI tools for creators"; localPrompt -> "Create a launch plan for a digital product"; localBio -> "AI music creator"; localProduct -> "AI Music Generator Class"; localResume -> "Managed social media content and improved engagement"; localRewrite -> "We are launching a new product that helps people create useful content faster."; localEmail -> "Introduce a new digital product"; localMeta -> "AI tools for creators"; else -> "" }; benefit=if (localHook || localAdCopy) "Save time and get started quickly" else ""; pageSummary=if (localMeta) "Explain the product, key benefits, and how visitors can get started." else ""; emailPoints=if (localEmail) "What it does\nWho it is for\nHow to get started" else ""; resultMetric=if (localResume) "increased engagement" else ""; features=if (localProduct) "Beginner friendly\nWorks from a smartphone\nUses accessible tools" else ""; goal=if (localIdea || localContentBrief) "Educate and give the reader a practical next step" else goal; audience="creators and small businesses"; pattern="";sql="";json="";output="";error="";selectedFile=null }) { Text("Reset") }
         }
-        if (output.isNotBlank()) Text(output, style = MaterialTheme.typography.bodyMedium)
+        if (output.isNotBlank()) OutlinedTextField(
+            value = output,
+            onValueChange = { output = it },
+            label = { Text("Editable draft") },
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 6,
+            maxLines = 16,
+        )
         if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
         Spacer(Modifier.padding(1.dp))
         Text("AI output can be wrong. Review it before you use it. Native deterministic tools remain available offline.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -222,6 +229,7 @@ private fun NativeAiMicroToolForm(toolId: String) {
     val clipboard = LocalClipboardManager.current
     var values by remember(toolId) { mutableStateOf(NativeAiMicroEngine.initialValues(toolId)) }
     var output by remember(toolId) { mutableStateOf("") }
+    var generatedOutput by remember(toolId) { mutableStateOf("") }
     var error by remember(toolId) { mutableStateOf("") }
     val toneChoices = listOf("natural" to "Natural", "professional" to "Professional", "friendly" to "Friendly", "bold" to "Bold", "playful" to "Playful")
 
@@ -246,20 +254,28 @@ private fun NativeAiMicroToolForm(toolId: String) {
                     modifier = Modifier.fillMaxWidth(),
                     minLines = if (field.multiline) 3 else 1,
                     maxLines = if (field.multiline) 6 else 1,
-                    keyboardOptions = KeyboardOptions(keyboardType = if (field.name == "count") KeyboardType.Number else KeyboardType.Text),
+                    keyboardOptions = KeyboardOptions(keyboardType = if (field.name in setOf("count", "duration")) KeyboardType.Number else KeyboardType.Text),
                 )
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = {
                 runCatching { NativeAiMicroEngine.generate(toolId, values) }
-                    .onSuccess { output = it; error = "" }
-                    .onFailure { output = ""; error = it.message ?: "Could not generate text." }
+                    .onSuccess { output = it; generatedOutput = it; error = "" }
+                    .onFailure { output = ""; generatedOutput = ""; error = it.message ?: "Could not generate text." }
             }) { Text("Generate") }
-            OutlinedButton(onClick = { output = ""; error = "" }) { Text("Clear") }
+            if (output.isNotBlank() && output != generatedOutput) OutlinedButton(onClick = { output = generatedOutput }) { Text("Reset edits") }
+            OutlinedButton(onClick = { output = ""; generatedOutput = ""; error = "" }) { Text("Clear") }
             if (output.isNotBlank()) OutlinedButton(onClick = { clipboard.setText(AnnotatedString(output)) }) { Text("Copy output") }
         }
-        if (output.isNotBlank()) Text(output, style = MaterialTheme.typography.bodyMedium)
+        if (output.isNotBlank()) OutlinedTextField(
+            value = output,
+            onValueChange = { output = it },
+            label = { Text("Editable draft") },
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 6,
+            maxLines = 16,
+        )
         if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
     }
 }

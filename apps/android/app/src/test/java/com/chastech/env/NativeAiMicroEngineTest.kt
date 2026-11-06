@@ -6,7 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NativeAiMicroEngineTest {
-    @Test fun supportsOnlyTheExactThirteenWebOnlyIds() {
+    @Test fun supportsOnlyTheExactThirteenToolIds() {
         val ids = listOf(
             "ai-meeting-agenda-generator", "blog-outline-generator", "call-to-action-generator", "expand-helper",
             "faq-generator", "feature-benefit-generator", "meeting-action-items", "product-title-generator",
@@ -17,71 +17,168 @@ class NativeAiMicroEngineTest {
         assertFalse(NativeAiMicroEngine.supports("blog-outline-generator-extra"))
     }
 
-    @Test fun fieldDefaultsMatchTheWebForms() {
-        assertEquals("5", NativeAiMicroEngine.initialValues("tiktok-caption-helper")["count"])
-        assertEquals("8", NativeAiMicroEngine.initialValues("youtube-title-helper")["count"])
-        assertEquals("Progress\nBlockers\nDecisions\nNext steps", NativeAiMicroEngine.initialValues("ai-meeting-agenda-generator")["topics"])
-        assertTrue(NativeAiMicroEngine.fields("expand-helper").single().multiline)
+    @Test fun nativeFieldsExposeTheSameNewInputsAsWeb() {
+        assertEquals("60", NativeAiMicroEngine.initialValues("shorten-helper")["count"])
+        assertEquals("30", NativeAiMicroEngine.initialValues("ai-meeting-agenda-generator")["duration"])
+        assertTrue(NativeAiMicroEngine.fields("expand-helper").first().multiline)
+        assertEquals("", NativeAiMicroEngine.initialValues("expand-helper")["audience"])
+        assertEquals("Who is this for?", NativeAiMicroEngine.fields("expand-helper").first { it.name == "audience" }.label)
+        assertTrue(NativeAiMicroEngine.fields("faq-generator").any { it.name == "answers" })
+        assertTrue(NativeAiMicroEngine.fields("feature-benefit-generator").any { it.name == "outcomes" })
+        assertTrue(NativeAiMicroEngine.fields("youtube-description-helper").any { it.name == "chapters" })
         assertEquals(emptyList<NativeAiMicroField>(), NativeAiMicroEngine.fields("not-an-ai-tool"))
     }
 
-    @Test fun blogOutlineMatchesWebTemplate() {
-        assertEquals("Title: Gardening\nAudience: new growers\nGoal: Build confidence\n\nOutline\n1. Introduction — the problem and why it matters\n2. What Gardening means\n3. The key ideas new growers should understand\n4. Practical steps or examples\n5. Common mistakes to avoid\n6. Checklist / next steps\n7. Conclusion and CTA", NativeAiMicroEngine.generate("blog-outline-generator", mapOf("topic" to "Gardening", "audience" to "new growers", "goal" to "Build confidence")))
+    @Test fun blogOutlineIncludesEditorialBriefAndVerifiedInputs() {
+        val output = NativeAiMicroEngine.generate("blog-outline-generator", mapOf(
+            "topic" to "Urban gardening", "audience" to "apartment renters", "goal" to "Help readers grow herbs",
+            "angle" to "Low-cost methods for small spaces", "keyPoints" to "Use containers\nCheck sunlight",
+            "cta" to "Start with one herb pot",
+        ))
+        assertTrue(output.contains("CONTENT BRIEF"))
+        assertTrue(output.contains("Low-cost methods for small spaces"))
+        assertTrue(output.contains("• Use containers\n• Check sunlight"))
+        assertTrue(output.contains("Start with one herb pot"))
+        assertTrue(output.contains("do not present assumptions as evidence"))
     }
 
-    @Test fun callToActionMatchesWebTemplate() {
-        assertEquals("1. Get started with Meal prep\n\n2. Try Meal prep today\n\n3. See how Meal prep can help\n\n4. Learn more about Meal prep\n\n5. Start creating with Meal prep", NativeAiMicroEngine.generate("call-to-action-generator", mapOf("topic" to "Meal prep")))
+    @Test fun ctaUsesTheRequestedActionAndFlagsMissingBenefits() {
+        val output = NativeAiMicroEngine.generate("call-to-action-generator", mapOf(
+            "topic" to "Meal prep", "audience" to "busy students", "action" to "Download the planner", "benefit" to "plan meals in one place",
+        ))
+        assertTrue(output.contains("Download the planner to plan meals in one place"))
+        assertTrue(NativeAiMicroEngine.generate("call-to-action-generator", mapOf("topic" to "Meal prep")).contains("Add a specific, supportable benefit"))
     }
 
-    @Test fun expandMatchesWebTemplateAndFallback() {
-        assertEquals("A useful idea.\n\nKey context: explain why this matters, who it affects, and what should happen next. Add one practical example and finish with a clear next step.", NativeAiMicroEngine.generate("expand-helper", mapOf("text" to "A useful idea")))
-        assertTrue(NativeAiMicroEngine.generate("expand-helper", mapOf("text" to " ")).startsWith("Your notes."))
+    @Test fun expandUsesSuppliedContextAndDoesNotInventExamples() {
+        val output = NativeAiMicroEngine.generate("expand-helper", mapOf(
+            "text" to "A useful idea", "audience" to "new growers", "context" to "Small spaces make growing food feel difficult.",
+            "example" to "A pot of basil beside a bright window.", "nextStep" to "Choose one herb to grow.",
+        ))
+        assertTrue(output.contains("WHY IT MATTERS\nSmall spaces make growing food feel difficult."))
+        assertTrue(output.contains("WHO IT AFFECTS\nWrite for: new growers"))
+        assertTrue(output.contains("A pot of basil beside a bright window."))
+        assertTrue(output.contains("Choose one herb to grow."))
+        assertFalse(output.contains("[Add a real example"))
+        assertTrue(NativeAiMicroEngine.generate("expand-helper", mapOf("text" to " ")).contains("Add the text or notes"))
     }
 
-    @Test fun faqSplitsAndTrimsPoints() {
-        assertEquals("Q: Storage about Meal prep?\nA: Explain storage in a concise, factual way for students.\n\nQ: Cost about Meal prep?\nA: Explain cost in a concise, factual way for students.", NativeAiMicroEngine.generate("faq-generator", mapOf("topic" to "Meal prep", "audience" to "students", "points" to "Storage\n, Cost, ")))
+    @Test fun faqUsesExactSuppliedAnswersAndFlagsMissingAnswers() {
+        val output = NativeAiMicroEngine.generate("faq-generator", mapOf(
+            "topic" to "Meal prep", "audience" to "students", "points" to "How long does it keep?\nCan I freeze it?",
+            "answers" to "How long does it keep? | Refrigerated meals should be used within the safe storage window for their ingredients.",
+        ))
+        assertTrue(output.contains("A: Refrigerated meals should be used within the safe storage window"))
+        assertTrue(output.contains("Can I freeze it?\nA: [Add a verified answer before publishing.]"))
+        assertTrue(output.contains("NEEDS AN ANSWER"))
     }
 
-    @Test fun featureBenefitHandlesCommaAndNewlineLists() {
-        assertEquals("Feature: Shared workspace\nBenefit: Helps teams get a clearer result with less friction.\n\nFeature: Fast search\nBenefit: Helps teams get a clearer result with less friction.\n\nFeature: Version history\nBenefit: Helps teams get a clearer result with less friction.", NativeAiMicroEngine.generate("feature-benefit-generator", mapOf("audience" to "teams", "benefit" to "Shared workspace,Fast search\nVersion history")))
+    @Test fun featureBenefitRequiresSpecificOutcomesAndEvidence() {
+        val output = NativeAiMicroEngine.generate("feature-benefit-generator", mapOf(
+            "audience" to "teams", "benefit" to "Shared workspace\nFast search", "outcomes" to "Everyone works from the same project view",
+        ))
+        assertTrue(output.contains("Customer outcome: Everyone works from the same project view"))
+        assertTrue(output.contains("Feature: Fast search\nCustomer outcome: [Add the specific result"))
+        assertTrue(output.contains("Evidence to support the claim"))
     }
 
-    @Test fun agendaNumbersTopicsAndAddsCloseOutReminder() {
-        assertEquals("Meeting goal: Choose a launch date\n\nAgenda\n1. Progress\n2. Blockers\n3. Decision\n\nClose with owners, deadlines, and unresolved questions.", NativeAiMicroEngine.generate("ai-meeting-agenda-generator", mapOf("goal" to "Choose a launch date", "topics" to "Progress\nBlockers, Decision")))
+    @Test fun agendaDistributesTimeAcrossTopics() {
+        val output = NativeAiMicroEngine.generate("ai-meeting-agenda-generator", mapOf(
+            "goal" to "Choose a launch date", "duration" to "30", "topics" to "Progress\nDecision",
+        ))
+        assertTrue(output.contains("Planned duration: 30 minutes"))
+        assertTrue(output.contains("1. Progress — 15 min\n2. Decision — 15 min"))
+        assertTrue(output.contains("Confirm decisions, owners, deadlines"))
     }
 
-    @Test fun meetingActionsIgnoreBlankLinesAndNumberNotes() {
-        assertEquals("Action items\n1. Sam — draft\n2. Lee — review\n\nBefore sharing, confirm each owner and deadline.", NativeAiMicroEngine.generate("meeting-action-items", mapOf("notes" to "Sam — draft\n\nLee — review")))
+    @Test fun meetingActionsParseOwnersDatesAndPriorityWithoutInventingStatus() {
+        val output = NativeAiMicroEngine.generate("meeting-action-items", mapOf(
+            "notes" to "Sam | Draft launch brief | Friday | High\nLee | Review pricing | Monday | Medium",
+        ))
+        assertTrue(output.contains("Owner: Sam | Action: Draft launch brief | Due: Friday | Priority: High"))
+        assertTrue(output.contains("Status has not been inferred"))
+        val incomplete = NativeAiMicroEngine.generate("meeting-action-items", mapOf("notes" to "Finish the landing page"))
+        assertTrue(incomplete.contains("[Assign owner]"))
+        assertTrue(incomplete.contains("[Add due date]"))
     }
 
-    @Test fun productTitleUsesBenefitAndEmitsFiveOptions() {
-        assertEquals("1. Focus app — Plan a calmer day\n\n2. Focus app: Plan a calmer day\n\n3. The Focus app Starter Guide\n\n4. Focus app Made Simple\n\n5. Focus app Toolkit", NativeAiMicroEngine.generate("product-title-generator", mapOf("topic" to "Focus app", "benefit" to "Plan a calmer day")))
+    @Test fun productTitleUsesKeywordBenefitAndCustomer() {
+        val output = NativeAiMicroEngine.generate("product-title-generator", mapOf(
+            "topic" to "Focus app", "keyword" to "Daily planner", "benefit" to "Plan a calmer day", "audience" to "remote teams",
+        ))
+        assertTrue(output.contains("Daily planner — Plan a calmer day"))
+        assertTrue(output.contains("The Daily planner guide for remote teams"))
     }
 
-    @Test fun prosConsIncludesVerificationQuestions() {
-        val output = NativeAiMicroEngine.generate("pros-cons-generator", mapOf("topic" to "Pilot a new workflow", "option" to "Launch now vs wait"))
-        assertTrue(output.startsWith("Decision worksheet: Launch now vs wait"))
-        assertTrue(output.contains("Potential upside: Pilot a new workflow may help achieve the stated goal."))
-        assertTrue(output.contains("What would make you stop or change direction?"))
+    @Test fun prosConsSeparatesSuppliedEvidenceFromAssumptions() {
+        val output = NativeAiMicroEngine.generate("pros-cons-generator", mapOf(
+            "option" to "Launch now vs wait", "upsides" to "Reach early users", "risks" to "Support load may increase", "criteria" to "Weekly active use",
+        ))
+        assertTrue(output.contains("UPSIDE TO VERIFY\n• Reach early users"))
+        assertTrue(output.contains("RISKS / COSTS TO CHECK\n• Support load may increase"))
+        assertTrue(output.contains("DECISION CRITERIA\n• Weekly active use"))
+        assertTrue(output.contains("Separate measured results from assumptions"))
     }
 
-    @Test fun shortenUsesTwentyEightWordsAndKeepsShortUnicodeText() {
-        val input = (1..29).joinToString(" ") { "word$it" }
-        val expected = (1..28).joinToString(" ") { "word$it" } + "…"
-        assertEquals(expected, NativeAiMicroEngine.generate("shorten-helper", mapOf("text" to input)))
-        assertEquals("Café déjà vu", NativeAiMicroEngine.generate("shorten-helper", mapOf("text" to "Café déjà vu")))
+    @Test fun shortenHonorsTargetAndPreservesSentenceBoundariesAndUnicode() {
+        val source = "Our tool helps teams manage projects. It keeps deadlines visible. It stores files securely. It sends weekly reminders."
+        assertEquals(
+            "Our tool helps teams manage projects. It keeps deadlines visible…",
+            NativeAiMicroEngine.generate("shorten-helper", mapOf("text" to source, "count" to "10")),
+        )
+        assertEquals("Café déjà vu", NativeAiMicroEngine.generate("shorten-helper", mapOf("text" to "Café déjà vu", "count" to "60")))
+        assertTrue(NativeAiMicroEngine.generate("shorten-helper", mapOf("text" to " ")).contains("Add the text you want to shorten"))
     }
 
-    @Test fun tiktokCaptionHonorsVariantCount() {
-        assertEquals("1. Quiet mornings made simple. Save this for later.\n\n2. If you're into Quiet mornings, this one is for you.", NativeAiMicroEngine.generate("tiktok-caption-helper", mapOf("topic" to "Quiet mornings", "audience" to "students", "count" to "2")))
+    @Test fun tiktokCaptionsHonorCountHookAndCallToAction() {
+        val output = NativeAiMicroEngine.generate("tiktok-caption-helper", mapOf(
+            "topic" to "Quiet mornings", "audience" to "students", "hook" to "One habit to try",
+            "cta" to "Save this checklist", "count" to "2",
+        ))
+        assertEquals(2, output.split("\n\n").size)
+        assertTrue(output.contains("One habit to try: Quiet mornings. Save this checklist"))
     }
 
-    @Test fun youtubeDescriptionUsesToneAndKeyPoints() {
-        assertEquals("Urban gardening\n\nIn this video, we break down Urban gardening for beginners in a clear and professional way.\n\nWhat you'll cover:\n• Tools\n• Planning\n• Harvest\n\nIf you found this useful, save it for later and share it with someone working on the same goal.", NativeAiMicroEngine.generate("youtube-description-helper", mapOf("topic" to "Urban gardening", "audience" to "beginners", "tone" to "professional", "points" to "Tools\nPlanning,Harvest")))
+    @Test fun youtubeDescriptionIncludesSuppliedChaptersLinksAndNextStep() {
+        val output = NativeAiMicroEngine.generate("youtube-description-helper", mapOf(
+            "topic" to "Urban gardening", "audience" to "beginners", "tone" to "professional", "points" to "Tools\nPlanning",
+            "chapters" to "0:00 Introduction\n1:20 Choose a container", "links" to "https://example.com/guide",
+            "cta" to "Subscribe for the next lesson",
+        ))
+        assertTrue(output.contains("WHAT YOU'LL LEARN"))
+        assertTrue(output.contains("CHAPTERS\n0:00 Introduction\n1:20 Choose a container"))
+        assertTrue(output.contains("LINKS / RESOURCES\nhttps://example.com/guide"))
+        assertTrue(output.contains("Subscribe for the next lesson"))
     }
 
-    @Test fun youtubeTitleCountIsClampedAndInvalidValuesUseDefault() {
-        assertEquals("1. Learning SQL: What analysts Should Know\n\n2. How to Get Better Results With Learning SQL", NativeAiMicroEngine.generate("youtube-title-helper", mapOf("topic" to "Learning SQL", "audience" to "analysts", "count" to "2")))
-        assertEquals(5, NativeAiMicroEngine.generate("youtube-title-helper", mapOf("topic" to "SQL", "audience" to "learners", "count" to "not-a-number")).split("\n\n").size)
+    @Test fun youtubeTitlesRespectOneHundredCharacterLimit() {
+        val output = NativeAiMicroEngine.generate("youtube-title-helper", mapOf(
+            "topic" to "Learning SQL", "audience" to "analysts", "keyword" to "SQL reporting",
+            "angle" to "a practical guide to advanced reporting", "count" to "8",
+        ))
+        val titles = output.split("\n\n").map { it.replace(Regex("^\\d+\\.\\s"), "") }
+        assertEquals(8, titles.size)
+        assertTrue(titles.all { it.length <= 100 })
     }
+
+    @Test fun lineBasedInputsKeepCommasInsideEntries() {
+        val faq = NativeAiMicroEngine.generate("faq-generator", mapOf(
+            "topic" to "Safety", "points" to "Is this safe, for everyone?",
+            "answers" to "Is this safe, for everyone? | Check the product's stated limits before use.",
+        ))
+        assertTrue(faq.contains("Q: Is this safe, for everyone?"))
+        assertTrue(faq.contains("A: Check the product's stated limits before use."))
+
+        val benefits = NativeAiMicroEngine.generate("feature-benefit-generator", mapOf(
+            "topic" to "Search", "benefit" to "Fast search, with filters", "outcomes" to "Find matching records more quickly",
+        ))
+        assertTrue(benefits.contains("Feature: Fast search, with filters"))
+        assertTrue(benefits.contains("Customer outcome: Find matching records more quickly"))
+
+        val agenda = NativeAiMicroEngine.generate("ai-meeting-agenda-generator", mapOf(
+            "duration" to "20", "topics" to "Review risks, costs and scope\nChoose next step",
+        ))
+        assertTrue(agenda.contains("1. Review risks, costs and scope — 10 min"))
+    }
+
 }

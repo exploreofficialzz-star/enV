@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FieldGrid, type UiField } from "@/components/engines/fields";
 import { ErrorBanner } from "@/components/tools/error-banner";
-import { CodeResult } from "@/components/engines/result-panel";
+import { CopyButton } from "@/components/tools/copy-button";
+import { downloadText } from "@/lib/utils";
 import { initialValues } from "@/components/engines/initial-values";
 import { generateAiMicroTool, isAiMicroOperation } from "@/lib/ai/micro-tools";
 
@@ -23,8 +24,10 @@ function fieldsFor(op: string): UiField[] {
   const tone: UiField = { name: "tone", label: "Tone", type: "select", defaultValue: "natural", options: TONES };
   const topic: UiField = { name: "topic", label: "Topic / subject", type: "text", defaultValue: "AI tools for creators" };
   const audience: UiField = { name: "audience", label: "Audience", type: "text", defaultValue: "creators and small businesses" };
-  if (["title", "yt-title"].includes(op)) return [topic, audience, { name: "count", label: "Options", type: "number", defaultValue: 8, min: 1, max: 20 }];
-  if (["caption", "tt-caption"].includes(op)) return [topic, audience, { name: "count", label: "Options", type: "number", defaultValue: 5, min: 1, max: 15 }];
+  if (op === "yt-title") return [topic, audience, { name: "keyword", label: "Primary keyword (optional)", type: "text", defaultValue: "" }, { name: "angle", label: "Video angle", type: "text", defaultValue: "a practical guide" }, { name: "count", label: "Options", type: "number", defaultValue: 8, min: 1, max: 8 }];
+  if (op === "title") return [topic, audience, { name: "count", label: "Options", type: "number", defaultValue: 8, min: 1, max: 20 }];
+  if (op === "tt-caption") return [topic, audience, tone, { name: "hook", label: "Opening angle", type: "text", defaultValue: "A useful reminder" }, { name: "cta", label: "Call to action", type: "text", defaultValue: "What would you add?" }, { name: "count", label: "Options", type: "number", defaultValue: 5, min: 1, max: 7 }];
+  if (op === "caption") return [topic, audience, { name: "count", label: "Options", type: "number", defaultValue: 5, min: 1, max: 15 }];
   if (op === "bio") return [{ name: "role", label: "Role / what you do", type: "text", defaultValue: "AI music creator" }, audience, tone, { name: "count", label: "Options", type: "number", defaultValue: 5, min: 1, max: 15 }];
   if (op === "product-desc") return [{ name: "product", label: "Product name", type: "text", defaultValue: "AI Music Generator Class" }, { name: "features", label: "Features / benefits", type: "textarea", defaultValue: "Beginner friendly\nWorks from a smartphone\nUses accessible tools" }, audience, tone];
   if (op === "email") return [{ name: "purpose", label: "Email purpose", type: "text", defaultValue: "Introduce a new digital product" }, { name: "points", label: "Key points", type: "textarea", defaultValue: "What it does\nWho it is for\nHow to get started" }, tone];
@@ -32,19 +35,19 @@ function fieldsFor(op: string): UiField[] {
   if (op === "alt") return [{ name: "image", label: "Describe the image", type: "textarea", defaultValue: "A person using a laptop to create music with AI" }, tone];
   if (op === "meta-desc") return [topic, { name: "page", label: "Page purpose", type: "textarea", defaultValue: "Explain the product, key benefits, and how visitors can get started." }, tone];
   if (op === "resume") return [{ name: "duty", label: "Duty / responsibility", type: "textarea", defaultValue: "Managed social media content and improved engagement" }, { name: "result", label: "Result or metric (optional)", type: "text", defaultValue: "increased engagement" }, tone];
-  if (op === "yt-desc") return [topic, audience, tone, { name: "points", label: "Key points", type: "textarea", defaultValue: "Problem\nSolution\nPractical examples\nCall to action" }];
-  if (op === "blog-outline") return [topic, audience, { name: "goal", label: "Goal", type: "text", defaultValue: "Educate and give the reader a practical next step" }];
+  if (op === "yt-desc") return [topic, audience, tone, { name: "points", label: "Video points (one per line)", type: "textarea", defaultValue: "" }, { name: "chapters", label: "Chapters / timestamps (optional)", type: "textarea", defaultValue: "" }, { name: "links", label: "Links / resources (optional)", type: "textarea", defaultValue: "" }, { name: "cta", label: "Viewer next step", type: "text", defaultValue: "" }];
+  if (op === "blog-outline") return [topic, audience, { name: "goal", label: "Goal", type: "text", defaultValue: "Help the reader understand the topic and take a useful next step" }, { name: "angle", label: "Editorial angle", type: "textarea", defaultValue: "Explain the practical problem before presenting the solution" }, { name: "keyPoints", label: "Verified facts / points to include", type: "textarea", defaultValue: "" }, { name: "cta", label: "Reader next step", type: "text", defaultValue: "" }];
   if (["content-brief", "idea", "ideas"].includes(op)) return [topic, audience, tone, { name: "goal", label: "Goal", type: "text", defaultValue: "Educate and give the reader a practical next step" }];
-  if (op === "cta") return [topic];
-  if (op === "product-title") return [topic, { name: "benefit", label: "Main benefit", type: "text", defaultValue: "Save time and get started quickly" }];
-  if (op === "feature-benefit") return [topic, audience, { name: "benefit", label: "Main benefit", type: "text", defaultValue: "Save time and get started quickly" }];
+  if (op === "cta") return [topic, audience, { name: "action", label: "Action to ask for", type: "text", defaultValue: "Learn more" }, { name: "benefit", label: "Specific benefit (optional)", type: "text", defaultValue: "" }, tone];
+  if (op === "product-title") return [topic, { name: "benefit", label: "Specific product benefit (optional)", type: "text", defaultValue: "" }, { name: "audience", label: "Target customer (optional)", type: "text", defaultValue: "" }, { name: "keyword", label: "Primary keyword (optional)", type: "text", defaultValue: "" }];
+  if (op === "feature-benefit") return [topic, audience, { name: "benefit", label: "Features (one per line)", type: "textarea", defaultValue: "Shared workspace\nFast search\nVersion history" }, { name: "outcomes", label: "Actual customer outcomes (same order)", type: "textarea", defaultValue: "" }];
   if (["ad-copy", "hook"].includes(op)) return [topic, audience, tone, { name: "benefit", label: "Main benefit", type: "text", defaultValue: "Save time and get started quickly" }];
-  if (op === "faq") return [topic, audience, { name: "points", label: "Key points", type: "textarea", defaultValue: "What it is\nWho it is for\nHow it works\nPricing or access" }];
-  if (op === "agenda") return [{ name: "goal", label: "Meeting goal", type: "text", defaultValue: "Plan the next launch" }, { name: "topics", label: "Topics", type: "textarea", defaultValue: "Progress\nBlockers\nDecisions\nNext steps" }];
-  if (op === "actions") return [{ name: "notes", label: "Rough notes", type: "textarea", defaultValue: "John — finish landing page by Friday\nAda — confirm pricing\nTeam — test checkout" }];
-  if (op === "pros-cons") return [topic, { name: "option", label: "Option / decision", type: "text", defaultValue: "Launch now vs wait for more features" }];
-  if (["shorten", "expand"].includes(op)) return [{ name: "text", label: "Text", type: "textarea", defaultValue: "We are launching a new product that helps people create useful content faster." }];
-  if (op === "yt-desc") return [topic, audience, tone, { name: "points", label: "Key points", type: "textarea", defaultValue: "Problem\nSolution\nPractical examples\nCall to action" }];
+  if (op === "faq") return [topic, audience, { name: "points", label: "Questions (one per line)", type: "textarea", defaultValue: "What it is\nWho it is for\nHow it works\nPricing or access" }, { name: "answers", label: "Verified answers (Question | Answer)", type: "textarea", defaultValue: "" }];
+  if (op === "agenda") return [{ name: "goal", label: "Meeting goal", type: "text", defaultValue: "Plan the next launch" }, { name: "duration", label: "Meeting duration (minutes)", type: "number", defaultValue: 30, min: 1, max: 600 }, { name: "topics", label: "Topics", type: "textarea", defaultValue: "Progress\nBlockers\nDecisions\nNext steps" }];
+  if (op === "actions") return [{ name: "notes", label: "Action items (Owner | Action | Due date | Priority)", type: "textarea", defaultValue: "John | Finish landing page | Friday | High\nAda | Confirm pricing | Thursday | Medium\nTeam | Test checkout | Friday | High" }];
+  if (op === "pros-cons") return [{ name: "option", label: "Option / decision", type: "text", defaultValue: "Launch now vs wait for more features" }, { name: "upsides", label: "Observed upsides (one per line)", type: "textarea", defaultValue: "" }, { name: "risks", label: "Known risks / costs (one per line)", type: "textarea", defaultValue: "" }, { name: "criteria", label: "Decision criteria (one per line)", type: "textarea", defaultValue: "" }];
+  if (op === "shorten") return [{ name: "text", label: "Text", type: "textarea", defaultValue: "We are launching a new product that helps people create useful content faster." }, { name: "count", label: "Target words", type: "number", defaultValue: 60, min: 10, max: 500 }];
+  if (op === "expand") return [{ name: "text", label: "Text / notes to expand", type: "textarea", defaultValue: "" }, { name: "audience", label: "Who is this for?", type: "text", defaultValue: "" }, { name: "context", label: "Why does it matter?", type: "textarea", defaultValue: "" }, { name: "example", label: "Real example / supporting detail", type: "textarea", defaultValue: "" }, { name: "nextStep", label: "Next step for the reader", type: "text", defaultValue: "" }];
   if (["rewrite", "shorten", "expand"].includes(op)) return [{ name: "text", label: "Text", type: "textarea", defaultValue: "We are launching a new product that helps people create useful content faster." }, tone];
   return [topic, audience, tone];
 }
@@ -156,16 +159,36 @@ export function AiEngine({ op }: { op: string }) {
   const fields = useMemo(() => fieldsFor(op), [op]);
   const [values, setValues] = useState(() => initialValues(fields));
   const [out, setOut] = useState("");
+  const [generated, setGenerated] = useState("");
   const [error, setError] = useState<string | null>(null);
   const runTool = () => {
-    try { setError(null); setOut(run(op, values)); }
+    try { setError(null); const next = run(op, values); setOut(next); setGenerated(next); }
     catch (e) { setError(e instanceof Error ? e.message : "Could not run AI micro-tool."); }
   };
   return <div className="space-y-4">
-    <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-subtle">The Generate button here runs locally with deterministic templates. It does not send your text anywhere and does not claim to be an LLM.</div>
+    <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-sm text-subtle">Runs on this device with deterministic templates. Your text stays here; this is not a cloud LLM.</div>
     <FieldGrid fields={fields} values={values} onChange={(name, value) => setValues((x) => ({ ...x, [name]: value }))} />
-    <div className="flex flex-wrap gap-2"><Button type="button" onClick={runTool}>Generate</Button><Button type="button" variant="ghost" onClick={() => { setOut(""); setError(null); }}>Clear</Button></div>
+    <div className="flex flex-wrap gap-2">
+      <Button type="button" onClick={runTool}>Generate</Button>
+      {out && out !== generated ? <Button type="button" variant="outline" onClick={() => setOut(generated)}>Reset edits</Button> : null}
+      <Button type="button" variant="ghost" onClick={() => { setOut(""); setGenerated(""); setError(null); }}>Clear</Button>
+    </div>
     <ErrorBanner message={error} />
-    <CodeResult code={out} filename={`env-ai-${op}.txt`} />
+    {out ? <section className="space-y-2" aria-label="Generated draft">
+      <label htmlFor="ai-micro-editable-draft" className="text-sm font-medium">Editable draft</label>
+      <textarea
+        id="ai-micro-editable-draft"
+        aria-label="Editable draft"
+        value={out}
+        onChange={(event) => setOut(event.target.value)}
+        rows={12}
+        spellCheck
+        className="w-full min-h-56 resize-y rounded-lg border border-border bg-surface px-3 py-2 text-sm leading-6 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      />
+      <div className="flex flex-wrap gap-2">
+        <CopyButton text={out} />
+        <Button type="button" variant="outline" onClick={() => downloadText(out, `env-ai-${op}.txt`)}>Download</Button>
+      </div>
+    </section> : null}
   </div>;
 }
