@@ -17,7 +17,7 @@ private enum NativeCameraLook: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate, AVCaptureFileOutputRecordingDelegate {
+private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePhotoCaptureDelegate, AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureAudioDataOutputSampleBufferDelegate {
     let session = AVCaptureSession()
     @Published private(set) var ready = false
     @Published private(set) var recording = false
@@ -43,15 +43,25 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
 
     private let queue = DispatchQueue(label: "com.chastech.env.camera-studio.capture", qos: .userInitiated)
     private let photoOutput = AVCapturePhotoOutput()
-    private let movieOutput = AVCaptureMovieFileOutput()
+    private let videoDataOutput = AVCaptureVideoDataOutput()
+    private let audioDataOutput = AVCaptureAudioDataOutput()
     private var videoInput: AVCaptureDeviceInput?
     private var audioInput: AVCaptureDeviceInput?
     private var activePhotoDelegates: [Int64: PhotoDelegate] = [:]
     private var configured = false
     private var flashEnabled = false
-    private var stopSessionAfterRecording = false
     private var sessionObservers: [NSObjectProtocol] = []
     private let context = CIContext()
+    private weak var previewSink: CALayer?
+    private var assetWriter: AVAssetWriter?
+    private var writerVideoInput: AVAssetWriterInput?
+    private var writerAudioInput: AVAssetWriterInput?
+    private var pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor?
+    private var activeVideoURL: URL?
+    private var activeLook: NativeCameraLook = .natural
+    private var recordingRequested = false
+    private var writerSessionStarted = false
+    private var writerStartTime = CMTime.invalid
 
     func start() {
         installSessionObservers()
@@ -86,7 +96,8 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
                 guard let self else { return }
                 self.ready = false
                 if self.recording {
-                    self.error = "Recording was interrupted by the system. Camera Studio is finalizing the take where possible."
+                    self.error = "Recording was interrupted by the system. Finalizing the saved portion where possible."
+                    self.queue.async { [weak self] in self?.finishVideoRecording(stopSession: false) }
                 } else {
                     self.message = reason.map { "Camera temporarily unavailable (system interruption \($0)). Waiting to reconnect." }
                         ?? "Camera temporarily unavailable. Waiting to reconnect."
@@ -114,6 +125,9 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
                 guard let self else { return }
                 self.ready = false
                 self.error = captureError?.localizedDescription ?? "The camera session stopped unexpectedly. Restart Camera Studio to continue."
+                if self.recording {
+                    self.queue.async { [weak self] in self?.finishVideoRecording(stopSession: false) }
+                }
                 if captureError?.code == .mediaServicesWereReset, !self.recording {
                     self.message = "Camera services restarted. Reconnecting…"
                     self.startSession()
@@ -171,10 +185,18 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
             session.addOutput(photoOutput)
             photoOutput.isHighResolutionCaptureEnabled = true
 
-            guard session.canAddOutput(movieOutput) else {
-                throw NativeCameraError.message("Video recording is unavailable on this camera.")
+            videoDataOutput.videoSettings = [
+                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
+            ]
+            videoDataOutput.alwaysDiscardsLateVideoFrames = true
+            guard session.canAddOutput(videoDataOutput) else {
+                throw NativeCameraError.message("Filtered video capture is unavailable on this camera.")
             }
-            session.addOutput(movieOutput)
+            session.addOutput(videoDataOutput)
+            videoDataOutput.setSampleBufferDelegate(self, queue: queue)
+            if let connection = videoDataOutput.connection(with: .video), connection.isVideoOrientationSupported {
+                connection.videoOrientation = .portrait
+            }
             configured = true
             session.commitConfiguration()
             Task { @MainActor in
@@ -190,18 +212,20 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
     func stop() {
         queue.async { [weak self] in
             guard let self else { return }
-            if self.movieOutput.isRecording {
-                self.stopSessionAfterRecording = true
-                self.movieOutput.stopRecording()
+            if self.recordingRequested {
+                self.finishVideoRecording(stopSession: true)
             } else {
                 if self.session.isRunning { self.session.stopRunning() }
-                Task { @MainActor in self.ready = false }
+                Task { @MainActor in
+                    self.ready = false
+                    self.previewSink?.contents = nil
+                }
             }
         }
     }
 
     func switchCamera() {
-        guard ready, !recording else { return }
+        guard ready, !recording, !recordingRequested else { return }
         let nextPosition: AVCaptureDevice.Position = cameraPosition == .back ? .front : .back
         queue.async { [weak self] in
             guard let self else { return }
@@ -385,7 +409,7 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
 
     func pauseForMultiCamera(completion: @escaping () -> Void) {
         queue.async { [weak self] in
-            guard let self, !self.movieOutput.isRecording else { return }
+            guard let self, !self.recordingRequested else { return }
             if self.session.isRunning { self.session.stopRunning() }
             Task { @MainActor in
                 self.ready = false
@@ -459,31 +483,109 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
         }
     }
 
-    func startVideo() {
-        guard ready, !recording else { return }
+    func startVideo(look: NativeCameraLook) {
+        guard ready, !recording, !recordingRequested else { return }
         let startWithAudio: (Bool) -> Void = { [weak self] audioAllowed in
             guard let self else { return }
             self.queue.async {
+                var outputURL: URL?
                 do {
-                    if audioAllowed, self.audioInput == nil, let microphone = AVCaptureDevice.default(for: .audio) {
-                        let input = try AVCaptureDeviceInput(device: microphone)
-                        self.session.beginConfiguration()
-                        if self.session.canAddInput(input) {
-                            self.session.addInput(input)
-                            self.audioInput = input
+                    var useAudio = false
+                    self.session.beginConfiguration()
+                    if audioAllowed {
+                        if self.audioInput == nil, let microphone = AVCaptureDevice.default(for: .audio) {
+                            let input = try AVCaptureDeviceInput(device: microphone)
+                            if self.session.canAddInput(input) {
+                                self.session.addInput(input)
+                                self.audioInput = input
+                            }
                         }
-                        self.session.commitConfiguration()
+                        if self.audioInput != nil {
+                            if !self.session.outputs.contains(where: { $0 === self.audioDataOutput }),
+                               self.session.canAddOutput(self.audioDataOutput) {
+                                self.session.addOutput(self.audioDataOutput)
+                            }
+                            useAudio = self.session.outputs.contains(where: { $0 === self.audioDataOutput })
+                            if useAudio {
+                                self.audioDataOutput.setSampleBufferDelegate(self, queue: self.queue)
+                            }
+                        }
                     }
+                    self.session.commitConfiguration()
+
+                    guard let device = self.videoInput?.device else {
+                        throw NativeCameraError.message("The camera is no longer available.")
+                    }
+                    let dimensions = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
+                    let width = max(2, Int(dimensions.width))
+                    let height = max(2, Int(dimensions.height))
                     let url = FileManager.default.temporaryDirectory
                         .appendingPathComponent("env-camera-\(UUID().uuidString).mov")
-                    self.movieOutput.startRecording(to: url, recordingDelegate: self)
+                    outputURL = url
+                    let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
+                    let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: [
+                        AVVideoCodecKey: AVVideoCodecType.h264,
+                        AVVideoWidthKey: width,
+                        AVVideoHeightKey: height
+                    ])
+                    videoInput.expectsMediaDataInRealTime = true
+                    guard writer.canAdd(videoInput) else {
+                        throw NativeCameraError.message("The video encoder cannot create this recording.")
+                    }
+                    writer.add(videoInput)
+
+                    var audioWriterInput: AVAssetWriterInput?
+                    if useAudio {
+                        let candidate = AVAssetWriterInput(mediaType: .audio, outputSettings: [
+                            AVFormatIDKey: kAudioFormatMPEG4AAC,
+                            AVSampleRateKey: 44_100,
+                            AVNumberOfChannelsKey: 1,
+                            AVEncoderBitRateKey: 96_000
+                        ])
+                        candidate.expectsMediaDataInRealTime = true
+                        if writer.canAdd(candidate) {
+                            writer.add(candidate)
+                            audioWriterInput = candidate
+                        }
+                    }
+
+                    let pixelAttributes: [String: Any] = [
+                        kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+                        kCVPixelBufferWidthKey as String: width,
+                        kCVPixelBufferHeightKey as String: height,
+                        kCVPixelBufferCGImageCompatibilityKey as String: true,
+                        kCVPixelBufferCGBitmapContextCompatibilityKey as String: true
+                    ]
+                    let adaptor = AVAssetWriterInputPixelBufferAdaptor(
+                        assetWriterInput: videoInput,
+                        sourcePixelBufferAttributes: pixelAttributes
+                    )
+                    guard writer.startWriting() else {
+                        throw writer.error ?? NativeCameraError.message("The video encoder could not start.")
+                    }
+
+                    self.assetWriter = writer
+                    self.writerVideoInput = videoInput
+                    self.writerAudioInput = audioWriterInput
+                    self.pixelBufferAdaptor = adaptor
+                    self.activeVideoURL = url
+                    self.activeLook = look
+                    self.recordingRequested = true
+                    self.writerSessionStarted = false
+                    self.writerStartTime = .invalid
                     Task { @MainActor in
                         self.recording = true
                         self.error = nil
-                        self.message = audioAllowed ? "Recording video with microphone audio." : "Recording video without microphone audio."
+                        self.message = useAudio
+                            ? "Recording with the selected filter and microphone audio."
+                            : "Recording with the selected filter and no microphone audio."
                     }
                 } catch {
-                    Task { @MainActor in self.error = error.localizedDescription }
+                    if let outputURL { try? FileManager.default.removeItem(at: outputURL) }
+                    Task { @MainActor in
+                        self.recording = false
+                        self.error = error.localizedDescription
+                    }
                 }
             }
         }
@@ -503,9 +605,116 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
     func stopVideo() {
         guard recording else { return }
         queue.async { [weak self] in
-            guard let self, self.movieOutput.isRecording else { return }
-            self.movieOutput.stopRecording()
+            self?.finishVideoRecording(stopSession: false)
         }
+    }
+
+    private func finishVideoRecording(stopSession: Bool) {
+        guard recordingRequested, let writer = assetWriter else {
+            if stopSession, session.isRunning { session.stopRunning() }
+            if stopSession {
+                Task { @MainActor in self.ready = false }
+            }
+            return
+        }
+        recordingRequested = false
+        writerVideoInput?.markAsFinished()
+        writerAudioInput?.markAsFinished()
+
+        guard writerSessionStarted else {
+            writer.cancelWriting()
+            if let activeVideoURL { try? FileManager.default.removeItem(at: activeVideoURL) }
+            clearWriterState()
+            Task { @MainActor in
+                self.recording = false
+                self.error = "No video frames were received. Check camera access and try again."
+                if stopSession {
+                    if self.session.isRunning { self.session.stopRunning() }
+                    self.ready = false
+                }
+            }
+            return
+        }
+
+        writer.finishWriting { [weak self] in
+            guard let self else { return }
+            self.queue.async {
+                let completedURL = writer.status == .completed ? writer.outputURL : nil
+                let failure = writer.error?.localizedDescription ?? "The filtered video could not be finalized."
+                if completedURL == nil { try? FileManager.default.removeItem(at: writer.outputURL) }
+                if stopSession, self.session.isRunning { self.session.stopRunning() }
+                self.clearWriterState()
+                Task { @MainActor in
+                    self.recording = false
+                    if let completedURL {
+                        self.latestVideoURL = completedURL
+                        self.rememberCapture(completedURL)
+                        self.message = "Filtered video recording complete."
+                        self.saveVideoToLibrary(completedURL)
+                    } else {
+                        self.latestVideoURL = nil
+                        self.error = failure
+                    }
+                    if stopSession { self.ready = false }
+                }
+            }
+        }
+    }
+
+    private func clearWriterState() {
+        assetWriter = nil
+        writerVideoInput = nil
+        writerAudioInput = nil
+        pixelBufferAdaptor = nil
+        activeVideoURL = nil
+        writerSessionStarted = false
+        writerStartTime = .invalid
+        activeLook = .natural
+    }
+
+    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        if output === audioDataOutput {
+            guard recordingRequested, writerSessionStarted,
+                  let writerAudioInput, writerAudioInput.isReadyForMoreMediaData else { return }
+            let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+            guard CMTimeCompare(timestamp, writerStartTime) >= 0 else { return }
+            writerAudioInput.append(sampleBuffer)
+            return
+        }
+        guard output === videoDataOutput, let sourceBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+
+        let sourceImage = CIImage(cvPixelBuffer: sourceBuffer)
+        let filteredImage = applyLook(sourceImage, look: activeLook)
+        var previewImage = filteredImage
+
+        if recordingRequested, let writerVideoInput, let pixelBufferAdaptor,
+           writerVideoInput.isReadyForMoreMediaData,
+           let pool = pixelBufferAdaptor.pixelBufferPool {
+            var renderedBuffer: CVPixelBuffer?
+            if CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool, &renderedBuffer) == kCVReturnSuccess,
+               let outputBuffer = renderedBuffer {
+                context.render(filteredImage, to: outputBuffer, bounds: filteredImage.extent, colorSpace: CGColorSpaceCreateDeviceRGB())
+                let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+                if !writerSessionStarted, let assetWriter, assetWriter.status == .writing {
+                    assetWriter.startSession(atSourceTime: timestamp)
+                    writerSessionStarted = true
+                    writerStartTime = timestamp
+                }
+                if writerSessionStarted, pixelBufferAdaptor.append(outputBuffer, withPresentationTime: timestamp) {
+                    previewImage = CIImage(cvPixelBuffer: outputBuffer)
+                } else if let writerError = assetWriter?.error {
+                    DispatchQueue.main.async { [weak self] in self?.error = writerError.localizedDescription }
+                }
+            }
+        }
+
+        if let cgImage = context.createCGImage(previewImage, from: previewImage.extent) {
+            DispatchQueue.main.async { [weak self] in self?.previewSink?.contents = cgImage }
+        }
+    }
+
+    func setPreviewSink(_ layer: CALayer?) {
+        previewSink = layer
     }
 
     private func refreshDeviceCapabilities(device: AVCaptureDevice? = nil) {
@@ -595,7 +804,13 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
                 }
                 return
             }
-            let data = owner.applyLook(original, look: look)
+            let originalImage = CIImage(data: original) ?? CIImage(color: .black)
+            let filteredImage = owner.applyLook(originalImage, look: look)
+            guard let cgImage = owner.context.createCGImage(filteredImage, from: filteredImage.extent),
+                  let data = UIImage(cgImage: cgImage).jpegData(compressionQuality: 0.94) else {
+                Task { @MainActor in owner.error = "The selected photo filter could not be rendered." }
+                return
+            }
             let url = FileManager.default.temporaryDirectory.appendingPathComponent("env-photo-\(UUID().uuidString).jpg")
             do {
                 try data.write(to: url, options: .atomic)
@@ -612,48 +827,21 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
         }
     }
 
-    private func applyLook(_ data: Data, look: NativeCameraLook) -> Data {
-        guard look != .natural, let source = CIImage(data: data) else { return data }
-        let filtered: CIImage
+    private func applyLook(_ source: CIImage, look: NativeCameraLook) -> CIImage {
+        guard look != .natural else { return source }
         switch look {
-        case .natural: return data
-        case .mono: filtered = source.applyingFilter("CIPhotoEffectMono")
-        case .warm: filtered = source.applyingFilter("CISepiaTone", parameters: [kCIInputIntensityKey: 0.22])
-        case .cool: filtered = source.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0.92, kCIInputContrastKey: 1.04, kCIInputBrightnessKey: 0.01])
-        case .vivid: filtered = source.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 1.25, kCIInputContrastKey: 1.08, kCIInputBrightnessKey: 0.0])
-        case .fade: filtered = source.applyingFilter("CIPhotoEffectFade")
+        case .natural: return source
+        case .mono: return source.applyingFilter("CIPhotoEffectMono")
+        case .warm: return source.applyingFilter("CISepiaTone", parameters: [kCIInputIntensityKey: 0.22])
+        case .cool: return source.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0.92, kCIInputContrastKey: 1.04, kCIInputBrightnessKey: 0.01])
+        case .vivid: return source.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 1.25, kCIInputContrastKey: 1.08, kCIInputBrightnessKey: 0.0])
+        case .fade: return source.applyingFilter("CIPhotoEffectFade")
         case .sunset:
             let warm = source.applyingFilter("CISepiaTone", parameters: [kCIInputIntensityKey: 0.18])
-            filtered = warm.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 1.22, kCIInputContrastKey: 1.02, kCIInputBrightnessKey: 0.02])
+            return warm.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 1.22, kCIInputContrastKey: 1.02, kCIInputBrightnessKey: 0.02])
         case .glow:
             let bright = source.applyingFilter("CIExposureAdjust", parameters: [kCIInputEVKey: 0.25])
-            filtered = bright.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 1.12, kCIInputContrastKey: 0.96, kCIInputBrightnessKey: 0.01])
-        }
-        guard let cgImage = context.createCGImage(filtered, from: filtered.extent),
-              let jpeg = UIImage(cgImage: cgImage).jpegData(compressionQuality: 0.94) else { return data }
-        return jpeg
-    }
-
-    func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL, from connections: [AVCaptureConnection], error: Error?) {
-        Task { @MainActor in
-            recording = false
-            if let error {
-                self.error = error.localizedDescription
-                latestVideoURL = nil
-            } else {
-                latestVideoURL = outputFileURL
-                rememberCapture(outputFileURL)
-                message = "Video recording complete."
-                saveVideoToLibrary(outputFileURL)
-            }
-            if stopSessionAfterRecording {
-                stopSessionAfterRecording = false
-                queue.async { [weak self] in
-                    guard let self else { return }
-                    if self.session.isRunning { self.session.stopRunning() }
-                    Task { @MainActor in self.ready = false }
-                }
-            }
+            return bright.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 1.12, kCIInputContrastKey: 0.96, kCIInputBrightnessKey: 0.01])
         }
     }
 }
@@ -1213,19 +1401,33 @@ private enum NativeCameraError: LocalizedError {
 }
 
 private struct NativeCameraPreview: UIViewRepresentable {
-    let session: AVCaptureSession
+    let capture: NativeCameraCapture
     let onFocus: (CGPoint) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(onFocus: onFocus) }
 
     func makeUIView(context: Context) -> UIView {
         let view = UIView(frame: .zero)
-        let preview = AVCaptureVideoPreviewLayer(session: session)
+        view.clipsToBounds = true
+        let imageView = UIImageView(frame: view.bounds)
+        imageView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        imageView.contentMode = .scaleAspectFill
+        imageView.clipsToBounds = true
+        view.addSubview(imageView)
+
+        // This transparent preview layer only converts view taps into camera sensor
+        // coordinates. The visible image comes from the same filtered frames that
+        // are sent to AVAssetWriter, so preview and saved video stay in sync.
+        let preview = AVCaptureVideoPreviewLayer(session: capture.session)
         preview.videoGravity = .resizeAspectFill
+        preview.opacity = 0.001
         view.layer.addSublayer(preview)
         let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap(_:)))
         view.addGestureRecognizer(tap)
+        capture.setPreviewSink(imageView.layer)
         context.coordinator.previewLayer = preview
+        context.coordinator.imageView = imageView
+        context.coordinator.capture = capture
         context.coordinator.container = view
         return view
     }
@@ -1235,13 +1437,21 @@ private struct NativeCameraPreview: UIViewRepresentable {
         let preview = context.coordinator.previewLayer
             ?? uiView.layer.sublayers?.compactMap { $0 as? AVCaptureVideoPreviewLayer }.first
         preview?.frame = uiView.bounds
+        context.coordinator.imageView?.frame = uiView.bounds
+        context.coordinator.capture?.setPreviewSink(context.coordinator.imageView?.layer)
         context.coordinator.previewLayer = preview
         context.coordinator.container = uiView
+    }
+
+    static func dismantleUIView(_ uiView: UIView, coordinator: Coordinator) {
+        coordinator.capture?.setPreviewSink(nil)
     }
 
     final class Coordinator: NSObject {
         var onFocus: (CGPoint) -> Void
         weak var previewLayer: AVCaptureVideoPreviewLayer?
+        weak var imageView: UIImageView?
+        weak var capture: NativeCameraCapture?
         weak var container: UIView?
 
         init(onFocus: @escaping (CGPoint) -> Void) {
@@ -1300,7 +1510,7 @@ struct NativeCameraStudioView: View {
                         }.padding(12)
                     }
                 } else if capture.ready {
-                    NativeCameraPreview(session: capture.session, onFocus: { capture.focus(at: $0) })
+                    NativeCameraPreview(capture: capture, onFocus: { capture.focus(at: $0) })
                     if gridEnabled {
                         GeometryReader { geometry in
                             Path { path in
@@ -1384,7 +1594,7 @@ struct NativeCameraStudioView: View {
                             capture.capturePhoto(look: look)
                         }
                     } else if capture.recording { capture.stopVideo() }
-                    else { capture.startVideo() }
+                    else { capture.startVideo(look: look) }
                 } label: {
                     ZStack {
                         Circle().strokeBorder(Color.envInk, lineWidth: 5).frame(width: 66, height: 66)
