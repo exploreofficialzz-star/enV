@@ -728,7 +728,7 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
                         : "The cameras could not start. Return to the normal camera."
                 }
             } catch {
-                if self.session.isRunning { self.session.stopRunning() }
+                self.resetSessionAfterFailure()
                 Task { @MainActor in
                     self.ready = false
                     self.error = error.localizedDescription
@@ -767,6 +767,22 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
             session.commitConfiguration()
             throw error
         }
+    }
+
+    private func resetSessionAfterFailure() {
+        if session.isRunning { session.stopRunning() }
+        session.beginConfiguration()
+        for connection in session.connections { session.removeConnection(connection) }
+        for output in session.outputs { session.removeOutput(output) }
+        for input in session.inputs { session.removeInput(input) }
+        session.commitConfiguration()
+        backOutput.setSampleBufferDelegate(nil, queue: nil)
+        frontOutput.setSampleBufferDelegate(nil, queue: nil)
+        audioOutput.setSampleBufferDelegate(nil, queue: nil)
+        backInput = nil
+        frontInput = nil
+        microphoneInput = nil
+        previewConnections.removeAll()
     }
 
     private func configureModerateFormat(_ device: AVCaptureDevice) throws {
@@ -1479,10 +1495,10 @@ struct NativeCameraStudioView: View {
                     ForEach(NativeCameraLook.allCases) { item in Text(item.rawValue).tag(item) }
                 }.pickerStyle(.menu)
             }
-            if let message = capture.message {
+            if let message = (dualCameraMode ? dualCapture.message : capture.message) {
                 Text(message).font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.envMuted)
             }
-            if let error = capture.error {
+            if let error = (dualCameraMode ? dualCapture.error : capture.error) {
                 HStack(alignment: .center, spacing: 10) {
                     Text(error).font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.red)
                     Spacer(minLength: 0)
