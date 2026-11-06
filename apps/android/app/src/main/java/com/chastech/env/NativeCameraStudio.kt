@@ -323,7 +323,7 @@ private val nativeCameraQualities = listOf(
     NativeCameraQuality("4K", Quality.UHD),
 )
 
-@androidx.annotation.OptIn(androidx.camera.camera2.interop.ExperimentalCamera2Interop::class)
+@androidx.annotation.OptIn(androidx.camera.camera2.interop.ExperimentalCamera2Interop::class, androidx.camera.core.ExperimentalGetImage::class)
 @Composable
 fun NativeCameraStudioScreen() {
     val context = LocalContext.current
@@ -393,29 +393,43 @@ fun NativeCameraStudioScreen() {
                 if (!imageProxy.imageInfo.sensorToBufferTransformMatrix.invert(analysisToSensor)) {
                     imageProxy.close()
                 } else {
-                    val input = InputImage.fromMediaImage(mediaImage, rotation)
-                    faceDetector.process(input)
-                        .addOnSuccessListener(faceAnalysisExecutor) { detectedFaces ->
-                            val geometries = detectedFaces.map { face ->
-                                mapNativeFaceToSensor(
-                                    face,
-                                    imageProxy.width,
-                                    imageProxy.height,
-                                    rotation,
-                                    analysisToSensor
-                                )
+                    try {
+                        val input = InputImage.fromMediaImage(mediaImage, rotation)
+                        faceDetector.process(input)
+                            .addOnSuccessListener(faceAnalysisExecutor) { detectedFaces ->
+                                val geometries = detectedFaces.map { face ->
+                                    mapNativeFaceToSensor(
+                                        face,
+                                        imageProxy.width,
+                                        imageProxy.height,
+                                        rotation,
+                                        analysisToSensor
+                                    )
+                                }
+                                faceFrameResults[timestamp] = geometries
+                                while (faceFrameResults.size > 8) {
+                                    faceFrameResults.keys.minOrNull()?.let(faceFrameResults::remove) ?: break
+                                }
+                                faceOverlayEffect.drawFrameAsync(timestamp)
                             }
-                            faceFrameResults[timestamp] = geometries
-                            faceOverlayEffect.drawFrameAsync(timestamp)
-                        }
-                        .addOnFailureListener(faceAnalysisExecutor) { failure ->
-                            Handler(Looper.getMainLooper()).post {
-                                faceOverlayError = failure.message ?: "Face tracking could not process this frame."
+                            .addOnFailureListener(faceAnalysisExecutor) { failure ->
+                                faceFrameResults[timestamp] = emptyList()
+                                faceOverlayEffect.drawFrameAsync(timestamp)
+                                Handler(Looper.getMainLooper()).post {
+                                    faceOverlayError = failure.message ?: "Face tracking could not process this frame."
+                                }
                             }
+                            .addOnCompleteListener(faceAnalysisExecutor) {
+                                imageProxy.close()
+                            }
+                    } catch (failure: Throwable) {
+                        imageProxy.close()
+                        faceFrameResults[timestamp] = emptyList()
+                        faceOverlayEffect.drawFrameAsync(timestamp)
+                        Handler(Looper.getMainLooper()).post {
+                            faceOverlayError = failure.message ?: "Face tracking could not process this frame."
                         }
-                        .addOnCompleteListener(faceAnalysisExecutor) {
-                            imageProxy.close()
-                        }
+                    }
                 }
             }
         }
@@ -456,6 +470,7 @@ fun NativeCameraStudioScreen() {
     DisposableEffect(faceDetector, faceOverlayEffect, faceAnalysisExecutor, faceOverlayThread, controller) {
         onDispose {
             runCatching { controller.clearImageAnalysisAnalyzer() }
+            runCatching { controller.setEffects(emptySet()) }
             faceFrameResults.clear()
             faceDetector.close()
             faceOverlayEffect.close()
@@ -1065,7 +1080,7 @@ fun NativeCameraStudioScreen() {
                     lookRow.forEach { look ->
                         OutlinedButton(
                             onClick = { selectedLook = look },
-                            enabled = !recordingActive,
+                            enabled = !recordingActive && faceEffectMode == "Off",
                             modifier = Modifier.weight(1f)
                         ) {
                             Text(if (selectedLook == look) "✓ ${look.label}" else look.label)
