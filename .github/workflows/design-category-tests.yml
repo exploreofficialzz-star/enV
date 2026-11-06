@@ -12,6 +12,12 @@ on:
       - "scripts/check-design.mjs"
       - "scripts/audit-design-category-browser.mjs"
       - "src/components/tools/design-category-explorer.tsx"
+      - "src/components/tools/tool-engine.tsx"
+      - "src/components/engines/smartphone-prototype-lab-engine.tsx"
+      - "src/lib/registry.ts"
+      - "src/lib/tool-engine-preload.ts"
+      - "scripts/check-smartphone-prototype-lab.mjs"
+      - "public/labs/smartphone-prototype-lab/**"
       - ".github/workflows/accessibility-phase8.yml"
       - "scripts/catalog-reader.mjs"
       - "src/data/catalog.ts"
@@ -55,6 +61,8 @@ jobs:
           src/lib/production-notice.test.ts
       - name: Audit every Design catalogue entry and implementation gate
         run: node scripts/check-design.mjs
+      - name: Verify Smartphone Prototype Lab route and compressed 3D scene
+        run: node scripts/check-smartphone-prototype-lab.mjs
       - name: Verify Web Design availability and native production boundaries
         run: npm run check:production-gating
 
