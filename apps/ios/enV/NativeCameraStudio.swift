@@ -789,7 +789,7 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
     private func configureModerateFormat(_ device: AVCaptureDevice) throws {
         let formats = device.formats.filter { format in
             let dimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
-            return dimensions.width <= 1920 &&
+            return format.isMultiCamSupported && dimensions.width <= 1920 &&
                 dimensions.height <= 1080 &&
                 format.videoSupportedFrameRateRanges.contains {
                     $0.minFrameRate <= 30 && $0.maxFrameRate >= 30
