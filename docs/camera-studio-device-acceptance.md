@@ -2,7 +2,7 @@
 
 **Release state: NOT ACCEPTED.** Source-level checks and simulator/emulator builds are not evidence of real-camera acceptance.
 
-**Current execution state: NOT RUN — requires real hardware.** No physical Android phone or iPhone was available to this repository workflow on 6 November 2026. Do not change a row to PASS without the device model, OS version, app commit, test date, and evidence link.
+**Physical-device execution state: NOT RUN.** No verified physical-device result has been attached to this branch as of 7 November 2026. Do not change a row to PASS without the device model, OS version, app commit, test date, measurements, and evidence link.
 
 ## Required test record
 
@@ -43,7 +43,7 @@ A result without this evidence remains NOT RUN.
 | Low-storage and recording finalization | Show a recoverable error, do not publish a partial file as complete, and preserve an already completed take when a save picker is canceled | NOT RUN |
 | System interruptions and app backgrounding | Calls, app switches, camera pre-emption and iOS media-services reset stop/reconnect safely; files remain playable where finalization succeeds | NOT RUN |
 | Thermal and battery behaviour | Run repeated and sustained recording; note thermal warnings, throttling, dropped frames and battery drain; do not advertise unmeasured performance | NOT RUN |
-| Filter preview-to-export parity | Each native color look is visible in preview and present in the saved photo/video; Natural resets correctly; no stale filter after mode changes | NOT RUN |
+| Filter preview-to-export parity | Each native color look is visible in preview and present in the saved photo/video; Natural resets correctly; no stale filter after mode changes | NOT RUN |\n| Face tracking and original AR effects | Test one and multiple faces, glasses/crown alignment, face movement/entry/exit, rotation, low light, processing latency, frame drops and exact preview-to-export parity | NOT RUN |\n| Beauty / soft-light effects | Verify iOS face-only softening is subtle and bounded; verify Android soft glow stays attached to the detected face; confirm no effect is applied to unsupported photo/dual modes | NOT RUN |\n| Face-effect privacy and lifecycle | Confirm no face data leaves device; disabling effects stops analysis; leaving Camera Studio releases Vision/ML Kit resources and camera outputs | NOT RUN |
 | Manual camera controls | Verify actual sensor capability gating; ISO/shutter, white balance, focus distance/lock and optical lens selection change capture output; unsupported controls are hidden | NOT RUN |
 | Permission revoked in Settings | Return to Camera Studio after revocation; camera is not bound until permission returns; retry/settings route works | NOT RUN |
 | Long recording | Test at least 5 minutes and 30 minutes on a capable device; confirm output duration, sound, playback, storage use and cleanup | NOT RUN |
@@ -78,4 +78,4 @@ The next face-effects implementation must use original enV assets/effects and an
 3. Compare the encoded file to the preview; do not judge from the preview alone.
 4. Repeat tests after app backgrounding, a phone call, low storage, and a camera permission change.
 5. Attach test artifacts to the PR and update this matrix with measured values before enabling or promoting device-dependent features.
-6. Keep face effects disabled until the landmark pipeline is implemented and its latency, export parity, privacy behaviour and device fallback are tested.
+6. Keep face effects off by default until latency, orientation, export parity, privacy behaviour, and low-end device fallback have passed the physical-device matrix. The in-app sample modes may be exercised during controlled testing.
