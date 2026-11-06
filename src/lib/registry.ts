@@ -170,6 +170,29 @@ const cameraStudioTool: ToolMeta = {
   isNew: true,
 };
 
+const smartphonePrototypeLabTool: ToolMeta = {
+  id: "smartphone-prototype-lab",
+  name: "Smartphone Prototype Lab",
+  slug: "smartphone-prototype-lab",
+  description: "Explore a generic smartphone as an interactive 3D production model. Inspect the display stack, motherboard packages, cameras, power systems, materials and factory assembly sequence.",
+  category: "design",
+  subcategory: "Product engineering",
+  keywords: ["smartphone", "phone", "prototype", "3d", "3d model", "product engineering", "manufacturing", "production", "hardware", "electronics", "motherboard", "pcb", "soc", "cpu", "gpu", "npu", "ram", "storage", "display", "oled", "lcd", "camera", "battery", "assembly"],
+  tags: ["smartphone", "3d", "engineering", "manufacturing", "hardware", "electronics", "product design"],
+  icon: "Smartphone",
+  iconBackground: "#171b1e",
+  iconAccent: "#c7f36b",
+  popularity: 1350,
+  featured: false,
+  clientSide: true,
+  requiresBackend: false,
+  requiresAuth: false,
+  status: "active",
+  related: [],
+  engine: { type: "custom", id: "smartphone-prototype-lab" },
+  isNew: true,
+};
+
 const allTools: ToolMeta[] = [
   // The browser has real dispatchers for both families. The generated catalogue is
   // shared with native clients, so expose these web-ready records as active here
@@ -203,6 +226,7 @@ const allTools: ToolMeta[] = [
   ...(!catalogTools.some((tool) => tool.id === aBookTool.id) ? [aBookTool] : []),
   ...(!catalogTools.some((tool) => tool.id === zipAnyFileTool.id) ? [zipAnyFileTool] : []),
   ...(!catalogTools.some((tool) => tool.id === cameraStudioTool.id) ? [cameraStudioTool] : []),
+  ...(!catalogTools.some((tool) => tool.id === smartphonePrototypeLabTool.id) ? [smartphonePrototypeLabTool] : []),
 ];
 
 const byId = new Map(allTools.map((t) => [t.id, t]));

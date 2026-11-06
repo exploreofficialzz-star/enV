@@ -11,7 +11,9 @@ import { isEventTemplateTool } from "@/lib/events/event-templates";
 export async function preloadToolEngine(tool: ToolMeta): Promise<void> {
   let pending: Promise<unknown> | null = null;
 
-  if (tool.id === "camera-studio") {
+  if (tool.id === "smartphone-prototype-lab") {
+    pending = import("@/components/engines/smartphone-prototype-lab-engine");
+  } else if (tool.id === "camera-studio") {
     pending = import("@/components/engines/camera-studio-engine");
   } else if (tool.category === "mockups") {
     pending = import("@/components/engines/mockups-category-engine");
@@ -172,6 +174,7 @@ const ALL_TOOL_ENGINE_MODULES: Array<() => Promise<unknown>> = [
   () => import("@/components/engines/ai-music-data-sandbox"),
   () => import("@/components/engines/zip-archive-engine"),
   () => import("@/components/engines/camera-studio-engine"),
+  () => import("@/components/engines/smartphone-prototype-lab-engine"),
   () => import("@/components/world-lab/world-lab"),
   () => import("@/components/game-studio/game-studio"),
 ];
