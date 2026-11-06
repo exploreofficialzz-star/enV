@@ -782,7 +782,6 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
         lastFaceDetectionTime = timestamp
         do {
             faceRequest = VNDetectFaceLandmarksRequest()
-            faceRequest.usesCPUOnly = false
             try faceSequenceHandler.perform([faceRequest], on: pixelBuffer, orientation: .up)
             cachedFaceObservations = (faceRequest.results ?? []).filter { $0.confidence >= 0.35 }
         } catch {
@@ -831,8 +830,8 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
                 ).insetBy(dx: CGFloat(width) * 0.006, dy: CGFloat(height) * 0.008)
                 overlayContext.fillEllipse(in: rect)
 
-                // Keep the eyes and mouth outside the softening mask so the effect
-                // does not wash out the user's expression or eye detail.
+                // Keep eye detail outside the softening mask so the effect
+                // does not wash out the user's expression.
                 overlayContext.setBlendMode(.clear)
                 if let leftEye = face.landmarks?.leftEye, let rightEye = face.landmarks?.rightEye {
                     for region in [leftEye, rightEye] {
@@ -868,9 +867,20 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
             if activeFaceEffect == "Glasses" {
                 let leftPoints = face.landmarks?.leftEye?.normalizedPoints ?? []
                 let rightPoints = face.landmarks?.rightEye?.normalizedPoints ?? []
-                guard let left = leftPoints.first, let right = rightPoints.first else { continue }
-                let leftEye = faceImagePoint(CGPoint(x: CGFloat(left.x), y: CGFloat(left.y)), in: face, extent: source.extent)
-                let rightEye = faceImagePoint(CGPoint(x: CGFloat(right.x), y: CGFloat(right.y)), in: face, extent: source.extent)
+                func centerOfEye(_ points: [vector_float2]) -> CGPoint? {
+                    guard !points.isEmpty else { return nil }
+                    let total = points.reduce(CGPoint.zero) { partial, point in
+                        CGPoint(x: partial.x + CGFloat(point.x), y: partial.y + CGFloat(point.y))
+                    }
+                    return CGPoint(
+                        x: total.x / CGFloat(points.count),
+                        y: total.y / CGFloat(points.count)
+                    )
+                }
+                guard let leftCenter = centerOfEye(leftPoints),
+                      let rightCenter = centerOfEye(rightPoints) else { continue }
+                let leftEye = faceImagePoint(leftCenter, in: face, extent: source.extent)
+                let rightEye = faceImagePoint(rightCenter, in: face, extent: source.extent)
                 let eyeDistance = hypot(rightEye.x - leftEye.x, rightEye.y - leftEye.y)
                 let lensWidth = max(eyeDistance * 0.82, faceRect.width * 0.14)
                 let lensHeight = lensWidth * 0.52
@@ -1975,7 +1985,7 @@ struct NativeCameraStudioView: View {
                         Text("Crown").tag("Crown")
                     }.pickerStyle(.menu).disabled(capture.recording)
                 }
-                Text(faceEffect == "Off" ? "Face effects are off." : "Face tracking and original effects are processed on this device and included in recorded video.")
+                Text(faceEffect == "Off" ? "Face effects are off." : faceEffect == "Beauty" ? "Adds subtle face-only softening. Original face effects are processed on this device and included in recorded video." : "Face tracking anchors this original effect to your face. Processing stays on this device and is included in recorded video.")
                     .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
             }
             if let message = (dualCameraMode ? dualCapture.message : capture.message) {
