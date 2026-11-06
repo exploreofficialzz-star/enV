@@ -21,6 +21,8 @@ class NativeAiMicroEngineTest {
         assertEquals("60", NativeAiMicroEngine.initialValues("shorten-helper")["count"])
         assertEquals("30", NativeAiMicroEngine.initialValues("ai-meeting-agenda-generator")["duration"])
         assertTrue(NativeAiMicroEngine.fields("expand-helper").first().multiline)
+        assertEquals("", NativeAiMicroEngine.initialValues("expand-helper")["audience"])
+        assertEquals("Who is this for?", NativeAiMicroEngine.fields("expand-helper").first { it.name == "audience" }.label)
         assertTrue(NativeAiMicroEngine.fields("faq-generator").any { it.name == "answers" })
         assertTrue(NativeAiMicroEngine.fields("feature-benefit-generator").any { it.name == "outcomes" })
         assertTrue(NativeAiMicroEngine.fields("youtube-description-helper").any { it.name == "chapters" })
