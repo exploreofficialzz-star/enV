@@ -142,6 +142,7 @@ private fun nativeCameraEffects(look: NativeCameraLook): List<Effect> = when (lo
 }
 
 private data class NativeCameraQuality(val label: String, val quality: Quality)
+private data class NativeCameraLensOption(val cameraId: String, val focalLengthMm: Float, val label: String)
 
 private val nativeCameraQualities = listOf(
     NativeCameraQuality("720p", Quality.HD),
@@ -212,6 +213,8 @@ fun NativeCameraStudioScreen() {
     var videoFrameRate by remember { mutableStateOf(30) }
     val captureScope = rememberCoroutineScope()
     var usingFrontCamera by remember { mutableStateOf(false) }
+    var rearCameraLenses by remember { mutableStateOf(emptyList<NativeCameraLensOption>()) }
+    var selectedRearCameraId by remember { mutableStateOf<String?>(null) }
     var manualSensorSupported by remember { mutableStateOf(false) }
     var manualIsoRange by remember { mutableStateOf<Range<Int>?>(null) }
     var manualExposureTimeRange by remember { mutableStateOf<Range<Long>?>(null) }
@@ -234,14 +237,41 @@ fun NativeCameraStudioScreen() {
     val latestRecording = rememberUpdatedState(recording)
     val disposeAfterRecording = remember(controller) { AtomicBoolean(false) }
 
-    LaunchedEffect(cameraGranted, usingFrontCamera) {
+    LaunchedEffect(cameraGranted) {
         if (!cameraGranted) {
+            rearCameraLenses = emptyList()
+            selectedRearCameraId = null
             manualSensorSupported = false
             manualIsoRange = null
             manualExposureTimeRange = null
             manualFocusMinimum = 0f
             whiteBalanceModes = emptySet()
             return@LaunchedEffect
+        }
+        runCatching {
+            val provider = withContext(Dispatchers.IO) {
+                ProcessCameraProvider.getInstance(context.applicationContext).get()
+            }
+            val discovered = provider.availableCameraInfos.mapNotNull { info ->
+                runCatching {
+                    val camera2Info = Camera2CameraInfo.from(info)
+                    if (camera2Info.lensFacing != CameraSelector.LENS_FACING_BACK) return@runCatching null
+                    val focalLengths = camera2Info.getCameraCharacteristic(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
+                    val focalLength = focalLengths?.minOrNull() ?: return@runCatching null
+                    NativeCameraLensOption(
+                        cameraId = camera2Info.cameraId,
+                        focalLengthMm = focalLength,
+                        label = "Rear · ${String.format("%.1f", focalLength)} mm"
+                    )
+                }.getOrNull()
+            }.distinctBy { it.cameraId }.sortedBy { it.focalLengthMm }
+            rearCameraLenses = discovered
+            val activeId = controller.cameraInfo?.let { info ->
+                runCatching { Camera2CameraInfo.from(info).cameraId }.getOrNull()
+            }
+            selectedRearCameraId = discovered.firstOrNull { it.cameraId == activeId }?.cameraId ?: discovered.firstOrNull()?.cameraId
+        }.onFailure {
+            advancedControlError = "Available rear lenses could not be read on this device."
         }
         repeat(8) {
             val info = controller.cameraInfo
@@ -447,6 +477,19 @@ fun NativeCameraStudioScreen() {
                 }
             }
         }
+    }
+
+    fun selectRearLens(option: NativeCameraLensOption) {
+        if (recordingActive || !cameraGranted) return
+        usingFrontCamera = false
+        selectedRearCameraId = option.cameraId
+        controller.cameraSelector = CameraSelector.Builder().addCameraFilter { infos ->
+            infos.filter { info ->
+                runCatching { Camera2CameraInfo.from(info).cameraId == option.cameraId }.getOrDefault(false)
+            }
+        }.build()
+        status = "${option.label} selected."
+        error = null
     }
 
     fun switchCamera() {
@@ -817,6 +860,24 @@ fun NativeCameraStudioScreen() {
                     valueRange = exposureRange.lower.toFloat()..exposureRange.upper.toFloat(),
                     enabled = !recordingActive,
                 )
+            }
+        }
+
+        if (cameraGranted && !usingFrontCamera && rearCameraLenses.size > 1) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Rear lens", style = MaterialTheme.typography.labelMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    rearCameraLenses.forEach { lens ->
+                        OutlinedButton(
+                            onClick = { selectRearLens(lens) },
+                            enabled = !recordingActive,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(if (selectedRearCameraId == lens.cameraId) "✓ ${lens.label}" else lens.label)
+                        }
+                    }
+                }
+                Text("Only rear cameras exposed by the device camera framework are listed.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
