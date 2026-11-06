@@ -119,7 +119,7 @@ import com.google.mlkit.vision.face.FaceDetectorOptions
 import com.google.mlkit.vision.face.FaceLandmark
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
-import java.util.function.Consumer
+import androidx.core.util.Consumer
 import androidx.media3.effect.RgbFilter
 import androidx.compose.runtime.livedata.observeAsState
 import java.io.File
@@ -352,7 +352,7 @@ fun NativeCameraStudioScreen() {
             CameraEffect.PREVIEW or CameraEffect.VIDEO_CAPTURE,
             6,
             Handler(faceOverlayThread.looper),
-            Consumer { failure ->
+            Consumer<Throwable> { failure ->
                 Handler(Looper.getMainLooper()).post {
                     faceOverlayError = failure.message ?: "Face effects are unavailable on this camera."
                 }
