@@ -563,28 +563,55 @@ struct NativeGoogleSigningKeyView: View {
     }
 
     private func attachFileExporters<Content: View>(to content: Content) -> some View {
-        content
-            .fileExporter(isPresented: $exportArchive, document: archiveData.map { NativeSigningArtifactDocument($0) }, contentType: .zip, defaultFilename: "android-upload-key-package.zip") { result in
-                if case .failure(let error) = result { errorMessage = error.localizedDescription }
-            }
-            .fileExporter(isPresented: $exportKeystore, document: artifacts.map { NativeSigningArtifactDocument($0.keystore) }, contentType: .data, defaultFilename: "upload-keystore.jks") { result in
-                if case .failure(let error) = result { errorMessage = error.localizedDescription }
-            }
-            .fileExporter(isPresented: $exportCertificate, document: artifacts.map { NativeSigningArtifactDocument(Data($0.certificatePEM.utf8)) }, contentType: .data, defaultFilename: "upload_certificate.pem") { result in
-                if case .failure(let error) = result { errorMessage = error.localizedDescription }
-            }
-            .fileExporter(isPresented: $exportBase64, document: artifacts.map { NativeSigningArtifactDocument(Data($0.keystoreBase64.utf8)) }, contentType: .plainText, defaultFilename: "upload-keystore.base64.txt") { result in
-                if case .failure(let error) = result { errorMessage = error.localizedDescription }
-            }
-            .fileExporter(isPresented: $exportSecrets, document: artifacts.map { NativeSigningArtifactDocument(Data($0.githubSecrets.utf8)) }, contentType: .plainText, defaultFilename: "github-secrets.txt") { result in
-                if case .failure(let error) = result { errorMessage = error.localizedDescription }
-            }
-            .fileExporter(isPresented: $exportWorkflow, document: artifacts.map { NativeSigningArtifactDocument(Data($0.githubActionsWorkflow.utf8)) }, contentType: .plainText, defaultFilename: "android-release.yml") { result in
-                if case .failure(let error) = result { errorMessage = error.localizedDescription }
-            }
-            .fileExporter(isPresented: $exportInfo, document: artifacts.map { NativeSigningArtifactDocument(Data($0.signingInfo.utf8)) }, contentType: .plainText, defaultFilename: "signing-info.txt") { result in
-                if case .failure(let error) = result { errorMessage = error.localizedDescription }
-            }
+        let archive = attachArchiveExporter(to: content)
+        let keystore = attachKeystoreExporter(to: archive)
+        let certificate = attachCertificateExporter(to: keystore)
+        let base64 = attachBase64Exporter(to: certificate)
+        let secrets = attachSecretsExporter(to: base64)
+        let workflow = attachWorkflowExporter(to: secrets)
+        return attachInfoExporter(to: workflow)
+    }
+
+    private func attachArchiveExporter<Content: View>(to content: Content) -> some View {
+        content.fileExporter(isPresented: $exportArchive, document: archiveData.map { NativeSigningArtifactDocument($0) }, contentType: .zip, defaultFilename: "android-upload-key-package.zip") { result in
+            if case .failure(let error) = result { errorMessage = error.localizedDescription }
+        }
+    }
+
+    private func attachKeystoreExporter<Content: View>(to content: Content) -> some View {
+        content.fileExporter(isPresented: $exportKeystore, document: artifacts.map { NativeSigningArtifactDocument($0.keystore) }, contentType: .data, defaultFilename: "upload-keystore.jks") { result in
+            if case .failure(let error) = result { errorMessage = error.localizedDescription }
+        }
+    }
+
+    private func attachCertificateExporter<Content: View>(to content: Content) -> some View {
+        content.fileExporter(isPresented: $exportCertificate, document: artifacts.map { NativeSigningArtifactDocument(Data($0.certificatePEM.utf8)) }, contentType: .data, defaultFilename: "upload_certificate.pem") { result in
+            if case .failure(let error) = result { errorMessage = error.localizedDescription }
+        }
+    }
+
+    private func attachBase64Exporter<Content: View>(to content: Content) -> some View {
+        content.fileExporter(isPresented: $exportBase64, document: artifacts.map { NativeSigningArtifactDocument(Data($0.keystoreBase64.utf8)) }, contentType: .plainText, defaultFilename: "upload-keystore.base64.txt") { result in
+            if case .failure(let error) = result { errorMessage = error.localizedDescription }
+        }
+    }
+
+    private func attachSecretsExporter<Content: View>(to content: Content) -> some View {
+        content.fileExporter(isPresented: $exportSecrets, document: artifacts.map { NativeSigningArtifactDocument(Data($0.githubSecrets.utf8)) }, contentType: .plainText, defaultFilename: "github-secrets.txt") { result in
+            if case .failure(let error) = result { errorMessage = error.localizedDescription }
+        }
+    }
+
+    private func attachWorkflowExporter<Content: View>(to content: Content) -> some View {
+        content.fileExporter(isPresented: $exportWorkflow, document: artifacts.map { NativeSigningArtifactDocument(Data($0.githubActionsWorkflow.utf8)) }, contentType: .plainText, defaultFilename: "android-release.yml") { result in
+            if case .failure(let error) = result { errorMessage = error.localizedDescription }
+        }
+    }
+
+    private func attachInfoExporter<Content: View>(to content: Content) -> some View {
+        content.fileExporter(isPresented: $exportInfo, document: artifacts.map { NativeSigningArtifactDocument(Data($0.signingInfo.utf8)) }, contentType: .plainText, defaultFilename: "signing-info.txt") { result in
+            if case .failure(let error) = result { errorMessage = error.localizedDescription }
+        }
     }
 
     @ViewBuilder private func stepButton(_ title: String, index: Int) -> some View {
