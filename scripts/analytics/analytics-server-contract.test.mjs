@@ -31,7 +31,7 @@ test("browser dashboard sessions require an active server-side HMAC digest row",
   assert.match(server, /readDashboardSession\(cookieToken\(request\), secret/);
   assert.match(server, /where session_digest=\$1 and revoked_at is null and expires_at>now\(\) limit 1/);
   assert.match(server, /dashboardSessionDigest\(session\.sessionId, secret\)/);
-  assert.match(server, /set revoked_at=coalesce\(revoked_at, now\)/);
+  assert.match(server, /set revoked_at=coalesce\(revoked_at, now\(\)\)/);
   assert.match(revokeRoute, /await revokeAnalyticsDashboardSession\(request\)/);
   assert.match(revokeRoute, /clearAnalyticsDashboardCookie\(\)/);
 });
