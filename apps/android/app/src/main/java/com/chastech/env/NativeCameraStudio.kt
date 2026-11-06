@@ -237,7 +237,7 @@ fun NativeCameraStudioScreen() {
     val latestRecording = rememberUpdatedState(recording)
     val disposeAfterRecording = remember(controller) { AtomicBoolean(false) }
 
-    LaunchedEffect(cameraGranted) {
+    LaunchedEffect(cameraGranted, usingFrontCamera, selectedRearCameraId) {
         if (!cameraGranted) {
             rearCameraLenses = emptyList()
             selectedRearCameraId = null
@@ -495,7 +495,14 @@ fun NativeCameraStudioScreen() {
     fun switchCamera() {
         if (recordingActive || !cameraGranted) return
         usingFrontCamera = !usingFrontCamera
-        controller.cameraSelector = if (usingFrontCamera) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
+        controller.cameraSelector = if (usingFrontCamera) CameraSelector.DEFAULT_FRONT_CAMERA else {
+            val selectedId = selectedRearCameraId
+            if (selectedId == null) CameraSelector.DEFAULT_BACK_CAMERA else CameraSelector.Builder().addCameraFilter { infos ->
+                infos.filter { info ->
+                    runCatching { Camera2CameraInfo.from(info).cameraId == selectedId }.getOrDefault(false)
+                }
+            }.build()
+        }
         status = if (usingFrontCamera) "Front camera selected." else "Rear camera selected."
         error = null
     }
