@@ -3,6 +3,7 @@ import CoreImage
 import Photos
 import SwiftUI
 import UIKit
+import Vision
 
 private enum NativeCameraLook: String, CaseIterable, Identifiable {
     case natural = "Natural"
@@ -84,6 +85,11 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
     private var pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor?
     private var activeVideoURL: URL?
     private var activeLook: NativeCameraLook = .natural
+    private var activeFaceEffect = "Off"
+    private let faceSequenceHandler = VNSequenceRequestHandler()
+    private var faceRequest = VNDetectFaceLandmarksRequest()
+    private var cachedFaceObservations: [VNFaceObservation] = []
+    private var lastFaceDetectionTime = CMTime.invalid
     private var recordingRequested = false
     private var writerSessionStarted = false
     private var writerStartTime = CMTime.invalid
@@ -328,6 +334,15 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
 
     func setLook(_ look: NativeCameraLook) {
         activeLook = look
+    }
+
+    func setFaceEffect(_ effect: String) {
+        queue.async { [weak self] in
+            guard let self else { return }
+            self.activeFaceEffect = effect
+            self.cachedFaceObservations.removeAll(keepingCapacity: true)
+            self.lastFaceDetectionTime = .invalid
+        }
     }
 
     func focus(at point: CGPoint) {
@@ -756,6 +771,150 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
         writerStartTime = .invalid
     }
 
+    private func detectFacesIfNeeded(in pixelBuffer: CVPixelBuffer, at timestamp: CMTime) {
+        guard activeFaceEffect != "Off" else {
+            cachedFaceObservations.removeAll(keepingCapacity: true)
+            return
+        }
+        let shouldDetect = !lastFaceDetectionTime.isValid ||
+            CMTimeGetSeconds(CMTimeSubtract(timestamp, lastFaceDetectionTime)) >= (1.0 / 15.0)
+        guard shouldDetect else { return }
+        lastFaceDetectionTime = timestamp
+        do {
+            faceRequest = VNDetectFaceLandmarksRequest()
+            faceRequest.usesCPUOnly = false
+            try faceSequenceHandler.perform([faceRequest], on: pixelBuffer, orientation: .up)
+            cachedFaceObservations = (faceRequest.results ?? []).filter { $0.confidence >= 0.35 }
+        } catch {
+            cachedFaceObservations.removeAll(keepingCapacity: true)
+        }
+    }
+
+    private func faceImagePoint(_ point: CGPoint, in face: VNFaceObservation, extent: CGRect) -> CGPoint {
+        CGPoint(
+            x: extent.minX + (face.boundingBox.minX + point.x * face.boundingBox.width) * extent.width,
+            y: extent.minY + (face.boundingBox.minY + point.y * face.boundingBox.height) * extent.height
+        )
+    }
+
+    private func applyFaceEffect(_ source: CIImage, pixelBuffer: CVPixelBuffer, timestamp: CMTime) -> CIImage {
+        guard activeFaceEffect != "Off" else { return source }
+        detectFacesIfNeeded(in: pixelBuffer, at: timestamp)
+        guard !cachedFaceObservations.isEmpty else { return source }
+
+        let width = max(1, Int(source.extent.width.rounded()))
+        let height = max(1, Int(source.extent.height.rounded()))
+        let bytesPerRow = width * 4
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+
+        guard let overlayContext = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return source }
+        overlayContext.clear(CGRect(x: 0, y: 0, width: width, height: height))
+        overlayContext.setShouldAntialias(true)
+
+        if activeFaceEffect == "Beauty" {
+            overlayContext.setFillColor(UIColor.white.withAlphaComponent(0.28).cgColor)
+            for face in cachedFaceObservations {
+                let bounds = face.boundingBox
+                let rect = CGRect(
+                    x: bounds.minX * CGFloat(width),
+                    y: bounds.minY * CGFloat(height),
+                    width: bounds.width * CGFloat(width),
+                    height: bounds.height * CGFloat(height)
+                ).insetBy(dx: CGFloat(width) * 0.006, dy: CGFloat(height) * 0.008)
+                overlayContext.fillEllipse(in: rect)
+
+                // Keep the eyes and mouth outside the softening mask so the effect
+                // does not wash out the user's expression or eye detail.
+                overlayContext.setBlendMode(.clear)
+                if let leftEye = face.landmarks?.leftEye, let rightEye = face.landmarks?.rightEye {
+                    for region in [leftEye, rightEye] {
+                        let points = region.normalizedPoints.map { faceImagePoint(CGPoint(x: CGFloat($0.x), y: CGFloat($0.y)), in: face, extent: source.extent) }
+                        if !points.isEmpty {
+                            let minX = points.map(\.x).min() ?? 0
+                            let maxX = points.map(\.x).max() ?? 0
+                            let minY = points.map(\.y).min() ?? 0
+                            let maxY = points.map(\.y).max() ?? 0
+                            overlayContext.fillEllipse(in: CGRect(x: minX, y: minY, width: max(1, maxX - minX), height: max(1, maxY - minY)).insetBy(dx: -CGFloat(width) * 0.012, dy: -CGFloat(height) * 0.012))
+                        }
+                    }
+                }
+                overlayContext.setBlendMode(.normal)
+            }
+            guard let maskCGImage = overlayContext.makeImage() else { return source }
+            let mask = CIImage(cgImage: maskCGImage)
+            let softened = source.applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 2.2]).cropped(to: source.extent)
+            return softened.applyingFilter("CIBlendWithMask", parameters: [
+                kCIInputBackgroundImageKey: source,
+                kCIInputMaskImageKey: mask
+            ]).cropped(to: source.extent)
+        }
+
+        for face in cachedFaceObservations {
+            let bounds = face.boundingBox
+            let faceRect = CGRect(
+                x: bounds.minX * CGFloat(width),
+                y: bounds.minY * CGFloat(height),
+                width: bounds.width * CGFloat(width),
+                height: bounds.height * CGFloat(height)
+            )
+            if activeFaceEffect == "Glasses" {
+                let leftPoints = face.landmarks?.leftEye?.normalizedPoints ?? []
+                let rightPoints = face.landmarks?.rightEye?.normalizedPoints ?? []
+                guard let left = leftPoints.first, let right = rightPoints.first else { continue }
+                let leftEye = faceImagePoint(CGPoint(x: CGFloat(left.x), y: CGFloat(left.y)), in: face, extent: source.extent)
+                let rightEye = faceImagePoint(CGPoint(x: CGFloat(right.x), y: CGFloat(right.y)), in: face, extent: source.extent)
+                let eyeDistance = hypot(rightEye.x - leftEye.x, rightEye.y - leftEye.y)
+                let lensWidth = max(eyeDistance * 0.82, faceRect.width * 0.14)
+                let lensHeight = lensWidth * 0.52
+                let leftLens = CGRect(x: leftEye.x - lensWidth / 2, y: leftEye.y - lensHeight / 2, width: lensWidth, height: lensHeight)
+                let rightLens = CGRect(x: rightEye.x - lensWidth / 2, y: rightEye.y - lensHeight / 2, width: lensWidth, height: lensHeight)
+                overlayContext.setFillColor(UIColor(red: 0.035, green: 0.11, blue: 0.16, alpha: 0.72).cgColor)
+                overlayContext.fillEllipse(in: leftLens)
+                overlayContext.fillEllipse(in: rightLens)
+                overlayContext.setStrokeColor(UIColor(red: 0.24, green: 0.88, blue: 0.92, alpha: 0.95).cgColor)
+                overlayContext.setLineWidth(max(2, CGFloat(width) * 0.003))
+                overlayContext.strokeEllipse(in: leftLens)
+                overlayContext.strokeEllipse(in: rightLens)
+                overlayContext.move(to: CGPoint(x: leftLens.maxX, y: leftEye.y))
+                overlayContext.addLine(to: CGPoint(x: rightLens.minX, y: rightEye.y))
+                overlayContext.strokePath()
+            } else if activeFaceEffect == "Crown" {
+                let crownWidth = faceRect.width * 0.68
+                let baseY = faceRect.maxY + faceRect.height * 0.035
+                let crownHeight = faceRect.height * 0.24
+                let left = faceRect.midX - crownWidth / 2
+                let right = faceRect.midX + crownWidth / 2
+                let path = CGMutablePath()
+                path.move(to: CGPoint(x: left, y: baseY))
+                path.addLine(to: CGPoint(x: left + crownWidth * 0.08, y: baseY + crownHeight * 0.82))
+                path.addLine(to: CGPoint(x: left + crownWidth * 0.34, y: baseY + crownHeight * 0.34))
+                path.addLine(to: CGPoint(x: faceRect.midX, y: baseY + crownHeight))
+                path.addLine(to: CGPoint(x: left + crownWidth * 0.66, y: baseY + crownHeight * 0.34))
+                path.addLine(to: CGPoint(x: right - crownWidth * 0.08, y: baseY + crownHeight * 0.82))
+                path.addLine(to: CGPoint(x: right, y: baseY))
+                path.closeSubpath()
+                overlayContext.addPath(path)
+                overlayContext.setFillColor(UIColor(red: 1, green: 0.77, blue: 0.18, alpha: 0.94).cgColor)
+                overlayContext.fillPath()
+                overlayContext.setStrokeColor(UIColor(red: 1, green: 0.93, blue: 0.62, alpha: 1).cgColor)
+                overlayContext.setLineWidth(max(2, CGFloat(width) * 0.003))
+                overlayContext.strokePath()
+            }
+        }
+
+        guard let overlayCGImage = overlayContext.makeImage() else { return source }
+        let overlay = CIImage(cgImage: overlayCGImage).cropped(to: source.extent)
+        return overlay.composited(over: source).cropped(to: source.extent)
+    }
+
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         if output === audioDataOutput {
             guard recordingRequested, writerSessionStarted,
@@ -767,8 +926,10 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
         }
         guard output === videoDataOutput, let sourceBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
+        let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
         let sourceImage = CIImage(cvPixelBuffer: sourceBuffer)
-        let filteredImage = applyLook(sourceImage, look: activeLook)
+        let faceProcessedImage = applyFaceEffect(sourceImage, pixelBuffer: sourceBuffer, timestamp: timestamp)
+        let filteredImage = applyLook(faceProcessedImage, look: activeLook)
         var previewImage = filteredImage
 
         if recordingRequested, let writerVideoInput, let pixelBufferAdaptor,
@@ -778,7 +939,6 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
             if CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pool, &renderedBuffer) == kCVReturnSuccess,
                let outputBuffer = renderedBuffer {
                 context.render(filteredImage, to: outputBuffer, bounds: filteredImage.extent, colorSpace: CGColorSpaceCreateDeviceRGB())
-                let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
                 if !writerSessionStarted, let assetWriter, assetWriter.status == .writing {
                     assetWriter.startSession(atSourceTime: timestamp)
                     writerSessionStarted = true
@@ -1560,6 +1720,7 @@ struct NativeCameraStudioView: View {
     @State private var countdown: Int?
     @State private var gridEnabled = false
     @State private var showAdvancedControls = false
+    @State private var faceEffect = "Off"
 
     private var latestURL: URL? { mode == "Photo" ? capture.latestPhotoURL : capture.latestVideoURL }
 
@@ -1803,6 +1964,20 @@ struct NativeCameraStudioView: View {
                     ForEach(NativeCameraLook.allCases) { item in Text(item.rawValue).tag(item) }
                 }.pickerStyle(.menu)
             }
+            if !dualCameraMode {
+                HStack {
+                    Text("Face effects").font(.envScaled(size: 12, weight: .medium)).foregroundStyle(Color.envInk)
+                    Spacer()
+                    Picker("Face effects", selection: $faceEffect) {
+                        Text("Off").tag("Off")
+                        Text("Beauty").tag("Beauty")
+                        Text("Glasses").tag("Glasses")
+                        Text("Crown").tag("Crown")
+                    }.pickerStyle(.menu).disabled(capture.recording)
+                }
+                Text(faceEffect == "Off" ? "Face effects are off." : "Face tracking and original effects are processed on this device and included in recorded video.")
+                    .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
+            }
             if let message = (dualCameraMode ? dualCapture.message : capture.message) {
                 Text(message).font(.envScaled(size: 11, weight: .regular)).foregroundStyle(Color.envMuted)
             }
@@ -1847,9 +2022,11 @@ struct NativeCameraStudioView: View {
         }
         .onAppear {
             capture.setLook(look)
+            capture.setFaceEffect(faceEffect)
             capture.start()
         }
         .onChange(of: look) { nextLook in capture.setLook(nextLook) }
+        .onChange(of: faceEffect) { nextEffect in capture.setFaceEffect(nextEffect) }
         .onDisappear {
             dualCapture.stop()
             capture.stop()
