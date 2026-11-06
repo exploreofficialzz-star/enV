@@ -234,6 +234,8 @@ final class NativeAiMicroEngineTests: XCTestCase {
         XCTAssertEqual(NativeAiMicroEngine.initialValues("shorten-helper")["count"], "60")
         XCTAssertEqual(NativeAiMicroEngine.initialValues("ai-meeting-agenda-generator")["duration"], "30")
         XCTAssertTrue(NativeAiMicroEngine.fields(for: "expand-helper").first?.multiline == true)
+        XCTAssertEqual(NativeAiMicroEngine.initialValues("expand-helper")["audience"], "")
+        XCTAssertEqual(NativeAiMicroEngine.fields(for: "expand-helper").first(where: { $0.name == "audience" })?.label, "Who is this for?")
         XCTAssertTrue(NativeAiMicroEngine.fields(for: "faq-generator").contains(where: { $0.name == "answers" }))
         XCTAssertTrue(NativeAiMicroEngine.fields(for: "feature-benefit-generator").contains(where: { $0.name == "outcomes" }))
         XCTAssertTrue(NativeAiMicroEngine.fields(for: "youtube-description-helper").contains(where: { $0.name == "chapters" }))
