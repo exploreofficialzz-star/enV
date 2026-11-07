@@ -2489,7 +2489,7 @@ private struct NativeConverterToolView: View {
                 enVCharacterSpacedText("Unit IDs are the same IDs used by the web engine (examples: \(NativeConverterEngine.units(for: op).prefix(5).map(\.id).joined(separator: ", ")) …)").font(.caption).foregroundStyle(.secondary)
                 NativeInputField(title: "From unit", text: $from)
                 NativeInputField(title: "To unit", text: $to)
-                NativeActionRow(output: output, completion: { error == nil }, run: {
+                NativeActionRow(output: output, completion: { error.isEmpty }, run: {
                     do { output = try NativeConverterEngine.run(op, valueText: value, from: from.trimmingCharacters(in: .whitespaces), to: to.trimmingCharacters(in: .whitespaces)); error = "" }
                     catch let caughtError { output = ""; error = caughtError.localizedDescription }
                 }, reset: { value = "1"; from = NativeConverterEngine.units(for: op).first?.id ?? ""; to = NativeConverterEngine.units(for: op).dropFirst().first?.id ?? from; output = ""; error = "" })
