@@ -6,6 +6,7 @@ const server = readFileSync(new URL("../../src/lib/analytics/analytics.server.ts
 const revokeRoute = readFileSync(new URL("../../server/routes/api/analytics/admin/session/revoke.post.ts", import.meta.url), "utf8");
 const migration = readFileSync(new URL("../../migrations/0018_analytics_dashboard_sessions.sql", import.meta.url), "utf8");
 const liveSmoke = readFileSync(new URL("../check-subdomain-live.mjs", import.meta.url), "utf8");
+const iosNativeViews = readFileSync(new URL("../../apps/ios/enV/NativeZipArchiveView.swift", import.meta.url), "utf8");
 
 test("consent withdrawal locks the consent row before deleting events and consent", () => {
   const withdrawalStart = server.indexOf("export async function saveAnalyticsConsent");
@@ -49,4 +50,14 @@ test("live smoke rejects a disabled dashboard and does not count 503 as private 
   assert.match(liveSmoke, /dashboard UI is disabled in the production Web build/);
   assert.match(liveSmoke, /\[401, 403\]\.includes\(summary\.status\)/);
   assert.doesNotMatch(liveSmoke, /\[401, 403, 503\]\.includes\(summary\.status\)/);
+});
+
+test("iOS native tool destinations record views and ZIP execution outcomes without file content", () => {
+  assert.match(iosNativeViews, /NativeAnalyticsClient\.record\("tool_viewed", toolID: tool\.id\)/);
+  assert.match(iosNativeViews, /NativeAnalyticsClient\.record\("tool_started", toolID: "zip-any-file"\)/);
+  assert.match(iosNativeViews, /NativeAnalyticsClient\.record\(\s*"tool_completed"/);
+  assert.match(iosNativeViews, /NativeAnalyticsClient\.record\(\s*"tool_failed"/);
+  assert.match(iosNativeViews, /errorCode: "ZIP_CREATE_FAILED"/);
+  assert.match(iosNativeViews, /errorCode: "ZIP_EXTRACT_FAILED"/);
+  assert.doesNotMatch(iosNativeViews, /properties:\s*\[.*(?:fileName|filePath|entryPath)/i);
 });
