@@ -7,6 +7,8 @@ const revokeRoute = readFileSync(new URL("../../server/routes/api/analytics/admi
 const migration = readFileSync(new URL("../../migrations/0018_analytics_dashboard_sessions.sql", import.meta.url), "utf8");
 const liveSmoke = readFileSync(new URL("../check-subdomain-live.mjs", import.meta.url), "utf8");
 const iosNativeViews = readFileSync(new URL("../../apps/ios/enV/NativeZipArchiveView.swift", import.meta.url), "utf8");
+const iosToolViews = readFileSync(new URL("../../apps/ios/enV/ToolViews.swift", import.meta.url), "utf8");
+const androidMainActivity = readFileSync(new URL("../../apps/android/app/src/main/java/com/chastech/env/MainActivity.kt", import.meta.url), "utf8");
 
 test("consent withdrawal locks the consent row before deleting events and consent", () => {
   const withdrawalStart = server.indexOf("export async function saveAnalyticsConsent");
@@ -61,3 +63,23 @@ test("iOS native tool destinations record views and ZIP execution outcomes witho
   assert.match(iosNativeViews, /errorCode: "ZIP_EXTRACT_FAILED"/);
   assert.doesNotMatch(iosNativeViews, /properties:\s*\[.*(?:fileName|filePath|entryPath)/i);
 });
+
+test("iOS shared native tool detail records views and execution outcomes", () => {
+  assert.match(iosToolViews, /NativeAnalyticsClient\.record\("tool_viewed", toolID: tool\.id\)/);
+  assert.match(iosToolViews, /NativeToolExecutionTracker/);
+  assert.match(iosToolViews, /Button\("Run"\)\s*\{\s*executionTracker\?\.start\(\)\s*run\(\)/);
+  assert.match(iosToolViews, /executionTracker\?\.finish\(success: completion\(\)\)/);
+  assert.match(iosToolViews, /func abandon\(\)[\s\S]{0,500}"tool_abandoned"/);
+  assert.match(iosToolViews, /\.onDisappear\s*\{\s*executionTracker\.abandon\(\)\s*\}/);
+  assert.equal((iosToolViews.match(/completion: \{ error == nil \}/g) ?? []).length, 10);
+  assert.equal((iosToolViews.match(/completion: \{ error\.isEmpty \}/g) ?? []).length, 1);
+  assert.match(iosToolViews, /guard !isRunning else \{ return \}/);
+});
+
+test("Android native tool tracker records starts, result outcomes and abandonment on disposal", () => {
+  assert.match(androidMainActivity, /NativeAnalytics\.record\(context, "tool_started", toolId\)/);
+  assert.match(androidMainActivity, /if \(success\) "tool_completed" else "tool_failed"/);
+  assert.match(androidMainActivity, /fun abandon\(\)[\s\S]{0,500}"tool_abandoned"/);
+  assert.match(androidMainActivity, /DisposableEffect\(telemetry\)\s*\{\s*onDispose\s*\{\s*telemetry\.abandon\(\)/);
+});
+
