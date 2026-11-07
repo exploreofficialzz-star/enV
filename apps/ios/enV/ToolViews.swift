@@ -1055,6 +1055,7 @@ struct NativeFamilyToolView: View {
             }
         }
         .environment(\.nativeToolExecutionTracker, executionTracker)
+        .onDisappear { executionTracker.abandon() }
     }
 }
 
@@ -1714,6 +1715,7 @@ private struct NativeBackendToolView: View {
             if case .failure(let caughtError) = result { error = caughtError.localizedDescription }
         }
         .environment(\.nativeToolExecutionTracker, executionTracker)
+        .onDisappear { executionTracker.abandon() }
     }
 
     private func operationLabel(_ value: String) -> String { value.replacingOccurrences(of: "-", with: " ").capitalized }
@@ -6678,6 +6680,20 @@ private final class NativeToolExecutionTracker {
             outcome: success ? "success" : "failure",
             durationMs: duration,
             errorCode: success ? nil : "NATIVE_TOOL_FAILED"
+        )
+        Task { try? await NativeAnalyticsClient.flush() }
+    }
+
+    func abandon() {
+        guard let startedAt, !resultRecorded else { return }
+        resultRecorded = true
+        let duration = Int(min(3_600_000, max(0, Date().timeIntervalSince(startedAt) * 1000)))
+        NativeAnalyticsClient.record(
+            "tool_abandoned",
+            toolID: toolID,
+            outcome: "abandoned",
+            durationMs: duration,
+            errorCode: "NATIVE_TOOL_LEFT_BEFORE_RESULT"
         )
         Task { try? await NativeAnalyticsClient.flush() }
     }
