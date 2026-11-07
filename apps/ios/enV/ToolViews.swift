@@ -1977,7 +1977,7 @@ private struct NativeUtilityToolView: View {
                 .font(.caption).foregroundStyle(.secondary)
             NativeInputField(title: "Input", text: $input)
             NativeInputField(title: "Options JSON", text: $optionsJSON)
-            NativeActionRow(output: output, run: {
+            NativeActionRow(output: output, completion: { error == nil }, run: {
                 do { let result = try NativeUtilityEngine.run(tool, input: input, optionsJSON: optionsJSON); output = result.text; error = nil }
                 catch let caughtError { output = ""; error = caughtError.localizedDescription }
             }, reset: { input = ""; optionsJSON = "{}"; output = ""; error = nil })
@@ -2489,7 +2489,7 @@ private struct NativeConverterToolView: View {
                 enVCharacterSpacedText("Unit IDs are the same IDs used by the web engine (examples: \(NativeConverterEngine.units(for: op).prefix(5).map(\.id).joined(separator: ", ")) …)").font(.caption).foregroundStyle(.secondary)
                 NativeInputField(title: "From unit", text: $from)
                 NativeInputField(title: "To unit", text: $to)
-                NativeActionRow(output: output, run: {
+                NativeActionRow(output: output, completion: { error == nil }, run: {
                     do { output = try NativeConverterEngine.run(op, valueText: value, from: from.trimmingCharacters(in: .whitespaces), to: to.trimmingCharacters(in: .whitespaces)); error = "" }
                     catch let caughtError { output = ""; error = caughtError.localizedDescription }
                 }, reset: { value = "1"; from = NativeConverterEngine.units(for: op).first?.id ?? ""; to = NativeConverterEngine.units(for: op).dropFirst().first?.id ?? from; output = ""; error = "" })
@@ -6486,7 +6486,7 @@ private struct NativeAudioToolView: View {
                 NativeInputField(title: "BPM", text: $bpm)
                 NativeInputField(title: "Bars in 4/4", text: $bars)
             }
-            NativeActionRow(output: output, run: {
+            NativeActionRow(output: output, completion: { error == nil }, run: {
                 do { output = try NativeAudioEngine.calculate(operation: operation == "calc" ? calculationMode : operation, platform: platform, duration: Double(duration) ?? 0, bitrate: Double(bitrate) ?? 0, sampleRate: Double(sampleRate) ?? 0, channels: Int(channels) ?? 0, bits: Int(bits) ?? 0, bpm: Double(bpm) ?? 0, bars: Int(bars) ?? 0, targetSizeMegabytes: Double(targetSizeMegabytes) ?? 0); error = nil }
                 catch { output = ""; self.error = error.localizedDescription }
             }, reset: { duration = "180"; bitrate = "128"; sampleRate = "44100"; channels = "2"; bits = "16"; bpm = "120"; bars = "4"; targetSizeMegabytes = "0.96"; calculationMode = tool.id == "audio-file-size-calculator" ? "file-size" : "bitrate"; output = ""; error = nil })
@@ -6582,7 +6582,7 @@ private struct NativeExpansionCalculatorToolView: View {
                 if op.target != "a" { NativeInputField(title: op.aLabel, text: binding(for: "a")) }
                 if op.target != "b" { NativeInputField(title: op.bLabel, text: binding(for: "b")) }
                 if op.target != "c" { NativeInputField(title: op.cLabel, text: binding(for: "c")) }
-                NativeActionRow(output: output, run: {
+                NativeActionRow(output: output, completion: { error == nil }, run: {
                     do {
                         let numericValues = values.compactMapValues { Double($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
                         let result = try NativeExpansionCalculatorEngine.run(op, values: numericValues)
@@ -6617,7 +6617,7 @@ private struct NativeMathExerciseToolView: View {
             VStack(alignment: .leading, spacing: 12) {
                 enVCharacterSpacedText(op.formula).font(.subheadline.weight(.semibold))
                 ForEach(op.fields, id: \.name) { field in NativeInputField(title: field.label, text: binding(for: field.name)) }
-                NativeActionRow(output: output, run: {
+                NativeActionRow(output: output, completion: { error == nil }, run: {
                     do {
                         let rows = try NativeMathExerciseEngine.run(op, values: values)
                         output = rows.map { "\($0.label): \($0.value)\($0.hint.map { " \($0)" } ?? "")" }.joined(separator: "\n"); error = nil
@@ -6686,12 +6686,21 @@ private final class NativeToolExecutionTracker {
 private struct NativeActionRow: View {
     @Environment(\.nativeToolExecutionTracker) private var executionTracker
     let output: String
+    // Synchronous tools report completion directly so identical repeated output
+    // still produces a result event. Async tools omit this and finish from output/error.
+    var completion: (() -> Bool)? = nil
     let run: () -> Void
     let reset: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
-            Button("Run") { executionTracker?.start(); run() }.buttonStyle(.borderedProminent)
+            Button("Run") {
+                executionTracker?.start()
+                run()
+                if let completion {
+                    executionTracker?.finish(success: completion())
+                }
+            }.buttonStyle(.borderedProminent)
             Button("Reset", action: reset).buttonStyle(.bordered)
             Button { UIPasteboard.general.string = output } label: {
                 HStack(spacing: 6) { EnVIcon(name: "Copy", size: 14, tint: .envAccent); enVCharacterSpacedText("Copy") }
@@ -6754,7 +6763,7 @@ struct NativeCodecToolView: View {
                 enVCharacterSpacedText("Input").font(.subheadline.weight(.semibold))
                 TextEditor(text: $input).frame(minHeight: 130).overlay(RoundedRectangle(cornerRadius: 10).stroke(.secondary.opacity(0.25)))
             }
-            NativeActionRow(output: output, run: run, reset: reset)
+            NativeActionRow(output: output, completion: { error == nil }, run: run, reset: reset)
             NativeOutputView(output: output, error: error)
         }
     }
@@ -6797,7 +6806,7 @@ struct NativeColorToolView: View {
                 colorSwatchRow(input, label: "Color")
                 ColorPicker("Adjust preview", selection: Binding(get: { color(for: input) }, set: { input = hex(for: $0) }))
             }
-            NativeActionRow(output: output, run: run, reset: reset)
+            NativeActionRow(output: output, completion: { error == nil }, run: run, reset: reset)
             NativeOutputView(output: output, error: error)
             if !palette.isEmpty {
                 enVCharacterSpacedText("Palette swatches · tap to apply").font(.subheadline).foregroundStyle(.secondary)
@@ -6882,7 +6891,7 @@ struct NativeDateTimeToolView: View {
                 TextField(label(for: key), text: Binding(get: { values[key, default: defaultValue(for: key)] }, set: { values[key] = $0 }))
                     .textFieldStyle(.roundedBorder)
             }
-            NativeActionRow(output: output, run: run, reset: reset)
+            NativeActionRow(output: output, completion: { error == nil }, run: run, reset: reset)
             NativeOutputView(output: output, error: error)
         }
         .onAppear { for key in fields where values[key] == nil { values[key] = defaultValue(for: key) } }
@@ -6985,7 +6994,7 @@ struct NativeMimeToolView: View {
             TextField("File name", text: $fileName).textFieldStyle(.roundedBorder)
             TextField("Declared MIME", text: $browserMime).textFieldStyle(.roundedBorder)
             TextField("Bytes as hex (e.g. 89 50 4e 47)", text: $bytesHex).textFieldStyle(.roundedBorder)
-            NativeActionRow(output: output, run: run, reset: reset)
+            NativeActionRow(output: output, completion: { error == nil }, run: run, reset: reset)
             NativeOutputView(output: output, error: error)
         }
         .fileImporter(isPresented: $showingFileImporter, allowedContentTypes: [.item], allowsMultipleSelection: false, onCompletion: importFile)
@@ -7681,7 +7690,7 @@ private struct NativeBarcodeToolView: View {
                     Picker(field.title,selection:binding(field.key)) { ForEach(field.options,id:\.self) { option in Text(option).tag(option) } }.pickerStyle(.menu)
                 }
             }
-            NativeActionRow(output: output, run: {
+            NativeActionRow(output: output, completion: { error == nil }, run: {
                 do {
                     let result=try NativeBarcodeEngine.execute(toolID:tool.id,values:values)
                     output=result.text; images=result.images; exportText=result.exportText; exportName=result.exportName ?? "env-code"
@@ -9074,7 +9083,7 @@ private struct NativeBusinessToolView: View {
                 }
             }
             Button("Load example") { loadBusinessExample() }.buttonStyle(.bordered)
-            NativeActionRow(output: output, run: { runBusiness() }, reset: { a="1000"; b="600"; c="50"; d="0"; e="12"; monthlyContribution="0"; targetProfit="0"; lineItemRows=[NativeBusinessLineItemDraft()]; localLogoData=nil; businessName="Your Business"; clientName="Client"; documentNumber="DOC-001"; documentDate=Date().formatted(date: .numeric, time: .omitted); currency="USD"; taxPercent="0"; discountPercent="0"; seed="technology"; audience="customers"; agendaItems="Welcome and objectives | 5\nProgress updates | 10\nDecisions and blockers | 15\nActions and next steps | 5"; signatureName="Alex Morgan"; signatureRole="Founder"; signatureEmail="hello@example.com"; signaturePhone=""; signatureWebsite=""; signatureSocialLink=""; namingStyle="descriptive"; maxNameLength="32"; nameBlacklist=""; generationOffset=0; ltvModel="simple"; grossMarginPct="80"; monthlyChurnPct="5"; meetingTitle="Weekly planning"; meetingDateTime=""; meetingLocation=""; meetingGoal="Weekly planning"; attendees="Team"; prepNotes=""; discussionNotes=""; decisions=""; actionItems=""; nextMeeting=""; payPeriod=""; output=""; error=nil })
+            NativeActionRow(output: output, completion: { error == nil }, run: { runBusiness() }, reset: { a="1000"; b="600"; c="50"; d="0"; e="12"; monthlyContribution="0"; targetProfit="0"; lineItemRows=[NativeBusinessLineItemDraft()]; localLogoData=nil; businessName="Your Business"; clientName="Client"; documentNumber="DOC-001"; documentDate=Date().formatted(date: .numeric, time: .omitted); currency="USD"; taxPercent="0"; discountPercent="0"; seed="technology"; audience="customers"; agendaItems="Welcome and objectives | 5\nProgress updates | 10\nDecisions and blockers | 15\nActions and next steps | 5"; signatureName="Alex Morgan"; signatureRole="Founder"; signatureEmail="hello@example.com"; signaturePhone=""; signatureWebsite=""; signatureSocialLink=""; namingStyle="descriptive"; maxNameLength="32"; nameBlacklist=""; generationOffset=0; ltvModel="simple"; grossMarginPct="80"; monthlyChurnPct="5"; meetingTitle="Weekly planning"; meetingDateTime=""; meetingLocation=""; meetingGoal="Weekly planning"; attendees="Team"; prepNotes=""; discussionNotes=""; decisions=""; actionItems=""; nextMeeting=""; payPeriod=""; output=""; error=nil })
             NativeOutputView(output: output, error: error)
             if !output.isEmpty {
                 Button("Download PDF") { pdfData = NativeBusinessPDFRenderer.render(output, title: studioModeTitle, logoData: localLogoData); exportingPDF = true }.buttonStyle(.borderedProminent)
