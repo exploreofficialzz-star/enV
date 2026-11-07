@@ -14,6 +14,9 @@ struct NativeArchiveToolDestinationView: View {
             }
         }
         .task(id: tool.id) {
+            // Standard tools are recorded by ToolDetailView. These three destinations
+            // bypass that shared detail view and must record their own visit here.
+            guard ["zip-any-file", "the-world-lab", "ux-ui-studio"].contains(tool.id) else { return }
             NativeAnalyticsClient.record("tool_viewed", toolID: tool.id)
             try? await NativeAnalyticsClient.flush()
         }
