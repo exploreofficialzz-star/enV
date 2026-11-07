@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Accessibility, Layers3, Palette, Search, Shapes, Sparkles, WandSparkles, X } from "lucide-react";
+import { Accessibility, Layers3, Palette, Search, Shapes, Smartphone, Sparkles, WandSparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ToolCard } from "@/components/tools/tool-card";
@@ -46,6 +46,14 @@ const GROUPS = [
     description: "Check contrast and explore how color combinations can be perceived.",
     icon: Accessibility,
     ids: ["contrast-checker", "wcag-checker", "color-blindness-simulator"],
+  },
+  {
+    id: "hardware",
+    label: "Product engineering",
+    title: "Product engineering",
+    description: "Explore physical devices, component systems and assembly concepts in 3D.",
+    icon: Smartphone,
+    ids: ["smartphone-prototype-lab"],
   },
 ] as const;
 

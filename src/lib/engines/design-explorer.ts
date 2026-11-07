@@ -1,6 +1,6 @@
 import type { EngineRef } from "../../types/tool.ts";
 
-export type DesignExplorerGroupId = "color" | "effects" | "components" | "shapes" | "accessibility";
+export type DesignExplorerGroupId = "color" | "effects" | "components" | "shapes" | "accessibility" | "hardware";
 
 const CSS_FAMILY_GROUP: Record<string, DesignExplorerGroupId> = {
   gradient: "effects",

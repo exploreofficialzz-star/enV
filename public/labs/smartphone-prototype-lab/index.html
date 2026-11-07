@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0a0b0e">
+  <title>Smartphone Prototype Lab | enV</title>
+  <script>if(new URLSearchParams(location.search).get("embedded")==="1")document.documentElement.classList.add("embedded");</script>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">e</span><div><b>enV / PRODUCTION LAB</b><small>SMARTPHONE ANATOMY · 3D ENGINEERING</small></div></div>
+    <div class="device-title"><span class="live-dot"></span><span>Generic smartphone reference design</span><span class="tag">MODEL-VARIANT AWARE</span></div>
+    <div class="top-actions"><button id="resetView" class="icon-btn" title="Reset view" aria-label="Reset view">↺</button><button id="fullscreen" class="icon-btn" title="Full screen" aria-label="Full screen">⛶</button></div>
+  </header>
+  <main class="workspace">
+    <section class="stage-column">
+      <div class="stage-head">
+        <div><div class="eyebrow">PRODUCT ENGINEERING / DIGITAL TWIN STUDY</div><h1>Smartphone Prototype Lab</h1><p>Explore a modern phone from materials and component packages to complete assemblies, then follow its manufacturing sequence.</p></div>
+        <div class="stage-badges"><span class="badge badge-green">3D interactive</span><span class="badge">Representative engineering model</span></div>
+      </div>
+      <div class="spec-row"><span>OLED or LCD display architecture</span><span>SoC + LPDDR RAM + flash storage</span><span>Rechargeable battery pack</span><span>Cellular · Wi-Fi · Bluetooth · GNSS</span></div>
+      <div class="viewport-wrap" id="viewportWrap">
+        <canvas id="renderCanvas" aria-label="Interactive 3D generic smartphone production model"></canvas>
+        <div class="viewport-top-left"><span class="view-label" id="viewLabel">FULL DEVICE · EXPLODED</span><span class="hint">DRAG TO ROTATE · SCROLL TO ZOOM · SELECT A PART TO INSPECT</span></div>
+        <div class="viewport-bottom-left"><span class="axis-pill">X <i></i></span><span class="axis-pill">Y <i></i></span><span class="axis-pill">Z <i></i></span></div>
+        <div class="viewport-bottom-right"><span class="engine-status"><i></i> BABYLON ENGINE</span></div>
+        <div class="loading" id="loading"><div class="spinner"></div><span>Building the digital twin…</span></div>
+      </div>
+      <div class="controls-row">
+        <div class="explode-control"><label for="explodeRange">EXPLODE DISTANCE <b id="explodeValue">68%</b></label><input id="explodeRange" type="range" min="0" max="100" value="68"></div>
+        <div class="control-buttons"><button class="btn" id="assembleBtn">Assemble</button><button class="btn btn-primary" id="explodeBtn">Explode</button><button class="btn btn-play" id="playBuild">▶ Factory build</button></div>
+      </div>
+      <div class="view-tabs" role="tablist" aria-label="Inspection views">
+        <button class="view-tab active" data-view="all">Whole phone</button><button class="view-tab" data-view="display">Display stack</button><button class="view-tab" data-view="board">Motherboard</button><button class="view-tab" data-view="camera">Camera system</button><button class="view-tab" data-view="power">Power &amp; cooling</button><button class="view-tab" data-view="materials">Materials</button>
+      </div>
+      <div class="display-architecture" id="displayArchitectureControls">
+        <div><div class="eyebrow">DISPLAY ARCHITECTURE</div><span id="displayArchitectureLabel">OLED stack selected</span></div>
+        <div class="display-mode-buttons"><button class="display-mode active" data-display-mode="oled"><b>OLED</b><small id="displayArchOled">Selected</small></button><button class="display-mode" data-display-mode="lcd"><b>LCD</b><small id="displayArchLcd">Choose LCD</small></button></div>
+      </div>
+      <section class="production-strip">
+        <div class="strip-head"><div><div class="eyebrow">MANUFACTURING FLOW</div><b id="flowTitle">01 / Raw materials &amp; component fabrication</b></div><span id="flowCounter">01 of 08</span></div>
+        <div class="flow-track" id="flowTrack">
+          <button class="flow-step active" data-stage="0"><i>01</i><span>Materials</span></button><button class="flow-step" data-stage="1"><i>02</i><span>Frame</span></button><button class="flow-step" data-stage="2"><i>03</i><span>Display</span></button><button class="flow-step" data-stage="3"><i>04</i><span>PCB / chips</span></button><button class="flow-step" data-stage="4"><i>05</i><span>Camera</span></button><button class="flow-step" data-stage="5"><i>06</i><span>Power / RF</span></button><button class="flow-step" data-stage="6"><i>07</i><span>Integration</span></button><button class="flow-step" data-stage="7"><i>08</i><span>Quality / test</span></button>
+        </div>
+        <div class="flow-description" id="flowDescription">Raw materials become display glass, frame stock, copper foil, polymers, battery materials, silicon wafers and electronic components. Supplier processes vary by material.</div>
+      </section>
+    </section>
+    <aside class="inspector-column">
+      <section class="inspector-card selected-card">
+        <div class="card-head"><div><div class="eyebrow">COMPONENT INSPECTOR</div><h2 id="partName">Main chassis frame</h2></div><span class="part-index" id="partIndex">01</span></div>
+        <div class="part-meta"><span id="partCategory">STRUCTURE</span><span id="partEvidence" class="evidence verified">COMMON PHONE ELEMENT</span></div>
+        <p id="partDescription">The structural carrier locates the display, boards, battery, camera system and external enclosure.</p>
+        <div class="detail-grid"><div><small>FUNCTION</small><b id="partFunction">Mechanical alignment</b></div><div><small>BUILD LEVEL</small><b id="partLevel">Subassembly</b></div><div><small>WHAT IT CONNECTS</small><b id="partConnects">Display, boards, battery</b></div><div><small>MODEL BASIS</small><b id="partBasis">Generic reference phone form factor</b></div></div>
+        <button class="text-action" id="focusPart">⊕ Focus selected component</button>
+      </section>
+      <section class="inspector-card parts-card">
+        <div class="card-head"><div><div class="eyebrow">ASSEMBLY TREE</div><h2>Smartphone components</h2></div><span class="count-pill" id="partCount">component groups</span></div>
+        <div class="search-wrap"><span>⌕</span><input id="partSearch" type="search" placeholder="Find a component…" autocomplete="off"></div>
+        <div class="part-list" id="partList"></div>
+      </section>
+      <section class="inspector-card notes-card">
+        <div class="eyebrow">ENGINEERING NOTE</div>
+        <p id="engineeringNote">The model shows a phone as an assembly of functional systems. Select any system to inspect its role and its relationship to the rest of the device.</p>
+        <div class="evidence-legend"><span><i class="legend-dot green"></i>Common phone technology</span><span><i class="legend-dot amber"></i>Illustrative / optional detail</span></div>
+      </section>
+    </aside>
+  </main>
+  <footer class="footer"><div><b>enV PRODUCTION LAB</b><span>Interactive engineering study · not an official manufacturer CAD model</span></div><div class="footer-right"><span>GENERIC SMARTPHONE</span><span>EDUCATIONAL 3D GEOMETRY</span><span>BUILD / 1.0</span></div></footer>
+</div>
+<script src="app-loader.js" defer></script>
+</body>
+</html>

@@ -82,9 +82,11 @@ const tests = read("src/lib/engines/accessibility-color.test.ts");
 const dispatcher = read("src/components/tools/tool-engine.tsx");
 const explorerGroupIds = [...explorer.matchAll(/ids:\s*\[([^\]]+)\]/g)]
   .flatMap((match) => [...match[1].matchAll(/"([^"]+)"/g)].map((item) => item[1]));
+const curatedRuntimeToolIds = new Set(["smartphone-prototype-lab"]);
+const expectedExplorerIds = new Set([...expectedIds, ...curatedRuntimeToolIds]);
 const missingExplorerIds = expectedIds.filter((id) => !explorerGroupIds.includes(id));
 const duplicateExplorerIds = explorerGroupIds.filter((id, index) => explorerGroupIds.indexOf(id) !== index);
-const unexpectedExplorerIds = explorerGroupIds.filter((id) => !expectedIds.includes(id));
+const unexpectedExplorerIds = explorerGroupIds.filter((id) => !expectedExplorerIds.has(id));
 const generatedFamilyGroups = {
   gradient: "effects", shadow: "effects", border: "effects", glass: "effects", neomorph: "effects", noise: "effects",
   button: "components", card: "components", badge: "components", input: "components", avatar: "components",
@@ -99,8 +101,9 @@ const unmappedGeneratedDesignTools = generatedDesignTools.filter((tool) => {
 const checks = [
   ["Design tools are isolated from Calculators and other categories", misplacedDesignTools.length === 0],
   ["Design category search", explorer.includes("Search design tools")],
-  ["Design category filter groups", ["Color & palettes", "Gradients & effects", "SVG & backgrounds", "Accessibility"].every((label) => explorer.includes(label))],
-  ["Every core Design tool appears in exactly one explorer group", missingExplorerIds.length === 0 && duplicateExplorerIds.length === 0 && unexpectedExplorerIds.length === 0 && explorerGroupIds.length === expectedIds.length],
+  ["Smartphone Prototype Lab is registered and grouped as a curated runtime Design tool", registrySource.includes('id: "smartphone-prototype-lab"') && registrySource.includes('engine: { type: "custom", id: "smartphone-prototype-lab" }') && explorer.includes('ids: ["smartphone-prototype-lab"]') && dispatcher.includes('tool.id === "smartphone-prototype-lab"')],
+  ["Design category filter groups", ["Color & palettes", "Gradients & effects", "SVG & backgrounds", "Accessibility", "Product engineering"].every((label) => explorer.includes(label))],
+  ["Every curated Design tool appears in exactly one explorer group", missingExplorerIds.length === 0 && duplicateExplorerIds.length === 0 && unexpectedExplorerIds.length === 0 && explorerGroupIds.length === expectedExplorerIds.size],
   ["Generated Design workflow families are mapped into visible groups", designCatalogGenerator.includes('addCross("design"') && ["gradient", "shadow", "border", "glass", "neomorph", "noise", "button", "card", "badge", "input", "avatar", "pattern", "blob", "wave"].every((family) => explorerUtils.includes(family + ":")) && explorerUtils.includes('engine.type === "color"') && explorerUtilsTests.includes("every generated Design CSS family maps to one visible explorer group")],
   ["Generated tools participate in explorer filtering and result counts", explorer.includes("getGeneratedDesignTools(tools, CORE_TOOL_IDS, group.id)") && explorerUtils.includes("getGeneratedDesignTools") && explorerUtilsTests.includes("generated utilities are grouped once") && explorer.includes("uniqueTools.filter((tool) => !normalizedQuery")],
   ["Every generated Design catalog entry maps into a visible explorer group", generatedDesignTools.length === design.length - coreDesignCatalogIds.length && unmappedGeneratedDesignTools.length === 0],
