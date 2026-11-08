@@ -55,7 +55,7 @@ A daily Vercel cron calls `GET /api/analytics/retention` at 03:00 UTC with `Auth
 1. Publish and legally review the privacy notice for actual purposes, lawful basis, retention and international processing.
 2. Verify opt-in, denial, withdrawal and deletion flows on Web, Android and iOS.
 3. Configure separate preview and production secrets.
-4. Verify the target PostgreSQL database and a restorable backup, then apply the reviewed migration sequence through the explicit `npm run db:migrate` release operation; include `0018_analytics_dashboard_sessions.sql`.
+4. Verify the target PostgreSQL database and a restorable backup, then apply the reviewed migration sequence through the explicit `npm run db:migrate` release operation; confirm analytics migrations `0008_product_analytics.sql`, `0012_analytics_dashboard_security.sql`, `0013_analytics_daily_snapshots.sql`, `0016_analytics_feedback_rls.sql`, `0017_analytics_daily_reports.sql` and `0018_analytics_dashboard_sessions.sql` are all applied.
 5. Verify `product_analytics_dashboard_sessions` has RLS enabled and no client-facing policies.
 6. Test ingestion, consent denial, withdrawal racing with event ingestion, copied-cookie rejection after sign-out, rate limiting, admin authorization and retention against staging PostgreSQL.
 7. Protect the private dashboard with its application login and a host-only identity boundary where available without blocking public product hosts.
