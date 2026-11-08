@@ -1128,6 +1128,10 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
     private var writerSessionStarted = false
     private var recordingRequested = false
     private var recordingCompletion: ((URL?, String?) -> Void)?
+    private var sessionObservers: [NSObjectProtocol] = []
+    // These lifecycle flags are read and written only on the serial capture queue.
+    private var stopRequested = false
+    private var resumeAfterFinalization = false
 
     private let outputWidth = 720
     private let outputHeight = 1280
@@ -1147,8 +1151,11 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
             return
         }
 
+        installSessionObservers()
         queue.async { [weak self] in
             guard let self else { return }
+            self.stopRequested = false
+            self.resumeAfterFinalization = false
             do {
                 try self.configureSession()
                 guard self.session.hardwareCost <= 1.0 else {
@@ -1174,6 +1181,112 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
                 }
             }
         }
+    }
+
+    private func installSessionObservers() {
+        guard sessionObservers.isEmpty else { return }
+        let center = NotificationCenter.default
+        sessionObservers.append(center.addObserver(
+            forName: .AVCaptureSessionWasInterrupted,
+            object: session,
+            queue: .main
+        ) { [weak self] notification in
+            let reason = notification.userInfo?[AVCaptureSessionInterruptionReasonKey] as? Int
+            guard let self else { return }
+            self.queue.async {
+                guard !self.stopRequested else { return }
+                let wasRecording = self.recordingRequested
+                Task { @MainActor in
+                    self.ready = false
+                    self.message = reason.map { "Both cameras were interrupted by the system (reason \\($0))." }
+                        ?? "Both cameras were interrupted by the system."
+                    if wasRecording {
+                        self.error = "Dual-camera recording was interrupted. Finalizing the saved portion where possible."
+                    }
+                }
+                if self.recordingRequested {
+                    self.finishRecordingLocked(stopSession: false, stopCompletion: nil)
+                }
+            }
+        })
+        sessionObservers.append(center.addObserver(
+            forName: .AVCaptureSessionInterruptionEnded,
+            object: session,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            self.queue.async {
+                guard !self.stopRequested else { return }
+                if self.recordingRequested {
+                    self.resumeAfterFinalization = true
+                    self.finishRecordingLocked(stopSession: false, stopCompletion: nil)
+                } else if self.writer != nil {
+                    // The current clip is still being finalized; resume from its completion.
+                    self.resumeAfterFinalization = true
+                } else {
+                    self.restartSessionLocked()
+                }
+            }
+        })
+        sessionObservers.append(center.addObserver(
+            forName: .AVCaptureSessionRuntimeError,
+            object: session,
+            queue: .main
+        ) { [weak self] notification in
+            let captureError = notification.userInfo?[AVCaptureSessionErrorKey] as? AVError
+            guard let self else { return }
+            self.queue.async {
+                guard !self.stopRequested else { return }
+                Task { @MainActor in
+                    self.ready = false
+                    self.error = captureError?.localizedDescription
+                        ?? "The dual-camera session stopped unexpectedly. Return to the normal camera and try again."
+                }
+                if self.recordingRequested {
+                    self.finishRecordingLocked(stopSession: false, stopCompletion: nil)
+                }
+                if captureError?.code == .mediaServicesWereReset {
+                    self.resetSessionAfterFailure()
+                    if self.writer != nil {
+                        self.resumeAfterFinalization = true
+                    } else {
+                        self.restartSessionLocked()
+                    }
+                }
+            }
+        })
+    }
+
+    private func restartSessionLocked() {
+        guard !stopRequested, !recordingRequested, writer == nil else { return }
+        do {
+            try configureSession()
+            guard session.hardwareCost <= 1.0 else {
+                throw NativeCameraError.message("This device cannot safely restart both cameras after the interruption.")
+            }
+            guard session.systemPressureCost <= 1.0 else {
+                throw NativeCameraError.message("The camera system is still under too much pressure to restart dual-camera mode.")
+            }
+            if !session.isRunning { session.startRunning() }
+            let isRunning = session.isRunning
+            Task { @MainActor in
+                self.ready = isRunning
+                self.error = isRunning ? nil : "The dual-camera session could not restart. Use the normal camera instead."
+                self.message = isRunning
+                    ? "Both cameras are ready again."
+                    : "Your normal single-camera mode remains available."
+            }
+        } catch {
+            Task { @MainActor in
+                self.ready = false
+                self.error = error.localizedDescription
+                self.message = "Your normal single-camera mode remains available."
+            }
+        }
+    }
+
+    deinit {
+        sessionObservers.forEach(NotificationCenter.default.removeObserver)
     }
 
     private func configureSession() throws {
@@ -1444,6 +1557,8 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
     func stop(completion: (() -> Void)? = nil) {
         queue.async { [weak self] in
             guard let self else { return }
+            self.stopRequested = true
+            self.resumeAfterFinalization = false
             if self.recordingRequested {
                 self.finishRecordingLocked(stopSession: true, stopCompletion: completion)
             } else {
@@ -1478,6 +1593,10 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
             let callback = recordingCompletion
             recordingCompletion = nil
             clearWriterState()
+            if resumeAfterFinalization && !stopRequested && !stopSession {
+                resumeAfterFinalization = false
+                restartSessionLocked()
+            }
             Task { @MainActor in
                 self.recording = false
                 callback?(nil, "No synchronized front and rear frames were received.")
@@ -1497,14 +1616,19 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
             let completedURL = writer.status == .completed ? writer.outputURL : nil
             let failure = writer.error?.localizedDescription ?? "The combined video could not be finalized."
             if completedURL == nil { try? FileManager.default.removeItem(at: writer.outputURL) }
-            if stopSession, self.session.isRunning { self.session.stopRunning() }
-            self.clearWriterState()
-            Task { @MainActor in
-                self.recording = false
-                callback?(completedURL, completedURL == nil ? failure : nil)
-                if stopSession {
-                    self.ready = false
-                    stopCompletion?()
+            self.queue.async {
+                if stopSession, self.session.isRunning { self.session.stopRunning() }
+                self.clearWriterState()
+                let shouldResume = self.resumeAfterFinalization && !self.stopRequested && !stopSession
+                self.resumeAfterFinalization = false
+                if shouldResume { self.restartSessionLocked() }
+                Task { @MainActor in
+                    self.recording = false
+                    callback?(completedURL, completedURL == nil ? failure : nil)
+                    if stopSession {
+                        self.ready = false
+                        stopCompletion?()
+                    }
                 }
             }
         }
