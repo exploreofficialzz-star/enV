@@ -643,7 +643,7 @@ fun NativeCameraStudioScreen() {
         manualExposureEnabled = false
         manualFocusLocked = false
         selectedWhiteBalance = CaptureRequest.CONTROL_AWB_MODE_AUTO
-        videoStabilizationEnabled = false
+        videoStabilizationEnabled = videoStabilizationModes.contains(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_ON)
         controller.setTapToFocusEnabled(true)
         applyAdvancedCameraSettings()
     }
