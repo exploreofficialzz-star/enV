@@ -45,7 +45,7 @@ test("hybrid offline policy only applies to explicitly selected cross-platform m
   assert.equal(isHybridAdSupportedToolId("json-formatter", goodEnvironment), false);
   assert.equal(isHybridAdSupportedToolId("average-speed-calculator", { ...goodEnvironment, enabled: "false" }), false);
   assert.equal(isHybridAdSupportedToolId("average-speed-calculator", { ...goodEnvironment, privacyConfigured: "false" }), false);
-  assert.equal(isHybridAdSupportedToolId("average-speed-calculator", { ...goodEnvironment, slotId: "" }), false);
+  assert.equal(isHybridAdSupportedToolId("average-speed-calculator", { ...goodEnvironment, toolSlotId: "" }), false);
 });
 
 test("only explicitly selected, active, public device-local tools can show an ad", () => {
