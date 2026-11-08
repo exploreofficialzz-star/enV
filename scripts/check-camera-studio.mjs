@@ -82,6 +82,12 @@ assert.match(iosCamera, /preferredVideoStabilizationMode = enabled \? \.auto : \
 const iosDualCameraStabilization = iosCamera.slice(iosCamera.indexOf("private final class NativeDualCameraCapture"));
 assert.match(iosDualCameraStabilization, /connection\.isVideoStabilizationSupported/);
 assert.match(iosDualCameraStabilization, /preferredVideoStabilizationMode = \.auto/);
+const iosDualPreviewConnections = iosDualCameraStabilization.slice(
+  iosDualCameraStabilization.indexOf("func connectPreviewLayers"),
+  iosDualCameraStabilization.indexOf("func startRecording")
+);
+assert.match(iosDualPreviewConnections, /backConnection\.isVideoStabilizationSupported/);
+assert.match(iosDualPreviewConnections, /frontConnection\.isVideoStabilizationSupported/);
 assert.match(iosCamera, /preferredVideoStabilizationMode = \.auto/);
 assert.match(iosCamera, /"Video stabilization"/);
 assert.ok(iosCamera.includes("AVCaptureMultiCamSession"));
