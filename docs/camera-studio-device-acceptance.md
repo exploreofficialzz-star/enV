@@ -62,7 +62,7 @@ A result without this evidence remains NOT RUN.
 - iOS `AVCaptureMultiCamSession` front/rear capture with capability, hardware-cost and system-pressure checks.
 - Android CameraX/Media3 color processing for preview, photo and video outputs.
 - iOS Core Image frame processing shared by preview and the `AVAssetWriter` export path.
-- Android Camera2 video stabilization toggle, exposed only when the active camera reports `CONTROL_VIDEO_STABILIZATION_MODE_ON`; disabled automatically when unsupported and limited to video mode. Concurrent front/rear mode requests stabilization independently for each supported feed.
+- Android Camera2 video stabilization defaults on when the active camera reports `CONTROL_VIDEO_STABILIZATION_MODE_ON`, remains user-toggleable, resets to the supported default, and is hidden when unsupported. It is limited to video mode. Concurrent front/rear mode requests stabilization independently for each supported feed.
 - iOS AVFoundation video stabilization, using `.auto` only when the active video connection reports support; dual-camera video connections request `.auto` independently when supported.
 - Android Camera2-interoperability manual sensor ISO/shutter, supported white-balance modes, focus lock/focus distance, and rear-lens selection, shown only when reported by the active camera.
 - iOS manual ISO/shutter, white-balance presets, focus lock and optical-lens selection, shown only where the active device supports them.
