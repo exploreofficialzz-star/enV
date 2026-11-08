@@ -64,6 +64,8 @@ assert.doesNotMatch(iosProject, /,,/, "The iOS project file must remain syntacti
 assert.match(iosProject, /NativeAds\.swift in Sources/, "The iOS native ad implementation must be part of the app target.");
 assert.match(iosAds, /ConsentInformation\.shared\.requestConsentInfoUpdate/, "iOS must refresh UMP consent at launch.");
 assert.match(iosAds, /MobileAds\.shared\.start/, "iOS must initialize Google Mobile Ads after consent.");
+assert.match(iosAds, /publisherPrivacyPersonalizationState = \.disabled/, "iOS ad requests must default to non-personalized treatment.");
+assert.match(iosAds, /coarseLocationCollectionEnabled = false/, "iOS ads must not collect coarse device location by default.");
 assert.match(iosAds, /originReachable = await NativeAdsPolicy\.isApplicationOnline\(\)/, "iOS ad display must verify that the application origin is reachable.");
 assert.match(iosAds, /BannerView\(adSize:/, "iOS must render a native adaptive banner view.");
 assert.match(iosAds, /privacyOptionsRequired/, "iOS must expose the UMP privacy-options requirement.");
