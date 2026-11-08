@@ -18,7 +18,7 @@ The selected-tool allowlist is also the offline-access boundary and is evaluated
 
 The following are not supplied by this repository and must not be fabricated:
 
-- the approved AdSense site / publisher account and responsive display unit;
+- Google's final AdSense site approval and production serving eligibility;
 - the production AdMob Android and iOS app IDs and banner unit IDs;
 - the account's certified Google consent messages / CMP configuration;
 - the exact authorized-seller line for `ads.txt`;
@@ -26,19 +26,19 @@ The following are not supplied by this repository and must not be fabricated:
 
 ## Web / AdSense configuration
 
-The publisher supplied the AdSense site-verification client ID `ca-pub-2492078126313994`. The shared document head exposes it using Google’s supported `<meta name="google-adsense-account" content="ca-pub-2492078126313994">` verification method. The AdSense JavaScript library is loaded only after an eligible tool slot mounts, after its CMP callback has been registered, so the global script cannot mutate the page before React hydration.
+The publisher supplied the AdSense publisher client ID `ca-pub-2492078126313994` and responsive display slot `5033935799` (`enV Responsive Tools`). Site ownership has been verified in AdSense and the site review has been requested. The shared document head exposes the client ID using Google’s supported `<meta name="google-adsense-account" content="ca-pub-2492078126313994">` verification method. The AdSense JavaScript library is loaded only after an eligible tool slot mounts, after its CMP callback has been registered, so the global script cannot mutate the page before React hydration.
 
-The verification meta tag is **not** a display ad unit and does not provide a `data-ad-slot` ID. Actual tool placements remain disabled unless the separate Vercel configuration below is complete and the site is approved. Keep AdSense Auto ads disabled: Auto ads can bypass the enV selected-tool placement allowlist.
+The production Vercel project `env` has `VITE_ADSENSE_CLIENT_ID=ca-pub-2492078126313994` and `VITE_ADSENSE_TOOL_SLOT_ID=5033935799` configured. Serving remains explicitly disabled with `VITE_ADS_ENABLED=false` and `VITE_ADSENSE_PRIVACY_CONFIGURED=false`; the reviewed cross-platform tool allowlist is not yet configured. Keep AdSense Auto ads disabled: Auto ads can bypass the enV selected-tool placement allowlist.
 
 Set these Vercel environment variables only for the production deployment after the provider and privacy configuration are ready:
 
 | Variable | Required value |
 |---|---|
-| `VITE_ADS_ENABLED` | `true` |
-| `VITE_ADSENSE_CLIENT_ID` | Actual `ca-pub-...` publisher client ID |
-| `VITE_ADSENSE_TOOL_SLOT_ID` | Actual numeric display-ad slot ID |
-| `VITE_AD_SUPPORTED_TOOL_IDS` | Comma-separated IDs reviewed against the local/cross-platform registry |
-| `VITE_ADSENSE_PRIVACY_CONFIGURED` | `true` only after the Google-certified CMP / Privacy & Messaging configuration has been tested |
+| `VITE_ADS_ENABLED` | `false` until AdSense approval, CMP validation, and release checks are complete; production currently remains `false` |
+| `VITE_ADSENSE_CLIENT_ID` | `ca-pub-2492078126313994` (configured for production) |
+| `VITE_ADSENSE_TOOL_SLOT_ID` | `5033935799` (configured for production) |
+| `VITE_AD_SUPPORTED_TOOL_IDS` | Not configured; set only to reviewed IDs in the canonical local/cross-platform registry |
+| `VITE_ADSENSE_PRIVACY_CONFIGURED` | `false` until the published Google Privacy & Messaging / certified CMP configuration has been tested; production currently remains `false` |
 
 The Web component requests non-personalized ads. That is not equivalent to “no cookies” or “no identifiers”; the disclosure explains that the provider can process request context and technical identifiers for delivery, fraud prevention, frequency capping, and reporting. Analytics consent and advertising consent are separate controls. When Google's Privacy & Messaging API is ready, the enV Privacy page exposes Google's documented consent-revocation entry point.
 
@@ -88,7 +88,13 @@ Offline access is not “anonymous free use”: the selected tools reject execut
 
 ## Ads.txt and release verification
 
-After AdSense supplies the authorized seller account record, add the exact line to the site's `/ads.txt` file. Do not guess the publisher number or seller type.
+The publisher-authorized seller record is committed at `public/ads.txt`:
+
+```text
+google.com, pub-2492078126313994, DIRECT, f08c47fec0942fa0
+```
+
+It will be publicly available at `https://envtools.store/ads.txt` after the latest `main` commit is successfully deployed. The commit is on `main`; the latest deployment is pending because Vercel rejected another deployment under the current team deployment limit.
 
 Before launch, verify:
 
