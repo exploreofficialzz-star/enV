@@ -11,6 +11,7 @@ const iosToolViews = readFileSync(new URL("../../apps/ios/enV/ToolViews.swift", 
 const iosInfo = readFileSync(new URL("../../apps/ios/enV/Info.plist", import.meta.url), "utf8");
 const iosProject = readFileSync(new URL("../../apps/ios/enV.xcodeproj/project.pbxproj", import.meta.url), "utf8");
 const androidGradle = readFileSync(new URL("../../apps/android/app/build.gradle.kts", import.meta.url), "utf8");
+const androidActivity = readFileSync(new URL("../../apps/android/app/src/main/java/com/chastech/env/MainActivity.kt", import.meta.url), "utf8");
 const envExample = readFileSync(new URL("../../.env.example", import.meta.url), "utf8");
 
 test("consent withdrawal locks the consent row before deleting events and consent", () => {
@@ -78,4 +79,11 @@ test("iOS records tool views and unfinished executions", () => {
   assert.match(iosToolViews, /"tool_abandoned"/);
   assert.match(iosToolViews, /NATIVE_TOOL_LEFT_BEFORE_RESULT/);
   assert.match(iosToolViews, /\.onDisappear \{ executionTracker\.abandon\(\) \}/);
+});
+
+test("Android records native tool executions abandoned before a result", () => {
+  assert.match(androidActivity, /DisposableEffect\(telemetry\)\s*\{\s*onDispose \{ telemetry\.abandon\(\) \}/);
+  assert.match(androidActivity, /@Synchronized fun abandon\(\)/);
+  assert.match(androidActivity, /"tool_abandoned"/);
+  assert.match(androidActivity, /NATIVE_TOOL_LEFT_BEFORE_RESULT/);
 });
