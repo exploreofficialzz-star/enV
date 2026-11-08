@@ -19,19 +19,21 @@ test("consent withdrawal locks the consent row before deleting events and consen
   const ingestionStart = server.indexOf("export async function ingestAnalyticsEvents");
   assert.ok(withdrawalStart >= 0 && ingestionStart > withdrawalStart);
   const withdrawal = server.slice(withdrawalStart, ingestionStart);
+  const advisoryLock = withdrawal.indexOf("pg_advisory_xact_lock(hashtextextended($1, 0))");
   const lock = withdrawal.indexOf("where subject_digest=$1 for update");
   const eventsDelete = withdrawal.indexOf("delete from product_analytics_events");
   const consentDelete = withdrawal.indexOf("delete from product_analytics_consents");
-  assert.ok(lock >= 0 && eventsDelete > lock && consentDelete > eventsDelete);
+  assert.ok(advisoryLock >= 0 && lock > advisoryLock && eventsDelete > lock && consentDelete > eventsDelete);
 });
 
 test("event ingestion locks current consent before inserting a batch", () => {
   const ingestionStart = server.indexOf("export async function ingestAnalyticsEvents");
   const summaryStart = server.indexOf("export async function getAnalyticsSummary");
   const ingestion = server.slice(ingestionStart, summaryStart);
+  const advisoryLock = ingestion.indexOf("pg_advisory_xact_lock(hashtextextended($1, 0))");
   const lock = ingestion.indexOf("where subject_digest=$1 and policy_version=$2 for update");
   const insert = ingestion.indexOf("insert into product_analytics_events");
-  assert.ok(lock >= 0 && insert > lock);
+  assert.ok(advisoryLock >= 0 && lock > advisoryLock && insert > lock);
 });
 
 test("browser dashboard sessions require an active server-side HMAC digest row", () => {
