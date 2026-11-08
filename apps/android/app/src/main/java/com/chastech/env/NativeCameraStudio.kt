@@ -1418,10 +1418,10 @@ private fun NativeDualCameraStudioScreen(
     LaunchedEffect(previewView) {
         val targetPreview = previewView ?: return@LaunchedEffect
         try {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R ||
-                !context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_CONCURRENT)
-            ) {
-                throw IllegalStateException("This phone does not support simultaneous front and rear camera recording.")
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+                throw IllegalStateException(
+                    "Simultaneous front + rear capture needs Android 11 or newer on the standard Android camera API. This phone can still use normal single-camera recording."
+                )
             }
 
             val cameraProvider = withContext(Dispatchers.IO) {
@@ -1445,29 +1445,59 @@ private fun NativeDualCameraStudioScreen(
                 infos.filter { Camera2CameraInfo.from(it).cameraId == frontCameraId }
             }.build()
 
-            // CameraX composition mode records both live feeds into one video file.
-            // The same Preview and VideoCapture use cases must be shared by both camera configs.
-            val preview = Preview.Builder().build().also {
-                it.setSurfaceProvider(targetPreview.surfaceProvider)
-            }
-            val recorder = Recorder.Builder()
-                .setQualitySelector(
-                    QualitySelector.from(Quality.HD, FallbackStrategy.lowerQualityOrHigherThan(Quality.SD))
-                )
-                .build()
-            val video = VideoCapture.withOutput(recorder)
-            val group = UseCaseGroup.Builder()
-                .addUseCase(preview)
-                .addUseCase(video)
-                .addEffect(cameraEffect)
-                .build()
+            // Use CameraX composition mode so both distinct camera feeds become one
+            // encoded video. Start at 720p, then retry at SD if the device cannot bind
+            // both streams at the higher quality. This is especially important on
+            // low-memory and lower-bandwidth camera/encoder combinations.
+            var bound: Triple<Preview, VideoCapture<Recorder>, ConcurrentCamera>? = null
+            var selectedQuality: Quality? = null
+            var lastBindFailure: Throwable? = null
 
-            val concurrentCamera = cameraProvider.bindToLifecycle(
-                listOf(
-                    ConcurrentCamera.SingleCameraConfig(backSelector, group, lifecycleOwner),
-                    ConcurrentCamera.SingleCameraConfig(frontSelector, group, lifecycleOwner)
-                )
+            for (quality in listOf(Quality.HD, Quality.SD)) {
+                val preview = Preview.Builder().build().also {
+                    it.setSurfaceProvider(targetPreview.surfaceProvider)
+                }
+                val recorder = Recorder.Builder()
+                    .setQualitySelector(
+                        QualitySelector.from(
+                            quality,
+                            FallbackStrategy.lowerQualityOrHigherThan(Quality.SD)
+                        )
+                    )
+                    .build()
+                val video = VideoCapture.withOutput(recorder)
+                val group = UseCaseGroup.Builder()
+                    .addUseCase(preview)
+                    .addUseCase(video)
+                    .addEffect(cameraEffect)
+                    .build()
+
+                try {
+                    val concurrent = cameraProvider.bindToLifecycle(
+                        listOf(
+                            ConcurrentCamera.SingleCameraConfig(backSelector, group, lifecycleOwner),
+                            ConcurrentCamera.SingleCameraConfig(frontSelector, group, lifecycleOwner)
+                        )
+                    )
+                    bound = Triple(preview, video, concurrent)
+                    selectedQuality = quality
+                    break
+                } catch (failure: Throwable) {
+                    lastBindFailure = failure
+                    // A failed high-quality bind can leave partial use cases attached.
+                    // Clear them before trying the lower-cost SD profile.
+                    runCatching { cameraProvider.unbindAll() }
+                }
+            }
+
+            val activeBinding = bound ?: throw IllegalStateException(
+                "This phone reports front/rear camera concurrency, but could not start both streams even at low-power SD quality. Normal single-camera recording remains available.",
+                lastBindFailure
             )
+            val preview = activeBinding.first
+            val video = activeBinding.second
+            val concurrentCamera = activeBinding.third
+            val qualityLabel = if (selectedQuality == Quality.SD) "low-power SD" else "HD"
             // Request hardware video stabilization independently for each stream when
             // that camera advertises support. Unsupported cameras continue normally.
             concurrentCamera.cameras.forEach { activeCamera ->
@@ -1497,7 +1527,7 @@ private fun NativeDualCameraStudioScreen(
             previewUseCase = preview
             videoCapture = video
             cameraReady = true
-            localStatus = "Both cameras are live. Video quality is automatically limited to a supported dual-camera mode."
+            localStatus = "Both cameras are live in $qualityLabel mode. If recording becomes unstable, use the normal camera or lower the device load."
             localError = null
         } catch (failure: Throwable) {
             cameraReady = false
