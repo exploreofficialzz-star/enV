@@ -90,8 +90,7 @@ internal object NativeAdsPolicy {
     fun isHybridTool(context: Context, tool: ToolRecord): Boolean {
         val restrictedDisclaimers = setOf("health", "finance", "earnings")
         val restrictedCategories = setOf("fitness", "personal")
-        return adDisplayConfigured &&
-            tool.id in allowlistedIds &&
+        return tool.id in allowlistedIds &&
             tool.id in crossPlatformMeteredIds(context) &&
             tool.status == "active" &&
             tool.clientSide &&
