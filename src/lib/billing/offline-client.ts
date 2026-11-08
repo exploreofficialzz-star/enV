@@ -145,7 +145,7 @@ export async function runOfflineMeteredOperationIfSelected<T>(input: { toolId: s
   const hybridAdTool = isHybridAdSupportedToolId(input.toolId, {
     enabled: import.meta.env.VITE_ADS_ENABLED,
     clientId: import.meta.env.VITE_ADSENSE_CLIENT_ID,
-    slotId: import.meta.env.VITE_ADSENSE_TOOL_SLOT_ID,
+    toolSlotId: import.meta.env.VITE_ADSENSE_TOOL_SLOT_ID,
     privacyConfigured: import.meta.env.VITE_ADSENSE_PRIVACY_CONFIGURED,
     toolIds: import.meta.env.VITE_AD_SUPPORTED_TOOL_IDS,
   });
