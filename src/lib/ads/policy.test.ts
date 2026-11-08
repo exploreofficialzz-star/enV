@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canShowAdForTool, resolveAdConfig } from "./policy";
+import { canShowAdForTool, resolveAdConfig } from "./policy.ts";
 
 const goodEnvironment = {
   enabled: "true",
