@@ -231,7 +231,8 @@ assert.ok(billingProfiles.profiles.some((profile) => profile.toolId === "camera-
 assert.match(androidBuild, /androidx\.compose\.runtime:runtime-livedata/);
 assert.match(androidBuild, /androidx\.camera\.media3:media3-effect:1\.0\.0-alpha04/);
 assert.match(androidBuild, /androidx\.media3:media3-effect:1\.5\.1/);
-assert.ok(deviceAcceptance.includes("NOT RUN — requires real hardware"), "Physical device acceptance must remain explicitly open until real devices are tested.");
+assert.ok(deviceAcceptance.includes("Physical-device execution state: NOT RUN"), "Physical device acceptance must remain explicitly open until real devices are tested.");
+assert.ok(deviceAcceptance.includes("Release state: NOT ACCEPTED"), "Camera Studio must not be marked release-accepted before physical-device evidence exists.");
 for (const gate of [
   "Dual-camera capability and graceful fallback",
   "Front/rear orientation and mirroring",
