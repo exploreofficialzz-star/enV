@@ -151,6 +151,9 @@ export async function saveAnalyticsConsent(request: Request, input: unknown) {
   const userId = body.granted ? await userLookup(request).catch(() => null) : null;
   const sql = await getSql();
   await sql.transaction(async tx => {
+    // Serialize every decision for this installation, including first-time
+    // grant/withdraw races where a consent row does not exist to lock yet.
+    await tx.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", [subject]);
     if (body.granted) {
       await tx.query(
         `insert into product_analytics_consents (subject_digest,user_id,platform,consent_status,policy_version,decided_at,updated_at)
@@ -192,8 +195,9 @@ export async function ingestAnalyticsEvents(request: Request, input: unknown) {
   const referrer = classifyReferrer(request.headers.get("referer"));
   const minute = Math.floor(Date.now() / 60000);
   await sql.transaction(async tx => {
-    // Lock consent in the same transaction as event insertion. Withdrawal either
-    // wins first (this batch is rejected) or waits and deletes the accepted batch.
+    // Take the same per-installation lock as grant/withdrawal, then lock the row.
+    // The advisory lock also serializes ingestion against a first-time decision.
+    await tx.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", [subject]);
     const consent = await tx.query<{consent_status:string}>(
       `select consent_status from product_analytics_consents
        where subject_digest=$1 and policy_version=$2 for update`,
