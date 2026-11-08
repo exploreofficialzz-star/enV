@@ -23,11 +23,20 @@ A result without this evidence remains NOT RUN.
 
 ## Device coverage
 
+## Compatibility boundary
+
+- Android 11+ uses the public concurrent-camera capability list and only enables front/rear capture when the device reports that exact pair. The app retries an SD recording profile if the pair exists but cannot bind the initial 720p profile.
+- Android 9/10 must not be advertised as supporting front/rear simultaneous recording through this CameraX implementation. Android's Android 9 multi-camera API exposes physical sensors belonging to a logical camera; it does not guarantee that the separate front and rear camera devices can stream concurrently. Opening unrelated camera IDs on these versions is device/vendor-specific and requires physical-device validation.
+- iOS uses the AVCaptureMultiCamSession support flag, supported formats, and live hardware/system-pressure costs. It now retries a low-power 480p/24 profile after the 720p/30 profile fails or exceeds the device resource budget.
+- Browser dual capture requests the second camera at progressively lower resource profiles (720p/30, 480p/24, then 240p/15). The browser and camera driver may still prohibit opening both cameras at once.
+- No software path can make simultaneous capture universally available on hardware/OS combinations that do not expose concurrent camera streams. Do not simulate dual capture by duplicating frames or label sequential capture as simultaneous.
+
 | Platform cohort | Minimum coverage | Required checks | Status |
 |---|---|---|---|
-| Android 10 baseline | At least one physical Android 10 phone | Single-camera preview/capture, permission denial and retry, save, fallback messaging; dual-camera must remain unavailable because CameraX concurrent capture requires Android 11+ | NOT RUN |
+| Android 10 baseline | At least one physical Android 10 phone | Single-camera preview/capture, permission denial and retry, save, fallback messaging; do not claim simultaneous front/rear capture because the standard CameraX concurrent API requires Android 11+ | NOT RUN |
 | Android 11+ dual-capable | At least one phone where CameraX reports a front/rear concurrent pair | Simultaneous preview, PiP composition, one-file recording, audio, orientation, stop/finalize, filters | NOT RUN |
 | Android 11+ non-dual-capable | At least one phone where the concurrent pair is not reported | Clear unavailable state and working single-camera fallback | NOT RUN |
+| Android 11+ low/mid-range dual-capable | At least one constrained-memory phone that reports a concurrent front/rear pair | 720p bind, SD retry, actual output resolution/FPS, heat, encoder load, audio and finalization | NOT RUN |
 | Android low/mid-range | At least one constrained-memory phone | Heat, dropped frames, recording length, low storage, background/foreground, resource release | NOT RUN |
 | iOS MultiCam-capable | At least one physical iPhone where `AVCaptureMultiCamSession.isMultiCamSupported` is true | Both cameras, synchronized PiP, audio, orientation, thermal pressure, finalization | NOT RUN |
 | iOS non-MultiCam | At least one physical iPhone where MultiCam is unavailable | Clear unavailable state and working single-camera fallback | NOT RUN |
@@ -38,6 +47,7 @@ A result without this evidence remains NOT RUN.
 | Scenario | Required acceptance behaviour | Status |
 |---|---|---|
 | Dual-camera capability and graceful fallback | Detect actual concurrent-camera support; never duplicate one stream to fake dual capture; keep single camera usable if unsupported | NOT RUN |
+| Adaptive dual-camera quality fallback | Android retries 720p then SD; iOS retries 720p/30 then 480p/24; browser retries 720p/30, 480p/24 and 240p/15; preview and exported output must match the selected profile | NOT RUN |
 | Front/rear orientation and mirroring | Portrait and landscape clips are upright; front inset mirroring is intentional; PiP does not crop the subject unexpectedly | NOT RUN |
 | Microphone permission and audio synchronization | Ask only when recording with sound; silent recording works after denial; audio stays synchronized with the exported video | NOT RUN |
 | Low-storage and recording finalization | Show a recoverable error, do not publish a partial file as complete, and preserve an already completed take when a save picker is canceled | NOT RUN |
