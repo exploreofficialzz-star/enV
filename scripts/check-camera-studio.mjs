@@ -190,7 +190,7 @@ assert.match(androidCatalog, /fun Catalog\.withCameraStudio\(\)/);
 assert.match(androidCatalogTests, /runtimeCameraStudioAdditionIsUniqueAndSearchable/);
 
 assert.match(iosCamera, /AVCaptureSession/);
-assert.match(iosCamera, /onAppear \{ capture\.start\(\) \}/);
+assert.match(iosCamera, /\.onAppear\s*\{[\s\S]*?capture\.start\(\)/, "iOS Camera Studio starts from its view lifecycle");
 assert.match(iosCamera, /UIApplication\.openSettingsURLString/);
 assert.doesNotMatch(iosCamera, /Allow camera access to start|Button\("Start camera"\)/);
 assert.match(iosCamera, /AVCapturePhotoOutput/);
