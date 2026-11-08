@@ -42,18 +42,18 @@ assert.match(slot, /VITE_ADSENSE_PRIVACY_CONFIGURED/, "Ad requests must require 
 assert.match(route, /<ToolShell tool=\{tool\}/, "The public tool route must continue to use the regular tool shell.");
 assert.doesNotMatch(route, /SignInGate|RedirectToSignIn/, "The tool route must not gain a guest sign-in gate.");
 assert.match(offlineClient, /getToolById\(input\.toolId\)/, "Hybrid offline billing must load the full canonical catalogue record.");
-assert.match(offlineClient, /isHybridAccessToolId\\(input\\.toolId,[\\s\\S]*?catalogTool\\)/, "Hybrid offline billing must use the selected-tool access policy independently from ad rendering.");
+assert.match(offlineClient, /isHybridAccessToolId\(input\.toolId,[\s\S]*?catalogTool\)/, "Hybrid offline billing must use the selected-tool access policy independently from ad rendering.");
 assert.match(offlineClient, /HYBRID_OFFLINE_ALLOWANCE_REQUIRED/, "Hybrid ad tools must fail closed offline without an allowance.");
 assert.match(offlineClient, /isApplicationOnline\(\)/, "Web hybrid access must check same-origin reachability.");
 assert.match(offlineClient, /toolSlotId: import\.meta\.env\.VITE_ADSENSE_TOOL_SLOT_ID/, "Web offline policy must use the exact validated AdSense slot setting.");
 assert.match(adPolicy, /offline-eligible-tools\.json/, "Hybrid ads must use the canonical cross-platform metering registry.");
-assert.match(adPolicy, /tool\\.id\\.startsWith\\("finance-"\\)/, "Finance calculators must not enter the hybrid offline metering cohort.");
+assert.match(adPolicy, /tool\.id\.startsWith\("finance-"\)/, "Finance calculators must not enter the hybrid offline metering cohort.");
 
 assert.match(adPolicy, /export function isHybridAccessToolId/, "The offline access policy must be independent from ad provider readiness.");
 assert.match(offlineClient, /isHybridAccessToolId/, "Web offline billing must use the ad-independent hybrid access policy.");
-assert.match(androidAds, /!tool\\.id\\.startsWith\\("finance-"\\)/, "Android must exclude finance-prefixed tools from the hybrid cohort.");
-assert.match(iosAds, /!tool\\.id\\.hasPrefix\\("finance-"\\)/, "iOS must exclude finance-prefixed tools from the hybrid cohort.");
-assert.match(iosAds, /NativeAdsPolicy\\.adDisplayConfigured && NativeAdsPolicy\\.isHybridTool/, "iOS ad rendering must remain disabled until provider configuration is ready.");
+assert.match(androidAds, /!tool\.id\.startsWith\("finance-"\)/, "Android must exclude finance-prefixed tools from the hybrid cohort.");
+assert.match(iosAds, /!tool\.id\.hasPrefix\("finance-"\)/, "iOS must exclude finance-prefixed tools from the hybrid cohort.");
+assert.match(iosAds, /NativeAdsPolicy\.adDisplayConfigured && NativeAdsPolicy\.isHybridTool/, "iOS ad rendering must remain disabled until provider configuration is ready.");
 
 assert.ok(meteredProfiles.profiles.every((profile) => profile.platforms.includes("web") && profile.platforms.includes("android") && profile.platforms.includes("ios")), "Offline metering profiles must have platform parity.");
 assert.match(offlinePolicy, /tokenPolicy: "monetization-pending"/, "Offline execution classification must remain separate from billing rollout.");
