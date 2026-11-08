@@ -517,10 +517,8 @@ export function CameraStudioEngine() {
       canvas.height = video.videoHeight;
       const context = canvas.getContext("2d");
       if (!context) throw new Error("This device could not prepare the photo.");
-      if (facing === "user") {
-        context.translate(canvas.width, 0);
-        context.scale(-1, 1);
-      }
+      // drawCover owns per-feed mirroring. Do not mirror the whole canvas here:
+      // dual-camera composition must mirror each feed independently, exactly once.
       context.filter = look.css;
       const secondaryVideo = dualVideoRef.current;
       const activeSecondary = dualStreamRef.current;
