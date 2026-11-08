@@ -7,6 +7,7 @@ import {
 } from "./offline-protocol";
 import eligibleTools from "../../data/offline-eligible-tools.json";
 import { recordAnalyticsEvent } from "../analytics/client";
+import { getToolById } from "../registry";
 import { isApplicationOnline, isHybridAdSupportedToolId } from "../ads/policy";
 
 type EligibleToolsIndex = { pricingVersion: string; toolCount: number; profiles: { toolId: string; billingKey: string; subunitsPerUnit: number; platforms: ("web" | "android" | "ios")[] }[] };
@@ -142,13 +143,14 @@ export async function runOfflineMeteredOperationIfSelected<T>(input: { toolId: s
   const profile = offlineEligibleById.get(input.toolId);
   if (!profile || !profile.billingKey.startsWith("local.") || !profile.platforms.includes("web")) return await operation();
 
-  const hybridAdTool = isHybridAdSupportedToolId(input.toolId, {
+  const catalogTool = getToolById(input.toolId);
+  const hybridAdTool = Boolean(catalogTool && isHybridAdSupportedToolId(input.toolId, {
     enabled: import.meta.env.VITE_ADS_ENABLED,
     clientId: import.meta.env.VITE_ADSENSE_CLIENT_ID,
     toolSlotId: import.meta.env.VITE_ADSENSE_TOOL_SLOT_ID,
     privacyConfigured: import.meta.env.VITE_ADSENSE_PRIVACY_CONFIGURED,
     toolIds: import.meta.env.VITE_AD_SUPPORTED_TOOL_IDS,
-  });
+  }, catalogTool));
 
   if (hybridAdTool && await isApplicationOnline()) {
     // Online access for the selected cohort is guest-friendly and ad-funded, not token-metered.
