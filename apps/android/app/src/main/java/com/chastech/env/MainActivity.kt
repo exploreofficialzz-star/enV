@@ -184,6 +184,7 @@ import java.time.Year
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        NativeAdsPrivacyManager.refreshConsent(this)
         val favorites = FavoritesStore(applicationContext)
         setContent {
             var themeMode by rememberSaveable { mutableStateOf(favorites.getThemeMode()) }
@@ -1189,6 +1190,7 @@ private fun ToolDetail(
                 Column(Modifier.fillMaxWidth().padding(if (compact) 16.dp else 24.dp)) {
                     NativeToolInterfaceContent(tool, backend, supported, onRelatedTool)
                     if (!isFullscreen) NativeToolCommunityPanel(tool.id)
+                    if (!isFullscreen) NativeToolAdSlot(tool.id)
                 }
             }
             if (!isFullscreen) {
@@ -2177,8 +2179,14 @@ private fun NativeCalculatorToolForm(tool: ToolRecord) {
         ActionRow(
             onRun = {
                 val allowanceId = runCatching { journal.activeAllowanceId() }.getOrNull()
-                val metered = allowanceId != null && runCatching { journal.isEligibleTool(context, tool.id) }.getOrDefault(false)
-                if (!metered || allowanceId == null) {
+                val walletEligible = runCatching { journal.isEligibleTool(context, tool.id) }.getOrDefault(false)
+                val hybridAdTool = NativeAdsPolicy.isHybridTool(context, tool.id) && walletEligible
+                val online = NativeAdsPolicy.hasValidatedInternet(context)
+                val metered = allowanceId != null && walletEligible && !(hybridAdTool && online)
+                if (hybridAdTool && !online && allowanceId == null) {
+                    output = ""
+                    error = "Connect to use this tool online, or sign in and prepare an offline allowance in Wallet before disconnecting."
+                } else if (!metered || allowanceId == null) {
                     runCatching { NativeCalculatorEngine.run(operation, values.toMap()) }.fold(
                         { rows -> output = render(rows); error = "" },
                         { output = ""; error = it.message ?: "Unable to run calculator" }
