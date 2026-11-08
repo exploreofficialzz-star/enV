@@ -5,6 +5,7 @@ export const ANALYTICS_MIGRATION_FILES = Object.freeze([
   "0017_analytics_daily_reports.sql",
   "0018_analytics_dashboard_sessions.sql",
   "0019_analytics_core_rls.sql",
+  "0020_analytics_privilege_lockdown.sql",
 ]);
 
 /**
