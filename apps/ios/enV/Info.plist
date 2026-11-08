@@ -27,6 +27,16 @@
 	</dict>
 	<key>UILaunchScreen</key>
 	<dict/>
+	<key>GADApplicationIdentifier</key>
+	<string>$(ENV_ADMOB_APP_ID)</string>
+	<key>ENV_ADS_ENABLED</key>
+	<string>$(ENV_ADS_ENABLED)</string>
+	<key>ENV_ADS_PRIVACY_CONFIGURED</key>
+	<string>$(ENV_ADS_PRIVACY_CONFIGURED)</string>
+	<key>ENV_AD_SUPPORTED_TOOL_IDS</key>
+	<string>$(ENV_AD_SUPPORTED_TOOL_IDS)</string>
+	<key>ENV_ADMOB_BANNER_AD_UNIT_ID</key>
+	<string>$(ENV_ADMOB_BANNER_AD_UNIT_ID)</string>
 	<key>ENV_API_BASE_URL</key>
 	<string>$(ENV_API_BASE_URL)</string>
 	<!-- Opt-in analytics UI remains disabled unless the native release explicitly enables it. -->
