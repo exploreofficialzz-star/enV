@@ -94,7 +94,7 @@ The publisher-authorized seller record is committed at `public/ads.txt`:
 google.com, pub-2492078126313994, DIRECT, f08c47fec0942fa0
 ```
 
-It will be publicly available at `https://envtools.store/ads.txt` after the latest `main` commit is successfully deployed. The commit is on `main`; the latest deployment is pending because Vercel rejected another deployment under the current team deployment limit.
+As of 2026-11-09, the verified GitHub `main` commit `b975bf1b774925e6b29325eadafe4b3e0e47551e` is serving `https://envtools.store/ads.txt` with HTTP 200 and the exact seller line above. The same READY Vercel deployment serves the homepage with the AdSense account verification meta tag. Its custom-domain alias points to deployment `dpl_HjSxtuSJQnmiMYbc1oSD92EQyNk3`, built from `main` at that commit. The Vercel deployment record still reports `target: null`, so this is a verified live custom-domain alias, not a deployment record marked as a production target. Verify the target and alias on the next Git-triggered `main` deployment before treating automatic production promotion as proven. Ad delivery remains disabled while Google's site review and the CMP/privacy release gates are pending.
 
 Before launch, verify:
 
