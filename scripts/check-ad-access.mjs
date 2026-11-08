@@ -80,6 +80,10 @@ assert.match(iosAds, /ConsentInformation\.shared\.requestConsentInfoUpdate/, "iO
 assert.match(iosAds, /MobileAds\.shared\.start/, "iOS must initialize Google Mobile Ads after consent.");
 assert.match(iosAds, /publisherPrivacyPersonalizationState = \.disabled/, "iOS ad requests must default to non-personalized treatment.");
 assert.match(iosAds, /coarseLocationCollectionEnabled = false/, "iOS ads must not collect coarse device location by default.");
+assert.match(iosAds, /static func isHybridTool\(_ tool: Tool\)/, "iOS must evaluate the full catalog record before selecting an ad-supported tool.");
+assert.match(iosAds, /restrictedCategories/, "iOS must exclude fitness and personal tools like Web and Android.");
+assert.match(iosAds, /restrictedDisclaimers/, "iOS must exclude health, finance and earnings disclaimer tools.");
+assert.match(iosCalculator, /NativeAdsPolicy\.isHybridTool\(tool\)/, "iOS ad slots and offline gating must use the same per-tool decision.");
 assert.match(iosAds, /originReachable = await NativeAdsPolicy\.isApplicationOnline\(\)/, "iOS ad display must verify that the application origin is reachable.");
 assert.match(iosAds, /largeAnchoredAdaptiveBanner\(width: CGFloat\(width\)\)/, "iOS adaptive banners must pass the SDK-required CGFloat width.");
 assert.match(iosAds, /BannerView\(adSize:/, "iOS must render a native adaptive banner view.");
