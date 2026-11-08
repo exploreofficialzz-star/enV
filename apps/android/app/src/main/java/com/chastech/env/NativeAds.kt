@@ -34,6 +34,7 @@ import com.google.android.libraries.ads.mobile.sdk.banner.BannerAd
 import com.google.android.libraries.ads.mobile.sdk.banner.BannerAdRequest
 import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback
 import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
+import com.google.android.libraries.ads.mobile.sdk.common.RequestConfiguration
 import com.google.android.libraries.ads.mobile.sdk.initialization.InitializationConfig
 import com.google.android.ump.ConsentInformation
 import com.google.android.ump.ConsentRequestParameters
@@ -43,6 +44,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.net.HttpURLConnection
+import java.net.URL
 import org.json.JSONObject
 
 internal object NativeAdsPolicy {
@@ -51,7 +55,7 @@ internal object NativeAdsPolicy {
     val adDisplayConfigured: Boolean get() = BuildConfig.ENV_ADS_ENABLED &&
         BuildConfig.ENV_ADS_PRIVACY_CONFIGURED &&
         BuildConfig.ENV_ADMOB_APP_ID.matches(Regex("ca-app-pub-[0-9]{16}~[0-9]{10}")) &&
-        BuildConfig.ENV_ADMOB_BANNER_AD_UNIT_ID.isNotBlank()
+        BuildConfig.ENV_ADMOB_BANNER_AD_UNIT_ID.matches(Regex("ca-app-pub-[0-9]{16}/[0-9]{10}"))
 
     private val allowlistedIds: Set<String> by lazy {
         BuildConfig.ENV_AD_SUPPORTED_TOOL_IDS.split(",").map { it.trim() }.filter { toolIdPattern.matches(it) }.toSet()
@@ -83,6 +87,24 @@ internal object NativeAdsPolicy {
 
     fun isHybridTool(context: Context, toolId: String): Boolean =
         adDisplayConfigured && toolId in allowlistedIds && toolId in crossPlatformMeteredIds(context)
+
+    suspend fun isApplicationOnline(context: Context): Boolean = withContext(Dispatchers.IO) {
+        if (!hasValidatedInternet(context)) return@withContext false
+        val connection = (URL("https://envtools.store/").openConnection() as? HttpURLConnection)
+            ?: return@withContext false
+        try {
+            connection.requestMethod = "HEAD"
+            connection.connectTimeout = 2500
+            connection.readTimeout = 2500
+            connection.useCaches = false
+            val status = connection.responseCode
+            status in 200..399 && connection.url.host == "envtools.store"
+        } catch (_: Exception) {
+            false
+        } finally {
+            connection.disconnect()
+        }
+    }
 
     fun hasValidatedInternet(context: Context): Boolean {
         val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
@@ -130,6 +152,11 @@ internal object NativeAdsPrivacyManager {
         initializing = true
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             runCatching {
+                MobileAds.setRequestConfiguration(
+                    RequestConfiguration.Builder()
+                        .setPublisherPrivacyPersonalizationState(RequestConfiguration.PublisherPrivacyPersonalizationState.DISABLED)
+                        .build(),
+                )
                 MobileAds.initialize(
                     activity.applicationContext,
                     InitializationConfig.Builder(BuildConfig.ENV_ADMOB_APP_ID).build(),
@@ -176,7 +203,11 @@ internal fun NativeToolAdSlot(toolId: String) {
             runCatching { com.chastech.env.billing.OfflineWalletJournal(context).isEligibleTool(context, toolId) }.getOrDefault(false)
     }
     val network = rememberValidatedAdNetwork(context)
-    if (preview || !supported || !network || !NativeAdsPolicy.adDisplayConfigured ||
+    var applicationOnline by remember(toolId) { mutableStateOf(false) }
+    LaunchedEffect(network, toolId) {
+        applicationOnline = network && NativeAdsPolicy.isApplicationOnline(context)
+    }
+    if (preview || !supported || !applicationOnline || !NativeAdsPolicy.adDisplayConfigured ||
         !NativeAdsPrivacyManager.canRequestAds || !NativeAdsPrivacyManager.sdkReady) return
     val adView = remember(toolId) { AdView(context) }
     val widthDp = remember(context) {
