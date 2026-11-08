@@ -14,6 +14,8 @@ The selected hybrid cohort is intersected with `src/data/offline-eligible-tools.
 
 Advertising is **off by default** in Web, Android, and iOS builds. Blank provider IDs, blank allowlists, or an unconfigured privacy flag fail closed. Do not enable the feature until you have completed the relevant publisher account setup, privacy messaging, test-device setup, and release review.
 
+The selected-tool allowlist is also the offline-access boundary and is evaluated independently from ad rendering. When a reviewed cohort is configured but provider IDs or CMP readiness are absent, the tools remain guest-usable online, ads stay suppressed, and those same tools still require a valid offline allowance when the enV origin cannot be reached. Disabling ads must never disable offline token enforcement for an already selected cohort.
+
 The following are not supplied by this repository and must not be fabricated:
 
 - the approved AdSense site / publisher account and responsive display unit;
