@@ -165,7 +165,8 @@ assert.match(registry, /engine: \{ type: "custom", id: "camera-studio" \}/);
 assert.match(registry, /status: "active"/);
 
 assert.match(androidCamera, /LifecycleCameraController/);
-assert.match(androidCamera, /LaunchedEffect\(Unit\)/);
+assert.match(androidCamera, /LaunchedEffect\\([\\s\\S]*?videoStabilizationEnabled,[\\s\\S]*?videoStabilizationModes,[\\s\\S]*?usingFrontCamera,[\\s\\S]*?selectedRearCameraId[\\s\\S]*?\\)/);
+assert.match(androidCamera, /if \\(cameraGranted\\) applyAdvancedCameraSettings\\(\\)/, "Android camera settings re-apply ON/OFF after each camera/lens switch.");
 assert.match(androidCamera, /requestCameraAccess\(\)/);
 assert.match(androidCamera, /Settings\.ACTION_APPLICATION_DETAILS_SETTINGS/);
 assert.doesNotMatch(androidCamera, /Your camera preview appears here|Allow camera access to begin|Enable camera/);
