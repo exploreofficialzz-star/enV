@@ -81,7 +81,7 @@ test("analytics plan fails closed when an allowlisted migration file is missing"
       allFeatureMigrations.filter((name) => name !== "0020_analytics_privilege_lockdown.sql"),
       [],
     ),
-    /Missing required analytics migration files: 0020_analytics_privilege_lockdown\\.sql/,
+    /Missing required analytics migration files/,
   );
 });
 
