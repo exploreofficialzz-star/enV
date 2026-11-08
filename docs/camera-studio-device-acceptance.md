@@ -43,7 +43,11 @@ A result without this evidence remains NOT RUN.
 | Low-storage and recording finalization | Show a recoverable error, do not publish a partial file as complete, and preserve an already completed take when a save picker is canceled | NOT RUN |
 | System interruptions and app backgrounding | Calls, app switches, camera pre-emption and iOS media-services reset stop/reconnect safely; files remain playable where finalization succeeds | NOT RUN |
 | Thermal and battery behaviour | Run repeated and sustained recording; note thermal warnings, throttling, dropped frames and battery drain; do not advertise unmeasured performance | NOT RUN |
-| Filter preview-to-export parity | Each native color look is visible in preview and present in the saved photo/video; Natural resets correctly; no stale filter after mode changes | NOT RUN |\n| Face tracking and original AR effects | Test one and multiple faces, glasses/crown alignment, face movement/entry/exit, rotation, low light, processing latency, frame drops and exact preview-to-export parity | NOT RUN |\n| Beauty / soft-light effects | Verify iOS face-only softening is subtle and bounded; verify Android soft glow stays attached to the detected face; confirm no effect is applied to unsupported photo/dual modes | NOT RUN |\n| Face-effect privacy and lifecycle | Confirm no face data leaves device; disabling effects stops analysis; leaving Camera Studio releases Vision/ML Kit resources and camera outputs | NOT RUN |
+| Filter preview-to-export parity | Each native color look is visible in preview and present in the saved photo/video; Natural resets correctly; no stale filter after mode changes | NOT RUN |
+| Video stabilization | Verify Android Camera2 and iOS AVFoundation enable stabilization only when reported by the active camera/format; compare supported modes and exported motion at the same resolution/frame rate | NOT RUN |
+| Face tracking and original AR effects | Test one and multiple faces, glasses/crown alignment, face movement/entry/exit, rotation, low light, processing latency, frame drops and exact preview-to-export parity | NOT RUN |
+| Beauty / soft-light effects | Verify iOS face-only softening is subtle and bounded; verify Android soft glow stays attached to the detected face; confirm no effect is applied to unsupported photo/dual modes | NOT RUN |
+| Face-effect privacy and lifecycle | Confirm no face data leaves device; disabling effects stops analysis; leaving Camera Studio releases Vision/ML Kit resources and camera outputs | NOT RUN |
 | Manual camera controls | Verify actual sensor capability gating; ISO/shutter, white balance, focus distance/lock and optical lens selection change capture output; unsupported controls are hidden | NOT RUN |
 | Permission revoked in Settings | Return to Camera Studio after revocation; camera is not bound until permission returns; retry/settings route works | NOT RUN |
 | Long recording | Test at least 5 minutes and 30 minutes on a capable device; confirm output duration, sound, playback, storage use and cleanup | NOT RUN |
@@ -58,6 +62,8 @@ A result without this evidence remains NOT RUN.
 - iOS `AVCaptureMultiCamSession` front/rear capture with capability, hardware-cost and system-pressure checks.
 - Android CameraX/Media3 color processing for preview, photo and video outputs.
 - iOS Core Image frame processing shared by preview and the `AVAssetWriter` export path.
+- Android Camera2 video stabilization toggle, exposed only when the active camera reports `CONTROL_VIDEO_STABILIZATION_MODE_ON`; disabled automatically when unsupported and limited to video mode.
+- iOS AVFoundation video stabilization, using `.auto` only when the active video connection reports support; dual-camera video connections request `.auto` independently when supported.
 - Android Camera2-interoperability manual sensor ISO/shutter, supported white-balance modes, focus lock/focus distance, and rear-lens selection, shown only when reported by the active camera.
 - iOS manual ISO/shutter, white-balance presets, focus lock and optical-lens selection, shown only where the active device supports them.
 - iOS Vision face-landmark detection throttled to 15 updates/second, with original glasses and crown overlays plus subtle face-only softening. The same transformed frame goes to the preview and video writer.
