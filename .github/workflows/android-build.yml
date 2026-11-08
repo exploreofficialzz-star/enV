@@ -79,6 +79,8 @@ jobs:
         run: npm run typecheck
       - name: Lint web app
         run: npm run lint
+      - name: Run Camera Studio regression checks
+        run: node scripts/check-camera-studio.mjs
       - name: Test web app
         run: npm test
 
