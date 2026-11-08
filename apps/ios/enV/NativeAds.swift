@@ -163,7 +163,11 @@ struct NativeToolAdSlot: View {
             }
         }
         .task(id: reachability.hasNetwork) {
-            originReachable = reachability.hasNetwork && await NativeAdsPolicy.isApplicationOnline()
+            if reachability.hasNetwork {
+            originReachable = await NativeAdsPolicy.isApplicationOnline()
+        } else {
+            originReachable = false
+        }
         }
     }
 }
