@@ -1198,7 +1198,7 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
                 let wasRecording = self.recordingRequested
                 Task { @MainActor in
                     self.ready = false
-                    self.message = reason.map { "Both cameras were interrupted by the system (reason \\($0))." }
+                    self.message = reason.map { "Both cameras were interrupted by the system (reason \($0))." }
                         ?? "Both cameras were interrupted by the system."
                     if wasRecording {
                         self.error = "Dual-camera recording was interrupted. Finalizing the saved portion where possible."
