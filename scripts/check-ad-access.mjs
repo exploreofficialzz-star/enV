@@ -56,7 +56,9 @@ assert.match(iosAds, /coarseLocationCollectionEnabled = false/, "iOS ads must no
 assert.match(androidAds, /context\.assets\.open\("offline-eligible-tools\.json"\)/, "Android must read the canonical bundled offline pricing registry.");
 assert.match(androidAds, /common\.AdLoadCallback|common\.LoadAdError/, "Android must use the current Google Ads callback API.");
 assert.match(androidMain, /NativeToolAdSlot\(tool\.id\)/, "The native Android tool surface must include its ad slot.");
-assert.match(androidMain, /hybridAdTool && !online && allowanceId == null/, "Android hybrid tools must block offline execution without a prepared allowance.");
+assert.match(androidMain, /val online = NativeAdsPolicy\.isApplicationOnline\(context\)/, "Android hybrid runs must verify the enV origin.");
+assert.match(androidMain, /allowanceId != null && walletEligible -> runWithOfflineCharge\(\)/, "Android offline use must be journalled against a prepared allowance.");
+assert.match(androidMain, /else -> \{\s*output = ""\s*error = "This tool needs an offline enV token allowance\./, "Android hybrid tools must block offline execution without a prepared allowance.");
 assert.match(androidInfo, /NativeAdsPrivacyOptionsButton/, "Android must expose UMP privacy options from Privacy.");
 assert.match(iosProject, /GoogleMobileAds/, "iOS must link the Google Mobile Ads Swift package.");
 assert.match(iosProject, /GoogleUserMessagingPlatform/, "iOS must link the UMP Swift package.");
