@@ -1042,6 +1042,22 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
         let dimensions = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
         let fps = device.activeFormat.videoSupportedFrameRateRanges.map { Int($0.maxFrameRate) }.max() ?? 30
         actualQuality = "\(dimensions.width) × \(dimensions.height) · up to \(fps) fps"
+        refreshVideoStabilizationSupport(requested: videoStabilizationEnabled)
+    }
+
+    private func refreshVideoStabilizationSupport(requested: Bool) {
+        queue.async { [weak self] in
+            guard let self else { return }
+            let connection = self.videoDataOutput.connection(with: .video)
+            let supported = connection?.isVideoStabilizationSupported ?? false
+            if let connection, supported {
+                connection.preferredVideoStabilizationMode = requested ? .auto : .off
+            }
+            Task { @MainActor in
+                self.supportsVideoStabilization = supported
+                self.videoStabilizationEnabled = supported && requested
+            }
+        }
     }
 
     private func savePhotoToLibrary(_ imageData: Data) {
