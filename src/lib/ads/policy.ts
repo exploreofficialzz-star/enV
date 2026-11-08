@@ -23,7 +23,7 @@ export type AdEligibleTool = {
   requiresBackend: boolean;
   requiresAuth: boolean;
   disclaimer?: string;
-  engine?: { type?: string; op?: string };
+  engine: { type: string; id?: string; op?: string };
 };
 
 const TOOL_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,119}$/;
