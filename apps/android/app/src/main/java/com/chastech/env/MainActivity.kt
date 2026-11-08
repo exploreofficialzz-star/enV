@@ -2180,7 +2180,7 @@ private fun NativeCalculatorToolForm(tool: ToolRecord) {
             onRun = {
                 val allowanceId = runCatching { journal.activeAllowanceId() }.getOrNull()
                 val walletEligible = runCatching { journal.isEligibleTool(context, tool.id) }.getOrDefault(false)
-                val hybridAdTool = NativeAdsPolicy.isHybridTool(context, tool) && walletEligible
+                val hybridAdTool = NativeAdsPolicy.isHybridTool(context, tool)
 
                 fun runWithoutOfflineCharge() {
                     runCatching { NativeCalculatorEngine.run(operation, values.toMap()) }.fold(
