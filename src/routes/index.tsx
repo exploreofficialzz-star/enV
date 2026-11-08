@@ -36,7 +36,6 @@ function Home() {
   const trending = getPopularTools(12);
   const recent = usePrefs((state) => state.recent);
   const usageCounts = usePrefs((state) => state.usageCounts);
-  const prefsHydrated = usePrefs((state) => state.hydrated);
   const mostUsedTools = useMemo(
     () => rankMostUsedToolIds(recent, usageCounts, 10).flatMap((id) => {
       const tool = getToolById(id);
@@ -51,7 +50,6 @@ function Home() {
 
   return (
     <AppShell>
-      <div className={prefsHydrated ? "visible" : "invisible"} aria-busy={!prefsHydrated}>
       <section className="mx-auto flex max-w-6xl flex-col items-center px-4 pb-10 pt-1 text-center sm:px-6 sm:pt-1">
         <ProductUpdatesBanner />
         <Logo size="hero" />
@@ -91,7 +89,6 @@ function Home() {
         </h1>
       </section>
       <ToolSection title="Trending tools" tools={trending} />
-      </div>
     </AppShell>
   );
 }
