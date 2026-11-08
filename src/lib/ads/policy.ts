@@ -63,9 +63,13 @@ export function resolveAdConfig(env: AdEnvironment): AdRuntimeConfig | null {
  * Only intentionally selected, active, public, device-local Web tools may show ads.
  * Backend/auth tools and sensitive finance/health/earnings experiences stay excluded.
  */
-export function isHybridAdSupportedToolId(toolId: string, env: AdEnvironment): boolean {
+export function isHybridAdSupportedToolId(toolId: string, env: AdEnvironment, tool: AdEligibleTool): boolean {
   const config = resolveAdConfig(env);
-  return config !== null && config.allowedToolIds.has(toolId) && OFFLINE_PROFILE_IDS.has(toolId) && !toolId.startsWith("finance-");
+  return config !== null &&
+    tool.id === toolId &&
+    config.allowedToolIds.has(toolId) &&
+    OFFLINE_PROFILE_IDS.has(toolId) &&
+    canShowAdForTool(tool, config);
 }
 
 /** Same-origin reachability check: browser online hints alone are not authoritative. */
