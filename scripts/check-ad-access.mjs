@@ -5,6 +5,8 @@ import { resolve } from "node:path";
 const root = process.cwd();
 const read = (path) => readFileSync(resolve(root, path), "utf8");
 const slot = read("src/components/tools/ad-slot.tsx");
+const webAdPrivacy = read("src/components/layout/ad-privacy-controls.tsx");
+const adsBrowser = read("src/lib/ads/browser.ts");
 const shell = read("src/components/tools/tool-shell.tsx");
 const route = read("src/routes/tools/$category/$slug.tsx");
 const env = read(".env.example");
@@ -46,6 +48,10 @@ assert.match(env, /VITE_ADSENSE_PRIVACY_CONFIGURED=false/, "CMP readiness must r
 assert.match(privacy, /advertisingEnabled = import\.meta\.env\.VITE_ADS_ENABLED === "true"/, "Privacy disclosure must appear when ad serving is enabled.");
 assert.match(privacy, /frequency capping and aggregated reporting/, "Privacy disclosure must explain NPA identifier use.");
 assert.match(privacyControls, /separate provider and CMP privacy choices/, "Analytics consent must be distinct from advertising consent.");
+assert.match(webAdPrivacy, /whenGooglePrivacyMessagingReady/, "Web Privacy must wait for Google Privacy & Messaging readiness before showing revocation controls.");
+assert.match(webAdPrivacy, /reopenGooglePrivacySettings/, "Web Privacy must expose the provider consent-revocation entry point.");
+assert.match(adsBrowser, /showRevocationMessage/, "Web must use the supported Google consent revocation API.");
+assert.match(adsBrowser, /CONSENT_API_READY/, "Web must wait for the Google consent API readiness callback.");
 
 assert.match(androidGradle, /ads-mobile-sdk:1\.6\.0/, "Android must use the native Google Mobile Ads SDK.");
 assert.match(androidGradle, /user-messaging-platform:4\.0\.0/, "Android must use the native UMP consent SDK.");
