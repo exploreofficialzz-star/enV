@@ -49,6 +49,7 @@ assert.match(privacyControls, /separate provider and CMP privacy choices/, "Anal
 assert.match(androidGradle, /ads-mobile-sdk:1\.6\.0/, "Android must use the native Google Mobile Ads SDK.");
 assert.match(androidGradle, /user-messaging-platform:4\.0\.0/, "Android must use the native UMP consent SDK.");
 assert.match(androidManifest, /com\.google\.android\.gms\.ads\.APPLICATION_ID/, "Android must declare its configured AdMob app ID.");
+assert.match(androidAds, /import com\.google\.android\.ump\.ConsentInformation\.PrivacyOptionsRequirementStatus/, "Android must use the UMP ConsentInformation privacy status enum.");
 assert.match(androidAds, /UserMessagingPlatform\.getConsentInformation/, "Android must refresh and evaluate UMP consent.");
 assert.match(androidAds, /refreshing = false/, "Android consent refresh must release its launch guard.");
 assert.match(androidAds, /delay\(15_000L\)/, "Android must recheck application-origin availability after temporary outages.");
@@ -80,6 +81,7 @@ assert.match(iosAds, /MobileAds\.shared\.start/, "iOS must initialize Google Mob
 assert.match(iosAds, /publisherPrivacyPersonalizationState = \.disabled/, "iOS ad requests must default to non-personalized treatment.");
 assert.match(iosAds, /coarseLocationCollectionEnabled = false/, "iOS ads must not collect coarse device location by default.");
 assert.match(iosAds, /originReachable = await NativeAdsPolicy\.isApplicationOnline\(\)/, "iOS ad display must verify that the application origin is reachable.");
+assert.match(iosAds, /largeAnchoredAdaptiveBanner\(width: CGFloat\(width\)\)/, "iOS adaptive banners must pass the SDK-required CGFloat width.");
 assert.match(iosAds, /BannerView\(adSize:/, "iOS must render a native adaptive banner view.");
 assert.match(iosAds, /privacyOptionsRequired/, "iOS must expose the UMP privacy-options requirement.");
 assert.match(iosApp, /refreshConsentAtLaunch\(\)/, "iOS must refresh advertising consent at app launch.");
