@@ -45,6 +45,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
@@ -98,7 +99,7 @@ internal object NativeAdsPolicy {
             !tool.requiresAuth &&
             tool.category !in restrictedCategories &&
             !tool.id.startsWith("finance-") &&
-            tool.disclaimer !in restrictedDisclaimers
+            (tool.disclaimer == null || tool.disclaimer !in restrictedDisclaimers)
     }
 
     suspend fun isApplicationOnline(context: Context): Boolean = withContext(Dispatchers.IO) {
@@ -136,9 +137,11 @@ internal object NativeAdsPrivacyManager {
     var sdkReady by mutableStateOf(false)
         private set
     private var initializing = false
+    private var refreshing = false
 
     fun refreshConsent(activity: Activity) {
-        if (!NativeAdsPolicy.adDisplayConfigured) return
+        if (!NativeAdsPolicy.adDisplayConfigured || refreshing) return
+        refreshing = true
         val information = UserMessagingPlatform.getConsentInformation(activity)
         val parameters = ConsentRequestParameters.Builder().build()
         information.requestConsentInfoUpdate(
@@ -146,12 +149,14 @@ internal object NativeAdsPrivacyManager {
             parameters,
             {
                 UserMessagingPlatform.loadAndShowConsentFormIfRequired(activity) {
+                    refreshing = false
                     updateConsentAndInitialize(activity, information)
                 }
             },
             {
                 // A failed refresh never grants new permission. Cached UMP permission is used
                 // only when the SDK itself still reports that ads may be requested.
+                refreshing = false
                 updateConsentAndInitialize(activity, information)
             },
         )
@@ -188,11 +193,14 @@ internal object NativeAdsPrivacyManager {
     fun showPrivacyOptions(activity: Activity) {
         if (!privacyOptionsRequired) return
         UserMessagingPlatform.showPrivacyOptionsForm(activity) { error ->
-            if (error != null) canRequestAds = false
             val information = UserMessagingPlatform.getConsentInformation(activity)
-            canRequestAds = error == null && information.canRequestAds()
-            privacyOptionsRequired = information.privacyOptionsRequirementStatus ==
-                PrivacyOptionsRequirementStatus.REQUIRED
+            if (error != null) {
+                canRequestAds = false
+                privacyOptionsRequired = information.privacyOptionsRequirementStatus ==
+                    PrivacyOptionsRequirementStatus.REQUIRED
+            } else {
+                updateConsentAndInitialize(activity, information)
+            }
         }
     }
 }
@@ -219,7 +227,14 @@ internal fun NativeToolAdSlot(tool: ToolRecord) {
     val network = rememberValidatedAdNetwork(context)
     var applicationOnline by remember(toolId) { mutableStateOf(false) }
     LaunchedEffect(network, toolId) {
-        applicationOnline = network && NativeAdsPolicy.isApplicationOnline(context)
+        if (!network) {
+            applicationOnline = false
+        } else {
+            while (true) {
+                applicationOnline = NativeAdsPolicy.isApplicationOnline(context)
+                delay(15_000L)
+            }
+        }
     }
     if (preview || !supported || !applicationOnline || !NativeAdsPolicy.adDisplayConfigured ||
         !NativeAdsPrivacyManager.canRequestAds || !NativeAdsPrivacyManager.sdkReady) return
