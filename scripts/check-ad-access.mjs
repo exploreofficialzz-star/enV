@@ -30,10 +30,8 @@ const iosApp = read("apps/ios/enV/enVApp.swift");
 const iosProject = read("apps/ios/enV.xcodeproj/project.pbxproj");
 
 assert.match(rootRoute, /ca-pub-2492078126313994/, "The AdSense site verification tag must use the publisher ID supplied by the account owner.");
-assert.match(rootRoute, /ADSENSE_BOOTSTRAP_SCRIPT/, "The global AdSense script must be preceded by the consent bootstrap.");
-assert.match(rootRoute, /adsbygoogle\.pauseAdRequests = 1/, "Ad requests must be paused before the AdSense library loads.");
-assert.match(rootRoute, /data-env-adsense-client=\{ADSENSE_SITE_CLIENT_ID\}/, "The shared document head must identify the AdSense loader.");
-assert.match(rootRoute, /CONSENT_DATA_READY/, "The global bootstrap must record consent readiness even if it fires before an ad slot mounts.");
+assert.match(rootRoute, /name: "google-adsense-account", content: ADSENSE_SITE_CLIENT_ID/, "The shared document head must expose Google AdSense site verification.");
+assert.doesNotMatch(rootRoute, /ADSENSE_BOOTSTRAP_SCRIPT|pagead\.googlesyndication\.com/, "The root document must not load AdSense before hydration.");
 assert.match(shell, /<AdSlot tool=\{tool\} \/>/, "Tool details must include the ad placement.");
 assert.match(slot, /isApplicationOnline\(\)/, "Ads must not be requested unless the application origin is reachable.");
 assert.match(shell, /!isFullscreen \? <AdSlot tool=\{tool\} \/> : null/, "Web ads must stay outside the full-screen tool-only experience.");

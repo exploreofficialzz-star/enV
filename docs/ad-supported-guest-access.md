@@ -26,9 +26,9 @@ The following are not supplied by this repository and must not be fabricated:
 
 ## Web / AdSense configuration
 
-The publisher supplied the AdSense site-verification client ID `ca-pub-2492078126313994`. Its exact asynchronous loader is installed once in the shared Web document head. The head bootstrap pauses ad requests before the library loads and records the `CONSENT_DATA_READY` signal so a fast consent callback cannot be missed before an eligible tool slot mounts.
+The publisher supplied the AdSense site-verification client ID `ca-pub-2492078126313994`. The shared document head exposes it using Google’s supported `<meta name="google-adsense-account" content="ca-pub-2492078126313994">` verification method. The AdSense JavaScript library is loaded only after an eligible tool slot mounts, after its CMP callback has been registered, so the global script cannot mutate the page before React hydration.
 
-This loader is for site connection/review; it is **not** a display ad unit and does not provide a `data-ad-slot` ID. Actual tool placements remain disabled unless the separate Vercel configuration below is complete and the site is approved. Keep AdSense Auto ads disabled: Auto ads can bypass the enV selected-tool placement allowlist.
+The verification meta tag is **not** a display ad unit and does not provide a `data-ad-slot` ID. Actual tool placements remain disabled unless the separate Vercel configuration below is complete and the site is approved. Keep AdSense Auto ads disabled: Auto ads can bypass the enV selected-tool placement allowlist.
 
 Set these Vercel environment variables only for the production deployment after the provider and privacy configuration are ready:
 
