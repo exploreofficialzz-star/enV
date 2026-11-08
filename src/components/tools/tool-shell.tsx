@@ -11,6 +11,7 @@ import type { ToolMeta } from "@/types/tool";
 import { offlineAwareToolDescription } from "@/lib/offline/capabilities";
 import { Button } from "@/components/ui/button";
 import { ComingSoonBadge } from "@/components/tools/coming-soon";
+import { AdSlot } from "@/components/tools/ad-slot";
 import { ToolAppIcon } from "@/components/tools/tool-app-icon";
 import { AiAssistPanel } from "@/components/ai/ai-assist-panel";
 import { ToolCommunityPanel } from "@/components/tools/tool-community-panel";
@@ -308,6 +309,7 @@ export function ToolShell({
 
       {tool.category !== "creators" ? (
         <>
+      <AdSlot tool={tool} />
       <AiAssistPanel toolId={tool.id} />
 
       <section className="mt-10" aria-labelledby="tool-guide-heading">
