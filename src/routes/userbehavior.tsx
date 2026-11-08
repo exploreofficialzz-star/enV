@@ -194,19 +194,18 @@ function UserBehaviorDashboard() {
   }
 
   async function signOut() {
-    let signOutProblem = "";
+    setProblem("");
     try {
       const response = await fetch("/api/analytics/admin/session/revoke", { method: "POST", credentials: "same-origin" });
       if (!response.ok) {
         const payload = await response.json().catch(() => ({})) as { message?: string };
-        signOutProblem = payload.message || "The browser session was cleared, but server-side revocation could not be confirmed.";
+        setProblem(payload.message || "Server-side revocation could not be confirmed. Retry sign-out when the database is available.");
+        return;
       }
-    } catch {
-      signOutProblem = "The server could not confirm session revocation. Retry sign-out when the connection is available.";
-    } finally {
       setAuthenticated(false);
       setSummary(null);
-      setProblem(signOutProblem);
+    } catch {
+      setProblem("The server could not confirm session revocation. Retry sign-out when the connection is available.");
     }
   }
 
