@@ -62,12 +62,21 @@ export function AdSlot({ tool }: { tool: ToolMeta }) {
     let active = true;
     const update = () => { void isApplicationOnline().then((reachable) => { if (active) setOnline(reachable); }); };
     update();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") update();
+    };
+    const refreshHandle = window.setInterval(update, 15_000);
     window.addEventListener("online", update);
     window.addEventListener("offline", update);
+    window.addEventListener("focus", update);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       active = false;
+      window.clearInterval(refreshHandle);
       window.removeEventListener("online", update);
       window.removeEventListener("offline", update);
+      window.removeEventListener("focus", update);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
 
