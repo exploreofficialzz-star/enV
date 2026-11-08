@@ -48,7 +48,7 @@ The application password login and server-revocable session are mandatory. Use a
 
 ## Retention
 
-A daily Vercel cron calls `GET /api/analytics/retention` at 03:00 UTC with `Authorization: Bearer $CRON_SECRET`. It removes raw events older than the configured retention window and rate-limit rows older than one day. Aggregates are currently computed from retained rows; there is not yet a separate long-term aggregate warehouse.
+A daily Vercel cron calls `GET /api/analytics/retention` at 03:00 UTC with `Authorization: Bearer $CRON_SECRET`. Before pruning, it upserts daily aggregates into `product_analytics_daily_snapshots` and privacy-safe daily reports into `product_analytics_daily_reports`; it then removes raw events older than the configured retention window and stale rate-limit rows. Snapshots and reports are retained for up to 730 days. The cron requires a server-only `CRON_SECRET` and all supporting migrations to be applied; verify actual successful scheduled runs rather than assuming the configured cron has executed.
 
 ## Production release gates
 
