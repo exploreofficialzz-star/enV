@@ -7,6 +7,7 @@ const revokeRoute = readFileSync(new URL("../../server/routes/api/analytics/admi
 const migration = readFileSync(new URL("../../migrations/0018_analytics_dashboard_sessions.sql", import.meta.url), "utf8");
 const liveSmoke = readFileSync(new URL("../check-subdomain-live.mjs", import.meta.url), "utf8");
 const iosClient = readFileSync(new URL("../../apps/ios/enV/ContentViews.swift", import.meta.url), "utf8");
+const iosToolViews = readFileSync(new URL("../../apps/ios/enV/ToolViews.swift", import.meta.url), "utf8");
 const iosInfo = readFileSync(new URL("../../apps/ios/enV/Info.plist", import.meta.url), "utf8");
 const iosProject = readFileSync(new URL("../../apps/ios/enV.xcodeproj/project.pbxproj", import.meta.url), "utf8");
 const androidGradle = readFileSync(new URL("../../apps/android/app/build.gradle.kts", import.meta.url), "utf8");
@@ -69,4 +70,12 @@ test("Web, Android and iOS collection switches default off", () => {
   assert.match(iosInfo, /<key>ENV_ANALYTICS_ENABLED<\/key>\s*<string>\$\(ENV_ANALYTICS_ENABLED\)<\/string>/);
   assert.match(iosProject, /ENV_ANALYTICS_ENABLED = NO/);
   assert.match(iosClient, /\[("1",\s*"yes",\s*"true")\]/);
+});
+
+test("iOS records tool views and unfinished executions", () => {
+  assert.match(iosToolViews, /NativeAnalyticsClient\.record\("tool_viewed", toolID: tool\.id\)/);
+  assert.match(iosToolViews, /func abandon\(\)/);
+  assert.match(iosToolViews, /"tool_abandoned"/);
+  assert.match(iosToolViews, /NATIVE_TOOL_LEFT_BEFORE_RESULT/);
+  assert.match(iosToolViews, /\.onDisappear \{ executionTracker\.abandon\(\) \}/);
 });
