@@ -35,6 +35,7 @@ import com.google.android.libraries.ads.mobile.sdk.banner.BannerAdRequest
 import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback
 import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 import com.google.android.libraries.ads.mobile.sdk.common.RequestConfiguration
+import com.chastech.env.data.ToolRecord
 import com.google.android.libraries.ads.mobile.sdk.initialization.InitializationConfig
 import com.google.android.ump.ConsentInformation
 import com.google.android.ump.ConsentRequestParameters
@@ -85,8 +86,20 @@ internal object NativeAdsPolicy {
         return loaded
     }
 
-    fun isHybridTool(context: Context, toolId: String): Boolean =
-        adDisplayConfigured && toolId in allowlistedIds && toolId in crossPlatformMeteredIds(context)
+    fun isHybridTool(context: Context, tool: ToolRecord): Boolean {
+        val restrictedDisclaimers = setOf("health", "finance", "earnings")
+        val restrictedCategories = setOf("fitness", "personal")
+        return adDisplayConfigured &&
+            tool.id in allowlistedIds &&
+            tool.id in crossPlatformMeteredIds(context) &&
+            tool.status == "active" &&
+            tool.clientSide &&
+            !tool.requiresBackend &&
+            !tool.requiresAuth &&
+            tool.category !in restrictedCategories &&
+            !tool.id.startsWith("finance-") &&
+            tool.disclaimer !in restrictedDisclaimers
+    }
 
     suspend fun isApplicationOnline(context: Context): Boolean = withContext(Dispatchers.IO) {
         if (!hasValidatedInternet(context)) return@withContext false
@@ -195,11 +208,12 @@ internal fun NativeAdsPrivacyOptionsButton() {
 }
 
 @Composable
-internal fun NativeToolAdSlot(toolId: String) {
+internal fun NativeToolAdSlot(tool: ToolRecord) {
+    val toolId = tool.id
     val context = LocalContext.current
     val preview = LocalInspectionMode.current
     val supported = remember(toolId) {
-        NativeAdsPolicy.isHybridTool(context, toolId) &&
+        NativeAdsPolicy.isHybridTool(context, tool) &&
             runCatching { com.chastech.env.billing.OfflineWalletJournal(context).isEligibleTool(context, toolId) }.getOrDefault(false)
     }
     val network = rememberValidatedAdNetwork(context)
