@@ -309,7 +309,7 @@ export function ToolShell({
 
       {tool.category !== "creators" ? (
         <>
-      <AdSlot tool={tool} />
+      {!isFullscreen ? <AdSlot tool={tool} /> : null}
       <AiAssistPanel toolId={tool.id} />
 
       <section className="mt-10" aria-labelledby="tool-guide-heading">
