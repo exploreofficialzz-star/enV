@@ -1,4 +1,4 @@
-type AdsByGoogleQueue = Array<Record<string, unknown>> & { requestNonPersonalizedAds?: number };
+type AdsByGoogleQueue = Array<Record<string, unknown>> & { requestNonPersonalizedAds?: number; pauseAdRequests?: number };
 type GoogleFcCallback = (() => void) | Record<string, () => void>;
 type GoogleFcApi = {
   callbackQueue?: GoogleFcCallback[];
@@ -62,6 +62,11 @@ export function whenGooglePrivacyMessagingReady(callback: () => void): void {
 }
 
 /** Google requires its consent messaging methods to be invoked via callbackQueue. */
+/** Run ad-slot requests only after Google's CMP has resolved the visitor's consent data. */
+export function whenGooglePrivacyConsentDataReady(callback: () => void): void {
+  ensureGoogleFcQueue().callbackQueue!.push({ CONSENT_DATA_READY: callback });
+}
+
 export function reopenGooglePrivacySettings(): void {
   ensureGoogleFcQueue().callbackQueue!.push(() => {
     window.googlefc?.showRevocationMessage?.();
