@@ -49,6 +49,10 @@ assert.match(androidGradle, /user-messaging-platform:4\.0\.0/, "Android must use
 assert.match(androidManifest, /com\.google\.android\.gms\.ads\.APPLICATION_ID/, "Android must declare its configured AdMob app ID.");
 assert.match(androidAds, /UserMessagingPlatform\.getConsentInformation/, "Android must refresh and evaluate UMP consent.");
 assert.match(androidAds, /NetworkCapabilities\.NET_CAPABILITY_VALIDATED/, "Android ads must require validated network connectivity.");
+assert.match(androidAds, /suspend fun isApplicationOnline/, "Android must verify the application origin, not only network connectivity.");
+assert.match(androidAds, /MobileAds\.setRequestConfiguration/, "Android ad requests must default to non-personalized treatment.");
+assert.match(iosAds, /publisherPrivacyPersonalizationState = \.disabled/, "iOS ad requests must default to non-personalized treatment.");
+assert.match(iosAds, /coarseLocationCollectionEnabled = false/, "iOS ads must not collect coarse device location by default.");
 assert.match(androidAds, /context\.assets\.open\("offline-eligible-tools\.json"\)/, "Android must read the canonical bundled offline pricing registry.");
 assert.match(androidAds, /common\.AdLoadCallback|common\.LoadAdError/, "Android must use the current Google Ads callback API.");
 assert.match(androidMain, /NativeToolAdSlot\(tool\.id\)/, "The native Android tool surface must include its ad slot.");
@@ -60,6 +64,7 @@ assert.doesNotMatch(iosProject, /,,/, "The iOS project file must remain syntacti
 assert.match(iosProject, /NativeAds\.swift in Sources/, "The iOS native ad implementation must be part of the app target.");
 assert.match(iosAds, /ConsentInformation\.shared\.requestConsentInfoUpdate/, "iOS must refresh UMP consent at launch.");
 assert.match(iosAds, /MobileAds\.shared\.start/, "iOS must initialize Google Mobile Ads after consent.");
+assert.match(iosAds, /originReachable = await NativeAdsPolicy\.isApplicationOnline\(\)/, "iOS ad display must verify that the application origin is reachable.");
 assert.match(iosAds, /BannerView\(adSize:/, "iOS must render a native adaptive banner view.");
 assert.match(iosAds, /privacyOptionsRequired/, "iOS must expose the UMP privacy-options requirement.");
 assert.match(iosApp, /refreshConsentAtLaunch\(\)/, "iOS must refresh advertising consent at app launch.");
