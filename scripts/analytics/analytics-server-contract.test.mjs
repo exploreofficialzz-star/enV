@@ -5,6 +5,8 @@ import { readFileSync } from "node:fs";
 const server = readFileSync(new URL("../../src/lib/analytics/analytics.server.ts", import.meta.url), "utf8");
 const revokeRoute = readFileSync(new URL("../../server/routes/api/analytics/admin/session/revoke.post.ts", import.meta.url), "utf8");
 const migration = readFileSync(new URL("../../migrations/0018_analytics_dashboard_sessions.sql", import.meta.url), "utf8");
+const privilegeMigration = readFileSync(new URL("../../migrations/0020_analytics_privilege_lockdown.sql", import.meta.url), "utf8");
+const analyticsMigrator = readFileSync(new URL("../migrate-analytics.mjs", import.meta.url), "utf8");
 const liveSmoke = readFileSync(new URL("../check-subdomain-live.mjs", import.meta.url), "utf8");
 const iosClient = readFileSync(new URL("../../apps/ios/enV/ContentViews.swift", import.meta.url), "utf8");
 const iosToolViews = readFileSync(new URL("../../apps/ios/enV/ToolViews.swift", import.meta.url), "utf8");
@@ -95,4 +97,34 @@ test("Android records native tool executions abandoned before a result", () => {
   assert.match(androidActivity, /@Synchronized fun abandon\(\)/);
   assert.match(androidActivity, /"tool_abandoned"/);
   assert.match(androidActivity, /NATIVE_TOOL_LEFT_BEFORE_RESULT/);
+});
+
+
+test("analytics tables and migration ledger are private to the server role", () => {
+  assert.match(privilegeMigration, /alter table public\._migrations enable row level security/i);
+  assert.match(privilegeMigration, /revoke all privileges on table[\s\S]*from public/i);
+  assert.match(privilegeMigration, /array\['anon',\s*'authenticated'\]/i);
+  for (const table of [
+    "public._migrations",
+    "public.product_analytics_consents",
+    "public.product_analytics_events",
+    "public.product_analytics_rate_limits",
+    "public.product_analytics_admin_rate_limits",
+    "public.product_analytics_daily_snapshots",
+    "public.product_analytics_daily_reports",
+    "public.product_analytics_dashboard_sessions",
+  ]) {
+    assert.ok(privilegeMigration.includes(table), table + " must be included in the access lockdown");
+  }
+  assert.doesNotMatch(privilegeMigration, /create policy/i);
+});
+
+test("analytics migrator uses pooler-safe transaction-scoped locking", () => {
+  assert.match(analyticsMigrator, /SET LOCAL search_path TO public/);
+  assert.match(analyticsMigrator, /pg_advisory_xact_lock/);
+  assert.match(analyticsMigrator, /await client\.query\("BEGIN"\)/);
+  assert.match(analyticsMigrator, /await client\.query\("COMMIT"\)/);
+  assert.doesNotMatch(analyticsMigrator, /pg_advisory_lock\(/);
+  assert.doesNotMatch(analyticsMigrator, /pg_advisory_unlock/);
+  assert.doesNotMatch(analyticsMigrator, /SET search_path TO public/);
 });
