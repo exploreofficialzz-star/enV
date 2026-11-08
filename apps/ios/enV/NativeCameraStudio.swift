@@ -56,6 +56,8 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
     @Published private(set) var manualShutterDuration = 1.0 / 60.0
     @Published private(set) var supportsManualExposure = false
     @Published private(set) var supportsFocusLock = false
+    @Published private(set) var supportsVideoStabilization = false
+    @Published private(set) var videoStabilizationEnabled = true
     @Published private(set) var focusLocked = false
     @Published private(set) var whiteBalanceSelection = "Auto"
     @Published private(set) var lensOptions: [NativeCameraLensOption] = []
@@ -225,8 +227,16 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
             }
             session.addOutput(videoDataOutput)
             videoDataOutput.setSampleBufferDelegate(self, queue: queue)
-            if let connection = videoDataOutput.connection(with: .video), connection.isVideoOrientationSupported {
-                connection.videoOrientation = .portrait
+            if let connection = videoDataOutput.connection(with: .video) {
+                if connection.isVideoOrientationSupported { connection.videoOrientation = .portrait }
+                let stabilizationAvailable = connection.isVideoStabilizationSupported
+                if stabilizationAvailable {
+                    connection.preferredVideoStabilizationMode = videoStabilizationEnabled ? .auto : .off
+                }
+                Task { @MainActor in
+                    self.supportsVideoStabilization = stabilizationAvailable
+                    if !stabilizationAvailable { self.videoStabilizationEnabled = false }
+                }
             }
             configured = true
             session.commitConfiguration()
@@ -250,6 +260,28 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
                 Task { @MainActor in
                     self.ready = false
                     self.previewSink?.contents = nil
+                }
+            }
+        }
+    }
+
+    func setVideoStabilization(_ enabled: Bool) {
+        guard !recording, !recordingRequested else { return }
+        queue.async { [weak self] in
+            guard let self, let connection = self.videoDataOutput.connection(with: .video) else {
+                Task { @MainActor in self?.videoStabilizationEnabled = false }
+                return
+            }
+            let supported = connection.isVideoStabilizationSupported
+            if supported {
+                connection.preferredVideoStabilizationMode = enabled ? .auto : .off
+            }
+            let activePreference = supported && enabled
+            Task { @MainActor in
+                self.supportsVideoStabilization = supported
+                self.videoStabilizationEnabled = activePreference
+                if enabled && !supported {
+                    self.message = "Video stabilization is not supported by this camera at the selected format."
                 }
             }
         }
@@ -1378,6 +1410,9 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
         }
         session.addConnection(connection)
         if connection.isVideoOrientationSupported { connection.videoOrientation = .portrait }
+        if connection.isVideoStabilizationSupported {
+            connection.preferredVideoStabilizationMode = .auto
+        }
         if input.device.position == .front && connection.isVideoMirroringSupported {
             connection.automaticallyAdjustsVideoMirroring = false
             connection.isVideoMirrored = true
@@ -1991,6 +2026,18 @@ struct NativeCameraStudioView: View {
                             .frame(width: 132)
                     }
                 }
+            }
+
+            if !dualCameraMode && mode == "Video" && capture.supportsVideoStabilization {
+                Toggle(
+                    "Video stabilization",
+                    isOn: Binding(
+                        get: { capture.videoStabilizationEnabled },
+                        set: { capture.setVideoStabilization($0) }
+                    )
+                )
+                .font(.envScaled(size: 12, weight: .medium))
+                .disabled(capture.recording)
             }
 
             if let exposureRange = capture.exposureBiasRange {
