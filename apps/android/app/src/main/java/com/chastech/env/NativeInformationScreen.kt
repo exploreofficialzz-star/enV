@@ -343,6 +343,7 @@ fun NativeInformationScreen(pageId: String, catalog: com.chastech.env.data.Catal
                 "history" -> InformationSection("", listOf("Recently used tools will appear here."))
                 "privacy" -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     PrivacyInformation()
+                    NativeAdsPrivacyDisclosure()
                     NativeAdsPrivacyOptionsButton()
                 }
                 "terms" -> TermsInformation()
