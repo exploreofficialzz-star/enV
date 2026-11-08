@@ -34,7 +34,7 @@ Set these Vercel environment variables only for the production deployment after 
 | `VITE_AD_SUPPORTED_TOOL_IDS` | Comma-separated IDs reviewed against the local/cross-platform registry |
 | `VITE_ADSENSE_PRIVACY_CONFIGURED` | `true` only after the Google-certified CMP / Privacy & Messaging configuration has been tested |
 
-The Web component requests non-personalized ads. That is not equivalent to “no cookies” or “no identifiers”; the disclosure explains that the provider can process request context and technical identifiers for delivery, fraud prevention, frequency capping, and reporting. Analytics consent and advertising consent are separate controls.
+The Web component requests non-personalized ads. That is not equivalent to “no cookies” or “no identifiers”; the disclosure explains that the provider can process request context and technical identifiers for delivery, fraud prevention, frequency capping, and reporting. Analytics consent and advertising consent are separate controls. When Google's Privacy & Messaging API is ready, the enV Privacy page exposes Google's documented consent-revocation entry point.
 
 Do not turn on `VITE_ADSENSE_PRIVACY_CONFIGURED` merely to make ads render. Configure the messages and regions in the AdSense Privacy & Messaging console first. Where Google requires a certified CMP (including applicable EEA, UK, and Switzerland traffic), ensure its message and consent flow are actually published and test both consent and refusal paths.
 
@@ -99,6 +99,7 @@ Before launch, verify:
 ## Provider references
 
 - [AdSense non-personalized ad guidance](https://support.google.com/adsense/answer/9007336?hl=en)
+- [Google Privacy & Messaging JavaScript API and consent revocation](https://developers.google.com/funding-choices/fc-api-docs)
 - [Google's CMP requirement for relevant EEA, UK, and Switzerland traffic](https://support.google.com/adsense/answer/13554116?hl=en)
 - [AdSense ads.txt guidance](https://support.google.com/adsense/answer/9785052?hl=en)
 - [Android Google Mobile Ads Next-Gen quick start](https://developers.google.com/ad-manager/mobile-ads-sdk/android/next-gen/quick-start)
