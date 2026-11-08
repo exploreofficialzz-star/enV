@@ -149,6 +149,7 @@ private enum class NativeCameraLook(val label: String) {
     GLOW("Glow"),
 }
 
+@androidx.annotation.OptIn(UnstableApi::class)
 @OptIn(UnstableApi::class)
 private fun nativeCameraEffects(look: NativeCameraLook): List<Effect> = when (look) {
     NativeCameraLook.NATURAL -> emptyList()
@@ -323,7 +324,7 @@ private val nativeCameraQualities = listOf(
     NativeCameraQuality("4K", Quality.UHD),
 )
 
-@androidx.annotation.OptIn(androidx.camera.camera2.interop.ExperimentalCamera2Interop::class, androidx.camera.core.ExperimentalGetImage::class)
+@androidx.annotation.OptIn(androidx.camera.camera2.interop.ExperimentalCamera2Interop::class, androidx.camera.core.ExperimentalGetImage::class, UnstableApi::class)
 @Composable
 fun NativeCameraStudioScreen() {
     val context = LocalContext.current
