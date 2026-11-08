@@ -1212,7 +1212,7 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
                     self.ready = self.session.isRunning
                     self.error = nil
                     self.message = self.ready
-                        ? "Both cameras are ready in \\(selectedProfile) mode. Start recording when you are set."
+                        ? "Both cameras are ready in \(selectedProfile) mode. Start recording when you are set."
                         : "The cameras could not start. Return to the normal camera."
                 }
             } catch {
@@ -1310,7 +1310,7 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
                 self.ready = isRunning
                 self.error = isRunning ? nil : "The dual-camera session could not restart. Use the normal camera instead."
                 self.message = isRunning
-                    ? "Both cameras are ready again in \\(selectedProfile) mode."
+                    ? "Both cameras are ready again in \(selectedProfile) mode."
                     : "Your normal single-camera mode remains available."
             }
         } catch {
@@ -1355,7 +1355,7 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
         } catch {
             resetSessionAfterFailure()
             throw NativeCameraError.message(
-                "This iPhone could not sustain both cameras, even with the low-power profile. Use the normal camera instead. \\(error.localizedDescription)"
+                "This iPhone could not sustain both cameras, even with the low-power profile. Use the normal camera instead. \(error.localizedDescription)"
             )
         }
     }
@@ -1442,7 +1442,7 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
             return Int(left.width) * Int(left.height) < Int(right.width) * Int(right.height)
         }) else {
             throw NativeCameraError.message(
-                "A MultiCam-compatible camera format at or below \\(maxWidth)x\\(maxHeight) and \\(Int(frameRate)) fps is not available."
+                "A MultiCam-compatible camera format at or below \(maxWidth)x\(maxHeight) and \(Int(frameRate)) fps is not available."
             )
         }
 
