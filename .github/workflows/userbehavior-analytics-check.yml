@@ -8,6 +8,7 @@ on:
       - "server/routes/api/analytics/**"
       - "migrations/0018_analytics_dashboard_sessions.sql"
       - "migrations/0019_analytics_core_rls.sql"
+      - "migrations/0020_analytics_privilege_lockdown.sql"
       - "scripts/migrate-analytics.mjs"
       - "package.json"
       - "scripts/analytics/**"
