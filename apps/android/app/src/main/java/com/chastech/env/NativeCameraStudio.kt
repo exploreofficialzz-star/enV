@@ -647,10 +647,17 @@ fun NativeCameraStudioScreen() {
         applyAdvancedCameraSettings()
     }
 
-    LaunchedEffect(videoStabilizationEnabled, mode, videoStabilizationModes, cameraGranted) {
-        if (cameraGranted && videoStabilizationModes.contains(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_ON)) {
-            applyAdvancedCameraSettings()
-        }
+    LaunchedEffect(
+        videoStabilizationEnabled,
+        mode,
+        videoStabilizationModes,
+        cameraGranted,
+        usingFrontCamera,
+        selectedRearCameraId
+    ) {
+        // Apply ON or OFF to the currently selected camera after permission,
+        // lens switching, mode changes, or a capability refresh.
+        if (cameraGranted) applyAdvancedCameraSettings()
     }
 
     val savePicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/jpeg")) { target ->
