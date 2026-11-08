@@ -185,3 +185,11 @@ private struct NativeBannerAdView: UIViewRepresentable {
         uiView.delegate = nil
     }
 }
+
+enum NativeHybridAccessError: LocalizedError {
+    case offlineAllowanceRequired
+
+    var errorDescription: String? {
+        "Connect to use this tool online, or sign in and prepare an offline allowance in Wallet before disconnecting."
+    }
+}
