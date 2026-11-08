@@ -1,14 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ToolMeta } from "@/types/tool";
 import { canShowAdForTool, isApplicationOnline, resolveAdConfig } from "@/lib/ads/policy";
-
-type AdsByGoogleQueue = Array<Record<string, unknown>> & { requestNonPersonalizedAds?: number };
-
-declare global {
-  interface Window {
-    adsbygoogle?: AdsByGoogleQueue;
-  }
-}
+import { loadAdSenseScript } from "@/lib/ads/browser";
 
 const adConfig = resolveAdConfig({
   enabled: import.meta.env.VITE_ADS_ENABLED,
@@ -17,39 +10,6 @@ const adConfig = resolveAdConfig({
   toolSlotId: import.meta.env.VITE_ADSENSE_TOOL_SLOT_ID,
   toolIds: import.meta.env.VITE_AD_SUPPORTED_TOOL_IDS,
 });
-
-let adSenseScriptPromise: Promise<void> | null = null;
-
-function loadAdSenseScript(clientId: string): Promise<void> {
-  if (typeof document === "undefined") return Promise.reject(new Error("Ads are only available in a browser."));
-  const existing = document.querySelector<HTMLScriptElement>("script[data-env-adsense-client]");
-  if (existing && existing.dataset.envAdsenseClient !== clientId) {
-    return Promise.reject(new Error("A different AdSense publisher script is already loaded."));
-  }
-  if (existing?.dataset.loaded === "true") return Promise.resolve();
-  if (adSenseScriptPromise) return adSenseScriptPromise;
-
-  adSenseScriptPromise = new Promise<void>((resolve, reject) => {
-    const script = existing ?? document.createElement("script");
-    script.addEventListener("load", () => {
-      script.dataset.loaded = "true";
-      resolve();
-    }, { once: true });
-    script.addEventListener("error", () => {
-      adSenseScriptPromise = null;
-      script.remove();
-      reject(new Error("The advertising provider could not be loaded."));
-    }, { once: true });
-    if (!existing) {
-      script.async = true;
-      script.crossOrigin = "anonymous";
-      script.dataset.envAdsenseClient = clientId;
-      script.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=" + encodeURIComponent(clientId);
-      document.head.appendChild(script);
-    }
-  });
-  return adSenseScriptPromise;
-}
 
 /** One responsive, clearly labelled ad below eligible Web tool interfaces. */
 export function AdSlot({ tool }: { tool: ToolMeta }) {
