@@ -59,6 +59,12 @@ assert.match(androidCamera, /UseCaseGroup\.Builder/);
 assert.match(androidCamera, /VideoCapture\.withOutput/);
 assert.match(androidCamera, /withAudioEnabled\(\)/);
 assert.match(androidCamera, /NativeDualCameraStudioScreen/);
+const androidDualCameraScreen = androidCamera.slice(androidCamera.indexOf("private fun NativeDualCameraStudioScreen"));
+assert.match(
+  androidDualCameraScreen,
+  /if \(disposeAfterRecording\.compareAndSet\(true, false\)\) \{[\s\S]*?currentProvider\.unbind\(currentPreview, currentVideo\)/,
+  "Leaving dual-camera mode during recording must unbind concurrent use cases after recording finalization."
+);
 assert.match(androidCamera, /videoFrameRate/);
 assert.ok(androidCamera.includes("Save canceled. Your photo is still ready to save."));
 assert.match(androidCamera, /Your capture is still available to retry/);
