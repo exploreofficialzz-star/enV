@@ -5,6 +5,10 @@
  * Dry-run is the default. Pass --apply only after confirming the database
  * target and a restorable backup. This runner has an explicit allowlist and
  * does not apply Product Feedback, Community, Wallet, or World Lab migrations.
+ *
+ * Every database operation runs inside one transaction. SET LOCAL and a
+ * transaction-scoped advisory lock work with Supabase's transaction pooler
+ * (DATABASE_URL on port 6543); no session state is required.
  */
 import { readdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -36,14 +40,15 @@ if (invalidArgs.length || (apply && args.includes("--dry-run"))) {
 
     const pool = new pg.Pool({ connectionString: databaseUrl, max: 1 });
     let client;
-    let lockAcquired = false;
+    let transactionOpen = false;
     try {
       client = await pool.connect();
-      await client.query("SET search_path TO public");
+      await client.query("BEGIN");
+      transactionOpen = true;
+      await client.query("SET LOCAL search_path TO public");
       await client.query(
-        "SELECT pg_advisory_lock(hashtextextended('enV:userbehavior:analytics-migrations', 0))",
+        "SELECT pg_advisory_xact_lock(hashtextextended('enV:userbehavior:analytics-migrations', 0))",
       );
-      lockAcquired = true;
 
       const database = await client.query(
         "SELECT current_database() AS database_name, " +
@@ -68,6 +73,8 @@ if (invalidArgs.length || (apply && args.includes("--dry-run"))) {
 
       if (!pending.length) {
         console.log("[migrate:analytics] User Behavior migrations are already up to date.");
+        await client.query("ROLLBACK");
+        transactionOpen = false;
         return;
       }
 
@@ -77,6 +84,8 @@ if (invalidArgs.length || (apply && args.includes("--dry-run"))) {
         }
         console.log("[migrate:analytics] Dry-run only; no schema changes were made.");
         console.log("[migrate:analytics] After backup and target verification, rerun with --apply.");
+        await client.query("ROLLBACK");
+        transactionOpen = false;
         return;
       }
 
@@ -90,36 +99,33 @@ if (invalidArgs.length || (apply && args.includes("--dry-run"))) {
       for (const migration of pending) {
         const sql = await readFile(join(migrationsDir, migration.path), "utf8");
         try {
-          await client.query("BEGIN");
           await client.query(sql);
           await client.query(
             "INSERT INTO public._migrations (name) VALUES ($1)",
             [migration.name],
           );
-          await client.query("COMMIT");
         } catch (error) {
           console.error("[migrate:analytics] Failed while applying " + migration.name);
-          try {
-            await client.query("ROLLBACK");
-          } catch {
-            // Preserve the original SQL error if the connection has dropped.
-          }
           throw error;
         }
         console.log("[migrate:analytics] applied " + migration.name);
         count += 1;
       }
+
+      // The complete allowlisted batch and its ledger entries commit together.
+      await client.query("COMMIT");
+      transactionOpen = false;
       console.log("[migrate:analytics] completed; " + count + " analytics migration(s) applied.");
-    } finally {
-      if (client && lockAcquired) {
+    } catch (error) {
+      if (client && transactionOpen) {
         try {
-          await client.query(
-            "SELECT pg_advisory_unlock(hashtextextended('enV:userbehavior:analytics-migrations', 0))",
-          );
+          await client.query("ROLLBACK");
         } catch {
-          // The connection may already have been dropped.
+          // Preserve the original SQL error if the connection has dropped.
         }
       }
+      throw error;
+    } finally {
       if (client) client.release();
       await pool.end();
     }
