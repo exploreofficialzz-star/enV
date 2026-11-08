@@ -269,17 +269,16 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
         guard !recording, !recordingRequested else { return }
         queue.async { [weak self] in
             guard let self, let connection = self.videoDataOutput.connection(with: .video) else {
-                Task { @MainActor in self?.videoStabilizationEnabled = false }
+                Task { @MainActor in self?.videoStabilizationEnabled = enabled }
                 return
             }
             let supported = connection.isVideoStabilizationSupported
             if supported {
                 connection.preferredVideoStabilizationMode = enabled ? .auto : .off
             }
-            let activePreference = supported && enabled
             Task { @MainActor in
                 self.supportsVideoStabilization = supported
-                self.videoStabilizationEnabled = activePreference
+                self.videoStabilizationEnabled = enabled
                 if enabled && !supported {
                     self.message = "Video stabilization is not supported by this camera at the selected format."
                 }
@@ -1055,7 +1054,9 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
             }
             Task { @MainActor in
                 self.supportsVideoStabilization = supported
-                self.videoStabilizationEnabled = supported && requested
+                // Keep the user's preference while unsupported lenses hide this control.
+                // If a later lens supports stabilization, apply the preserved preference.
+                self.videoStabilizationEnabled = requested
             }
         }
     }
