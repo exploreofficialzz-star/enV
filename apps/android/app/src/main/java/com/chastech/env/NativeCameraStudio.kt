@@ -1451,12 +1451,36 @@ private fun NativeDualCameraStudioScreen(
                 .addEffect(cameraEffect)
                 .build()
 
-            cameraProvider.bindToLifecycle(
+            val concurrentCamera = cameraProvider.bindToLifecycle(
                 listOf(
                     ConcurrentCamera.SingleCameraConfig(backSelector, group, lifecycleOwner),
                     ConcurrentCamera.SingleCameraConfig(frontSelector, group, lifecycleOwner)
                 )
             )
+            // Request hardware video stabilization independently for each stream when
+            // that camera advertises support. Unsupported cameras continue normally.
+            concurrentCamera.cameras.forEach { activeCamera ->
+                runCatching {
+                    val info = Camera2CameraInfo.from(activeCamera.cameraInfo)
+                    val modes = info.getCameraCharacteristic(
+                        CameraCharacteristics.CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES
+                    )?.toSet().orEmpty()
+                    if (modes.contains(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_ON)) {
+                        val options = CaptureRequestOptions.Builder()
+                            .setCaptureRequestOption(
+                                CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
+                                CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_ON
+                            )
+                            .build()
+                        val future = Camera2CameraControl.from(activeCamera.cameraControl)
+                            .setCaptureRequestOptions(options)
+                        future.addListener(
+                            { runCatching { future.get() } },
+                            ContextCompat.getMainExecutor(context)
+                        )
+                    }
+                }
+            }
 
             provider = cameraProvider
             previewUseCase = preview
