@@ -19,6 +19,7 @@ const allFeatureMigrations = [
   "0017_analytics_daily_reports.sql",
   "0018_analytics_dashboard_sessions.sql",
   "0019_analytics_core_rls.sql",
+  "0020_analytics_privilege_lockdown.sql",
 ];
 
 test("analytics migration plan contains only the User Behavior schema", () => {
@@ -32,6 +33,7 @@ test("analytics migration plan contains only the User Behavior schema", () => {
       "0017_analytics_daily_reports.sql",
       "0018_analytics_dashboard_sessions.sql",
       "0019_analytics_core_rls.sql",
+      "0020_analytics_privilege_lockdown.sql",
     ],
   );
   assert.equal(pending.length, ANALYTICS_MIGRATION_FILES.length);
@@ -68,6 +70,7 @@ test("analytics plan skips only migrations already recorded as applied", () => {
       "0017_analytics_daily_reports.sql",
       "0018_analytics_dashboard_sessions.sql",
       "0019_analytics_core_rls.sql",
+      "0020_analytics_privilege_lockdown.sql",
     ],
   );
 });
@@ -75,10 +78,10 @@ test("analytics plan skips only migrations already recorded as applied", () => {
 test("analytics plan fails closed when an allowlisted migration file is missing", () => {
   assert.throws(
     () => pendingAnalyticsMigrations(
-      allFeatureMigrations.filter((name) => name !== "0019_analytics_core_rls.sql"),
+      allFeatureMigrations.filter((name) => name !== "0020_analytics_privilege_lockdown.sql"),
       [],
     ),
-    /Missing required analytics migration files: 0019_analytics_core_rls\.sql/,
+    /Missing required analytics migration files: 0020_analytics_privilege_lockdown\\.sql/,
   );
 });
 
