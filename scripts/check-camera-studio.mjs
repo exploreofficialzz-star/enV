@@ -198,6 +198,8 @@ assert.match(androidCamera, /CaptureRequest\.CONTROL_AWB_MODE/);
 assert.match(androidCamera, /CameraCharacteristics.CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES/);
 assert.match(androidCamera, /CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_ON/);
 assert.match(androidCamera, /videoStabilizationEnabled/);
+assert.match(androidCamera, /videoStabilizationEnabled by remember \{ mutableStateOf\(true\) \}/, "Android enables hardware stabilization by default where the active camera supports it.");
+assert.match(androidCamera, /LaunchedEffect\(videoStabilizationEnabled, mode, videoStabilizationModes, cameraGranted\)/);
 assert.match(androidCamera, /Video stabilization/);
 assert.match(androidCamera, /Reset pro controls/);
 assert.match(androidCamera, /disposeAfterRecording\.set\(true\)/);
