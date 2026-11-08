@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { InfoPage } from "@/components/layout/info-page";
 import { seoPageHead, pageSchema } from "@/lib/seo-metadata";
 import { PrivacyControls } from "@/components/layout/privacy-controls";
+import { AdPrivacyControls } from "@/components/layout/ad-privacy-controls";
 
 export const Route = createFileRoute("/privacy")({
   head: () => seoPageHead({
@@ -55,6 +56,7 @@ function Privacy() {
       </section>
 
       <PrivacyControls />
+      <AdPrivacyControls />
 
       <section className="space-y-2">
         <h2 className="text-lg font-semibold text-fg">Optional analytics</h2>
