@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ToolMeta } from "@/types/tool";
 import { canShowAdForTool, isApplicationOnline, resolveAdConfig } from "@/lib/ads/policy";
-import { loadAdSenseScript } from "@/lib/ads/browser";
+import { loadAdSenseScript, whenGooglePrivacyConsentDataReady } from "@/lib/ads/browser";
 
 const adConfig = resolveAdConfig({
   enabled: import.meta.env.VITE_ADS_ENABLED,
@@ -44,18 +44,22 @@ export function AdSlot({ tool }: { tool: ToolMeta }) {
     const slot = slotRef.current;
     if (!eligible || !online || !adConfig || !slot || slot.dataset.envAdRequested === "true") return;
     let active = true;
-    void loadAdSenseScript(adConfig.clientId).then(() => {
+    const queue = window.adsbygoogle ?? (window.adsbygoogle = []);
+    // Do not let the publisher tag request an ad before CMP consent data is resolved.
+    queue.pauseAdRequests = 1;
+    whenGooglePrivacyConsentDataReady(() => {
       if (!active || !slot.isConnected || slot.dataset.envAdRequested === "true") return;
       try {
-        const queue = window.adsbygoogle ?? (window.adsbygoogle = []);
-        // Non-personalized requests reduce profiling but do not replace required CMP consent.
-        queue.requestNonPersonalizedAds = 1;
-        queue.push({});
+        const consentedQueue = window.adsbygoogle ?? (window.adsbygoogle = []);
+        consentedQueue.requestNonPersonalizedAds = 1;
+        consentedQueue.pauseAdRequests = 0;
+        consentedQueue.push({});
         slot.dataset.envAdRequested = "true";
       } catch {
         if (active) setFailed(true);
       }
-    }).catch(() => {
+    });
+    void loadAdSenseScript(adConfig.clientId).catch(() => {
       if (active) setFailed(true);
     });
     return () => { active = false; };
