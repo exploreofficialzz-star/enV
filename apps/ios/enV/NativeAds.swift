@@ -116,6 +116,8 @@ final class NativeAdsPrivacyManager: ObservableObject {
     private func initializeSDKWhenAllowed() async {
         guard canRequestAds, !sdkReady, !sdkStarting else { return }
         sdkStarting = true
+        MobileAds.shared.requestConfiguration.publisherPrivacyPersonalizationState = .disabled
+        MobileAds.shared.requestConfiguration.coarseLocationCollectionEnabled = false
         await withCheckedContinuation { continuation in
             MobileAds.shared.start { _ in continuation.resume() }
         }
