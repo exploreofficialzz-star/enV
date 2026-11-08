@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 
 const root = process.cwd();
 const read = (path) => readFileSync(resolve(root, path), "utf8");
+const rootRoute = read("src/routes/__root.tsx");
 const slot = read("src/components/tools/ad-slot.tsx");
 const webAdPrivacy = read("src/components/layout/ad-privacy-controls.tsx");
 const adsBrowser = read("src/lib/ads/browser.ts");
@@ -28,6 +29,11 @@ const iosPrivacy = read("apps/ios/enV/ContentViews.swift");
 const iosApp = read("apps/ios/enV/enVApp.swift");
 const iosProject = read("apps/ios/enV.xcodeproj/project.pbxproj");
 
+assert.match(rootRoute, /ca-pub-2492078126313994/, "The AdSense site verification tag must use the publisher ID supplied by the account owner.");
+assert.match(rootRoute, /ADSENSE_BOOTSTRAP_SCRIPT/, "The global AdSense script must be preceded by the consent bootstrap.");
+assert.match(rootRoute, /adsbygoogle\.pauseAdRequests = 1/, "Ad requests must be paused before the AdSense library loads.");
+assert.match(rootRoute, /data-env-adsense-client=\{ADSENSE_SITE_CLIENT_ID\}/, "The shared document head must identify the AdSense loader.");
+assert.match(rootRoute, /CONSENT_DATA_READY/, "The global bootstrap must record consent readiness even if it fires before an ad slot mounts.");
 assert.match(shell, /<AdSlot tool=\{tool\} \/>/, "Tool details must include the ad placement.");
 assert.match(slot, /isApplicationOnline\(\)/, "Ads must not be requested unless the application origin is reachable.");
 assert.match(shell, /!isFullscreen \? <AdSlot tool=\{tool\} \/> : null/, "Web ads must stay outside the full-screen tool-only experience.");
@@ -35,7 +41,8 @@ assert.match(shell, /!isFullscreen \? <AdSlot tool=\{tool\} \/> : null/, "Web ad
 assert.match(slot, /whenGooglePrivacyConsentDataReady/, "Web ad requests must wait for the CMP consent-data-ready callback.");
 assert.match(slot, /pauseAdRequests = 1/, "Web must pause ad requests before consent data is ready.");
 assert.match(slot, /pauseAdRequests = 0/, "Web must resume ad requests only after consent data is ready.");
-assert.match(adsBrowser, /CONSENT_DATA_READY/, "Web must use Google's supported consent-data-ready callback.");
+assert.match(adsBrowser, /CONSENT_DATA_READY/, "Web must use the supported consent-data-ready callback.");
+assert.match(adsBrowser, /__envGoogleConsentDataReady/, "Web must retain CMP readiness when Google signals before an ad slot mounts.");
 
 assert.match(slot, /requestNonPersonalizedAds = 1/, "Ad requests must default to non-personalized.");
 assert.match(slot, /VITE_ADSENSE_PRIVACY_CONFIGURED/, "Ad requests must require privacy/CMP setup.");

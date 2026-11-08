@@ -9,6 +9,16 @@ import type { CategoryId } from "@/types/tool";
 import { businessStudioAnchorSlug } from "@/lib/business-studios-catalog";
 
 const APP_NAME = "enV — Browser Toolkit";
+const ADSENSE_SITE_CLIENT_ID = "ca-pub-2492078126313994";
+const ADSENSE_BOOTSTRAP_SCRIPT = `(() => {
+  const googlefc = window.googlefc || (window.googlefc = {});
+  googlefc.callbackQueue = googlefc.callbackQueue || [];
+  googlefc.callbackQueue.push({
+    CONSENT_DATA_READY: () => { window.__envGoogleConsentDataReady = true; }
+  });
+  const adsbygoogle = window.adsbygoogle || (window.adsbygoogle = []);
+  adsbygoogle.pauseAdRequests = 1;
+})();`;
 
 const NON_INDEXABLE_PATHS = [
   "/account", "/agent", "/assistant", "/developer", "/favorites", "/feedback",
@@ -72,6 +82,13 @@ function RootDocument() {
     <html lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: INITIAL_THEME_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: ADSENSE_BOOTSTRAP_SCRIPT }} />
+        <script
+          async
+          crossOrigin="anonymous"
+          data-env-adsense-client={ADSENSE_SITE_CLIENT_ID}
+          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_SITE_CLIENT_ID}`}
+        />
         <HeadContent />
       </head>
       <body>

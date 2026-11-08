@@ -9,6 +9,7 @@ declare global {
   interface Window {
     adsbygoogle?: AdsByGoogleQueue;
     googlefc?: GoogleFcApi;
+    __envGoogleConsentDataReady?: boolean;
   }
 }
 
@@ -31,7 +32,8 @@ export function loadAdSenseScript(clientId: string): Promise<void> {
     return Promise.reject(new Error("A different AdSense publisher script is already loaded."));
   }
   ensureGoogleFcQueue();
-  if (existing?.dataset.loaded === "true") return Promise.resolve();
+  // The site-verification tag is in the document head. The queue accepts requests before the async library loads.
+  if (existing) return Promise.resolve();
   if (adSenseScriptPromise) return adSenseScriptPromise;
 
   adSenseScriptPromise = new Promise<void>((resolve, reject) => {
@@ -64,7 +66,16 @@ export function whenGooglePrivacyMessagingReady(callback: () => void): void {
 /** Google requires its consent messaging methods to be invoked via callbackQueue. */
 /** Run ad-slot requests only after Google's CMP has resolved the visitor's consent data. */
 export function whenGooglePrivacyConsentDataReady(callback: () => void): void {
-  ensureGoogleFcQueue().callbackQueue!.push({ CONSENT_DATA_READY: callback });
+  if (window.__envGoogleConsentDataReady === true) {
+    callback();
+    return;
+  }
+  ensureGoogleFcQueue().callbackQueue!.push({
+    CONSENT_DATA_READY: () => {
+      window.__envGoogleConsentDataReady = true;
+      callback();
+    },
+  });
 }
 
 export function reopenGooglePrivacySettings(): void {
