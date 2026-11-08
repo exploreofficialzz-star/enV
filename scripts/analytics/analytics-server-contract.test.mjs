@@ -6,6 +6,11 @@ const server = readFileSync(new URL("../../src/lib/analytics/analytics.server.ts
 const revokeRoute = readFileSync(new URL("../../server/routes/api/analytics/admin/session/revoke.post.ts", import.meta.url), "utf8");
 const migration = readFileSync(new URL("../../migrations/0018_analytics_dashboard_sessions.sql", import.meta.url), "utf8");
 const liveSmoke = readFileSync(new URL("../check-subdomain-live.mjs", import.meta.url), "utf8");
+const iosClient = readFileSync(new URL("../../apps/ios/enV/ContentViews.swift", import.meta.url), "utf8");
+const iosInfo = readFileSync(new URL("../../apps/ios/enV/Info.plist", import.meta.url), "utf8");
+const iosProject = readFileSync(new URL("../../apps/ios/enV.xcodeproj/project.pbxproj", import.meta.url), "utf8");
+const androidGradle = readFileSync(new URL("../../apps/android/app/build.gradle.kts", import.meta.url), "utf8");
+const envExample = readFileSync(new URL("../../.env.example", import.meta.url), "utf8");
 
 test("consent withdrawal locks the consent row before deleting events and consent", () => {
   const withdrawalStart = server.indexOf("export async function saveAnalyticsConsent");
@@ -50,4 +55,14 @@ test("live smoke requires an enabled dashboard login and strict API denial", () 
   assert.match(liveSmoke, /dashboard UI is disabled in the production Web build/);
   assert.match(liveSmoke, /\[401, 403\]\.includes\(summary\.status\)/);
   assert.doesNotMatch(liveSmoke, /\[401, 403, 503\]\.includes\(summary\.status\)/);
+});
+
+test("Web, Android and iOS collection switches default off", () => {
+  assert.match(envExample, /^ANALYTICS_ENABLED=false$/m);
+  assert.match(envExample, /^VITE_ANALYTICS_ENABLED=false$/m);
+  assert.match(envExample, /^VITE_ANALYTICS_DASHBOARD_ENABLED=false$/m);
+  assert.match(androidGradle, /buildConfigField\("boolean",\s*"ANALYTICS_ENABLED",\s*providers\.gradleProperty\("envAnalyticsEnabled"\)\.orNull \?\? "false"\)/);
+  assert.match(iosInfo, /<key>ENV_ANALYTICS_ENABLED<\/key>\s*<string>\$\(ENV_ANALYTICS_ENABLED\)<\/string>/);
+  assert.match(iosProject, /ENV_ANALYTICS_ENABLED = NO/);
+  assert.match(iosClient, /\[("1",\s*"yes",\s*"true")\]/);
 });
