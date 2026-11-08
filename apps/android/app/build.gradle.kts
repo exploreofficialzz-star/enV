@@ -17,7 +17,7 @@ android {
         buildConfigField("boolean", "ENV_ADS_ENABLED", providers.gradleProperty("envAdsEnabled").orNull ?: "false")
         buildConfigField("boolean", "ENV_ADS_PRIVACY_CONFIGURED", providers.gradleProperty("envAdsPrivacyConfigured").orNull ?: "false")
         val adToolIds = (providers.gradleProperty("envAdSupportedToolIds").orNull ?: "").split(",").map { it.trim() }.filter { it.matches(Regex("[a-z0-9][a-z0-9-]{0,119}")) }.distinct().joinToString(",")
-        val admobAppId = (providers.gradleProperty("envAdmobAppId").orNull ?: "").filter { it.isLetterOrDigit() || it == '-' || it == '_' || it == '~' }
+        val admobAppId = (providers.gradleProperty("envAdmobAppId").orNull ?: "ca-app-pub-3940256099942544~3347511713").filter { it.isLetterOrDigit() || it == '-' || it == '_' || it == '~' }
         val admobBannerUnit = providers.gradleProperty("envAdmobBannerAdUnitId").orNull ?: ""
         buildConfigField("String", "ENV_AD_SUPPORTED_TOOL_IDS", "\"$adToolIds\"")
         buildConfigField("String", "ENV_ADMOB_APP_ID", "\"$admobAppId\"")
