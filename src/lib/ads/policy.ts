@@ -64,7 +64,8 @@ export function resolveAdConfig(env: AdEnvironment): AdRuntimeConfig | null {
  * Backend/auth tools and sensitive finance/health/earnings experiences stay excluded.
  */
 export function isHybridAdSupportedToolId(toolId: string, env: AdEnvironment): boolean {
-  return resolveAdConfig(env) !== null && OFFLINE_PROFILE_IDS.has(toolId);
+  const config = resolveAdConfig(env);
+  return config !== null && config.allowedToolIds.has(toolId) && OFFLINE_PROFILE_IDS.has(toolId);
 }
 
 /** Same-origin reachability check: browser online hints alone are not authoritative. */
