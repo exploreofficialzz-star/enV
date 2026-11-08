@@ -139,6 +139,8 @@ test("public privacy notice states analytics purpose, identifiers, retention and
   assert.match(section, /product analytics helps/i);
   assert.match(section, /not used to target advertisements/i);
   assert.match(section, /keyed HMAC digests/i);
+  assert.match(section, /private dashboard sign-in/i);
+  assert.match(section, /only the digest is stored/i);
   assert.match(section, /pseudonymous/i);
   assert.match(section, /90 days from receipt/i);
   assert.match(section, /up to 730 days/i);
