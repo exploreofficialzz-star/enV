@@ -63,13 +63,29 @@ export function resolveAdConfig(env: AdEnvironment): AdRuntimeConfig | null {
  * Only intentionally selected, active, public, device-local Web tools may show ads.
  * Backend/auth tools and sensitive finance/health/earnings experiences stay excluded.
  */
+function isEligibleHybridToolRecord(toolId: string, tool: AdEligibleTool): boolean {
+  return tool.id === toolId &&
+    OFFLINE_PROFILE_IDS.has(toolId) &&
+    tool.status === "active" &&
+    tool.clientSide === true &&
+    !tool.requiresBackend &&
+    !tool.requiresAuth &&
+    tool.category !== "fitness" &&
+    tool.category !== "personal" &&
+    !tool.id.startsWith("finance-") &&
+    !(tool.disclaimer && RESTRICTED_DISCLAIMERS.has(tool.disclaimer)) &&
+    classifyOfflineToolRecord(tool).execution === "device-local";
+}
+
+/** A selected hybrid tool must remain metered offline even while ad serving is disabled. */
+export function isHybridAccessToolId(toolId: string, env: AdEnvironment, tool: AdEligibleTool): boolean {
+  return parseAllowedToolIds(env.toolIds).has(toolId) && isEligibleHybridToolRecord(toolId, tool);
+}
+
+/** Ad rendering is a separate, stricter decision from the guest/offline access boundary. */
 export function isHybridAdSupportedToolId(toolId: string, env: AdEnvironment, tool: AdEligibleTool): boolean {
   const config = resolveAdConfig(env);
-  return config !== null &&
-    tool.id === toolId &&
-    config.allowedToolIds.has(toolId) &&
-    OFFLINE_PROFILE_IDS.has(toolId) &&
-    canShowAdForTool(tool, config);
+  return config !== null && config.allowedToolIds.has(toolId) && isHybridAccessToolId(toolId, env, tool);
 }
 
 /** Same-origin reachability check: browser online hints alone are not authoritative. */
@@ -91,9 +107,7 @@ export function canShowAdForTool(
   tool: AdEligibleTool,
   config: AdRuntimeConfig | null,
 ): boolean {
-  if (!config || !config.allowedToolIds.has(tool.id) || !OFFLINE_PROFILE_IDS.has(tool.id)) return false;
-  if (tool.status !== "active" || tool.clientSide !== true || tool.requiresBackend || tool.requiresAuth) return false;
-  if (tool.category === "fitness" || tool.category === "personal" || tool.id.startsWith("finance-")) return false;
-  if (tool.disclaimer && RESTRICTED_DISCLAIMERS.has(tool.disclaimer)) return false;
-  return classifyOfflineToolRecord(tool).execution === "device-local";
+  return config !== null &&
+    config.allowedToolIds.has(tool.id) &&
+    isEligibleHybridToolRecord(tool.id, tool);
 }
