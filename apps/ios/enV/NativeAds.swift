@@ -168,7 +168,7 @@ struct NativeToolAdSlot: View {
                         .font(.caption2)
                         .foregroundStyle(Color.envMuted)
                     let width = max(320, Int(UIScreen.main.bounds.width - 32))
-                    let size = largeAnchoredAdaptiveBanner(width: width)
+                    let size = largeAnchoredAdaptiveBanner(width: CGFloat(width))
                     NativeBannerAdView(adUnitID: NativeAdsPolicy.bannerUnitID, adSize: size)
                         .frame(width: size.size.width, height: size.size.height)
                 }
