@@ -61,7 +61,7 @@ test("Web, Android and iOS collection switches default off", () => {
   assert.match(envExample, /^ANALYTICS_ENABLED=false$/m);
   assert.match(envExample, /^VITE_ANALYTICS_ENABLED=false$/m);
   assert.match(envExample, /^VITE_ANALYTICS_DASHBOARD_ENABLED=false$/m);
-  assert.match(androidGradle, /buildConfigField\("boolean",\s*"ANALYTICS_ENABLED",\s*providers\.gradleProperty\("envAnalyticsEnabled"\)\.orNull \?\? "false"\)/);
+  assert.match(androidGradle, /buildConfigField\("boolean",\s*"ANALYTICS_ENABLED",\s*providers\.gradleProperty\("envAnalyticsEnabled"\)\.orNull \?: "false"\)/);
   assert.match(iosInfo, /<key>ENV_ANALYTICS_ENABLED<\/key>\s*<string>\$\(ENV_ANALYTICS_ENABLED\)<\/string>/);
   assert.match(iosProject, /ENV_ANALYTICS_ENABLED = NO/);
   assert.match(iosClient, /\[("1",\s*"yes",\s*"true")\]/);
