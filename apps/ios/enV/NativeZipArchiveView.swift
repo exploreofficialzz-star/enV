@@ -6,10 +6,19 @@ struct NativeArchiveToolDestinationView: View {
     let tool: Tool
 
     var body: some View {
-        if tool.id == "zip-any-file" {
-            NativeZipArchiveScreen()
-        } else {
-            ToolDestinationView(tool: tool)
+        Group {
+            if tool.id == "zip-any-file" {
+                NativeZipArchiveScreen()
+            } else {
+                ToolDestinationView(tool: tool)
+            }
+        }
+        .task(id: tool.id) {
+            // Standard tools are recorded by ToolDetailView. These three destinations
+            // bypass that shared detail view and must record their own visit here.
+            guard ["zip-any-file", "the-world-lab", "ux-ui-studio"].contains(tool.id) else { return }
+            NativeAnalyticsClient.record("tool_viewed", toolID: tool.id)
+            try? await NativeAnalyticsClient.flush()
         }
     }
 }
@@ -259,12 +268,23 @@ struct NativeZipArchiveScreen: View {
 
     private func createArchive() {
         guard !selectedFiles.isEmpty, !isWorking else { return }
+        let startedAt = Date()
+        NativeAnalyticsClient.record("tool_started", toolID: "zip-any-file")
         let sources = selectedFiles
         let duplicateNames = Dictionary(grouping: sources, by: { $0.lastPathComponent }).filter { $0.value.count > 1 }
         guard duplicateNames.isEmpty else {
+            NativeAnalyticsClient.record(
+                "tool_failed",
+                toolID: "zip-any-file",
+                outcome: "failure",
+                durationMs: analyticsDuration(since: startedAt),
+                errorCode: "ZIP_DUPLICATE_ENTRY_NAMES"
+            )
+            Task { try? await NativeAnalyticsClient.flush() }
             failure = "Some selected files share the same name. Rename duplicates before creating the archive."
             return
         }
+        Task { try? await NativeAnalyticsClient.flush() }
         let access = sources.map { $0.startAccessingSecurityScopedResource() }
         let allowedCompressedTypes = precompressedExtensions
         let output = FileManager.default.temporaryDirectory
@@ -299,16 +319,33 @@ struct NativeZipArchiveScreen: View {
                 outputArchive = created
                 status = "ZIP archive created successfully."
                 selectedFiles = []
+                NativeAnalyticsClient.record(
+                    "tool_completed",
+                    toolID: "zip-any-file",
+                    outcome: "success",
+                    durationMs: analyticsDuration(since: startedAt)
+                )
             } catch {
+                NativeAnalyticsClient.record(
+                    "tool_failed",
+                    toolID: "zip-any-file",
+                    outcome: "failure",
+                    durationMs: analyticsDuration(since: startedAt),
+                    errorCode: "ZIP_CREATE_FAILED"
+                )
                 failure = error.localizedDescription
                 status = ""
             }
+            try? await NativeAnalyticsClient.flush()
             isWorking = false
         }
     }
 
     private func extractArchive(to folder: URL) {
         guard let source = selectedArchive, !isWorking else { return }
+        let startedAt = Date()
+        NativeAnalyticsClient.record("tool_started", toolID: "zip-any-file")
+        Task { try? await NativeAnalyticsClient.flush() }
         let sourceAccess = source.startAccessingSecurityScopedResource()
         let folderAccess = folder.startAccessingSecurityScopedResource()
         let entryCountLimit = maxEntryCount
@@ -358,12 +395,31 @@ struct NativeZipArchiveScreen: View {
                 }.value
                 status = "Extraction completed. Files were saved in your selected folder."
                 selectedArchive = nil
+                NativeAnalyticsClient.record(
+                    "tool_completed",
+                    toolID: "zip-any-file",
+                    outcome: "success",
+                    durationMs: analyticsDuration(since: startedAt)
+                )
             } catch {
+                NativeAnalyticsClient.record(
+                    "tool_failed",
+                    toolID: "zip-any-file",
+                    outcome: "failure",
+                    durationMs: analyticsDuration(since: startedAt),
+                    errorCode: "ZIP_EXTRACT_FAILED"
+                )
                 failure = error.localizedDescription
                 status = ""
             }
+            try? await NativeAnalyticsClient.flush()
             isWorking = false
         }
+    }
+
+    private func analyticsDuration(since start: Date) -> Int {
+        let elapsed = Int((Date().timeIntervalSince(start) * 1000).rounded())
+        return min(3_600_000, max(0, elapsed))
     }
 
     private static func nonOverwritingURL(_ requested: URL) -> URL {

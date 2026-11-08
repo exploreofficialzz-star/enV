@@ -71,6 +71,8 @@ jobs:
           fi
       - name: Install locked web dependencies
         run: npm ci
+      - name: Run User Behavior analytics security tests
+        run: node --test scripts/analytics/*.test.mjs
       - name: Audit web dependencies
         run: npm audit --audit-level=moderate
       - name: Build web app

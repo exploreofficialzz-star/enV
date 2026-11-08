@@ -3,3 +3,6 @@ ENV_API_BASE_URL = https://env-q3mq.onrender.com
 OCR_PROCESSOR_URL =
 DOCUMENT_PROCESSOR_URL =
 WEBSITE_SCREENSHOT_API_URL =
+
+// Keep disabled by default. Set YES only after the production analytics release gates pass.
+ENV_ANALYTICS_ENABLED = NO
