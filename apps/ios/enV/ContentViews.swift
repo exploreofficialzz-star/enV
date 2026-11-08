@@ -3112,6 +3112,7 @@ private struct NativeContactInformationPage: View {
 }
 
 private struct NativePrivacyInformationPage: View {
+    @StateObject private var advertisingPrivacy = NativeAdsPrivacyManager.shared
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             NativeInfoSectionView(title: nil, paragraphs: ["**chAs Technologies LLC**, a company registered in Delaware, USA, develops and operates enV. This notice describes the information handled by the enV Web, Android, and iOS experiences and how feature-specific processing works."])
@@ -3200,6 +3201,12 @@ private struct NativeResponsibleUseInformationPage: View {
                 "Keep a human in control: review outputs, verify important facts, and use qualified professionals for legal, medical, financial, tax, and safety-critical matters.",
             ])
             NativeInfoSectionView(title: "Reporting a concern", paragraphs: ["If you believe enV is being used unlawfully or encounter a safety or privacy issue, contact [envtoolkit@gmail.com](mailto:envtoolkit@gmail.com). Company-related correspondence may be sent to [chastechnologiesllc@gmail.com](mailto:chastechnologiesllc@gmail.com)."])
+        }
+        if NativeAdsPolicy.adDisplayConfigured && advertisingPrivacy.privacyOptionsRequired {
+            Button("Advertising privacy options") {
+                Task { await advertisingPrivacy.presentPrivacyOptions() }
+            }
+            .buttonStyle(.bordered)
         }
     }
 }
