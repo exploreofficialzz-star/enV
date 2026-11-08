@@ -32,6 +32,12 @@ const androidBuild = read("apps/android/app/build.gradle.kts");
 
 // Camera Studio parity upgrade: true second-device browser capture and native controls.
 assert.match(engine, /const startDualCamera/);
+assert.doesNotMatch(
+  engine,
+  /if \(facing === "user"\) \{\s*context\.translate\(canvas\.width, 0\);\s*context\.scale\(-1, 1\);/,
+  "Photo capture must mirror each camera feed once through drawCover, not flip the composite canvas twice."
+);
+assert.match(engine, /drawCover\(context, video, 0, 0, canvas\.width, canvas\.height, facing === "user"\)/);
 assert.match(engine, /enumerateDevices\(\)/);
 assert.match(engine, /dualStreamRef\.current/);
 assert.match(engine, /drawCover\(recordingContext/);
