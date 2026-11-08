@@ -1,0 +1,38 @@
+name: User Behavior analytics security tests
+
+on:
+  pull_request:
+    paths:
+      - "src/lib/analytics/**"
+      - "src/routes/userbehavior.tsx"
+      - "server/routes/api/analytics/**"
+      - "migrations/0018_analytics_dashboard_sessions.sql"
+      - "scripts/analytics/**"
+      - "scripts/check-subdomain-live.mjs"
+      - "docs/product-analytics-privacy-and-operations.md"
+      - "docs/subdomain-production-runbook.md"
+      - ".github/workflows/userbehavior-analytics-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: userbehavior-analytics-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analytics-security:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run analytics protocol, retention and session tests
+        run: node --test scripts/analytics/*.test.mjs
+      - name: Verify analytics session helper syntax
+        run: node --check src/lib/analytics/dashboard-session.mjs

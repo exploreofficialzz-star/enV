@@ -1,4 +1,5 @@
-import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
+import { dashboardSessionDigest, issueDashboardSession, readDashboardSession } from "./dashboard-session.mjs";
 import { createSessionLookup } from "../ai/server/session";
 import { getSql } from "../db";
 import { ANALYTICS_POLICY_VERSION, classifyReferrer, classifyUserAgent, validateConsentPayload, validateEventsPayload } from "./protocol.mjs";
@@ -37,34 +38,43 @@ function authorized(request: Request, expected: string | undefined) {
 const analyticsDashboardCookieName = "env_analytics_admin";
 const analyticsDashboardSessionSeconds = 8 * 60 * 60;
 
+function dashboardSigningSecret() {
+  const secret = process.env.ANALYTICS_DASHBOARD_COOKIE_SECRET?.trim() ?? "";
+  if (secret.length < 32) throw new AnalyticsError("ANALYTICS_DASHBOARD_NOT_CONFIGURED", "The dashboard cookie secret is not configured.", 503);
+  return secret;
+}
 function dashboardConfig() {
   if (process.env.ANALYTICS_DASHBOARD_ENABLED !== "true") throw new AnalyticsError("ANALYTICS_DASHBOARD_DISABLED", "The private analytics dashboard is disabled.", 503);
   const password = process.env.ANALYTICS_DASHBOARD_PASSWORD?.trim() ?? "";
-  const secret = process.env.ANALYTICS_DASHBOARD_COOKIE_SECRET?.trim() ?? "";
-  if (password.length < 24 || secret.length < 32) throw new AnalyticsError("ANALYTICS_DASHBOARD_NOT_CONFIGURED", "The private analytics dashboard credentials are not configured.", 503);
+  const secret = dashboardSigningSecret();
+  if (password.length < 24) throw new AnalyticsError("ANALYTICS_DASHBOARD_NOT_CONFIGURED", "The dashboard password is not configured.", 503);
   return { password, secret };
 }
 function cookieToken(request: Request) {
-  const cookies=request.headers.get("cookie")??"";
-  for(const part of cookies.split(";")){
-    const [name,...rest]=part.trim().split("=");
-    if(name===analyticsDashboardCookieName)return rest.join("=");
+  const cookies = request.headers.get("cookie") ?? "";
+  for (const part of cookies.split(";")) {
+    const [name, ...rest] = part.trim().split("=");
+    if (name === analyticsDashboardCookieName) return rest.join("=");
   }
   return "";
 }
-function validDashboardCookie(request: Request) {
-  try {
-    const {secret}=dashboardConfig();
-    const token=cookieToken(request);
-    const [payload,signature,...extra]=token.split(".");
-    if(!payload||!signature||extra.length)return false;
-    const supplied=Buffer.from(signature,"base64url");
-    const expected=createHmac("sha256",secret).update(payload).digest();
-    if(supplied.length!==expected.length||!timingSafeEqual(supplied,expected))return false;
-    const session=JSON.parse(Buffer.from(payload,"base64url").toString("utf8")) as {version?:number;expiresAt?:number;issuedAt?:number;sessionId?:string};
-    const now=Math.floor(Date.now()/1000);
-    return session.version===1&&typeof session.sessionId==="string"&&session.expiresAt!==undefined&&session.expiresAt>now&&session.issuedAt!==undefined&&session.issuedAt<=now+60&&session.expiresAt-session.issuedAt<=analyticsDashboardSessionSeconds;
-  } catch { return false; }
+async function validDashboardCookie(request: Request) {
+  const { secret } = dashboardConfig();
+  const session = readDashboardSession(cookieToken(request), secret, Math.floor(Date.now() / 1000));
+  if (!session) return false;
+
+  // A valid signature is not enough: the server-side allowlist makes logout and
+  // incident-response revocation effective immediately, including for copied cookies.
+  const sql = await getSql();
+  const active = await sql.query(
+    `select 1 as active from product_analytics_dashboard_sessions
+     where session_digest=$1 and revoked_at is null and expires_at>now() limit 1`,
+    [dashboardSessionDigest(session.sessionId, secret)],
+  );
+  return active.length > 0;
+}
+export function clearAnalyticsDashboardCookie() {
+  return analyticsDashboardCookieName + "=; Path=/api/analytics; Max-Age=0; HttpOnly; Secure; SameSite=Strict";
 }
 function networkSubject(request: Request, secret: string) {
   // Do not let client-supplied forwarding headers select the admin throttle bucket.
@@ -99,19 +109,35 @@ export async function createAnalyticsDashboardSession(request: Request, input: u
   );
   if(!rows.length)throw new AnalyticsError("ANALYTICS_DASHBOARD_RATE_LIMITED","Too many dashboard sign-in attempts. Try again later.",429);
   if(!matches)throw new AnalyticsError("ANALYTICS_DASHBOARD_LOGIN_FAILED","The developer password is incorrect.",401);
-  const now=Math.floor(Date.now()/1000);
-  const payload=Buffer.from(JSON.stringify({version:1,sessionId:randomUUID(),issuedAt:now,expiresAt:now+analyticsDashboardSessionSeconds})).toString("base64url");
-  const signature=createHmac("sha256",secret).update(payload).digest("base64url");
-  await sql.query("delete from product_analytics_admin_rate_limits where window_minute<$1",[window-96]);
+  const now = Math.floor(Date.now() / 1000);
+  const session = issueDashboardSession(secret, now, analyticsDashboardSessionSeconds);
+  await sql.query(
+    `insert into product_analytics_dashboard_sessions(session_digest, created_at, expires_at)
+     values($1, to_timestamp($2), to_timestamp($3))`,
+    [dashboardSessionDigest(session.sessionId, secret), session.issuedAt, session.expiresAt],
+  );
+  await sql.query("delete from product_analytics_admin_rate_limits where window_minute<$1", [window - 96]);
   return {
-    setCookie: analyticsDashboardCookieName+"="+payload+"."+signature+"; Path=/api/analytics; Max-Age="+analyticsDashboardSessionSeconds+"; HttpOnly; Secure; SameSite=Strict",
-    expiresAt:new Date((now+analyticsDashboardSessionSeconds)*1000).toISOString(),
+    setCookie: analyticsDashboardCookieName + "=" + session.token + "; Path=/api/analytics; Max-Age=" + analyticsDashboardSessionSeconds + "; HttpOnly; Secure; SameSite=Strict",
+    expiresAt: new Date(session.expiresAt * 1000).toISOString(),
   };
 }
-export function revokeAnalyticsDashboardSession() {
-  return analyticsDashboardCookieName+"=; Path=/api/analytics; Max-Age=0; HttpOnly; Secure; SameSite=Strict";
+export async function revokeAnalyticsDashboardSession(request: Request) {
+  // Logout works even if the dashboard feature flag has since been switched off.
+  const secret = process.env.ANALYTICS_DASHBOARD_COOKIE_SECRET?.trim() ?? "";
+  if (secret.length >= 32) {
+    const session = readDashboardSession(cookieToken(request), secret, Math.floor(Date.now() / 1000));
+    if (session) {
+      const sql = await getSql();
+      await sql.query(
+        `update product_analytics_dashboard_sessions
+         set revoked_at=coalesce(revoked_at, now())
+         where session_digest=$1 and revoked_at is null`,
+        [dashboardSessionDigest(session.sessionId, secret)],
+      );
+    }
+  }
 }
-
 export async function saveAnalyticsConsent(request: Request, input: unknown) {
   // Consent withdrawal remains available even when collection is switched off.
   const secret = signingSecret();
@@ -122,20 +148,36 @@ export async function saveAnalyticsConsent(request: Request, input: unknown) {
     throw new AnalyticsError("ANALYTICS_DISABLED", "Product analytics is disabled and cannot accept new consent grants.", 503);
   }
   const subject = digest(body.subjectId, secret);
-  const userId = await userLookup(request).catch(() => null);
+  const userId = body.granted ? await userLookup(request).catch(() => null) : null;
   const sql = await getSql();
-  await sql.query(
-    `insert into product_analytics_consents (subject_digest,user_id,platform,consent_status,policy_version,decided_at,updated_at)
-     values ($1,$2,$3,$4,$5,now(),now())
-     on conflict (subject_digest) do update set user_id=coalesce(excluded.user_id,product_analytics_consents.user_id),
-       platform=excluded.platform,consent_status=excluded.consent_status,policy_version=excluded.policy_version,
-       decided_at=now(),updated_at=now()`,
-    [subject,userId,body.platform,body.granted ? "granted" : "denied",body.policyVersion],
-  );
-  if (!body.granted) {
-    await sql.query("delete from product_analytics_events where anonymous_subject_digest=$1", [subject]);
-    await sql.query("delete from product_analytics_rate_limits where subject_digest=$1", [subject]);
-  }
+  await sql.transaction(async tx => {
+    // Serialize every decision for this installation, including first-time
+    // grant/withdraw races where a consent row does not exist to lock yet.
+    await tx.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", [subject]);
+    if (body.granted) {
+      await tx.query(
+        `insert into product_analytics_consents (subject_digest,user_id,platform,consent_status,policy_version,decided_at,updated_at)
+         values ($1,$2,$3,'granted',$4,now(),now())
+         on conflict (subject_digest) do update set user_id=coalesce(excluded.user_id,product_analytics_consents.user_id),
+           platform=excluded.platform,consent_status='granted',policy_version=excluded.policy_version,
+           decided_at=now(),updated_at=now()`,
+        [subject, userId, body.platform, body.policyVersion],
+      );
+      return;
+    }
+
+    // Lock first, using the same row lock as event ingestion. This ensures a
+    // batch cannot be inserted after the event DELETE but before consent removal.
+    await tx.query(
+      "select subject_digest from product_analytics_consents where subject_digest=$1 for update",
+      [subject],
+    );
+    // Withdrawal and raw-event deletion are atomic. Removing the consent row also
+    // removes the retained installation-level pseudonymous identifier.
+    await tx.query("delete from product_analytics_events where anonymous_subject_digest=$1", [subject]);
+    await tx.query("delete from product_analytics_rate_limits where subject_digest=$1", [subject]);
+    await tx.query("delete from product_analytics_consents where subject_digest=$1", [subject]);
+  });
   return { consent: body.granted ? "granted" : "denied", policyVersion: ANALYTICS_POLICY_VERSION };
 }
 export async function ingestAnalyticsEvents(request: Request, input: unknown) {
@@ -148,16 +190,21 @@ export async function ingestAnalyticsEvents(request: Request, input: unknown) {
   if (!/^[0-9a-f-]{36}$/i.test(sessionId)) throw new AnalyticsError("INVALID_SESSION", "Invalid analytics session.", 400);
   const session = digest(sessionId, secret);
   const sql = await getSql();
-  const consent = await sql.query<{consent_status:string}>(
-    "select consent_status from product_analytics_consents where subject_digest=$1 and policy_version=$2 limit 1",
-    [subject, body.policyVersion],
-  );
-  if (consent[0]?.consent_status !== "granted") throw new AnalyticsError("ANALYTICS_CONSENT_REQUIRED", "Current opt-in consent is required.", 403);
   const userId = await userLookup(request).catch(() => null);
   const ua = classifyUserAgent(request.headers.get("user-agent"));
   const referrer = classifyReferrer(request.headers.get("referer"));
   const minute = Math.floor(Date.now() / 60000);
   await sql.transaction(async tx => {
+    // Take the same per-installation lock as grant/withdrawal, then lock the row.
+    // The advisory lock also serializes ingestion against a first-time decision.
+    await tx.query("select pg_advisory_xact_lock(hashtextextended($1, 0))", [subject]);
+    const consent = await tx.query<{consent_status:string}>(
+      `select consent_status from product_analytics_consents
+       where subject_digest=$1 and policy_version=$2 for update`,
+      [subject, body.policyVersion],
+    );
+    if (consent[0]?.consent_status !== "granted") throw new AnalyticsError("ANALYTICS_CONSENT_REQUIRED", "Current opt-in consent is required.", 403);
+
     const limit = await tx.query(
       `insert into product_analytics_rate_limits(subject_digest,window_minute,request_count,updated_at)
        values($1,$2,1,now()) on conflict(subject_digest,window_minute) do update
@@ -183,7 +230,9 @@ export async function ingestAnalyticsEvents(request: Request, input: unknown) {
 }
 export async function getAnalyticsSummary(request: Request) {
   configSecret();
-  if (!authorized(request, process.env.ANALYTICS_ADMIN_TOKEN) && !validDashboardCookie(request)) throw new AnalyticsError("ANALYTICS_ADMIN_UNAUTHORIZED", "Developer analytics access is required.", 401);
+  const bearerAuthorized = authorized(request, process.env.ANALYTICS_ADMIN_TOKEN);
+  const cookieAuthorized = bearerAuthorized ? false : await validDashboardCookie(request);
+  if (!bearerAuthorized && !cookieAuthorized) throw new AnalyticsError("ANALYTICS_ADMIN_UNAUTHORIZED", "Developer analytics access is required.", 401);
   const sql = await getSql();
   const [overview,daily,tools,platforms,devices,browsers,networks,referrers,failures,dailyReports] = await Promise.all([
     sql.query(`select count(*) total_events,count(distinct anonymous_subject_digest) installations,count(distinct user_id) signed_in_users,
@@ -316,7 +365,9 @@ export async function runAnalyticsRetention(request: Request) {
   const adminLimits=await sql.query("delete from product_analytics_admin_rate_limits where window_minute<$1 returning subject_digest",[Math.floor(Date.now()/900000)-96]);
   const oldSnapshots=await sql.query("delete from product_analytics_daily_snapshots where snapshot_day<current_date-730 returning snapshot_day");
   const oldReports=await sql.query("delete from product_analytics_daily_reports where report_day<current_date-730 returning report_day");
+  const dashboardSessions=await sql.query("delete from product_analytics_dashboard_sessions where expires_at<now() or revoked_at<now()-interval '1 day' returning session_digest");
   return {retainedDays:days,aggregateHistoryDays:730,snapshotsCaptured:snapshots.length,dailyReportsSaved,
     deletedEvents:events.length,deletedRateLimitRows:limits.length,deletedAdminRateLimitRows:adminLimits.length,
+    deletedDashboardSessions:dashboardSessions.length,
     deletedOldSnapshots:oldSnapshots.length,deletedOldReports:oldReports.length,completedAt:new Date().toISOString()};
 }

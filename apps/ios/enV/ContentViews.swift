@@ -256,7 +256,12 @@ enum NativeAnalyticsClient {
     }
 
     static var isEnabled: Bool {
-        (Bundle.main.object(forInfoDictionaryKey: "ENV_ANALYTICS_ENABLED") as? Bool) == true
+        let value = Bundle.main.object(forInfoDictionaryKey: "ENV_ANALYTICS_ENABLED")
+        if let flag = value as? Bool { return flag }
+        if let flag = value as? String {
+            return ["1", "yes", "true"].contains(flag.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+        }
+        return false
     }
     static var choice: String { defaults.string(forKey: choiceKey) ?? "unset" }
     private static var baseURL: URL? {
