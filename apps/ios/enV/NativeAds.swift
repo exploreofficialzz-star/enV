@@ -47,8 +47,19 @@ enum NativeAdsPolicy {
         }.map(\.toolId))
     }()
 
-    static func isHybridTool(_ toolID: String) -> Bool {
-        adDisplayConfigured && allowlistedToolIDs.contains(toolID) && crossPlatformMeteredIDs.contains(toolID)
+    static func isHybridTool(_ tool: Tool) -> Bool {
+        let restrictedDisclaimers: Set<String> = ["health", "finance", "earnings"]
+        let restrictedCategories: Set<String> = ["fitness", "personal"]
+        return adDisplayConfigured &&
+            allowlistedToolIDs.contains(tool.id) &&
+            crossPlatformMeteredIDs.contains(tool.id) &&
+            tool.status == "active" &&
+            tool.clientSide &&
+            !tool.requiresBackend &&
+            !tool.requiresAuth &&
+            !restrictedCategories.contains(tool.category) &&
+            !tool.id.hasPrefix("finance-") &&
+            !(tool.disclaimer.map(restrictedDisclaimers.contains) ?? false)
     }
 
     static func isApplicationOnline() async -> Bool {
@@ -150,7 +161,7 @@ struct NativeToolAdSlot: View {
 
     var body: some View {
         Group {
-            if NativeAdsPolicy.isHybridTool(tool.id) && originReachable &&
+            if NativeAdsPolicy.isHybridTool(tool) && originReachable &&
                 consent.canRequestAds && consent.sdkReady {
                 VStack(alignment: .leading, spacing: 5) {
                     Text("Advertisement")
