@@ -18,7 +18,7 @@ const ADSENSE_BOOTSTRAP_SCRIPT = `(() => {
   });
   const adsbygoogle = window.adsbygoogle || (window.adsbygoogle = []);
   adsbygoogle.pauseAdRequests = 1;
-})();`
+})();`;
 
 const NON_INDEXABLE_PATHS = [
   "/account", "/agent", "/assistant", "/developer", "/favorites", "/feedback",
