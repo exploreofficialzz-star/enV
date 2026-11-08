@@ -6,6 +6,10 @@ on:
     paths:
       - ".github/workflows/ad-supported-guest-access.yml"
       - "src/lib/ads/**"
+      - "src/lib/ads/browser.ts"
+      - "src/components/layout/ad-privacy-controls.tsx"
+      - "src/routes/privacy.tsx"
+      - "src/components/layout/privacy-controls.tsx"
       - "src/lib/offline/policy.mjs"
       - "src/components/tools/ad-slot.tsx"
       - "src/components/tools/tool-shell.tsx"
