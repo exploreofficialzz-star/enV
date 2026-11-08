@@ -1,0 +1,57 @@
+name: Ad-supported guest access
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/ad-supported-guest-access.yml"
+      - "src/lib/ads/**"
+      - "src/lib/ads/browser.ts"
+      - "src/components/layout/ad-privacy-controls.tsx"
+      - "src/routes/privacy.tsx"
+      - "src/components/layout/privacy-controls.tsx"
+      - "src/lib/offline/policy.mjs"
+      - "src/components/tools/ad-slot.tsx"
+      - "src/components/tools/tool-shell.tsx"
+      - "src/routes/tools/$category/$slug.tsx"
+      - "scripts/check-ad-access.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".env.example"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/ad-supported-guest-access.yml"
+      - "src/lib/ads/**"
+      - "src/lib/offline/policy.mjs"
+      - "src/components/tools/ad-slot.tsx"
+      - "src/components/tools/tool-shell.tsx"
+      - "src/routes/tools/$category/$slug.tsx"
+      - "scripts/check-ad-access.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".env.example"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ad-supported-guest-access-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Verify ad policy and guest/offline boundaries
+        run: npm run check:ads

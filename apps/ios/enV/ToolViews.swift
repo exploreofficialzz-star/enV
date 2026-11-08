@@ -196,6 +196,7 @@ struct ToolDetailView: View {
                 }
 
                 toolInterface.padding(.top, 24)
+                if !isToolFullscreen { NativeToolAdSlot(tool: tool).padding(.top, 12) }
 
                 if !isToolFullscreen {
                 if let assistFeature = NativeAiAssistFeatureRegistry.feature(toolID: tool.id) {
@@ -6536,9 +6537,16 @@ private struct NativeCalculatorToolView: View {
                         defer { isRunning = false }
                         let journal = offlineJournal
                         let normalizedAllowanceID = try? journal?.activeAllowanceID()
-                        let shouldMeter = normalizedAllowanceID != nil && (journal?.isEligibleTool(tool.id) ?? false)
+                        let hybridAdTool = NativeAdsPolicy.isHybridTool(tool)
+                        let applicationOnline = hybridAdTool ? await NativeAdsPolicy.isApplicationOnline() : false
+                        let offlineEligible = journal?.isEligibleTool(tool.id) ?? false
+                        let shouldMeter = normalizedAllowanceID != nil && offlineEligible &&
+                            !(hybridAdTool && applicationOnline)
                         var ticket: OfflineWalletJournal.OperationTicket?
                         do {
+                            if hybridAdTool && !applicationOnline && (!offlineEligible || normalizedAllowanceID == nil) {
+                                throw NativeHybridAccessError.offlineAllowanceRequired
+                            }
                             // Validate and compute before reserving an offline token. Invalid
                             // input must not consume a token. Keep the result hidden until the
                             // successful action has a durable local journal record.

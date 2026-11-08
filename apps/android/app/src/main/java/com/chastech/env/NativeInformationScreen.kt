@@ -341,7 +341,11 @@ fun NativeInformationScreen(pageId: String, catalog: com.chastech.env.data.Catal
                 }
                 "wallet" -> NativeWalletDashboard()
                 "history" -> InformationSection("", listOf("Recently used tools will appear here."))
-                "privacy" -> PrivacyInformation()
+                "privacy" -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    PrivacyInformation()
+                    NativeAdsPrivacyDisclosure()
+                    NativeAdsPrivacyOptionsButton()
+                }
                 "terms" -> TermsInformation()
                 "disclaimer" -> DisclaimerInformation()
                 "responsible-use" -> ResponsibleUseInformation()

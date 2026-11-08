@@ -3117,6 +3117,7 @@ private struct NativeContactInformationPage: View {
 }
 
 private struct NativePrivacyInformationPage: View {
+    @StateObject private var advertisingPrivacy = NativeAdsPrivacyManager.shared
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             NativeInfoSectionView(title: nil, paragraphs: ["**chAs Technologies LLC**, a company registered in Delaware, USA, develops and operates enV. This notice describes the information handled by the enV Web, Android, and iOS experiences and how feature-specific processing works."])
@@ -3146,6 +3147,17 @@ private struct NativePrivacyInformationPage: View {
                 "We may revise this notice when product features, providers, or data practices change. The published version should be checked before using connected features.",
                 "For privacy questions or requests, contact [envtoolkit@gmail.com](mailto:envtoolkit@gmail.com). Company correspondence may also be sent to [chastechnologiesllc@gmail.com](mailto:chastechnologiesllc@gmail.com).",
             ])
+            if NativeAdsPolicy.adDisplayConfigured {
+                NativeInfoSectionView(title: "Advertising on selected tools", paragraphs: [
+                    "When enabled, Google Mobile Ads may load on selected, allowlisted tools while the device is online. Google may process request context and technical identifiers for ad delivery, fraud prevention, frequency capping, and reporting. Advertising requests are subject to the privacy choices presented by Google’s User Messaging Platform. Analytics settings are separate from advertising choices.",
+                ])
+                if advertisingPrivacy.privacyOptionsRequired {
+                    Button("Advertising privacy options") {
+                        Task { await advertisingPrivacy.presentPrivacyOptions() }
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
         }
     }
 }

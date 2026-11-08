@@ -51,12 +51,14 @@ private extension DynamicTypeSize {
 @main
 struct enVApp: App {
     @StateObject private var store = CatalogStore()
+    @StateObject private var advertisingPrivacy = NativeAdsPrivacyManager.shared
 
     var body: some Scene {
         WindowGroup {
             RootTabView()
                 .environmentObject(store)
                 .tint(Color.envAccent)
+                .task { await advertisingPrivacy.refreshConsentAtLaunch() }
         }
     }
 }

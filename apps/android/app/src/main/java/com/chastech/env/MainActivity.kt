@@ -184,6 +184,7 @@ import java.time.Year
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        NativeAdsPrivacyManager.refreshConsent(this)
         val favorites = FavoritesStore(applicationContext)
         setContent {
             var themeMode by rememberSaveable { mutableStateOf(favorites.getThemeMode()) }
@@ -1189,6 +1190,7 @@ private fun ToolDetail(
                 Column(Modifier.fillMaxWidth().padding(if (compact) 16.dp else 24.dp)) {
                     NativeToolInterfaceContent(tool, backend, supported, onRelatedTool)
                     if (!isFullscreen) NativeToolCommunityPanel(tool.id)
+                    if (!isFullscreen) NativeToolAdSlot(tool)
                 }
             }
             if (!isFullscreen) {
@@ -2180,34 +2182,61 @@ private fun NativeCalculatorToolForm(tool: ToolRecord) {
         ActionRow(
             onRun = {
                 val allowanceId = runCatching { journal.activeAllowanceId() }.getOrNull()
-                val metered = allowanceId != null && runCatching { journal.isEligibleTool(context, tool.id) }.getOrDefault(false)
-                if (!metered || allowanceId == null) {
+                val walletEligible = runCatching { journal.isEligibleTool(context, tool.id) }.getOrDefault(false)
+                val hybridAdTool = NativeAdsPolicy.isHybridTool(context, tool)
+
+                fun runWithoutOfflineCharge() {
                     runCatching { NativeCalculatorEngine.run(operation, values.toMap()) }.fold(
                         { rows -> output = render(rows); error = "" },
                         { output = ""; error = it.message ?: "Unable to run calculator" }
                     )
-                } else scope.launch {
-                    var ticket: com.chastech.env.billing.OfflineWalletJournal.OperationTicket? = null
-                    try {
-                        // Validate and compute before reserving a billable journal ticket so
-                        // invalid input does not consume offline tokens. Do not display the
-                        // prepared result until the successful Calculate action is journaled.
-                        val rows = NativeCalculatorEngine.run(operation, values.toMap())
-                        val operationTicket = journal.beginOperation(context, allowanceId, tool.id)
-                        ticket = operationTicket
-                        journal.finishOperation(context, operationTicket, "succeeded")
-                        output = render(rows); error = ""
-                        if (com.chastech.env.billing.OfflineWalletNativeApi.isPaired(context)) {
-                            runCatching { com.chastech.env.billing.OfflineWalletNativeApi.synchronize(context, journal, allowanceId) }
-                        }
-                    } catch (failure: Exception) {
-                        val journalMessage = ticket?.let { operationTicket ->
-                            runCatching { journal.finishOperation(context, operationTicket, "failed") }.exceptionOrNull()?.message
-                        }
+                }
+
+                fun runWithOfflineCharge() {
+                    if (allowanceId == null) {
                         output = ""
-                        error = listOfNotNull(failure.message ?: "Unable to run calculator", journalMessage?.let { "Usage record needs recovery: $it" }).joinToString(" ")
-                        if (ticket != null && com.chastech.env.billing.OfflineWalletNativeApi.isPaired(context)) {
-                            runCatching { com.chastech.env.billing.OfflineWalletNativeApi.synchronize(context, journal, allowanceId) }
+                        error = "This tool needs an offline enV token allowance. Connect to use it online, or sign in and prepare an offline allowance in Wallet before disconnecting."
+                        return
+                    }
+                    scope.launch {
+                        var ticket: com.chastech.env.billing.OfflineWalletJournal.OperationTicket? = null
+                        try {
+                            // Validate and compute before reserving a billable journal ticket so
+                            // invalid input does not consume offline tokens. Do not display the
+                            // prepared result until the successful Calculate action is journaled.
+                            val rows = NativeCalculatorEngine.run(operation, values.toMap())
+                            val operationTicket = journal.beginOperation(context, allowanceId, tool.id)
+                            ticket = operationTicket
+                            journal.finishOperation(context, operationTicket, "succeeded")
+                            output = render(rows); error = ""
+                            if (com.chastech.env.billing.OfflineWalletNativeApi.isPaired(context)) {
+                                runCatching { com.chastech.env.billing.OfflineWalletNativeApi.synchronize(context, journal, allowanceId) }
+                            }
+                        } catch (failure: Exception) {
+                            val journalMessage = ticket?.let { operationTicket ->
+                                runCatching { journal.finishOperation(context, operationTicket, "failed") }.exceptionOrNull()?.message
+                            }
+                            output = ""
+                            error = listOfNotNull(failure.message ?: "Unable to run calculator", journalMessage?.let { "Usage record needs recovery: $it" }).joinToString(" ")
+                            if (ticket != null && com.chastech.env.billing.OfflineWalletNativeApi.isPaired(context)) {
+                                runCatching { com.chastech.env.billing.OfflineWalletNativeApi.synchronize(context, journal, allowanceId) }
+                            }
+                        }
+                    }
+                }
+
+                if (!hybridAdTool) {
+                    if (allowanceId != null && walletEligible) runWithOfflineCharge() else runWithoutOfflineCharge()
+                } else {
+                    scope.launch {
+                        val online = NativeAdsPolicy.isApplicationOnline(context)
+                        when {
+                            online -> runWithoutOfflineCharge()
+                            allowanceId != null && walletEligible -> runWithOfflineCharge()
+                            else -> {
+                                output = ""
+                                error = "This tool needs an offline enV token allowance. Connect to use it online, or sign in and prepare an offline allowance in Wallet before disconnecting."
+                            }
                         }
                     }
                 }
@@ -3102,7 +3131,6 @@ internal class NativeToolExecutionTelemetry(
         )
         flush()
     }
-
     @Synchronized fun abandon() {
         val start = startedAtMs ?: return
         if (resultRecorded) return

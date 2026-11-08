@@ -5,6 +5,8 @@ import { resolve } from "node:path";
 const root = process.cwd();
 const read = (path) => readFileSync(resolve(root, path), "utf8");
 const slot = read("src/components/tools/ad-slot.tsx");
+const webAdPrivacy = read("src/components/layout/ad-privacy-controls.tsx");
+const adsBrowser = read("src/lib/ads/browser.ts");
 const shell = read("src/components/tools/tool-shell.tsx");
 const route = read("src/routes/tools/$category/$slug.tsx");
 const env = read(".env.example");
@@ -29,15 +31,30 @@ const iosProject = read("apps/ios/enV.xcodeproj/project.pbxproj");
 assert.match(shell, /<AdSlot tool=\{tool\} \/>/, "Tool details must include the ad placement.");
 assert.match(slot, /isApplicationOnline\(\)/, "Ads must not be requested unless the application origin is reachable.");
 assert.match(shell, /!isFullscreen \? <AdSlot tool=\{tool\} \/> : null/, "Web ads must stay outside the full-screen tool-only experience.");
+
+assert.match(slot, /whenGooglePrivacyConsentDataReady/, "Web ad requests must wait for the CMP consent-data-ready callback.");
+assert.match(slot, /pauseAdRequests = 1/, "Web must pause ad requests before consent data is ready.");
+assert.match(slot, /pauseAdRequests = 0/, "Web must resume ad requests only after consent data is ready.");
+assert.match(adsBrowser, /CONSENT_DATA_READY/, "Web must use Google's supported consent-data-ready callback.");
+
 assert.match(slot, /requestNonPersonalizedAds = 1/, "Ad requests must default to non-personalized.");
 assert.match(slot, /VITE_ADSENSE_PRIVACY_CONFIGURED/, "Ad requests must require privacy/CMP setup.");
 assert.match(route, /<ToolShell tool=\{tool\}/, "The public tool route must continue to use the regular tool shell.");
 assert.doesNotMatch(route, /SignInGate|RedirectToSignIn/, "The tool route must not gain a guest sign-in gate.");
+assert.match(offlineClient, /getToolById\(input\.toolId\)/, "Hybrid offline billing must load the full canonical catalogue record.");
+assert.match(offlineClient, /isHybridAccessToolId\(input\.toolId,[\s\S]*?catalogTool\)/, "Hybrid offline billing must use the selected-tool access policy independently from ad rendering.");
 assert.match(offlineClient, /HYBRID_OFFLINE_ALLOWANCE_REQUIRED/, "Hybrid ad tools must fail closed offline without an allowance.");
 assert.match(offlineClient, /isApplicationOnline\(\)/, "Web hybrid access must check same-origin reachability.");
 assert.match(offlineClient, /toolSlotId: import\.meta\.env\.VITE_ADSENSE_TOOL_SLOT_ID/, "Web offline policy must use the exact validated AdSense slot setting.");
 assert.match(adPolicy, /offline-eligible-tools\.json/, "Hybrid ads must use the canonical cross-platform metering registry.");
-assert.match(adPolicy, /!toolId\.startsWith\("finance-"\)/, "Finance calculators must not enter the hybrid offline metering cohort.");
+assert.match(adPolicy, /tool\.id\.startsWith\("finance-"\)/, "Finance calculators must not enter the hybrid offline metering cohort.");
+
+assert.match(adPolicy, /export function isHybridAccessToolId/, "The offline access policy must be independent from ad provider readiness.");
+assert.match(offlineClient, /isHybridAccessToolId/, "Web offline billing must use the ad-independent hybrid access policy.");
+assert.match(androidAds, /!tool\.id\.startsWith\("finance-"\)/, "Android must exclude finance-prefixed tools from the hybrid cohort.");
+assert.match(iosAds, /!tool\.id\.hasPrefix\("finance-"\)/, "iOS must exclude finance-prefixed tools from the hybrid cohort.");
+assert.match(iosAds, /NativeAdsPolicy\.adDisplayConfigured && NativeAdsPolicy\.isHybridTool/, "iOS ad rendering must remain disabled until provider configuration is ready.");
+
 assert.ok(meteredProfiles.profiles.every((profile) => profile.platforms.includes("web") && profile.platforms.includes("android") && profile.platforms.includes("ios")), "Offline metering profiles must have platform parity.");
 assert.match(offlinePolicy, /tokenPolicy: "monetization-pending"/, "Offline execution classification must remain separate from billing rollout.");
 assert.match(offline, /BILLING_OFFLINE_ENABLED !== "true"/, "Production offline token spending must remain fail-closed.");
@@ -46,6 +63,10 @@ assert.match(env, /VITE_ADSENSE_PRIVACY_CONFIGURED=false/, "CMP readiness must r
 assert.match(privacy, /advertisingEnabled = import\.meta\.env\.VITE_ADS_ENABLED === "true"/, "Privacy disclosure must appear when ad serving is enabled.");
 assert.match(privacy, /frequency capping and aggregated reporting/, "Privacy disclosure must explain NPA identifier use.");
 assert.match(privacyControls, /separate provider and CMP privacy choices/, "Analytics consent must be distinct from advertising consent.");
+assert.match(webAdPrivacy, /whenGooglePrivacyMessagingReady/, "Web Privacy must wait for Google Privacy & Messaging readiness before showing revocation controls.");
+assert.match(webAdPrivacy, /reopenGooglePrivacySettings/, "Web Privacy must expose the provider consent-revocation entry point.");
+assert.match(adsBrowser, /showRevocationMessage/, "Web must use the supported Google consent revocation API.");
+assert.match(adsBrowser, /CONSENT_API_READY/, "Web must wait for the Google consent API readiness callback.");
 
 assert.match(androidGradle, /ads-mobile-sdk:1\.6\.0/, "Android must use the native Google Mobile Ads SDK.");
 assert.match(androidGradle, /user-messaging-platform:4\.0\.0/, "Android must use the native UMP consent SDK.");
