@@ -6529,7 +6529,7 @@ private struct NativeCalculatorToolView: View {
                         let normalizedAllowanceID = try? journal?.activeAllowanceID()
                         var ticket: OfflineWalletJournal.OperationTicket?
                         do {
-                            let hybridAdTool = NativeAdsPolicy.isHybridTool(tool.id)
+                            let hybridAdTool = NativeAdsPolicy.isHybridTool(tool)
                             let applicationOnline = hybridAdTool ? await NativeAdsPolicy.isApplicationOnline() : false
                             let offlineEligible = journal?.isEligibleTool(tool.id) ?? false
                             if hybridAdTool && !applicationOnline && (!offlineEligible || normalizedAllowanceID == nil) {
