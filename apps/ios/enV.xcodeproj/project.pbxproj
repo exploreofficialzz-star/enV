@@ -192,7 +192,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-	F10000000000000000000000 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (EA0000000000000000000008 /* GLTFKit2 in Frameworks */,F8E000000000000000000005 /* ZIPFoundation in Frameworks */,D50000000000000000000001 /* libsqlite3.tbd in Frameworks */,,AD0000000000000000000003 /* GoogleMobileAds in Frameworks */,AD0000000000000000000004 /* GoogleUserMessagingPlatform in Frameworks */,); runOnlyForDeploymentPostprocessing = 0; };
+	F10000000000000000000000 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (EA0000000000000000000008 /* GLTFKit2 in Frameworks */,F8E000000000000000000005 /* ZIPFoundation in Frameworks */,D50000000000000000000001 /* libsqlite3.tbd in Frameworks */,AD0000000000000000000003 /* GoogleMobileAds in Frameworks */,AD0000000000000000000004 /* GoogleUserMessagingPlatform in Frameworks */,); runOnlyForDeploymentPostprocessing = 0; };
 	F20000000000000000000000 /* Test Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		9B0000000000000000000007 /* enVUITests Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXFrameworksBuildPhase section */
