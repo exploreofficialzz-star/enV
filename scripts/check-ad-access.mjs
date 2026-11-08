@@ -35,6 +35,8 @@ assert.match(slot, /requestNonPersonalizedAds = 1/, "Ad requests must default to
 assert.match(slot, /VITE_ADSENSE_PRIVACY_CONFIGURED/, "Ad requests must require privacy/CMP setup.");
 assert.match(route, /<ToolShell tool=\{tool\}/, "The public tool route must continue to use the regular tool shell.");
 assert.doesNotMatch(route, /SignInGate|RedirectToSignIn/, "The tool route must not gain a guest sign-in gate.");
+assert.match(offlineClient, /getToolById\(input\.toolId\)/, "Hybrid offline billing must load the full canonical catalogue record.");
+assert.match(offlineClient, /isHybridAdSupportedToolId\(input\.toolId,[\s\S]*?catalogTool\)/, "Hybrid offline billing must use the same full-record eligibility policy as ad display.");
 assert.match(offlineClient, /HYBRID_OFFLINE_ALLOWANCE_REQUIRED/, "Hybrid ad tools must fail closed offline without an allowance.");
 assert.match(offlineClient, /isApplicationOnline\(\)/, "Web hybrid access must check same-origin reachability.");
 assert.match(offlineClient, /toolSlotId: import\.meta\.env\.VITE_ADSENSE_TOOL_SLOT_ID/, "Web offline policy must use the exact validated AdSense slot setting.");
