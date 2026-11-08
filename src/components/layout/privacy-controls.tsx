@@ -29,7 +29,7 @@ export function PrivacyControls() {
     <section className="rounded-xl border border-border bg-surface p-4 sm:p-5" aria-labelledby="privacy-controls-heading">
       <h2 id="privacy-controls-heading" className="text-lg font-semibold text-fg">Your privacy choices</h2>
       <p className="mt-2 text-sm leading-6 text-muted">
-        Optional product analytics is separate from essential account/session handling. It uses browser storage and sends a bounded set of tool events only after you opt in. It does not use an advertising or cross-site tracking cookie.
+        Optional product analytics is separate from advertising and essential account/session handling. It uses browser storage and sends a bounded set of tool events only after you opt in. The analytics feature does not set or read advertising cookies; advertising technologies, when enabled, use separate provider and CMP privacy choices.
       </p>
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <span className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-fg">
