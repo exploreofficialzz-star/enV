@@ -8,7 +8,7 @@ const androidBuild = read("apps/android/app/build.gradle.kts");
 const ios = read("apps/ios/enV/NativeCameraStudio.swift");
 const acceptance = read("docs/camera-studio-device-acceptance.md");
 
-assert.match(androidBuild, /androidx\.camera:camera-effects:1\.5\.3/);
+assert.match(androidBuild, /androidx\.camera:camera-effects:1\.6\.2/);
 assert.match(androidBuild, /com\.google\.mlkit:face-detection:16\.1\.7/);
 assert.match(android, /FaceDetection\.getClient/);
 assert.match(android, /FaceDetectorOptions\.PERFORMANCE_MODE_FAST/);
