@@ -49,6 +49,10 @@ assert.match(androidGradle, /ads-mobile-sdk:1\.6\.0/, "Android must use the nati
 assert.match(androidGradle, /user-messaging-platform:4\.0\.0/, "Android must use the native UMP consent SDK.");
 assert.match(androidManifest, /com\.google\.android\.gms\.ads\.APPLICATION_ID/, "Android must declare its configured AdMob app ID.");
 assert.match(androidAds, /UserMessagingPlatform\.getConsentInformation/, "Android must refresh and evaluate UMP consent.");
+assert.match(androidAds, /refreshing = false/, "Android consent refresh must release its launch guard.");
+assert.match(androidAds, /delay\(15_000L\)/, "Android must recheck application-origin availability after temporary outages.");
+assert.match(iosAds, /Task\.sleep\(nanoseconds: 15_000_000_000\)/, "iOS must recheck application-origin availability after temporary outages.");
+assert.match(slot, /setInterval\(update, 15_000\)/, "Web must recheck application-origin availability after temporary outages.");
 assert.match(androidAds, /NetworkCapabilities\.NET_CAPABILITY_VALIDATED/, "Android ads must require validated network connectivity.");
 assert.match(androidAds, /suspend fun isApplicationOnline/, "Android must verify the application origin, not only network connectivity.");
 assert.match(androidAds, /MobileAds\.setRequestConfiguration/, "Android ad requests must default to non-personalized treatment.");
