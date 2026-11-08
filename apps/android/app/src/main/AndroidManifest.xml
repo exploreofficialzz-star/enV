@@ -27,6 +27,9 @@
         android:label="enV"
         android:supportsRtl="true"
         android:theme="@style/Theme.EnV">
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="${envAdmobAppId}" />
         <activity
             android:name=".NativeGamePreviewActivity"
             android:exported="false" />
