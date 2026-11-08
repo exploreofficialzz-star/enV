@@ -83,6 +83,13 @@ test("iOS records tool views and unfinished executions", () => {
   assert.match(iosToolViews, /\.onDisappear \{ executionTracker\.abandon\(\) \}/);
 });
 
+test("iOS synchronous tools record repeated identical results", () => {
+  assert.match(iosToolViews, /var completion: \(\(\) -> Bool\)\? = nil/);
+  assert.match(iosToolViews, /if let completion \{\s*executionTracker\?\.finish\(success: completion\(\)\)/);
+  const synchronousRuns = iosToolViews.match(/completion: \{ error(?: == nil|\.isEmpty) \}/g) ?? [];
+  assert.equal(synchronousRuns.length, 11);
+});
+
 test("Android records native tool executions abandoned before a result", () => {
   assert.match(androidActivity, /DisposableEffect\(telemetry\)\s*\{\s*onDispose \{ telemetry\.abandon\(\) \}/);
   assert.match(androidActivity, /@Synchronized fun abandon\(\)/);
