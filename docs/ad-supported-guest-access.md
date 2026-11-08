@@ -29,6 +29,8 @@ The implementation is intentionally dormant by default. Before enabling it:
 
 The client sends non-personalized ad requests by default. This does not replace a required consent-management platform: Google notes that non-personalized ads can still use cookies or identifiers for frequency capping and aggregated reporting, and consent may be required where applicable. Google requires a Google-certified CMP integrated with the IAB TCF when serving personalized ads to users in the EEA, UK and Switzerland.
 
+Official provider references: [Google's personalized and non-personalized ad guidance](https://support.google.com/adsense/answer/9007336?hl=en), [Google's CMP requirement for publishers in the EEA, UK and Switzerland](https://support.google.com/adsense/answer/13554116?hl=en), and [Google's ads.txt publisher-ID guidance](https://support.google.com/adsense/answer/9785052?hl=en). Review these current policies before enabling an ad type or adding an authorized-seller record.
+
 ## Offline and token boundary
 
 Ads never load or make ad requests while offline. The existing offline tool package and local execution behavior remain separate from ad serving.
