@@ -3142,6 +3142,17 @@ private struct NativePrivacyInformationPage: View {
                 "We may revise this notice when product features, providers, or data practices change. The published version should be checked before using connected features.",
                 "For privacy questions or requests, contact [envtoolkit@gmail.com](mailto:envtoolkit@gmail.com). Company correspondence may also be sent to [chastechnologiesllc@gmail.com](mailto:chastechnologiesllc@gmail.com).",
             ])
+            if NativeAdsPolicy.adDisplayConfigured {
+                NativeInfoSectionView(title: "Advertising on selected tools", paragraphs: [
+                    "When enabled, Google Mobile Ads may load on selected, allowlisted tools while the device is online. Google may process request context and technical identifiers for ad delivery, fraud prevention, frequency capping, and reporting. Advertising requests are subject to the privacy choices presented by Google’s User Messaging Platform. Analytics settings are separate from advertising choices.",
+                ])
+                if advertisingPrivacy.privacyOptionsRequired {
+                    Button("Advertising privacy options") {
+                        Task { await advertisingPrivacy.presentPrivacyOptions() }
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
         }
     }
 }
@@ -3201,12 +3212,6 @@ private struct NativeResponsibleUseInformationPage: View {
                 "Keep a human in control: review outputs, verify important facts, and use qualified professionals for legal, medical, financial, tax, and safety-critical matters.",
             ])
             NativeInfoSectionView(title: "Reporting a concern", paragraphs: ["If you believe enV is being used unlawfully or encounter a safety or privacy issue, contact [envtoolkit@gmail.com](mailto:envtoolkit@gmail.com). Company-related correspondence may be sent to [chastechnologiesllc@gmail.com](mailto:chastechnologiesllc@gmail.com)."])
-        }
-        if NativeAdsPolicy.adDisplayConfigured && advertisingPrivacy.privacyOptionsRequired {
-            Button("Advertising privacy options") {
-                Task { await advertisingPrivacy.presentPrivacyOptions() }
-            }
-            .buttonStyle(.bordered)
         }
     }
 }
