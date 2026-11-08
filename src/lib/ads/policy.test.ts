@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canShowAdForTool, isHybridAdSupportedToolId, resolveAdConfig } from "./policy.ts";
+import { canShowAdForTool, isHybridAccessToolId, isHybridAdSupportedToolId, resolveAdConfig } from "./policy.ts";
 
 const goodEnvironment = {
   enabled: "true",
@@ -49,6 +49,18 @@ test("hybrid offline policy only applies to explicitly selected cross-platform m
   assert.equal(isHybridAdSupportedToolId("average-speed-calculator", { ...goodEnvironment, enabled: "false" }, eligibleTool()), false);
   assert.equal(isHybridAdSupportedToolId("average-speed-calculator", { ...goodEnvironment, privacyConfigured: "false" }, eligibleTool()), false);
   assert.equal(isHybridAdSupportedToolId("average-speed-calculator", { ...goodEnvironment, toolSlotId: "" }, eligibleTool()), false);
+});
+
+
+test("offline access enforcement is independent from ad-serving and CMP readiness", () => {
+  const adsDisabled = { ...goodEnvironment, enabled: "false" };
+  const cmpNotReady = { ...goodEnvironment, privacyConfigured: "false" };
+  assert.equal(isHybridAccessToolId("average-speed-calculator", adsDisabled, eligibleTool()), true);
+  assert.equal(isHybridAccessToolId("average-speed-calculator", cmpNotReady, eligibleTool()), true);
+  assert.equal(isHybridAdSupportedToolId("average-speed-calculator", adsDisabled, eligibleTool()), false);
+  assert.equal(isHybridAdSupportedToolId("average-speed-calculator", cmpNotReady, eligibleTool()), false);
+  assert.equal(isHybridAccessToolId("average-speed-calculator", { ...goodEnvironment, toolIds: "" }, eligibleTool()), false);
+  assert.equal(canShowAdForTool(eligibleTool(), null), false);
 });
 
 test("only explicitly selected, active, public device-local tools can show an ad", () => {
