@@ -1465,6 +1465,16 @@ private fun NativeDualCameraStudioScreen(
                         recordingActive = false
                         if (disposeAfterRecording.compareAndSet(true, false)) {
                             output.delete()
+                            val currentProvider = provider
+                            val currentPreview = previewUseCase
+                            val currentVideo = videoCapture
+                            if (currentProvider != null && currentPreview != null && currentVideo != null) {
+                                runCatching { currentProvider.unbind(currentPreview, currentVideo) }
+                            }
+                            provider = null
+                            previewUseCase = null
+                            videoCapture = null
+                            cameraReady = false
                         } else if (event.hasError()) {
                             output.delete()
                             localError = "Dual-camera video could not be finalized (error ${event.error}). Check storage and try again."
