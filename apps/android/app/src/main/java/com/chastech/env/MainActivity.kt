@@ -1253,6 +1253,9 @@ private fun NativeToolInterfaceContent(
             scope.launch { runCatching { NativeAnalytics.flush(context.applicationContext) } }
         }
     }
+    DisposableEffect(telemetry) {
+        onDispose { telemetry.abandon() }
+    }
     CompositionLocalProvider(LocalNativeToolExecutionTelemetry provides telemetry) {
         when {
             tool.category == "communication" -> NativeCommunicationToolForm(tool.id)
@@ -3125,6 +3128,21 @@ internal class NativeToolExecutionTelemetry(
             outcome = if (success) "success" else "failure",
             durationMs = duration,
             errorCode = if (success) null else "NATIVE_TOOL_FAILED",
+        )
+        flush()
+    }
+    @Synchronized fun abandon() {
+        val start = startedAtMs ?: return
+        if (resultRecorded) return
+        resultRecorded = true
+        val duration = (SystemClock.elapsedRealtime() - start).coerceIn(0L, 3_600_000L)
+        NativeAnalytics.record(
+            context,
+            "tool_abandoned",
+            toolId,
+            outcome = "abandoned",
+            durationMs = duration,
+            errorCode = "NATIVE_TOOL_LEFT_BEFORE_RESULT",
         )
         flush()
     }

@@ -39,9 +39,9 @@
 	<string>$(ENV_ADMOB_BANNER_AD_UNIT_ID)</string>
 	<key>ENV_API_BASE_URL</key>
 	<string>$(ENV_API_BASE_URL)</string>
-	<!-- Opt-in analytics UI remains disabled unless the native release explicitly enables it. -->
+	<!-- Build setting defaults to NO; enable only after server privacy and consent gates pass. -->
 	<key>ENV_ANALYTICS_ENABLED</key>
-	<false/>
+	<string>$(ENV_ANALYTICS_ENABLED)</string>
 	<key>NSCameraUsageDescription</key>
 	<string>enV uses the camera when you scan a QR code, take a photo, record a video, or start a live video performance.</string>
 	<key>NSMicrophoneUsageDescription</key>

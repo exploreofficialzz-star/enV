@@ -31,23 +31,26 @@ try {
     redirect: "manual",
     signal: AbortSignal.timeout(20000),
   });
-  if (dashboard.status >= 200 && dashboard.status < 300) {
+  if (dashboard.status === 200) {
     const html = await dashboard.text();
-    if (!html.includes("Private product analytics") && !html.includes("Developer analytics")) {
-      failures.push("userbehavior.envtools.store: private dashboard/login page content was not rendered");
+    if (!html.includes("Developer analytics")) {
+      failures.push("userbehavior.envtools.store: enabled developer sign-in page was not rendered");
+    }
+    if (html.includes("analytics dashboard is not enabled") || html.includes("not enabled on this deployment")) {
+      failures.push("userbehavior.envtools.store: dashboard UI is disabled in the production Web build");
     }
     const summary = await fetch("https://userbehavior.envtools.store/api/analytics/summary", {
       redirect: "manual",
       signal: AbortSignal.timeout(20000),
     });
-    if (![401, 403, 503].includes(summary.status)) {
-      failures.push("userbehavior.envtools.store: unauthenticated summary endpoint must deny access; received HTTP " + summary.status);
+    if (![401, 403].includes(summary.status)) {
+      failures.push("userbehavior.envtools.store: enabled dashboard must reject unauthenticated summary access with 401/403; received HTTP " + summary.status);
     }
     console.log("userbehavior.envtools.store: dashboard HTTP " + dashboard.status + "; unauthenticated summary HTTP " + summary.status);
   } else if ([301, 302, 303, 307, 308, 401, 403].includes(dashboard.status)) {
-    console.log("userbehavior.envtools.store: private host gate responded with HTTP " + dashboard.status);
+    console.log("userbehavior.envtools.store: external private-host gate responded with HTTP " + dashboard.status);
   } else {
-    failures.push("userbehavior.envtools.store: unexpected private-host response HTTP " + dashboard.status);
+    failures.push("userbehavior.envtools.store: dashboard must be enabled behind its login or external host protection; received HTTP " + dashboard.status);
   }
 } catch (error) {
   failures.push("userbehavior.envtools.store: " + (error instanceof Error ? error.message : String(error)));

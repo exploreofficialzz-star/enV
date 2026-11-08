@@ -156,6 +156,12 @@ function UserBehaviorDashboard() {
     setLoading(true); setProblem("");
     try {
       const response = await fetch("/api/analytics/summary", { credentials: "same-origin", headers: { accept: "application/json" } });
+      if (response.status === 401) {
+        // Missing or expired dashboard sessions are the normal signed-out state.
+        setAuthenticated(false);
+        setSummary(null);
+        return;
+      }
       setSummary(await readPayload<Summary>(response));
       setAuthenticated(true);
     } catch (error) {
@@ -188,12 +194,18 @@ function UserBehaviorDashboard() {
   }
 
   async function signOut() {
+    setProblem("");
     try {
-      await fetch("/api/analytics/admin/session/revoke", { method: "POST", credentials: "same-origin" });
-    } finally {
+      const response = await fetch("/api/analytics/admin/session/revoke", { method: "POST", credentials: "same-origin" });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({})) as { message?: string };
+        setProblem(payload.message || "Server-side revocation could not be confirmed. Retry sign-out when the database is available.");
+        return;
+      }
       setAuthenticated(false);
       setSummary(null);
-      setProblem("");
+    } catch {
+      setProblem("The server could not confirm session revocation. Retry sign-out when the connection is available.");
     }
   }
 
