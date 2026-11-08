@@ -8,7 +8,7 @@ import {
 import eligibleTools from "../../data/offline-eligible-tools.json";
 import { recordAnalyticsEvent } from "../analytics/client";
 import { getToolById } from "../registry";
-import { isApplicationOnline, isHybridAdSupportedToolId } from "../ads/policy";
+import { isApplicationOnline, isHybridAccessToolId } from "../ads/policy";
 
 type EligibleToolsIndex = { pricingVersion: string; toolCount: number; profiles: { toolId: string; billingKey: string; subunitsPerUnit: number; platforms: ("web" | "android" | "ios")[] }[] };
 const offlineEligibleTools = eligibleTools as EligibleToolsIndex;
@@ -144,7 +144,7 @@ export async function runOfflineMeteredOperationIfSelected<T>(input: { toolId: s
   if (!profile || !profile.billingKey.startsWith("local.") || !profile.platforms.includes("web")) return await operation();
 
   const catalogTool = getToolById(input.toolId);
-  const hybridAdTool = Boolean(catalogTool && isHybridAdSupportedToolId(input.toolId, {
+  const hybridAdTool = Boolean(catalogTool && isHybridAccessToolId(input.toolId, {
     enabled: import.meta.env.VITE_ADS_ENABLED,
     clientId: import.meta.env.VITE_ADSENSE_CLIENT_ID,
     toolSlotId: import.meta.env.VITE_ADSENSE_TOOL_SLOT_ID,
