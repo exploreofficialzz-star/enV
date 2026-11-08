@@ -23,8 +23,8 @@ A result without this evidence remains NOT RUN.
 
 ## Compatibility boundary
 
-- Android uses CameraX's concurrent-camera feature contract and only enables front/rear capture when the device advertises FEATURE_CAMERA_CONCURRENT and CameraX reports an actual front/rear pair. Android documents that the feature may also be advertised below API 30; when present, the same main front/rear concurrent-stream guarantees apply. This means Android 10 is not categorically rejected, but an Android 10 phone that does not advertise the feature remains unsupported by this path. The app retries an SD recording profile if the pair exists but cannot bind the initial 720p profile.
-- Android 9 logical multi-camera support by itself does not guarantee that separate front and rear camera devices can stream concurrently. It only defines supported physical-camera stream combinations inside a logical camera group. Do not open unrelated camera IDs speculatively and claim support without device testing.
+- Android's OS feature flag can be advertised below API 30, but the current CameraX pair-discovery implementation uses CameraManager.getConcurrentCameraIds(), which is only available from API 30. CameraX's compatibility implementation returns an empty concurrent-pair set below that level. Therefore this CameraX dual-recording path still requires Android 11+ and FEATURE_CAMERA_CONCURRENT plus an actual front/rear pair. Android 10 phones are not supported by this path even when a feature flag is exposed.
+- A separate pre-Android-11 Camera2 engine could experimentally open independent camera devices on some vendor builds, but Android does not guarantee those unrelated camera IDs can stream concurrently. Android 9 logical multi-camera support only guarantees physical-camera stream combinations inside a logical camera group; it does not guarantee front + rear capture. A legacy adapter is NOT IMPLEMENTED and would require hardware-specific testing before release.
 - iOS uses the AVCaptureMultiCamSession support flag, supported formats, and live hardware/system-pressure costs. It now retries a low-power 480p/24 profile after the 720p/30 profile fails or exceeds the device resource budget.
 - Browser dual capture requests the second camera at progressively lower resource profiles (720p/30, 480p/24, then 240p/15). The browser and camera driver may still prohibit opening both cameras at once.
 - No software path can make simultaneous capture universally available on hardware/OS combinations that do not expose concurrent camera streams. Do not simulate dual capture by duplicating frames or label sequential capture as simultaneous.
@@ -33,7 +33,7 @@ A result without this evidence remains NOT RUN.
 
 | Platform cohort | Minimum coverage | Required checks | Status |
 |---|---|---|---|
-| Android 10 baseline | At least one physical Android 10 phone | Check FEATURE_CAMERA_CONCURRENT and CameraX's reported front/rear pair; if advertised, test simultaneous preview/recording and low-power fallback; if absent, verify single-camera fallback | NOT RUN |
+| Android 10 baseline | At least one physical Android 10 phone | Verify current CameraX dual mode correctly falls back to single camera; record feature declaration; a separate legacy Camera2 dual path is NOT IMPLEMENTED and must not be marked PASS | NOT RUN |
 | Android 11+ dual-capable | At least one phone where CameraX reports a front/rear concurrent pair | Simultaneous preview, PiP composition, one-file recording, audio, orientation, stop/finalize, filters | NOT RUN |
 | Android 11+ non-dual-capable | At least one phone where the concurrent pair is not reported | Clear unavailable state and working single-camera fallback | NOT RUN |
 | Android 11+ low/mid-range dual-capable | At least one constrained-memory phone that reports a concurrent front/rear pair | 720p bind, SD retry, actual output resolution/FPS, heat, encoder load, audio and finalization | NOT RUN |
