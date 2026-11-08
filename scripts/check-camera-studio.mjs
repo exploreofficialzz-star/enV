@@ -75,6 +75,8 @@ assert.match(iosCamera, /func setFocusLocked/);
 assert.match(iosCamera, /func setWhiteBalance/);
 assert.match(iosCamera, /func setManualExposure/);
 assert.match(iosCamera, /func setVideoStabilization\(_ enabled: Bool\)/);
+assert.match(iosCamera, /func refreshVideoStabilizationSupport\(requested: Bool\)/);
+assert.match(iosCamera, /refreshVideoStabilizationSupport\(requested: videoStabilizationEnabled\)/);
 assert.match(iosCamera, /connection\.isVideoStabilizationSupported/);
 assert.match(iosCamera, /preferredVideoStabilizationMode = enabled \? \.auto : \.off/);
 const iosDualCameraStabilization = iosCamera.slice(iosCamera.indexOf("private final class NativeDualCameraCapture"));
