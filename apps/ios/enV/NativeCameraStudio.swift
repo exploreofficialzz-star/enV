@@ -1182,8 +1182,8 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
     private var stopRequested = false
     private var resumeAfterFinalization = false
 
-    private let outputWidth = 720
-    private let outputHeight = 1280
+    private var outputWidth = 720
+    private var outputHeight = 1280
 
     var backCameraInput: AVCaptureDeviceInput? { backInput }
     var frontCameraInput: AVCaptureDeviceInput? { frontInput }
@@ -1206,19 +1206,13 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
             self.stopRequested = false
             self.resumeAfterFinalization = false
             do {
-                try self.configureSession()
-                guard self.session.hardwareCost <= 1.0 else {
-                    throw NativeCameraError.message("This device cannot safely run both cameras at the selected quality.")
-                }
-                guard self.session.systemPressureCost <= 1.0 else {
-                    throw NativeCameraError.message("The camera system is under too much pressure for dual-camera recording.")
-                }
+                let selectedProfile = try self.configureBestAvailableSession()
                 if !self.session.isRunning { self.session.startRunning() }
                 Task { @MainActor in
                     self.ready = self.session.isRunning
                     self.error = nil
                     self.message = self.ready
-                        ? "Both cameras are ready. Start recording when you are set."
+                        ? "Both cameras are ready in \\(selectedProfile) mode. Start recording when you are set."
                         : "The cameras could not start. Return to the normal camera."
                 }
             } catch {
@@ -1309,23 +1303,18 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
     private func restartSessionLocked() {
         guard !stopRequested, !recordingRequested, writer == nil else { return }
         do {
-            try configureSession()
-            guard session.hardwareCost <= 1.0 else {
-                throw NativeCameraError.message("This device cannot safely restart both cameras after the interruption.")
-            }
-            guard session.systemPressureCost <= 1.0 else {
-                throw NativeCameraError.message("The camera system is still under too much pressure to restart dual-camera mode.")
-            }
+            let selectedProfile = try configureBestAvailableSession()
             if !session.isRunning { session.startRunning() }
             let isRunning = session.isRunning
             Task { @MainActor in
                 self.ready = isRunning
                 self.error = isRunning ? nil : "The dual-camera session could not restart. Use the normal camera instead."
                 self.message = isRunning
-                    ? "Both cameras are ready again."
+                    ? "Both cameras are ready again in \\(selectedProfile) mode."
                     : "Your normal single-camera mode remains available."
             }
         } catch {
+            resetSessionAfterFailure()
             Task { @MainActor in
                 self.ready = false
                 self.error = error.localizedDescription
@@ -1338,7 +1327,44 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
         sessionObservers.forEach(NotificationCenter.default.removeObserver)
     }
 
-    private func configureSession() throws {
+    // Try a balanced dual-camera profile first, then reduce both sensor streams and
+    // the encoded output together. This cannot add hardware concurrency to an
+    // unsupported iPhone, but it avoids rejecting devices that only sustain a
+    // lower-bandwidth MultiCam configuration.
+    private func configureBestAvailableSession() throws -> String {
+        do {
+            try configureSession(maxWidth: 1280, maxHeight: 720, frameRate: 30)
+            guard session.hardwareCost <= 1.0, session.systemPressureCost <= 1.0 else {
+                throw NativeCameraError.message("The 720p dual-camera profile exceeds this iPhone's camera resource budget.")
+            }
+            outputWidth = 720
+            outputHeight = 1280
+            return "720p"
+        } catch {
+            resetSessionAfterFailure()
+        }
+
+        do {
+            try configureSession(maxWidth: 640, maxHeight: 480, frameRate: 24)
+            guard session.hardwareCost <= 1.0, session.systemPressureCost <= 1.0 else {
+                throw NativeCameraError.message("The 480p dual-camera profile still exceeds this iPhone's camera resource budget.")
+            }
+            outputWidth = 480
+            outputHeight = 854
+            return "low-power 480p"
+        } catch {
+            resetSessionAfterFailure()
+            throw NativeCameraError.message(
+                "This iPhone could not sustain both cameras, even with the low-power profile. Use the normal camera instead. \\(error.localizedDescription)"
+            )
+        }
+    }
+
+    private func configureSession(
+        maxWidth: Int = 1280,
+        maxHeight: Int = 720,
+        frameRate: Double = 30
+    ) throws {
         guard backInput == nil, frontInput == nil else { return }
         session.beginConfiguration()
         do {
@@ -1347,8 +1373,18 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
                 throw NativeCameraError.message("Both a front and rear camera are required for this mode.")
             }
 
-            try configureModerateFormat(backDevice)
-            try configureModerateFormat(frontDevice)
+            try configureModerateFormat(
+                backDevice,
+                maxWidth: maxWidth,
+                maxHeight: maxHeight,
+                frameRate: frameRate
+            )
+            try configureModerateFormat(
+                frontDevice,
+                maxWidth: maxWidth,
+                maxHeight: maxHeight,
+                frameRate: frameRate
+            )
 
             let back = try AVCaptureDeviceInput(device: backDevice)
             let front = try AVCaptureDeviceInput(device: frontDevice)
@@ -1385,13 +1421,19 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
         previewConnections.removeAll()
     }
 
-    private func configureModerateFormat(_ device: AVCaptureDevice) throws {
+    private func configureModerateFormat(
+        _ device: AVCaptureDevice,
+        maxWidth: Int,
+        maxHeight: Int,
+        frameRate: Double
+    ) throws {
         let formats = device.formats.filter { format in
             let dimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
-            return format.isMultiCamSupported && dimensions.width <= 1920 &&
-                dimensions.height <= 1080 &&
+            return format.isMultiCamSupported &&
+                Int(dimensions.width) <= maxWidth &&
+                Int(dimensions.height) <= maxHeight &&
                 format.videoSupportedFrameRateRanges.contains {
-                    $0.minFrameRate <= 30 && $0.maxFrameRate >= 30
+                    $0.minFrameRate <= frameRate && $0.maxFrameRate >= frameRate
                 }
         }
         guard let selected = formats.max(by: { lhs, rhs in
@@ -1399,13 +1441,16 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
             let right = CMVideoFormatDescriptionGetDimensions(rhs.formatDescription)
             return Int(left.width) * Int(left.height) < Int(right.width) * Int(right.height)
         }) else {
-            throw NativeCameraError.message("A stable 1080p-or-lower, 30 fps camera format is not available.")
+            throw NativeCameraError.message(
+                "A MultiCam-compatible camera format at or below \\(maxWidth)x\\(maxHeight) and \\(Int(frameRate)) fps is not available."
+            )
         }
 
+        let frameScale = CMTimeScale(frameRate)
         try device.lockForConfiguration()
         device.activeFormat = selected
-        device.activeVideoMinFrameDuration = CMTime(value: 1, timescale: 30)
-        device.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: 30)
+        device.activeVideoMinFrameDuration = CMTime(value: 1, timescale: frameScale)
+        device.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: frameScale)
         device.unlockForConfiguration()
     }
 
