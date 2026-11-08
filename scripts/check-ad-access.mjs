@@ -27,7 +27,7 @@ const iosApp = read("apps/ios/enV/enVApp.swift");
 const iosProject = read("apps/ios/enV.xcodeproj/project.pbxproj");
 
 assert.match(shell, /<AdSlot tool=\{tool\} \/>/, "Tool details must include the ad placement.");
-assert.match(slot, /navigator\.onLine/, "Ads must not be requested while offline.");
+assert.match(slot, /isApplicationOnline\(\)/, "Ads must not be requested unless the application origin is reachable.");
 assert.match(slot, /requestNonPersonalizedAds = 1/, "Ad requests must default to non-personalized.");
 assert.match(slot, /VITE_ADSENSE_PRIVACY_CONFIGURED/, "Ad requests must require privacy/CMP setup.");
 assert.match(route, /<ToolShell tool=\{tool\}/, "The public tool route must continue to use the regular tool shell.");
