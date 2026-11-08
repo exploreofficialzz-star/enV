@@ -55,8 +55,11 @@ assert.match(androidAds, /MobileAds\.setRequestConfiguration/, "Android ad reque
 assert.match(iosAds, /publisherPrivacyPersonalizationState = \.disabled/, "iOS ad requests must default to non-personalized treatment.");
 assert.match(iosAds, /coarseLocationCollectionEnabled = false/, "iOS ads must not collect coarse device location by default.");
 assert.match(androidAds, /context\.assets\.open\("offline-eligible-tools\.json"\)/, "Android must read the canonical bundled offline pricing registry.");
+assert.match(androidAds, /tool\.status == "active"/, "Android ads must exclude non-active tools.");
+assert.match(androidAds, /tool\.requiresBackend|!tool\.requiresBackend/, "Android ads must exclude backend-dependent tools.");
+assert.match(androidAds, /restrictedDisclaimers/, "Android ads must apply the same sensitive-topic exclusions as Web.");
 assert.match(androidAds, /common\.AdLoadCallback|common\.LoadAdError/, "Android must use the current Google Ads callback API.");
-assert.match(androidMain, /NativeToolAdSlot\(tool\.id\)/, "The native Android tool surface must include its ad slot.");
+assert.match(androidMain, /NativeToolAdSlot\(tool\)/, "The native Android tool surface must include its ad slot.");
 assert.match(androidMain, /val online = NativeAdsPolicy\.isApplicationOnline\(context\)/, "Android hybrid runs must verify the enV origin.");
 assert.match(androidMain, /allowanceId != null && walletEligible -> runWithOfflineCharge\(\)/, "Android offline use must be journalled against a prepared allowance.");
 assert.match(androidMain, /else -> \{\s*output = ""\s*error = "This tool needs an offline enV token allowance\./, "Android hybrid tools must block offline execution without a prepared allowance.");
@@ -65,6 +68,8 @@ assert.match(iosProject, /GoogleMobileAds/, "iOS must link the Google Mobile Ads
 assert.match(iosProject, /GoogleUserMessagingPlatform/, "iOS must link the UMP Swift package.");
 assert.doesNotMatch(iosProject, /,,/, "The iOS project file must remain syntactically valid.");
 assert.match(iosProject, /NativeAds\.swift in Sources/, "The iOS native ad implementation must be part of the app target.");
+assert.match(iosAds, /restrictedDisclaimers/, "iOS ads must apply the same sensitive-topic exclusions as Web.");
+assert.match(iosAds, /tool\.requiresBackend/, "iOS ads must exclude backend-dependent tools.");
 assert.match(iosAds, /ConsentInformation\.shared\.requestConsentInfoUpdate/, "iOS must refresh UMP consent at launch.");
 assert.match(iosAds, /MobileAds\.shared\.start/, "iOS must initialize Google Mobile Ads after consent.");
 assert.match(iosAds, /publisherPrivacyPersonalizationState = \.disabled/, "iOS ad requests must default to non-personalized treatment.");
