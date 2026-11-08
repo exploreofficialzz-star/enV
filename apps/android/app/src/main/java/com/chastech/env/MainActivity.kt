@@ -1190,7 +1190,7 @@ private fun ToolDetail(
                 Column(Modifier.fillMaxWidth().padding(if (compact) 16.dp else 24.dp)) {
                     NativeToolInterfaceContent(tool, backend, supported, onRelatedTool)
                     if (!isFullscreen) NativeToolCommunityPanel(tool.id)
-                    if (!isFullscreen) NativeToolAdSlot(tool.id)
+                    if (!isFullscreen) NativeToolAdSlot(tool)
                 }
             }
             if (!isFullscreen) {
@@ -2180,7 +2180,7 @@ private fun NativeCalculatorToolForm(tool: ToolRecord) {
             onRun = {
                 val allowanceId = runCatching { journal.activeAllowanceId() }.getOrNull()
                 val walletEligible = runCatching { journal.isEligibleTool(context, tool.id) }.getOrDefault(false)
-                val hybridAdTool = NativeAdsPolicy.isHybridTool(context, tool.id) && walletEligible
+                val hybridAdTool = NativeAdsPolicy.isHybridTool(context, tool) && walletEligible
 
                 fun runWithoutOfflineCharge() {
                     runCatching { NativeCalculatorEngine.run(operation, values.toMap()) }.fold(
