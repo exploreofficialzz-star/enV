@@ -59,7 +59,7 @@ enum NativeAdsPolicy {
             !tool.requiresAuth &&
             !restrictedCategories.contains(tool.category) &&
             !tool.id.hasPrefix("finance-") &&
-            !(tool.disclaimer.map(restrictedDisclaimers.contains) ?? false)
+            (tool.disclaimer.map { !restrictedDisclaimers.contains($0) } ?? true)
     }
 
     static func isApplicationOnline() async -> Bool {
@@ -176,11 +176,14 @@ struct NativeToolAdSlot: View {
             }
         }
         .task(id: reachability.hasNetwork) {
-            if reachability.hasNetwork {
-            originReachable = await NativeAdsPolicy.isApplicationOnline()
-        } else {
-            originReachable = false
-        }
+            guard reachability.hasNetwork else {
+                originReachable = false
+                return
+            }
+            while !Task.isCancelled {
+                originReachable = await NativeAdsPolicy.isApplicationOnline()
+                try? await Task.sleep(nanoseconds: 15_000_000_000)
+            }
         }
     }
 }
