@@ -166,14 +166,20 @@ assert.match(registry, /status: "active"/);
 
 assert.match(androidCamera, /LifecycleCameraController/);
 assert.ok(
-  androidCamera.includes("LaunchedEffect(\\n        videoStabilizationEnabled,\\n        mode,\\n        videoStabilizationModes,\\n        cameraGranted,\\n        usingFrontCamera,\\n        selectedRearCameraId\\n    )"),
+  androidCamera.includes(`LaunchedEffect(
+        videoStabilizationEnabled,
+        mode,
+        videoStabilizationModes,
+        cameraGranted,
+        usingFrontCamera,
+        selectedRearCameraId
+    )`),
   "Android stabilization settings react to camera/lens switches."
 );
 assert.ok(
   androidCamera.includes("if (cameraGranted) applyAdvancedCameraSettings()"),
   "Android camera settings re-apply ON/OFF after each camera/lens switch."
 );
-assert.match(androidCamera, /if \\(cameraGranted\\) applyAdvancedCameraSettings\\(\\)/, "Android camera settings re-apply ON/OFF after each camera/lens switch.");
 assert.match(androidCamera, /requestCameraAccess\(\)/);
 assert.match(androidCamera, /Settings\.ACTION_APPLICATION_DETAILS_SETTINGS/);
 assert.doesNotMatch(androidCamera, /Your camera preview appears here|Allow camera access to begin|Enable camera/);
@@ -210,8 +216,7 @@ assert.match(androidCamera, /videoStabilizationEnabled by remember \{ mutableSta
 assert.doesNotMatch(androidCamera, /if \(!videoStabilizationModes\.contains\(CaptureRequest\.CONTROL_VIDEO_STABILIZATION_MODE_ON\)\) videoStabilizationEnabled = false/, "Unsupported lenses must not erase the user's stabilization preference.");
 assert.match(iosCamera, /self\.videoStabilizationEnabled = requested/);
 assert.match(iosCamera, /self\.videoStabilizationEnabled = enabled/, "iOS preserves the stabilization preference when a lens lacks support.");
-assert.match(androidCamera, /LaunchedEffect\(\s*videoStabilizationEnabled,[\s\S]*?videoStabilizationModes,[\s\S]*?usingFrontCamera,[\s\S]*?selectedRearCameraId[\s\S]*?\)/);
-assert.match(androidCamera, /if \(cameraGranted\) applyAdvancedCameraSettings\(\)/, "Android camera settings re-apply ON/OFF after each camera/lens switch.");
+
 assert.match(androidCamera, /videoStabilizationEnabled = videoStabilizationModes\.contains\(CaptureRequest\.CONTROL_VIDEO_STABILIZATION_MODE_ON\)/, "Resetting pro controls restores supported stabilization.");
 assert.match(androidCamera, /Video stabilization/);
 assert.match(androidCamera, /Reset pro controls/);
