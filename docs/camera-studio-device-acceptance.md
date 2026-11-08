@@ -21,8 +21,6 @@ For every test run, record:
 
 A result without this evidence remains NOT RUN.
 
-## Device coverage
-
 ## Compatibility boundary
 
 - Android 11+ uses the public concurrent-camera capability list and only enables front/rear capture when the device reports that exact pair. The app retries an SD recording profile if the pair exists but cannot bind the initial 720p profile.
@@ -30,6 +28,8 @@ A result without this evidence remains NOT RUN.
 - iOS uses the AVCaptureMultiCamSession support flag, supported formats, and live hardware/system-pressure costs. It now retries a low-power 480p/24 profile after the 720p/30 profile fails or exceeds the device resource budget.
 - Browser dual capture requests the second camera at progressively lower resource profiles (720p/30, 480p/24, then 240p/15). The browser and camera driver may still prohibit opening both cameras at once.
 - No software path can make simultaneous capture universally available on hardware/OS combinations that do not expose concurrent camera streams. Do not simulate dual capture by duplicating frames or label sequential capture as simultaneous.
+
+## Device coverage
 
 | Platform cohort | Minimum coverage | Required checks | Status |
 |---|---|---|---|
