@@ -99,7 +99,7 @@ internal object NativeAdsPolicy {
             !tool.requiresAuth &&
             tool.category !in restrictedCategories &&
             !tool.id.startsWith("finance-") &&
-            (tool.disclaimer == null || tool.disclaimer !in restrictedDisclaimers)
+            (tool.disclaimer?.let { it !in restrictedDisclaimers } ?: true)
     }
 
     suspend fun isApplicationOnline(context: Context): Boolean = withContext(Dispatchers.IO) {
