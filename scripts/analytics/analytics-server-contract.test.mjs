@@ -40,6 +40,10 @@ test("browser dashboard sessions require an active server-side HMAC digest row",
   assert.match(revokeRoute, /await revokeAnalyticsDashboardSession\(request\)/);
   assert.match(revokeRoute, /clearAnalyticsDashboardCookie\(\)/);
   assert.match(revokeRoute, /status:503/);
+  const revokeFailure = revokeRoute.slice(revokeRoute.indexOf("} catch {"));
+  assert.match(revokeFailure, /Your session remains active/);
+  assert.doesNotMatch(revokeFailure, /set-cookie.*clearCookie/);
+  assert.match(server, /where session_digest=\$1 and revoked_at is null/);
 });
 
 test("dashboard session migration stores only HMAC digests and enables RLS", () => {
