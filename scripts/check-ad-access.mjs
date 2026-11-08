@@ -15,6 +15,16 @@ const offlineClient = read("src/lib/billing/offline-client.ts");
 const adPolicy = read("src/lib/ads/policy.ts");
 const meteredProfiles = JSON.parse(read("src/data/offline-eligible-tools.json"));
 const offlinePolicy = read("src/lib/offline/policy.mjs");
+const androidInfo = read("apps/android/app/src/main/java/com/chastech/env/NativeInformationScreen.kt");
+const androidAds = read("apps/android/app/src/main/java/com/chastech/env/NativeAds.kt");
+const androidMain = read("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt");
+const androidGradle = read("apps/android/app/build.gradle.kts");
+const androidManifest = read("apps/android/app/src/main/AndroidManifest.xml");
+const iosAds = read("apps/ios/enV/NativeAds.swift");
+const iosCalculator = read("apps/ios/enV/ToolViews.swift");
+const iosPrivacy = read("apps/ios/enV/ContentViews.swift");
+const iosApp = read("apps/ios/enV/enVApp.swift");
+const iosProject = read("apps/ios/enV.xcodeproj/project.pbxproj");
 
 assert.match(shell, /<AdSlot tool=\{tool\} \/>/, "Tool details must include the ad placement.");
 assert.match(slot, /navigator\.onLine/, "Ads must not be requested while offline.");
@@ -33,5 +43,28 @@ assert.match(env, /VITE_ADSENSE_PRIVACY_CONFIGURED=false/, "CMP readiness must r
 assert.match(privacy, /advertisingEnabled = import\.meta\.env\.VITE_ADS_ENABLED === "true"/, "Privacy disclosure must appear when ad serving is enabled.");
 assert.match(privacy, /frequency capping and aggregated reporting/, "Privacy disclosure must explain NPA identifier use.");
 assert.match(privacyControls, /separate provider and CMP privacy choices/, "Analytics consent must be distinct from advertising consent.");
+
+assert.match(androidGradle, /ads-mobile-sdk:1\.6\.0/, "Android must use the native Google Mobile Ads SDK.");
+assert.match(androidGradle, /user-messaging-platform:4\.0\.0/, "Android must use the native UMP consent SDK.");
+assert.match(androidManifest, /com\.google\.android\.gms\.ads\.APPLICATION_ID/, "Android must declare its configured AdMob app ID.");
+assert.match(androidAds, /UserMessagingPlatform\.getConsentInformation/, "Android must refresh and evaluate UMP consent.");
+assert.match(androidAds, /NetworkCapabilities\.NET_CAPABILITY_VALIDATED/, "Android ads must require validated network connectivity.");
+assert.match(androidAds, /context\.assets\.open\("offline-eligible-tools\.json"\)/, "Android must read the canonical bundled offline pricing registry.");
+assert.match(androidAds, /common\.AdLoadCallback|common\.LoadAdError/, "Android must use the current Google Ads callback API.");
+assert.match(androidMain, /NativeToolAdSlot\(tool\.id\)/, "The native Android tool surface must include its ad slot.");
+assert.match(androidMain, /hybridAdTool && !online && allowanceId == null/, "Android hybrid tools must block offline execution without a prepared allowance.");
+assert.match(androidInfo, /NativeAdsPrivacyOptionsButton/, "Android must expose UMP privacy options from Privacy.");
+assert.match(iosProject, /GoogleMobileAds/, "iOS must link the Google Mobile Ads Swift package.");
+assert.match(iosProject, /GoogleUserMessagingPlatform/, "iOS must link the UMP Swift package.");
+assert.doesNotMatch(iosProject, /,,/, "The iOS project file must remain syntactically valid.");
+assert.match(iosProject, /NativeAds\.swift in Sources/, "The iOS native ad implementation must be part of the app target.");
+assert.match(iosAds, /ConsentInformation\.shared\.requestConsentInfoUpdate/, "iOS must refresh UMP consent at launch.");
+assert.match(iosAds, /MobileAds\.shared\.start/, "iOS must initialize Google Mobile Ads after consent.");
+assert.match(iosAds, /BannerView\(adSize:/, "iOS must render a native adaptive banner view.");
+assert.match(iosAds, /privacyOptionsRequired/, "iOS must expose the UMP privacy-options requirement.");
+assert.match(iosApp, /refreshConsentAtLaunch\(\)/, "iOS must refresh advertising consent at app launch.");
+assert.match(iosPrivacy, /Advertising privacy options/, "iOS must surface advertising privacy choices on its Privacy screen.");
+assert.match(iosCalculator, /NativeToolAdSlot\(tool: tool\)/, "The native iOS tool surface must include its ad slot.");
+assert.match(iosCalculator, /NativeHybridAccessError\.offlineAllowanceRequired/, "iOS hybrid tools must block offline execution without a prepared allowance.");
 
 console.log("Ad-access checks PASS: cross-platform metered allowlist, guest online access, offline allowance gate, privacy controls and unchanged production billing lock.");
