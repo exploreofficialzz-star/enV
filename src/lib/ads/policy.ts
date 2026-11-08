@@ -65,7 +65,7 @@ export function resolveAdConfig(env: AdEnvironment): AdRuntimeConfig | null {
  */
 export function isHybridAdSupportedToolId(toolId: string, env: AdEnvironment): boolean {
   const config = resolveAdConfig(env);
-  return config !== null && config.allowedToolIds.has(toolId) && OFFLINE_PROFILE_IDS.has(toolId);
+  return config !== null && config.allowedToolIds.has(toolId) && OFFLINE_PROFILE_IDS.has(toolId) && !toolId.startsWith("finance-");
 }
 
 /** Same-origin reachability check: browser online hints alone are not authoritative. */

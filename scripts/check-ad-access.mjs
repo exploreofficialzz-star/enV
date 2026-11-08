@@ -37,6 +37,7 @@ assert.match(offlineClient, /HYBRID_OFFLINE_ALLOWANCE_REQUIRED/, "Hybrid ad tool
 assert.match(offlineClient, /isApplicationOnline\(\)/, "Web hybrid access must check same-origin reachability.");
 assert.match(offlineClient, /toolSlotId: import\.meta\.env\.VITE_ADSENSE_TOOL_SLOT_ID/, "Web offline policy must use the exact validated AdSense slot setting.");
 assert.match(adPolicy, /offline-eligible-tools\.json/, "Hybrid ads must use the canonical cross-platform metering registry.");
+assert.match(adPolicy, /!toolId\.startsWith\("finance-"\)/, "Finance calculators must not enter the hybrid offline metering cohort.");
 assert.ok(meteredProfiles.profiles.every((profile) => profile.platforms.includes("web") && profile.platforms.includes("android") && profile.platforms.includes("ios")), "Offline metering profiles must have platform parity.");
 assert.match(offlinePolicy, /tokenPolicy: "monetization-pending"/, "Offline execution classification must remain separate from billing rollout.");
 assert.match(offline, /BILLING_OFFLINE_ENABLED !== "true"/, "Production offline token spending must remain fail-closed.");

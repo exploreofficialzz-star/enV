@@ -43,6 +43,7 @@ test("ads configuration accepts a valid publisher, slot and deduplicated explici
 test("hybrid offline policy only applies to explicitly selected cross-platform metered tools", () => {
   assert.equal(isHybridAdSupportedToolId("average-speed-calculator", goodEnvironment), true);
   assert.equal(isHybridAdSupportedToolId("json-formatter", goodEnvironment), false);
+  assert.equal(isHybridAdSupportedToolId("finance-apr-calculator", { ...goodEnvironment, toolIds: `${goodEnvironment.toolIds},finance-apr-calculator` }), false, "Finance calculators must never be enrolled in the hybrid ad cohort.");
   assert.equal(isHybridAdSupportedToolId("average-speed-calculator", { ...goodEnvironment, enabled: "false" }), false);
   assert.equal(isHybridAdSupportedToolId("average-speed-calculator", { ...goodEnvironment, privacyConfigured: "false" }), false);
   assert.equal(isHybridAdSupportedToolId("average-speed-calculator", { ...goodEnvironment, toolSlotId: "" }), false);
