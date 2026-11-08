@@ -7,6 +7,7 @@ import {
 } from "./offline-protocol";
 import eligibleTools from "../../data/offline-eligible-tools.json";
 import { recordAnalyticsEvent } from "../analytics/client";
+import { isApplicationOnline, isHybridAdSupportedToolId } from "../ads/policy";
 
 type EligibleToolsIndex = { pricingVersion: string; toolCount: number; profiles: { toolId: string; billingKey: string; subunitsPerUnit: number; platforms: ("web" | "android" | "ios")[] }[] };
 const offlineEligibleTools = eligibleTools as EligibleToolsIndex;
@@ -139,17 +140,29 @@ export async function listLocalWebOfflineAllowances() {
  * this journal until their execution boundary is explicitly wired and audited. */
 export async function runOfflineMeteredOperationIfSelected<T>(input: { toolId: string }, operation: () => T | Promise<T>): Promise<T> {
   const profile = offlineEligibleById.get(input.toolId);
-  if (!profile || !profile.billingKey.startsWith("local.") || !profile.platforms.includes("web")) {
-    // Monetization is deliberately being wired after the offline feature rollout.
-    // A missing billing profile must not block a verified device-local tool action.
+  if (!profile || !profile.billingKey.startsWith("local.") || !profile.platforms.includes("web")) return await operation();
+
+  const hybridAdTool = isHybridAdSupportedToolId(input.toolId, {
+    enabled: import.meta.env.VITE_ADS_ENABLED,
+    toolIds: import.meta.env.VITE_AD_SUPPORTED_TOOL_IDS,
+  });
+
+  if (hybridAdTool && await isApplicationOnline()) {
+    // Online access for the selected cohort is guest-friendly and ad-funded, not token-metered.
     return await operation();
   }
+
   const selectedAllowanceId = getSelectedWebOfflineAllowanceId();
   if (!selectedAllowanceId) {
-    // The pre-monetization offline release makes local execution available first.
-    // No token is deducted here; per-tool metering is integrated in the monetization phase.
+    if (hybridAdTool) {
+      throw new OfflineClientError(
+        "HYBRID_OFFLINE_ALLOWANCE_REQUIRED",
+        "This tool needs an offline enV token allowance. Connect to use it online, or sign in and prepare an offline allowance in Wallet before disconnecting.",
+      );
+    }
     return await operation();
   }
+
   const db = await openDb();
   const allowance = await getRow<StoredAllowance>(db, "allowances", selectedAllowanceId);
   db.close();
@@ -158,14 +171,9 @@ export async function runOfflineMeteredOperationIfSelected<T>(input: { toolId: s
     throw new OfflineClientError("OFFLINE_ALLOWANCE_UNAVAILABLE", "The selected enV token allowance is expired or requires recovery. This operation did not run; open the wallet and review the allowance.");
   }
   const result = await runOfflineMeteredOperation({ allowanceId: selectedAllowanceId, toolId: input.toolId, unitCount: 1 }, operation);
-  if (typeof navigator !== "undefined" && navigator.onLine) {
-    // The signed row is already durable. A network failure is deliberately non-fatal here:
-    // keep the local record and retry on the next online event or from the wallet screen.
-    void synchronizeSelectedWebOfflineAllowance();
-  }
+  if (typeof navigator !== "undefined" && navigator.onLine) void synchronizeSelectedWebOfflineAllowance();
   return result;
 }
-
 function openDb(): Promise<IDBDatabase> {
   requireBrowser();
   return new Promise((resolve, reject) => {
