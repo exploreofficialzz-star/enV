@@ -8,6 +8,8 @@ const slot = read("src/components/tools/ad-slot.tsx");
 const shell = read("src/components/tools/tool-shell.tsx");
 const route = read("src/routes/tools/$category/$slug.tsx");
 const env = read(".env.example");
+const privacy = read("src/routes/privacy.tsx");
+const privacyControls = read("src/components/layout/privacy-controls.tsx");
 const offline = read("src/lib/billing/offline.server.ts");
 const offlinePolicy = read("src/lib/offline/policy.mjs");
 
@@ -21,5 +23,8 @@ assert.match(offlinePolicy, /tokenPolicy: "monetization-pending"/, "Offline exec
 assert.match(offline, /BILLING_OFFLINE_ENABLED !== "true"/, "Production offline token spending must remain fail-closed.");
 assert.match(env, /VITE_ADS_ENABLED=false/, "Ads must remain off by default in the environment template.");
 assert.match(env, /VITE_ADSENSE_PRIVACY_CONFIGURED=false/, "CMP readiness must remain off by default.");
+assert.match(privacy, /advertisingEnabled = import\.meta\.env\.VITE_ADS_ENABLED === "true"/, "Privacy disclosure must appear when ad serving is enabled.");
+assert.match(privacy, /frequency capping and aggregated reporting/, "Privacy disclosure must explain NPA identifier use.");
+assert.match(privacyControls, /separate provider and CMP privacy choices/, "Analytics consent must be distinct from advertising consent.");
 
 console.log("Ad-access checks PASS: explicit local-tool allowlist, guest route, online-only slots, privacy gate, and unchanged offline billing lock.");
