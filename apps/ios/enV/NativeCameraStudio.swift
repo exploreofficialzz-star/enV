@@ -1453,6 +1453,12 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
                 self.session.addConnection(frontConnection)
                 if backConnection.isVideoOrientationSupported { backConnection.videoOrientation = .portrait }
                 if frontConnection.isVideoOrientationSupported { frontConnection.videoOrientation = .portrait }
+                if backConnection.isVideoStabilizationSupported {
+                    backConnection.preferredVideoStabilizationMode = .auto
+                }
+                if frontConnection.isVideoStabilizationSupported {
+                    frontConnection.preferredVideoStabilizationMode = .auto
+                }
                 if frontConnection.isVideoMirroringSupported {
                     frontConnection.automaticallyAdjustsVideoMirroring = false
                     frontConnection.isVideoMirrored = true
