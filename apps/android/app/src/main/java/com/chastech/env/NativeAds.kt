@@ -223,3 +223,19 @@ private fun rememberValidatedAdNetwork(context: Context): Boolean {
     }
     return connected
 }
+
+@Composable
+internal fun NativeAdsPrivacyDisclosure() {
+    if (!NativeAdsPolicy.adDisplayConfigured) return
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text("Advertising on selected tools", style = MaterialTheme.typography.titleSmall)
+        Text(
+            "Google Mobile Ads may load on selected, allowlisted tools while online. Google may process request context and technical identifiers for ad delivery, fraud prevention, frequency capping and reporting. Advertising uses separate privacy choices presented by Google’s User Messaging Platform.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
