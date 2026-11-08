@@ -56,6 +56,8 @@ assert.match(androidCamera, /availableConcurrentCameraInfos/);
 assert.match(androidCamera, /FEATURE_CAMERA_CONCURRENT/);
 assert.match(androidCamera, /ConcurrentCamera\.SingleCameraConfig/);
 assert.match(androidCamera, /concurrentCamera\.cameras\.forEach/);
+assert.match(androidCamera, /Camera2CameraControl\.from\(activeCamera\.cameraControl\)/, "Android concurrent camera feeds request stabilization independently.");
+assert.match(androidCamera, /CaptureRequest\.CONTROL_VIDEO_STABILIZATION_MODE_ON/);
 assert.match(androidCamera, /Camera2CameraControl\.from\(activeCamera\.cameraControl\)/, "Android concurrent feeds request stabilization independently when supported.");
 assert.match(androidCamera, /UseCaseGroup\.Builder/);
 assert.match(androidCamera, /VideoCapture\.withOutput/);
