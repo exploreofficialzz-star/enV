@@ -1,5 +1,5 @@
 enV CAMERA STUDIO — PROFESSIONAL CAMERA UPGRADE PROMPT
-Version: 1.0
+Version: 1.1
 Purpose: Continue the Camera Studio implementation into a dependable, phone-first camera experience while preserving enV's familiar, ordinary interface.
 
 ROLE
@@ -11,19 +11,20 @@ Build a simple camera that feels familiar to anyone who has used a normal phone 
 CURRENT BASELINE
 Camera Studio is integrated across the web app, Android CameraX and iOS AVFoundation. The browser version includes permission-gated preview, front/rear switching, photos, video with microphone fallback, eight color looks, requested 720p/1080p/4K and 24/30/60 fps targets, hardware-reported zoom/exposure/torch, framing grid, timer, a temporary local gallery, download, and recording recovery.
 
-The native applications have separate camera screens. Android includes photo/video capture, contextual permissions, silent-video fallback, front/rear switching, torch, zoom, tap-to-focus, exposure compensation and local document-picker export. The Camera Studio parity upgrade adds a 3/10-second photo timer, framing grid, CameraX video-quality choices (720p/1080p/4K) and 24/30/60 fps targets with device fallback. A dedicated front + rear video mode now uses CameraX concurrent-camera composition to record one combined clip on supported Android 11+ devices. Unsupported phones retain the normal single-camera path. Requested quality and frame rate are not guaranteed on every phone.
+The native applications have separate camera screens. Android includes photo/video capture, contextual permissions, silent-video fallback, front/rear switching, torch, zoom, tap-to-focus, exposure compensation, document-picker export, timer, grid, device-aware quality/frame-rate targets, supported rear-lens selection, manual ISO/shutter, white-balance presets and focus lock. CameraX/Media3 color looks run in preview and capture outputs. Optional ML Kit face tracking draws original glasses, crown and face-following soft-glow overlays into preview and recorded video; face analysis is local, off by default and disabled in photo and dual-camera modes. Camera2 video stabilization is exposed only when the active camera reports support. A dedicated front + rear video mode uses CameraX concurrent-camera composition to record one combined clip on supported Android 11+ devices; each concurrent stream requests hardware stabilization independently when supported. Unsupported phones retain the normal single-camera path. Requested quality and frame rate are not guaranteed on every phone.
 
-iOS includes photo/video capture, interruption recovery, photo looks, timer, Photos export/share, zoom, torch, tap-to-focus, exposure compensation and actual active-format reporting. The Camera Studio parity upgrade adds all eight photo looks, a framing grid, recent-capture share/remove actions, focus lock, white-balance presets and manual ISO/shutter controls only when the active camera format reports support.
+iOS includes photo/video capture, session interruption and media-service-reset recovery, all eight Core Image looks in preview and recorded video, timer, framing grid, Photos export/share, recent-capture management, zoom, torch, tap-to-focus, exposure compensation and actual active-format reporting. Manual ISO/shutter, white-balance presets, focus lock and optical-lens selection are shown only when supported by the active camera. Vision face-landmark tracking provides original glasses/crown overlays and subtle face-only softening in preview and recorded video; effects are local, opt-in and video-only. AVFoundation video stabilization uses the active connection's automatic mode only when supported, including separate preview/output support checks in dual-camera mode.
 
-The browser dual-camera upgrade requests a second, distinct camera device only after the user enables it. When the browser and phone permit both streams, the preview and exported photos/videos are composited as picture-in-picture or split view. If the second stream cannot open, the tool reports that condition and retains single-camera use. It never duplicates one stream to simulate two cameras.
+The browser dual-camera path requests a second, distinct camera device only after the user enables it. When the browser and phone permit both streams, the preview and exported photos/videos are composited as picture-in-picture or split view. Each feed is mirrored independently once, including selfie photos and video exports. If the second stream cannot open, the tool reports that condition and retains single-camera use. It never duplicates one stream to simulate two cameras.
 
 Current limits that remain real:
-- Native Android concurrent front/rear video recording is implemented with CameraX composition and a supported camera-pair check; physical-device acceptance remains required. Native iOS simultaneous front/rear video now uses AVCaptureMultiCamSession, synchronized frames, a 720p picture-in-picture composite and AVAssetWriter; physical-device acceptance remains required.
-- Snapchat-style live face-landmark tracking, AR masks and face-attached effects are not complete. Color looks are not face tracking.
-- Native Android/iOS live-video filters are not complete; iOS looks currently affect photos, not native video.
-- Browser dual-camera availability depends on the browser and actual phone hardware. Physical-device acceptance is still required.
-- Android and iOS native recent-capture and save behavior still need multi-device lifecycle, storage-pressure and long-recording acceptance.
-- The iOS project has repository-wide build issues outside NativeCameraStudio.swift; do not call iOS CI green until the full app builds.
+- Physical-device acceptance has NOT RUN. Android emulator and iOS simulator checks do not prove camera/encoder behaviour on Tecno, Infinix or iPhone hardware. The acceptance matrix remains NOT RUN and the PR must not be release-accepted until real-device evidence is attached.
+- Android concurrent front/rear capture requires Android 11+ and a reported concurrent-camera pair. Android 10 phones must show the normal single-camera fallback; do not imply dual capture works on those devices.
+- The included glasses, crown, soft-glow and subtle iOS face-softening effects are original enV samples, not a licensed Snapchat Lens catalogue or Snap Camera Kit integration.
+- Android Soft glow is a face-following light overlay, not skin smoothing. Full 3D meshes, occlusion-aware masks, expression/blendshape effects and advanced skin retouch are not implemented.
+- Face effects are not enabled during simultaneous front/rear recording. They must remain opt-in and off by default.
+- Browser camera support depends on secure context, permission, browser APIs and actual device capability. Browser face-tracking AR effects and native-style manual ISO/shutter controls are not implemented.
+- Android/iOS manual controls, stabilization and optical lenses are hardware/format-gated. Availability and actual video quality vary by phone and must be measured rather than assumed.
 Treat these as real gaps. Never report them as completed.
 
 PHASE 1 — COMPLETE NATIVE CAMERA INTEGRATION
@@ -38,7 +39,7 @@ PHASE 1 — COMPLETE NATIVE CAMERA INTEGRATION
 PHASE 2 — DEVICE-AWARE PRO CAMERA CONTROLS
 1. Offer sensible targets: 720p, 1080p and 4K where supported; 24, 30 and 60 fps where supported. Never show a requested value as if it were the actual output. Read back and display actual device settings.
 2. Add focus modes and tap-to-focus only where the device framework supports them.
-3. Add exposure compensation, white-balance modes, hardware zoom, flash and stabilization only when the device reports support.
+3. Add exposure compensation, white-balance modes, hardware zoom, flash and video stabilization only when the active device/connection reports support. Android Camera2 and iOS AVFoundation stabilization are implemented with hardware gating; dual-camera feeds request stabilization independently.
 4. Add aspect-ratio choices such as 4:3, 16:9 and square. Ensure preview framing matches the exported result.
 5. Avoid promising RAW/DNG, HDR, optical zoom, 4K60 or high-frame-rate slow motion until the exact device and encoder path can produce and save those formats.
 6. Include a simple reset-to-auto option so users can recover from manual settings.
@@ -52,13 +53,22 @@ This is not the same as switching between cameras.
 5. Do not simulate dual camera by showing the same stream twice, and do not imply that a device supports dual capture just because it has two lenses.
 
 PHASE 4 — CREATOR FILTERS AND FACE EFFECTS
-1. Keep simple color looks such as Natural, Warm, Cool, Mono, Vivid, Fade, Sunset and Glow.
-2. Add optional real-time face effects only through a genuine face-landmark pipeline. Evaluate MediaPipe Face Landmarker for web and appropriate native face/landmark solutions for Android/iOS.
-3. Use face landmarks, blendshape scores and transformation matrices to anchor original overlays and effects to faces. Example effects: glasses, hats, small sparkles, color tints and simple seasonal overlays.
-4. Add a beauty/soft-light option carefully. Do not claim skin retouching or face tracking if the algorithm only applies a global CSS color filter.
-5. Process video filters in the same media pipeline that is saved. The exported file must match the preview filter/effect.
-6. Keep model assets and filter assets versioned, licensed and packaged appropriately. Do not download arbitrary code or assets at runtime.
-7. Face detection must be opt-in, local by default, and disabled when performance or device support is insufficient. Keep inference off the UI thread where possible.
+IMPLEMENTED ON NATIVE PLATFORMS
+1. Keep the eight simple color looks: Natural, Warm, Cool, Mono, Vivid, Fade, Sunset and Glow.
+2. Android uses bundled on-device ML Kit face detection/tracking with CameraX timestamp-matched overlay frames. Original glasses, crown and face-following soft-glow effects are drawn into preview and recorded video.
+3. iOS uses Vision face landmarks and Core Image/AVAssetWriter. Original glasses and crown overlays plus subtle face-only softening are included in preview and recorded video.
+4. Native face effects are opt-in, off by default, local to the device and video-only. They are disabled in Android still-photo and simultaneous front/rear modes; iOS dual-camera mode also does not include face effects.
+5. Native color looks and face effects use the same processed frame path for preview and video export. Continue measuring preview-to-export parity on real devices.
+
+NOT YET IMPLEMENTED
+1. Browser face-landmark AR effects.
+2. Licensed Snapchat Lens catalogue or Snap Camera Kit integration.
+3. Expression-driven blendshapes, a full 3D face mesh, occlusion-aware effects and advanced skin retouch.
+4. Android skin smoothing. Android Soft glow is a face-following light overlay, not skin retouch. The iOS Beauty sample is subtle face-only softening, not a professional beauty studio.
+5. Face effects during simultaneous front/rear recording.
+6. A broader catalogue of original masks/effects with tested performance on lower-end phones.
+
+Do not overstate these limits. Keep model assets packaged and licensed, inference off the UI thread, and face frames/landmarks local.
 
 PHASE 5 — STORAGE, EXPORT AND PRIVACY
 1. Save captures to the user's device gallery/library with platform-appropriate permissions and clear success/failure confirmation.
