@@ -1418,9 +1418,13 @@ private fun NativeDualCameraStudioScreen(
     LaunchedEffect(previewView) {
         val targetPreview = previewView ?: return@LaunchedEffect
         try {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            // Do not reject solely by Android version. Some devices on older OS
+            // releases advertise FEATURE_CAMERA_CONCURRENT and receive the same
+            // guaranteed concurrent front/rear stream combinations. CameraX uses
+            // this feature flag and its actual concurrent-camera list as the gate.
+            if (!context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_CONCURRENT)) {
                 throw IllegalStateException(
-                    "Simultaneous front + rear capture needs Android 11 or newer on the standard Android camera API. This phone can still use normal single-camera recording."
+                    "This phone does not report simultaneous front + rear camera support. Normal single-camera recording remains available."
                 )
             }
 
