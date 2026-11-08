@@ -142,7 +142,7 @@ test("public privacy notice states analytics purpose, identifiers, retention and
   assert.match(section, /private dashboard sign-in/i);
   assert.match(section, /only the digest is stored/i);
   assert.match(section, /pseudonymous/i);
-  assert.match(section, /90 days from receipt/i);
+  assert.match(section, /90-day window from receipt/i);
   assert.match(section, /up to 730 days/i);
   assert.match(section, /offline/i);
   assert.match(section, /revocation request/i);
