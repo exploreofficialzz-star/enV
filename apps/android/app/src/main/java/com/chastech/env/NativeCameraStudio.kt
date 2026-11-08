@@ -520,7 +520,7 @@ fun NativeCameraStudioScreen() {
     var manualFocusDistance by remember { mutableStateOf(0f) }
     var whiteBalanceModes by remember { mutableStateOf(emptySet<Int>()) }
     var videoStabilizationModes by remember { mutableStateOf(emptySet<Int>()) }
-    var videoStabilizationEnabled by remember { mutableStateOf(false) }
+    var videoStabilizationEnabled by remember { mutableStateOf(true) }
     var selectedWhiteBalance by remember { mutableStateOf(CaptureRequest.CONTROL_AWB_MODE_AUTO) }
     var advancedControlError by remember { mutableStateOf<String?>(null) }
     var recording by remember { mutableStateOf<Recording?>(null) }
@@ -543,7 +543,6 @@ fun NativeCameraStudioScreen() {
             manualFocusMinimum = 0f
             whiteBalanceModes = emptySet()
             videoStabilizationModes = emptySet()
-            videoStabilizationEnabled = false
             return@LaunchedEffect
         }
         runCatching {
@@ -647,6 +646,12 @@ fun NativeCameraStudioScreen() {
         videoStabilizationEnabled = false
         controller.setTapToFocusEnabled(true)
         applyAdvancedCameraSettings()
+    }
+
+    LaunchedEffect(videoStabilizationEnabled, mode, videoStabilizationModes, cameraGranted) {
+        if (cameraGranted && videoStabilizationModes.contains(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_ON)) {
+            applyAdvancedCameraSettings()
+        }
     }
 
     val savePicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/jpeg")) { target ->
