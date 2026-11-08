@@ -50,8 +50,7 @@ enum NativeAdsPolicy {
     static func isHybridTool(_ tool: Tool) -> Bool {
         let restrictedDisclaimers: Set<String> = ["health", "finance", "earnings"]
         let restrictedCategories: Set<String> = ["fitness", "personal"]
-        return adDisplayConfigured &&
-            allowlistedToolIDs.contains(tool.id) &&
+        return allowlistedToolIDs.contains(tool.id) &&
             crossPlatformMeteredIDs.contains(tool.id) &&
             tool.status == "active" &&
             tool.clientSide &&
@@ -161,7 +160,7 @@ struct NativeToolAdSlot: View {
 
     var body: some View {
         Group {
-            if NativeAdsPolicy.isHybridTool(tool) && originReachable &&
+            if NativeAdsPolicy.adDisplayConfigured && NativeAdsPolicy.isHybridTool(tool) && originReachable &&
                 consent.canRequestAds && consent.sdkReady {
                 VStack(alignment: .leading, spacing: 5) {
                     Text("Advertisement")
