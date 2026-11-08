@@ -150,7 +150,6 @@ private enum class NativeCameraLook(val label: String) {
 }
 
 @androidx.annotation.OptIn(UnstableApi::class)
-@OptIn(UnstableApi::class)
 private fun nativeCameraEffects(look: NativeCameraLook): List<Effect> = when (look) {
     NativeCameraLook.NATURAL -> emptyList()
     NativeCameraLook.WARM -> listOf(HslAdjustment.Builder().adjustHue(-7f).adjustSaturation(8f).adjustLightness(2f).build())
@@ -520,6 +519,8 @@ fun NativeCameraStudioScreen() {
     var manualFocusLocked by remember { mutableStateOf(false) }
     var manualFocusDistance by remember { mutableStateOf(0f) }
     var whiteBalanceModes by remember { mutableStateOf(emptySet<Int>()) }
+    var videoStabilizationModes by remember { mutableStateOf(emptySet<Int>()) }
+    var videoStabilizationEnabled by remember { mutableStateOf(false) }
     var selectedWhiteBalance by remember { mutableStateOf(CaptureRequest.CONTROL_AWB_MODE_AUTO) }
     var advancedControlError by remember { mutableStateOf<String?>(null) }
     var recording by remember { mutableStateOf<Recording?>(null) }
@@ -541,6 +542,8 @@ fun NativeCameraStudioScreen() {
             manualExposureTimeRange = null
             manualFocusMinimum = 0f
             whiteBalanceModes = emptySet()
+            videoStabilizationModes = emptySet()
+            videoStabilizationEnabled = false
             return@LaunchedEffect
         }
         runCatching {
@@ -579,6 +582,8 @@ fun NativeCameraStudioScreen() {
                     manualExposureTimeRange = camera2Info.getCameraCharacteristic(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE)
                     manualFocusMinimum = camera2Info.getCameraCharacteristic(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE) ?: 0f
                     whiteBalanceModes = camera2Info.getCameraCharacteristic(CameraCharacteristics.CONTROL_AWB_AVAILABLE_MODES)?.toSet().orEmpty()
+                    videoStabilizationModes = camera2Info.getCameraCharacteristic(CameraCharacteristics.CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES)?.toSet().orEmpty()
+                    if (!videoStabilizationModes.contains(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_ON)) videoStabilizationEnabled = false
                     manualIsoRange?.let { range -> manualIso = manualIso.coerceIn(range.lower.toFloat(), range.upper.toFloat()) }
                     manualExposureTimeRange?.let { range ->
                         manualShutterSeconds = manualShutterSeconds.coerceIn(
@@ -600,6 +605,10 @@ fun NativeCameraStudioScreen() {
         runCatching {
             val options = CaptureRequestOptions.Builder()
                 .setCaptureRequestOption(CaptureRequest.CONTROL_AWB_MODE, selectedWhiteBalance)
+                .setCaptureRequestOption(
+                    CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
+                    if (mode == NativeCameraMode.VIDEO && videoStabilizationEnabled && videoStabilizationModes.contains(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_ON)) CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_ON else CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_OFF
+                )
                 .apply {
                     if (manualExposureEnabled && manualSensorSupported && manualIsoRange != null && manualExposureTimeRange != null) {
                         setCaptureRequestOption(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_OFF)
@@ -635,6 +644,7 @@ fun NativeCameraStudioScreen() {
         manualExposureEnabled = false
         manualFocusLocked = false
         selectedWhiteBalance = CaptureRequest.CONTROL_AWB_MODE_AUTO
+        videoStabilizationEnabled = false
         controller.setTapToFocusEnabled(true)
         applyAdvancedCameraSettings()
     }
@@ -1209,9 +1219,28 @@ fun NativeCameraStudioScreen() {
             }
         }
 
-        if (cameraGranted && (manualSensorSupported || whiteBalanceModes.size > 1 || manualFocusMinimum > 0f)) {
+        if (cameraGranted && (manualSensorSupported || whiteBalanceModes.size > 1 || manualFocusMinimum > 0f || videoStabilizationModes.contains(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_ON))) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Pro controls", style = MaterialTheme.typography.titleSmall)
+                if (mode == NativeCameraMode.VIDEO && videoStabilizationModes.contains(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_ON)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Video stabilization", style = MaterialTheme.typography.labelMedium)
+                            Text("Uses the camera's supported hardware stabilization when recording video.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                videoStabilizationEnabled = !videoStabilizationEnabled
+                                applyAdvancedCameraSettings()
+                            },
+                            enabled = !recordingActive
+                        ) { Text(if (videoStabilizationEnabled) "On" else "Off") }
+                    }
+                }
                 if (manualSensorSupported && manualIsoRange != null && manualExposureTimeRange != null) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
