@@ -28,11 +28,11 @@ import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.google.android.libraries.ads.mobile.sdk.MobileAds
-import com.google.android.libraries.ads.mobile.sdk.banner.AdLoadCallback
 import com.google.android.libraries.ads.mobile.sdk.banner.AdSize
 import com.google.android.libraries.ads.mobile.sdk.banner.AdView
 import com.google.android.libraries.ads.mobile.sdk.banner.BannerAd
 import com.google.android.libraries.ads.mobile.sdk.banner.BannerAdRequest
+import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback
 import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 import com.google.android.libraries.ads.mobile.sdk.initialization.InitializationConfig
 import com.google.android.ump.ConsentInformation
@@ -57,13 +57,12 @@ internal object NativeAdsPolicy {
         BuildConfig.ENV_AD_SUPPORTED_TOOL_IDS.split(",").map { it.trim() }.filter { toolIdPattern.matches(it) }.toSet()
     }
 
-    private val crossPlatformMeteredIds: Set<String> by lazy {
-        runCatching {
-            val json = JSONObject(
-                javaClass.classLoader?.getResourceAsStream("offline-eligible-tools.json")
-                    ?.bufferedReader()?.use { it.readText() }
-                    ?: return@runCatching emptySet<String>()
-            )
+    @Volatile private var cachedCrossPlatformMeteredIds: Set<String>? = null
+
+    private fun crossPlatformMeteredIds(context: Context): Set<String> {
+        cachedCrossPlatformMeteredIds?.let { return it }
+        val loaded = runCatching {
+            val json = JSONObject(context.assets.open("offline-eligible-tools.json").bufferedReader().use { it.readText() })
             val profiles = json.getJSONArray("profiles")
             buildSet {
                 for (index in 0 until profiles.length()) {
@@ -78,10 +77,12 @@ internal object NativeAdsPolicy {
                 }
             }
         }.getOrDefault(emptySet())
+        synchronized(this) { cachedCrossPlatformMeteredIds = loaded }
+        return loaded
     }
 
     fun isHybridTool(context: Context, toolId: String): Boolean =
-        adsSelectionEnabled && toolId in allowlistedIds && toolId in crossPlatformMeteredIds
+        adsSelectionEnabled && toolId in allowlistedIds && toolId in crossPlatformMeteredIds(context)
 
     fun hasValidatedInternet(context: Context): Boolean {
         val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
