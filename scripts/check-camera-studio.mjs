@@ -199,6 +199,9 @@ assert.match(androidCamera, /CameraCharacteristics.CONTROL_AVAILABLE_VIDEO_STABI
 assert.match(androidCamera, /CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_ON/);
 assert.match(androidCamera, /videoStabilizationEnabled/);
 assert.match(androidCamera, /videoStabilizationEnabled by remember \{ mutableStateOf\(true\) \}/, "Android enables hardware stabilization by default where the active camera supports it.");
+assert.doesNotMatch(androidCamera, /if \(!videoStabilizationModes\.contains\(CaptureRequest\.CONTROL_VIDEO_STABILIZATION_MODE_ON\)\) videoStabilizationEnabled = false/, "Unsupported lenses must not erase the user's stabilization preference.");
+assert.match(iosCamera, /self\.videoStabilizationEnabled = requested/);
+assert.match(iosCamera, /self\.videoStabilizationEnabled = enabled/, "iOS preserves the stabilization preference when a lens lacks support.");
 assert.match(androidCamera, /LaunchedEffect\(videoStabilizationEnabled, mode, videoStabilizationModes, cameraGranted\)/);
 assert.match(androidCamera, /videoStabilizationEnabled = videoStabilizationModes\.contains\(CaptureRequest\.CONTROL_VIDEO_STABILIZATION_MODE_ON\)/, "Resetting pro controls restores supported stabilization.");
 assert.match(androidCamera, /Video stabilization/);
