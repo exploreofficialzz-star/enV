@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const server = readFileSync(new URL("../../src/lib/analytics/analytics.server.ts", import.meta.url), "utf8");
+const privacyPage = readFileSync(new URL("../../src/routes/privacy.tsx", import.meta.url), "utf8");
 const revokeRoute = readFileSync(new URL("../../server/routes/api/analytics/admin/session/revoke.post.ts", import.meta.url), "utf8");
 const migration = readFileSync(new URL("../../migrations/0018_analytics_dashboard_sessions.sql", import.meta.url), "utf8");
 const privilegeMigration = readFileSync(new URL("../../migrations/0020_analytics_privilege_lockdown.sql", import.meta.url), "utf8");
@@ -127,4 +128,24 @@ test("analytics migrator uses pooler-safe transaction-scoped locking", () => {
   assert.doesNotMatch(analyticsMigrator, /pg_advisory_lock\(/);
   assert.doesNotMatch(analyticsMigrator, /pg_advisory_unlock/);
   assert.doesNotMatch(analyticsMigrator, /SET search_path TO public/);
+});
+
+
+test("public privacy notice states analytics purpose, identifiers, retention and withdrawal", () => {
+  const sectionStart = privacyPage.indexOf('<h2 className="text-lg font-semibold text-fg">Optional analytics</h2>');
+  const sectionEnd = privacyPage.indexOf('<h2 className="text-lg font-semibold text-fg">Community and public content</h2>');
+  assert.ok(sectionStart >= 0 && sectionEnd > sectionStart);
+  const section = privacyPage.slice(sectionStart, sectionEnd);
+  assert.match(section, /product analytics helps/i);
+  assert.match(section, /not used to target advertisements/i);
+  assert.match(section, /keyed HMAC digests/i);
+  assert.match(section, /private dashboard sign-in/i);
+  assert.match(section, /only the digest is stored/i);
+  assert.match(section, /pseudonymous/i);
+  assert.match(section, /90-day window from receipt/i);
+  assert.match(section, /up to 730 days/i);
+  assert.match(section, /offline/i);
+  assert.match(section, /revocation request/i);
+  assert.match(section, /eu-central-1/);
+  assert.doesNotMatch(section, /raw IP addresses.*are collected/i);
 });
