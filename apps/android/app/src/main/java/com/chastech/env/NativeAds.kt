@@ -82,7 +82,7 @@ internal object NativeAdsPolicy {
     }
 
     fun isHybridTool(context: Context, toolId: String): Boolean =
-        adsSelectionEnabled && toolId in allowlistedIds && toolId in crossPlatformMeteredIds(context)
+        adDisplayConfigured && toolId in allowlistedIds && toolId in crossPlatformMeteredIds(context)
 
     fun hasValidatedInternet(context: Context): Boolean {
         val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
