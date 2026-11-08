@@ -44,7 +44,7 @@ A result without this evidence remains NOT RUN.
 | System interruptions and app backgrounding | Calls, app switches, camera pre-emption and iOS media-services reset stop/reconnect safely; files remain playable where finalization succeeds | NOT RUN |
 | Thermal and battery behaviour | Run repeated and sustained recording; note thermal warnings, throttling, dropped frames and battery drain; do not advertise unmeasured performance | NOT RUN |
 | Filter preview-to-export parity | Each native color look is visible in preview and present in the saved photo/video; Natural resets correctly; no stale filter after mode changes | NOT RUN |
-| Video stabilization | Verify Android Camera2 and iOS AVFoundation enable stabilization only when reported by the active camera/format; compare supported modes and exported motion at the same resolution/frame rate | NOT RUN |
+| Video stabilization | Verify Android Camera2 and iOS AVFoundation enable stabilization only when reported by the active camera/format, including each concurrent feed; compare supported modes and exported motion at the same resolution/frame rate | NOT RUN |
 | Face tracking and original AR effects | Test one and multiple faces, glasses/crown alignment, face movement/entry/exit, rotation, low light, processing latency, frame drops and exact preview-to-export parity | NOT RUN |
 | Beauty / soft-light effects | Verify iOS face-only softening is subtle and bounded; verify Android soft glow stays attached to the detected face; confirm no effect is applied to unsupported photo/dual modes | NOT RUN |
 | Face-effect privacy and lifecycle | Confirm no face data leaves device; disabling effects stops analysis; leaving Camera Studio releases Vision/ML Kit resources and camera outputs | NOT RUN |
@@ -62,7 +62,7 @@ A result without this evidence remains NOT RUN.
 - iOS `AVCaptureMultiCamSession` front/rear capture with capability, hardware-cost and system-pressure checks.
 - Android CameraX/Media3 color processing for preview, photo and video outputs.
 - iOS Core Image frame processing shared by preview and the `AVAssetWriter` export path.
-- Android Camera2 video stabilization toggle, exposed only when the active camera reports `CONTROL_VIDEO_STABILIZATION_MODE_ON`; disabled automatically when unsupported and limited to video mode.
+- Android Camera2 video stabilization toggle, exposed only when the active camera reports `CONTROL_VIDEO_STABILIZATION_MODE_ON`; disabled automatically when unsupported and limited to video mode. Concurrent front/rear mode requests stabilization independently for each supported feed.
 - iOS AVFoundation video stabilization, using `.auto` only when the active video connection reports support; dual-camera video connections request `.auto` independently when supported.
 - Android Camera2-interoperability manual sensor ISO/shutter, supported white-balance modes, focus lock/focus distance, and rear-lens selection, shown only when reported by the active camera.
 - iOS manual ISO/shutter, white-balance presets, focus lock and optical-lens selection, shown only where the active device supports them.
