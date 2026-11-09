@@ -328,13 +328,13 @@ function Account() {
               <Link
                 key={action.title}
                 to={action.to}
-                className="flex min-h-[76px] items-center justify-between gap-3 rounded-2xl border border-border bg-surface p-4 transition hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:justify-center"
+                className="account-shortcut-link flex min-h-[76px] items-center gap-3 rounded-2xl border border-border bg-surface p-4 transition hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               >
-                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-fg md:hidden">
+                <span className="account-shortcut-leading grid size-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-fg">
                   <Icon size={21} aria-hidden="true" />
                 </span>
-                <span className="min-w-0 flex-1 text-sm font-semibold text-fg md:flex-none md:text-center">{action.title}</span>
-                <ArrowRight size={19} className="shrink-0 text-muted md:hidden" aria-hidden="true" />
+                <span className="account-shortcut-title min-w-0 text-sm font-semibold text-fg">{action.title}</span>
+                <ArrowRight size={19} className="account-shortcut-arrow shrink-0 text-muted" aria-hidden="true" />
               </Link>
             );
           })}
