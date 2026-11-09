@@ -150,6 +150,33 @@ html[data-env-view-mode="desktop"] .env-app-shell {
   width: min(100%, 1440px);
 }
 
+/* Account shortcut affordances follow the selected enV device mode, not window width. */
+.env-app-shell .account-shortcut-link {
+  justify-content: center;
+}
+.env-app-shell .account-shortcut-leading,
+.env-app-shell .account-shortcut-arrow {
+  display: none;
+}
+.env-app-shell .account-shortcut-title {
+  flex: none;
+  text-align: center;
+}
+html[data-env-view-mode="mobile"] .env-app-shell .account-shortcut-link {
+  justify-content: space-between;
+}
+html[data-env-view-mode="mobile"] .env-app-shell .account-shortcut-leading {
+  display: grid;
+}
+html[data-env-view-mode="mobile"] .env-app-shell .account-shortcut-arrow {
+  display: block;
+}
+html[data-env-view-mode="mobile"] .env-app-shell .account-shortcut-title {
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+}
+
 @layer components {
   .personal-tools-scroll {
     width: 100%;
