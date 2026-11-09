@@ -122,7 +122,7 @@
     "check:creator-device-ui": "node scripts/check-creators.mjs && node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/engines/creator.test.ts src/lib/image/platform-presets.creator.test.ts",
     "check:communication": "node scripts/check-communication.mjs && node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/components/engines/communication-engine-utils.test.ts",
     "check:native-communication": "node scripts/check-native-communication.mjs",
-    "check:ads": "node --experimental-strip-types --test src/lib/ads/policy.test.ts && node scripts/check-ad-access.mjs"
+    "check:ads": "node --experimental-strip-types --test src/lib/ads/policy.test.ts src/lib/ads/page-units.test.ts && node scripts/check-ad-access.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",

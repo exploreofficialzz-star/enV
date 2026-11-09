@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, ChevronDown, Search } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
+import { AdSensePageUnit } from "@/components/layout/ad-sense-page-unit";
 import { BLOG_ARTICLES } from "@/data/blog-articles";
 import { getSearchableTools, categoryLabel, toolPath } from "@/lib/registry";
 import { searchTools } from "@/lib/search";
@@ -175,8 +176,9 @@ function BlogIndex() {
 
             {visibleTools.length > 0 ? (
               <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {visibleTools.map((tool) => (
-                  <article key={tool.id} className="flex min-w-0 flex-col rounded-2xl border border-border bg-surface p-4 sm:p-5">
+                {visibleTools.map((tool, index) => (
+                  <Fragment key={tool.id}>
+                  <article className="flex min-w-0 flex-col rounded-2xl border border-border bg-surface p-4 sm:p-5">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-full bg-surface-2 px-2.5 py-1 text-[11px] font-medium text-muted">
                         {toolCategoryLabel(tool)}
@@ -209,6 +211,8 @@ function BlogIndex() {
                       </Link>
                     </div>
                   </article>
+                  {index === 3 && visibleTools.length > 4 ? <AdSensePageUnit format="in-feed" /> : null}
+                  </Fragment>
                 ))}
               </div>
             ) : (
