@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { chooseAnalyticsConsent, getAnalyticsConsent } from "@/lib/analytics/client";
 
 const NOTICE_KEY = "env.cookie-preferences.seen.v1";
@@ -16,6 +16,7 @@ export function CookieConsent() {
   const analyticsEnabled = import.meta.env.VITE_ANALYTICS_ENABLED === "true";
   const advertisingEnabled = import.meta.env.VITE_ADS_ENABLED === "true";
   const pageRef = useRef<HTMLElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   const [visible, setVisible] = useState(false);
   const [analyticsAllowed, setAnalyticsAllowed] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -32,6 +33,7 @@ export function CookieConsent() {
     }
 
     const reopen = () => {
+      returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       setError("");
       setVisible(true);
     };
@@ -40,9 +42,40 @@ export function CookieConsent() {
   }, []);
 
   useEffect(() => {
-    if (!visible) return;
-    pageRef.current?.focus();
+    if (visible) {
+      pageRef.current?.focus();
+      return;
+    }
+    returnFocusRef.current?.focus();
+    returnFocusRef.current = null;
   }, [visible]);
+
+  function trapFocus(event: ReactKeyboardEvent<HTMLElement>) {
+    if (event.key === "Escape") {
+      // A first-visit privacy choice must be completed through the visible actions.
+      event.preventDefault();
+      return;
+    }
+    if (event.key !== "Tab") return;
+
+    const focusable = event.currentTarget.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    );
+    const first = focusable.item(0);
+    const last = focusable.item(focusable.length - 1);
+    if (!first || !last) {
+      event.preventDefault();
+      event.currentTarget.focus();
+      return;
+    }
+    if (event.shiftKey && (document.activeElement === first || document.activeElement === event.currentTarget)) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
 
   async function savePreferences(granted: boolean) {
     setSaving(true);
@@ -66,13 +99,14 @@ export function CookieConsent() {
 
   return (
     <div className="fixed inset-0 z-[100] flex min-h-dvh w-screen items-center justify-center overflow-y-auto bg-bg px-4 py-6 sm:px-8 sm:py-10">
-      <main
+      <section
         ref={pageRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="env-cookie-title"
         aria-describedby="env-cookie-description"
         tabIndex={-1}
+        onKeyDown={trapFocus}
         className="my-auto w-full max-w-3xl rounded-[28px] border border-border bg-card px-5 py-6 text-left text-card-foreground shadow-xl outline-none sm:px-9 sm:py-9"
       >
         <header className="mb-6 text-center sm:mb-8">
@@ -174,7 +208,7 @@ export function CookieConsent() {
             </button>
           </div>
         </footer>
-      </main>
+      </section>
     </div>
   );
 }
