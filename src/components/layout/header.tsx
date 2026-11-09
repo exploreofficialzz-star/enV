@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { usePrefs } from "@/lib/storage";
+import type { ViewModePreference } from "@/lib/view-mode";
 
 const MENU_ITEM_BASE_CLASS = "flex min-h-8 w-full items-center rounded-lg px-3 py-1 text-sm leading-5 text-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
 const MENU_ITEM_CLASS = `${MENU_ITEM_BASE_CLASS} gap-2.5`;
@@ -61,10 +62,10 @@ export function Header() {
   const [menuTop, setMenuTop] = useState(64);
   const menuRef = useRef<HTMLDetailsElement>(null);
   const menuPanelRef = useRef<HTMLDivElement>(null);
-  const viewMode = usePrefs((state) => state.viewMode);
+  const viewModePreference = usePrefs((state) => state.viewModePreference);
   const setViewMode = usePrefs((state) => state.setViewMode);
 
-  function chooseViewMode(mode: "mobile" | "tablet" | "desktop") {
+  function chooseViewMode(mode: ViewModePreference) {
     setViewMode(mode);
   }
 
@@ -150,17 +151,21 @@ export function Header() {
                   </section>
                   <section className="border-b border-border px-1 py-1" aria-label="View mode">
                     <h2 className={MENU_HEADING_CLASS}>View mode</h2>
-                    <button type="button" aria-pressed={viewMode === "mobile"} onClick={(event) => { chooseViewMode("mobile"); closeMenu(event); setMenuOpen(false); }} className={MENU_VIEW_ITEM_CLASS}>
+                    <button type="button" aria-pressed={viewModePreference === "auto"} onClick={(event) => { chooseViewMode("auto"); closeMenu(event); setMenuOpen(false); }} className={MENU_VIEW_ITEM_CLASS}>
+                      <span className="flex min-w-0 flex-1 items-center gap-2.5"><SettingsIcon size={16} className="shrink-0" aria-hidden="true" /><span>Automatic view</span></span>
+                      {viewModePreference === "auto" ? <Check size={15} className="text-accent" aria-hidden="true" /> : null}
+                    </button>
+                    <button type="button" aria-pressed={viewModePreference === "mobile"} onClick={(event) => { chooseViewMode("mobile"); closeMenu(event); setMenuOpen(false); }} className={MENU_VIEW_ITEM_CLASS}>
                       <span className="flex min-w-0 flex-1 items-center gap-2.5"><Smartphone size={16} className="shrink-0" aria-hidden="true" /><span>Mobile view</span></span>
-                      {viewMode === "mobile" ? <Check size={15} className="text-accent" aria-hidden="true" /> : null}
+                      {viewModePreference === "mobile" ? <Check size={15} className="text-accent" aria-hidden="true" /> : null}
                     </button>
-                    <button type="button" aria-pressed={viewMode === "tablet"} onClick={(event) => { chooseViewMode("tablet"); closeMenu(event); setMenuOpen(false); }} className={MENU_VIEW_ITEM_CLASS}>
+                    <button type="button" aria-pressed={viewModePreference === "tablet"} onClick={(event) => { chooseViewMode("tablet"); closeMenu(event); setMenuOpen(false); }} className={MENU_VIEW_ITEM_CLASS}>
                       <span className="flex min-w-0 flex-1 items-center gap-2.5"><Tablet size={16} className="shrink-0" aria-hidden="true" /><span>Tablet view</span></span>
-                      {viewMode === "tablet" ? <Check size={15} className="text-accent" aria-hidden="true" /> : null}
+                      {viewModePreference === "tablet" ? <Check size={15} className="text-accent" aria-hidden="true" /> : null}
                     </button>
-                    <button type="button" aria-pressed={viewMode === "desktop"} onClick={(event) => { chooseViewMode("desktop"); closeMenu(event); setMenuOpen(false); }} className={MENU_VIEW_ITEM_CLASS}>
+                    <button type="button" aria-pressed={viewModePreference === "desktop"} onClick={(event) => { chooseViewMode("desktop"); closeMenu(event); setMenuOpen(false); }} className={MENU_VIEW_ITEM_CLASS}>
                       <span className="flex min-w-0 flex-1 items-center gap-2.5"><Monitor size={16} className="shrink-0" aria-hidden="true" /><span>Desktop view</span></span>
-                      {viewMode === "desktop" ? <Check size={15} className="text-accent" aria-hidden="true" /> : null}
+                      {viewModePreference === "desktop" ? <Check size={15} className="text-accent" aria-hidden="true" /> : null}
                     </button>
                   </section>
                   {MENU_GROUPS.map((group) => (
