@@ -246,7 +246,7 @@ export function TokenDashboard() {
                 })}
                 </div>
               ) : loadState === "loading" ? null : (
-                <div className="mt-5 rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted">Your seven-day usage chart will appear here when account data is available.</div>
+                <div className="mt-5 rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted">No recent token usage.</div>
               )}
             </section>
 
