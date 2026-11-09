@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import {
   ArrowLeft,
@@ -7,6 +8,7 @@ import {
   FileText,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
+import { AdSensePageUnit } from "@/components/layout/ad-sense-page-unit";
 import { getBlogArticle, type BlogArticle } from "@/data/blog-articles";
 import {
   getRelatedTools,
@@ -118,6 +120,7 @@ function BlogResourcePage() {
 }
 
 function BlogArticlePage({ article }: { article: BlogArticle }) {
+  const firstEligibleAdSection = article.sections.findIndex((section) => section.paragraphs.length >= 2);
   return (
     <AppShell>
       <article className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
@@ -133,11 +136,16 @@ function BlogArticlePage({ article }: { article: BlogArticle }) {
           <p className="mt-4 text-base leading-7 text-muted">{article.summary}</p>
         </header>
         <div className="mt-8 space-y-8">
-          {article.sections.map((section) => (
+          {article.sections.map((section, sectionIndex) => (
             <section key={section.heading} className="space-y-3">
               <h2 className="text-xl font-semibold text-fg">{section.heading}</h2>
-              {section.paragraphs.map((paragraph) => (
-                <p key={paragraph} className="text-base leading-7 text-muted">{paragraph}</p>
+              {section.paragraphs.map((paragraph, paragraphIndex) => (
+                <Fragment key={section.heading + "-p-" + paragraphIndex}>
+                  <p className="text-base leading-7 text-muted">{paragraph}</p>
+                  {sectionIndex === firstEligibleAdSection && paragraphIndex === 1
+                    ? <AdSensePageUnit format="in-article" />
+                    : null}
+                </Fragment>
               ))}
               {section.bullets ? (
                 <ul className="list-disc space-y-2 pl-5 text-sm leading-6 text-muted">
@@ -147,6 +155,7 @@ function BlogArticlePage({ article }: { article: BlogArticle }) {
             </section>
           ))}
         </div>
+        <AdSensePageUnit format="multiplex" />
         <aside className="mt-10 rounded-2xl border border-border bg-surface-2 p-5">
           <h2 className="font-semibold text-fg">Need a hand?</h2>
           <p className="mt-2 text-sm leading-6 text-muted">
