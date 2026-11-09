@@ -27,9 +27,9 @@ function Account() {
   if (isPending) {
     return (
       <AppShell>
-        <main className="mx-auto flex min-h-[calc(100dvh-9rem)] max-w-4xl items-center justify-center px-4 py-10">
+        <div className="mx-auto flex min-h-[calc(100dvh-9rem)] max-w-4xl items-center justify-center px-4 py-10">
           <p role="status" aria-live="polite" className="text-sm text-muted">Loading your profile…</p>
-        </main>
+        </div>
       </AppShell>
     );
   }
@@ -63,7 +63,7 @@ function Account() {
 
   return (
     <AppShell>
-      <main className="mx-auto w-full max-w-4xl px-4 py-7 sm:px-6 sm:py-10">
+      <div className="mx-auto w-full max-w-4xl px-4 py-7 sm:px-6 sm:py-10">
         <header className="mb-6 sm:mb-8">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">enV · Profile</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-fg sm:text-4xl">Good to see you, {firstName}</h1>
@@ -173,7 +173,7 @@ function Account() {
           </section>
         ) : null}
         {error ? <p role="alert" className="mt-3 rounded-xl border border-danger/30 bg-surface px-3 py-2 text-sm text-danger">{error}</p> : null}
-      </main>
+      </div>
     </AppShell>
   );
 }
