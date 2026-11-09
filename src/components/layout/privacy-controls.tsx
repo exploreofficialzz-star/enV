@@ -14,7 +14,11 @@ export function PrivacyControls() {
 
   useEffect(()=>{setChoice(getAnalyticsConsent());},[]);
 
-  function openCookiePreferences() {\n    window.dispatchEvent(new Event("env:open-cookie-preferences"));\n  }\n\n  async function update(granted:boolean) {
+  function openCookiePreferences() {
+    window.dispatchEvent(new Event("env:open-cookie-preferences"));
+  }
+
+  async function update(granted:boolean) {
     setSaving(true);setError("");setMessage("");
     try {
       await chooseAnalyticsConsent(granted);
@@ -31,7 +35,8 @@ export function PrivacyControls() {
       <p className="mt-2 text-sm leading-6 text-muted">
         Optional product analytics is separate from advertising and essential account/session handling. It uses browser storage and sends a bounded set of tool events only after you opt in. Advertising, when enabled, uses separate provider and CMP privacy choices.
       </p>
-      <div className="mt-4 flex flex-wrap items-center gap-2">\n        <Button type="button" size="sm" variant="outline" onClick={openCookiePreferences}>Open cookie preferences</Button>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <Button type="button" size="sm" variant="outline" onClick={openCookiePreferences}>Open cookie preferences</Button>
         <span className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-fg">
           {choice==="granted"?"Analytics allowed":choice==="denied"?"Analytics declined":"No choice recorded"}
         </span>
