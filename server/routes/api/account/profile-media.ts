@@ -86,11 +86,12 @@ function imageResponse(bytes: unknown, mime: string | null): Response {
   if (!bytes || !mime) {
     return new Response(null, { status: 404, headers: { "cache-control": "private, no-store" } });
   }
-  return new Response(Buffer.from(bytes as Uint8Array), {
+  const imageBytes = Uint8Array.from(bytes as Uint8Array);
+  return new Response(imageBytes, {
     status: 200,
     headers: {
       "content-type": mime,
-      "content-length": String(Buffer.from(bytes as Uint8Array).byteLength),
+      "content-length": String(imageBytes.byteLength),
       "cache-control": "private, no-store",
       "x-content-type-options": "nosniff",
       "content-disposition": "inline",
