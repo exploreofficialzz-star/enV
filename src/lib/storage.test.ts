@@ -58,6 +58,7 @@ test("automatic device detection distinguishes phones, tablets and desktop compu
 
 function runInitialViewModeScript(options: {
   preference?: string | null;
+  legacyPreference?: string | null;
   userAgent: string;
   platform?: string;
   screenWidth: number;
@@ -66,6 +67,7 @@ function runInitialViewModeScript(options: {
 }) {
   const {
     preference = null,
+    legacyPreference = null,
     userAgent,
     platform = "Linux",
     screenWidth,
@@ -74,8 +76,14 @@ function runInitialViewModeScript(options: {
   } = options;
   const root: { dataset: { envViewMode?: string } } = { dataset: {} };
   const viewport = { content: "width=device-width, initial-scale=1, viewport-fit=cover" };
+  const savedPreferences = new Map<string, string>();
+  if (preference !== null) savedPreferences.set("env:view-mode:v2", preference);
+  if (legacyPreference !== null) savedPreferences.set("env:view-mode", legacyPreference);
   const window = {
-    localStorage: { getItem: () => preference },
+    localStorage: {
+      getItem: (key: string) => savedPreferences.get(key) ?? null,
+      setItem: (key: string, value: string) => savedPreferences.set(key, value),
+    },
     navigator: { userAgent, platform, maxTouchPoints },
     screen: { width: screenWidth, height: screenHeight },
     innerWidth: screenWidth,
@@ -88,7 +96,7 @@ function runInitialViewModeScript(options: {
       querySelector: () => viewport,
     },
   });
-  return { mode: root.dataset.envViewMode, viewport: viewport.content };
+  return { mode: root.dataset.envViewMode, viewport: viewport.content, savedPreference: savedPreferences.get("env:view-mode:v2") };
 }
 
 test("first-paint bootstrap selects each device's actual layout before React hydrates", () => {
@@ -138,4 +146,38 @@ test("automatic preference detects the device instead of persisting a mobile fal
     screenHeight: 900,
   });
   assert.equal(result.mode, "desktop");
+});
+
+test("legacy mobile fallback migrates to automatic so existing desktops stop opening in mobile view", () => {
+  const result = runInitialViewModeScript({
+    legacyPreference: "mobile",
+    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    platform: "Win32",
+    screenWidth: 1920,
+    screenHeight: 1080,
+  });
+  assert.equal(result.mode, "desktop");
+  assert.equal(result.savedPreference, "auto");
+});
+
+test("legacy tablet and desktop selections survive the view preference migration", () => {
+  const tablet = runInitialViewModeScript({
+    legacyPreference: "tablet",
+    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+    platform: "Win32",
+    screenWidth: 1920,
+    screenHeight: 1080,
+  });
+  const desktop = runInitialViewModeScript({
+    legacyPreference: "desktop",
+    userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile",
+    platform: "iPhone",
+    screenWidth: 390,
+    screenHeight: 844,
+    maxTouchPoints: 5,
+  });
+  assert.equal(tablet.mode, "tablet");
+  assert.equal(tablet.savedPreference, "tablet");
+  assert.equal(desktop.mode, "desktop");
+  assert.equal(desktop.savedPreference, "desktop");
 });
