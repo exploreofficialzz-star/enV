@@ -59,7 +59,7 @@ function Settings() {
                   <p className="mt-1 text-sm leading-6 text-muted">Choose the theme that feels most comfortable to use.</p>
                 </div>
               </div>
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
                 {themeOptions.map((option) => {
                   const Icon = option.icon;
                   const selected = themePreference === option.value;
@@ -93,7 +93,7 @@ function Settings() {
                   </p>
                 </div>
               </div>
-              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {viewOptions.map((option) => {
                   const Icon = option.icon;
                   const selected = viewModePreference === option.value;
