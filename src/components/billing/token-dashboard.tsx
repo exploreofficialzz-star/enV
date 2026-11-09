@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Activity, ArrowDownLeft, ArrowUpRight, CalendarDays, CheckCircle2, Clock3, Coins, RefreshCw, ShieldCheck, Wallet } from "lucide-react";
+import { Activity, ArrowDownLeft, ArrowUpRight, CalendarDays, CheckCircle2, Clock3, Coins, ShieldCheck, Wallet } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { getToolById } from "@/lib/registry";
 
