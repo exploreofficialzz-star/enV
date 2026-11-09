@@ -23,7 +23,7 @@ export function PrivacyControls() {
     try {
       await chooseAnalyticsConsent(granted);
       setChoice(granted?"granted":"denied");
-      setMessage(granted?"Optional analytics consent saved.":"Analytics disabled. Pending local analytics events were removed.");
+      setMessage(granted?"Analytics preference saved.":"Analytics declined. Pending local analytics events were removed.");
     } catch (reason) {
       setError(reason instanceof Error?reason.message:"Your privacy choice could not be saved.");
     } finally {setSaving(false);}
@@ -33,14 +33,14 @@ export function PrivacyControls() {
     <section className="rounded-xl border border-border bg-surface p-4 sm:p-5" aria-labelledby="privacy-controls-heading">
       <h2 id="privacy-controls-heading" className="text-lg font-semibold text-fg">Cookie and analytics preferences</h2>
       <p className="mt-2 text-sm leading-6 text-muted">
-        Optional product analytics is separate from advertising and essential account/session handling. It uses browser storage and sends a bounded set of tool events only after you opt in. Advertising, when enabled, uses separate provider and CMP privacy choices.
+        Review product analytics separately from essential account/session handling. Advertising, when enabled, uses separate provider and CMP privacy controls.
       </p>
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <Button type="button" size="sm" variant="outline" onClick={openCookiePreferences}>Open cookie preferences</Button>
+        <Button type="button" size="sm" variant="outline" onClick={openCookiePreferences}>Open cookie preferences page</Button>
         <span className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-fg">
           {choice==="granted"?"Analytics allowed":choice==="denied"?"Analytics declined":"No choice recorded"}
         </span>
-        {!enabled ? <span className="text-xs text-muted">Analytics is disabled in this Web build.</span> : null}
+        {!enabled ? <span className="text-xs text-muted">Analytics is not enabled in this Web build.</span> : null}
       </div>
       {enabled || choice==="granted" ? (
         <div className="mt-4 flex flex-wrap gap-2">
