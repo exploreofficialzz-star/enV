@@ -20,7 +20,7 @@ test("the first-visit prompt is a centered cookie dialog, not a floating analyti
 test("optional analytics starts off unless the person previously granted consent", () => {
   assert.match(component, /setAnalyticsAllowed\(savedChoice === "granted"\)/);
   assert.match(component, /checked=\{analyticsAllowed\}/);
-  assert.match(component, /analyticsEnabled\\s*\\?\\s*"Allow limited tool usage/);
+  assert.match(component, /analyticsEnabled\\s+\\?\\s*"Allow limited tool usage/);
   assert.match(component, /if \(analyticsEnabled\) \{\s*await chooseAnalyticsConsent\(granted\)/);
   assert.match(component, /No optional analytics events will be collected/);
   assert.match(analyticsClient, /getAnalyticsConsent\(\)!=="granted"\)return/);
