@@ -219,7 +219,7 @@ export const auth = betterAuth({
       });
     },
   },
-
+  advanced: {
     useSecureCookies: secureCookies,
     defaultCookieAttributes: { secure: secureCookies, sameSite: "lax", path: "/" },
     cookies: {
