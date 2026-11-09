@@ -65,8 +65,12 @@ if (!feedbackPage.includes("email app opens")) errors.push("Help & feedback must
 if (!preferences.includes("viewport.content = DEFAULT_VIEWPORT")) errors.push("Mobile view must restore the responsive viewport.");
 
 for (const path of ["src/routes/account.tsx", "src/routes/wallet.tsx", "src/routes/login.tsx", "src/routes/signup.tsx", "src/routes/forgot-password.tsx", "src/routes/reset-password.tsx", "src/routes/api/auth/$.ts", "src/routes/agent.tsx", "src/routes/token-dashboard.tsx", "src/routes/token-guide.tsx", "src/components/billing/token-dashboard.tsx", "server/routes/api/billing/token-usage.get.ts", "src/lib/billing/token-usage.server.ts"]) if (!existsSync(resolve(path))) errors.push(`Missing route: ${path}`);
-const account = requireText("src/routes/account.tsx", ['createFileRoute("/account")', 'AuthPage mode="sign-in"'], "Account page");
-if (account.includes("Wallet") || account.includes("Manage your enV identity")) errors.push("The Account route must open sign-in directly without an overview or wallet panel.");
+const account = requireText("src/routes/account.tsx", ['createFileRoute("/account")', "useCurrentUserState", "if (isPending)", 'if (!user) return <AuthPage mode="sign-in" />', "Good to see you, ", "Profile details", "Your enV shortcuts", 'to: "/wallet" as const', 'to: "/token-dashboard" as const', 'to: "/settings" as const', "Account status", "signOut"], "Friendly session-aware Account profile");
+if (!(account.indexOf("if (isPending)") < account.indexOf('if (!user) return <AuthPage mode="sign-in" />'))) errors.push("The Account route must finish resolving the session before showing sign-in.");
+if (!account.includes("user.profileImageUrl") || !account.includes("initials")) errors.push("The Account profile must show the available profile photo or a derived initials avatar.");
+const tokenDashboard = requireText("src/components/billing/token-dashboard.tsx", ["Welcome to your token dashboard"], "Token dashboard");
+if (tokenDashboard.includes("Sign in to load your real enV balance") || tokenDashboard.includes(">Sign in</Link>")) errors.push("Token dashboard must not show the redundant sign-in prompt card.");
+if (!tokenDashboard.includes('wallet ? tokenLabel(wallet.availableTokens) : "—"')) errors.push("Token dashboard must not show a fabricated zero balance when account data is unavailable.");
 const wallet = requireText("src/routes/wallet.tsx", ['createFileRoute("/wallet")', "Total balance", "Tag enV on your videos", "Refer a friend"], "Wallet page");
 for (const item of ['const isWalletPage = pathname === "/wallet"', '<h1 className="text-xl font-semibold tracking-tight text-fg sm:text-2xl">Wallet</h1>', 'aria-label="Notifications"', 'aria-label="Profile and account"']) {
   if (!header.includes(item)) errors.push(`Wallet shared header is missing ${item}`);

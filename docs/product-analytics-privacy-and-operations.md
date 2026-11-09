@@ -15,7 +15,7 @@ Do not send passwords, cookies, auth tokens, payment data, IP addresses, full us
 - Analytics is off unless the user actively chooses **Allow analytics**.
 - Consent is installation-scoped and tied to a policy version.
 - **No thanks** stops local queuing, clears the local queue and requests deletion of that installation's event history.
-- The Web shows a one-time, centered **Cookie preferences** dialog on first visit. It has no persistent floating chip. People can reopen the dialog from **Cookie and analytics preferences** on the Privacy page.
+- The Web renders a full-screen, centered **Cookie preferences page** on first visit. It occupies the viewport and presents one continuous content panel rather than a floating dialog or multiple cards. The layout stays horizontally and vertically centered on phones, tablets and desktop screens; when the content is taller than the screen, the page scrolls without clipping. People can reopen the page from **Cookie and analytics preferences** on the Privacy page.
 - A changed policy version requires renewed consent.
 - The server rejects event batches without a current granted consent record.
 - Account creation or ordinary tool use is not consent.
@@ -72,7 +72,7 @@ Anonymous abuse control uses a keyed HMAC digest of a network identifier; the ra
 
 ## Public community content and counters
 
-Comments, replies, selected public display labels, reactions, reports and blocks are community features, not analytics. Comment content is visible to other visitors and should be accompanied by clear posting/visibility terms. Choosing **Anonymous** hides the public display label; it does not mean the service has no private abuse-control record. The service retains a keyed HMAC actor digest so users can block/report abuse and moderators can enforce rules. Raw IP addresses are not stored by this community schema. A **Public** display label is user-selected and is not a verified real-world identity. Community view counters are deduplicated once per pseudonymous actor/tool/day and do not store full page URLs. Users can remove their own comments; moderators can hide or remove reported content. Publish retention, deletion, reporting and appeal processes before enabling the feature.
+Comments, replies, selected public display labels, reactions, reports and blocks are community features, not analytics. Comment content is visible to other visitors and should be accompanied by clear posting/visibility terms. Choosing **Anonymous** hides the public display label; it does not mean the service has no private abuse-control record. The service retains a keyed HMAC actor digest so users can block/report abuse and moderators can enforce rules. Raw IP addresses are not stored by this community schema. A **Public** display label is user-selected and is not a verified real-world identity. Community view counters are deduplicated once per pseudonymous actor/tool/day and do not store full page URLs. Users can remove their own comments; moderators can hide or remove reported content. Publish retention, deletion, reporting and appeal processes before enabling public discussions.
 
 
 ## Private analytics dashboard access
