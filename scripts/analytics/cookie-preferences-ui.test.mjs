@@ -13,6 +13,8 @@ test("first visit renders a full-screen centered cookie preferences page", () =>
   assert.match(component, /max-w-3xl/);
   assert.match(component, /role="dialog"/);
   assert.match(component, /aria-modal="true"/);
+  assert.match(component, /onKeyDown=\{trapFocus\}/);
+  assert.match(component, /returnFocusRef\.current\?\.focus\(\)/);
   assert.match(component, /Essential cookies and storage/);
   assert.doesNotMatch(component, /<dialog|showModal\(\)|backdrop:/);
   assert.doesNotMatch(component, /rounded-2xl border border-border bg-surface p-4/);
