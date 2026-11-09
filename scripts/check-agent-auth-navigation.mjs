@@ -65,12 +65,35 @@ if (!feedbackPage.includes("email app opens")) errors.push("Help & feedback must
 if (!preferences.includes("viewport.content = DEFAULT_VIEWPORT")) errors.push("Mobile view must restore the responsive viewport.");
 
 for (const path of ["src/routes/account.tsx", "src/routes/wallet.tsx", "src/routes/login.tsx", "src/routes/signup.tsx", "src/routes/forgot-password.tsx", "src/routes/reset-password.tsx", "src/routes/api/auth/$.ts", "src/routes/agent.tsx", "src/routes/token-dashboard.tsx", "src/routes/token-guide.tsx", "src/components/billing/token-dashboard.tsx", "server/routes/api/billing/token-usage.get.ts", "src/lib/billing/token-usage.server.ts"]) if (!existsSync(resolve(path))) errors.push(`Missing route: ${path}`);
-const account = requireText("src/routes/account.tsx", ['createFileRoute("/account")', "useCurrentUserState", "if (isPending)", 'if (!user) return <AuthPage mode="sign-in" />', "Good to see you, ", "Profile details", "Your enV shortcuts", 'to: "/wallet" as const', 'to: "/token-dashboard" as const', 'to: "/settings" as const', "Account status", "signOut"], "Friendly session-aware Account profile");
-if (!(account.indexOf("if (isPending)") < account.indexOf('if (!user) return <AuthPage mode="sign-in" />'))) errors.push("The Account route must finish resolving the session before showing sign-in.");
+const account = requireText("src/routes/account.tsx", [
+  'createFileRoute("/account")',
+  'createServerFn({ method: "GET" })',
+  "loadAccountProfile",
+  'if (!user) return <AuthPage mode="sign-in" />',
+  "Profile details",
+  "coverInput",
+  "avatarInput",
+  "authClient.updateUser({ name })",
+  'authClient.changeEmail({ newEmail, callbackURL: "/account" })',
+  'to: "/wallet" as const',
+  'to: "/token-dashboard" as const',
+  'to: "/settings" as const',
+  "bg-red-600",
+  "signOut",
+], "Session-aware editable Account profile");
+for (const removed of ["Loading your profile", "Good to see you", "enV · Profile", "Welcome to your personal enV space", "Account status", "Your enV shortcuts", "Jump straight to the things you use most", "Need to leave?"]) {
+  if (account.includes(removed)) errors.push("Account profile still contains removed text: " + removed);
+}
 if (!account.includes("user.profileImageUrl") || !account.includes("initials")) errors.push("The Account profile must show the available profile photo or a derived initials avatar.");
+if (!account.includes('aria-label="Edit name"') || !account.includes('aria-label="Edit email"')) errors.push("Name and email must each have an edit control.");
+if (!account.includes('aria-label="Change cover photo"') || !account.includes('aria-label="Change profile photo"')) errors.push("The cover and avatar must each have a camera upload control.");
+if (!account.includes("text-fg")) errors.push("Shortcut icons must follow the active theme's foreground colour.");
+if (!existsSync(resolve("server/routes/api/account/profile-media.ts"))) errors.push("Missing authenticated profile media upload endpoint.");
+if (!existsSync(resolve("migrations/0021_account_profile_media.sql"))) errors.push("Missing account profile media migration.");
 const tokenDashboard = requireText("src/components/billing/token-dashboard.tsx", ["Welcome to your token dashboard"], "Token dashboard");
 if (tokenDashboard.includes("Sign in to load your real enV balance") || tokenDashboard.includes(">Sign in</Link>")) errors.push("Token dashboard must not show the redundant sign-in prompt card.");
 if (!tokenDashboard.includes('wallet ? tokenLabel(wallet.availableTokens) : "—"')) errors.push("Token dashboard must not show a fabricated zero balance when account data is unavailable.");
+if (!tokenDashboard.includes('loadState === "loading" ? null')) errors.push("Token dashboard must not render a textual loading placeholder while the first request is pending.");
 const wallet = requireText("src/routes/wallet.tsx", ['createFileRoute("/wallet")', "Total balance", "Tag enV on your videos", "Refer a friend"], "Wallet page");
 for (const item of ['const isWalletPage = pathname === "/wallet"', '<h1 className="text-xl font-semibold tracking-tight text-fg sm:text-2xl">Wallet</h1>', 'aria-label="Notifications"', 'aria-label="Profile and account"']) {
   if (!header.includes(item)) errors.push(`Wallet shared header is missing ${item}`);
