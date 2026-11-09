@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { detectDefaultViewMode, type ViewMode, type ViewModePreference } from "./view-mode";
 
 const FAV_KEY = "env:favorites";
 const RECENT_KEY = "env:recent";
@@ -10,7 +11,6 @@ const MAX_RECENT = 24;
 const canonicalToolId = (id: string) => id === "audio-analyze-studio" ? "song-metadata-analyzer" : id;
 
 export type ThemePreference = "system" | "light" | "dark";
-export type ViewMode = "mobile" | "tablet" | "desktop";
 
 function browserStorage(): Storage | null {
   if (typeof window === "undefined") return null;
@@ -127,6 +127,7 @@ type PrefsState = {
   theme: "light" | "dark";
   themePreference: ThemePreference;
   viewMode: ViewMode;
+  viewModePreference: ViewModePreference;
   hydrated: boolean;
   storageAvailable: boolean;
   storageError: string | null;
@@ -136,7 +137,7 @@ type PrefsState = {
   recordRecent: (id: string) => void;
   setTheme: (theme: "light" | "dark") => void;
   setThemePreference: (preference: ThemePreference) => void;
-  setViewMode: (mode: ViewMode) => void;
+  setViewMode: (preference: ViewModePreference) => void;
   toggleTheme: () => void;
 };
 
@@ -149,6 +150,7 @@ export const usePrefs = create<PrefsState>((set, get) => ({
   theme: "light",
   themePreference: "system",
   viewMode: "mobile",
+  viewModePreference: "auto",
   hydrated: false,
   storageAvailable: false,
   storageError: null,
@@ -163,11 +165,16 @@ export const usePrefs = create<PrefsState>((set, get) => ({
         ? window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
         : themePreference;
     const storedViewMode = storage?.getItem(VIEW_MODE_KEY);
-    const viewMode: ViewMode =
-      storedViewMode === "desktop" || storedViewMode === "tablet" || storedViewMode === "mobile" ? storedViewMode : "mobile";
+    const viewModePreference: ViewModePreference =
+      storedViewMode === "desktop" || storedViewMode === "tablet" || storedViewMode === "mobile" || storedViewMode === "auto"
+        ? storedViewMode
+        : "auto";
+    const viewMode: ViewMode = viewModePreference === "auto"
+      ? detectDefaultViewMode()
+      : viewModePreference;
 
     document.documentElement.classList.toggle("dark", theme === "dark");
-    if (storage && storedViewMode !== viewMode) writeSetting(VIEW_MODE_KEY, viewMode);
+    if (storage && storedViewMode !== viewModePreference) writeSetting(VIEW_MODE_KEY, viewModePreference);
     applyViewMode(viewMode);
     const oldFavorites = readList(FAV_KEY), oldRecent = readList(RECENT_KEY), oldCounts = readCounts(USAGE_KEY);
     const favorites = [...new Set(oldFavorites.map(canonicalToolId))];
@@ -187,6 +194,7 @@ export const usePrefs = create<PrefsState>((set, get) => ({
       theme,
       themePreference,
       viewMode,
+      viewModePreference,
       hydrated: true,
       storageAvailable: Boolean(storage),
       storageError: storage ? null : storageWarning,
@@ -240,10 +248,15 @@ export const usePrefs = create<PrefsState>((set, get) => ({
 
     set({ theme, themePreference: preference, storageError: persisted ? null : storageWarning });
   },
-  setViewMode: (mode) => {
+  setViewMode: (preference) => {
+    const mode = preference === "auto" ? detectDefaultViewMode() : preference;
     applyViewMode(mode);
-    const persisted = writeSetting(VIEW_MODE_KEY, mode);
-    set({ viewMode: mode, storageError: persisted ? null : storageWarning });
+    const persisted = writeSetting(VIEW_MODE_KEY, preference);
+    set({
+      viewMode: mode,
+      viewModePreference: preference,
+      storageError: persisted ? null : storageWarning,
+    });
   },
   toggleTheme: () => {
     get().setTheme(get().theme === "dark" ? "light" : "dark");
