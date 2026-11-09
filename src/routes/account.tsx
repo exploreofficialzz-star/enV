@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "r
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
-import { Camera, ChartNoAxesCombined, Check, LogOut, Pencil, Settings, Wallet, X } from "lucide-react";
+import { ArrowRight, Camera, ChartNoAxesCombined, Check, LogOut, Pencil, Settings, Wallet, X } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { AuthPage } from "@/components/auth/auth-page";
 import { authClient, authEnabled, signOut } from "@/lib/auth/client";
@@ -219,7 +219,7 @@ function Account() {
               ref={coverInput}
               type="file"
               accept="image/jpeg,image/png,image/webp"
-              capture="environment"
+              aria-label="Select cover image"
               onChange={onImageSelected("cover")}
               className="sr-only"
               tabIndex={-1}
@@ -249,8 +249,7 @@ function Account() {
                   ref={avatarInput}
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
-                  capture="user"
-                  onChange={onImageSelected("avatar")}
+                      onChange={onImageSelected("avatar")}
                   className="sr-only"
                   tabIndex={-1}
                 />
@@ -265,11 +264,11 @@ function Account() {
         <section className="mt-7" aria-labelledby="profile-details-heading">
           <h2 id="profile-details-heading" className="mb-2 text-lg font-semibold text-fg">Profile details</h2>
           <dl className="divide-y divide-border rounded-2xl border border-border bg-surface px-4 sm:px-6">
-            <div className="flex min-h-[68px] items-center gap-4 py-3">
+            <div className="flex min-h-[68px] flex-nowrap items-center gap-3 py-3">
               <dt className="w-20 shrink-0 text-sm text-muted">Name</dt>
               <dd className="min-w-0 flex-1">
                 {editingField === "name" ? (
-                  <form onSubmit={event => void saveName(event)} className="flex items-center gap-2">
+                  <form onSubmit={event => void saveName(event)} className="flex min-w-0 flex-nowrap items-center gap-1.5">
                     <input
                       autoFocus
                       value={nameDraft}
@@ -282,7 +281,7 @@ function Account() {
                     <button type="submit" disabled={savingField} aria-label="Save name" className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-fg disabled:opacity-50"><Check size={17} /></button>
                     <button type="button" disabled={savingField} onClick={() => { setEditingField(null); setNameDraft(displayName); }} aria-label="Cancel name edit" className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-fg"><X size={17} /></button>
                   </form>
-                ) : <span className="block break-words text-sm font-medium text-fg">{displayName}</span>}
+                ) : <span className="block truncate whitespace-nowrap text-sm font-medium text-fg" title={displayName}>{displayName}</span>}
               </dd>
               {editingField !== "name" ? (
                 <button type="button" aria-label="Edit name" onClick={() => { setNameDraft(displayName); setEditingField("name"); setError(""); setNotice(""); }} className="grid size-9 shrink-0 place-items-center rounded-lg text-fg transition hover:bg-surface-2">
@@ -308,7 +307,7 @@ function Account() {
                     <button type="submit" disabled={savingField} aria-label="Save email" className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-fg disabled:opacity-50"><Check size={17} /></button>
                     <button type="button" disabled={savingField} onClick={() => { setEditingField(null); setEmailDraft(user.primaryEmail ?? ""); }} aria-label="Cancel email edit" className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-fg"><X size={17} /></button>
                   </form>
-                ) : <span className="block break-all text-sm font-medium text-fg">{user.primaryEmail || "—"}</span>}
+                ) : <span className="block truncate whitespace-nowrap text-sm font-medium text-fg" title={user.primaryEmail || "—"}>{user.primaryEmail || "—"}</span>}
               </dd>
               {editingField !== "email" ? (
                 <button type="button" aria-label="Edit email" onClick={() => { setEmailDraft(user.primaryEmail ?? ""); setEditingField("email"); setError(""); setNotice(""); }} className="grid size-9 shrink-0 place-items-center rounded-lg text-fg transition hover:bg-surface-2">
@@ -328,12 +327,13 @@ function Account() {
               <Link
                 key={action.title}
                 to={action.to}
-                className="flex min-h-[76px] items-center gap-3 rounded-2xl border border-border bg-surface p-4 transition hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                className="flex min-h-[76px] items-center justify-between gap-3 rounded-2xl border border-border bg-surface p-4 transition hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:justify-center"
               >
-                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-fg">
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-fg md:hidden">
                   <Icon size={21} aria-hidden="true" />
                 </span>
-                <span className="min-w-0 text-sm font-semibold text-fg">{action.title}</span>
+                <span className="min-w-0 flex-1 text-sm font-semibold text-fg md:flex-none md:text-center">{action.title}</span>
+                <ArrowRight size={19} className="shrink-0 text-muted md:hidden" aria-hidden="true" />
               </Link>
             );
           })}
