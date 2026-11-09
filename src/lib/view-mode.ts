@@ -35,7 +35,16 @@ export function detectDefaultViewMode(hints?: Partial<DeviceHints>): ViewMode {
 export const VIEW_MODE_BOOTSTRAP_SCRIPT = `(() => {
   let preference = null;
   try {
-    preference = window.localStorage.getItem("env:view-mode");
+    preference = window.localStorage.getItem("env:view-mode:v2");
+    if (preference === null) {
+      const legacyPreference = window.localStorage.getItem("env:view-mode");
+      // Pre-v2 clients stored "mobile" automatically even without a user choice.
+      // Only legacy Tablet/Desktop values are reliable manual overrides.
+      preference = legacyPreference === "tablet" || legacyPreference === "desktop"
+        ? legacyPreference
+        : "auto";
+      window.localStorage.setItem("env:view-mode:v2", preference);
+    }
   } catch {}
 
   const userAgent = window.navigator?.userAgent || "";
