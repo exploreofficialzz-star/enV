@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { rankMostUsedToolIds } from "./storage.ts";
+import { runInNewContext } from "node:vm";
+import { detectDefaultViewMode, VIEW_MODE_BOOTSTRAP_SCRIPT } from "./view-mode.ts";
 
 test("rankMostUsedToolIds orders by local use count, then recent use", () => {
   assert.deepEqual(
@@ -19,9 +21,6 @@ test("rankMostUsedToolIds falls back to this user's recent tools", () => {
   assert.deepEqual(rankMostUsedToolIds([], {}, 5), []);
 });
 
-
-import { runInNewContext } from "node:vm";
-import { detectDefaultViewMode, VIEW_MODE_BOOTSTRAP_SCRIPT } from "./view-mode.ts";
 
 test("automatic device detection distinguishes phones, tablets and desktop computers", () => {
   assert.equal(detectDefaultViewMode({
