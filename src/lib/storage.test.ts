@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { rankMostUsedToolIds } from "./storage.ts";
 import { runInNewContext } from "node:vm";
+import { rankMostUsedToolIds } from "./storage.ts";
 import { detectDefaultViewMode, VIEW_MODE_BOOTSTRAP_SCRIPT } from "./view-mode.ts";
 
 test("rankMostUsedToolIds orders by local use count, then recent use", () => {
@@ -56,14 +56,22 @@ test("automatic device detection distinguishes phones, tablets and desktop compu
   }), "desktop");
 });
 
-function runInitialViewModeScript({
-  preference = null,
-  userAgent,
-  platform = "Linux",
-  screenWidth,
-  screenHeight,
-  maxTouchPoints = 0,
+function runInitialViewModeScript(options: {
+  preference?: string | null;
+  userAgent: string;
+  platform?: string;
+  screenWidth: number;
+  screenHeight: number;
+  maxTouchPoints?: number;
 }) {
+  const {
+    preference = null,
+    userAgent,
+    platform = "Linux",
+    screenWidth,
+    screenHeight,
+    maxTouchPoints = 0,
+  } = options;
   const root = { dataset: {} };
   const viewport = { content: "width=device-width, initial-scale=1, viewport-fit=cover" };
   const window = {
