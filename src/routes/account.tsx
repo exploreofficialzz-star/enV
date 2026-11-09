@@ -37,8 +37,8 @@ export const Route = createFileRoute("/account")({
 
 type ProfileMediaResponse = {
   ok?: boolean;
-  avatar?: string | null;
-  cover?: string | null;
+  avatarAvailable?: boolean;
+  coverAvailable?: boolean;
   imageUrl?: string;
   error?: string;
 };
@@ -80,8 +80,8 @@ function Account() {
       if (!response.ok) return;
       const payload = await response.json() as ProfileMediaResponse;
       if (controller.signal.aborted || !payload.ok) return;
-      if (payload.avatar) setAvatarUrl(payload.avatar);
-      if (payload.cover) setCoverUrl(payload.cover);
+      if (payload.avatarAvailable) setAvatarUrl("/api/account/profile-media?kind=avatar");
+      if (payload.coverAvailable) setCoverUrl("/api/account/profile-media?kind=cover");
     }).catch(() => {
       // Profile media is optional; the profile stays usable without a custom image.
     });
