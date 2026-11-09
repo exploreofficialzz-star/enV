@@ -12,13 +12,14 @@ Do not send passwords, cookies, auth tokens, payment data, IP addresses, full us
 
 ## Consent controls
 
-- Analytics is off unless the user actively chooses **Allow analytics**.
+- Analytics is off unless the user actively chooses **Allow analytics** from the dedicated Privacy page controls.
 - Consent is installation-scoped and tied to a policy version.
-- **No thanks** stops local queuing, clears the local queue and requests deletion of that installation's event history.
-- The Web renders a full-screen, centered **Cookie preferences page** on first visit. It occupies the viewport and presents one continuous content panel rather than a floating dialog or multiple cards. The layout stays horizontally and vertically centered on phones, tablets and desktop screens; when the content is taller than the screen, the page scrolls without clipping. People can reopen the page from **Cookie and analytics preferences** on the Privacy page.
+- **Decline / withdraw consent** stops local queuing, clears the local queue and requests deletion of that installation's event history.
+- The Web shows a small, centered **Cookie preferences** popup on first visit. It contains a short essential-storage notice, a Privacy policy link and a **Continue** action. It does not present a Product Analytics checkbox or an analytics allow/decline choice. People can reopen the popup from the Privacy page.
+- Optional analytics can be allowed or declined separately in **Cookie and analytics preferences** on the Privacy page.
 - A changed policy version requires renewed consent.
 - The server rejects event batches without a current granted consent record.
-- Account creation or ordinary tool use is not consent.
+- Account creation, the popup's Continue action or ordinary tool use is not analytics consent.
 
 Android and iOS already have independent native consent surfaces and clients. Android keeps its bounded event queue encrypted with an Android Keystore-backed AES-GCM key; iOS stores its subject and queue in Keychain. Both use the same versioned metadata-only protocol and HTTPS API. Native collection is disabled by default in release configuration and must be deliberately enabled only after the server and privacy release gates below pass.
 
