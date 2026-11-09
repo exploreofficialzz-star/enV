@@ -5,65 +5,93 @@ import { readFileSync } from "node:fs";
 const component = readFileSync(new URL("../../src/components/layout/cookie-consent.tsx", import.meta.url), "utf8");
 const appShell = readFileSync(new URL("../../src/components/layout/app-shell.tsx", import.meta.url), "utf8");
 const privacyControls = readFileSync(new URL("../../src/components/layout/privacy-controls.tsx", import.meta.url), "utf8");
-const analyticsClient = readFileSync(new URL("../../src/lib/analytics/client.ts", import.meta.url), "utf8");
 const accountPage = readFileSync(new URL("../../src/routes/account.tsx", import.meta.url), "utf8");
+const profileMediaRoute = readFileSync(new URL("../../server/routes/api/account/profile-media.ts", import.meta.url), "utf8");
+const profileMigration = readFileSync(new URL("../../migrations/0021_account_profile_media.sql", import.meta.url), "utf8");
+const authServer = readFileSync(new URL("../../src/lib/auth/server.ts", import.meta.url), "utf8");
 const tokenDashboard = readFileSync(new URL("../../src/components/billing/token-dashboard.tsx", import.meta.url), "utf8");
 
-test("first visit renders a full-screen centered cookie preferences page", () => {
+test("cookie preferences are a compact popup rather than a full explanatory page", () => {
   assert.match(component, /Cookie preferences/);
-  assert.match(component, /fixed inset-0[^"]*min-h-dvh[^"]*items-center justify-center/);
-  assert.match(component, /max-w-3xl/);
+  assert.match(component, /useLocation/);
+  assert.match(component, /pathname\.startsWith\("\/tools\/"\)/);
+  assert.match(component, /pathname === "\/3d-game-studio"/);
+  assert.match(component, /pointer-events-none fixed bottom-4 left-4 right-4/);
+  assert.match(component, /pointer-events-auto w-full rounded-2xl/);
+  assert.match(component, /sm:w-\[24rem\]/);
+  assert.doesNotMatch(component, /fixed inset-0|bg-black|backdrop-blur|min-h-dvh/);
   assert.match(component, /role="dialog"/);
-  assert.match(component, /aria-modal="true"/);
-  assert.match(component, /onKeyDown=\{trapFocus\}/);
-  assert.match(component, /returnFocusRef\.current\?\.focus\(\)/);
-  assert.match(component, /Essential cookies and storage/);
-  assert.doesNotMatch(component, /<dialog|showModal\(\)|backdrop:/);
-  assert.doesNotMatch(component, /rounded-2xl border border-border bg-surface p-4/);
-  assert.doesNotMatch(component, /Help improve enV|Help train enV|Privacy choices|fixed bottom-/);
+  assert.match(component, /aria-modal="false"/);
+  assert.match(component, /if \(event\.key === "Escape"\)/);
+  assert.match(component, /focusOnOpenRef\.current = true/);
+  assert.match(component, /returnFocusRef\.current\.focus\(\)/);
+  assert.match(component, /essential browser storage/);
+  assert.match(component, /Continue/);
+  assert.doesNotMatch(component, /min-h-dvh w-screen|max-w-3xl|Product analytics|analyticsAllowed|type="checkbox"|Decline analytics|chooseAnalyticsConsent/);
 });
 
-test("the page keeps product analytics disclosure and the existing explicit preference control", () => {
-  assert.match(component, /Product analytics/);
-  assert.match(component, /checked=\{analyticsAllowed\}/);
-  assert.match(component, /chooseAnalyticsConsent\(granted\)/);
-  assert.match(analyticsClient, /getAnalyticsConsent\(\)!=="granted"\)return/);
+test("cookie popup does not offer analytics as a checkbox or yes/no choice", () => {
+  assert.doesNotMatch(component, /Product analytics|Allow product analytics|Decline analytics|Save preferences|env-analytics-toggle/);
+  assert.match(privacyControls, /Allow analytics/);
+  assert.match(privacyControls, /Decline \/ withdraw consent/);
 });
 
 test("cookie acknowledgement is versioned and remembered locally", () => {
-  assert.match(component, /env\.cookie-preferences\.seen\.v1/);
+  assert.match(component, /env\.cookie-preferences\.seen\.v2/);
   assert.match(component, /window\.localStorage\.getItem\(NOTICE_KEY\) !== "1"/);
   assert.match(component, /window\.localStorage\.setItem\(NOTICE_KEY, "1"\)/);
 });
 
-test("the page is mounted globally and can be reopened from Privacy", () => {
+test("popup is mounted globally and can be reopened from Privacy", () => {
   assert.match(appShell, /import \{ CookieConsent \} from "@\/components\/layout\/cookie-consent"/);
   assert.match(appShell, /<CookieConsent \/>/);
-  assert.doesNotMatch(appShell, /AnalyticsConsent|analytics-consent/);
   assert.match(privacyControls, /env:open-cookie-preferences/);
   assert.match(privacyControls, /Open cookie preferences/);
   assert.match(component, /addEventListener\(OPEN_EVENT, reopen\)/);
 });
 
-test("signed-in visitors get the account profile instead of being sent back to sign-in", () => {
-  assert.match(accountPage, /useCurrentUserState\(\)/);
-  assert.doesNotMatch(accountPage, /<main\b|<\/main>/);
-  assert.ok(accountPage.indexOf("if (isPending)") < accountPage.indexOf('if (!user) return <AuthPage mode="sign-in" />'));
-  assert.match(accountPage, /Good to see you, \{firstName\}/);
-  assert.match(accountPage, /user\.profileImageUrl/);
-  assert.match(accountPage, /initials \|\| "E"/);
-  assert.match(accountPage, /Profile details/);
-  assert.match(accountPage, /Your enV shortcuts/);
+test("account profile is server-session aware and renders without a textual loading state", () => {
+  assert.match(accountPage, /createServerFn\(\{ method: "GET" \}\)/);
+  assert.match(accountPage, /loadAccountProfile/);
+  assert.match(accountPage, /loader: \(\) => loadAccountProfile\(\)/);
+  assert.doesNotMatch(accountPage, /Loading your profile|Good to see you|enV · Profile|Welcome to your personal enV space|Account status|Your enV shortcuts|Jump straight to the things you use most|Need to leave\?/);
+  assert.match(accountPage, /if \(!user\) return <AuthPage mode="sign-in" \/>/);
+  assert.match(accountPage, /profileImageUrl: session\.user\.image/);
+  assert.match(accountPage, /initials/);
+  assert.match(accountPage, /coverInput/);
+  assert.match(accountPage, /avatarInput/);
+  assert.match(accountPage, /aria-label="Change cover photo"/);
+  assert.match(accountPage, /aria-label="Change profile photo"/);
+  assert.match(accountPage, /authClient\.updateUser\(\{ name \}\)/);
+  assert.match(accountPage, /authClient\.changeEmail\(\{ newEmail, callbackURL: "\/account" \}\)/);
+  assert.match(accountPage, /aria-label="Edit name"/);
+  assert.match(accountPage, /aria-label="Edit email"/);
+  assert.match(accountPage, /bg-red-600[\s\S]*Sign out/);
   assert.match(accountPage, /to: "\/wallet" as const/);
   assert.match(accountPage, /to: "\/token-dashboard" as const/);
   assert.match(accountPage, /to: "\/settings" as const/);
-  assert.match(accountPage, /signOut\("\/"\)/);
+  assert.match(accountPage, /text-fg/);
+  assert.match(accountPage, /signOut\("\/"/);
 });
 
-test("token dashboard has no redundant sign-in card or fabricated zero balance", () => {
+test("profile photos are stored server-side per authenticated account with bounded image validation", () => {
+  assert.match(profileMediaRoute, /auth\.api\.getSession/);
+  assert.match(profileMediaRoute, /account_profile_media/);
+  assert.match(profileMediaRoute, /AVATAR_LIMIT/);
+  assert.match(profileMediaRoute, /COVER_LIMIT/);
+  assert.match(profileMediaRoute, /matchesImageSignature/);
+  assert.match(profileMediaRoute, /same-origin/);
+  assert.match(profileMigration, /REFERENCES public\."user" \("id"\) ON DELETE CASCADE/);
+  assert.match(profileMigration, /ENABLE ROW LEVEL SECURITY/);
+  assert.match(profileMigration, /REVOKE ALL PRIVILEGES/);
+  assert.match(authServer, /changeEmail:/);
+  assert.match(authServer, /sendChangeEmailConfirmation/);
+});
+
+test("token dashboard hides its loading placeholders and has no redundant sign-in card", () => {
   assert.doesNotMatch(tokenDashboard, /Sign in to load your real enV balance|>Sign in<\/Link>/);
-  assert.doesNotMatch(tokenDashboard, /Sign in to load token history/);
-  assert.match(tokenDashboard, /loadState === "signed-out" \? null : \(/);
+  assert.doesNotMatch(tokenDashboard, /Sign in to load token history|Loading token activity|Loading your tokens/);
+  assert.match(tokenDashboard, /loadState === "loading" \? null/);
+  assert.match(tokenDashboard, /loadState === "signed-out" \|\| loadState === "loading" \? null/);
   assert.match(tokenDashboard, /wallet \? tokenLabel\(wallet\.availableTokens\) : "—"/);
-  assert.match(tokenDashboard, /const daily = data\?\.tokenUsage\.weeklyUsage \?\? \[\]/);
 });

@@ -1,212 +1,106 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { chooseAnalyticsConsent, getAnalyticsConsent } from "@/lib/analytics/client";
+import { useEffect, useRef, useState } from "react";
+import { useLocation } from "@tanstack/react-router";
 
-const NOTICE_KEY = "env.cookie-preferences.seen.v1";
+const NOTICE_KEY = "env.cookie-preferences.seen.v2";
 const OPEN_EVENT = "env:open-cookie-preferences";
 
 function markNoticeSeen() {
   try {
     window.localStorage.setItem(NOTICE_KEY, "1");
   } catch {
-    // The page still closes for this page session when storage is unavailable.
+    // The popup still closes for this page session when storage is unavailable.
   }
 }
 
 export function CookieConsent() {
-  const analyticsEnabled = import.meta.env.VITE_ANALYTICS_ENABLED === "true";
-  const advertisingEnabled = import.meta.env.VITE_ADS_ENABLED === "true";
-  const pageRef = useRef<HTMLElement>(null);
+  const pathname = useLocation({ select: location => location.pathname });
+  const isToolSurface = pathname.startsWith("/tools/") || pathname === "/3d-game-studio";
+  const popupRef = useRef<HTMLElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
+  const focusOnOpenRef = useRef(false);
   const [visible, setVisible] = useState(false);
-  const [analyticsAllowed, setAnalyticsAllowed] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
 
   useEffect(() => {
-    const savedChoice = getAnalyticsConsent();
-    setAnalyticsAllowed(savedChoice === "granted");
-
+    if (isToolSurface) {
+      setVisible(false);
+      return;
+    }
     try {
       setVisible(window.localStorage.getItem(NOTICE_KEY) !== "1");
     } catch {
       setVisible(true);
     }
+  }, [isToolSurface]);
 
+  useEffect(() => {
     const reopen = () => {
+      if (isToolSurface) return;
       returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      setError("");
+      focusOnOpenRef.current = true;
       setVisible(true);
     };
     window.addEventListener(OPEN_EVENT, reopen);
     return () => window.removeEventListener(OPEN_EVENT, reopen);
-  }, []);
+  }, [isToolSurface]);
 
   useEffect(() => {
-    if (visible) {
-      pageRef.current?.focus();
+    if (visible && focusOnOpenRef.current) {
+      popupRef.current?.focus();
+      focusOnOpenRef.current = false;
       return;
     }
-    returnFocusRef.current?.focus();
-    returnFocusRef.current = null;
+    if (!visible && returnFocusRef.current) {
+      if (returnFocusRef.current.isConnected) returnFocusRef.current.focus();
+      returnFocusRef.current = null;
+    }
   }, [visible]);
 
-  function trapFocus(event: ReactKeyboardEvent<HTMLElement>) {
-    if (event.key === "Escape") {
-      // A first-visit privacy choice must be completed through the visible actions.
-      event.preventDefault();
-      return;
-    }
-    if (event.key !== "Tab") return;
-
-    const focusable = event.currentTarget.querySelectorAll<HTMLElement>(
-      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-    );
-    const first = focusable.item(0);
-    const last = focusable.item(focusable.length - 1);
-    if (!first || !last) {
-      event.preventDefault();
-      event.currentTarget.focus();
-      return;
-    }
-    if (event.shiftKey && (document.activeElement === first || document.activeElement === event.currentTarget)) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  }
-
-  async function savePreferences(granted: boolean) {
-    setSaving(true);
-    setError("");
-
-    try {
-      if (analyticsEnabled) {
-        await chooseAnalyticsConsent(granted);
-        setAnalyticsAllowed(granted);
-      }
-      markNoticeSeen();
-      setVisible(false);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Your cookie preference could not be saved. Please try again.");
-    } finally {
-      setSaving(false);
-    }
+  function dismiss() {
+    markNoticeSeen();
+    setVisible(false);
   }
 
   if (!visible) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex min-h-dvh w-screen items-center justify-center overflow-y-auto bg-bg px-4 py-6 sm:px-8 sm:py-10">
+    <div className="pointer-events-none fixed bottom-4 left-4 right-4 z-[100] flex justify-end sm:bottom-6 sm:left-auto sm:right-6 sm:w-[24rem]">
       <section
-        ref={pageRef}
+        ref={popupRef}
         role="dialog"
-        aria-modal="true"
+        aria-modal="false"
         aria-labelledby="env-cookie-title"
         aria-describedby="env-cookie-description"
         tabIndex={-1}
-        onKeyDown={trapFocus}
-        className="my-auto w-full max-w-3xl rounded-[28px] border border-border bg-card px-5 py-6 text-left text-card-foreground shadow-xl outline-none sm:px-9 sm:py-9"
+        onKeyDown={event => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            dismiss();
+          }
+        }}
+        className="pointer-events-auto w-full rounded-2xl border border-border bg-card px-4 py-4 text-left text-card-foreground shadow-xl outline-none sm:px-5"
       >
-        <header className="mb-6 text-center sm:mb-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">enV · Privacy</p>
-          <h1 id="env-cookie-title" className="mt-3 text-2xl font-semibold tracking-tight text-fg sm:text-3xl">
+        <header>
+          <h2 id="env-cookie-title" className="text-lg font-semibold tracking-tight text-fg">
             Cookie preferences
-          </h1>
-          <p id="env-cookie-description" className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-muted sm:text-base">
-            Review how enV uses browser storage and product analytics. Your choices do not affect access to the toolkit.
+          </h2>
+          <p id="env-cookie-description" className="mt-1.5 text-sm leading-5 text-muted">
+            enV uses essential browser storage for your account session and saved settings.
           </p>
         </header>
-
-        <div className="divide-y divide-border border-y border-border">
-          <section className="py-5" aria-labelledby="env-essential-title">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 id="env-essential-title" className="text-base font-semibold text-fg">
-                Essential cookies and storage
-              </h2>
-              <span className="text-xs font-semibold text-muted">Always active</span>
-            </div>
-            <p className="mt-2 text-sm leading-6 text-muted">
-              Required for secure account sessions, service protection, and remembering settings on this device. These functions are necessary for enV to work.
-            </p>
-          </section>
-
-          <section className="py-5" aria-labelledby="env-analytics-title">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 id="env-analytics-title" className="text-base font-semibold text-fg">
-                Product analytics
-              </h2>
-              {!analyticsEnabled ? <span className="text-xs font-semibold text-muted">Not enabled in this build</span> : null}
-            </div>
-            <p className="mt-2 text-sm leading-6 text-muted">
-              {analyticsEnabled
-                ? "enV uses limited tool usage and reliability events to understand which experiences work well and where failures need attention. Analytics does not include your files, text you enter, passwords, search terms, or tool outputs."
-                : "Product analytics collection is not enabled in this Web build. No optional analytics events will be collected by this client."}
-            </p>
-            {analyticsEnabled ? (
-              <label htmlFor="env-analytics-toggle" className="mt-4 flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium text-fg">
-                <input
-                  id="env-analytics-toggle"
-                  type="checkbox"
-                  checked={analyticsAllowed}
-                  disabled={saving}
-                  onChange={(event) => setAnalyticsAllowed(event.target.checked)}
-                  className="size-4 shrink-0 accent-[var(--color-accent)]"
-                />
-                Allow product analytics on this device
-              </label>
-            ) : null}
-            {analyticsEnabled ? (
-              <p className="mt-2 text-xs leading-5 text-muted">
-                You can change this choice later from the Privacy page. Declining does not prevent ordinary toolkit use.
-              </p>
-            ) : null}
-          </section>
-
-          {advertisingEnabled ? (
-            <section className="py-5" aria-labelledby="env-advertising-title">
-              <h2 id="env-advertising-title" className="text-base font-semibold text-fg">Advertising</h2>
-              <p className="mt-2 text-sm leading-6 text-muted">
-                Advertising preferences are managed separately through the advertising provider's privacy controls when ads are shown.
-              </p>
-            </section>
-          ) : null}
-        </div>
-
-        {error ? (
-          <p role="alert" className="mt-5 rounded-xl border border-danger/30 bg-surface px-3 py-2 text-sm text-danger">
-            {error}
-          </p>
-        ) : null}
-
-        <footer className="mt-6 flex flex-col-reverse gap-3 sm:mt-8 sm:flex-row sm:items-center sm:justify-between">
+        <footer className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
           <a
             href="/privacy"
-            className="inline-flex min-h-11 items-center justify-center text-sm font-medium text-muted underline underline-offset-4 hover:text-fg"
+            className="inline-flex min-h-10 items-center text-sm font-medium text-muted underline underline-offset-4 hover:text-fg"
           >
-            Read privacy policy
+            Privacy policy
           </a>
-          <div className="flex flex-col-reverse gap-2 sm:flex-row">
-            {analyticsEnabled ? (
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => void savePreferences(false)}
-                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-border px-4 py-2 text-sm font-semibold text-fg transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {saving ? "Saving…" : "Decline analytics"}
-              </button>
-            ) : null}
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => void savePreferences(analyticsEnabled && analyticsAllowed)}
-              className="inline-flex min-h-11 items-center justify-center rounded-xl bg-accent px-5 py-2 text-sm font-semibold text-accent-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {saving ? "Saving…" : analyticsEnabled ? "Save preferences" : "Continue"}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={dismiss}
+            className="inline-flex min-h-10 items-center justify-center rounded-xl bg-accent px-5 py-2 text-sm font-semibold text-accent-foreground transition hover:opacity-90"
+          >
+            Continue
+          </button>
         </footer>
       </section>
     </div>

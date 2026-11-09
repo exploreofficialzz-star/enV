@@ -36,7 +36,7 @@ export function PrivacyControls() {
         Review product analytics separately from essential account/session handling. Advertising, when enabled, uses separate provider and CMP privacy choices.
       </p>
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <Button type="button" size="sm" variant="outline" onClick={openCookiePreferences}>Open cookie preferences page</Button>
+        <Button type="button" size="sm" variant="outline" onClick={openCookiePreferences}>Open cookie preferences</Button>
         <span className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-fg">
           {choice==="granted"?"Analytics allowed":choice==="denied"?"Analytics declined":"No choice recorded"}
         </span>
