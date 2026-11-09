@@ -160,6 +160,25 @@ export const auth = betterAuth({
     ...(googleConfigured ? { google: { clientId: googleClientId!, clientSecret: googleClientSecret! } } : {}),
     ...(appleConfigured ? { apple: async () => ({ clientId: appleClientId!, clientSecret: await getAppleClientSecret() }) } : {}),
   },
+  user: {
+    changeEmail: {
+      enabled: authRequested && Boolean(resendApiKey && authEmailFrom),
+      sendChangeEmailConfirmation: async ({
+        user,
+        newEmail,
+        url,
+      }: { user: { email: string; name: string }; newEmail: string; url: string }) => {
+        const safeUrl = escapeHtml(url);
+        const safeNewEmail = escapeHtml(newEmail);
+        await sendTransactionalEmail({
+          to: user.email,
+          subject: "Confirm your enV email change",
+          text: `Hello ${user.name},\n\nConfirm the request to change your enV email address to ${newEmail}: ${url}\n\nIf you did not request this change, ignore this email.`,
+          html: `<p>Hello ${escapeHtml(user.name)},</p><p>Confirm the request to change your enV email address to <strong>${safeNewEmail}</strong>:</p><p><a href="${safeUrl}">Confirm email change</a></p><p>If you did not request this change, ignore this email.</p>`,
+        });
+      },
+    },
+  },
   account: {
     encryptOAuthTokens: true,
     accountLinking: {
@@ -187,22 +206,20 @@ export const auth = betterAuth({
       },
     },
   } : {}),
-  ...(emailPasswordAuthEnabled ? {
-    emailVerification: {
-      sendOnSignUp: true,
-      autoSignInAfterVerification: true,
-      sendVerificationEmail: async ({ user, url }: { user: { email: string; name: string }; url: string }) => {
-        const safeUrl = escapeHtml(url);
-        await sendTransactionalEmail({
-          to: user.email,
-          subject: "Verify your enV email address",
-          text: `Hello ${user.name},\n\nVerify your enV email address by opening this link: ${url}\n\nThe link expires. If you did not create this account, you can ignore this email.`,
-          html: `<p>Hello ${escapeHtml(user.name)},</p><p>Verify your enV email address by opening this link:</p><p><a href="${safeUrl}">Verify email address</a></p><p>The link expires. If you did not create this account, you can ignore this email.</p>`,
-        });
-      },
+  emailVerification: {
+    sendOnSignUp: emailPasswordAuthEnabled,
+    autoSignInAfterVerification: emailPasswordAuthEnabled,
+    sendVerificationEmail: async ({ user, url }: { user: { email: string; name: string }; url: string }) => {
+      const safeUrl = escapeHtml(url);
+      await sendTransactionalEmail({
+        to: user.email,
+        subject: "Verify your enV email address",
+        text: `Hello ${user.name},\n\nVerify your enV email address by opening this link: ${url}\n\nThe link expires. If you did not request this, ignore this email.`,
+        html: `<p>Hello ${escapeHtml(user.name)},</p><p>Verify your enV email address by opening this link:</p><p><a href="${safeUrl}">Verify email address</a></p><p>The link expires. If you did not request this, ignore this email.</p>`,
+      });
     },
-  } : {}),
-  advanced: {
+  },
+
     useSecureCookies: secureCookies,
     defaultCookieAttributes: { secure: secureCookies, sameSite: "lax", path: "/" },
     cookies: {
