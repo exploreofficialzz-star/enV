@@ -47,6 +47,7 @@ test("the page is mounted globally and can be reopened from Privacy", () => {
 
 test("signed-in visitors get the account profile instead of being sent back to sign-in", () => {
   assert.match(accountPage, /useCurrentUserState\(\)/);
+  assert.doesNotMatch(accountPage, /<main\\b|<\\/main>/);
   assert.ok(accountPage.indexOf("if (isPending)") < accountPage.indexOf('if (!user) return <AuthPage mode="sign-in" />'));
   assert.match(accountPage, /Good to see you, \{firstName\}/);
   assert.match(accountPage, /user\.profileImageUrl/);
