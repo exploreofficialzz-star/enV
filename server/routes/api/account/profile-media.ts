@@ -82,9 +82,21 @@ async function authorize(request: Request): Promise<{ userId: string | null; sta
   }
 }
 
-function dataUrl(bytes: unknown, mime: string | null): string | null {
-  if (!bytes || !mime) return null;
-  return `data:${mime};base64,${Buffer.from(bytes as Uint8Array).toString("base64")}`;
+function imageResponse(bytes: unknown, mime: string | null): Response {
+  if (!bytes || !mime) {
+    return new Response(null, { status: 404, headers: { "cache-control": "private, no-store" } });
+  }
+  return new Response(Buffer.from(bytes as Uint8Array), {
+    status: 200,
+    headers: {
+      "content-type": mime,
+      "content-length": String(Buffer.from(bytes as Uint8Array).byteLength),
+      "cache-control": "private, no-store",
+      "x-content-type-options": "nosniff",
+      "content-disposition": "inline",
+      "cross-origin-resource-policy": "same-origin",
+    },
+  });
 }
 
 export default defineHandler(async event => {
@@ -95,24 +107,37 @@ export default defineHandler(async event => {
   try {
     const sql = await getSql();
     if (request.method === "GET") {
+      const kind = new URL(request.url).searchParams.get("kind");
+      if (kind === "avatar" || kind === "cover") {
+        const rows = await sql.query<{
+          avatar_bytes: Uint8Array | null;
+          avatar_mime: string | null;
+          cover_bytes: Uint8Array | null;
+          cover_mime: string | null;
+        }>(
+          kind === "avatar"
+            ? `select avatar_bytes, avatar_mime from public.account_profile_media where user_id = $1 limit 1`
+            : `select cover_bytes, cover_mime from public.account_profile_media where user_id = $1 limit 1`,
+          [authorization.userId],
+        );
+        const media = rows[0];
+        return kind === "avatar"
+          ? imageResponse(media?.avatar_bytes, media?.avatar_mime ?? null)
+          : imageResponse(media?.cover_bytes, media?.cover_mime ?? null);
+      }
+
       const rows = await sql.query<{
-        avatar_bytes: Uint8Array | null;
-        avatar_mime: string | null;
-        cover_bytes: Uint8Array | null;
-        cover_mime: string | null;
+        has_avatar: boolean;
+        has_cover: boolean;
       }>(
-        `select avatar_bytes, avatar_mime, cover_bytes, cover_mime
+        `select (avatar_bytes is not null) as has_avatar,
+                (cover_bytes is not null) as has_cover
            from public.account_profile_media
           where user_id = $1
           limit 1`,
         [authorization.userId],
       );
-      const media = rows[0];
-      return respond({
-        ok: true,
-        avatar: dataUrl(media?.avatar_bytes, media?.avatar_mime ?? null),
-        cover: dataUrl(media?.cover_bytes, media?.cover_mime ?? null),
-      });
+      return respond({ ok: true, avatarAvailable: rows[0]?.has_avatar ?? false, coverAvailable: rows[0]?.has_cover ?? false });
     }
 
     if (request.method !== "POST") return respond({ ok: false, error: "Method not allowed." }, 405);
@@ -142,7 +167,7 @@ export default defineHandler(async event => {
       );
     }
 
-    return respond({ ok: true, kind, imageUrl: dataUrl(bytes, mime) });
+    return respond({ ok: true, kind, imageUrl: `/api/account/profile-media?kind=${kind}&v=${Date.now()}` });
   } catch (reason) {
     const message = reason instanceof Error ? reason.message : "Could not process this profile photo.";
     const status = /larger than|supported image|Choose a JPG|No image data/i.test(message) ? 400 : 503;
