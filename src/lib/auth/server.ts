@@ -4,7 +4,12 @@ import { betterAuth } from "better-auth";
 import { genericOAuth } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { Pool } from "pg";
-import { ensureDbReady, getPglite, getPostgresPoolOptions, isSupabaseDatabaseUrl } from "../db";
+import {
+  ensureDbReady,
+  getPglite,
+  getPostgresPoolOptions,
+  isSupabaseDatabaseUrl,
+} from "../db";
 import { emailAndPasswordEnabled } from "./email-password";
 import { OAUTH_PROVIDERS } from "./providers";
 import { pgliteDialect } from "./pglite-dialect";
