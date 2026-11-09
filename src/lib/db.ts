@@ -91,14 +91,22 @@ export function isSupabaseDatabaseUrl(value: string): boolean {
  * before passing the Supabase CA through pg's supported ssl.ca option.
  */
 function stripSslConnectionParameters(connectionString: string): string {
-  return connectionString
-    .replace(/([?&])sslmode=[^&#]*&?/i, (_match, separator: string, following: string | undefined) =>
-      following ? separator : "",
-    )
-    .replace(/([?&])sslrootcert=[^&#]*&?/i, (_match, separator: string, following: string | undefined) =>
-      following ? separator : "",
-    )
-    .replace(/[?&]$/, "");
+  const queryStart = connectionString.indexOf("?");
+  if (queryStart < 0) return connectionString;
+
+  const fragmentStart = connectionString.indexOf("#", queryStart);
+  const queryEnd = fragmentStart < 0 ? connectionString.length : fragmentStart;
+  const base = connectionString.slice(0, queryStart);
+  const query = connectionString.slice(queryStart + 1, queryEnd);
+  const fragment = fragmentStart < 0 ? "" : connectionString.slice(fragmentStart);
+  const remaining = query
+    .split("&")
+    .filter((parameter) => {
+      const key = (parameter.split("=", 1)[0] ?? "").toLowerCase();
+      return key !== "sslmode" && key !== "sslrootcert";
+    });
+
+  return `${base}${remaining.length ? `?${remaining.join("&")}` : ""}${fragment}`;
 }
 
 export function getPostgresPoolOptions(max: number) {
