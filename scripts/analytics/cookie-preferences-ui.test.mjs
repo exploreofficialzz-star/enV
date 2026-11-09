@@ -76,9 +76,9 @@ test("account profile is server-session aware and renders without a textual load
   assert.match(accountPage, /account-shortcut-arrow/);
   assert.match(accountPage, /account-shortcut-title/);
   assert.doesNotMatch(accountPage, /md:hidden|md:justify-center|md:text-center/);
-  assert.match(appStyles, /html\\[data-env-view-mode="mobile"\\] \\.env-app-shell \\.account-shortcut-arrow/);
-  assert.match(appStyles, /html\\[data-env-view-mode="mobile"\\] \\.env-app-shell \\.account-shortcut-leading/);
-  assert.match(appStyles, /\\.env-app-shell \\.account-shortcut-title/);
+  assert.ok(appStyles.includes('html[data-env-view-mode="mobile"] .env-app-shell .account-shortcut-arrow'));
+  assert.ok(appStyles.includes('html[data-env-view-mode="mobile"] .env-app-shell .account-shortcut-leading'));
+  assert.ok(appStyles.includes('.env-app-shell .account-shortcut-title'));
   assert.match(accountPage, /truncate whitespace-nowrap/);
   assert.doesNotMatch(accountPage, /break-all text-sm font-medium|block break-words text-sm font-medium/);
   assert.match(accountPage, /authClient\.updateUser\(\{ name \}\)/);
