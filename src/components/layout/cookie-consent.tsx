@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { chooseAnalyticsConsent, getAnalyticsConsent } from "@/lib/analytics/client";
 
-type AnalyticsChoice = "granted" | "denied" | "unset";
-
 const NOTICE_KEY = "env.cookie-preferences.seen.v1";
 const OPEN_EVENT = "env:open-cookie-preferences";
 
@@ -19,14 +17,12 @@ export function CookieConsent() {
   const advertisingEnabled = import.meta.env.VITE_ADS_ENABLED === "true";
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [visible, setVisible] = useState(false);
-  const [analyticsChoice, setAnalyticsChoice] = useState<AnalyticsChoice>("unset");
   const [analyticsAllowed, setAnalyticsAllowed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     const savedChoice = getAnalyticsConsent();
-    setAnalyticsChoice(savedChoice);
     setAnalyticsAllowed(savedChoice === "granted");
 
     try {
@@ -65,7 +61,6 @@ export function CookieConsent() {
     try {
       if (analyticsEnabled) {
         await chooseAnalyticsConsent(granted);
-        setAnalyticsChoice(granted ? "granted" : "denied");
         setAnalyticsAllowed(granted);
       }
       markNoticeSeen();
