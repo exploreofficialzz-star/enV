@@ -15,7 +15,7 @@ Do not send passwords, cookies, auth tokens, payment data, IP addresses, full us
 - Analytics is off unless the user actively chooses **Allow analytics**.
 - Consent is installation-scoped and tied to a policy version.
 - **No thanks** stops local queuing, clears the local queue and requests deletion of that installation's event history.
-- The Web prompt can be reopened through **Privacy choices** while the UI flag is enabled.
+- The Web shows a one-time, centered **Cookie preferences** dialog on first visit. It has no persistent floating chip. People can reopen the dialog from **Cookie and analytics preferences** on the Privacy page.
 - A changed policy version requires renewed consent.
 - The server rejects event batches without a current granted consent record.
 - Account creation or ordinary tool use is not consent.
