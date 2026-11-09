@@ -118,8 +118,8 @@ test("token dashboard hides its loading placeholders and has no redundant sign-i
 test("device view is detected before first paint and manual choices survive refresh", () => {
   assert.match(rootRoute, /VIEW_MODE_BOOTSTRAP_SCRIPT/);
   assert.match(rootRoute, /<HeadContent \/>[\s\S]*VIEW_MODE_BOOTSTRAP_SCRIPT/);
-  assert.match(viewMode, /localStorage\\.getItem\\("env:view-mode:v2"\\)/);
-  assert.match(viewMode, /legacyPreference === "tablet" \\|\\| legacyPreference === "desktop"/);
+  assert.ok(viewMode.includes('localStorage.getItem("env:view-mode:v2")'));
+  assert.ok(viewMode.includes('legacyPreference === "tablet" || legacyPreference === "desktop"'));
   assert.match(viewMode, /localStorage\.getItem\("env:view-mode"\)/);
   assert.match(viewMode, /validPreference && preference !== "auto" \? preference : detected/);
   assert.match(storage, /viewModePreference/);
