@@ -1,6 +1,6 @@
 import { Footer } from "@/components/layout/footer";
 import { Header } from "@/components/layout/header";
-import { AnalyticsConsent } from "@/components/layout/analytics-consent";
+import { CookieConsent } from "@/components/layout/cookie-consent";
 import { useHydratePrefs } from "@/hooks/use-theme";
 import { useEffect } from "react";
 import { synchronizeSelectedWebOfflineAllowance } from "@/lib/billing/offline-client";
@@ -32,7 +32,7 @@ export function AppShell({ children, showChrome = true }: { children: React.Reac
       {showChrome && <Header />}
       <main className="flex-1">{children}</main>
       {showChrome && <Footer />}
-      <AnalyticsConsent />
+      <CookieConsent />
     </div>
   );
 }
