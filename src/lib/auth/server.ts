@@ -4,7 +4,12 @@ import { betterAuth } from "better-auth";
 import { genericOAuth } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { Pool } from "pg";
-import { ensureDbReady, getPglite } from "../db";
+import {
+  ensureDbReady,
+  getPglite,
+  getPostgresPoolOptions,
+  isSupabaseDatabaseUrl,
+} from "../db";
 import { emailAndPasswordEnabled } from "./email-password";
 import { OAUTH_PROVIDERS } from "./providers";
 import { pgliteDialect } from "./pglite-dialect";
@@ -56,6 +61,7 @@ export const authConfigurationError = (() => {
   if (authRequested && oauthPartiallyConfigured) return "OAuth is partially configured. Set AUTH_OAUTH_ISSUER, AUTH_OAUTH_CLIENT_ID, and AUTH_OAUTH_CLIENT_SECRET together, or remove all three to use social providers or email/password authentication.";
   if (authRequested && googlePartiallyConfigured) return "Google sign-in requires both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.";
   if (authRequested && emailPasswordUiRequested && !emailPasswordAuthEnabled) return "The email/password sign-in UI is enabled but AUTH_EMAIL_PASSWORD_ENABLED is not true on the server.";
+  if (authRequested && databaseUrl && isSupabaseDatabaseUrl(databaseUrl) && !env("SUPABASE_CA_CERT")) return "Supabase PostgreSQL TLS requires SUPABASE_CA_CERT so the server can verify the database certificate.";
   if (authRequested && googleUiRequested && !googleConfigured) return "The Google sign-in UI is enabled but GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are not configured on the server.";
   if (authRequested && appleUiRequested && !appleConfigured) return "The Apple sign-in UI is enabled but complete Apple credentials are not configured on the server.";
   if (authRequested && appleClientSecret && appleGeneratedSecretConfigured) return "Configure either APPLE_CLIENT_SECRET or APPLE_TEAM_ID, APPLE_KEY_ID, and APPLE_PRIVATE_KEY, not both.";
@@ -74,7 +80,7 @@ if (authConfigurationError) {
 }
 const secret = configuredSecret ?? randomBytes(32).toString("hex");
 const database = databaseUrl
-  ? new Pool({ connectionString: databaseUrl, max: 5 })
+  ? new Pool(getPostgresPoolOptions(5))
   : { dialect: pgliteDialect(() => getPglite()), type: "postgres" as const };
 
 // Auth is opt-in. Avoid starting an embedded database on every Vercel function

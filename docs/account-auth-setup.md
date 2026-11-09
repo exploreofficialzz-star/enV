@@ -12,6 +12,7 @@ This runbook covers the Web Account service built on Better Auth: email/password
    - `BETTER_AUTH_URL=https://envtools.store`
    - `BETTER_AUTH_SECRET=<generated secret>`
    - `DATABASE_URL=<production PostgreSQL connection string>`
+   - `SUPABASE_CA_CERT=<contents of Supabase's public prod-ca-2021.crt>` when `DATABASE_URL` points to Supabase Postgres. Keep the PEM server-only (no `VITE_` prefix).
 5. Keep authentication disabled until at least one identity method is complete. The public `VITE_AUTH_*` variables only control which options are rendered in the browser; they never replace server credentials.
 
 Use a separate database, canonical URL, and OAuth callback registration for a staging deployment. Do not put secrets in Git, `.enV/app-env.json`, client-side code, or any variable prefixed with `VITE_`.

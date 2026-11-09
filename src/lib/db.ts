@@ -69,6 +69,65 @@ const OID_DATE = 1082;
 const OID_INTERVAL = 1186;
 const identity = (v: string) => v;
 
+/**
+ * Supabase uses a private CA for Postgres TLS. Detect Supabase connection
+ * hosts without parsing credentials (DATABASE_URL may contain escaped or
+ * unescaped reserved characters in its userinfo section).
+ */
+export function isSupabaseDatabaseUrl(value: string): boolean {
+  const schemeEnd = value.indexOf("://");
+  if (schemeEnd < 0) return false;
+  const authority = value.slice(schemeEnd + 3).split(/[/?#]/, 1)[0] ?? "";
+  const hostPort = authority.slice(authority.lastIndexOf("@") + 1);
+  const hostname = hostPort.startsWith("[")
+    ? hostPort.slice(1, hostPort.indexOf("]"))
+    : hostPort.split(":")[0] ?? "";
+  return hostname.endsWith(".supabase.co") || hostname.endsWith(".pooler.supabase.com");
+}
+
+/**
+ * pg-connection-string treats sslmode in DATABASE_URL as authoritative and
+ * may override an explicitly supplied SSL object. Remove URL SSL parameters
+ * before passing the Supabase CA through pg's supported ssl.ca option.
+ */
+function stripSslConnectionParameters(connectionString: string): string {
+  const queryStart = connectionString.indexOf("?");
+  if (queryStart < 0) return connectionString;
+
+  const fragmentStart = connectionString.indexOf("#", queryStart);
+  const queryEnd = fragmentStart < 0 ? connectionString.length : fragmentStart;
+  const base = connectionString.slice(0, queryStart);
+  const query = connectionString.slice(queryStart + 1, queryEnd);
+  const fragment = fragmentStart < 0 ? "" : connectionString.slice(fragmentStart);
+  const remaining = query
+    .split("&")
+    .filter((parameter) => {
+      const key = (parameter.split("=", 1)[0] ?? "").toLowerCase();
+      return key !== "sslmode" && key !== "sslrootcert";
+    });
+
+  return `${base}${remaining.length ? `?${remaining.join("&")}` : ""}${fragment}`;
+}
+
+export function getPostgresPoolOptions(max: number) {
+  if (!databaseUrl) throw new Error("DATABASE_URL is required for PostgreSQL connections.");
+
+  if (!isSupabaseDatabaseUrl(databaseUrl)) {
+    return { connectionString: databaseUrl, max };
+  }
+
+  const ca = typeof process !== "undefined" ? process.env.SUPABASE_CA_CERT?.trim() : undefined;
+  if (!ca) {
+    throw new Error("SUPABASE_CA_CERT is required to verify the Supabase PostgreSQL TLS certificate.");
+  }
+
+  return {
+    connectionString: stripSslConnectionParameters(databaseUrl),
+    ssl: { ca, rejectUnauthorized: true },
+    max,
+  };
+}
+
 type Run = <T>(text: string, params: unknown[]) => Promise<T[]>;
 type TransactionRunner = <T>(callback: (tx: Sql) => Promise<T>) => Promise<T>;
 
@@ -97,7 +156,7 @@ function createNeonSql(): Promise<Sql> {
     types.setTypeParser(OID_INT8, Number);
     types.setTypeParser(OID_DATE, identity);
     types.setTypeParser(OID_INTERVAL, identity);
-    const pool = new Pool({ connectionString: databaseUrl });
+    const pool = new Pool(getPostgresPoolOptions(10));
     const run: Run = async <T>(text: string, params: unknown[]) => {
       const res = await pool.query(text, params);
       return res.rows as T[];
