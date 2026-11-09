@@ -6,6 +6,8 @@ const component = readFileSync(new URL("../../src/components/layout/cookie-conse
 const appShell = readFileSync(new URL("../../src/components/layout/app-shell.tsx", import.meta.url), "utf8");
 const privacyControls = readFileSync(new URL("../../src/components/layout/privacy-controls.tsx", import.meta.url), "utf8");
 const analyticsClient = readFileSync(new URL("../../src/lib/analytics/client.ts", import.meta.url), "utf8");
+const accountPage = readFileSync(new URL("../../src/routes/account.tsx", import.meta.url), "utf8");
+const tokenDashboard = readFileSync(new URL("../../src/components/billing/token-dashboard.tsx", import.meta.url), "utf8");
 
 test("first visit renders a full-screen centered cookie preferences page", () => {
   assert.match(component, /Cookie preferences/);
@@ -41,4 +43,25 @@ test("the page is mounted globally and can be reopened from Privacy", () => {
   assert.match(privacyControls, /env:open-cookie-preferences/);
   assert.match(privacyControls, /Open cookie preferences/);
   assert.match(component, /addEventListener\(OPEN_EVENT, reopen\)/);
+});
+
+test("signed-in visitors get the account profile instead of being sent back to sign-in", () => {
+  assert.match(accountPage, /useCurrentUserState\(\)/);
+  assert.ok(accountPage.indexOf("if (isPending)") < accountPage.indexOf('if (!user) return <AuthPage mode="sign-in" />'));
+  assert.match(accountPage, /Good to see you, \{firstName\}/);
+  assert.match(accountPage, /user\.profileImageUrl/);
+  assert.match(accountPage, /initials \|\| "E"/);
+  assert.match(accountPage, /Profile details/);
+  assert.match(accountPage, /Your enV shortcuts/);
+  assert.match(accountPage, /to: "\/wallet" as const/);
+  assert.match(accountPage, /to: "\/token-dashboard" as const/);
+  assert.match(accountPage, /to: "\/settings" as const/);
+  assert.match(accountPage, /signOut\("\/"\)/);
+});
+
+test("token dashboard has no redundant sign-in card or fabricated zero balance", () => {
+  assert.doesNotMatch(tokenDashboard, /Sign in to load your real enV balance|>Sign in<\/Link>/);
+  assert.doesNotMatch(tokenDashboard, /Sign in to load token history/);
+  assert.match(tokenDashboard, /wallet \? tokenLabel\(wallet\.availableTokens\) : "—"/);
+  assert.match(tokenDashboard, /const daily = data\?\.tokenUsage\.weeklyUsage \?\? \[\]/);
 });
