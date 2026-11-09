@@ -72,7 +72,7 @@ function runInitialViewModeScript(options: {
     screenHeight,
     maxTouchPoints = 0,
   } = options;
-  const root = { dataset: {} };
+  const root: { dataset: { envViewMode?: string } } = { dataset: {} };
   const viewport = { content: "width=device-width, initial-scale=1, viewport-fit=cover" };
   const window = {
     localStorage: { getItem: () => preference },
