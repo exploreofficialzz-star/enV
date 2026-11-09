@@ -4,7 +4,7 @@ This folder contains the server-side integration boundary for the existing Rende
 
 ## Routing contract
 
-Web, Android, and iOS call the enV public Render API at `https://env-q3mq.onrender.com` for `/api/backend/*` and `/api/ai/*`. The exact Render URL `https://env-q3mq.onrender.com` is the downstream processor host, not a client API base URL: it accepts `/media`, `/info`, `/download` (and optionally `/transcribe`) and requires the server-only `PROCESSOR_SHARED_SECRET`. The Vercel gateway adds that secret and keeps it out of browser and native builds.
+The Web client calls the same-origin Vercel routes at `/api/backend/*` and `/api/ai/*`. This is required for the browser same-origin and CSRF protections. Android and iOS remain independent native clients and use the configured `https://env-q3mq.onrender.com` application API base. The Render URL is the downstream processor host for server-to-server media processing; the Vercel gateway adds `PROCESSOR_SHARED_SECRET` and keeps it out of browser and native builds.
 
 ## Routes
 
@@ -26,7 +26,7 @@ Set these in the existing Vercel project, for Production and Preview as appropri
 - `BACKEND_ALLOWED_ORIGIN`: optional allowed origin; leave unset for the default permissive CORS behavior used by the existing standalone processors.
 - `PROCESSOR_SHARED_SECRET`: server-only secret shared by Vercel and the Render processor. Render's Blueprint generates it for the processor; copy the same value into the Vercel project without exposing it as `VITE_*`.
 
-The Vercel gateway intentionally does not run FFmpeg, yt-dlp, or Whisper itself. Vercel Functions are request handlers with temporary writable storage and execution limits; those processor binaries belong in the configured external service. The frontend falls back to these same-origin routes when the corresponding public `VITE_*` URL is not set, so processor URLs and credentials remain server-side.
+The Vercel gateway intentionally does not run FFmpeg, yt-dlp, or Whisper itself. Vercel Functions are request handlers with temporary writable storage and execution limits; those processor binaries belong in the configured external service. The Web frontend calls these same-origin routes by default when the corresponding public `VITE_*` URL is not set, so processor URLs and credentials remain server-side.
 
 The repository includes a Render-ready processor in `processor/` and `render.yaml`. It packages the existing FFmpeg and yt-dlp implementations into one HTTPS service. Render Free is appropriate for initial testing but may sleep after inactivity, has limited CPU/RAM, and has no persistent filesystem; Blob remains the durable file store.
 
