@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useLocation } from "@tanstack/react-router";
 
 const NOTICE_KEY = "env.cookie-preferences.seen.v2";
 const OPEN_EVENT = "env:open-cookie-preferences";
@@ -12,26 +13,35 @@ function markNoticeSeen() {
 }
 
 export function CookieConsent() {
+  const pathname = useLocation({ select: location => location.pathname });
+  const isToolSurface = pathname.startsWith("/tools/") || pathname === "/3d-game-studio";
   const popupRef = useRef<HTMLElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const focusOnOpenRef = useRef(false);
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
+    if (isToolSurface) {
+      setVisible(false);
+      return;
+    }
     try {
       setVisible(window.localStorage.getItem(NOTICE_KEY) !== "1");
     } catch {
       setVisible(true);
     }
+  }, [isToolSurface]);
 
+  useEffect(() => {
     const reopen = () => {
+      if (isToolSurface) return;
       returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       focusOnOpenRef.current = true;
       setVisible(true);
     };
     window.addEventListener(OPEN_EVENT, reopen);
     return () => window.removeEventListener(OPEN_EVENT, reopen);
-  }, []);
+  }, [isToolSurface]);
 
   useEffect(() => {
     if (visible && focusOnOpenRef.current) {
@@ -40,7 +50,7 @@ export function CookieConsent() {
       return;
     }
     if (!visible && returnFocusRef.current) {
-      returnFocusRef.current.focus();
+      if (returnFocusRef.current.isConnected) returnFocusRef.current.focus();
       returnFocusRef.current = null;
     }
   }, [visible]);
