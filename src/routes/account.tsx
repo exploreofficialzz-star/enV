@@ -129,7 +129,7 @@ function Account() {
       const result = await authClient.changeEmail({ newEmail, callbackURL: "/account" });
       if (result.error) throw new Error(result.error.message || "Could not start the email change.");
       setEditingField(null);
-      setNotice("Verification sent to your new email address.");
+      setNotice("Check your current email to approve this change.");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not start the email change.");
     } finally {
