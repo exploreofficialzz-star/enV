@@ -293,7 +293,7 @@ export function TokenDashboard() {
                     );
                   })}
                 </div>
-              ) : (
+              ) : loadState === "signed-out" ? null : (
                 <div className="mt-4 rounded-xl border border-dashed border-border p-6 text-center">
                   <span className="mx-auto grid size-10 place-items-center rounded-full bg-surface-2 text-muted"><ShieldCheck size={20} aria-hidden="true" /></span>
                   <h3 className="mt-3 text-sm font-semibold text-fg">{loadState === "signed-out" ? "Account activity is not available" : loadState === "auth-disabled" ? "No token activity recorded yet" : loadState === "unavailable" ? "Token history is temporarily unavailable" : filter === "deductions" ? "No confirmed token deductions yet" : filter === "tool-activity" ? "No recorded tool activity yet" : "No token activity recorded yet"}</h3>
