@@ -6,7 +6,8 @@ const FAV_KEY = "env:favorites";
 const RECENT_KEY = "env:recent";
 const USAGE_KEY = "env:tool-use-counts";
 const THEME_KEY = "env:theme";
-const VIEW_MODE_KEY = "env:view-mode";
+const VIEW_MODE_KEY = "env:view-mode:v2";
+const LEGACY_VIEW_MODE_KEY = "env:view-mode";
 const DEFAULT_VIEWPORT = "width=device-width, initial-scale=1, viewport-fit=cover";
 const MAX_RECENT = 24;
 const canonicalToolId = (id: string) => id === "audio-analyze-studio" ? "song-metadata-analyzer" : id;
@@ -166,9 +167,19 @@ export const usePrefs = create<PrefsState>((set, get) => ({
         ? window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
         : themePreference;
     const storedViewMode = storage?.getItem(VIEW_MODE_KEY);
+    const legacyViewMode = storedViewMode === null || storedViewMode === undefined
+      ? storage?.getItem(LEGACY_VIEW_MODE_KEY)
+      : null;
+    // Older builds wrote "mobile" automatically for every first-time visitor.
+    // Preserve old explicit Tablet/Desktop choices, but re-detect old Mobile
+    // values because they cannot be distinguished from that former fallback.
+    const migratedViewMode = legacyViewMode === "tablet" || legacyViewMode === "desktop"
+      ? legacyViewMode
+      : "auto";
+    const savedViewMode = storedViewMode ?? migratedViewMode;
     const viewModePreference: ViewModePreference =
-      storedViewMode === "desktop" || storedViewMode === "tablet" || storedViewMode === "mobile" || storedViewMode === "auto"
-        ? storedViewMode
+      savedViewMode === "desktop" || savedViewMode === "tablet" || savedViewMode === "mobile" || savedViewMode === "auto"
+        ? savedViewMode
         : "auto";
     const viewMode: ViewMode = viewModePreference === "auto"
       ? detectDefaultViewMode()
