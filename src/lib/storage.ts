@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { detectDefaultViewMode, type ViewMode, type ViewModePreference } from "./view-mode";
+export type { ViewMode, ViewModePreference } from "./view-mode";
 
 const FAV_KEY = "env:favorites";
 const RECENT_KEY = "env:recent";
