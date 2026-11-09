@@ -10,6 +10,13 @@ const profileMediaRoute = readFileSync(new URL("../../server/routes/api/account/
 const profileMigration = readFileSync(new URL("../../migrations/0021_account_profile_media.sql", import.meta.url), "utf8");
 const authServer = readFileSync(new URL("../../src/lib/auth/server.ts", import.meta.url), "utf8");
 const tokenDashboard = readFileSync(new URL("../../src/components/billing/token-dashboard.tsx", import.meta.url), "utf8");
+const rootRoute = readFileSync(new URL("../../src/routes/__root.tsx", import.meta.url), "utf8");
+const appShell = readFileSync(new URL("../../src/components/layout/app-shell.tsx", import.meta.url), "utf8");
+const appStyles = readFileSync(new URL("../../src/styles.css", import.meta.url), "utf8");
+const storage = readFileSync(new URL("../../src/lib/storage.ts", import.meta.url), "utf8");
+const viewMode = readFileSync(new URL("../../src/lib/view-mode.ts", import.meta.url), "utf8");
+const settingsPage = readFileSync(new URL("../../src/routes/settings.tsx", import.meta.url), "utf8");
+const header = readFileSync(new URL("../../src/components/layout/header.tsx", import.meta.url), "utf8");
 
 test("cookie preferences are a compact popup rather than a full explanatory page", () => {
   assert.match(component, /Cookie preferences/);
@@ -62,6 +69,15 @@ test("account profile is server-session aware and renders without a textual load
   assert.match(accountPage, /avatarInput/);
   assert.match(accountPage, /aria-label="Change cover photo"/);
   assert.match(accountPage, /aria-label="Change profile photo"/);
+  assert.doesNotMatch(accountPage, /capture="(?:environment|user)"/);
+  assert.match(accountPage, /aria-label="Select cover image"/);
+  assert.match(accountPage, /aria-label="Select profile image"/);
+  assert.match(accountPage, /ArrowRight/);
+  assert.match(accountPage, /md:hidden/);
+  assert.match(accountPage, /md:justify-center/);
+  assert.match(accountPage, /md:text-center/);
+  assert.match(accountPage, /truncate whitespace-nowrap/);
+  assert.doesNotMatch(accountPage, /break-all text-sm font-medium|block break-words text-sm font-medium/);
   assert.match(accountPage, /authClient\.updateUser\(\{ name \}\)/);
   assert.match(accountPage, /authClient\.changeEmail\(\{ newEmail, callbackURL: "\/account" \}\)/);
   assert.match(accountPage, /aria-label="Edit name"/);
@@ -94,4 +110,19 @@ test("token dashboard hides its loading placeholders and has no redundant sign-i
   assert.match(tokenDashboard, /loadState === "loading" \? null/);
   assert.match(tokenDashboard, /loadState === "signed-out" \|\| loadState === "loading" \? null/);
   assert.match(tokenDashboard, /wallet \? tokenLabel\(wallet\.availableTokens\) : "—"/);
+});
+
+test("device view is detected before first paint and manual choices survive refresh", () => {
+  assert.match(rootRoute, /VIEW_MODE_BOOTSTRAP_SCRIPT/);
+  assert.match(rootRoute, /<HeadContent \/>[\s\S]*VIEW_MODE_BOOTSTRAP_SCRIPT/);
+  assert.match(viewMode, /localStorage\.getItem\("env:view-mode"\)/);
+  assert.match(viewMode, /preference !== "auto" \? preference : detected/);
+  assert.match(storage, /viewModePreference/);
+  assert.match(storage, /detectDefaultViewMode\(\)/);
+  assert.match(settingsPage, /value: "auto"/);
+  assert.match(header, /chooseViewMode\("auto"\)/);
+  assert.doesNotMatch(appShell, /widthClass|viewMode === "mobile"/);
+  assert.match(appStyles, /html\[data-env-view-mode="mobile"\] \.env-app-shell/);
+  assert.match(appStyles, /html\[data-env-view-mode="tablet"\] \.env-app-shell/);
+  assert.match(appStyles, /html\[data-env-view-mode="desktop"\] \.env-app-shell/);
 });
