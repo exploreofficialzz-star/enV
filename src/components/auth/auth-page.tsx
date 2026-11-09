@@ -73,7 +73,7 @@ export function AuthPage({ mode }: AuthPageProps) {
       const pendingSignature = window.localStorage.getItem("env.pendingReferralSignature");
       const referralCallback = pendingReferral
         ? `/wallet?claimReferral=1&ref=${encodeURIComponent(pendingReferral)}&source=${pendingSource}${pendingSource === "video" && pendingSignature ? `&sig=${encodeURIComponent(pendingSignature)}` : ""}`
-        : "/agent";
+        : "/";
       if (isSignUp) {
         const result = await authClient.signUp.email({
           name: name.trim(),
@@ -89,10 +89,10 @@ export function AuthPage({ mode }: AuthPageProps) {
         const result = await authClient.signIn.email({
           email: email.trim(),
           password,
-          callbackURL: "/agent",
+          callbackURL: "/",
         });
         if (result.error) throw new Error(result.error.message || "Sign-in failed. Check your details.");
-        window.location.assign("/agent");
+        window.location.assign("/");
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Authentication failed. Please try again.");
@@ -113,7 +113,7 @@ export function AuthPage({ mode }: AuthPageProps) {
         provider,
         callbackURL: isSignUp && window.localStorage.getItem("env.pendingReferralCode")
           ? `/wallet?claimReferral=1&ref=${encodeURIComponent(window.localStorage.getItem("env.pendingReferralCode")!)}&source=${window.localStorage.getItem("env.pendingReferralSource") === "video" ? "video" : "referral"}${window.localStorage.getItem("env.pendingReferralSource") === "video" && window.localStorage.getItem("env.pendingReferralSignature") ? `&sig=${encodeURIComponent(window.localStorage.getItem("env.pendingReferralSignature")!)}` : ""}`
-          : "/agent",
+          : "/",
         errorCallbackURL: isSignUp ? "/signup" : "/account",
         disableRedirect: true,
       });
