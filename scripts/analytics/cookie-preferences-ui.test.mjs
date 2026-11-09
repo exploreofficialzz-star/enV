@@ -63,6 +63,7 @@ test("signed-in visitors get the account profile instead of being sent back to s
 test("token dashboard has no redundant sign-in card or fabricated zero balance", () => {
   assert.doesNotMatch(tokenDashboard, /Sign in to load your real enV balance|>Sign in<\/Link>/);
   assert.doesNotMatch(tokenDashboard, /Sign in to load token history/);
+  assert.doesNotMatch(tokenDashboard, /Account activity is not available|Account-specific token history will appear here/);
   assert.match(tokenDashboard, /wallet \? tokenLabel\(wallet\.availableTokens\) : "—"/);
   assert.match(tokenDashboard, /const daily = data\?\.tokenUsage\.weeklyUsage \?\? \[\]/);
 });
