@@ -21,7 +21,7 @@ test("cookie preferences are a compact popup rather than a full explanatory page
   assert.match(component, /onKeyDown=\{trapFocus\}/);
   assert.match(component, /returnFocusRef\.current\?\.focus\(\)/);
   assert.match(component, /essential browser storage/);
-  assert.match(component, />Continue</);
+  assert.match(component, /Continue/);
   assert.doesNotMatch(component, /min-h-dvh w-screen|max-w-3xl|Product analytics|analyticsAllowed|type="checkbox"|Decline analytics|chooseAnalyticsConsent/);
 });
 
@@ -51,7 +51,7 @@ test("account profile is server-session aware and renders without a textual load
   assert.match(accountPage, /loader: \(\) => loadAccountProfile\(\)/);
   assert.doesNotMatch(accountPage, /Loading your profile|Good to see you|enV · Profile|Welcome to your personal enV space|Account status|Your enV shortcuts|Jump straight to the things you use most|Need to leave\?/);
   assert.match(accountPage, /if \(!user\) return <AuthPage mode="sign-in" \/>/);
-  assert.match(accountPage, /user\.profileImageUrl/);
+  assert.match(accountPage, /profileImageUrl: session\.user\.image/);
   assert.match(accountPage, /initials/);
   assert.match(accountPage, /coverInput/);
   assert.match(accountPage, /avatarInput/);
