@@ -32,7 +32,7 @@ test("cookie popup does not offer analytics as a checkbox or yes/no choice", () 
 });
 
 test("cookie acknowledgement is versioned and remembered locally", () => {
-  assert.match(component, /env\.cookie-preferences\.seen\.v1/);
+  assert.match(component, /env\.cookie-preferences\.seen\.v2/);
   assert.match(component, /window\.localStorage\.getItem\(NOTICE_KEY\) !== "1"/);
   assert.match(component, /window\.localStorage\.setItem\(NOTICE_KEY, "1"\)/);
 });
