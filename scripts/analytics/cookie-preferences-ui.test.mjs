@@ -72,9 +72,13 @@ test("account profile is server-session aware and renders without a textual load
   assert.match(accountPage, /aria-label="Select cover image"/);
   assert.match(accountPage, /aria-label="Select profile image"/);
   assert.match(accountPage, /ArrowRight/);
-  assert.match(accountPage, /md:hidden/);
-  assert.match(accountPage, /md:justify-center/);
-  assert.match(accountPage, /md:text-center/);
+  assert.match(accountPage, /account-shortcut-leading/);
+  assert.match(accountPage, /account-shortcut-arrow/);
+  assert.match(accountPage, /account-shortcut-title/);
+  assert.doesNotMatch(accountPage, /md:hidden|md:justify-center|md:text-center/);
+  assert.match(appStyles, /html\\[data-env-view-mode="mobile"\\] \\.env-app-shell \\.account-shortcut-arrow/);
+  assert.match(appStyles, /html\\[data-env-view-mode="mobile"\\] \\.env-app-shell \\.account-shortcut-leading/);
+  assert.match(appStyles, /\\.env-app-shell \\.account-shortcut-title/);
   assert.match(accountPage, /truncate whitespace-nowrap/);
   assert.doesNotMatch(accountPage, /break-all text-sm font-medium|block break-words text-sm font-medium/);
   assert.match(accountPage, /authClient\.updateUser\(\{ name \}\)/);
