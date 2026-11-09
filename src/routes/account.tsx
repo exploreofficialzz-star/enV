@@ -11,23 +11,21 @@ import { DEV_USER, type AppUser } from "@/lib/auth/use-current-user";
 
 const loadAccountProfile = createServerFn({ method: "GET" }).handler(async () => {
   if (!authConfigured) return DEV_USER;
-  if (authConfigurationError) return null;
+  if (authConfigurationError) throw new Error("Account authentication is temporarily unavailable.");
   const request = getRequest();
-  if (!request) return null;
+  if (!request) throw new Error("Account session context is unavailable.");
 
-  try {
-    const session = await auth.api.getSession({ headers: request.headers });
-    if (!session?.user) return null;
-    return {
-      id: session.user.id,
-      displayName: session.user.name ?? null,
-      primaryEmail: session.user.email ?? null,
-      profileImageUrl: session.user.image ?? null,
-      isDevFallback: false,
-    } satisfies AppUser;
-  } catch {
-    return null;
-  }
+  // A missing session is a signed-out state. Infrastructure/auth errors must
+  // propagate instead of being mistaken for a signed-out visitor.
+  const session = await auth.api.getSession({ headers: request.headers });
+  if (!session?.user) return null;
+  return {
+    id: session.user.id,
+    displayName: session.user.name ?? null,
+    primaryEmail: session.user.email ?? null,
+    profileImageUrl: session.user.image ?? null,
+    isDevFallback: false,
+  } satisfies AppUser;
 });
 
 export const Route = createFileRoute("/account")({
