@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect } from "react";
 import { applyViewMode, usePrefs } from "@/lib/storage";
+import { detectDefaultViewMode } from "@/lib/view-mode";
 
 const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
@@ -9,6 +10,7 @@ export function useHydratePrefs() {
   const theme = usePrefs((s) => s.theme);
   const themePreference = usePrefs((s) => s.themePreference);
   const viewMode = usePrefs((s) => s.viewMode);
+  const viewModePreference = usePrefs((s) => s.viewModePreference);
 
   useIsomorphicLayoutEffect(() => {
     if (!hydrated) hydrate();
@@ -35,7 +37,12 @@ export function useHydratePrefs() {
 
   useEffect(() => {
     if (!hydrated || typeof window === "undefined") return;
-    const applySelectedViewMode = () => applyViewMode(viewMode);
+    const applySelectedViewMode = () => {
+      const preference = usePrefs.getState().viewModePreference;
+      const nextMode = preference === "auto" ? detectDefaultViewMode() : preference;
+      applyViewMode(nextMode);
+      if (nextMode !== usePrefs.getState().viewMode) usePrefs.setState({ viewMode: nextMode });
+    };
     applySelectedViewMode();
     window.addEventListener("resize", applySelectedViewMode);
     window.addEventListener("orientationchange", applySelectedViewMode);
@@ -43,5 +50,5 @@ export function useHydratePrefs() {
       window.removeEventListener("resize", applySelectedViewMode);
       window.removeEventListener("orientationchange", applySelectedViewMode);
     };
-  }, [hydrated, viewMode]);
+  }, [hydrated, viewMode, viewModePreference]);
 }

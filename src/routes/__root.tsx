@@ -7,6 +7,7 @@ import { webmasterVerificationMeta, websiteSchema, isIndexableTool } from "@/lib
 import { getToolByPath, getToolsByCategory } from "@/lib/registry";
 import type { CategoryId } from "@/types/tool";
 import { businessStudioAnchorSlug } from "@/lib/business-studios-catalog";
+import { VIEW_MODE_BOOTSTRAP_SCRIPT } from "@/lib/view-mode";
 
 const APP_NAME = "enV — Browser Toolkit";
 const ADSENSE_SITE_CLIENT_ID = "ca-pub-2492078126313994";
@@ -74,6 +75,7 @@ function RootDocument() {
       <head>
         <script dangerouslySetInnerHTML={{ __html: INITIAL_THEME_SCRIPT }} />
         <HeadContent />
+        <script dangerouslySetInnerHTML={{ __html: VIEW_MODE_BOOTSTRAP_SCRIPT }} />
       </head>
       <body>
         <AssistantStateProvider>
