@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
-const NOTICE_KEY = "env.cookie-preferences.seen.v1";
+const NOTICE_KEY = "env.cookie-preferences.seen.v2";
 const OPEN_EVENT = "env:open-cookie-preferences";
 
 function markNoticeSeen() {
