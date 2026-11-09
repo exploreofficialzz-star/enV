@@ -13,13 +13,15 @@ const tokenDashboard = readFileSync(new URL("../../src/components/billing/token-
 
 test("cookie preferences are a compact popup rather than a full explanatory page", () => {
   assert.match(component, /Cookie preferences/);
-  assert.match(component, /fixed inset-0[\s\S]*items-center justify-center/);
-  assert.match(component, /max-w-md/);
-  assert.match(component, /bg-black\/45/);
+  assert.match(component, /pointer-events-none fixed bottom-4 left-4 right-4/);
+  assert.match(component, /pointer-events-auto w-full rounded-2xl/);
+  assert.match(component, /sm:w-\[24rem\]/);
+  assert.doesNotMatch(component, /fixed inset-0|bg-black\\/45|min-h-dvh/);
   assert.match(component, /role="dialog"/);
-  assert.match(component, /aria-modal="true"/);
-  assert.match(component, /onKeyDown=\{trapFocus\}/);
-  assert.match(component, /returnFocusRef\.current\?\.focus\(\)/);
+  assert.match(component, /aria-modal="false"/);
+  assert.match(component, /if \(event\.key === "Escape"\)/);
+  assert.match(component, /focusOnOpenRef\.current = true/);
+  assert.match(component, /returnFocusRef\.current\.focus\(\)/);
   assert.match(component, /essential browser storage/);
   assert.match(component, /Continue/);
   assert.doesNotMatch(component, /min-h-dvh w-screen|max-w-3xl|Product analytics|analyticsAllowed|type="checkbox"|Decline analytics|chooseAnalyticsConsent/);
