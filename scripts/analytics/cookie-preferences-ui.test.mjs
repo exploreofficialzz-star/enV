@@ -115,7 +115,7 @@ test("device view is detected before first paint and manual choices survive refr
   assert.match(rootRoute, /VIEW_MODE_BOOTSTRAP_SCRIPT/);
   assert.match(rootRoute, /<HeadContent \/>[\s\S]*VIEW_MODE_BOOTSTRAP_SCRIPT/);
   assert.match(viewMode, /localStorage\.getItem\("env:view-mode"\)/);
-  assert.match(viewMode, /validPreference && preference !== "auto" \\? preference : detected/);
+  assert.match(viewMode, /validPreference && preference !== "auto" \? preference : detected/);
   assert.match(storage, /viewModePreference/);
   assert.match(storage, /detectDefaultViewMode\(\)/);
   assert.match(settingsPage, /value: "auto"/);
