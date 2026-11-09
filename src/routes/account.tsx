@@ -249,7 +249,8 @@ function Account() {
                   ref={avatarInput}
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
-                      onChange={onImageSelected("avatar")}
+                  aria-label="Select profile image"
+                  onChange={onImageSelected("avatar")}
                   className="sr-only"
                   tabIndex={-1}
                 />
@@ -289,11 +290,11 @@ function Account() {
                 </button>
               ) : null}
             </div>
-            <div className="flex min-h-[68px] items-center gap-4 py-3">
+            <div className="flex min-h-[68px] flex-nowrap items-center gap-3 py-3">
               <dt className="w-20 shrink-0 text-sm text-muted">Email</dt>
               <dd className="min-w-0 flex-1">
                 {editingField === "email" ? (
-                  <form onSubmit={event => void saveEmail(event)} className="flex items-center gap-2">
+                  <form onSubmit={event => void saveEmail(event)} className="flex min-w-0 flex-nowrap items-center gap-1.5">
                     <input
                       autoFocus
                       type="email"
