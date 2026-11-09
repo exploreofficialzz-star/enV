@@ -13,6 +13,9 @@ const tokenDashboard = readFileSync(new URL("../../src/components/billing/token-
 
 test("cookie preferences are a compact popup rather than a full explanatory page", () => {
   assert.match(component, /Cookie preferences/);
+  assert.match(component, /useLocation/);
+  assert.match(component, /pathname\.startsWith\("\/tools\/"\)/);
+  assert.match(component, /pathname === "\/3d-game-studio"/);
   assert.match(component, /pointer-events-none fixed bottom-4 left-4 right-4/);
   assert.match(component, /pointer-events-auto w-full rounded-2xl/);
   assert.match(component, /sm:w-\[24rem\]/);
