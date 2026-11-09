@@ -97,7 +97,7 @@ if (!account.includes('aria-label="Edit name"') || !account.includes('aria-label
 if (!account.includes('aria-label="Change cover photo"') || !account.includes('aria-label="Change profile photo"')) errors.push("The cover and avatar must each have a camera upload control.");
 if (account.includes('capture="environment"') || account.includes('capture="user"')) errors.push("Profile image controls must open the platform picker instead of forcing camera capture.");
 if (!account.includes("ArrowRight") || !account.includes("account-shortcut-arrow") || !account.includes("account-shortcut-title")) errors.push("Account shortcut controls must expose the mobile arrow and device-aware centered title.");
-if (!displayStyles.includes(".account-shortcut-arrow") || !displayStyles.includes("html[data-env-view-mode=\\\"mobile\\\"] .env-app-shell .account-shortcut-arrow")) errors.push("Account shortcut arrows must be hidden in tablet/desktop mode and visible only in mobile mode.");
+if (!displayStyles.includes(".account-shortcut-arrow") || !displayStyles.includes('html[data-env-view-mode="mobile"] .env-app-shell .account-shortcut-arrow')) errors.push("Account shortcut arrows must be hidden in tablet/desktop mode and visible only in mobile mode.");
 if (!account.includes("truncate whitespace-nowrap") || account.includes('block break-all text-sm font-medium')) errors.push("Profile name and email values must stay on one line and truncate rather than wrap.");
 if (!account.includes("text-fg")) errors.push("Shortcut icons must follow the active theme's foreground colour.");
 if (!existsSync(resolve("server/routes/api/account/profile-media.ts"))) errors.push("Missing authenticated profile media upload endpoint.");
