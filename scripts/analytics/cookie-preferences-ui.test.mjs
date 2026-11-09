@@ -80,6 +80,7 @@ test("account profile is server-session aware and renders without a textual load
   assert.ok(appStyles.includes('html[data-env-view-mode="mobile"] .env-app-shell .account-shortcut-leading'));
   assert.ok(appStyles.includes('.env-app-shell .account-shortcut-title'));
   assert.match(accountPage, /truncate whitespace-nowrap/);
+  assert.ok(accountPage.includes("max-w-[min(80vw,30rem)] truncate whitespace-nowrap"));
   assert.doesNotMatch(accountPage, /break-all text-sm font-medium|block break-words text-sm font-medium/);
   assert.match(accountPage, /authClient\.updateUser\(\{ name \}\)/);
   assert.match(accountPage, /authClient\.changeEmail\(\{ newEmail, callbackURL: "\/account" \}\)/);
