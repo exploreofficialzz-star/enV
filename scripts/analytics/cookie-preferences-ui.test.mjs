@@ -11,7 +11,6 @@ const profileMigration = readFileSync(new URL("../../migrations/0021_account_pro
 const authServer = readFileSync(new URL("../../src/lib/auth/server.ts", import.meta.url), "utf8");
 const tokenDashboard = readFileSync(new URL("../../src/components/billing/token-dashboard.tsx", import.meta.url), "utf8");
 const rootRoute = readFileSync(new URL("../../src/routes/__root.tsx", import.meta.url), "utf8");
-const appShell = readFileSync(new URL("../../src/components/layout/app-shell.tsx", import.meta.url), "utf8");
 const appStyles = readFileSync(new URL("../../src/styles.css", import.meta.url), "utf8");
 const storage = readFileSync(new URL("../../src/lib/storage.ts", import.meta.url), "utf8");
 const viewMode = readFileSync(new URL("../../src/lib/view-mode.ts", import.meta.url), "utf8");
@@ -116,7 +115,7 @@ test("device view is detected before first paint and manual choices survive refr
   assert.match(rootRoute, /VIEW_MODE_BOOTSTRAP_SCRIPT/);
   assert.match(rootRoute, /<HeadContent \/>[\s\S]*VIEW_MODE_BOOTSTRAP_SCRIPT/);
   assert.match(viewMode, /localStorage\.getItem\("env:view-mode"\)/);
-  assert.match(viewMode, /preference !== "auto" \? preference : detected/);
+  assert.match(viewMode, /validPreference && preference !== "auto" \\? preference : detected/);
   assert.match(storage, /viewModePreference/);
   assert.match(storage, /detectDefaultViewMode\(\)/);
   assert.match(settingsPage, /value: "auto"/);
