@@ -255,7 +255,7 @@ function Account() {
                   tabIndex={-1}
                 />
               </div>
-              <h1 className="mt-4 max-w-full break-words text-center text-2xl font-bold tracking-tight text-fg sm:text-3xl">
+              <h1 className="mt-4 max-w-[min(80vw,30rem)] truncate whitespace-nowrap text-center text-2xl font-bold tracking-tight text-fg sm:text-3xl" title={displayName}>
                 {displayName}
               </h1>
             </div>
