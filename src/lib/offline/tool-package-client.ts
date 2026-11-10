@@ -61,9 +61,9 @@ async function activeWorker(captureCurrentPage = false, captureShellAssets = fal
             /\.(?:m?js|css|wasm|woff2?|ttf|otf|svg|png|jpe?g|webp|avif)$/i.test(url.pathname);
         } catch { return false; }
       })
-      .slice(0, 300);
+      .slice(0, 800);
     if (assets.length) {
-      await sendWorkerMessage(controller, "CACHE_CORE_ASSETS", { assets }).catch(() => undefined);
+      await sendWorkerMessage(controller, "CACHE_CORE_ASSETS", { assets }, 60_000).catch(() => undefined);
     }
     performance.clearResourceTimings();
   }
