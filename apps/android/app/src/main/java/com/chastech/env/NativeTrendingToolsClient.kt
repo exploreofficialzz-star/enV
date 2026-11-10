@@ -17,15 +17,16 @@ object NativeTrendingToolsClient {
 
         var connection: HttpURLConnection? = null
         try {
-            connection = (URL("$base/api/analytics/trending").openConnection() as HttpURLConnection).apply {
+            val activeConnection = (URL("$base/api/analytics/trending").openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
                 connectTimeout = 8_000
                 readTimeout = 10_000
                 setRequestProperty("Accept", "application/json")
             }
-            if (connection.responseCode !in 200..299) return@withContext emptyList()
+            connection = activeConnection
+            if (activeConnection.responseCode !in 200..299) return@withContext emptyList()
 
-            val envelope = connection.inputStream.bufferedReader(Charsets.UTF_8).use {
+            val envelope = activeConnection.inputStream.bufferedReader(Charsets.UTF_8).use {
                 JSONObject(it.readText())
             }
             if (!envelope.optBoolean("ok")) return@withContext emptyList()
