@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { authClient, authEnabled } from "./client";
 
 /** Normalized user shape used across the app, auth on or off. */
@@ -58,17 +59,26 @@ export type CurrentUserState = {
 export function useCurrentUserState(): CurrentUserState {
   if (!authEnabled) return { user: DEV_USER, isPending: false, error: null, refetch: null };
   const { data, isPending, error, refetch } = authClient.useSession();
-  const user = data?.user;
-  return {
-    user: user
+  const sessionUser = data?.user;
+
+  // Keep the normalized user reference stable while the authenticated identity
+  // is unchanged. Account profile effects depend on this object; rebuilding it
+  // on every render causes a setState → render → effect loop for signed-in users.
+  const user = useMemo<AppUser | null>(
+    () => sessionUser
       ? {
-          id: user.id,
-          displayName: user.name ?? null,
-          primaryEmail: user.email ?? null,
-          profileImageUrl: user.image ?? null,
+          id: sessionUser.id,
+          displayName: sessionUser.name ?? null,
+          primaryEmail: sessionUser.email ?? null,
+          profileImageUrl: sessionUser.image ?? null,
           isDevFallback: false,
         }
       : null,
+    [sessionUser?.id, sessionUser?.name, sessionUser?.email, sessionUser?.image],
+  );
+
+  return {
+    user,
     isPending,
     error: error ?? null,
     refetch,
