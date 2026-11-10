@@ -715,7 +715,7 @@ private fun WebHomeFooter(catalog: Catalog, onInformation: (String) -> Unit, scr
 private fun BrandFooterIdentity(catalog: Catalog, modifier: Modifier = Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         EnVLogo(Modifier.width(84.dp).height(56.dp))
-        Text("Useful tools. One place. ${catalog.browserActiveToolCount} browser tools you can use without an account. Files and text stay on your device unless a tool says otherwise.",
+        Text("Useful tools. One place. ${catalog.browserActiveToolCount} browser tools for everyday tasks. Some tools require an account; others are available without one. Files and text stay on your device unless a tool says otherwise.",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 21.sp),
             modifier = Modifier.widthIn(max = 384.dp))
