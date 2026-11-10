@@ -36,7 +36,6 @@ function AccountProfileSkeleton() {
   return (
     <AppShell>
       <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-9" role="status" aria-live="polite" aria-busy="true">
-        <span className="sr-only">Loading your profile</span>
         <section className="overflow-hidden rounded-[28px] border border-border bg-surface shadow-sm">
           <div className="env-shimmer relative h-40 w-full overflow-hidden" />
           <div className="relative px-4 pb-6 sm:px-7">
