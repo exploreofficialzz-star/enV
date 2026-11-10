@@ -99,7 +99,7 @@ function Account() {
       if (!active) return;
       if (result.status === "fresh") {
         setter(createMediaObjectUrl(result.blob));
-        notifyAccountProfileMediaChanged(userId);
+        notifyAccountProfileMediaChanged(userId, kind);
       } else if (result.status === "missing") {
         setter(fallback);
       }
@@ -221,7 +221,7 @@ function Account() {
       const displayedUrl = cached ? createMediaObjectUrl(file) : payload.imageUrl;
       if (kind === "avatar") setAvatarUrl(displayedUrl);
       else setCoverUrl(displayedUrl);
-      notifyAccountProfileMediaChanged(accountId);
+      notifyAccountProfileMediaChanged(accountId, kind);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not save this photo.");
     } finally {
