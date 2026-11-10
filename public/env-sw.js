@@ -159,7 +159,7 @@ async function fetchAndStoreAsset(request, session, toolCache, coreCache) {
   return response;
 }
 
-async function handleAssetRequest(event) {
+async function handleAssetRequest(event, keepAlive) {
   const request = event.request;
   let session = null;
   let toolCache = null;
@@ -179,7 +179,7 @@ async function handleAssetRequest(event) {
 
   if (cached) {
     // Return the last good asset immediately, while the network refreshes it.
-    event.waitUntil(fetchAndStoreAsset(request, session, toolCache, coreCache).catch(() => undefined));
+    keepAlive(fetchAndStoreAsset(request, session, toolCache, coreCache).catch(() => undefined));
     return cached;
   }
 
@@ -481,6 +481,10 @@ self.addEventListener("fetch", (event) => {
     return;
   }
   if (isCacheableAsset(request, url)) {
-    event.respondWith(handleAssetRequest(event));
+    let backgroundRefresh = Promise.resolve();
+    const response = handleAssetRequest(event, promise => { backgroundRefresh = promise; });
+    event.respondWith(response);
+    // Register the revalidation lifetime synchronously while the fetch event is active.
+    event.waitUntil(response.then(() => backgroundRefresh));
   }
 });
