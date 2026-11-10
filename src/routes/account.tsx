@@ -383,7 +383,7 @@ function Account() {
               onClick={() => coverInput.current?.click()}
               disabled={uploadingImage}
               aria-label="Change cover photo"
-              className="absolute right-4 top-4 grid size-11 place-items-center rounded-full bg-white text-black shadow-lg transition hover:scale-105 disabled:opacity-60"
+              className="absolute right-4 top-4 z-20 grid size-11 place-items-center rounded-full bg-white text-black shadow-lg transition hover:scale-105 disabled:opacity-60"
             >
               <Camera size={21} aria-hidden="true" />
             </button>

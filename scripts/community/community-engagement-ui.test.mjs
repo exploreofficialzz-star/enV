@@ -232,6 +232,16 @@ test("profile shimmer is the only visible state until an account photo is resolv
 });
 
 
+test("cover photo picker control stays visible above the cover image and overlay", () => {
+  const coverStart = accountRoute.indexOf('aria-label="Change cover photo"');
+  const coverEnd = accountRoute.indexOf('aria-label="Select cover image"', coverStart);
+  assert.ok(coverStart >= 0 && coverEnd > coverStart, "Cover photo action and file input remain present");
+  const coverControl = accountRoute.slice(coverStart - 350, coverEnd + 120);
+  assert.ok(coverControl.includes("onClick={() => coverInput.current?.click()}"));
+  assert.ok(coverControl.includes('className="absolute right-4 top-4 z-20 grid size-11'));
+  assert.ok(coverControl.includes("<Camera size={21} aria-hidden=\"true\" />"));
+});
+
 test("profile cover and avatar preserve mobile geometry at every viewport and keep the name visible", () => {
   assert.ok(accountRoute.includes('<div className="relative h-40 bg-gradient-to-br from-neutral-800 via-neutral-700 to-neutral-950">'));
   assert.ok(!accountRoute.includes("sm:h-52"));
