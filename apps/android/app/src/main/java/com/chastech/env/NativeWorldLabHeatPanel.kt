@@ -63,9 +63,8 @@ fun NativeWorldLabHeatPanel(project:NativeWorldLabProject,onError:(String)->Unit
     }
     Text("Exchange heat between invented materials",
         style=MaterialTheme.typography.titleSmall)
-    Text("Two touching box solids exchange energy using their invented density, "+
-        "specific heat and conductivity. No measurements, radiation or phase change.",
-        style=MaterialTheme.typography.bodySmall)
+    LabNote("Two touching box solids exchange energy using their invented density, "+
+        "specific heat and conductivity. No measurements, radiation or phase change.")
     if(boxes.size<2){
         Text("Place at least two box solids and assign each a thermal material.")
         return
@@ -145,6 +144,6 @@ fun NativeWorldLabHeatPanel(project:NativeWorldLabProject,onError:(String)->Unit
         }
         Slider(value=speed,onValueChange={speed=it},valueRange=0.1f..10f,
             modifier=Modifier.semantics{contentDescription="Heat playback speed"})
-        Text(active.validity,style=MaterialTheme.typography.bodySmall)
+        LabNote(active.validity)
     }
 }

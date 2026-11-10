@@ -45,9 +45,8 @@ fun NativeWorldLabMultiCadPanel(
     Column(Modifier.fillMaxWidth().padding(vertical=8.dp),
         verticalArrangement=Arrangement.spacedBy(8.dp)){
         Text("Multi-part CAD",style=MaterialTheme.typography.titleSmall)
-        Text("Select several parts, then apply one atomic transform to all selected geometry. "+
-            "Each action creates one project revision; it does not create physical joints.",
-            style=MaterialTheme.typography.bodySmall)
+        LabNote("Select several parts, then apply one atomic transform to all selected geometry. "+
+            "Each action creates one project revision; it does not create physical joints.")
         Column(Modifier.fillMaxWidth().heightIn(max=180.dp).verticalScroll(rememberScrollState())){
             project.entities.forEach{solid->
                 Row(verticalAlignment=Alignment.CenterVertically){
@@ -78,8 +77,7 @@ fun NativeWorldLabMultiCadPanel(
                         style=MaterialTheme.typography.bodySmall)
                 }.onFailure{feedback=it.message?: "Could not measure the selected parts"}
         }else{
-            Text("Select exactly two parts to measure their centre-to-centre distance.",
-                style=MaterialTheme.typography.bodySmall)
+            LabNote("Select exactly two parts to measure their centre-to-centre distance.")
         }
         Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
             listOf("X","Y","Z").forEachIndexed{i,label->
@@ -127,7 +125,7 @@ fun NativeWorldLabMultiCadPanel(
                 }){Text("Duplicate all")}
         }
         Column(verticalArrangement=Arrangement.spacedBy(6.dp)){
-            Text("Align rotated part bounds",style=MaterialTheme.typography.bodySmall)
+            LabNote("Align rotated part bounds")
             Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
                 listOf("min" to "Minimum","center" to "Center","max" to "Maximum").forEach{(value,label)->
                     FilterChip(selected=alignment==value,onClick={alignment=value},
@@ -188,8 +186,7 @@ fun NativeWorldLabMultiCadPanel(
                 else apply{NativeWorldLabEditor.circularPatternSolids(it,ids,axis,values,count)}
             }){Text("Circular pattern")}
         }
-        Text("Alignment uses rotated primitive bounding extents. Distribution preserves part order and enforces the entered minimum gap. Pattern copies retain geometry/material assumptions and receive new identities.",
-            style=MaterialTheme.typography.bodySmall)
+        LabNote("Alignment uses rotated primitive bounding extents. Distribution preserves part order and enforces the entered minimum gap. Pattern copies retain geometry/material assumptions and receive new identities.")
         if(feedback.isNotBlank())Text(feedback,color=MaterialTheme.colorScheme.error,
             style=MaterialTheme.typography.bodySmall)
     }

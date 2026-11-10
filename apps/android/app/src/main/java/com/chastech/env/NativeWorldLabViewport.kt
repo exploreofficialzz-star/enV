@@ -14,6 +14,8 @@ import androidx.compose.foundation.focusable
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -29,6 +31,7 @@ import com.chastech.env.engine.NativeWorldLabGeodesy
 import com.chastech.env.engine.NativeLabVector
 import com.chastech.env.engine.NativeWorldLabProject
 import com.chastech.env.engine.NativeWorldLabCamera
+import com.chastech.env.engine.NativeWorldLabSky
 import com.chastech.env.engine.NativeWorldLabInspection
 import com.chastech.env.engine.NativeInspectionSettings
 import com.chastech.env.engine.NativeInspectionMode
@@ -61,26 +64,72 @@ private fun labProjectCenter(
     focalLength:Float,pan:Offset,width:Float,height:Float,elevation:Float,
 )=labPerspectivePoint(solid.positionMeters,focus,yaw,cameraDistance,focalLength,pan,width,height,elevation)
 
+/** Camera state shared by the full-bleed canvas and the controls that live in the tool panel. */
+@Stable
+class NativeWorldLabViewToggles {
+    var showLabels by mutableStateOf(true)
+    var showViewportOverlays by mutableStateOf(true)
+}
+
+@Stable
+class NativeWorldLabViewState(
+    initialZoom:Float,initialYaw:Float,initialElevation:Float,
+    initialEye:NativeLabVector,
+    val toggles:NativeWorldLabViewToggles,
+) {
+    /** First-person observer: the camera sits at the eye and yaw/elevation turn the head. */
+    var eyeX by mutableDoubleStateOf(initialEye.x)
+    var eyeY by mutableDoubleStateOf(initialEye.y)
+    var eyeZ by mutableDoubleStateOf(initialEye.z)
+    /** Move along the heading (forward) and across it (strafe) by one comfortable walking step. */
+    fun walk(forward:Double,strafe:Double=0.0){
+        val range=(45.0*8.0/zoom.toDouble()).coerceIn(0.5,100000.0)
+        val step=(0.12*sqrt(range/8.0)).coerceIn(0.03,500.0)
+        val s=sin(yaw.toDouble());val c=cos(yaw.toDouble())
+        eyeX+=(s*forward+c*strafe)*step
+        eyeZ+=(c*forward-s*strafe)*step
+    }
+    /** Move forward (or back, when negative) along the heading by an exact distance. */
+    fun travel(meters:Double){
+        eyeX+=sin(yaw.toDouble())*meters
+        eyeZ+=cos(yaw.toDouble())*meters
+    }
+    var zoom by mutableFloatStateOf(initialZoom)
+    var yaw by mutableFloatStateOf(initialYaw)
+    var elevation by mutableFloatStateOf(initialElevation)
+    var observerDepthMeters by mutableFloatStateOf(0f)
+    var pan by mutableStateOf(Offset.Zero)
+}
+
+@Composable
+fun rememberNativeWorldLabViewState(project:NativeWorldLabProject):NativeWorldLabViewState{
+    val toggles=remember(project.id){NativeWorldLabViewToggles()}
+    return remember(project.id,project.revision){
+        val pose=NativeWorldLabCamera.poseFromPosition(project.cameraPositionMeters,project.cameraLookingAtMeters)
+        val horizontal=(pose.distanceMeters*cos(Math.toRadians(pose.elevationDegrees))).coerceAtLeast(0.25)
+        NativeWorldLabViewState(
+            (45.0*8.0/horizontal).toFloat().coerceIn(0.1f,160f),
+            pose.yawRadians.toFloat(),
+            pose.elevationDegrees.toFloat().coerceIn(-85f,85f),
+            project.cameraPositionMeters,
+            toggles)
+    }
+}
+
 /**
- * Native perspective observer viewport. The local ground and subsurface bands are
- * explicitly schematic; they are not terrain, geology, or a surveyed Earth dataset.
+ * Full-bleed observer view: sky and horizon, ground grid, schematic subsurface bands and solids.
+ * The ground, bands and sky are explicitly schematic; they are not terrain, geology or a surveyed site.
  */
 @Composable
-fun NativeWorldLabViewport(
+fun NativeWorldLabViewportCanvas(
     project:NativeWorldLabProject,selectedId:String?,
+    view:NativeWorldLabViewState,
     onSelect:(String)->Unit,
-    onSaveView:(List<Double>,List<Double>)->Unit,
-    onResetView:()->Unit,
-    onSaveGeodeticOrigin:(NativeGeodetic)->Unit,
-    onClearGeodeticOrigin:()->Unit,
     inspection:NativeInspectionSettings=NativeInspectionSettings(),
-    onInspectionChange:(NativeInspectionSettings)->Unit={},
-    canUndoInspectionView:Boolean=false,canRedoInspectionView:Boolean=false,
-    onUndoInspectionView:()->Unit={},onRedoInspectionView:()->Unit={},
+    skyEpochMillis:Long=System.currentTimeMillis(),
+    modifier:Modifier=Modifier,
 ){
     val screenDensity=LocalDensity.current.density
-    var showLabels by remember(project.id){mutableStateOf(true)}
-    var showViewportOverlays by remember(project.id){mutableStateOf(true)}
     val selectedEntity=project.entities.firstOrNull{it.id==selectedId}
     val cutPlane=NativeWorldLabInspection.plane(project,selectedId,inspection)
     val cutOffset=cutPlane?.offset
@@ -96,44 +145,36 @@ fun NativeWorldLabViewport(
         }
     }
     fun isXrayTarget(entityId:String)=inspection.mode==NativeInspectionMode.XRAY&&isInspectionTarget(entityId)
-    val savedCameraPose=remember(project.id,project.revision){
-        NativeWorldLabCamera.poseFromPosition(project.cameraPositionMeters,project.cameraLookingAtMeters)
-    }
-    val horizontal=(savedCameraPose.distanceMeters*cos(Math.toRadians(savedCameraPose.elevationDegrees)))
-        .coerceAtLeast(0.25)
-    var zoom by remember(project.id,project.revision){
-        mutableFloatStateOf((45.0*8.0/horizontal).toFloat().coerceIn(0.1f,160f))
-    }
-    var yaw by remember(project.id,project.revision){mutableFloatStateOf(savedCameraPose.yawRadians.toFloat())}
-    var elevation by remember(project.id,project.revision){mutableFloatStateOf(savedCameraPose.elevationDegrees.toFloat().coerceIn(-85f,85f))}
-    var observerDepthMeters by remember(project.id,project.revision){mutableFloatStateOf(0f)}
-    var pan by remember(project.id,project.revision){mutableStateOf(Offset.Zero)}
-    val focus=NativeLabVector(project.cameraLookingAtMeters.x,
-        (project.cameraLookingAtMeters.y+observerDepthMeters).coerceIn(-20000.0,100000.0),
-        project.cameraLookingAtMeters.z)
-    val viewRangeMeters=(45.0*8.0/zoom.toDouble()).coerceIn(0.5,100000.0)
-    val elevationRadians=Math.toRadians(elevation.toDouble())
+    val eye=NativeLabVector(view.eyeX,(view.eyeY+view.observerDepthMeters).coerceIn(-20000.0,100000.0),view.eyeZ)
+    val viewRangeMeters=(45.0*8.0/view.zoom.toDouble()).coerceIn(0.5,100000.0)
+    val elevationRadians=Math.toRadians(view.elevation.toDouble())
     val cameraDistance=(viewRangeMeters/cos(elevationRadians).coerceAtLeast(0.08)).coerceIn(0.5,100000.0)
-    var latitude by remember(project.id,project.revision){mutableStateOf(project.geodeticOrigin?.latitudeDegrees?.toString() ?: "0")}
-    var longitude by remember(project.id,project.revision){mutableStateOf(project.geodeticOrigin?.longitudeDegrees?.toString() ?: "0")}
-    var height by remember(project.id,project.revision){mutableStateOf(project.geodeticOrigin?.heightMeters?.toString() ?: "0")}
+    val focus=NativeLabVector(
+        eye.x+sin(view.yaw.toDouble())*cos(elevationRadians)*cameraDistance,
+        eye.y-sin(elevationRadians)*cameraDistance,
+        eye.z+cos(view.yaw.toDouble())*cos(elevationRadians)*cameraDistance)
     fun projection(point:NativeLabVector,width:Float,height:Float,focalLength:Float)=
-        labPerspectivePoint(point,focus,yaw,cameraDistance,focalLength,pan,width,height,elevation)
-    Text("Explore your invention",style=MaterialTheme.typography.titleSmall)
-    if(showViewportOverlays)Text("Drag to move · pinch to zoom · twist to orbit · tap a part to select. "+
-        "The local world uses perspective depth; y=0 is the authored surface reference and underground bands are schematic, not surveyed geology.",
-        style=MaterialTheme.typography.bodySmall)
+        labPerspectivePoint(point,focus,view.yaw,cameraDistance,focalLength,view.pan,width,height,view.elevation)
+    val cameraAboveGround=eye.y>=0.0
+    val skyPose=NativeWorldLabSky.solarPosition(skyEpochMillis,0.0,
+        NativeWorldLabSky.representativeLongitude(java.util.TimeZone.getDefault().getOffset(skyEpochMillis)))
+    val skyPalette=NativeWorldLabSky.palette(skyPose.altitudeDegrees)
+    val skyLight=NativeWorldLabSky.lighting(skyPose.altitudeDegrees)
     Canvas(
-        Modifier.fillMaxWidth().height(250.dp)
-            .background(Color(0xFF15232E),RoundedCornerShape(12.dp))
+        modifier.fillMaxSize()
             .pointerInput(project.id,project.revision){
                 detectTransformGestures{_,panChange,zoomChange,rotationChange->
-                    pan+=panChange
-                    zoom=(zoom*zoomChange).coerceIn(0.1f,160f)
-                    yaw=(yaw+rotationChange*(PI.toFloat()/180f)).let{((it+PI.toFloat())%(2*PI.toFloat())+2*PI.toFloat())%(2*PI.toFloat())-PI.toFloat()}
+                    if(zoomChange==1f&&rotationChange==0f){
+                        // One finger turns the head; dragging down looks down, dragging right looks right.
+                        view.yaw=(view.yaw+panChange.x*0.0045f).let{((it+PI.toFloat())%(2*PI.toFloat())+2*PI.toFloat())%(2*PI.toFloat())-PI.toFloat()}
+                        view.elevation=(view.elevation+panChange.y*0.12f).coerceIn(-60f,85f)
+                    }else{
+                        // Two fingers: spreading walks forward, pinching walks back.
+                        view.travel((zoomChange-1.0)*viewRangeMeters*1.5)
+                    }
                 }
             }
-            .pointerInput(project.id,project.revision,zoom,yaw,pan){
+            .pointerInput(project.id,project.revision,view.zoom,view.yaw,view.pan){
                 detectTapGestures{touch->
                     val hit=project.entities.map{e->
                         val p=projection(e.positionMeters,size.width.toFloat(),size.height.toFloat(),360f*screenDensity)
@@ -148,35 +189,79 @@ fun NativeWorldLabViewport(
                 if(event.nativeKeyEvent.action!=AndroidKeyEvent.ACTION_DOWN)return@onPreviewKeyEvent false
                 val step=(0.8*sqrt(viewRangeMeters/8.0)).coerceIn(0.08,2000.0).toFloat()
                 when(event.nativeKeyEvent.keyCode){
-                    AndroidKeyEvent.KEYCODE_DPAD_LEFT->{yaw+=0.12f;true}
-                    AndroidKeyEvent.KEYCODE_DPAD_RIGHT->{yaw-=0.12f;true}
-                    AndroidKeyEvent.KEYCODE_DPAD_UP->{elevation=(elevation+4f).coerceAtMost(85f);true}
-                    AndroidKeyEvent.KEYCODE_DPAD_DOWN->{elevation=(elevation-4f).coerceAtLeast(-85f);true}
-                    AndroidKeyEvent.KEYCODE_PAGE_DOWN->{observerDepthMeters=(observerDepthMeters-step).coerceAtLeast(-20000f);true}
-                    AndroidKeyEvent.KEYCODE_PAGE_UP->{observerDepthMeters=(observerDepthMeters+step).coerceAtMost(20000f);true}
+                    AndroidKeyEvent.KEYCODE_DPAD_LEFT->{view.yaw-=0.12f;true}
+                    AndroidKeyEvent.KEYCODE_DPAD_RIGHT->{view.yaw+=0.12f;true}
+                    AndroidKeyEvent.KEYCODE_DPAD_UP->{view.elevation=(view.elevation-4f).coerceAtLeast(-60f);true}
+                    AndroidKeyEvent.KEYCODE_DPAD_DOWN->{view.elevation=(view.elevation+4f).coerceAtMost(85f);true}
+                    AndroidKeyEvent.KEYCODE_W->{view.walk(1.0);true}
+                    AndroidKeyEvent.KEYCODE_S->{view.walk(-1.0);true}
+                    AndroidKeyEvent.KEYCODE_A->{view.walk(0.0,-1.0);true}
+                    AndroidKeyEvent.KEYCODE_D->{view.walk(0.0,1.0);true}
+                    AndroidKeyEvent.KEYCODE_PAGE_DOWN->{view.observerDepthMeters=(view.observerDepthMeters-step).coerceAtLeast(-20000f);true}
+                    AndroidKeyEvent.KEYCODE_PAGE_UP->{view.observerDepthMeters=(view.observerDepthMeters+step).coerceAtMost(20000f);true}
                     else->false
                 }
             }
     ){
         val focalLength=360f*density
+        // Sky above the horizon, hazy ground below it, and the sun where it really is. Only at
+        // surface scale: below ground or zoomed far out the view hands over to the schematic layers.
+        val surfaceView=eye.y>=0.0&&viewRangeMeters<=400.0
+        if(surfaceView){
+            val horizonY=(size.height/2f+view.pan.y-focalLength*tan(Math.toRadians(view.elevation.toDouble())).toFloat())
+                .coerceIn(-size.height*6f,size.height*7f)
+            val zenith=Color(skyPalette.zenith[0].toFloat(),skyPalette.zenith[1].toFloat(),skyPalette.zenith[2].toFloat())
+            val haze=Color(skyPalette.horizon[0].toFloat(),skyPalette.horizon[1].toFloat(),skyPalette.horizon[2].toFloat())
+            val skyEnd=horizonY.coerceIn(0f,size.height)
+            if(skyEnd>0f)drawRect(
+                brush=Brush.verticalGradient(listOf(zenith,haze),startY=horizonY-size.height*1.2f,endY=horizonY),
+                size=Size(size.width,skyEnd))
+            if(skyEnd<size.height){
+                val shade=skyLight.ambient.toFloat().coerceIn(0.1f,1f)
+                val near=Color(0.43f*shade,0.56f*shade,0.45f*shade)
+                val far=Color(haze.red*0.7f+near.red*0.3f,haze.green*0.7f+near.green*0.3f,haze.blue*0.7f+near.blue*0.3f)
+                drawRect(
+                    brush=Brush.verticalGradient(listOf(far,near),startY=horizonY,endY=horizonY+size.height*0.55f),
+                    topLeft=Offset(0f,skyEnd),size=Size(size.width,size.height-skyEnd))
+            }
+            if(skyPose.altitudeDegrees>-2.0){
+                val dir=NativeWorldLabSky.sunDirection(skyPose)
+                val cameraX=eye.x
+                val cameraY=eye.y
+                val cameraZ=eye.z
+                val sun=projection(NativeLabVector(cameraX+dir.x*1e6,cameraY+dir.y*1e6,cameraZ+dir.z*1e6),size.width,size.height,focalLength)
+                if(sun.visible){
+                    val centre=Offset(sun.x,sun.y)
+                    val glowRadius=size.minDimension*0.28f
+                    val glowAlpha=(0.15f+0.5f*skyPalette.glowStrength.toFloat()).coerceIn(0f,0.7f)
+                    drawCircle(brush=Brush.radialGradient(listOf(Color(1f,0.85f,0.55f,glowAlpha),Color.Transparent),center=centre,radius=glowRadius),
+                        radius=glowRadius,center=centre)
+                    drawCircle(Color(1f,0.96f,0.84f),size.minDimension*0.028f,centre)
+                }
+            }
+        }else drawRect(Color(0xFF15232E))
         // Ground grid follows the saved target and adapts to the current visible range.
         val unit=when{
-            zoom>80->0.25;zoom>35->0.5;zoom>12->2.0;zoom>6->10.0
-            zoom>2->50.0;zoom>0.7->100.0;zoom>0.25->500.0;else->1000.0
+            view.zoom>80->0.25;view.zoom>35->0.5;view.zoom>12->2.0;view.zoom>6->10.0
+            view.zoom>2->50.0;view.zoom>0.7->100.0;view.zoom>0.25->500.0;else->1000.0
         }
-        val extent=12
-        for(i in -extent..extent){
-            val a=NativeLabVector(focus.x+i*unit,0.0,focus.z-extent*unit)
-            val b=NativeLabVector(focus.x+i*unit,0.0,focus.z+extent*unit)
-            val pa=projection(a,size.width,size.height,focalLength);val pb=projection(b,size.width,size.height,focalLength)
-            if(pa.visible&&pb.visible)drawLine(Color(0xFF3E5968),Offset(pa.x,pa.y),Offset(pb.x,pb.y),strokeWidth=1f)
-            val c=NativeLabVector(focus.x-extent*unit,0.0,focus.z+i*unit)
-            val d=NativeLabVector(focus.x+extent*unit,0.0,focus.z+i*unit)
-            val pc=projection(c,size.width,size.height,focalLength);val pd=projection(d,size.width,size.height,focalLength)
-            if(pc.visible&&pd.visible)drawLine(Color(0xFF3E5968),Offset(pc.x,pc.y),Offset(pd.x,pd.y),strokeWidth=1f)
+        val extent=24
+        // Ground grid is centred on the observer (snapped to the grid) and drawn in short segments
+        // so lines that pass behind the eye are clipped instead of dropped.
+        val gridX=floor(eye.x/unit)*unit
+        val gridZ=floor(eye.z/unit)*unit
+        if(cameraAboveGround)for(i in -extent..extent){
+            for(j in -extent until extent){
+                val a=projection(NativeLabVector(gridX+i*unit,0.0,gridZ+j*unit),size.width,size.height,focalLength)
+                val b=projection(NativeLabVector(gridX+i*unit,0.0,gridZ+(j+1)*unit),size.width,size.height,focalLength)
+                if(a.visible&&b.visible)drawLine(Color(0x47FFFFFF),Offset(a.x,a.y),Offset(b.x,b.y),strokeWidth=1f)
+                val c=projection(NativeLabVector(gridX+j*unit,0.0,gridZ+i*unit),size.width,size.height,focalLength)
+                val d=projection(NativeLabVector(gridX+(j+1)*unit,0.0,gridZ+i*unit),size.width,size.height,focalLength)
+                if(c.visible&&d.visible)drawLine(Color(0x47FFFFFF),Offset(c.x,c.y),Offset(d.x,d.y),strokeWidth=1f)
+            }
         }
         // A local y=0 reference surface and horizontal subsurface bands are schematic only.
-        if(focus.y < 0.0){
+        if(eye.y < 0.0){
             val layerY=listOf(0.0,-5.0,-25.0,-100.0,-500.0,-2000.0,-10000.0,-50000.0)
             val layerColors=listOf(
                 Color(0xFF9B8B6A),Color(0xFFB08B63),Color(0xFF8F7863),Color(0xFF777B79),
@@ -208,7 +293,7 @@ fun NativeWorldLabViewport(
             }
         }
         val observerMarker=projection(focus,size.width,size.height,focalLength)
-        if(observerMarker.visible){
+        if(false&&observerMarker.visible){
             drawCircle(Color(0xFFFFD166),5f,Offset(observerMarker.x,observerMarker.y))
             drawCircle(Color.White,8f,Offset(observerMarker.x,observerMarker.y),style=Stroke(1f))
         }
@@ -388,42 +473,89 @@ fun NativeWorldLabViewport(
             }
         }
     }
+}
+
+/** Inspection, Earth reference and accessible camera controls for the observer view. */
+@Composable
+fun NativeWorldLabViewportControls(
+    project:NativeWorldLabProject,selectedId:String?,
+    view:NativeWorldLabViewState,
+    onSaveView:(List<Double>,List<Double>)->Unit,
+    onResetView:()->Unit,
+    onSaveGeodeticOrigin:(NativeGeodetic)->Unit,
+    onClearGeodeticOrigin:()->Unit,
+    inspection:NativeInspectionSettings=NativeInspectionSettings(),
+    onInspectionChange:(NativeInspectionSettings)->Unit={},
+    canUndoInspectionView:Boolean=false,canRedoInspectionView:Boolean=false,
+    onUndoInspectionView:()->Unit={},onRedoInspectionView:()->Unit={},
+){
+    val screenDensity=LocalDensity.current.density
+    val selectedEntity=project.entities.firstOrNull{it.id==selectedId}
+    val cutPlane=NativeWorldLabInspection.plane(project,selectedId,inspection)
+    val cutOffset=cutPlane?.offset
+    val cutTargets=NativeWorldLabInspection.targetIds(project,selectedId)
+    fun clip(vertices:List<NativeLabVector>,entityId:String)=if(cutPlane==null||entityId !in cutTargets)vertices else NativeWorldLabInspection.clipPolygon(vertices,cutPlane)
+    fun isInspectionTarget(entityId:String)=entityId in cutTargets
+    fun alpha(entityId:String):Float{
+        if(!isInspectionTarget(entityId))return 0.86f
+        return when(inspection.mode){
+            NativeInspectionMode.NORMAL,NativeInspectionMode.ISOLATE,NativeInspectionMode.EXPLODED->0.86f
+            NativeInspectionMode.TRANSPARENT,NativeInspectionMode.CUTAWAY->inspection.opacity
+            NativeInspectionMode.XRAY->minOf(0.22f,inspection.opacity)
+        }
+    }
+    fun isXrayTarget(entityId:String)=inspection.mode==NativeInspectionMode.XRAY&&isInspectionTarget(entityId)
+    val eye=NativeLabVector(view.eyeX,(view.eyeY+view.observerDepthMeters).coerceIn(-20000.0,100000.0),view.eyeZ)
+    val viewRangeMeters=(45.0*8.0/view.zoom.toDouble()).coerceIn(0.5,100000.0)
+    val elevationRadians=Math.toRadians(view.elevation.toDouble())
+    val cameraDistance=(viewRangeMeters/cos(elevationRadians).coerceAtLeast(0.08)).coerceIn(0.5,100000.0)
+    val focus=NativeLabVector(
+        eye.x+sin(view.yaw.toDouble())*cos(elevationRadians)*cameraDistance,
+        eye.y-sin(elevationRadians)*cameraDistance,
+        eye.z+cos(view.yaw.toDouble())*cos(elevationRadians)*cameraDistance)
+    fun projection(point:NativeLabVector,width:Float,height:Float,focalLength:Float)=
+        labPerspectivePoint(point,focus,view.yaw,cameraDistance,focalLength,view.pan,width,height,view.elevation)
+    var latitude by remember(project.id,project.revision){mutableStateOf(project.geodeticOrigin?.latitudeDegrees?.toString() ?: "0")}
+    var longitude by remember(project.id,project.revision){mutableStateOf(project.geodeticOrigin?.longitudeDegrees?.toString() ?: "0")}
+    var height by remember(project.id,project.revision){mutableStateOf(project.geodeticOrigin?.heightMeters?.toString() ?: "0")}
+    if(view.toggles.showViewportOverlays)LabNote("Drag to move · pinch to zoom · twist to orbit · tap a part to select. "+
+        "The local world uses perspective depth; y=0 is the authored surface reference and underground bands are schematic, not surveyed geology.")
     Text("See Inside and inspect",style=MaterialTheme.typography.titleSmall)
     Row(horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically){
         OutlinedButton(onClick={
             selectedEntity?.let{solid->
                 val target=solid.positionMeters
                 val distance=(cameraDistance*0.45).coerceIn(0.5,100000.0)
-                val angle=Math.toRadians(elevation.toDouble())
+                val angle=Math.toRadians(view.elevation.toDouble())
                 val horizontalDistance=distance*cos(angle)
                 val position=listOf(
-                    target.x-sin(yaw.toDouble())*horizontalDistance,
+                    target.x-sin(view.yaw.toDouble())*horizontalDistance,
                     target.y+distance*sin(angle),
-                    target.z-cos(yaw.toDouble())*horizontalDistance
+                    target.z-cos(view.yaw.toDouble())*horizontalDistance
                 )
                 onSaveView(position,listOf(target.x,target.y,target.z))
-                observerDepthMeters=0f;pan=Offset.Zero
-                zoom=(45.0*8.0/distance).toFloat().coerceIn(0.1f,160f)
+                view.observerDepthMeters=0f;view.pan=Offset.Zero
+                view.zoom=(45.0*8.0/distance).toFloat().coerceIn(0.1f,160f)
             }
         },enabled=selectedEntity!=null){Text("Zoom to selected")}
-        OutlinedButton(onClick={showLabels=!showLabels}){Text(if(showLabels)"Hide labels" else "Show labels")}
-        OutlinedButton(onClick={showViewportOverlays=!showViewportOverlays}){
-            Text(if(showViewportOverlays)"Hide overlays" else "Show overlays")
+        OutlinedButton(onClick={view.toggles.showLabels=!view.toggles.showLabels}){Text(if(view.toggles.showLabels)"Hide labels" else "Show labels")}
+        OutlinedButton(onClick={view.toggles.showViewportOverlays=!view.toggles.showViewportOverlays}){
+            Text(if(view.toggles.showViewportOverlays)"Hide overlays" else "Show overlays")
         }
         OutlinedButton(onClick=onUndoInspectionView,enabled=canUndoInspectionView){Text("Undo view")}
         OutlinedButton(onClick=onRedoInspectionView,enabled=canRedoInspectionView){Text("Redo view")}
         OutlinedButton(onClick={
             onInspectionChange(NativeInspectionSettings())
-            showLabels=true;showViewportOverlays=true
+            view.toggles.showLabels=true;view.toggles.showViewportOverlays=true
         }){Text("Reset")}
     }
-    if(selectedEntity!=null&&showLabels&&showViewportOverlays){
+    if(selectedEntity!=null&&view.toggles.showLabels&&view.toggles.showViewportOverlays){
         Text("Selected: "+selectedEntity.name+" · "+selectedEntity.shape,
             style=MaterialTheme.typography.bodySmall,
             modifier=Modifier.semantics{contentDescription="Selected object label"})
     }
 
-    Text("Display-only views never alter material properties or scientific results.",style=MaterialTheme.typography.bodySmall)
+    LabNote("Display-only views never alter material properties or scientific results.")
     Row(horizontalArrangement=Arrangement.spacedBy(4.dp)){
         listOf(NativeInspectionMode.NORMAL,NativeInspectionMode.TRANSPARENT,NativeInspectionMode.XRAY).forEach{item->
             OutlinedButton(onClick={onInspectionChange(inspection.copy(mode=item))}){Text(when(item){NativeInspectionMode.NORMAL->"Normal";NativeInspectionMode.TRANSPARENT->"Inside";else->"X-ray"})}
@@ -467,8 +599,7 @@ fun NativeWorldLabViewport(
     if(inspection.mode==NativeInspectionMode.ISOLATE&&NativeWorldLabInspection.targetIds(project,selectedId).isEmpty())
         Text("Select a part first; no geometry is hidden without a valid selection.")
     Text("Earth reference (WGS84)",style=MaterialTheme.typography.titleSmall)
-    Text("A mathematical geodetic origin for the local ENU model. This does not fetch terrain, imagery or device location.",
-        style=MaterialTheme.typography.bodySmall)
+    LabNote("A mathematical geodetic origin for the local ENU model. This does not fetch terrain, imagery or device location.")
     Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
         OutlinedTextField(value=latitude,onValueChange={latitude=it},label={Text("Latitude °")},singleLine=true,modifier=Modifier.weight(1f))
         OutlinedTextField(value=longitude,onValueChange={longitude=it},label={Text("Longitude °")},singleLine=true,modifier=Modifier.weight(1f))
@@ -498,75 +629,62 @@ fun NativeWorldLabViewport(
         }.onFailure{}
     }
     Text("View scale: "+String.format(java.util.Locale.US,"%.2f",viewRangeMeters)+" m · "+
-        (if(observerDepthMeters<0)"below" else if(observerDepthMeters>0)"above" else "at")+
-        " saved target by "+String.format(java.util.Locale.US,"%.1f",abs(observerDepthMeters))+" m",
+        (if(view.observerDepthMeters<0)"below" else if(view.observerDepthMeters>0)"above" else "at")+
+        " saved target by "+String.format(java.util.Locale.US,"%.1f",abs(view.observerDepthMeters))+" m",
         style=MaterialTheme.typography.bodySmall)
     Text("Perspective observer · "+String.format(java.util.Locale.US,"%.2f",cameraDistance)+" m from focus · "+
         "visible far range is clipped at 50,000 km",style=MaterialTheme.typography.bodySmall)
     Text("Accessible camera controls · arrow keys orbit and tilt · Page Up/Down move vertically")
     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-        OutlinedButton(onClick={yaw+=0.18f}){Text("Look left")}
-        OutlinedButton(onClick={yaw-=0.18f}){Text("Look right")}
+        OutlinedButton(onClick={view.yaw+=0.18f}){Text("Look left")}
+        OutlinedButton(onClick={view.yaw-=0.18f}){Text("Look right")}
     }
     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-        OutlinedButton(onClick={pan+=Offset(48f,0f)}){Text("Pan right")}
-        OutlinedButton(onClick={pan-=Offset(48f,0f)}){Text("Pan left")}
+        OutlinedButton(onClick={view.pan+=Offset(48f,0f)}){Text("Pan right")}
+        OutlinedButton(onClick={view.pan-=Offset(48f,0f)}){Text("Pan left")}
     }
     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-        OutlinedButton(onClick={elevation=(elevation+5f).coerceAtMost(80f)}){Text("Look up")}
-        OutlinedButton(onClick={elevation=(elevation-5f).coerceAtLeast(5f)}){Text("Look down")}
+        OutlinedButton(onClick={view.elevation=(view.elevation+5f).coerceAtMost(80f)}){Text("Look up")}
+        OutlinedButton(onClick={view.elevation=(view.elevation-5f).coerceAtLeast(5f)}){Text("Look down")}
     }
     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
         OutlinedButton(onClick={
             val step=(0.8*sqrt(viewRangeMeters/8.0)).coerceIn(0.08,2000.0).toFloat()
-            observerDepthMeters=(observerDepthMeters-step).coerceAtLeast(-20000f)
+            view.observerDepthMeters=(view.observerDepthMeters-step).coerceAtLeast(-20000f)
         }){Text("Move down")}
         OutlinedButton(onClick={
             val step=(0.8*sqrt(viewRangeMeters/8.0)).coerceIn(0.08,2000.0).toFloat()
-            observerDepthMeters=(observerDepthMeters+step).coerceAtMost(20000f)
+            view.observerDepthMeters=(view.observerDepthMeters+step).coerceAtMost(20000f)
         }){Text("Move up")}
     }
-    Text("Observer elevation: "+elevation.toInt()+"°")
-    Slider(value=elevation,onValueChange={elevation=it},valueRange=-85f..85f,
+    Text("Observer elevation: "+view.elevation.toInt()+"°")
+    Slider(value=view.elevation,onValueChange={view.elevation=it},valueRange=-85f..85f,
         modifier=Modifier.semantics{contentDescription="Observer camera elevation angle"})
-    Text("Vertical observer offset: "+String.format(java.util.Locale.US,"%.1f",observerDepthMeters)+
+    Text("Vertical observer offset: "+String.format(java.util.Locale.US,"%.1f",view.observerDepthMeters)+
         " m below the local y=0 surface · schematic layers only")
-    Slider(value=observerDepthMeters,onValueChange={observerDepthMeters=it},
+    Slider(value=view.observerDepthMeters,onValueChange={view.observerDepthMeters=it},
         valueRange=-20000f..20000f,
         modifier=Modifier.semantics{contentDescription="Observer vertical offset from saved target"})
     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-        OutlinedButton(onClick={zoom=(zoom*1.25f).coerceAtMost(160f)}){Text("Zoom in")}
-        OutlinedButton(onClick={zoom=(zoom/1.25f).coerceAtLeast(0.1f)}){Text("Zoom out")}
+        OutlinedButton(onClick={view.zoom=(view.zoom*1.25f).coerceAtMost(160f)}){Text("Zoom in")}
+        OutlinedButton(onClick={view.zoom=(view.zoom/1.25f).coerceAtLeast(0.1f)}){Text("Zoom out")}
         OutlinedButton(onClick={
-            val distance=cameraDistance
-            val angle=Math.toRadians(elevation.toDouble())
-            val scale=(360.0*screenDensity/distance).coerceAtLeast(1e-6)
-            val panRight=pan.x/scale
-            val panUp=pan.y/scale
-            val cy=cos(yaw.toDouble());val sy=sin(yaw.toDouble())
-            val se=sin(angle);val ce=cos(angle)
-            val targetX=focus.x-panRight*cy+panUp*sy*se
-            val targetY=focus.y+panUp*ce
-            val targetZ=focus.z+panRight*sy+panUp*cy*se
-            val horizontalDistance=distance*ce
-            val target=listOf(targetX,targetY,targetZ)
-            val position=listOf(targetX-sy*horizontalDistance,
-                targetY+distance*se,targetZ-cy*horizontalDistance)
-            onSaveView(position,target)
-            observerDepthMeters=0f
+            onSaveView(listOf(eye.x,eye.y,eye.z),listOf(focus.x,focus.y,focus.z))
+            view.eyeY=eye.y;view.observerDepthMeters=0f
         }){Text("Save viewpoint")}
         OutlinedButton(onClick={
             val saved=project.cameraPositionMeters
             val target=project.cameraLookingAtMeters
             val pose=NativeWorldLabCamera.poseFromPosition(saved,target)
             val h=(pose.distanceMeters*cos(Math.toRadians(pose.elevationDegrees))).coerceAtLeast(0.25)
-            zoom=(45.0*8.0/h).toFloat().coerceIn(0.1f,160f)
-            yaw=pose.yawRadians.toFloat()
-            elevation=pose.elevationDegrees.toFloat().coerceIn(-85f,85f)
-            observerDepthMeters=0f;pan=Offset.Zero
+            view.zoom=(45.0*8.0/h).toFloat().coerceIn(0.1f,160f)
+            view.yaw=pose.yawRadians.toFloat()
+            view.elevation=pose.elevationDegrees.toFloat().coerceIn(-85f,85f)
+            view.eyeX=saved.x;view.eyeY=saved.y;view.eyeZ=saved.z
+            view.observerDepthMeters=0f;view.pan=Offset.Zero
         }){Text("Restore saved view")}
         OutlinedButton(onClick={
-            observerDepthMeters=0f;elevation=30f;pan=Offset.Zero
+            view.observerDepthMeters=0f;view.elevation=30f;view.pan=Offset.Zero
             onResetView()
         }){Text("Surface view")}
     }

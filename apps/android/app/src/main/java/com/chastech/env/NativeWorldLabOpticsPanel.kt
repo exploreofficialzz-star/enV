@@ -71,9 +71,8 @@ fun NativeWorldLabOpticsPanel(project:NativeWorldLabProject,onMessage:(String)->
         ?:materials.first{it.id!=first.id}
     Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
         Text("Invented light and optical materials",style=MaterialTheme.typography.titleSmall)
-        Text("Assumed refractive indices, planar Fresnel/Snell boundary only. "+
-            "No measured material identity, absorption or spectral behavior.",
-            style=MaterialTheme.typography.bodySmall)
+        LabNote("Assumed refractive indices, planar Fresnel/Snell boundary only. "+
+            "No measured material identity, absorption or spectral behavior.")
         OutlinedButton(onClick={
             val next=(materials.indexOf(first)+1)%materials.size
             firstId=materials[next].id;secondId="";result=null
@@ -105,7 +104,7 @@ fun NativeWorldLabOpticsPanel(project:NativeWorldLabProject,onMessage:(String)->
                     onMessage("Saved portable optical evidence locally.")
                 }.onFailure{onMessage(it.message?:"Optical record could not be saved.")}
             }){Text("Keep optical evidence on device")}
-            Text(run.validity,style=MaterialTheme.typography.bodySmall)
+            LabNote(run.validity)
         }
         OutlinedButton(onClick={importer.launch(arrayOf("application/json","text/plain"))}){
             Text("Import portable optical evidence")

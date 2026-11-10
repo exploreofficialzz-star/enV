@@ -32,10 +32,10 @@ const worldLabIos = readFileSync('apps/ios/enV/ToolViews.swift', 'utf8');
 const nativeKotlin = readFileSync('apps/android/app/src/main/java/com/chastech/env/NativeWorldLab.kt', 'utf8');
 const nativeSwift = readFileSync('apps/ios/enV/NativeWorldLabView.swift', 'utf8');
 assert.ok(worldLabWeb.includes('id: "the-world-lab"'), 'World Lab must be a separate discoverable workspace');
-assert.ok(worldLabAndroid.includes('"the-world-lab" -> NativeWorldLabEntryForm()'), 'Android must launch the native World Lab entry first');
-assert.ok(nativeKotlin.includes('fun NativeWorldLabEntryForm()') && nativeKotlin.includes('NativeWorldLabForm()'), 'Android entry must open the existing Compose workspace after Enter');
-assert.ok(worldLabIos.includes('tool.id == "the-world-lab"') && worldLabIos.includes('NativeWorldLabEntryView()'), 'iOS must launch the native World Lab entry first');
-assert.ok(nativeSwift.includes('struct NativeWorldLabEntryView') && nativeSwift.includes('NativeWorldLabView()'), 'iOS entry must open the existing SwiftUI workspace after Enter');
+assert.ok(worldLabAndroid.includes('"the-world-lab" -> NativeWorldLabEntryForm()'), 'Android must launch the native World Lab');
+assert.ok(nativeKotlin.includes('fun NativeWorldLabEntryForm()') && nativeKotlin.includes('NativeWorldLabForm()') && !nativeKotlin.includes('R.drawable.world_lab_title'), 'Android must open the Compose workspace directly with no entry screen');
+assert.ok(worldLabIos.includes('tool.id == "the-world-lab"') && worldLabIos.includes('NativeWorldLabEntryView()'), 'iOS must launch the native World Lab');
+assert.ok(nativeSwift.includes('struct NativeWorldLabEntryView') && nativeSwift.includes('NativeWorldLabView()') && !nativeSwift.includes('Image("WorldLabTitle")'), 'iOS must open the SwiftUI workspace directly with no entry screen');
 assert.ok(nativeKotlin.includes('NativeWorldLabScience.evaluate('), 'Android science UI must call a real solver');
 assert.ok(nativeSwift.includes('NativeWorldLabScience.evaluate('), 'iOS science UI must call a real solver');
 assert.deepEqual([...android.keys()].sort(), [...web.keys()].sort(), 'Android Studio IDs must match Web');
@@ -116,15 +116,10 @@ console.log('UX/UI Studio surface audit: PASS (Web PDF/icon search, Kotlin edito
 console.log(`Developer Studio platform parity: PASS (${web.size} Studios; ${[...web.values()].reduce((sum, modes) => sum + modes.length, 0)} Studio modes match across TypeScript, Kotlin, and Swift).`);
 
 const worldLabEntryWeb = readFileSync('src/components/world-lab/world-lab-entry.tsx', 'utf8');
-const worldLabEntryCss = readFileSync('src/components/world-lab/world-lab-entry.css', 'utf8');
-assert.ok(worldLabEntryWeb.includes('/world-lab-title.svg') && worldLabEntryWeb.includes('/logo-home-transparent.png') && worldLabEntryWeb.includes('🪐'), 'Web entry must use exact screenshot lettering, original enV logo and Saturn');
-assert.ok(worldLabEntryCss.includes('#f1f4f9') && worldLabEntryCss.includes('#f9fafc') && worldLabEntryCss.includes('#dbeaff'), 'Web entry palette must match the screenshot');
-assert.ok(nativeKotlin.includes('R.drawable.world_lab_title') && nativeKotlin.includes('R.drawable.world_lab_logo') && nativeKotlin.includes('🪐'), 'Android must use the exact wordmark, original logo and Saturn artwork');
-assert.ok(nativeKotlin.includes('Color(0xFFDBEAFF)') && nativeKotlin.includes('Color(0xFFF9FAFC)'), 'Android entry colors must match the screenshot');
-assert.ok(nativeSwift.includes('Image("WorldLabTitle")') && nativeSwift.includes('Image("WorldLabLogo")') && nativeSwift.includes('🪐'), 'iOS must use the exact wordmark, original logo and Saturn artwork');
-assert.ok(nativeSwift.includes('219.0 / 255.0') && nativeSwift.includes('249.0 / 255.0'), 'iOS entry colors must match the screenshot');
+const worldLabStudioCss = readFileSync('src/components/world-lab/world-lab-studio.css', 'utf8');
+assert.ok(!worldLabEntryWeb.includes('/world-lab-title.svg') && !worldLabEntryWeb.includes('Enter'), 'Web World Lab must open directly into the world with no entry gate');
+assert.ok(worldLabStudioCss.includes('.wl-studio') && worldLabStudioCss.includes('@media (max-width: 639px)') && worldLabStudioCss.includes('@media (min-width: 1024px)'), 'Web World Lab studio must define phone, tablet and desktop layouts');
+assert.ok(nativeKotlin.includes('NativeWorldLabViewportCanvas(') && nativeKotlin.includes('BoxWithConstraints(') && nativeKotlin.includes('maxWidth<640.dp') && nativeKotlin.includes('LabHoldButton(') && nativeKotlin.includes('LabNote('), 'Android must open into a full-bleed world with a HUD, tool rail and responsive tool panel');
+assert.ok(nativeSwift.includes('SceneView(scene:scene,pointOfView:sceneCameraNode,options:[])') && nativeSwift.includes('GeometryReader{ proxy in') && nativeSwift.includes('proxy.size.width<640') && nativeSwift.includes('NativeWorldLabHoldButton(') && nativeSwift.includes('NativeWorldLabNote('), 'iOS must open into a full-bleed world with a HUD, tool rail and responsive tool panel');
 
-const worldLabEntryCssPositionCheck = readFileSync('src/components/world-lab/world-lab-entry.css', 'utf8');
-assert.ok(worldLabEntryCssPositionCheck.includes('translateY(-4svh)'), 'Web World Lab entry must align the group in the upper third of the screen');
-assert.ok(nativeKotlin.includes('maxHeight * 0.04f'), 'Android World Lab entry must use the same proportional upper-third placement');
-assert.ok(nativeSwift.includes('geometry.size.height * 0.04'), 'iOS World Lab entry must use the same proportional upper-third placement');
+assert.ok(worldLabStudioCss.includes('env(safe-area-inset-bottom)') && worldLabStudioCss.includes('prefers-reduced-motion'), 'Web World Lab studio must respect safe areas and reduced motion');

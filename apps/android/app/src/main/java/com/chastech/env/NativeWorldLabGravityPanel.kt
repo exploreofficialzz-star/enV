@@ -62,9 +62,8 @@ fun NativeWorldLabGravityPanel(project:NativeWorldLabProject,onError:(String)->U
         }
     }
     Text("Explore invented gravity",style=MaterialTheme.typography.titleSmall)
-    Text("The native device calculates Newtonian attraction between two to eight "+
-        "spheres with user-assumed density. No cloud upload, measured planets or impacts.",
-        style=MaterialTheme.typography.bodySmall)
+    LabNote("The native device calculates Newtonian attraction between two to eight "+
+        "spheres with user-assumed density. No cloud upload, measured planets or impacts.")
     if(spheres.size<2){
         Text("Add at least two spherical solids and assign invented density.")
         return
@@ -156,6 +155,6 @@ fun NativeWorldLabGravityPanel(project:NativeWorldLabProject,onError:(String)->U
         }
         Slider(value=rate,onValueChange={rate=it},valueRange=0.1f..10f,
             modifier=Modifier.semantics{contentDescription="Gravity playback speed"})
-        Text(active.validity,style=MaterialTheme.typography.bodySmall)
+        LabNote(active.validity)
     }
 }

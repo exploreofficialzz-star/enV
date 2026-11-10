@@ -500,3 +500,46 @@ extension NativeWorldLabReplayManifestTests {
         XCTAssertEqual(manifest.inputFingerprint,"627da37ad5c8bfe2")
     }
 }
+
+final class NativeWorldLabSkyTests: XCTestCase {
+    private func epoch(_ iso: String) -> Double {
+        ISO8601DateFormatter().date(from: iso)!.timeIntervalSince1970
+    }
+
+    func testEquinoxSolarNoonOnTheEquatorIsNearlyOverhead() {
+        let p = NativeWorldLabSky.solarPosition(epochSeconds: epoch("2026-03-20T12:07:00Z"), latitudeDegrees: 0, longitudeDegrees: 0)
+        XCTAssertTrue(p.altitudeDegrees > 88 && p.altitudeDegrees <= 90.01, "\(p.altitudeDegrees)")
+    }
+
+    func testEquinoxSunriseIsEastAndSunsetIsWest() {
+        let rise = NativeWorldLabSky.solarPosition(epochSeconds: epoch("2026-03-20T06:07:00Z"), latitudeDegrees: 0, longitudeDegrees: 0)
+        let set = NativeWorldLabSky.solarPosition(epochSeconds: epoch("2026-03-20T18:07:00Z"), latitudeDegrees: 0, longitudeDegrees: 0)
+        XCTAssertTrue(abs(rise.altitudeDegrees) < 3 && abs(rise.azimuthDegrees - 90) < 6)
+        XCTAssertTrue(abs(set.altitudeDegrees) < 3 && abs(set.azimuthDegrees - 270) < 6)
+    }
+
+    func testMidnightSunIsFarBelowTheHorizon() {
+        let p = NativeWorldLabSky.solarPosition(epochSeconds: epoch("2026-03-20T00:07:00Z"), latitudeDegrees: 0, longitudeDegrees: 0)
+        XCTAssertLessThan(p.altitudeDegrees, -80)
+    }
+
+    func testSunDirectionIsAUnitVectorWithUpSecond() {
+        let d = NativeWorldLabSky.sunDirection(NativeSolarPosition(altitudeDegrees: 30, azimuthDegrees: 90))
+        XCTAssertEqual((d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).squareRoot(), 1, accuracy: 1e-12)
+        XCTAssertEqual(d[1], 0.5, accuracy: 1e-12)
+        XCTAssertTrue(d[0] > 0.8 && abs(d[2]) < 1e-9)
+    }
+
+    func testPaletteAndLightingStayBounded() {
+        var altitude = -30.0
+        while altitude <= 90 {
+            let palette = NativeWorldLabSky.palette(altitudeDegrees: altitude)
+            for channel in palette.zenith + palette.horizon { XCTAssertTrue(channel >= 0 && channel <= 1) }
+            let light = NativeWorldLabSky.lighting(altitudeDegrees: altitude)
+            XCTAssertTrue(light.ambient >= 0.1 && light.ambient <= 1 && light.sun >= 0 && light.sun <= 0.7)
+            altitude += 1
+        }
+        XCTAssertFalse(NativeWorldLabSky.lighting(altitudeDegrees: -30).sunVisible)
+        XCTAssertTrue(NativeWorldLabSky.lighting(altitudeDegrees: 40).sunVisible)
+    }
+}

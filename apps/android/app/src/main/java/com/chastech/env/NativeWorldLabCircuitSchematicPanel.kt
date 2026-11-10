@@ -134,8 +134,7 @@ internal fun NativeWorldLabCircuitSchematicPanel(
                 color=MaterialTheme.colorScheme.secondary,
                 style=MaterialTheme.typography.bodySmall)
         }
-        Text("Legend · arrows show conventional current direction · A = amperes · 0 A = no arrow",
-            style=MaterialTheme.typography.bodySmall)
+        LabNote("Legend · arrows show conventional current direction · A = amperes · 0 A = no arrow")
         Text("Topology-only circuit schematic; not measured wiring geometry or a spatial electric or magnetic field.",
             style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.secondary)
     }

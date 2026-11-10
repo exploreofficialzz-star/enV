@@ -1,4 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Archive, ArrowDown, ArrowUp, Box, Braces, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Crosshair, Download, FilePlus2, FileUp, Save, Upload } from "lucide-react";
+import { StudioBack, StudioDrawer, StudioGroup, StudioHoldButton, StudioNote, StudioRail, scrollToStudioGroup, type StudioGroupId } from "./studio-shell";
+import "./world-lab-studio.css";
+import { createGroundTexture, createWorldLabSky, HORIZON_FAR_PLANE_METRES, SURFACE_VIEW_MAX_RANGE_METRES, type WorldLabSky } from "./sky-dome";
 import * as B from "babylonjs";
 import {
   blankWorldLabProject, importLegacyGameScene, newSolid, parseWorldLabProject,
@@ -115,6 +119,7 @@ type SceneHandles = {
   heatSegments: B.Mesh[];
   groundMaterial: B.StandardMaterial;
   strataMaterials: B.StandardMaterial[];
+  sky: WorldLabSky;
 };
 const STORAGE_KEY = "env-world-lab-reference-v1";
 const defaultMechanical: DampedOscillator = {
@@ -298,6 +303,10 @@ export default function WorldLab() {
   const [actuatorPowerOffAt,setActuatorPowerOffAt] = useState<number|null>(null);
   const importInput = useRef<HTMLInputElement>(null);
   const cadImportInput=useRef<HTMLInputElement>(null);
+  const studioRef=useRef<HTMLDivElement>(null);
+  const [studioPanel,setStudioPanel]=useState<StudioGroupId|null>(null);
+  const [lookState,setLookState]=useState({heading:0,pitch:0});
+  useEffect(()=>{if(studioPanel)scrollToStudioGroup(studioRef.current,studioPanel);},[studioPanel]);
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
   const shapeCount = project?.entities.length ?? 0;
   const [materialName, setMaterialName] = useState("");
@@ -508,6 +517,7 @@ export default function WorldLab() {
       const loadedView=projectForEdits.current;
       if(loadedView){camera.position.copyFromFloats(...loadedView.camera.positionMeters);camera.setTarget(new B.Vector3(...loadedView.camera.lookingAtMeters));cameraRestoredProject.current=loadedView.id;}
       camera.minZ = 0.03;
+      camera.maxZ = HORIZON_FAR_PLANE_METRES;
       camera.speed = 0.3;
       camera.angularSensibility = 1400;
       camera.keysUp = [87, 38];
@@ -564,9 +574,14 @@ export default function WorldLab() {
       ambient.intensity = 0.85;
       const sunlight = new B.DirectionalLight("sunlight", new B.Vector3(-0.4, -1, 0.6), scene);
       sunlight.intensity = 0.55;
+      const sky = createWorldLabSky(scene, ambient, sunlight);
+      sky.update(new Date());
       const ground = B.MeshBuilder.CreateGround("representative-ground", { width: 100000, height: 100000 }, scene);
       const groundMaterial = new B.StandardMaterial("ground", scene);
-      groundMaterial.diffuseColor = B.Color3.FromHexString("#6D8E72");
+      groundMaterial.diffuseColor = B.Color3.White();
+      groundMaterial.diffuseTexture = createGroundTexture(scene, 100000);
+      groundMaterial.specularColor = B.Color3.Black();
+      groundMaterial.zOffset = -4;
       ground.material = groundMaterial;
       ground.isPickable = false;
       // These large, layered volumes are intentionally illustrative, NOT site measurements.
@@ -611,6 +626,7 @@ export default function WorldLab() {
         heatSegments.push(segment);
       }
       let lastDepthLabelAt = 0;
+      let lastSkyAt = 0;
       engine.runRenderLoop(() => {
         // Reveal layers automatically when the observer enters the ground.
         // See Inside is an optional view aid, not a navigation gate.
@@ -631,8 +647,13 @@ export default function WorldLab() {
           setObserverDepth(old => Math.abs(old - depth) > Math.max(0.02,depth*0.001) ? depth : old);
           const range=cameraRange();
           setObserverRange(old=>Math.abs(old-range)>Math.max(0.02,old*0.01)?range:old);
+          const headingDegrees=((camera.rotation.y*180/Math.PI)%360+360)%360,pitchDegrees=camera.rotation.x*180/Math.PI;
+          setLookState(old=>Math.abs(old.heading-headingDegrees)>0.5||Math.abs(old.pitch-pitchDegrees)>0.5?{heading:headingDegrees,pitch:pitchDegrees}:old);
           const clipping=observerClippingPlanes(range);
-          camera.minZ=clipping.minZ;camera.maxZ=clipping.maxZ;
+          camera.minZ=clipping.minZ;
+          camera.maxZ=range<=SURFACE_VIEW_MAX_RANGE_METRES?Math.max(clipping.maxZ,HORIZON_FAR_PLANE_METRES):clipping.maxZ;
+          sky.setObserver(range,depth);
+          if(now-lastSkyAt>5000){lastSkyAt=now;sky.update(new Date());}
           camera.speed=Math.max(0.05,Math.min(400,observerAdaptiveStepMetres(range)*0.15));
         }
         scene?.render();
@@ -644,7 +665,7 @@ export default function WorldLab() {
         const id = info.pickInfo?.pickedMesh?.metadata?.worldLabEntityId;
         if (typeof id === "string") setSelectedEntityId(id);
       });
-      sceneRef.current = { engine, scene, camera, device, circuit, deviceMaterial, circuitMaterial, addedShapes: new Map(), heatSegments, groundMaterial, strataMaterials };
+      sceneRef.current = { engine, scene, camera, device, circuit, deviceMaterial, circuitMaterial, addedShapes: new Map(), heatSegments, groundMaterial, strataMaterials, sky };
       // Callback-scoped cleanup also covers graphics initialization failures.
       observerNavigationCleanup = () => {
         canvas.removeEventListener("wheel", wheelTravel);
@@ -665,6 +686,7 @@ export default function WorldLab() {
     return () => {
       observer?.disconnect();
       observerNavigationCleanup?.();
+      sceneRef.current?.sky.dispose();
       sceneRef.current = null;
       scene?.dispose();
       engine?.dispose();
@@ -674,10 +696,11 @@ export default function WorldLab() {
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene) return;
-    const mechanicalVisible = modelKind === "damped-oscillator";
+    const hasRun = !!currentRun;
+    const mechanicalVisible = hasRun && modelKind === "damped-oscillator";
     scene.device.setEnabled(mechanicalVisible);
-    scene.circuit.setEnabled(modelKind === "rc-circuit");
-    const heatVisible = modelKind === "heat-rod";
+    scene.circuit.setEnabled(hasRun && modelKind === "rc-circuit");
+    const heatVisible = hasRun && modelKind === "heat-rod";
     const profile = sample?.temperaturesK;
     const sourceHeat = currentRun?.inputs.kind === "heat-rod" ? currentRun.inputs : heat;
     const lower=Math.min(sourceHeat.ambientTemperatureK,sourceHeat.centerTemperatureK);
@@ -1173,6 +1196,25 @@ export default function WorldLab() {
     camera.position.copyFromFloats(0,1.65,-8);
     camera.setTarget(new B.Vector3(0,1.2,0));
     setMessage("Returned to the illustrative surface starting point. Save the viewpoint to retain it.");
+  }
+  function lookBy(yawDegrees:number,pitchDegrees:number){
+    const camera=sceneRef.current?.camera;if(!camera)return;
+    camera.rotation.y+=yawDegrees*Math.PI/180;
+    camera.rotation.x=Math.max(-1.553,Math.min(1.553,camera.rotation.x+pitchDegrees*Math.PI/180));
+  }
+  function levelHorizon(){
+    const camera=sceneRef.current?.camera;if(camera)camera.rotation.x=0;
+  }
+  function walkBy(direction:1|-1){
+    const camera=sceneRef.current?.camera;if(!camera)return;
+    const range=observerRangeMetres([camera.position.x,camera.position.y,camera.position.z],
+      [camera.getTarget().x,camera.getTarget().y,camera.getTarget().z]);
+    const forward=camera.getForwardRay().direction.clone();forward.y=0;
+    if(forward.lengthSquared()<1e-6)return;
+    forward.normalize();
+    const next=camera.position.add(forward.scale(direction*Math.min(observerAdaptiveStepMetres(range),0.6)));
+    if(next.length()>OBSERVER_BOUNDS_METRES.maxRadius||next.y<OBSERVER_BOUNDS_METRES.minHeight)return;
+    camera.position.copyFrom(next);
   }
   function focusSelected() {
     const camera = sceneRef.current?.scene.activeCamera;
@@ -2099,1890 +2141,1904 @@ export default function WorldLab() {
   const inputLabel = "w-full rounded-lg border border-border bg-bg px-3 py-2 text-fg";
   const buttonClass = "rounded-lg border border-border px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2";
   return (
-    <section className="mx-auto w-full max-w-[1440px] px-3 py-5 sm:px-6" aria-label="The World Lab">
-      <header className="mb-3 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">enV · Scientific exploration</p>
-          <h1 className="text-2xl font-semibold">The World Lab</h1>
-          <p className="max-w-3xl text-sm text-muted-foreground">
-            Explore a representative 3D environment and run three bounded scientific experiments.
-            This reference workspace is not yet the complete World Lab or an engineering safety tool.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" className={buttonClass} onClick={newProject}>New project</button>
-          <button type="button" className={buttonClass} onClick={() => void save()} disabled={!project}>Save on device</button>
-          <button type="button" className={buttonClass} onClick={exportProject} disabled={!project}>Export project</button>
-          <button type="button" className={buttonClass} onClick={exportCadGeometry} disabled={!project||!project.entities.length}>Export CAD JSON</button>
-          <button type="button" className={buttonClass} onClick={()=>void exportCadGlb()} disabled={!project||!project.entities.length}>Export GLB</button>
-          <button type="button" className={buttonClass} onClick={exportCompleteArchive}
-            disabled={!project}>Export complete archive</button>
-          <input ref={importInput} className="sr-only" type="file" accept=".json,application/json"
-            aria-label="Import World Lab or legacy 3D project" onChange={event=>{
-              void importProject(event.target.files?.[0]);event.target.value="";
-            }}/>
-          <button type="button" className={buttonClass} onClick={()=>importInput.current?.click()}>Import JSON</button>
-          <input ref={cadImportInput} className="sr-only" type="file" accept=".envcad.json,.json,application/json"
-            aria-label="Import enV CAD geometry" onChange={event=>{
-              void importCadGeometry(event.target.files?.[0]);event.target.value="";
-            }}/>
-          <button type="button" className={buttonClass} onClick={()=>cadImportInput.current?.click()}>Import CAD JSON</button>
-        </div>
-      </header>
-      {project && (
-        <div className="mb-3 flex flex-wrap items-end gap-3 rounded-xl border border-border p-3">
-          <label className="min-w-[200px] flex-1 text-sm">Project name
-            <input className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2"
-              value={project.title} maxLength={120}
-              onChange={event=>mutateProject(current=>({...current,title:event.target.value}))}/>
-          </label>
-          <label className="min-w-[180px] text-sm">Saved local projects
-            <select className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2"
-              value={savedProjects.some(p=>p.id===project.id)?project.id:""}
-              onChange={event=>openSavedProject(event.target.value)}>
-              <option value="">Unsaved / imported copy</option>
-              {savedProjects.map(item=><option key={item.id} value={item.id}>{item.title} (rev {item.revision})</option>)}
-            </select>
-          </label>
-          <p role="status" className="text-xs text-muted-foreground">{workspaceDirty?"Unsaved project changes":"Local-only workspace"}</p>
-          {importWarnings.length>0 && <details className="w-full text-xs">
-            <summary>Legacy import notices ({importWarnings.length})</summary>
-            <ul className="list-disc pl-5">{importWarnings.map((x,i)=><li key={i}>{x}</li>)}</ul>
-          </details>}
-        </div>
-      )}
-      {recoveryDrafts.length>0&&
-        <section className="mb-3 rounded-xl border border-border p-3"
-          aria-label="Unsaved invention recovery">
-          <h3 className="text-sm font-semibold">Recover unfinished inventions</h3>
-          <p className="text-xs text-muted-foreground">
-            Browser-cached drafts are separate from saved projects.
-            Recovery only happens when you choose it; saving commits the recovered project.
-          </p>
-          {recoveryDrafts.map(draft=>
-            <div key={draft.id} className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
-              <span>{draft.project.title} · cached {new Date(draft.savedAt).toLocaleString()}</span>
-              <div className="flex gap-2">
-                <button className={buttonClass} type="button"
-                  onClick={()=>restoreRecoveryDraft(draft)}>Restore draft</button>
-                <button className={buttonClass} type="button"
-                  onClick={()=>{void discardRecoveryDraft(draft);}}>Discard cache</button>
-              </div>
-            </div>)}
-        </section>}
-      {recoveryStatus&&<p role="status" className="mb-2 text-xs">{recoveryStatus}</p>}
-      {cloudBackupsEnabled && <section className="mb-3 rounded-xl border border-border p-3"
-        aria-label="Authenticated project backups">
-        <h3 className="text-sm font-semibold">Back up your inventions to your account</h3>
-        <p className="text-xs text-muted-foreground">
-          Cloud backup is separate from local saving. Updates require a matching
-          cloud revision; downloads never silently overwrite your workspace.
-          The latest 20 saved cloud revisions are retained for explicit export.
-        </p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <button className={buttonClass} type="button" disabled={cloudBusy}
-            onClick={()=>{void loadAccountBackups();}}>Show my backups</button>
-          <button className={buttonClass} type="button" disabled={cloudBusy||!project}
-            onClick={()=>{void saveAccountBackup();}}>
-            {cloudBusy?"Working…":"Back up open project"}
-          </button>
-        </div>
-        {cloudError&&<p role="alert" className="mt-2 text-xs">{cloudError}</p>}
-        {cloudStatus&&<p role="status" className="mt-2 text-xs">{cloudStatus}</p>}
-        {cloudBackups.map(backup=><div key={backup.projectId}
-          className="mt-2 rounded-lg border border-border p-2 text-xs">
-          <p className="font-medium">{backup.title}</p>
-          <p>Project version {backup.projectRevision} · Backup version {backup.serverRevision}</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <button type="button" className={buttonClass}
-              disabled={cloudBusy}
-              onClick={()=>{void downloadAccountBackup(backup.projectId);}}>
-              Download JSON safely
-            </button>
-            <button type="button" className={buttonClass} disabled={cloudBusy}
-              onClick={()=>{void saveCloudBackupAsDeviceCopy(backup.projectId);}}>
-              Save new device copy
-            </button>
-            <button type="button" className={buttonClass} disabled={cloudBusy}
-              onClick={()=>{void loadAccountBackupVersions(backup.projectId);}}>
-              View history
-            </button>
-            <button type="button" className={buttonClass} disabled={cloudBusy}
-              onClick={()=>{void loadAccountScience(backup.projectId);}}>
-              Account scientific records
-            </button>
-            {project?.id===backup.projectId&&scientificEvidence.length>0&&
-              <button type="button" className={buttonClass} disabled={cloudBusy}
-                onClick={()=>{void uploadAccountScience(
-                  backup.projectId,backup.projectRevision);}}>
-                Upload saved scientific evidence
-              </button>}
-            <button type="button" className={buttonClass} disabled={cloudBusy}
-              onClick={()=>{void deleteAccountBackup(backup.projectId,backup.serverRevision);}}>
-              Delete cloud copy
-            </button>
-            {project?.id===backup.projectId&&
-              <button type="button" className={buttonClass} disabled={cloudBusy}
-                onClick={()=>{
-                  setCloudRevisionTokens(x=>({...x,
-                    [backup.projectId]:backup.serverRevision}));
-                  setCloudStatus("Prepared a conditional update from this open local design. Saving will still reject changes made on another device.");
-                }}>
-                Prepare update to this version
-              </button>}
+    <div ref={studioRef} className="wl-studio" data-open={studioPanel?"true":"false"} role="region" aria-label="The World Lab">
+      <h1 className="sr-only">The World Lab</h1>
+      <div className="wl-stage">
+        <canvas ref={canvasRef} className="wl-canvas"
+          aria-label="Interactive 3D illustrative environment. Touch or drag to look around; use WASD or arrow keys to move."
+          tabIndex={0} />
+        <WorldLabFieldOverlay layer={activeFieldLayer} timeSeconds={timeSeconds} visible={fieldOverlayEnabled&&!inspectionUiHidden}
+          vectorPlane={fieldVectorPlane} vectorSliceIndex={fieldVectorSliceIndex} tensorComponent={fieldTensorComponent}/>
+        {graphicsError && (
+          <div role="alert" className="absolute inset-0 flex items-center justify-center bg-bg p-4 text-center text-sm">
+            3D unavailable: {graphicsError}.
           </div>
-          {cloudScienceFor===backup.projectId&&
-            <div className="mt-2 space-y-2" aria-label={"Account scientific records for "+backup.title}>
-              {(cloudScience[backup.projectId]??[]).length===0&&
-                <p>No account scientific evidence is stored for this invention.</p>}
-              {(cloudScience[backup.projectId]??[]).map(record=>
-                <div key={record.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded border border-border p-2">
-                  <span>{record.kind} · revision {record.projectRevision}</span>
-                  <button type="button" className={buttonClass} disabled={cloudBusy}
-                    onClick={()=>{void getAccountScienceRecord(backup.projectId,record.id);}}>
-                    Download evidence
-                  </button>
-                  {project?.id===backup.projectId&&savedRevision!==null&&
-                    <button type="button" className={buttonClass} disabled={cloudBusy}
-                      onClick={()=>{void getAccountScienceRecord(
-                        backup.projectId,record.id,true);}}>
-                      Keep on this device
-                    </button>}
-                  <button type="button" className={buttonClass} disabled={cloudBusy}
-                    onClick={()=>{void removeAccountScience(backup.projectId,record.id);}}>
-                    Delete account copy
-                  </button>
-                </div>)}
-            </div>}
-          {cloudHistoryFor===backup.projectId&&
-            <div className="mt-2 space-y-2" aria-label={"Backup history for "+backup.title}>
-              {!(cloudVersions[backup.projectId]?.length)&&
-                <p>No saved versions are available.</p>}
-              {(cloudVersions[backup.projectId]??[]).map(version=>
-                <div key={version.serverRevision}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded border border-border p-2">
-                  <span>Backup #{version.serverRevision} · Project revision {version.projectRevision}</span>
-                  <button type="button" className={buttonClass} disabled={cloudBusy}
-                    onClick={()=>{void downloadAccountBackupVersion(
-                      backup.projectId,version.serverRevision);}}>
-                    Download snapshot
-                  </button>
-                  <button type="button" className={buttonClass} disabled={cloudBusy}
-                    onClick={()=>{void saveCloudBackupAsDeviceCopy(
-                      backup.projectId,version.serverRevision);}}>
-                    Save local copy
-                  </button>
-                </div>)}
-            </div>}
-        </div>)}
-      </section>}
-      {remoteJobsEnabled && <section className="mb-3 rounded-xl border border-border p-3"
-        aria-label="Authenticated remote World Lab calculations">
-        <h3 className="text-sm font-semibold">Run on your account's science worker</h3>
-        <p className="text-xs text-muted-foreground">
-          Advanced account-owned calculations. Only supported bounded models are submitted;
-          your locally saved projects remain available offline.
-        </p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <select className={inputLabel} value={remoteKind}
-            aria-label="Remote calculation type"
-            onChange={e=>{setRemoteKind(e.target.value as typeof remoteKind);setRemoteJob(null);setRemoteError("");}}>
-            <option value="hydrostatics">Floating and buoyancy</option>
-            <option value="dc-network">Connected DC circuit</option>
-            <option value="wired-motor">Circuit-powered lifting machine</option>
-            <option value="chemical-thermal">Hypothetical chemical heating</option>
-            <option value="multi-sphere">3D moving sphere contacts</option>
-            <option value="exhaustive-logic">Full invented digital truth-table check</option>
-            <option value="chemical-sweep">Chemical model: 25 assumption combinations</option>
-            <option value="structural-sweep">Structural beam: 25 material/load combinations</option>
-            <option value="newton-gravity">Newtonian multi-body gravity</option>
-          </select>
-          <button type="button" className={buttonClass} disabled={remoteBusy||!project||
-              (remoteKind!=="dc-network"&&remoteKind!=="chemical-thermal"&&remoteKind!=="multi-sphere"&&remoteKind!=="exhaustive-logic"&&remoteKind!=="chemical-sweep"&&
-                remoteKind!=="newton-gravity"&&!selectedEntity)||
-              (remoteKind==="exhaustive-logic"&&
-                ((project?.digitalNetworks?.[0]?.inputs.length??0)<9))||
-              (remoteKind==="newton-gravity"&&groupSpheres.length<2)||
-              (remoteKind==="multi-sphere"&&(groupSpheres.length<2||groupSpheres.length>12))||
-              (remoteKind!=="hydrostatics"&&remoteKind!=="multi-sphere"&&remoteKind!=="chemical-thermal"&&remoteKind!=="exhaustive-logic"&&remoteKind!=="chemical-sweep"&&
-                remoteKind!=="newton-gravity"&&!project?.networks?.[0])}
-            onClick={()=>{void submitRemoteJob();}}>
-            {remoteBusy?"Submitting calculation…":"Submit authenticated job"}
-          </button>
-          {remoteJob&&(remoteJob.status==="queued"||remoteJob.status==="running")&&
-            <button type="button" className={buttonClass}
-              onClick={()=>{void cancelRemoteJob();}}>Cancel job</button>}
+        )}
+      </div>
+      <div className="wl-hud-top">
+        <StudioBack/>
+        {showInspectionLabels&&!inspectionUiHidden&&<p className="wl-chip">
+          {illustrativeLayerForDepth(observerDepth)} · {observerDepth.toFixed(1)} m below surface · {observerRange.toFixed(1)} m view scale · illustrative, not mapped
+        </p>}
+      </div>
+      <div className="wl-hud-bottom">
+        <div className="wl-pad" role="group" aria-label="Look around">
+          <StudioHoldButton label="Look up" onStep={()=>lookBy(0,-2.2)}><ChevronUp aria-hidden="true" size={22}/></StudioHoldButton>
+          <StudioHoldButton label="Look left" onStep={()=>lookBy(-2.8,0)}><ChevronLeft aria-hidden="true" size={22}/></StudioHoldButton>
+          <StudioHoldButton label="Look right" onStep={()=>lookBy(2.8,0)}><ChevronRight aria-hidden="true" size={22}/></StudioHoldButton>
+          <StudioHoldButton label="Look down" onStep={()=>lookBy(0,2.2)}><ChevronDown aria-hidden="true" size={22}/></StudioHoldButton>
+          <StudioHoldButton label="Level horizon" once onStep={levelHorizon}><Crosshair aria-hidden="true" size={20}/></StudioHoldButton>
         </div>
-        <div className="mt-2">
-          <button type="button" className={buttonClass} disabled={remoteHistoryBusy}
-            onClick={()=>{void loadRemoteHistory();}}>
-            {remoteHistoryBusy?"Loading jobs…":"My recent cloud calculations"}
-          </button>
-          {remoteHistory.length>0&&
-            <div className="mt-2 max-h-52 space-y-2 overflow-y-auto"
-              aria-label="Previous authenticated scientific calculations">
-              {remoteHistory.map(job=>
-                <div key={job.id} className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <span>{job.kind} · {job.status} · project revision {job.projectRevision}</span>
-                  <button type="button" className={buttonClass}
-                    onClick={()=>{void openRemoteHistoryJob(job);}}>
-                    Open evidence
-                  </button>
-                </div>)}
-            </div>}
+        <div className="wl-compass" role="status" aria-label="Heading">
+          {String(Math.round(lookState.heading)%360).padStart(3,"0")}°
         </div>
-        {remoteError&&<p role="alert" className="mt-2 text-xs">{remoteError}</p>}
-        {remoteJob&&
-          <div role="status" aria-live="polite" className="mt-2 text-xs">
-            <p>Job {remoteJob.id}: {remoteJob.status}</p>
-            {(remoteJob.projectId!==project?.id||
-              remoteJob.projectRevision!==project?.revision)&&
-              <p className="mt-1 text-muted-foreground">
-                This is evidence for a different or earlier project snapshot
-                ({remoteJob.projectId}, revision {remoteJob.projectRevision}).
-                It is available for export only and is not applied to this invention.
-              </p>}
-            {remoteJob.errorCode&&<p>Solver status: {remoteJob.errorCode}</p>}
-            {remoteJob.status==="succeeded"&&remoteJob.result!==null&&
-              <div className="flex flex-wrap gap-2">
-                <button type="button" className={buttonClass} onClick={()=>
-                  downloadJson("world-lab-owned-computation-evidence.json",remoteJob.result)}>
-                  Export authenticated calculation evidence
-                </button>
-                {remoteJob.kind==="newton-gravity"&&
-                  remoteJob.projectId===project?.id&&
-                  remoteJob.projectRevision===project?.revision&&
-                  <button type="button" className={buttonClass}
-                    onClick={keepRemoteGravityEvidence}>
-                    Keep remote gravity trajectory with invention
-                  </button>}
-              </div>}
-          </div>}
-      </section>}
-      <section className="mb-3 rounded-xl border border-border p-3"
-        aria-label="Chemical reaction and temperature experiment">
-        <h3 className="text-sm font-semibold">See how an imagined reaction makes heat</h3>
-        <p className="text-xs text-muted-foreground">
-          Invent a hypothetical reaction. Temperature changes its rate;
-          released reaction heat changes temperature. These are your assumptions,
-          not proven chemical identities or real safety predictions.
-        </p>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          {([
-            ["initialReactantMol","Starting substance (mol)",0.001,10000,0.1],
-            ["preExponentialPerS","Assumed reaction factor (1/s)",0,100000,0.1],
-            ["activationEnergyJPerMol","Activation energy (J/mol)",0,200000,1000],
-            ["reactionHeatReleasedJPerMol","Heat released (+) or absorbed (−) (J/mol)",-1000000,1000000,1000],
-            ["heatCapacityJPerK","Total heat capacity (J/K)",1,1000000,50],
-            ["coolingConductanceWPerK","Cooling (W/K)",0,10000,1],
-            ["initialTemperatureK","Starting temperature (K)",200,1200,10],
-            ["ambientTemperatureK","Surrounding temperature (K)",200,1200,10],
-            ["externalHeatingW","External heating (+) or cooling (−) (W)",-10000,10000,10],
-          ] as const).map(([field,label,min,max,step])=>
-            <label key={field} className="text-xs">{label}
-              <input className={inputLabel} type="number" min={min} max={max}
-                step={step} aria-label={label} value={chemicalInput[field]}
-                onChange={e=>{
-                  setChemicalPlaying(false);setChemicalRun(null);
-                  setChemicalInput(p=>({...p,[field]:Number(e.target.value)}));
-                }}/>
-            </label>)}
+        <div className="wl-pad wl-pad--move" role="group" aria-label="Move">
+          <StudioHoldButton label="Step forward" onStep={()=>walkBy(1)}><ArrowUp aria-hidden="true" size={22}/></StudioHoldButton>
+          <StudioHoldButton label="Step back" onStep={()=>walkBy(-1)}><ArrowDown aria-hidden="true" size={22}/></StudioHoldButton>
         </div>
-        <button type="button" className={buttonClass+" mt-2"}
-          onClick={calculateChemicalReaction}>Calculate reaction and temperature</button>
-        {chemicalRun&&chemicalSample&&<div className="mt-2 rounded-lg border border-border p-2 text-xs"
-          aria-label="Computed reaction rate and thermal energy">
-          <p>Time: {chemicalSample.timeSeconds.toFixed(3)} s</p>
-          <p>Conversion: {(100*chemicalSample.productFormedMol/
-            chemicalRun.input.initialReactantMol).toFixed(2)}%</p>
-          <p>Temperature: {chemicalSample.temperatureK.toFixed(3)} K</p>
-          <p>Reaction rate: {chemicalSample.reactionRateMolPerS.toExponential(3)} mol/s</p>
-          <p>Reaction thermal power: {chemicalSample.reactionPowerW.toFixed(3)} W</p>
-          <p>Stored heat change: {chemicalSample.storedThermalEnergyChangeJ.toFixed(4)} J</p>
-          <p>Energy balance residual: {chemicalSample.energyResidualJ.toExponential(3)} J</p>
-          <div className="mt-1 h-2 overflow-hidden rounded bg-slate-200"
-            role="img" aria-label="Computed fraction of assumed reactant converted">
-            <div className="h-full bg-blue-600" style={{
-              width:(100*chemicalSample.productFormedMol/
-                chemicalRun.input.initialReactantMol)+"%",
-            }}/>
+      </div>
+      <StudioRail open={!!studioPanel} active={studioPanel} onSelect={setStudioPanel} onClose={()=>setStudioPanel(null)}/>
+      <StudioDrawer open={!!studioPanel} onClose={()=>setStudioPanel(null)}>
+        <StudioGroup id="project">
+          <div className="wl-toolbar" role="toolbar" aria-label="Project">
+            <button type="button" className="wl-tool" aria-label="New project" title="New project" onClick={newProject}><FilePlus2 aria-hidden="true" size={20}/></button>
+            <button type="button" className="wl-tool" aria-label="Save on device" title="Save on device" onClick={() => void save()} disabled={!project}><Save aria-hidden="true" size={20}/></button>
+            <button type="button" className="wl-tool" aria-label="Export project" title="Export project" onClick={exportProject} disabled={!project}><Download aria-hidden="true" size={20}/></button>
+            <button type="button" className="wl-tool" aria-label="Export CAD JSON" title="Export CAD JSON" onClick={exportCadGeometry} disabled={!project||!project.entities.length}><Braces aria-hidden="true" size={20}/></button>
+            <button type="button" className="wl-tool" aria-label="Export GLB" title="Export GLB" onClick={()=>void exportCadGlb()} disabled={!project||!project.entities.length}><Box aria-hidden="true" size={20}/></button>
+            <button type="button" className="wl-tool" aria-label="Export complete archive" title="Export complete archive" onClick={exportCompleteArchive} disabled={!project}><Archive aria-hidden="true" size={20}/></button>
+            <input ref={importInput} className="sr-only" type="file" accept=".json,application/json"
+                      aria-label="Import World Lab or legacy 3D project" onChange={event=>{
+                        void importProject(event.target.files?.[0]);event.target.value="";
+                      }}/>
+            <button type="button" className="wl-tool" aria-label="Import JSON" title="Import JSON" onClick={()=>importInput.current?.click()}><Upload aria-hidden="true" size={20}/></button>
+            <input ref={cadImportInput} className="sr-only" type="file" accept=".envcad.json,.json,application/json"
+                      aria-label="Import enV CAD geometry" onChange={event=>{
+                        void importCadGeometry(event.target.files?.[0]);event.target.value="";
+                      }}/>
+            <button type="button" className="wl-tool" aria-label="Import CAD JSON" title="Import CAD JSON" onClick={()=>cadImportInput.current?.click()}><FileUp aria-hidden="true" size={20}/></button>
           </div>
-          <label className="mt-2 block">Explore reaction time
-            <input className="w-full" type="range" min={0}
-              max={chemicalRun.input.durationSeconds}
-              step={chemicalRun.solverStepSeconds} value={chemicalTime}
-              aria-label="Explore chemical time"
-              onChange={e=>{setChemicalPlaying(false);setChemicalTime(Number(e.target.value));}}/>
-          </label>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <button type="button" className={buttonClass}
-              onClick={()=>setChemicalPlaying(v=>!v)}>
-              {chemicalPlaying?"Pause reaction":"Play reaction"}
-            </button>
-            <button type="button" className={buttonClass} onClick={()=>{
-              setChemicalPlaying(false);setChemicalTime(t=>
-                Math.min(chemicalRun.input.durationSeconds,t+chemicalRun.solverStepSeconds));
-            }}>Step reaction</button>
-            <button type="button" className={buttonClass} onClick={()=>{
-              setChemicalPlaying(false);setChemicalTime(0);
-            }}>Reset reaction</button>
-            <button type="button" className={buttonClass}
-              onClick={()=>downloadJson("world-lab-hypothetical-reaction-evidence.json",chemicalRun)}>
-              Export reaction evidence
-            </button>
-          </div>
-          <p className="mt-1 text-muted-foreground">{chemicalRun.validity}</p>
-        </div>}
-      </section>
-      <section className="mb-3 rounded-xl border border-border p-3"
-        aria-label="Recorded scientific evidence library">
-        <h3 className="text-sm font-semibold">Saved scientific evidence</h3>
-        <p className="text-xs text-muted-foreground">
-          Gravity and material-contact results keep their original project
-          revision, hypothetical inputs and numerical trajectory. Save or
-          export the invention to preserve newly recorded experiments.
-        </p>
-        {scientificEvidence.length===0&&
-          <p className="mt-2 text-xs">No additional scientific records yet.</p>}
-        {scientificEvidence.map(record=>
-          <div key={record.id}
-            className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
-            <span>{record.kind==="newton-gravity"?"Gravity":record.kind==="interface-optics"?"Optics":"Material heat"} ·
-              revision {record.projectRevision} ·
-              {new Date(record.createdAt).toLocaleString()}</span>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" className={buttonClass}
-                onClick={()=>downloadJson("world-lab-"+record.kind+"-"+record.id+".json",
-                  record.result)}>Export evidence</button>
-              <button type="button" className={buttonClass}
-                onClick={()=>{void discardScientificEvidence(record);}}>
-                Discard record
-              </button>
-            </div>
-          </div>)}
-      </section>
-      <WorldLabElasticWavePanel project={project} onKeepEvidence={keepScientificEvidence}/>
-      <WorldLabRadiationPanel project={project} onKeepEvidence={keepScientificEvidence}/>
-      <WorldLabMaterialHeatPanel project={project}
-        onKeepEvidence={keepScientificEvidence}
-        onSample={(sample:MaterialHeatSample|null,run:MaterialHeatRun|null)=>{
-          const scene=sceneRef.current;
-          if(!scene||!sample||!run)return;
-          const items=[[run.firstEntityId,sample.firstTemperatureK],
-            [run.secondEntityId,sample.secondTemperatureK]] as const;
-          for(const [id,temperature] of items){
-            const material=scene.addedShapes.get(id)?.material;
-            if(material instanceof B.StandardMaterial){
-              const hot=Math.max(0,Math.min(1,(temperature-200)/1800));
-              material.diffuseColor=new B.Color3(0.2+0.75*hot,0.4+0.35*hot,
-                0.85-0.65*hot);
-            }
-          }
-        }}/>
-      <WorldLabOpticsPanel project={project} mutateProject={mutateProject}
-        onKeepEvidence={keepScientificEvidence} onVisualize={drawOpticalReference}
-        onVisualizeRay={drawAuthoredOpticalTrace}/>
-      <WorldLabGravityPanel project={project} onKeepEvidence={keepScientificEvidence}
-        remoteComputed={remoteJob?.status==="succeeded"&&
-          remoteJob.kind==="newton-gravity"&&remoteJob.result&&
-          typeof remoteJob.result==="object"&&"outcome" in remoteJob.result?
-          (remoteJob.result as {outcome:GravityRun}).outcome:null}
-        cloudEnabled={remoteJobsEnabled}
-        cloudBusy={remoteBusy}
-        remoteJobStatus={remoteJob?.kind==="newton-gravity"&&
-          remoteJob.projectId===project?.id&&remoteJob.projectRevision===project?.revision
-          ?remoteJob.status:null}
-        onRemote={config=>{void submitRemoteJob("newton-gravity",config);}}
-        onFrame={(frame:GravityFrame|null,bodies:readonly GravityBody[])=>{
-          const scene=sceneRef.current;
-          if(!scene)return;
-          for(let i=0;i<bodies.length;i++){
-            const mesh=scene.addedShapes.get(bodies[i].entityId);
-            if(mesh){
-              const pos=frame?.positionsM[i]??bodies[i].initialPositionM;
-              mesh.position.copyFromFloats(...pos);
-            }
-          }
-        }}/>
-      <WorldLabDigitalLogicPanel project={project} mutateProject={mutateProject}
-        cloudConfigured={remoteJobsEnabled} cloudBusy={remoteBusy}
-        remoteJobStatus={remoteJob?.kind==="exhaustive-logic"&&
-          remoteJob.projectId===project?.id&&remoteJob.projectRevision===project?.revision
-          ?remoteJob.status:null}
-        onCloudVerify={()=>{void submitRemoteJob("exhaustive-logic");}}/>
-      <WorldLabVehiclePanel project={project}/>
-      <section className="mb-3 rounded-xl border border-border p-3" aria-label="Connected inventions and DC circuit">
-        <h3 className="text-sm font-semibold">Connect electricity</h3>
-        <p className="text-xs text-muted-foreground">Build a small connected circuit. Current and power are calculated from the wires (shared nodes), not animated guesses.</p>
-        {(project?.networks?.length??0)===0 && <button className={buttonClass+" mt-2"} type="button" onClick={createCircuit}>Build first circuit</button>}
-        {project?.networks?.[0] && <>
-          <WorldLabCircuitDiagram network={project.networks[0]}
-            result={dcRun?.projectId===project.id &&
-              dcRun.projectRevision===project.revision?dcRun:null}/>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            {project.networks[0].components.filter(c=>c.kind==="dc-source" || c.kind==="resistor").map(c=>
-              <label key={c.id} className="text-xs">
-                {c.kind==="dc-source"?"Battery voltage (V)":"Resistor ("+c.id+") (Ω)"}
-                <input className={inputLabel} type="number" aria-label={c.kind==="dc-source"?"Battery voltage":"Resistance "+c.id}
-                  min={c.kind==="dc-source"?-1000:0.01} max={c.kind==="dc-source"?1000:1000000000}
-                  step={c.kind==="dc-source"?1:10}
-                  value={c.kind==="dc-source"?c.voltageV:c.kind==="resistor"?c.resistanceOhm:0}
-                  onChange={e=>updateCircuitValue(c.id,Number(e.target.value))}/>
-              </label>)}
-          </div>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <button type="button" className={buttonClass} onClick={()=>{
-              const net=project.networks?.[0];
-              if(!net||net.components.length>=48||
-                !net.components.some(c=>c.kind==="dc-source"))return;
-              mutateProject(p=>({...p,networks:(p.networks??[]).map((n,i)=>i? n:{
-                ...n,components:[...n.components,{id:crypto.randomUUID(),kind:"resistor" as const,
-                  positiveNodeId:n.components.find(c=>c.kind==="dc-source")?.positiveNodeId??n.groundNodeId,
-                  negativeNodeId:n.components.find(c=>c.kind==="dc-source")?.negativeNodeId??n.groundNodeId,
-                  resistanceOhm:200}],
-              })}));
-            }}>Add parallel resistor</button>
-            <button type="button" className={buttonClass} onClick={calculateCircuit}>Calculate circuit</button>
-          </div>
-          <details className="mt-2 rounded-lg border border-border p-2" aria-label="Advanced circuit wiring">
-            <summary className="cursor-pointer text-xs font-medium">Connect more parts and wires</summary>
-            <p className="mt-2 text-xs text-muted-foreground">
-              A wire is a shared named node. Place components between two different
-              nodes; unconnected nodes cannot be calculated until wired.
-            </p>
-            <div className="mt-2 flex flex-wrap items-end gap-2">
-              <label className="text-xs">New wire junction name
-                <input className={inputLabel} aria-label="New electrical node label"
-                  maxLength={80} value={newCircuitNodeLabel}
-                  onChange={e=>setNewCircuitNodeLabel(e.target.value)}/>
-              </label>
-              <button type="button" className={buttonClass}
-                disabled={!newCircuitNodeLabel.trim()||project.networks[0].nodes.length>=24}
-                onClick={()=>{
-                  mutateProject(p=>({...p,networks:(p.networks??[]).map((n,i)=>i?n:
-                    addCircuitNode(n,crypto.randomUUID(),newCircuitNodeLabel))}));
-                  setNewCircuitNodeLabel("");
-                }}>Add wire junction</button>
-            </div>
-            <div className="mt-2 space-y-1">
-              {project.networks?.[0]?.nodes.map(node=><div className="flex items-center justify-between gap-2 text-xs"
-                key={node.id}>
-                <span>{node.label}{node.id===project.networks![0].groundNodeId?" (ground)":""}</span>
-                <button type="button" className={buttonClass}
-                  disabled={node.id===project.networks![0].groundNodeId||
-                    project.networks![0].nodes.length<=2||
-                    project.networks![0].components.some(c=>
-                      c.positiveNodeId===node.id||c.negativeNodeId===node.id)}
-                  onClick={()=>mutateProject(p=>({...p,
-                    networks:(p.networks??[]).map((n,i)=>i?n:removeUnusedCircuitNode(n,node.id)),
-                  }))}>Remove unused</button>
-              </div>)}
-            </div>
-            <p className="mt-2 text-xs font-medium">Add resistor between two chosen junctions</p>
-            <div className="mt-1 grid grid-cols-2 gap-2">
-              <label className="text-xs">Positive-side junction
-                <select className={inputLabel} aria-label="New resistor positive node"
-                  value={project.networks[0].nodes.some(n=>n.id===wirePositive)?wirePositive:""}
-                  onChange={e=>setWirePositive(e.target.value)}>
-                  <option value="">Choose node</option>
-                  {project.networks[0].nodes.map(n=><option key={n.id} value={n.id}>{n.label}</option>)}
-                </select>
-              </label>
-              <label className="text-xs">Negative-side junction
-                <select className={inputLabel} aria-label="New resistor negative node"
-                  value={project.networks[0].nodes.some(n=>n.id===wireNegative)?wireNegative:""}
-                  onChange={e=>setWireNegative(e.target.value)}>
-                  <option value="">Choose node</option>
-                  {project.networks[0].nodes.map(n=><option key={n.id} value={n.id}>{n.label}</option>)}
-                </select>
-              </label>
-              <label className="text-xs">Assumed resistance (Ω)
-                <input className={inputLabel} aria-label="New wired resistor ohms"
-                  type="number" min={0.01} max={1000000000}
-                  value={wireResistance} onChange={e=>setWireResistance(Number(e.target.value))}/>
-              </label>
-              <button type="button" className={buttonClass}
-                disabled={project.networks[0].components.length>=48||
-                  !project.networks[0].nodes.some(n=>n.id===wirePositive)||
-                  !project.networks[0].nodes.some(n=>n.id===wireNegative)||
-                  wirePositive===wireNegative||!Number.isFinite(wireResistance)||
-                  wireResistance<0.01||wireResistance>1e9}
-                onClick={()=>mutateProject(p=>({...p,networks:(p.networks??[]).map((n,i)=>i?n:
-                  addCircuitResistor(n,crypto.randomUUID(),wirePositive,wireNegative,wireResistance))}))}>
-                Connect resistor
-              </button>
-            </div>
-            <p className="mt-3 text-xs font-medium">Rewire existing components</p>
-            {project.networks[0].components.map(part=><div key={part.id}
-              className="mt-2 rounded border border-border p-2">
-              <p className="text-xs font-medium">
-                {part.kind==="dc-source"?"Source":part.kind==="resistor"?"Resistor":part.name}
-              </p>
-              <div className="mt-1 grid grid-cols-2 gap-2">
-                <label className="text-xs">Positive terminal
-                  <select className={inputLabel} aria-label={"Positive node for "+part.id}
-                    value={part.positiveNodeId}
-                    onChange={e=>mutateProject(p=>({...p,networks:(p.networks??[]).map((n,i)=>i?n:
-                      rewireCircuitPart(n,part.id,e.target.value,part.negativeNodeId))}))}>
-                    {project.networks?.[0]?.nodes.map(node=>
-                      <option key={node.id} value={node.id}>{node.label}</option>)}
-                  </select>
-                </label>
-                <label className="text-xs">Negative terminal
-                  <select className={inputLabel} aria-label={"Negative node for "+part.id}
-                    value={part.negativeNodeId}
-                    onChange={e=>mutateProject(p=>({...p,networks:(p.networks??[]).map((n,i)=>i?n:
-                      rewireCircuitPart(n,part.id,part.positiveNodeId,e.target.value))}))}>
-                    {project.networks?.[0]?.nodes.map(node=>
-                      <option key={node.id} value={node.id}>{node.label}</option>)}
-                  </select>
-                </label>
-              </div>
-            </div>)}
-            <p className="mt-2 text-xs text-muted-foreground">
-              Calculations use these node connections and conservation equations.
-              This is a bounded DC reference, not a general transient circuit solver.
-            </p>
-          </details>
-          <details className="mt-2">
-            <summary className="cursor-pointer text-xs">Invent an unknown electrical device</summary>
-            <label className="block text-xs">Name
-              <input className={inputLabel} maxLength={120} aria-label="Invented device name"
-                value={inventedDeviceName} onChange={e=>setInventedDeviceName(e.target.value)}/>
-            </label>
-            <label className="block text-xs">Assumed behavior or unknown property
-              <input className={inputLabel} maxLength={500} aria-label="Invented device assumption"
-                value={inventedDeviceAssumption} onChange={e=>setInventedDeviceAssumption(e.target.value)}/>
-            </label>
-            <label className="block text-xs">Optional assumed equivalent resistance (Ω)
-              <input className={inputLabel} type="number" min={0.01} max={1000000000}
-                aria-label="Invented component assumed resistance" value={inventedDeviceResistance}
-                placeholder="Leave blank if unknown"
-                onChange={e=>setInventedDeviceResistance(e.target.value)}/>
-            </label>
-            <p className="text-xs text-muted-foreground">Only a declared Ohmic approximation can be calculated; this does not establish how an unknown invention really behaves.</p>
-            <button type="button" className={buttonClass} onClick={inventDevice}
-              disabled={!inventedDeviceName.trim()||!inventedDeviceAssumption.trim()||
-                (inventedDeviceResistance.trim()!==""
-                  && (!Number.isFinite(Number(inventedDeviceResistance))||
-                      Number(inventedDeviceResistance)<0.01||Number(inventedDeviceResistance)>1e9))||
-                project.networks[0].components.length>=48}>Add hypothetical device</button>
-            <p className="text-xs text-muted-foreground">Unknown parts do not receive fabricated electronic behavior.</p>
-            {project.networks[0].components.filter(c=>c.kind==="hypothetical-device"||c.kind==="resistor").map(c=>
-              <div key={c.id} className="mt-2 flex items-center justify-between gap-2 text-xs">
-                <span>{c.kind==="hypothetical-device"
-                  ? c.name+(c.assumedResistanceOhm===undefined?" (unknown)": " (assumed "+c.assumedResistanceOhm+" Ω)")
-                  :"Resistor ("+c.id+")"}</span>
-                <button type="button" className={buttonClass}
-                  aria-label={"Remove circuit part "+c.id}
-                  onClick={()=>mutateProject(p=>({...p,networks:(p.networks??[]).map((n,i)=>i?n:{
-                    ...n,components:n.components.filter(x=>x.id!==c.id),
-                  })}))}>Remove</button>
-              </div>)}
-          </details>
-          {dcRun && dcRun.projectId===project.id&&dcRun.projectRevision===project.revision&&
-            dcRun.networkId===project.networks[0].id && <div className="mt-2 text-xs" aria-label="Calculated circuit results">
-              <p>Positive source node: {dcRun.nodeVoltagesV[
-                project.networks[0].components.find(c=>c.kind==="dc-source")?.positiveNodeId??project.networks[0].groundNodeId
-              ]?.toFixed(3)} V</p>
-              <p>Delivered power: {dcRun.sourcePowerSuppliedW.toFixed(4)} W</p>
-              <p>Resistor and assumed-Ohmic-device heating: {dcRun.resistivePowerW.toFixed(4)} W</p>
-              {dcRun.assumedOhmicDeviceIds.length>0 && <p>Hypothetical equivalent resistors used:
-                {" "+dcRun.assumedOhmicDeviceIds.join(", ")}. Their properties are not measured.</p>}
-              <p>Conservation residual: {dcRun.powerResidualW.toExponential(2)} W</p>
-              {Object.entries(dcRun.branchCurrentsA).map(([id,current])=><p key={id}>{id}: {current.toFixed(5)} A</p>)}
-              <button type="button" className={buttonClass} onClick={()=>downloadJson("world-lab-dc-evidence.json",dcRun)}>Export DC evidence</button>
-              <p className="text-muted-foreground">{dcRun.validity}</p>
-            </div>}
-        </>}
-      </section>
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-        <div className="min-w-0">
-          <div className="relative overflow-hidden rounded-xl border border-border bg-slate-200">
-            <canvas ref={canvasRef} className="h-[52dvh] min-h-[300px] w-full touch-none"
-              aria-label="Interactive 3D illustrative environment. Touch or drag to look around; use WASD or arrow keys to move."
-              tabIndex={0} />
-            <WorldLabFieldOverlay layer={activeFieldLayer} timeSeconds={timeSeconds} visible={fieldOverlayEnabled&&!inspectionUiHidden}
-              vectorPlane={fieldVectorPlane} vectorSliceIndex={fieldVectorSliceIndex} tensorComponent={fieldTensorComponent}/>
-            {graphicsError && (
-              <div role="alert" className="absolute inset-0 flex items-center justify-center bg-bg p-4 text-center text-sm">
-                3D unavailable: {graphicsError}. The scientific controls and values remain accessible below.
-              </div>
-            )}
-            {showInspectionLabels&&!inspectionUiHidden&&<p className="pointer-events-none absolute bottom-2 left-2 rounded bg-bg/90 px-2 py-1 text-xs text-fg">
-              {illustrativeLayerForDepth(observerDepth)} · {observerDepth.toFixed(1)} m below surface · {observerRange.toFixed(1)} m view scale · illustrative, not mapped
-            </p>}
-          </div>
-          <section className="mt-3 rounded-lg border border-border p-3" aria-label="Build interconnected visual assemblies">
-            <h3 className="text-sm font-semibold">Build an invention from parts</h3>
-            <p className="text-xs text-muted-foreground">
-              Group two created solids and move them together. This links their layout,
-              but does not invent a physical joint or certified rigidity.
-            </p>
-            {selectedEntity&&<div className="mt-2 grid grid-cols-2 gap-2">
-              <label className="text-xs">Assembly name
-                <input className={inputLabel} maxLength={120}
-                  aria-label="Assembly name" value={assemblyName}
-                  onChange={e=>setAssemblyName(e.target.value)}/>
-              </label>
-              <label className="text-xs">Second part
-                <select className={inputLabel} aria-label="Assembly second solid"
-                  value={assemblySecondId}
-                  onChange={e=>setAssemblySecondId(e.target.value)}>
-                  <option value="">Choose another solid</option>
-                  {project?.entities.filter(e=>e.id!==selectedEntity.id &&
-                    !(project?.assemblies??[]).some(a=>a.entityIds.includes(e.id))).map(e=>
-                      <option key={e.id} value={e.id}>{e.name}</option>)}
-                </select>
-              </label>
-              <button className={buttonClass} type="button"
-                disabled={!assemblyName.trim()||!assemblySecondId||
-                  (project?.assemblies?.length??0)>=50||
-                  (project?.assemblies??[]).some(a=>a.entityIds.includes(selectedEntity.id))}
-                onClick={()=>mutateProject(p=>createWorldLabAssembly(p,crypto.randomUUID(),
-                  assemblyName,[selectedEntity.id,assemblySecondId]))}>
-                Connect these visual parts
-              </button>
-            </div>}
-            {project?.assemblies?.map(a=>{
-              const details=summarizeWorldLabAssembly(project,a.id);
-              return <div key={a.id} className="mt-2 rounded border border-border p-2 text-xs">
-                <p className="font-medium">{a.name} · {details.count} solids</p>
-                <p>Combined shape volumes: {details.volumeM3.toFixed(4)} m³</p>
-                <p>Assumed combined mass: {details.assumedMassKg===null?"Unknown":
-                  details.assumedMassKg.toFixed(3)+" kg"}</p>
-                <p className="text-muted-foreground">{details.validity}</p>
-                <div className="mt-2 flex flex-wrap items-center gap-1">
-                  {(["X","Y","Z"] as const).map((axis,index)=><span key={axis}
-                    className="flex flex-wrap items-center gap-1">
-                    <button type="button" className={buttonClass}
-                      aria-label={"Move "+a.name+" negative "+axis}
-                      onClick={()=>mutateProject(p=>moveWorldLabAssembly(p,a.id,
-                        ([0,1,2] as const).map(i=>i===index?-assemblyStep:0) as [number,number,number]))}>
-                      −{axis}
-                    </button>
-                    <button type="button" className={buttonClass}
-                      aria-label={"Move "+a.name+" positive "+axis}
-                      onClick={()=>mutateProject(p=>moveWorldLabAssembly(p,a.id,
-                        ([0,1,2] as const).map(i=>i===index?assemblyStep:0) as [number,number,number]))}>
-                      +{axis}
-                    </button>
-                  </span>)}
-                  <button type="button" className={buttonClass}
-                    onClick={()=>mutateProject(p=>ungroupWorldLabAssembly(p,a.id))}>
-                    Disconnect group
-                  </button>
-                </div>
-              </div>;
-            })}
-            <label className="mt-2 block text-xs">Group movement increment (m)
-              <select className={inputLabel} aria-label="Assembly movement increment"
-                value={assemblyStep} onChange={e=>setAssemblyStep(Number(e.target.value))}>
-                <option value={0.1}>0.1</option><option value={0.5}>0.5</option>
-                <option value={1}>1</option><option value={5}>5</option>
-              </select>
-            </label>
-          </section>
-          <WorldLabCadPanel project={project} selectedEntityId={selectedEntityId} onChange={mutateProject}/>
-          <WorldLabGeoreferencePanel project={project} selectedEntityId={selectedEntityId} onChange={mutateProject}/>
-            <WorldLabReferenceLayersPanel/>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <button type="button" className={buttonClass} aria-expanded={seeInside}
-              onClick={() => updateInspectionView({mode:seeInside?"normal":"transparent"})}>See Inside</button>
-            <button type="button" className={buttonClass} onClick={() => zoomView(1)}
-              aria-label="Zoom in">Zoom in</button>
-            <button type="button" className={buttonClass} onClick={() => zoomView(-1)}
-              aria-label="Zoom out">Zoom out</button>
-            <button type="button" className={buttonClass} onClick={saveObserverViewpoint}>Save viewpoint</button>
-            <button type="button" className={buttonClass} onClick={restoreObserverViewpoint}>Restore viewpoint</button>
-            <button type="button" className={buttonClass} onClick={returnObserverToSurface}>Return to surface</button>
-            <button type="button" className={buttonClass} disabled={!project || shapeCount >= 200}
-              onClick={() => addShape("box")}>Add cube</button>
-            <button type="button" className={buttonClass} disabled={!project || shapeCount >= 200}
-              onClick={() => addShape("sphere")}>Add sphere</button>
-            <button type="button" className={buttonClass} disabled={!project || shapeCount >= 200}
-              onClick={() => addShape("cylinder")}>Add cylinder</button>
-            <button type="button" className={buttonClass} disabled={!selectedEntity}
-              onClick={() => {if(selectedEntity)mutateProject(p=>({...p,
-                entities:p.entities.filter(e=>e.id!==selectedEntity.id),
-                assemblies:(p.assemblies??[]).map(a=>({...a,entityIds:a.entityIds.filter(id=>
-                  id!==selectedEntity.id)})).filter(a=>a.entityIds.length>=2),
-              }));
-                setSelectedEntityId("");}}>Remove selected</button>
-              <button type="button" className={buttonClass} disabled={!canUndo}
-                aria-label="Undo World Lab edit" onClick={()=>travelEdit("undo")}>Undo</button>
-              <button type="button" className={buttonClass} disabled={!canRedo}
-                aria-label="Redo World Lab edit" onClick={()=>travelEdit("redo")}>Redo</button>
-          </div>
-          <WorldLabInspectionPanel mode={inspectionMode}
-            onModeChange={mode=>updateInspectionView({mode})}
-            opacity={opacity} onOpacityChange={value=>updateInspectionView({opacity:value})}
-            axis={cutawayAxis} onAxisChange={axis=>updateInspectionView({axis,normal:axis==="x"?[1,0,0]:axis==="y"?[0,1,0]:[0,0,1]})}
-            normal={cutawayNormal} onNormalChange={normal=>updateInspectionView({normal})}
-            cutawayFraction={cutawayFraction} onCutawayFractionChange={value=>updateInspectionView({cutawayFraction:value})}
-            explosionDistanceM={explosionDistanceM} onExplosionDistanceChange={value=>updateInspectionView({explosionDistanceM:value})}
-            selected={selectedEntity??null} hasAssembly={!!project?.assemblies?.some(a=>a.entityIds.includes(selectedEntityId))}
-            onSelectedOpacityChange={value=>{if(selectedEntity)editSelected({opacity:value});}}
-            onZoomSelected={focusSelected} onReset={()=>{
-              updateInspectionView({mode:"normal",opacity:55,axis:"x",normal:[1,0,0],cutawayFraction:0,explosionDistanceM:1});
-              setFieldOverlayEnabled(false);setInspectionUiHidden(false);setShowInspectionLabels(true);
-            }}
-            canUndoView={inspectionHistory.current.past.length>0}
-            canRedoView={inspectionHistory.current.future.length>0}
-            onUndoView={()=>travelInspectionView("undo")} onRedoView={()=>travelInspectionView("redo")}
-            showLabels={showInspectionLabels} onShowLabelsChange={setShowInspectionLabels}
-            uiHidden={inspectionUiHidden} onUiHiddenChange={setInspectionUiHidden}/>
-          <WorldLabFieldPanel layers={fieldLayers} selectedId={fieldLayerId}
-            onSelect={setFieldLayerId} timeSeconds={timeSeconds}
-            overlayEnabled={fieldOverlayEnabled} onOverlayChange={setFieldOverlayEnabled}
-            vectorPlane={fieldVectorPlane} onVectorPlaneChange={setFieldVectorPlane}
-            vectorSliceIndex={fieldVectorSliceIndex} onVectorSliceIndexChange={setFieldVectorSliceIndex}
-            tensorComponent={fieldTensorComponent} onTensorComponentChange={setFieldTensorComponent}/>
-          <p className="mt-2 text-xs text-muted-foreground">
-            Drag to look around; keyboard W/A/S/D or arrows to move. Tap a shape to inspect it.
-            Added solids are visual geometry with analytic volume. Without material density, mass is unknown;
-            an assigned density can be used as an assumed mass in the spring model.
-            Shape geometry is not a collision or deformation simulation.
-          </p>
-          <div className="mt-3 rounded-xl border border-border p-3">
-            <h2 className="text-base font-medium">Build and inspect</h2>
-            <label className="mt-2 block text-sm">Select a shape
-              <select className="mt-1 w-full rounded border border-border bg-bg p-2"
-                value={selectedEntityId} onChange={event=>setSelectedEntityId(event.target.value)}>
-                <option value="">None selected</option>
-                {project?.entities.map(entity=><option key={entity.id} value={entity.id}>{entity.name}</option>)}
-              </select>
-            </label>
-            {selectedEntity && selectedQuantities && (
-              <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
-                <label>Object name
-                  <input className={inputLabel} value={selectedEntity.name}
-                    onChange={event=>editSelected({name:event.target.value})}/>
-                </label>
-                <label>Color
-                  <input className="mt-1 h-10 w-full" type="color" value={selectedEntity.color}
-                    onChange={event=>editSelected({color:event.target.value})}/>
-                </label>
-                <div className="sm:col-span-2 grid grid-cols-3 gap-2" aria-label="Solid dimensions in metres">
-                  {(selectedEntity.shape === "box" ? ([0,1,2] as const) :
-                    selectedEntity.shape === "cylinder" ? ([0,1] as const) : ([0] as const)).map(axis=>(
-                    <label key={axis} className="text-xs">
-                      {selectedEntity.shape === "sphere" ? "Diameter" :
-                        selectedEntity.shape === "cylinder" ? (axis === 0 ? "Diameter" : "Height") :
-                        "Size "+["X","Y","Z"][axis]} (m)
-                      <input className={inputLabel} aria-label={selectedEntity.shape === "box"
-                        ? "Size "+["X","Y","Z"][axis]+" (m)" :
-                        selectedEntity.shape === "sphere" ? "Diameter (m)" :
-                        (axis === 0 ? "Diameter (m)" : "Height (m)")}
-                        type="number" min="0.001" max="10000" step="0.1"
-                        value={selectedEntity.dimensionsMeters[axis]}
-                        onChange={event=>editDimension(axis,Number(event.target.value))}/>
+                {project && (
+                  <div className="mb-3 flex flex-wrap items-end gap-3 rounded-xl border border-border p-3">
+                    <label className="min-w-[200px] flex-1 text-sm">Project name
+                      <input className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2"
+                        value={project.title} maxLength={120}
+                        onChange={event=>mutateProject(current=>({...current,title:event.target.value}))}/>
                     </label>
-                  ))}
-                </div>
-                <div className="sm:col-span-2 grid grid-cols-3 gap-2" aria-label="Solid position in metres">
-                  {([0,1,2] as const).map(axis=>(
-                    <label key={axis} className="text-xs">Position {["X","Y","Z"][axis]} (m)
-                      <input className={inputLabel} aria-label={"Position "+["X","Y","Z"][axis]+" (m)"}
-                        type="number" min="-100000" max="100000" step="0.1"
-                        value={selectedEntity.positionMeters[axis]}
-                        onChange={event=>editPosition(axis,Number(event.target.value))}/>
-                    </label>
-                  ))}
-                </div>
-                <div className="sm:col-span-2">
-                  <button type="button" className={buttonClass} onClick={focusSelected}>
-                    Focus selected object
-                  </button>
-                </div>
-                <div className="sm:col-span-2 rounded-lg border border-border p-2">
-                  <p className="text-xs font-semibold">Position and measure</p>
-                  <div className="mt-2 flex flex-wrap items-end gap-2">
-                    <label className="text-xs">Snap spacing (metres)
-                      <select className={inputLabel} aria-label="Grid snap spacing"
-                        value={gridStep} onChange={e=>setGridStep(Number(e.target.value))}>
-                        <option value={0.1}>0.1 m</option><option value={0.5}>0.5 m</option>
-                        <option value={1}>1 m</option><option value={5}>5 m</option>
+                    <label className="min-w-[180px] text-sm">Saved local projects
+                      <select className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2"
+                        value={savedProjects.some(p=>p.id===project.id)?project.id:""}
+                        onChange={event=>openSavedProject(event.target.value)}>
+                        <option value="">Unsaved / imported copy</option>
+                        {savedProjects.map(item=><option key={item.id} value={item.id}>{item.title} (rev {item.revision})</option>)}
                       </select>
                     </label>
-                    <button type="button" className={buttonClass}
-                      onClick={()=>editSelected(snapSolidPosition(selectedEntity,gridStep))}>
-                      Snap selected to grid
+                    <p role="status" className="text-xs text-muted-foreground">{workspaceDirty?"Unsaved project changes":"Local-only workspace"}</p>
+                    {importWarnings.length>0 && <details className="w-full text-xs">
+                      <summary>Legacy import notices ({importWarnings.length})</summary>
+                      <ul className="list-disc pl-5">{importWarnings.map((x,i)=><li key={i}>{x}</li>)}</ul>
+                    </details>}
+                  </div>
+                )}
+                {recoveryDrafts.length>0&&
+                  <section className="mb-3 rounded-xl border border-border p-3"
+                    aria-label="Unsaved invention recovery">
+                    <h3 className="text-sm font-semibold">Recover unfinished inventions</h3>
+                    <StudioNote>
+                      Browser-cached drafts are separate from saved projects.
+                      Recovery only happens when you choose it; saving commits the recovered project.
+                    </StudioNote>
+                    {recoveryDrafts.map(draft=>
+                      <div key={draft.id} className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <span>{draft.project.title} · cached {new Date(draft.savedAt).toLocaleString()}</span>
+                        <div className="flex gap-2">
+                          <button className={buttonClass} type="button"
+                            onClick={()=>restoreRecoveryDraft(draft)}>Restore draft</button>
+                          <button className={buttonClass} type="button"
+                            onClick={()=>{void discardRecoveryDraft(draft);}}>Discard cache</button>
+                        </div>
+                      </div>)}
+                  </section>}
+                {recoveryStatus&&<p role="status" className="mb-2 text-xs">{recoveryStatus}</p>}
+                {cloudBackupsEnabled && <section className="mb-3 rounded-xl border border-border p-3"
+                  aria-label="Authenticated project backups">
+                  <h3 className="text-sm font-semibold">Cloud backup</h3>
+                  <StudioNote>
+                    Cloud backup is separate from local saving. Updates require a matching
+                    cloud revision; downloads never silently overwrite your workspace.
+                    The latest 20 saved cloud revisions are retained for explicit export.
+                  </StudioNote>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button className={buttonClass} type="button" disabled={cloudBusy}
+                      onClick={()=>{void loadAccountBackups();}}>Show my backups</button>
+                    <button className={buttonClass} type="button" disabled={cloudBusy||!project}
+                      onClick={()=>{void saveAccountBackup();}}>
+                      {cloudBusy?"Working…":"Back up open project"}
                     </button>
                   </div>
-                  <label className="mt-2 block text-xs">Measure to another solid
-                    <select className={inputLabel} aria-label="Measure distance to solid"
-                      value={measurementTarget?.id??""}
-                      onChange={e=>setMeasureTargetId(e.target.value)}>
-                      <option value="">Choose second solid</option>
-                      {project?.entities.filter(e=>e.id!==selectedEntity.id).map(e=>
-                        <option key={e.id} value={e.id}>{e.name}</option>)}
+                  {cloudError&&<p role="alert" className="mt-2 text-xs">{cloudError}</p>}
+                  {cloudStatus&&<p role="status" className="mt-2 text-xs">{cloudStatus}</p>}
+                  {cloudBackups.map(backup=><div key={backup.projectId}
+                    className="mt-2 rounded-lg border border-border p-2 text-xs">
+                    <p className="font-medium">{backup.title}</p>
+                    <p>Project version {backup.projectRevision} · Backup version {backup.serverRevision}</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button type="button" className={buttonClass}
+                        disabled={cloudBusy}
+                        onClick={()=>{void downloadAccountBackup(backup.projectId);}}>
+                        Download JSON safely
+                      </button>
+                      <button type="button" className={buttonClass} disabled={cloudBusy}
+                        onClick={()=>{void saveCloudBackupAsDeviceCopy(backup.projectId);}}>
+                        Save new device copy
+                      </button>
+                      <button type="button" className={buttonClass} disabled={cloudBusy}
+                        onClick={()=>{void loadAccountBackupVersions(backup.projectId);}}>
+                        View history
+                      </button>
+                      <button type="button" className={buttonClass} disabled={cloudBusy}
+                        onClick={()=>{void loadAccountScience(backup.projectId);}}>
+                        Account scientific records
+                      </button>
+                      {project?.id===backup.projectId&&scientificEvidence.length>0&&
+                        <button type="button" className={buttonClass} disabled={cloudBusy}
+                          onClick={()=>{void uploadAccountScience(
+                            backup.projectId,backup.projectRevision);}}>
+                          Upload saved scientific evidence
+                        </button>}
+                      <button type="button" className={buttonClass} disabled={cloudBusy}
+                        onClick={()=>{void deleteAccountBackup(backup.projectId,backup.serverRevision);}}>
+                        Delete cloud copy
+                      </button>
+                      {project?.id===backup.projectId&&
+                        <button type="button" className={buttonClass} disabled={cloudBusy}
+                          onClick={()=>{
+                            setCloudRevisionTokens(x=>({...x,
+                              [backup.projectId]:backup.serverRevision}));
+                            setCloudStatus("Prepared a conditional update from this open local design. Saving will still reject changes made on another device.");
+                          }}>
+                          Prepare update to this version
+                        </button>}
+                    </div>
+                    {cloudScienceFor===backup.projectId&&
+                      <div className="mt-2 space-y-2" aria-label={"Account scientific records for "+backup.title}>
+                        {(cloudScience[backup.projectId]??[]).length===0&&
+                          <p>No account scientific evidence is stored for this invention.</p>}
+                        {(cloudScience[backup.projectId]??[]).map(record=>
+                          <div key={record.id}
+                            className="flex flex-wrap items-center justify-between gap-2 rounded border border-border p-2">
+                            <span>{record.kind} · revision {record.projectRevision}</span>
+                            <button type="button" className={buttonClass} disabled={cloudBusy}
+                              onClick={()=>{void getAccountScienceRecord(backup.projectId,record.id);}}>
+                              Download evidence
+                            </button>
+                            {project?.id===backup.projectId&&savedRevision!==null&&
+                              <button type="button" className={buttonClass} disabled={cloudBusy}
+                                onClick={()=>{void getAccountScienceRecord(
+                                  backup.projectId,record.id,true);}}>
+                                Keep on this device
+                              </button>}
+                            <button type="button" className={buttonClass} disabled={cloudBusy}
+                              onClick={()=>{void removeAccountScience(backup.projectId,record.id);}}>
+                              Delete account copy
+                            </button>
+                          </div>)}
+                      </div>}
+                    {cloudHistoryFor===backup.projectId&&
+                      <div className="mt-2 space-y-2" aria-label={"Backup history for "+backup.title}>
+                        {!(cloudVersions[backup.projectId]?.length)&&
+                          <p>No saved versions are available.</p>}
+                        {(cloudVersions[backup.projectId]??[]).map(version=>
+                          <div key={version.serverRevision}
+                            className="flex flex-wrap items-center justify-between gap-2 rounded border border-border p-2">
+                            <span>Backup #{version.serverRevision} · Project revision {version.projectRevision}</span>
+                            <button type="button" className={buttonClass} disabled={cloudBusy}
+                              onClick={()=>{void downloadAccountBackupVersion(
+                                backup.projectId,version.serverRevision);}}>
+                              Download snapshot
+                            </button>
+                            <button type="button" className={buttonClass} disabled={cloudBusy}
+                              onClick={()=>{void saveCloudBackupAsDeviceCopy(
+                                backup.projectId,version.serverRevision);}}>
+                              Save local copy
+                            </button>
+                          </div>)}
+                      </div>}
+                  </div>)}
+                </section>}
+                {remoteJobsEnabled && <section className="mb-3 rounded-xl border border-border p-3"
+                  aria-label="Authenticated remote World Lab calculations">
+                  <h3 className="text-sm font-semibold">Science worker</h3>
+                  <StudioNote>
+                    Advanced account-owned calculations. Only supported bounded models are submitted;
+                    your locally saved projects remain available offline.
+                  </StudioNote>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <select className={inputLabel} value={remoteKind}
+                      aria-label="Remote calculation type"
+                      onChange={e=>{setRemoteKind(e.target.value as typeof remoteKind);setRemoteJob(null);setRemoteError("");}}>
+                      <option value="hydrostatics">Floating and buoyancy</option>
+                      <option value="dc-network">Connected DC circuit</option>
+                      <option value="wired-motor">Circuit-powered lifting machine</option>
+                      <option value="chemical-thermal">Hypothetical chemical heating</option>
+                      <option value="multi-sphere">3D moving sphere contacts</option>
+                      <option value="exhaustive-logic">Full invented digital truth-table check</option>
+                      <option value="chemical-sweep">Chemical model: 25 assumption combinations</option>
+                      <option value="structural-sweep">Structural beam: 25 material/load combinations</option>
+                      <option value="newton-gravity">Newtonian multi-body gravity</option>
                     </select>
-                  </label>
-                  {measurement&&<div role="status" className="mt-2 text-xs"
-                    aria-label="Measured geometric distance">
-                    <p>Center-to-center: {measurement.centerDistanceMeters.toFixed(4)} m</p>
-                    <p>Horizontal distance: {measurement.horizontalDistanceMeters.toFixed(4)} m</p>
-                    <p>Offset X/Y/Z: {measurement.deltaMeters.map(v=>v.toFixed(3)).join(" / ")} m</p>
-                    {spatialClearance&&<>
-                      <p>AABB clearance lower bound: {spatialClearance.gapLowerBoundMeters.toFixed(4)} m</p>
-                      <p>Bounds status: {spatialClearance.status.replaceAll("-"," ")}</p>
-                      {spatialClearance.status==="box-intersection"&&<p>
-                        Box overlap X/Y/Z: {spatialClearance.overlapDepthMeters.map(x=>x.toFixed(4)).join(" / ")} m
-                      </p>}
-                      <p className="text-muted-foreground">{spatialClearance.validity}</p>
-                    </>}
-                  </div>}
-                </div>
-                <label>Material assumption
-                  <select className={inputLabel} value={selectedEntity.materialId??""}
-                    onChange={event=>editSelected({materialId:event.target.value||null})}>
-                    <option value="">No material: mass unknown</option>
-                    {materials.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}
-                  </select>
-                </label>
-                <p>Volume: <strong>{metric(selectedQuantities.volumeM3,"m³")}</strong></p>
-                <p>Mass: <strong>{selectedQuantities.massKg===null?"Unknown":metric(selectedQuantities.massKg,"kg")}</strong></p>
-                <p className="sm:col-span-2 text-xs text-muted-foreground">
-                  {selectedQuantities.massKg===null?"Unknown / Insufficient Evidence":
-                    "Computed from geometry × user-assumed density. Not measured or structurally validated."}
-                </p>
-                <div className="sm:col-span-2 rounded-xl border border-border p-3"
-                  aria-label="Multiple moving sphere impact experiment">
-                  <h3 className="text-sm font-semibold">Simulate a group of moving spheres</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Give every sphere an X/Y/Z starting velocity. A bounded event-driven
-                    3D solver checks each future impact, transfers the calculated impulse,
-                    and continues to the next contact. For 2–12 non-overlapping spheres
-                    with invented density. Independent simultaneous pairs are calculated;
-                    contacts sharing a sphere are rejected, not guessed.
-                  </p>
-                  {groupSpheres.length<2||groupSpheres.length>12
-                    ?<p className="mt-2 text-xs">Add 2–12 spheres and assign an invented material density to each.</p>
-                    :<>
-                      <div className="mt-2 max-h-64 space-y-2 overflow-y-auto">
-                        {groupSpheres.map((sphere,index)=>{
-                          const velocity=groupVelocities[sphere.id]??
-                            (index===0?[2,0,0] as Vec3:[0,0,0] as Vec3);
-                          return <div className="rounded border border-border p-2" key={sphere.id}>
-                            <p className="text-xs font-medium">{sphere.name} · {sphere.id.slice(0,8)}</p>
-                            <div className="grid grid-cols-3 gap-2">
-                              {([0,1,2] as const).map(axis=><label key={axis} className="text-xs">
-                                {["X","Y","Z"][axis]} m/s
-                                <input className={inputLabel} type="number" min={-100}
-                                  max={100} step="any"
-                                  aria-label={"Group "+sphere.id+" "+["X","Y","Z"][axis]+" speed"}
-                                  value={velocity[axis]}
-                                  onChange={e=>{
-                                    const next=[...velocity] as [number,number,number];
-                                    next[axis]=Number(e.target.value);
-                                    setGroupVelocities(old=>({...old,[sphere.id]:next}));
-                                    setGroupPlaying(false);setGroupRun(null);
+                    <button type="button" className={buttonClass} disabled={remoteBusy||!project||
+                        (remoteKind!=="dc-network"&&remoteKind!=="chemical-thermal"&&remoteKind!=="multi-sphere"&&remoteKind!=="exhaustive-logic"&&remoteKind!=="chemical-sweep"&&
+                          remoteKind!=="newton-gravity"&&!selectedEntity)||
+                        (remoteKind==="exhaustive-logic"&&
+                          ((project?.digitalNetworks?.[0]?.inputs.length??0)<9))||
+                        (remoteKind==="newton-gravity"&&groupSpheres.length<2)||
+                        (remoteKind==="multi-sphere"&&(groupSpheres.length<2||groupSpheres.length>12))||
+                        (remoteKind!=="hydrostatics"&&remoteKind!=="multi-sphere"&&remoteKind!=="chemical-thermal"&&remoteKind!=="exhaustive-logic"&&remoteKind!=="chemical-sweep"&&
+                          remoteKind!=="newton-gravity"&&!project?.networks?.[0])}
+                      onClick={()=>{void submitRemoteJob();}}>
+                      {remoteBusy?"Submitting calculation…":"Submit authenticated job"}
+                    </button>
+                    {remoteJob&&(remoteJob.status==="queued"||remoteJob.status==="running")&&
+                      <button type="button" className={buttonClass}
+                        onClick={()=>{void cancelRemoteJob();}}>Cancel job</button>}
+                  </div>
+                  <div className="mt-2">
+                    <button type="button" className={buttonClass} disabled={remoteHistoryBusy}
+                      onClick={()=>{void loadRemoteHistory();}}>
+                      {remoteHistoryBusy?"Loading jobs…":"My recent cloud calculations"}
+                    </button>
+                    {remoteHistory.length>0&&
+                      <div className="mt-2 max-h-52 space-y-2 overflow-y-auto"
+                        aria-label="Previous authenticated scientific calculations">
+                        {remoteHistory.map(job=>
+                          <div key={job.id} className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                            <span>{job.kind} · {job.status} · project revision {job.projectRevision}</span>
+                            <button type="button" className={buttonClass}
+                              onClick={()=>{void openRemoteHistoryJob(job);}}>
+                              Open evidence
+                            </button>
+                          </div>)}
+                      </div>}
+                  </div>
+                  {remoteError&&<p role="alert" className="mt-2 text-xs">{remoteError}</p>}
+                  {remoteJob&&
+                    <div role="status" aria-live="polite" className="mt-2 text-xs">
+                      <p>Job {remoteJob.id}: {remoteJob.status}</p>
+                      {(remoteJob.projectId!==project?.id||
+                        remoteJob.projectRevision!==project?.revision)&&
+                        <StudioNote>
+                          This is evidence for a different or earlier project snapshot
+                          ({remoteJob.projectId}, revision {remoteJob.projectRevision}).
+                          It is available for export only and is not applied to this invention.
+                        </StudioNote>}
+                      {remoteJob.errorCode&&<p>Solver status: {remoteJob.errorCode}</p>}
+                      {remoteJob.status==="succeeded"&&remoteJob.result!==null&&
+                        <div className="flex flex-wrap gap-2">
+                          <button type="button" className={buttonClass} onClick={()=>
+                            downloadJson("world-lab-owned-computation-evidence.json",remoteJob.result)}>
+                            Export authenticated calculation evidence
+                          </button>
+                          {remoteJob.kind==="newton-gravity"&&
+                            remoteJob.projectId===project?.id&&
+                            remoteJob.projectRevision===project?.revision&&
+                            <button type="button" className={buttonClass}
+                              onClick={keepRemoteGravityEvidence}>
+                              Keep remote gravity trajectory with invention
+                            </button>}
+                        </div>}
+                    </div>}
+                </section>}
+        </StudioGroup>
+        <StudioGroup id="build">
+                    <section className="mt-3 rounded-lg border border-border p-3" aria-label="Build interconnected visual assemblies">
+                      <h3 className="text-sm font-semibold">Assemblies</h3>
+                      <StudioNote>
+                        Group two created solids and move them together. This links their layout,
+                        but does not invent a physical joint or certified rigidity.
+                      </StudioNote>
+                      {selectedEntity&&<div className="mt-2 grid grid-cols-2 gap-2">
+                        <label className="text-xs">Assembly name
+                          <input className={inputLabel} maxLength={120}
+                            aria-label="Assembly name" value={assemblyName}
+                            onChange={e=>setAssemblyName(e.target.value)}/>
+                        </label>
+                        <label className="text-xs">Second part
+                          <select className={inputLabel} aria-label="Assembly second solid"
+                            value={assemblySecondId}
+                            onChange={e=>setAssemblySecondId(e.target.value)}>
+                            <option value="">Choose another solid</option>
+                            {project?.entities.filter(e=>e.id!==selectedEntity.id &&
+                              !(project?.assemblies??[]).some(a=>a.entityIds.includes(e.id))).map(e=>
+                                <option key={e.id} value={e.id}>{e.name}</option>)}
+                          </select>
+                        </label>
+                        <button className={buttonClass} type="button"
+                          disabled={!assemblyName.trim()||!assemblySecondId||
+                            (project?.assemblies?.length??0)>=50||
+                            (project?.assemblies??[]).some(a=>a.entityIds.includes(selectedEntity.id))}
+                          onClick={()=>mutateProject(p=>createWorldLabAssembly(p,crypto.randomUUID(),
+                            assemblyName,[selectedEntity.id,assemblySecondId]))}>
+                          Connect these visual parts
+                        </button>
+                      </div>}
+                      {project?.assemblies?.map(a=>{
+                        const details=summarizeWorldLabAssembly(project,a.id);
+                        return <div key={a.id} className="mt-2 rounded border border-border p-2 text-xs">
+                          <p className="font-medium">{a.name} · {details.count} solids</p>
+                          <p>Combined shape volumes: {details.volumeM3.toFixed(4)} m³</p>
+                          <p>Assumed combined mass: {details.assumedMassKg===null?"Unknown":
+                            details.assumedMassKg.toFixed(3)+" kg"}</p>
+                          <StudioNote>{details.validity}</StudioNote>
+                          <div className="mt-2 flex flex-wrap items-center gap-1">
+                            {(["X","Y","Z"] as const).map((axis,index)=><span key={axis}
+                              className="flex flex-wrap items-center gap-1">
+                              <button type="button" className={buttonClass}
+                                aria-label={"Move "+a.name+" negative "+axis}
+                                onClick={()=>mutateProject(p=>moveWorldLabAssembly(p,a.id,
+                                  ([0,1,2] as const).map(i=>i===index?-assemblyStep:0) as [number,number,number]))}>
+                                −{axis}
+                              </button>
+                              <button type="button" className={buttonClass}
+                                aria-label={"Move "+a.name+" positive "+axis}
+                                onClick={()=>mutateProject(p=>moveWorldLabAssembly(p,a.id,
+                                  ([0,1,2] as const).map(i=>i===index?assemblyStep:0) as [number,number,number]))}>
+                                +{axis}
+                              </button>
+                            </span>)}
+                            <button type="button" className={buttonClass}
+                              onClick={()=>mutateProject(p=>ungroupWorldLabAssembly(p,a.id))}>
+                              Disconnect group
+                            </button>
+                          </div>
+                        </div>;
+                      })}
+                      <label className="mt-2 block text-xs">Group movement increment (m)
+                        <select className={inputLabel} aria-label="Assembly movement increment"
+                          value={assemblyStep} onChange={e=>setAssemblyStep(Number(e.target.value))}>
+                          <option value={0.1}>0.1</option><option value={0.5}>0.5</option>
+                          <option value={1}>1</option><option value={5}>5</option>
+                        </select>
+                      </label>
+                    </section>
+                    <WorldLabCadPanel project={project} selectedEntityId={selectedEntityId} onChange={mutateProject}/>
+                    <WorldLabGeoreferencePanel project={project} selectedEntityId={selectedEntityId} onChange={mutateProject}/>
+                      <WorldLabReferenceLayersPanel/>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button type="button" className={buttonClass} aria-expanded={seeInside}
+                        onClick={() => updateInspectionView({mode:seeInside?"normal":"transparent"})}>See Inside</button>
+                      <button type="button" className={buttonClass} onClick={() => zoomView(1)}
+                        aria-label="Zoom in">Zoom in</button>
+                      <button type="button" className={buttonClass} onClick={() => zoomView(-1)}
+                        aria-label="Zoom out">Zoom out</button>
+                      <button type="button" className={buttonClass} onClick={saveObserverViewpoint}>Save viewpoint</button>
+                      <button type="button" className={buttonClass} onClick={restoreObserverViewpoint}>Restore viewpoint</button>
+                      <button type="button" className={buttonClass} onClick={returnObserverToSurface}>Return to surface</button>
+                      <button type="button" className={buttonClass} disabled={!project || shapeCount >= 200}
+                        onClick={() => addShape("box")}>Add cube</button>
+                      <button type="button" className={buttonClass} disabled={!project || shapeCount >= 200}
+                        onClick={() => addShape("sphere")}>Add sphere</button>
+                      <button type="button" className={buttonClass} disabled={!project || shapeCount >= 200}
+                        onClick={() => addShape("cylinder")}>Add cylinder</button>
+                      <button type="button" className={buttonClass} disabled={!selectedEntity}
+                        onClick={() => {if(selectedEntity)mutateProject(p=>({...p,
+                          entities:p.entities.filter(e=>e.id!==selectedEntity.id),
+                          assemblies:(p.assemblies??[]).map(a=>({...a,entityIds:a.entityIds.filter(id=>
+                            id!==selectedEntity.id)})).filter(a=>a.entityIds.length>=2),
+                        }));
+                          setSelectedEntityId("");}}>Remove selected</button>
+                        <button type="button" className={buttonClass} disabled={!canUndo}
+                          aria-label="Undo World Lab edit" onClick={()=>travelEdit("undo")}>Undo</button>
+                        <button type="button" className={buttonClass} disabled={!canRedo}
+                          aria-label="Redo World Lab edit" onClick={()=>travelEdit("redo")}>Redo</button>
+                    </div>
+                    <WorldLabInspectionPanel mode={inspectionMode}
+                      onModeChange={mode=>updateInspectionView({mode})}
+                      opacity={opacity} onOpacityChange={value=>updateInspectionView({opacity:value})}
+                      axis={cutawayAxis} onAxisChange={axis=>updateInspectionView({axis,normal:axis==="x"?[1,0,0]:axis==="y"?[0,1,0]:[0,0,1]})}
+                      normal={cutawayNormal} onNormalChange={normal=>updateInspectionView({normal})}
+                      cutawayFraction={cutawayFraction} onCutawayFractionChange={value=>updateInspectionView({cutawayFraction:value})}
+                      explosionDistanceM={explosionDistanceM} onExplosionDistanceChange={value=>updateInspectionView({explosionDistanceM:value})}
+                      selected={selectedEntity??null} hasAssembly={!!project?.assemblies?.some(a=>a.entityIds.includes(selectedEntityId))}
+                      onSelectedOpacityChange={value=>{if(selectedEntity)editSelected({opacity:value});}}
+                      onZoomSelected={focusSelected} onReset={()=>{
+                        updateInspectionView({mode:"normal",opacity:55,axis:"x",normal:[1,0,0],cutawayFraction:0,explosionDistanceM:1});
+                        setFieldOverlayEnabled(false);setInspectionUiHidden(false);setShowInspectionLabels(true);
+                      }}
+                      canUndoView={inspectionHistory.current.past.length>0}
+                      canRedoView={inspectionHistory.current.future.length>0}
+                      onUndoView={()=>travelInspectionView("undo")} onRedoView={()=>travelInspectionView("redo")}
+                      showLabels={showInspectionLabels} onShowLabelsChange={setShowInspectionLabels}
+                      uiHidden={inspectionUiHidden} onUiHiddenChange={setInspectionUiHidden}/>
+                    <WorldLabFieldPanel layers={fieldLayers} selectedId={fieldLayerId}
+                      onSelect={setFieldLayerId} timeSeconds={timeSeconds}
+                      overlayEnabled={fieldOverlayEnabled} onOverlayChange={setFieldOverlayEnabled}
+                      vectorPlane={fieldVectorPlane} onVectorPlaneChange={setFieldVectorPlane}
+                      vectorSliceIndex={fieldVectorSliceIndex} onVectorSliceIndexChange={setFieldVectorSliceIndex}
+                      tensorComponent={fieldTensorComponent} onTensorComponentChange={setFieldTensorComponent}/>
+                    <StudioNote>
+                      Drag to look around; keyboard W/A/S/D or arrows to move. Tap a shape to inspect it.
+                      Added solids are visual geometry with analytic volume. Without material density, mass is unknown;
+                      an assigned density can be used as an assumed mass in the spring model.
+                      Shape geometry is not a collision or deformation simulation.
+                    </StudioNote>
+                    <div className="mt-3 rounded-xl border border-border p-3">
+                      <h2 className="text-base font-medium">Shapes</h2>
+                      <label className="mt-2 block text-sm">Select a shape
+                        <select className="mt-1 w-full rounded border border-border bg-bg p-2"
+                          value={selectedEntityId} onChange={event=>setSelectedEntityId(event.target.value)}>
+                          <option value="">None selected</option>
+                          {project?.entities.map(entity=><option key={entity.id} value={entity.id}>{entity.name}</option>)}
+                        </select>
+                      </label>
+                      {selectedEntity && selectedQuantities && (
+                        <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+                          <label>Object name
+                            <input className={inputLabel} value={selectedEntity.name}
+                              onChange={event=>editSelected({name:event.target.value})}/>
+                          </label>
+                          <label>Color
+                            <input className="mt-1 h-10 w-full" type="color" value={selectedEntity.color}
+                              onChange={event=>editSelected({color:event.target.value})}/>
+                          </label>
+                          <div className="sm:col-span-2 grid grid-cols-3 gap-2" aria-label="Solid dimensions in metres">
+                            {(selectedEntity.shape === "box" ? ([0,1,2] as const) :
+                              selectedEntity.shape === "cylinder" ? ([0,1] as const) : ([0] as const)).map(axis=>(
+                              <label key={axis} className="text-xs">
+                                {selectedEntity.shape === "sphere" ? "Diameter" :
+                                  selectedEntity.shape === "cylinder" ? (axis === 0 ? "Diameter" : "Height") :
+                                  "Size "+["X","Y","Z"][axis]} (m)
+                                <input className={inputLabel} aria-label={selectedEntity.shape === "box"
+                                  ? "Size "+["X","Y","Z"][axis]+" (m)" :
+                                  selectedEntity.shape === "sphere" ? "Diameter (m)" :
+                                  (axis === 0 ? "Diameter (m)" : "Height (m)")}
+                                  type="number" min="0.001" max="10000" step="0.1"
+                                  value={selectedEntity.dimensionsMeters[axis]}
+                                  onChange={event=>editDimension(axis,Number(event.target.value))}/>
+                              </label>
+                            ))}
+                          </div>
+                          <div className="sm:col-span-2 grid grid-cols-3 gap-2" aria-label="Solid position in metres">
+                            {([0,1,2] as const).map(axis=>(
+                              <label key={axis} className="text-xs">Position {["X","Y","Z"][axis]} (m)
+                                <input className={inputLabel} aria-label={"Position "+["X","Y","Z"][axis]+" (m)"}
+                                  type="number" min="-100000" max="100000" step="0.1"
+                                  value={selectedEntity.positionMeters[axis]}
+                                  onChange={event=>editPosition(axis,Number(event.target.value))}/>
+                              </label>
+                            ))}
+                          </div>
+                          <div className="sm:col-span-2">
+                            <button type="button" className={buttonClass} onClick={focusSelected}>
+                              Focus selected object
+                            </button>
+                          </div>
+                          <div className="sm:col-span-2 rounded-lg border border-border p-2">
+                            <p className="text-xs font-semibold">Position and measure</p>
+                            <div className="mt-2 flex flex-wrap items-end gap-2">
+                              <label className="text-xs">Snap spacing (metres)
+                                <select className={inputLabel} aria-label="Grid snap spacing"
+                                  value={gridStep} onChange={e=>setGridStep(Number(e.target.value))}>
+                                  <option value={0.1}>0.1 m</option><option value={0.5}>0.5 m</option>
+                                  <option value={1}>1 m</option><option value={5}>5 m</option>
+                                </select>
+                              </label>
+                              <button type="button" className={buttonClass}
+                                onClick={()=>editSelected(snapSolidPosition(selectedEntity,gridStep))}>
+                                Snap selected to grid
+                              </button>
+                            </div>
+                            <label className="mt-2 block text-xs">Measure to another solid
+                              <select className={inputLabel} aria-label="Measure distance to solid"
+                                value={measurementTarget?.id??""}
+                                onChange={e=>setMeasureTargetId(e.target.value)}>
+                                <option value="">Choose second solid</option>
+                                {project?.entities.filter(e=>e.id!==selectedEntity.id).map(e=>
+                                  <option key={e.id} value={e.id}>{e.name}</option>)}
+                              </select>
+                            </label>
+                            {measurement&&<div role="status" className="mt-2 text-xs"
+                              aria-label="Measured geometric distance">
+                              <p>Center-to-center: {measurement.centerDistanceMeters.toFixed(4)} m</p>
+                              <p>Horizontal distance: {measurement.horizontalDistanceMeters.toFixed(4)} m</p>
+                              <p>Offset X/Y/Z: {measurement.deltaMeters.map(v=>v.toFixed(3)).join(" / ")} m</p>
+                              {spatialClearance&&<>
+                                <p>AABB clearance lower bound: {spatialClearance.gapLowerBoundMeters.toFixed(4)} m</p>
+                                <p>Bounds status: {spatialClearance.status.replaceAll("-"," ")}</p>
+                                {spatialClearance.status==="box-intersection"&&<p>
+                                  Box overlap X/Y/Z: {spatialClearance.overlapDepthMeters.map(x=>x.toFixed(4)).join(" / ")} m
+                                </p>}
+                                <StudioNote>{spatialClearance.validity}</StudioNote>
+                              </>}
+                            </div>}
+                          </div>
+                          <label>Material assumption
+                            <select className={inputLabel} value={selectedEntity.materialId??""}
+                              onChange={event=>editSelected({materialId:event.target.value||null})}>
+                              <option value="">No material: mass unknown</option>
+                              {materials.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}
+                            </select>
+                          </label>
+                          <p>Volume: <strong>{metric(selectedQuantities.volumeM3,"m³")}</strong></p>
+                          <p>Mass: <strong>{selectedQuantities.massKg===null?"Unknown":metric(selectedQuantities.massKg,"kg")}</strong></p>
+                          <StudioNote>
+                            {selectedQuantities.massKg===null?"Unknown / Insufficient Evidence":
+                              "Computed from geometry × user-assumed density. Not measured or structurally validated."}
+                          </StudioNote>
+                          <div className="sm:col-span-2 rounded-xl border border-border p-3"
+                            aria-label="Multiple moving sphere impact experiment">
+                            <h3 className="text-sm font-semibold">Sphere group</h3>
+                            <StudioNote>
+                              Give every sphere an X/Y/Z starting velocity. A bounded event-driven
+                              3D solver checks each future impact, transfers the calculated impulse,
+                              and continues to the next contact. For 2–12 non-overlapping spheres
+                              with invented density. Independent simultaneous pairs are calculated;
+                              contacts sharing a sphere are rejected, not guessed.
+                            </StudioNote>
+                            {groupSpheres.length<2||groupSpheres.length>12
+                              ?<p className="mt-2 text-xs">Add 2–12 spheres and assign an invented material density to each.</p>
+                              :<>
+                                <div className="mt-2 max-h-64 space-y-2 overflow-y-auto">
+                                  {groupSpheres.map((sphere,index)=>{
+                                    const velocity=groupVelocities[sphere.id]??
+                                      (index===0?[2,0,0] as Vec3:[0,0,0] as Vec3);
+                                    return <div className="rounded border border-border p-2" key={sphere.id}>
+                                      <p className="text-xs font-medium">{sphere.name} · {sphere.id.slice(0,8)}</p>
+                                      <div className="grid grid-cols-3 gap-2">
+                                        {([0,1,2] as const).map(axis=><label key={axis} className="text-xs">
+                                          {["X","Y","Z"][axis]} m/s
+                                          <input className={inputLabel} type="number" min={-100}
+                                            max={100} step="any"
+                                            aria-label={"Group "+sphere.id+" "+["X","Y","Z"][axis]+" speed"}
+                                            value={velocity[axis]}
+                                            onChange={e=>{
+                                              const next=[...velocity] as [number,number,number];
+                                              next[axis]=Number(e.target.value);
+                                              setGroupVelocities(old=>({...old,[sphere.id]:next}));
+                                              setGroupPlaying(false);setGroupRun(null);
+                                            }}/>
+                                        </label>)}
+                                      </div>
+                                    </div>;
+                                  })}
+                                </div>
+                                <label className="mt-2 block text-xs">Assumed group restitution (0–1)
+                                  <input className={inputLabel} type="number" min={0} max={1}
+                                    step="0.05" aria-label="Group sphere restitution"
+                                    value={groupRestitution} onChange={e=>{
+                                      setGroupRestitution(Number(e.target.value));
+                                      setGroupPlaying(false);setGroupRun(null);
+                                    }}/>
+                                </label>
+                                <button type="button" className={buttonClass+" mt-2"}
+                                  onClick={()=>{
+                                    if(!project)return;
+                                    try{
+                                      const velocityInputs=Object.fromEntries(groupSpheres.map((s,i)=>[
+                                        s.id,groupVelocities[s.id]??(i===0?[2,0,0]:[0,0,0]),
+                                      ])) as Record<string,Vec3>;
+                                      const run=runMultiSphereCollisions(project,velocityInputs,groupRestitution);
+                                      setGroupRun(run);setGroupPlaying(false);setGroupTime(0);
+                                      setSphereRun(null);setSpherePlaying(false);
+                                      setCollisionRun(null);setCollisionPlaying(false);
+                                      setError("");
+                                      setMessage("Calculated successive 3D contacts with conserved momentum and audited energy.");
+                                    }catch(cause){
+                                      setGroupRun(null);setGroupPlaying(false);
+                                      setError(cause instanceof Error?cause.message:"Unsupported multi-contact assumptions.");
+                                    }
+                                  }}>Calculate all sphere contacts</button>
+                              </>}
+                            {activeGroupRun&&(
+                              <div className="mt-3 space-y-2 text-xs" aria-label="Group collision results">
+                                <p>Actual computed contacts: {activeGroupRun.events.length}
+                                  {" · "}assumed inertial spheres: {activeGroupRun.initial.length}</p>
+                                <p>Momentum before/after (kg·m/s):
+                                  {activeGroupRun.initialMomentumKgMps.map(x=>x.toPrecision(4)).join(" / ")}
+                                  {" → "}
+                                  {activeGroupRun.finalMomentumKgMps.map(x=>x.toPrecision(4)).join(" / ")}</p>
+                                <p>Kinetic energy: {metric(activeGroupRun.totalInitialEnergyJ,"J")}
+                                  {" → "}{metric(activeGroupRun.totalFinalEnergyJ,"J")};
+                                  lost {metric(activeGroupRun.totalDissipatedEnergyJ,"J")}</p>
+                                {activeGroupRun.events.map((event,i)=><p key={i}>
+                                  Impact {i+1} at {event.atSeconds.toFixed(4)} s between
+                                  {" "}{event.firstEntityId.slice(0,8)} and {event.secondEntityId.slice(0,8)}.
+                                  Kinetic loss {metric(event.energyLostJ,"J")}
+                                </p>)}
+                                <label className="block">Group simulation time: {groupTime.toFixed(2)} s
+                                  <input className="w-full" type="range" min={0}
+                                    max={activeGroupRun.durationSeconds} step={0.01}
+                                    aria-label="Explore group collision time" value={groupTime}
+                                    onChange={e=>{
+                                      setGroupPlaying(false);setGroupTime(Number(e.target.value));
+                                    }}/>
+                                </label>
+                                {groupSample&&<p>Impacts completed at this moment: {groupSample.completedEvents}</p>}
+                                <div className="flex flex-wrap gap-2">
+                                  <button type="button" className={buttonClass}
+                                    onClick={()=>{setGroupPlaying(false);setGroupTime(0);}}>Beginning</button>
+                                  <button type="button" className={buttonClass}
+                                    disabled={!activeGroupRun.events.some(event=>event.atSeconds<groupTime-1e-9)}
+                                    onClick={()=>{setGroupPlaying(false);setGroupTime(previousEventTime(groupTime,activeGroupRun.durationSeconds,activeGroupRun.events.map(event=>event.atSeconds)));}}>
+                                    Previous contact
+                                  </button>
+                                  <button type="button" className={buttonClass}
+                                    onClick={()=>setGroupPlaying(v=>!v)}>
+                                    {groupPlaying?"Pause":"Play"}
+                                  </button>
+                                  <button type="button" className={buttonClass}
+                                    onClick={()=>{setGroupPlaying(false);setGroupTime(nextEventTime(groupTime,activeGroupRun.durationSeconds,activeGroupRun.events.map(event=>event.atSeconds)));}}>
+                                    Next contact
+                                  </button>
+                                  <button type="button" className={buttonClass}
+                                    onClick={()=>{setGroupPlaying(false);setGroupTime(activeGroupRun.durationSeconds);}}>End</button>
+                                  <select className={inputLabel} aria-label="Group impact playback rate"
+                                    value={groupRate} onChange={e=>setGroupRate(Number(e.target.value))}>
+                                    <option value={0.01}>0.01×</option><option value={0.1}>0.1×</option>
+                                    <option value={1}>1×</option><option value={10}>10×</option>
+                                    <option value={100}>100×</option>
+                                  </select>
+                                  <button type="button" className={buttonClass}
+                                    onClick={()=>downloadJson("world-lab-multi-sphere-evidence.json",activeGroupRun)}>
+                                    Export group impact evidence
+                                  </button>
+                                </div>
+                                <StudioNote>{activeGroupRun.validity}</StudioNote>
+                              </div>
+                            )}
+                          </div>
+                          <div className="sm:col-span-2 rounded-xl border border-border p-3"
+                            aria-label="Three-dimensional sphere impact experiment">
+                            <h3 className="text-sm font-semibold">Sphere collision</h3>
+                            <StudioNote>
+                              Two actual 3D spheres travel in straight lines from their positions in this world.
+                              Calculate their first contact and the exact normal impulse, with invented
+                              density and restitution assumptions. Off-axis strikes change all three axes.
+                              No gravity, spin, fracture, friction or second collision is inferred.
+                            </StudioNote>
+                            {selectedEntity.shape!=="sphere"&&
+                              <p className="text-xs">Select a sphere to use this spatial physics model.</p>}
+                            <label className="mt-2 block text-xs">Other sphere
+                              <select className={inputLabel} aria-label="Other sphere for 3D impact"
+                                value={sphereOther?.shape==="sphere"&&
+                                  sphereOther.id!==selectedEntity.id?sphereOtherId:""}
+                                onChange={e=>{
+                                  setSphereOtherId(e.target.value);setSphereRun(null);setSpherePlaying(false);
+                                }}>
+                                <option value="">Choose an invented sphere</option>
+                                {project?.entities.filter(e=>e.shape==="sphere"&&e.id!==selectedEntity.id)
+                                  .map(e=><option key={e.id} value={e.id}>
+                                    {e.name} · {e.id.slice(0,8)}</option>)}
+                              </select>
+                            </label>
+                            <div className="mt-2 grid grid-cols-3 gap-2">
+                              {([0,1,2] as const).map(i=><label className="text-xs" key={"a"+i}>
+                                First {["X","Y","Z"][i]} speed (m/s)
+                                <input type="number" className={inputLabel} step="any" min={-100} max={100}
+                                  aria-label={"First sphere "+["X","Y","Z"][i]+" velocity"}
+                                  value={sphereFirstVelocity[i]} onChange={e=>{
+                                    const next=[...sphereFirstVelocity] as [number,number,number];
+                                    next[i]=Number(e.target.value);setSphereFirstVelocity(next);
+                                    setSphereRun(null);setSpherePlaying(false);
+                                  }}/>
+                              </label>)}
+                              {([0,1,2] as const).map(i=><label className="text-xs" key={"b"+i}>
+                                Second {["X","Y","Z"][i]} speed (m/s)
+                                <input type="number" className={inputLabel} step="any" min={-100} max={100}
+                                  aria-label={"Second sphere "+["X","Y","Z"][i]+" velocity"}
+                                  value={sphereSecondVelocity[i]} onChange={e=>{
+                                    const next=[...sphereSecondVelocity] as [number,number,number];
+                                    next[i]=Number(e.target.value);setSphereSecondVelocity(next);
+                                    setSphereRun(null);setSpherePlaying(false);
                                   }}/>
                               </label>)}
                             </div>
-                          </div>;
-                        })}
-                      </div>
-                      <label className="mt-2 block text-xs">Assumed group restitution (0–1)
-                        <input className={inputLabel} type="number" min={0} max={1}
-                          step="0.05" aria-label="Group sphere restitution"
-                          value={groupRestitution} onChange={e=>{
-                            setGroupRestitution(Number(e.target.value));
-                            setGroupPlaying(false);setGroupRun(null);
-                          }}/>
-                      </label>
-                      <button type="button" className={buttonClass+" mt-2"}
-                        onClick={()=>{
-                          if(!project)return;
-                          try{
-                            const velocityInputs=Object.fromEntries(groupSpheres.map((s,i)=>[
-                              s.id,groupVelocities[s.id]??(i===0?[2,0,0]:[0,0,0]),
-                            ])) as Record<string,Vec3>;
-                            const run=runMultiSphereCollisions(project,velocityInputs,groupRestitution);
-                            setGroupRun(run);setGroupPlaying(false);setGroupTime(0);
-                            setSphereRun(null);setSpherePlaying(false);
-                            setCollisionRun(null);setCollisionPlaying(false);
-                            setError("");
-                            setMessage("Calculated successive 3D contacts with conserved momentum and audited energy.");
-                          }catch(cause){
-                            setGroupRun(null);setGroupPlaying(false);
-                            setError(cause instanceof Error?cause.message:"Unsupported multi-contact assumptions.");
-                          }
-                        }}>Calculate all sphere contacts</button>
-                    </>}
-                  {activeGroupRun&&(
-                    <div className="mt-3 space-y-2 text-xs" aria-label="Group collision results">
-                      <p>Actual computed contacts: {activeGroupRun.events.length}
-                        {" · "}assumed inertial spheres: {activeGroupRun.initial.length}</p>
-                      <p>Momentum before/after (kg·m/s):
-                        {activeGroupRun.initialMomentumKgMps.map(x=>x.toPrecision(4)).join(" / ")}
-                        {" → "}
-                        {activeGroupRun.finalMomentumKgMps.map(x=>x.toPrecision(4)).join(" / ")}</p>
-                      <p>Kinetic energy: {metric(activeGroupRun.totalInitialEnergyJ,"J")}
-                        {" → "}{metric(activeGroupRun.totalFinalEnergyJ,"J")};
-                        lost {metric(activeGroupRun.totalDissipatedEnergyJ,"J")}</p>
-                      {activeGroupRun.events.map((event,i)=><p key={i}>
-                        Impact {i+1} at {event.atSeconds.toFixed(4)} s between
-                        {" "}{event.firstEntityId.slice(0,8)} and {event.secondEntityId.slice(0,8)}.
-                        Kinetic loss {metric(event.energyLostJ,"J")}
-                      </p>)}
-                      <label className="block">Group simulation time: {groupTime.toFixed(2)} s
-                        <input className="w-full" type="range" min={0}
-                          max={activeGroupRun.durationSeconds} step={0.01}
-                          aria-label="Explore group collision time" value={groupTime}
-                          onChange={e=>{
-                            setGroupPlaying(false);setGroupTime(Number(e.target.value));
-                          }}/>
-                      </label>
-                      {groupSample&&<p>Impacts completed at this moment: {groupSample.completedEvents}</p>}
-                      <div className="flex flex-wrap gap-2">
-                        <button type="button" className={buttonClass}
-                          onClick={()=>{setGroupPlaying(false);setGroupTime(0);}}>Beginning</button>
-                        <button type="button" className={buttonClass}
-                          disabled={!activeGroupRun.events.some(event=>event.atSeconds<groupTime-1e-9)}
-                          onClick={()=>{setGroupPlaying(false);setGroupTime(previousEventTime(groupTime,activeGroupRun.durationSeconds,activeGroupRun.events.map(event=>event.atSeconds)));}}>
-                          Previous contact
-                        </button>
-                        <button type="button" className={buttonClass}
-                          onClick={()=>setGroupPlaying(v=>!v)}>
-                          {groupPlaying?"Pause":"Play"}
-                        </button>
-                        <button type="button" className={buttonClass}
-                          onClick={()=>{setGroupPlaying(false);setGroupTime(nextEventTime(groupTime,activeGroupRun.durationSeconds,activeGroupRun.events.map(event=>event.atSeconds)));}}>
-                          Next contact
-                        </button>
-                        <button type="button" className={buttonClass}
-                          onClick={()=>{setGroupPlaying(false);setGroupTime(activeGroupRun.durationSeconds);}}>End</button>
-                        <select className={inputLabel} aria-label="Group impact playback rate"
-                          value={groupRate} onChange={e=>setGroupRate(Number(e.target.value))}>
-                          <option value={0.01}>0.01×</option><option value={0.1}>0.1×</option>
-                          <option value={1}>1×</option><option value={10}>10×</option>
-                          <option value={100}>100×</option>
-                        </select>
-                        <button type="button" className={buttonClass}
-                          onClick={()=>downloadJson("world-lab-multi-sphere-evidence.json",activeGroupRun)}>
-                          Export group impact evidence
-                        </button>
-                      </div>
-                      <p className="text-muted-foreground">{activeGroupRun.validity}</p>
+                            <label className="mt-2 block text-xs">Assumed 3D restitution (0–1)
+                              <input type="number" className={inputLabel} step={0.05} min={0} max={1}
+                                aria-label="Three-dimensional collision restitution"
+                                value={sphereRestitution} onChange={e=>{
+                                  setSphereRestitution(Number(e.target.value));setSphereRun(null);setSpherePlaying(false);
+                                }}/>
+                            </label>
+                            <button type="button" className={buttonClass+" mt-2"}
+                              disabled={selectedEntity.shape!=="sphere"||!sphereOther||sphereOther.shape!=="sphere"}
+                              onClick={()=>{
+                                if(!project||!sphereOther)return;
+                                try{
+                                  const run=solveSphereImpact3d(project,selectedEntity.id,
+                                    sphereOther.id,sphereFirstVelocity,sphereSecondVelocity,sphereRestitution);
+                                  setSphereRun(run);setSphereTime(0);setSpherePlaying(false);
+                                  setCollisionRun(null);setCollisionPlaying(false);
+                                  setMessage("Calculated an isolated spatial contact and audited momentum, angular momentum and energy.");
+                                  setError("");
+                                }catch(cause){
+                                  setSphereRun(null);setSpherePlaying(false);
+                                  setError(cause instanceof Error?cause.message:"Unsupported spatial collision.");
+                                }
+                              }}>Calculate three-dimensional sphere impact</button>
+                            {selectedSphereRun && (selectedSphereRun.firstEntityId===selectedEntity.id||
+                              selectedSphereRun.secondEntityId===selectedEntity.id)&&(
+                              <div className="mt-3 space-y-2 text-xs"
+                                aria-label="Verified three-dimensional impact results">
+                                <p>Impact: {metric(selectedSphereRun.impactTimeSeconds,"s")} ·
+                                  masses: {metric(selectedSphereRun.firstMassKg,"kg")} /
+                                  {metric(selectedSphereRun.secondMassKg,"kg")}</p>
+                                <p>Contact normal X/Y/Z:
+                                  {selectedSphereRun.impactNormal.map(v=>v.toPrecision(4)).join(" / ")}</p>
+                                <p>Impulse X/Y/Z (N·s):
+                                  {selectedSphereRun.impulseNs.map(v=>v.toPrecision(5)).join(" / ")}</p>
+                                <p>Final first sphere velocity X/Y/Z (m/s):
+                                  {selectedSphereRun.firstFinalVelocityMps.map(v=>v.toPrecision(5)).join(" / ")}</p>
+                                <p>Final second sphere velocity X/Y/Z (m/s):
+                                  {selectedSphereRun.secondFinalVelocityMps.map(v=>v.toPrecision(5)).join(" / ")}</p>
+                                <p>Momentum X/Y/Z before (kg·m/s):
+                                  {selectedSphereRun.momentumBeforeKgMps.map(v=>v.toPrecision(5)).join(" / ")}</p>
+                                <p>Momentum X/Y/Z after (kg·m/s):
+                                  {selectedSphereRun.momentumAfterKgMps.map(v=>v.toPrecision(5)).join(" / ")}</p>
+                                <p>Angular momentum before/after (kg·m²/s):
+                                  {selectedSphereRun.angularMomentumBeforeKgM2PerS.map(v=>v.toPrecision(5)).join(" / ")} /
+                                  {selectedSphereRun.angularMomentumAfterKgM2PerS.map(v=>v.toPrecision(5)).join(" / ")}</p>
+                                <p>Energy: {metric(selectedSphereRun.energyBeforeJ,"J")} before,
+                                  {metric(selectedSphereRun.energyAfterJ,"J")} after,
+                                  {metric(selectedSphereRun.dissipatedEnergyJ,"J")} dissipated.</p>
+                                <label className="block">Spatial collision time: {sphereTime.toFixed(2)} s
+                                  <input type="range" className="w-full"
+                                    aria-label="Explore three-dimensional impact time"
+                                    min={0} max={selectedSphereRun.durationSeconds} step={0.01}
+                                    value={sphereTime} onChange={e=>{
+                                      setSpherePlaying(false);setSphereTime(Number(e.target.value));
+                                    }}/>
+                                </label>
+                                {sphereSample&&<p>Computed world coordinates, first /
+                                  second sphere (metres):
+                                  {sphereSample.firstCentreM.map(v=>v.toPrecision(4)).join(" / ")} ;
+                                  {sphereSample.secondCentreM.map(v=>v.toPrecision(4)).join(" / ")}
+                                </p>}
+                                <div className="flex flex-wrap gap-2">
+                                  <button type="button" className={buttonClass}
+                                    onClick={()=>{setSpherePlaying(false);setSphereTime(0);}}>Beginning</button>
+                                  <button type="button" className={buttonClass}
+                                    disabled={sphereTime<=1e-9}
+                                    onClick={()=>{setSpherePlaying(false);setSphereTime(previousEventTime(sphereTime,selectedSphereRun.durationSeconds,[selectedSphereRun.impactTimeSeconds]));}}>
+                                    Previous contact
+                                  </button>
+                                  <button type="button" className={buttonClass}
+                                    onClick={()=>setSpherePlaying(v=>!v)}>
+                                    {spherePlaying?"Pause":"Play"}
+                                  </button>
+                                  <button type="button" className={buttonClass}
+                                    onClick={()=>{setSpherePlaying(false);setSphereTime(nextEventTime(sphereTime,selectedSphereRun.durationSeconds,[selectedSphereRun.impactTimeSeconds]));}}>
+                                    Next contact
+                                  </button>
+                                  <button type="button" className={buttonClass}
+                                    onClick={()=>{setSpherePlaying(false);setSphereTime(selectedSphereRun.durationSeconds);}}>End</button>
+                                  <select className={inputLabel} aria-label="Three-dimensional collision playback rate"
+                                    value={spherePlaybackRate} onChange={e=>setSpherePlaybackRate(Number(e.target.value))}>
+                                    <option value={0.01}>0.01×</option><option value={0.1}>0.1×</option>
+                                    <option value={1}>1×</option><option value={10}>10×</option>
+                                    <option value={100}>100×</option>
+                                  </select>
+                                  <button type="button" className={buttonClass}
+                                    onClick={()=>downloadJson("world-lab-spatial-sphere-impact.json",selectedSphereRun)}>
+                                    Export 3D impact evidence
+                                  </button>
+                                </div>
+                                <StudioNote>{selectedSphereRun.validity}</StudioNote>
+                              </div>
+                            )}
+                          </div>
+                          <div className="sm:col-span-2 rounded-xl border border-border p-3"
+                            aria-label="Object-to-object impact experiment">
+                            <h3 className="text-sm font-semibold">Solid collision</h3>
+                            <StudioNote>
+                              Calculate a central X-direction collision in this world, without moving the saved geometry.
+                              Objects need aligned Y/Z centres, a positive starting gap and invented material densities.
+                              This is not a general 3D contact, deformation or fracture model.
+                            </StudioNote>
+                            <label className="mt-2 block text-xs">Second physical solid
+                              <select className={inputLabel} aria-label="Other solid to collide with"
+                                value={collisionPartner?.id!==selectedEntity.id?collisionOtherId:""}
+                                onChange={event=>{
+                                  setCollisionOtherId(event.target.value);
+                                  setCollisionRun(null);setCollisionPlaying(false);
+                                }}>
+                                <option value="">Choose another solid</option>
+                                {project?.entities.filter(e=>e.id!==selectedEntity.id).map(e=>
+                                  <option key={e.id} value={e.id}>{e.name} · {e.id.slice(0,8)}</option>)}
+                              </select>
+                            </label>
+                            <div className="mt-2 grid grid-cols-2 gap-2">
+                              <label className="text-xs">Left speed (m/s)
+                                <input aria-label="Collision left speed" className={inputLabel}
+                                  type="number" min={-100} max={100} step="any"
+                                  value={collisionLeftSpeed} onChange={e=>{
+                                    setCollisionLeftSpeed(Number(e.target.value));
+                                    setCollisionRun(null);setCollisionPlaying(false);
+                                  }}/>
+                              </label>
+                              <label className="text-xs">Right speed (m/s)
+                                <input aria-label="Collision right speed" className={inputLabel}
+                                  type="number" min={-100} max={100} step="any"
+                                  value={collisionRightSpeed} onChange={e=>{
+                                    setCollisionRightSpeed(Number(e.target.value));
+                                    setCollisionRun(null);setCollisionPlaying(false);
+                                  }}/>
+                              </label>
+                              <label className="col-span-2 text-xs">Assumed restitution coefficient (0–1)
+                                <input aria-label="Collision restitution" className={inputLabel}
+                                  type="number" min={0} max={1} step={0.1}
+                                  value={collisionRestitution} onChange={e=>{
+                                    setCollisionRestitution(Number(e.target.value));
+                                    setCollisionRun(null);setCollisionPlaying(false);
+                                  }}/>
+                              </label>
+                            </div>
+                            <button type="button" className={buttonClass+" mt-2"}
+                              disabled={!collisionPartner||collisionPartner.id===selectedEntity.id}
+                              onClick={()=>{
+                                if(!project||!collisionPartner)return;
+                                try{
+                                  const run=calculateObjectCollision(project,selectedEntity.id,
+                                    collisionPartner.id,collisionLeftSpeed,collisionRightSpeed,
+                                    collisionRestitution);
+                                  setCollisionRun(run);setCollisionTime(0);setCollisionPlaying(false);
+                                  setError("");setMessage("Computed physical impact, momentum and dissipated energy from invented density.");
+                                }catch(cause){
+                                  setCollisionRun(null);setCollisionPlaying(false);
+                                  setError(cause instanceof Error?cause.message:"Collision assumptions unsupported.");
+                                }
+                              }}>Calculate two-body collision</button>
+                            {selectedCollision && (selectedCollision.leftEntityId===selectedEntity.id||
+                              selectedCollision.rightEntityId===selectedEntity.id)&&(
+                              <div className="mt-3 space-y-2 text-xs"
+                                aria-label="Calculated collision motion and energy">
+                                <p>Invented mass left/right: {metric(selectedCollision.leftMassKg,"kg")} / {metric(selectedCollision.rightMassKg,"kg")}</p>
+                                <p>Impact time: {metric(selectedCollision.impactTimeSeconds,"s")}. Impulse: {metric(selectedCollision.impulseNs,"N·s")}</p>
+                                <p>Velocity after impact, left/right: {metric(selectedCollision.leftFinalVelocityMps,"m/s")} / {metric(selectedCollision.rightFinalVelocityMps,"m/s")}</p>
+                                <p>Momentum before/after: {metric(selectedCollision.momentumBeforeKgMps,"kg·m/s")} / {metric(selectedCollision.momentumAfterKgMps,"kg·m/s")}</p>
+                                <p>Energy before/after: {metric(selectedCollision.energyBeforeJ,"J")} / {metric(selectedCollision.energyAfterJ,"J")}. Dissipated: {metric(selectedCollision.dissipatedEnergyJ,"J")}</p>
+                                <label className="block">Explore collision time: {collisionTime.toFixed(2)} s
+                                  <input className="w-full" aria-label="Explore collision time" type="range"
+                                    min={0} max={selectedCollision.durationSeconds} step={0.01}
+                                    value={collisionTime} onChange={e=>{
+                                      setCollisionPlaying(false);setCollisionTime(Number(e.target.value));
+                                    }}/>
+                                </label>
+                                {collisionSample&&<>
+                                  <p>Live centre X, left/right: {metric(collisionSample.leftCenterXM,"m")} / {metric(collisionSample.rightCenterXM,"m")}</p>
+                                  <p>Phase: {collisionSample.collided?"after impact":"approaching"}</p>
+                                </>}
+                                <div className="flex flex-wrap gap-2">
+                                  <button type="button" className={buttonClass}
+                                    onClick={()=>{setCollisionPlaying(false);setCollisionTime(0);}}>Beginning</button>
+                                  <button type="button" className={buttonClass}
+                                    disabled={collisionTime<=1e-9}
+                                    onClick={()=>{setCollisionPlaying(false);setCollisionTime(previousEventTime(collisionTime,selectedCollision.durationSeconds,[selectedCollision.impactTimeSeconds]));}}>
+                                    Previous contact
+                                  </button>
+                                  <button type="button" className={buttonClass}
+                                    onClick={()=>setCollisionPlaying(v=>!v)}>
+                                    {collisionPlaying?"Pause":"Play"}
+                                  </button>
+                                  <button type="button" className={buttonClass}
+                                    onClick={()=>{setCollisionPlaying(false);setCollisionTime(nextEventTime(collisionTime,selectedCollision.durationSeconds,[selectedCollision.impactTimeSeconds]));}}>
+                                    Next contact
+                                  </button>
+                                  <button type="button" className={buttonClass}
+                                    onClick={()=>{setCollisionPlaying(false);setCollisionTime(selectedCollision.durationSeconds);}}>End</button>
+                                  <select className={inputLabel} aria-label="Collision playback speed"
+                                    value={collisionPlaybackRate} onChange={e=>setCollisionPlaybackRate(Number(e.target.value))}>
+                                    <option value={0.01}>0.01×</option><option value={0.1}>0.1×</option>
+                                    <option value={1}>1×</option><option value={10}>10×</option>
+                                    <option value={100}>100×</option>
+                                  </select>
+                                  <button type="button" className={buttonClass}
+                                    onClick={()=>downloadJson("world-lab-two-body-collision-evidence.json",selectedCollision)}>
+                                    Export collision evidence
+                                  </button>
+                                </div>
+                                <StudioNote>{selectedCollision.validity}</StudioNote>
+                              </div>
+                            )}
+                          </div>
+                          <div className="sm:col-span-2 rounded-xl border border-border p-3"
+                            aria-label="Invented material bending experiment">
+                            <h3 className="text-sm font-semibold">Beam stiffness</h3>
+                            <StudioNote>
+                              Treat a rectangular box as a cantilever: length along X, vertical depth along Y,
+                              width along Z, clamped at its left end and loaded at its free end.
+                              This uses your assumed Young's modulus, not a known strength or failure limit.
+                            </StudioNote>
+                            <label className="mt-2 block text-xs">
+                              Downward end load (newtons)
+                              <input type="number" className={inputLabel}
+                                aria-label="Cantilever end load" min={0} max={100000000} step="any"
+                                value={beamLoadN} onChange={event=>{
+                                  setBeamLoadN(Number(event.target.value));setBeamRun(null);
+                                }}/>
+                            </label>
+                            <button className={buttonClass+" mt-2"} type="button"
+                              disabled={selectedEntity.shape!=="box"||
+                                selectedMaterial?.youngModulusPa==null||
+                                selectedMaterial.youngModulusPa<=0}
+                              onClick={()=>{
+                                if(!project||!selectedEntity)return;
+                                try{
+                                  const computed=calculateStructuralBending(project,selectedEntity.id,beamLoadN);
+                                  setBeamRun(computed);setError("");
+                                  setMessage("Calculated an ideal small-deflection beam from explicitly assumed material stiffness.");
+                                }catch(cause){
+                                  setBeamRun(null);
+                                  setError(cause instanceof Error?cause.message:"Unsupported structural assumptions.");
+                                }
+                              }}>Calculate elastic bending</button>
+                            {selectedEntity.shape!=="box"&&<StudioNote>
+                              Only rectangular box beams are supported by this equation.
+                            </StudioNote>}
+                            {selectedMaterial?.youngModulusPa==null&&<StudioNote>
+                              Assign invented matter with a positive Young's modulus before testing stiffness.
+                            </StudioNote>}
+                            {beamRun&&beamRun.entityId===selectedEntity.id&&
+                              beamRun.projectId===project?.id&&beamRun.projectRevision===project.revision&&
+                              beamRun.appliedForceN===beamLoadN&&(
+                              <div className="mt-2 space-y-1 text-xs"
+                                aria-label="Calculated hypothetical bending results">
+                                <p>Free-end deflection: {metric(beamRun.maximumTipDeflectionM,"m")}</p>
+                                <p>Maximum bending stress: {metric(beamRun.maximumBendingStressPa,"Pa")}</p>
+                                <p>Maximum surface strain: {beamRun.maximumSurfaceStrain.toExponential(4)} (dimensionless)</p>
+                                <p>Geometric bending stiffness EI: {metric(beamRun.bendingStiffnessNm2,"N·m²")}</p>
+                                <StudioNote>{beamRun.validity}</StudioNote>
+                                <button type="button" className={buttonClass} onClick={()=>
+                                  downloadJson("world-lab-structural-bending-evidence.json",beamRun)}>
+                                  Export assumed bending evidence
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          <div className="sm:col-span-2 rounded-xl border border-border p-3" aria-label="Fluid displacement and buoyancy experiment">
+                            <h3 className="text-sm font-semibold">Buoyancy</h3>
+                            <StudioNote>
+                              Calculate liquid displacement, upward force and possible floating depth from this solid's geometry.
+                              An unknown invented density stays unknown.
+                            </StudioNote>
+                            <div className="mt-2 grid grid-cols-2 gap-2">
+                              <label className="text-xs">Assumed liquid density (kg/m³)
+                                <input type="number" className={inputLabel} aria-label="Liquid density"
+                                  min={0.01} max={25000} step={50} value={fluidDensity}
+                                  onChange={e=>{setFluidDensity(Number(e.target.value));setFluidRun(null);}} />
+                              </label>
+                              <label className="text-xs">Depth under liquid surface (m)
+                                <input type="number" className={inputLabel} aria-label="Immersion depth"
+                                  min={0} max={selectedEntity.dimensionsMeters[1]} step={0.1}
+                                  value={fluidDepth} onChange={e=>{setFluidDepth(Number(e.target.value));setFluidRun(null);}} />
+                              </label>
+                            </div>
+                            <div className="mt-2 grid grid-cols-2 gap-2">
+                              <label className="text-xs">Level of liquid above ground (m)
+                                <input className={inputLabel} type="number" min={0} max={20} step={0.1}
+                                  aria-label="Fluid surface height" value={fluidSurfaceHeight}
+                                  onChange={e=>{setFluidSurfaceHeight(Number(e.target.value));setFluidMotionPlaying(false);setFluidMotionRun(null);}}/>
+                              </label>
+                              <label className="text-xs">Assumed drag (N·s/m)
+                                <input className={inputLabel} type="number" min={0} max={10000} step={10}
+                                  aria-label="Fluid linear drag" value={fluidDrag}
+                                  onChange={e=>{setFluidDrag(Number(e.target.value));setFluidMotionPlaying(false);setFluidMotionRun(null);}}/>
+                              </label>
+                            </div>
+                            <button type="button" className={buttonClass+" mt-2"} onClick={simulateFluidMotion}>
+                              Simulate floating or sinking over time
+                            </button>
+                            {selectedFluidMotion&&fluidMotionSample&&
+                              <div className="mt-2 rounded-lg border border-border p-2 text-xs"
+                                aria-label="Time-dependent fluid mechanics results">
+                                <p>Simulated time: {fluidMotionSample.timeSeconds.toFixed(3)} seconds</p>
+                                <p>Bottom height: {fluidMotionSample.bottomHeightM.toFixed(4)} m</p>
+                                <p>Vertical velocity: {fluidMotionSample.velocityMps.toFixed(4)} m/s</p>
+                                <p>Submerged depth: {fluidMotionSample.immersionDepthM.toFixed(4)} m</p>
+                                <p>Calculated buoyancy: {fluidMotionSample.buoyancyForceN.toFixed(3)} N</p>
+                                <p>Assumed viscous drag: {fluidMotionSample.dragForceN.toFixed(3)} N</p>
+                                <p>Energy residual: {fluidMotionSample.energyResidualJ.toExponential(3)} J</p>
+                                <label className="block">Explore fluid time
+                                  <input className="w-full" type="range" aria-label="Explore fluid motion time"
+                                    min={0} max={selectedFluidMotion.input.durationSeconds}
+                                    step={selectedFluidMotion.stepSeconds} value={fluidMotionTime}
+                                    onChange={e=>{setFluidMotionPlaying(false);setFluidMotionTime(Number(e.target.value));}}/>
+                                </label>
+                                <div className="flex flex-wrap gap-2">
+                                  <button type="button" className={buttonClass}
+                                    onClick={()=>setFluidMotionPlaying(v=>!v)}>
+                                    {fluidMotionPlaying?"Pause fluid":"Play fluid"}
+                                  </button>
+                                  <button type="button" className={buttonClass}
+                                    onClick={()=>{setFluidMotionPlaying(false);setFluidMotionTime(0);}}>Reset fluid</button>
+                                  <button type="button" className={buttonClass}
+                                    onClick={()=>{setFluidMotionPlaying(false);setFluidMotionTime(t=>
+                                      Math.min(selectedFluidMotion.input.durationSeconds,
+                                        t+selectedFluidMotion.stepSeconds));}}>Step fluid</button>
+                                  <select className={inputLabel} aria-label="Fluid playback speed"
+                                    value={fluidMotionRate} onChange={e=>setFluidMotionRate(Number(e.target.value))}>
+                                    <option value={0.1}>0.1× slow</option>
+                                    <option value={1}>1× normal</option>
+                                    <option value={4}>4× fast</option>
+                                  </select>
+                                  <button type="button" className={buttonClass}
+                                    onClick={()=>downloadJson("world-lab-fluid-motion-evidence.json",selectedFluidMotion)}>
+                                    Export fluid trajectory evidence
+                                  </button>
+                                </div>
+                                <StudioNote>{selectedFluidMotion.validity}</StudioNote>
+                                <StudioNote>The blue 3D plane is an illustrative assumed fluid surface; vertical position follows the calculated trajectory.</StudioNote>
+                              </div>}
+                            <button type="button" className={buttonClass+" mt-2"} onClick={runFluidTest}>
+                              Calculate buoyancy
+                            </button>
+                            {fluidRun && fluidRun.projectId===project?.id &&
+                              fluidRun.projectRevision===project?.revision &&
+                              fluidRun.entityId===selectedEntity.id && (
+                              <div className="mt-2 space-y-1 text-xs" aria-label="Calculated buoyancy results">
+                                <WorldLabFluidCutaway entity={selectedEntity} result={fluidRun}/>
+                                <p>Displaced liquid: {fluidRun.immersedVolumeM3.toFixed(5)} m³</p>
+                                <p>Upward buoyancy: {fluidRun.buoyancyForceN.toFixed(3)} N</p>
+                                <p>Bottom gauge pressure: {fluidRun.bottomGaugePressurePa.toFixed(1)} Pa</p>
+                                <p>Status: {fluidRun.floatingStatus.replaceAll("-"," ")}</p>
+                                <p>Net upward force: {fluidRun.netUpwardForceN===null?"Unknown material mass":fluidRun.netUpwardForceN.toFixed(3)+" N"}</p>
+                                <p>Equilibrium draft: {fluidRun.equilibriumDraftM===null?"Unknown":fluidRun.equilibriumDraftM.toFixed(4)+" m"}</p>
+                                <button type="button" className={buttonClass} onClick={()=>
+                                  downloadJson("world-lab-buoyancy-evidence.json",fluidRun)}>Export fluid evidence</button>
+                                <StudioNote>{fluidRun.validity}</StudioNote>
+                              </div>
+                            )}
+                          </div>
+                          <div className="sm:col-span-2 rounded-xl border border-border p-3" aria-label="Electrical and mechanical actuator experiment">
+                            <h3 className="text-sm font-semibold">Actuator</h3>
+                            <StudioNote>
+                              Design a simple electric actuator. Electricity builds coil current, creates lifting force,
+                              moves your object and generates back-EMF and resistance heat. The same equations exchange
+                              energy between the electrical and physical systems.
+                            </StudioNote>
+                            <label className="mt-2 flex items-center gap-2 text-xs">
+                              <input aria-label="Include coil heating feedback" type="checkbox"
+                                checked={actuatorHeatEnabled} onChange={e=>{setActuatorHeatEnabled(e.target.checked);setActuatorRun(null);setActuatorPlaying(false);setActuatorAudit(null);}} />
+                              Include calculated coil heating and resistance feedback
+                            </label>
+                            {actuatorHeatEnabled && <details className="mt-2">
+                              <summary className="cursor-pointer text-xs">Adjust thermal assumptions</summary>
+                              <div className="grid grid-cols-2 gap-2">
+                                <label className="text-xs">Coil heat capacity (J/K)
+                                  <input aria-label="Coil heat capacity" type="number" className={inputLabel}
+                                    min={1} max={1000000} value={coilHeatCapacity}
+                                    onChange={e=>{setCoilHeatCapacity(Number(e.target.value));setActuatorRun(null);setActuatorPlaying(false);}} />
+                                </label>
+                                <label className="text-xs">Cooling (W/K)
+                                  <input aria-label="Coil cooling conductance" type="number" className={inputLabel}
+                                    min={0} max={10000} step={0.1} value={coilCooling}
+                                    onChange={e=>{setCoilCooling(Number(e.target.value));setActuatorRun(null);setActuatorPlaying(false);}} />
+                                </label>
+                              </div>
+                              <StudioNote>These are hypothetical thermal properties, not measurements.</StudioNote>
+                            </details>}
+                            <details className="mt-2">
+                              <summary className="cursor-pointer text-xs">Adjust electrical power and force</summary>
+                              <div className="mt-2 grid grid-cols-2 gap-2">
+                                <label className="text-xs">Voltage (V)
+                                  <input aria-label="Actuator supply voltage" type="number" className={inputLabel}
+                                    min={0} max={1000} step={1} value={actuatorVoltage}
+                                    onChange={e=>{setActuatorPlaying(false);setActuatorRun(null);setActuatorVoltage(Number(e.target.value));}} />
+                                </label>
+                                <label className="text-xs">Actuator strength (N/A)
+                                  <input aria-label="Actuator force constant" type="number" className={inputLabel}
+                                    min={0} max={10000} step={0.5} value={actuatorConstant}
+                                    onChange={e=>{setActuatorPlaying(false);setActuatorRun(null);setActuatorConstant(Number(e.target.value));}} />
+                                </label>
+                              </div>
+                            </details>
+                            <label className="mt-2 flex items-center gap-2 text-xs">
+                              <input type="checkbox" aria-label="Open motor supply switch during experiment"
+                                checked={actuatorPowerOffAt!==null}
+                                onChange={e=>{
+                                  setActuatorPowerOffAt(e.target.checked?2:null);
+                                  setActuatorPlaying(false);setActuatorRun(null);setActuatorAudit(null);
+                                }}/>
+                              Open the motor supply switch during the run
+                            </label>
+                            {actuatorPowerOffAt!==null&&<div className="mt-1 rounded border border-border p-2">
+                              <label className="block text-xs" htmlFor="worldlab-motor-power-off">
+                                Switch opens at {actuatorPowerOffAt.toFixed(3)} s
+                              </label>
+                              <input id="worldlab-motor-power-off" className="w-full" type="range"
+                                min="0" max="4" step={1/240} value={actuatorPowerOffAt}
+                                onChange={e=>{
+                                  setActuatorPowerOffAt(Number(e.target.value));
+                                  setActuatorPlaying(false);setActuatorRun(null);setActuatorAudit(null);
+                                }}/>
+                              <StudioNote>
+                                Supply voltage becomes zero at this exact event. The modeled coil current decays continuously through its R–L path; arcing, fuse damage and contact bounce are outside this model.
+                              </StudioNote>
+                            </div>}
+                            <button type="button" className={buttonClass+" mt-2"}
+                              disabled={selectedQuantities.massKg===null} onClick={()=>startActuatorWithSelectedSolid(false)}>
+                              Power this solid
+                            </button>
+                            {project?.networks?.[0] && <button type="button" className={buttonClass+" mt-2 ml-2"}
+                              disabled={selectedQuantities.massKg===null}
+                              onClick={()=>startActuatorWithSelectedSolid(true)}>
+                              Wire motor to circuit
+                            </button>}
+                            {project?.digitalNetworks?.[0]?.outputs.map(output=>
+                              <button key={output.id} type="button" className={buttonClass+" mt-2 ml-2"}
+                                disabled={selectedQuantities.massKg===null}
+                                onClick={()=>startDigitalMotor(output.id)}>
+                                Drive with invented logic: {output.label}
+                              </button>)}
+                            {selectedActuator && actuatorSample && (
+                              <div className="mt-3 space-y-2" aria-label="Coupled electromechanical results">
+                                <StudioNote>
+                                  Computed hypothetical electromechanical system · not measured
+                                </StudioNote>
+                                <dl className="grid grid-cols-2 gap-2 text-xs">
+                                  <div><dt>Height above ground</dt><dd>{actuatorSample.heightM.toFixed(3)} m</dd></div>
+                                  <div><dt>Coil current</dt><dd>{actuatorSample.coilCurrentA.toFixed(3)} A</dd></div>
+                                  <div><dt>Upward force</dt><dd>{actuatorSample.motorForceN.toFixed(3)} N</dd></div>
+                                  <div><dt>Back-EMF</dt><dd>{actuatorSample.backEmfV.toFixed(3)} V</dd></div>
+                                  <div><dt>Coil heat</dt><dd>{actuatorSample.resistiveHeatW.toFixed(3)} W</dd></div>
+                                  {actuatorSample.coilTemperatureK !== undefined && actuatorSample.coilTemperatureK !== null && <>
+                                    <div><dt>Coil temperature</dt><dd>{actuatorSample.coilTemperatureK.toFixed(2)} K</dd></div>
+                                    <div><dt>Hot resistance</dt><dd>{actuatorSample.coilResistanceOhm?.toFixed(3)} Ω</dd></div>
+                                    <div><dt>Stored coil heat</dt><dd>{actuatorSample.thermalEnergyJ?.toFixed(3)} J</dd></div>
+                                    <div><dt>Cooling loss</dt><dd>{actuatorSample.coolingPowerW?.toFixed(3)} W</dd></div>
+                                  </>}
+                                  <div><dt>Energy balance difference</dt><dd>{actuatorSample.energyResidualJ.toFixed(4)} J</dd></div>
+                                </dl>
+                                {digitalMotorRun && digitalMotorRun.projectId===project?.id &&
+                                  digitalMotorRun.projectRevision===project.revision &&
+                                  digitalMotorRun.entityId===selectedEntity?.id &&
+                                  digitalMotorRun.motor===actuatorRun && (
+                                  <div className="rounded border border-border p-2 text-xs"
+                                    aria-label="Computed invented digital controller">
+                                    <p>Invented logic output: {digitalMotorRun.logicBit} (assumed Boolean)</p>
+                                    <p>Applied ideal motor voltage: {digitalMotorRun.motor.input.supplyVoltageV.toFixed(3)} V</p>
+                                    <StudioNote>{digitalMotorRun.validity}</StudioNote>
+                                    <button type="button" className={buttonClass+" mt-2"}
+                                      onClick={()=>downloadJson("world-lab-digital-motor-evidence.json",digitalMotorRun)}>
+                                      Export linked digital-to-motion evidence
+                                    </button>
+                                  </div>
+                                )}
+                                {wiredMotorRun && wiredMotorRun.projectRevision===project?.revision &&
+                                  wiredMotorRun.entityId===selectedEntity?.id && (
+                                  <div className="text-xs" aria-label="Connected motor and source results">
+                                    <p>Connected source voltage: {wiredMotorRun.motor.input.supplyVoltageV.toFixed(3)} V</p>
+                                    <p>Total source current: {wiredMotorRun.samples[
+                                      Math.min(wiredMotorRun.samples.length-1,Math.round(actuatorTime/wiredMotorRun.motor.solverStepSeconds))
+                                    ].sourceBranchCurrentA.toFixed(4)} A (source convention)</p>
+                                    <p>Parallel resistor heating: {wiredMotorRun.dc.resistivePowerW.toFixed(3)} W</p>
+                                    <p>This motor is wired across an ideal voltage source; its dynamic current is counted alongside the passive loads.</p>
+                                    <button type="button" className={buttonClass} onClick={()=>
+                                      downloadJson("world-lab-wired-motor-evidence.json",wiredMotorRun)}>
+                                      Export connected evidence
+                                    </button>
+                                  </div>
+                                )}
+                                {actuatorAudit && (
+                                  <p className="text-xs text-muted-foreground" role={actuatorAudit.status === "outside-internal-tolerance" ? "alert" : undefined}>
+                                    Numerical self-check: {actuatorAudit.status === "within-internal-tolerance"
+                                      ? "within internal tolerance" : actuatorAudit.status === "unavailable"
+                                        ? "not available" : "outside internal tolerance"}.
+                                    {" "}{actuatorAudit.explanation}
+                                    {actuatorAudit.maximumRelativeStateDifference !== null && (
+                                      <> Step-refinement difference: {(100 * actuatorAudit.maximumRelativeStateDifference).toFixed(3)}%.
+                                      Energy residual fraction: {(100 * (actuatorAudit.maximumEnergyResidualFraction ?? 0)).toFixed(3)}%.</>
+                                    )}
+                                  </p>
+                                )}
+                                <WorldLabMotorInternalsPanel run={selectedActuator}
+                                  sample={actuatorSample} timeSeconds={actuatorTime}/>
+                                <label className="block text-xs">Explore motor time
+                                  <input aria-label="Explore motor time" type="range" min={0} className="w-full"
+                                    max={selectedActuator.input.durationSeconds} step={selectedActuator.solverStepSeconds}
+                                    value={actuatorTime}
+                                    onChange={e=>{setActuatorPlaying(false);setActuatorTime(Number(e.target.value));}} />
+                                </label>
+                                <div className="flex flex-wrap gap-2">
+                                  <button type="button" className={buttonClass}
+                                    onClick={()=>setActuatorPlaying(v=>!v)}>
+                                    {actuatorPlaying?"Pause motor":"Play motor"}
+                                  </button>
+                                  <button type="button" className={buttonClass}
+                                    onClick={()=>{setActuatorPlaying(false);setActuatorTime(0);}}>Reset motor</button>
+                                  <select className={inputLabel} aria-label="Motor playback speed"
+                                    value={actuatorRate} onChange={e=>setActuatorRate(Number(e.target.value))}>
+                                    <option value={0.1}>0.1× slow</option>
+                                    <option value={1}>1× normal</option>
+                                    <option value={4}>4× fast</option>
+                                  </select>
+                                  <button type="button" className={buttonClass}
+                                    onClick={()=>downloadJson("world-lab-electric-actuator-evidence.json",selectedActuator)}>
+                                    Export motor evidence
+                                  </button>
+                                </div>
+                                <StudioNote>{selectedActuator.validity}</StudioNote>
+                              </div>
+                            )}
+                          </div>
+                          <div className="sm:col-span-2 rounded-xl border border-border p-3" aria-label="Physical drop experiment">
+                            <h3 className="text-sm font-semibold">Drop & bounce</h3>
+                            <StudioNote>
+                              Release this object, predict gravity and contact, and watch its modeled motion.
+                              Density is your assumption; air drag and the ground are simplified.
+                            </StudioNote>
+                            <details className="mt-2">
+                              <summary className="cursor-pointer text-xs">Change test conditions</summary>
+                              <div className="mt-2 grid grid-cols-2 gap-2">
+                                <label className="text-xs">Height (m)
+                                  <input className={inputLabel} aria-label="Drop release height in metres"
+                                    type="number" min="0" max="100" step="0.5"
+                                    value={dropHeight} onChange={e => {setDropPlaying(false);setDropRun(null);setDropHeight(Number(e.target.value));}} />
+                                </label>
+                                <label className="text-xs">Bounciness
+                                  <input className={inputLabel} aria-label="Drop restitution"
+                                    type="number" min="0" max="1" step="0.05"
+                                    value={dropBounce} onChange={e => {setDropPlaying(false);setDropRun(null);setDropBounce(Number(e.target.value));}} />
+                                </label>
+                              </div>
+                            </details>
+                            <button type="button" className={buttonClass + " mt-2"}
+                              disabled={selectedQuantities.massKg === null} onClick={startDropWithSelectedSolid}>
+                              Drop this solid
+                            </button>
+                            {selectedDrop && dropSample && (
+                              <div className="mt-3 space-y-2" aria-label="Computed drop results">
+                                <p className="text-xs">Model result · {selectedDrop.inputEvidence.replaceAll("-", " ")} · not measured</p>
+                                <dl className="grid grid-cols-2 gap-2 text-xs">
+                                  <div><dt>Time</dt><dd>{dropSample.timeSeconds.toFixed(2)} s</dd></div>
+                                  <div><dt>Height above surface</dt><dd>{dropSample.heightAboveGroundM.toFixed(2)} m</dd></div>
+                                  <div><dt>Vertical speed</dt><dd>{dropSample.speedMps.toFixed(2)} m/s</dd></div>
+                                  <div><dt>Estimated impacts</dt><dd>{selectedDrop.impactCount}</dd></div>
+                                </dl>
+                                <label className="block text-xs">Explore drop time
+                                  <input type="range" aria-label="Explore drop time" className="w-full" min="0"
+                                    max={selectedDrop.input.durationSeconds} step={selectedDrop.stepSeconds}
+                                    value={dropTime} onChange={e=>{setDropPlaying(false);setDropTime(Number(e.target.value));}} />
+                                </label>
+                                <div className="flex flex-wrap gap-2">
+                                  <button type="button" className={buttonClass}
+                                    onClick={()=>setDropPlaying(v=>!v)}>{dropPlaying ? "Pause drop" : "Play drop"}</button>
+                                  <button type="button" className={buttonClass}
+                                    onClick={()=>{setDropPlaying(false);setDropTime(0);}}>Reset drop</button>
+                                  <button type="button" className={buttonClass}
+                                    onClick={()=>downloadJson("the-world-lab-drop-evidence.json",selectedDrop)}>
+                                    Export drop evidence
+                                  </button>
+                                  <select className={inputLabel} aria-label="Drop playback speed" value={dropPlaybackRate}
+                                    onChange={e=>setDropPlaybackRate(Number(e.target.value))}>
+                                    <option value={0.1}>0.1× slow</option>
+                                    <option value={1}>1× normal</option>
+                                    <option value={4}>4× fast</option>
+                                  </select>
+                                </div>
+                                <StudioNote>{selectedDrop.validity}</StudioNote>
+                              </div>
+                            )}
+                          </div>
+                          <div className="sm:col-span-2">
+                            <button type="button" className={buttonClass}
+                              disabled={selectedQuantities.massKg === null}
+                              onClick={startWithSelectedSolid}>Test this solid as spring mass</button>
+                            <StudioNote>
+                              Treat this object's geometry and your invented density as one lumped mass.
+                              The spring stiffness remains a separate assumption. This is not deformation,
+                              collision or material certification.
+                            </StudioNote>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-                <div className="sm:col-span-2 rounded-xl border border-border p-3"
-                  aria-label="Three-dimensional sphere impact experiment">
-                  <h3 className="text-sm font-semibold">Collide invented spheres in three dimensions</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Two actual 3D spheres travel in straight lines from their positions in this world.
-                    Calculate their first contact and the exact normal impulse, with invented
-                    density and restitution assumptions. Off-axis strikes change all three axes.
-                    No gravity, spin, fracture, friction or second collision is inferred.
-                  </p>
-                  {selectedEntity.shape!=="sphere"&&
-                    <p className="text-xs">Select a sphere to use this spatial physics model.</p>}
-                  <label className="mt-2 block text-xs">Other sphere
-                    <select className={inputLabel} aria-label="Other sphere for 3D impact"
-                      value={sphereOther?.shape==="sphere"&&
-                        sphereOther.id!==selectedEntity.id?sphereOtherId:""}
-                      onChange={e=>{
-                        setSphereOtherId(e.target.value);setSphereRun(null);setSpherePlaying(false);
-                      }}>
-                      <option value="">Choose an invented sphere</option>
-                      {project?.entities.filter(e=>e.shape==="sphere"&&e.id!==selectedEntity.id)
-                        .map(e=><option key={e.id} value={e.id}>
-                          {e.name} · {e.id.slice(0,8)}</option>)}
-                    </select>
-                  </label>
-                  <div className="mt-2 grid grid-cols-3 gap-2">
-                    {([0,1,2] as const).map(i=><label className="text-xs" key={"a"+i}>
-                      First {["X","Y","Z"][i]} speed (m/s)
-                      <input type="number" className={inputLabel} step="any" min={-100} max={100}
-                        aria-label={"First sphere "+["X","Y","Z"][i]+" velocity"}
-                        value={sphereFirstVelocity[i]} onChange={e=>{
-                          const next=[...sphereFirstVelocity] as [number,number,number];
-                          next[i]=Number(e.target.value);setSphereFirstVelocity(next);
-                          setSphereRun(null);setSpherePlaying(false);
-                        }}/>
-                    </label>)}
-                    {([0,1,2] as const).map(i=><label className="text-xs" key={"b"+i}>
-                      Second {["X","Y","Z"][i]} speed (m/s)
-                      <input type="number" className={inputLabel} step="any" min={-100} max={100}
-                        aria-label={"Second sphere "+["X","Y","Z"][i]+" velocity"}
-                        value={sphereSecondVelocity[i]} onChange={e=>{
-                          const next=[...sphereSecondVelocity] as [number,number,number];
-                          next[i]=Number(e.target.value);setSphereSecondVelocity(next);
-                          setSphereRun(null);setSpherePlaying(false);
-                        }}/>
-                    </label>)}
-                  </div>
-                  <label className="mt-2 block text-xs">Assumed 3D restitution (0–1)
-                    <input type="number" className={inputLabel} step={0.05} min={0} max={1}
-                      aria-label="Three-dimensional collision restitution"
-                      value={sphereRestitution} onChange={e=>{
-                        setSphereRestitution(Number(e.target.value));setSphereRun(null);setSpherePlaying(false);
-                      }}/>
-                  </label>
-                  <button type="button" className={buttonClass+" mt-2"}
-                    disabled={selectedEntity.shape!=="sphere"||!sphereOther||sphereOther.shape!=="sphere"}
-                    onClick={()=>{
-                      if(!project||!sphereOther)return;
-                      try{
-                        const run=solveSphereImpact3d(project,selectedEntity.id,
-                          sphereOther.id,sphereFirstVelocity,sphereSecondVelocity,sphereRestitution);
-                        setSphereRun(run);setSphereTime(0);setSpherePlaying(false);
-                        setCollisionRun(null);setCollisionPlaying(false);
-                        setMessage("Calculated an isolated spatial contact and audited momentum, angular momentum and energy.");
-                        setError("");
-                      }catch(cause){
-                        setSphereRun(null);setSpherePlaying(false);
-                        setError(cause instanceof Error?cause.message:"Unsupported spatial collision.");
-                      }
-                    }}>Calculate three-dimensional sphere impact</button>
-                  {selectedSphereRun && (selectedSphereRun.firstEntityId===selectedEntity.id||
-                    selectedSphereRun.secondEntityId===selectedEntity.id)&&(
-                    <div className="mt-3 space-y-2 text-xs"
-                      aria-label="Verified three-dimensional impact results">
-                      <p>Impact: {metric(selectedSphereRun.impactTimeSeconds,"s")} ·
-                        masses: {metric(selectedSphereRun.firstMassKg,"kg")} /
-                        {metric(selectedSphereRun.secondMassKg,"kg")}</p>
-                      <p>Contact normal X/Y/Z:
-                        {selectedSphereRun.impactNormal.map(v=>v.toPrecision(4)).join(" / ")}</p>
-                      <p>Impulse X/Y/Z (N·s):
-                        {selectedSphereRun.impulseNs.map(v=>v.toPrecision(5)).join(" / ")}</p>
-                      <p>Final first sphere velocity X/Y/Z (m/s):
-                        {selectedSphereRun.firstFinalVelocityMps.map(v=>v.toPrecision(5)).join(" / ")}</p>
-                      <p>Final second sphere velocity X/Y/Z (m/s):
-                        {selectedSphereRun.secondFinalVelocityMps.map(v=>v.toPrecision(5)).join(" / ")}</p>
-                      <p>Momentum X/Y/Z before (kg·m/s):
-                        {selectedSphereRun.momentumBeforeKgMps.map(v=>v.toPrecision(5)).join(" / ")}</p>
-                      <p>Momentum X/Y/Z after (kg·m/s):
-                        {selectedSphereRun.momentumAfterKgMps.map(v=>v.toPrecision(5)).join(" / ")}</p>
-                      <p>Angular momentum before/after (kg·m²/s):
-                        {selectedSphereRun.angularMomentumBeforeKgM2PerS.map(v=>v.toPrecision(5)).join(" / ")} /
-                        {selectedSphereRun.angularMomentumAfterKgM2PerS.map(v=>v.toPrecision(5)).join(" / ")}</p>
-                      <p>Energy: {metric(selectedSphereRun.energyBeforeJ,"J")} before,
-                        {metric(selectedSphereRun.energyAfterJ,"J")} after,
-                        {metric(selectedSphereRun.dissipatedEnergyJ,"J")} dissipated.</p>
-                      <label className="block">Spatial collision time: {sphereTime.toFixed(2)} s
-                        <input type="range" className="w-full"
-                          aria-label="Explore three-dimensional impact time"
-                          min={0} max={selectedSphereRun.durationSeconds} step={0.01}
-                          value={sphereTime} onChange={e=>{
-                            setSpherePlaying(false);setSphereTime(Number(e.target.value));
-                          }}/>
-                      </label>
-                      {sphereSample&&<p>Computed world coordinates, first /
-                        second sphere (metres):
-                        {sphereSample.firstCentreM.map(v=>v.toPrecision(4)).join(" / ")} ;
-                        {sphereSample.secondCentreM.map(v=>v.toPrecision(4)).join(" / ")}
-                      </p>}
-                      <div className="flex flex-wrap gap-2">
+                <section className="mb-3 rounded-xl border border-border p-3" aria-label="Connected inventions and DC circuit">
+                  <h3 className="text-sm font-semibold">Connect electricity</h3>
+                  <StudioNote>Build a small connected circuit. Current and power are calculated from the wires (shared nodes), not animated guesses.</StudioNote>
+                  {(project?.networks?.length??0)===0 && <button className={buttonClass+" mt-2"} type="button" onClick={createCircuit}>Build first circuit</button>}
+                  {project?.networks?.[0] && <>
+                    <WorldLabCircuitDiagram network={project.networks[0]}
+                      result={dcRun?.projectId===project.id &&
+                        dcRun.projectRevision===project.revision?dcRun:null}/>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      {project.networks[0].components.filter(c=>c.kind==="dc-source" || c.kind==="resistor").map(c=>
+                        <label key={c.id} className="text-xs">
+                          {c.kind==="dc-source"?"Battery voltage (V)":"Resistor ("+c.id+") (Ω)"}
+                          <input className={inputLabel} type="number" aria-label={c.kind==="dc-source"?"Battery voltage":"Resistance "+c.id}
+                            min={c.kind==="dc-source"?-1000:0.01} max={c.kind==="dc-source"?1000:1000000000}
+                            step={c.kind==="dc-source"?1:10}
+                            value={c.kind==="dc-source"?c.voltageV:c.kind==="resistor"?c.resistanceOhm:0}
+                            onChange={e=>updateCircuitValue(c.id,Number(e.target.value))}/>
+                        </label>)}
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button type="button" className={buttonClass} onClick={()=>{
+                        const net=project.networks?.[0];
+                        if(!net||net.components.length>=48||
+                          !net.components.some(c=>c.kind==="dc-source"))return;
+                        mutateProject(p=>({...p,networks:(p.networks??[]).map((n,i)=>i? n:{
+                          ...n,components:[...n.components,{id:crypto.randomUUID(),kind:"resistor" as const,
+                            positiveNodeId:n.components.find(c=>c.kind==="dc-source")?.positiveNodeId??n.groundNodeId,
+                            negativeNodeId:n.components.find(c=>c.kind==="dc-source")?.negativeNodeId??n.groundNodeId,
+                            resistanceOhm:200}],
+                        })}));
+                      }}>Add parallel resistor</button>
+                      <button type="button" className={buttonClass} onClick={calculateCircuit}>Calculate circuit</button>
+                    </div>
+                    <details className="mt-2 rounded-lg border border-border p-2" aria-label="Advanced circuit wiring">
+                      <summary className="cursor-pointer text-xs font-medium">Connect more parts and wires</summary>
+                      <StudioNote>
+                        A wire is a shared named node. Place components between two different
+                        nodes; unconnected nodes cannot be calculated until wired.
+                      </StudioNote>
+                      <div className="mt-2 flex flex-wrap items-end gap-2">
+                        <label className="text-xs">New wire junction name
+                          <input className={inputLabel} aria-label="New electrical node label"
+                            maxLength={80} value={newCircuitNodeLabel}
+                            onChange={e=>setNewCircuitNodeLabel(e.target.value)}/>
+                        </label>
                         <button type="button" className={buttonClass}
-                          onClick={()=>{setSpherePlaying(false);setSphereTime(0);}}>Beginning</button>
+                          disabled={!newCircuitNodeLabel.trim()||project.networks[0].nodes.length>=24}
+                          onClick={()=>{
+                            mutateProject(p=>({...p,networks:(p.networks??[]).map((n,i)=>i?n:
+                              addCircuitNode(n,crypto.randomUUID(),newCircuitNodeLabel))}));
+                            setNewCircuitNodeLabel("");
+                          }}>Add wire junction</button>
+                      </div>
+                      <div className="mt-2 space-y-1">
+                        {project.networks?.[0]?.nodes.map(node=><div className="flex items-center justify-between gap-2 text-xs"
+                          key={node.id}>
+                          <span>{node.label}{node.id===project.networks![0].groundNodeId?" (ground)":""}</span>
+                          <button type="button" className={buttonClass}
+                            disabled={node.id===project.networks![0].groundNodeId||
+                              project.networks![0].nodes.length<=2||
+                              project.networks![0].components.some(c=>
+                                c.positiveNodeId===node.id||c.negativeNodeId===node.id)}
+                            onClick={()=>mutateProject(p=>({...p,
+                              networks:(p.networks??[]).map((n,i)=>i?n:removeUnusedCircuitNode(n,node.id)),
+                            }))}>Remove unused</button>
+                        </div>)}
+                      </div>
+                      <p className="mt-2 text-xs font-medium">Add resistor between two chosen junctions</p>
+                      <div className="mt-1 grid grid-cols-2 gap-2">
+                        <label className="text-xs">Positive-side junction
+                          <select className={inputLabel} aria-label="New resistor positive node"
+                            value={project.networks[0].nodes.some(n=>n.id===wirePositive)?wirePositive:""}
+                            onChange={e=>setWirePositive(e.target.value)}>
+                            <option value="">Choose node</option>
+                            {project.networks[0].nodes.map(n=><option key={n.id} value={n.id}>{n.label}</option>)}
+                          </select>
+                        </label>
+                        <label className="text-xs">Negative-side junction
+                          <select className={inputLabel} aria-label="New resistor negative node"
+                            value={project.networks[0].nodes.some(n=>n.id===wireNegative)?wireNegative:""}
+                            onChange={e=>setWireNegative(e.target.value)}>
+                            <option value="">Choose node</option>
+                            {project.networks[0].nodes.map(n=><option key={n.id} value={n.id}>{n.label}</option>)}
+                          </select>
+                        </label>
+                        <label className="text-xs">Assumed resistance (Ω)
+                          <input className={inputLabel} aria-label="New wired resistor ohms"
+                            type="number" min={0.01} max={1000000000}
+                            value={wireResistance} onChange={e=>setWireResistance(Number(e.target.value))}/>
+                        </label>
                         <button type="button" className={buttonClass}
-                          disabled={sphereTime<=1e-9}
-                          onClick={()=>{setSpherePlaying(false);setSphereTime(previousEventTime(sphereTime,selectedSphereRun.durationSeconds,[selectedSphereRun.impactTimeSeconds]));}}>
-                          Previous contact
-                        </button>
-                        <button type="button" className={buttonClass}
-                          onClick={()=>setSpherePlaying(v=>!v)}>
-                          {spherePlaying?"Pause":"Play"}
-                        </button>
-                        <button type="button" className={buttonClass}
-                          onClick={()=>{setSpherePlaying(false);setSphereTime(nextEventTime(sphereTime,selectedSphereRun.durationSeconds,[selectedSphereRun.impactTimeSeconds]));}}>
-                          Next contact
-                        </button>
-                        <button type="button" className={buttonClass}
-                          onClick={()=>{setSpherePlaying(false);setSphereTime(selectedSphereRun.durationSeconds);}}>End</button>
-                        <select className={inputLabel} aria-label="Three-dimensional collision playback rate"
-                          value={spherePlaybackRate} onChange={e=>setSpherePlaybackRate(Number(e.target.value))}>
-                          <option value={0.01}>0.01×</option><option value={0.1}>0.1×</option>
-                          <option value={1}>1×</option><option value={10}>10×</option>
-                          <option value={100}>100×</option>
-                        </select>
-                        <button type="button" className={buttonClass}
-                          onClick={()=>downloadJson("world-lab-spatial-sphere-impact.json",selectedSphereRun)}>
-                          Export 3D impact evidence
+                          disabled={project.networks[0].components.length>=48||
+                            !project.networks[0].nodes.some(n=>n.id===wirePositive)||
+                            !project.networks[0].nodes.some(n=>n.id===wireNegative)||
+                            wirePositive===wireNegative||!Number.isFinite(wireResistance)||
+                            wireResistance<0.01||wireResistance>1e9}
+                          onClick={()=>mutateProject(p=>({...p,networks:(p.networks??[]).map((n,i)=>i?n:
+                            addCircuitResistor(n,crypto.randomUUID(),wirePositive,wireNegative,wireResistance))}))}>
+                          Connect resistor
                         </button>
                       </div>
-                      <p className="text-muted-foreground">{selectedSphereRun.validity}</p>
+                      <p className="mt-3 text-xs font-medium">Rewire existing components</p>
+                      {project.networks[0].components.map(part=><div key={part.id}
+                        className="mt-2 rounded border border-border p-2">
+                        <p className="text-xs font-medium">
+                          {part.kind==="dc-source"?"Source":part.kind==="resistor"?"Resistor":part.name}
+                        </p>
+                        <div className="mt-1 grid grid-cols-2 gap-2">
+                          <label className="text-xs">Positive terminal
+                            <select className={inputLabel} aria-label={"Positive node for "+part.id}
+                              value={part.positiveNodeId}
+                              onChange={e=>mutateProject(p=>({...p,networks:(p.networks??[]).map((n,i)=>i?n:
+                                rewireCircuitPart(n,part.id,e.target.value,part.negativeNodeId))}))}>
+                              {project.networks?.[0]?.nodes.map(node=>
+                                <option key={node.id} value={node.id}>{node.label}</option>)}
+                            </select>
+                          </label>
+                          <label className="text-xs">Negative terminal
+                            <select className={inputLabel} aria-label={"Negative node for "+part.id}
+                              value={part.negativeNodeId}
+                              onChange={e=>mutateProject(p=>({...p,networks:(p.networks??[]).map((n,i)=>i?n:
+                                rewireCircuitPart(n,part.id,part.positiveNodeId,e.target.value))}))}>
+                              {project.networks?.[0]?.nodes.map(node=>
+                                <option key={node.id} value={node.id}>{node.label}</option>)}
+                            </select>
+                          </label>
+                        </div>
+                      </div>)}
+                      <StudioNote>
+                        Calculations use these node connections and conservation equations.
+                        This is a bounded DC reference, not a general transient circuit solver.
+                      </StudioNote>
+                    </details>
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-xs">Invent an unknown electrical device</summary>
+                      <label className="block text-xs">Name
+                        <input className={inputLabel} maxLength={120} aria-label="Invented device name"
+                          value={inventedDeviceName} onChange={e=>setInventedDeviceName(e.target.value)}/>
+                      </label>
+                      <label className="block text-xs">Assumed behavior or unknown property
+                        <input className={inputLabel} maxLength={500} aria-label="Invented device assumption"
+                          value={inventedDeviceAssumption} onChange={e=>setInventedDeviceAssumption(e.target.value)}/>
+                      </label>
+                      <label className="block text-xs">Optional assumed equivalent resistance (Ω)
+                        <input className={inputLabel} type="number" min={0.01} max={1000000000}
+                          aria-label="Invented component assumed resistance" value={inventedDeviceResistance}
+                          placeholder="Leave blank if unknown"
+                          onChange={e=>setInventedDeviceResistance(e.target.value)}/>
+                      </label>
+                      <StudioNote>Only a declared Ohmic approximation can be calculated; this does not establish how an unknown invention really behaves.</StudioNote>
+                      <button type="button" className={buttonClass} onClick={inventDevice}
+                        disabled={!inventedDeviceName.trim()||!inventedDeviceAssumption.trim()||
+                          (inventedDeviceResistance.trim()!==""
+                            && (!Number.isFinite(Number(inventedDeviceResistance))||
+                                Number(inventedDeviceResistance)<0.01||Number(inventedDeviceResistance)>1e9))||
+                          project.networks[0].components.length>=48}>Add hypothetical device</button>
+                      <StudioNote>Unknown parts do not receive fabricated electronic behavior.</StudioNote>
+                      {project.networks[0].components.filter(c=>c.kind==="hypothetical-device"||c.kind==="resistor").map(c=>
+                        <div key={c.id} className="mt-2 flex items-center justify-between gap-2 text-xs">
+                          <span>{c.kind==="hypothetical-device"
+                            ? c.name+(c.assumedResistanceOhm===undefined?" (unknown)": " (assumed "+c.assumedResistanceOhm+" Ω)")
+                            :"Resistor ("+c.id+")"}</span>
+                          <button type="button" className={buttonClass}
+                            aria-label={"Remove circuit part "+c.id}
+                            onClick={()=>mutateProject(p=>({...p,networks:(p.networks??[]).map((n,i)=>i?n:{
+                              ...n,components:n.components.filter(x=>x.id!==c.id),
+                            })}))}>Remove</button>
+                        </div>)}
+                    </details>
+                    {dcRun && dcRun.projectId===project.id&&dcRun.projectRevision===project.revision&&
+                      dcRun.networkId===project.networks[0].id && <div className="mt-2 text-xs" aria-label="Calculated circuit results">
+                        <p>Positive source node: {dcRun.nodeVoltagesV[
+                          project.networks[0].components.find(c=>c.kind==="dc-source")?.positiveNodeId??project.networks[0].groundNodeId
+                        ]?.toFixed(3)} V</p>
+                        <p>Delivered power: {dcRun.sourcePowerSuppliedW.toFixed(4)} W</p>
+                        <p>Resistor and assumed-Ohmic-device heating: {dcRun.resistivePowerW.toFixed(4)} W</p>
+                        {dcRun.assumedOhmicDeviceIds.length>0 && <p>Hypothetical equivalent resistors used:
+                          {" "+dcRun.assumedOhmicDeviceIds.join(", ")}. Their properties are not measured.</p>}
+                        <p>Conservation residual: {dcRun.powerResidualW.toExponential(2)} W</p>
+                        {Object.entries(dcRun.branchCurrentsA).map(([id,current])=><p key={id}>{id}: {current.toFixed(5)} A</p>)}
+                        <button type="button" className={buttonClass} onClick={()=>downloadJson("world-lab-dc-evidence.json",dcRun)}>Export DC evidence</button>
+                        <StudioNote>{dcRun.validity}</StudioNote>
+                      </div>}
+                  </>}
+                </section>
+                  <section className="rounded-xl border border-border p-4" aria-label="New material proposal">
+                    <h2 className="text-lg font-semibold">{editingMaterialId?"Revise material assumptions":"Invent a material"}</h2>
+                    <StudioNote>
+                      Propose a material not in any catalog. Unknown properties remain unknown;
+                      no strength, chemistry or physical success is predicted by this reference model.
+                    </StudioNote>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      <label className="text-sm">Material name<input className={inputLabel} value={materialName}
+                        maxLength={120} onChange={(event) => setMaterialName(event.target.value)} /></label>
+                      <label className="text-sm">Assumed density (kg/m³), optional<input className={inputLabel}
+                        type="number" min="0.001" value={density}
+                        onChange={(event) => setDensity(event.target.value)} /></label>
+                      <label className="text-sm">Assumed Young's modulus (Pa), optional<input className={inputLabel}
+                        type="number" min="0" max="1000000000000000" step="any" value={youngModulus}
+                        onChange={(event) => setYoungModulus(event.target.value)} /></label>
+                      <label className="text-sm">Assumed thermal conductivity (W/m·K), optional
+                        <input className={inputLabel} type="number" min="0.000001"
+                          max="1000000" step="any" value={thermalConductivity}
+                          onChange={event=>setThermalConductivity(event.target.value)}/></label>
+                      <label className="text-sm">Assumed specific heat (J/kg·K), optional
+                        <input className={inputLabel} type="number" min="0.01"
+                          max="10000000" step="any" value={specificHeat}
+                          onChange={event=>setSpecificHeat(event.target.value)}/></label>
                     </div>
-                  )}
-                </div>
-                <div className="sm:col-span-2 rounded-xl border border-border p-3"
-                  aria-label="Object-to-object impact experiment">
-                  <h3 className="text-sm font-semibold">Collide two invented solids</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Calculate a central X-direction collision in this world, without moving the saved geometry.
-                    Objects need aligned Y/Z centres, a positive starting gap and invented material densities.
-                    This is not a general 3D contact, deformation or fracture model.
-                  </p>
-                  <label className="mt-2 block text-xs">Second physical solid
-                    <select className={inputLabel} aria-label="Other solid to collide with"
-                      value={collisionPartner?.id!==selectedEntity.id?collisionOtherId:""}
-                      onChange={event=>{
-                        setCollisionOtherId(event.target.value);
-                        setCollisionRun(null);setCollisionPlaying(false);
+                    <button type="button" className={buttonClass + " mt-3"} onClick={addMaterial}>
+                      {editingMaterialId?"Save revised assumptions":"Record hypothetical material"}
+                    </button>
+                    {editingMaterialId&&<button type="button" className={buttonClass+" mt-3 ml-2"}
+                      onClick={()=>{
+                        setEditingMaterialId(null);setMaterialName("");setDensity("");setYoungModulus("");
+                      }}>Cancel material edit</button>}
+                    {materials.length > 0 && (
+                      <ul className="mt-3 list-inside list-disc text-sm">
+                        {materials.map((material) => <li key={material.id}>{material.name}: density {material.densityKgM3 === null ? "Unknown" : metric(material.densityKgM3, "kg/m³")};
+                          modulus {material.youngModulusPa === null ? "Unknown" : metric(material.youngModulusPa,"Pa")} · Hypothetical / User-assumed
+                          <button type="button" className={buttonClass+" ml-2"}
+                            aria-label={"Revise assumptions for "+material.name}
+                            onClick={()=>{
+                              setEditingMaterialId(material.id);setMaterialName(material.name);
+                              setDensity(material.densityKgM3===null?"":String(material.densityKgM3));
+                              setYoungModulus(material.youngModulusPa===null?"":String(material.youngModulusPa));
+                              setThermalConductivity(material.thermalConductivityWPerMK==null?
+                                "":String(material.thermalConductivityWPerMK));
+                              setSpecificHeat(material.specificHeatJPerKgK==null?
+                                "":String(material.specificHeatJPerKgK));
+                            }}>Revise assumptions</button>
+                        </li>)}
+                      </ul>
+                    )}
+                  </section>
+        </StudioGroup>
+        <StudioGroup id="experiments">
+                  <section className="rounded-xl border border-border p-4" aria-label="Experiment controls">
+                    <label htmlFor="worldlab-model" className="mb-1 block text-sm font-medium">Experiment</label>
+                    <select id="worldlab-model" className={inputLabel} value={modelKind}
+                      onChange={(event) => {
+                        setModelKind(event.target.value as ModelInput["kind"]);
+                        setPlaying(false); setDirty(true); setRunId(""); setComparisonRunId(""); setTimeSeconds(0);
                       }}>
-                      <option value="">Choose another solid</option>
-                      {project?.entities.filter(e=>e.id!==selectedEntity.id).map(e=>
-                        <option key={e.id} value={e.id}>{e.name} · {e.id.slice(0,8)}</option>)}
+                      <option value="damped-oscillator">Spring and moving mass</option>
+                      <option value="rc-circuit">Battery and capacitor (RC)</option>
+                      <option value="heat-rod">Heat flowing through a rod</option>
                     </select>
-                  </label>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      {modelKind === "damped-oscillator" ? (
+                        <>
+                          <label className="text-sm">Mass (kg)<input className={inputLabel} type="number" min="0.001" max="10000" step="0.1"
+                            value={mechanical.massKg} onChange={(event) => changeMechanical("massKg", Number(event.target.value))} /></label>
+                          <label className="text-sm">Spring (N/m)<input className={inputLabel} type="number" min="0.001" max="1000000" step="0.5"
+                            value={mechanical.springNPerM} onChange={(event) => changeMechanical("springNPerM", Number(event.target.value))} /></label>
+                          <label className="text-sm">Damping (N·s/m)<input className={inputLabel} type="number" min="0" max="100000" step="0.1"
+                            value={mechanical.dampingNsPerM} onChange={(event) => changeMechanical("dampingNsPerM", Number(event.target.value))} /></label>
+                          <label className="text-sm">Initial position (m)<input className={inputLabel} type="number" min="-10" max="10" step="0.1"
+                            value={mechanical.initialDisplacementM} onChange={(event) => changeMechanical("initialDisplacementM", Number(event.target.value))} /></label>
+                        </>
+                      ) : modelKind === "rc-circuit" ? (
+                        <>
+                          <label className="text-sm">Resistance (Ω)<input className={inputLabel} type="number" min="0.001" step="100"
+                            value={circuit.resistanceOhm} onChange={(event) => changeCircuit("resistanceOhm", Number(event.target.value))} /></label>
+                          <label className="text-sm">Capacitance (F)<input className={inputLabel} type="number" min="0.000000001" step="0.001"
+                            value={circuit.capacitanceF} onChange={(event) => changeCircuit("capacitanceF", Number(event.target.value))} /></label>
+                          <label className="text-sm">Supply (V)<input className={inputLabel} type="number" min="-1000" max="1000" step="1"
+                            value={circuit.supplyVoltageV} onChange={(event) => changeCircuit("supplyVoltageV", Number(event.target.value))} /></label>
+                          <label className="text-sm">Start voltage (V)<input className={inputLabel} type="number" min="-1000" max="1000" step="1"
+                            value={circuit.initialVoltageV} onChange={(event) => changeCircuit("initialVoltageV", Number(event.target.value))} /></label>
+                        </>
+                      ) : (
+                        <>
+                          <label className="text-sm">Diffusivity (m²/s)<input className={inputLabel} type="number"
+                            min="0.0000001" max="100" step="0.01" value={heat.thermalDiffusivityM2PerS}
+                            onChange={event=>changeHeat("thermalDiffusivityM2PerS",Number(event.target.value))}/></label>
+                          <label className="text-sm">Rod length (m)<input className={inputLabel} type="number"
+                            min="0.1" max="100" step="0.1" value={heat.lengthMeters}
+                            onChange={event=>changeHeat("lengthMeters",Number(event.target.value))}/></label>
+                          <label className="text-sm">Initial rod temperature (K)<input className={inputLabel} type="number"
+                            min="0" max="2000" step="1" value={heat.ambientTemperatureK}
+                            onChange={event=>changeHeat("ambientTemperatureK",Number(event.target.value))}/></label>
+                          <label className="text-sm">Center temperature (K)<input className={inputLabel} type="number"
+                            min="0" max="2000" step="1" value={heat.centerTemperatureK}
+                            onChange={event=>changeHeat("centerTemperatureK",Number(event.target.value))}/></label>
+                        </>
+                      )}
+                    </div>
+                    <button type="button" className={buttonClass+" bg-foreground text-background"} onClick={start}>Start / Recalculate</button>
+                    <WorldLabTimeController run={currentRun} timeSeconds={timeSeconds} playing={playing}
+                      rate={playbackRate} direction={playbackDirection} onDirectionChange={setPlaybackDirection}
+                      timezoneDisplay={timezoneDisplay} onTimezoneDisplayChange={setTimezoneDisplay}
+                      wallTimeUTC={new Date().toISOString()}
+                      geodeticOrigin={project?.world.geodeticOrigin??null}
+                      onTimeChange={setTimeSeconds} onPlayingChange={setPlaying}
+                      onRateChange={setPlaybackRate}
+                      onCheckpoint={checkpoint=>downloadJson("world-lab-time-checkpoint.json",checkpoint)}
+                      onReplayExport={manifest=>downloadJson("world-lab-replay-manifest.json",manifest)}
+                      onReplay={replayedRun=>{
+                        setRuns(previous=>[...previous.filter(run=>run.id!==replayedRun.id),replayedRun]);
+                        setRunId(replayedRun.id);setComparisonRunId("");setTimeSeconds(0);
+                        setPlaying(false);setDirty(false);setModelKind(replayedRun.inputs.kind);
+                      }}
+                      onCreateBranch={branchReferenceRun}/>
+                    {runs.length > 0 && (
+                      <div className="mt-4 rounded-lg border border-border p-3 text-sm">
+                        <label htmlFor="worldlab-run-history" className="block font-medium">
+                          Open recorded run (local device)
+                        </label>
+                        <select id="worldlab-run-history" className={inputLabel} value={runId}
+                          onChange={event=>{
+                            const chosen=runs.find(run=>run.id===event.target.value);
+                            if(!chosen)return;
+                            setRunId(chosen.id);setComparisonRunId("");setTimeSeconds(0);
+                            setPlaying(false);setDirty(false);setModelKind(chosen.inputs.kind);
+                            if(chosen.inputs.kind==="damped-oscillator")setMechanical(chosen.inputs);
+                            else if(chosen.inputs.kind==="rc-circuit")setCircuit(chosen.inputs);
+                            else setHeat(chosen.inputs);
+                          }}>
+                          <option value="">Select a recorded run</option>
+                          {runs.map((run,index)=><option key={run.id} value={run.id}>
+                            {index+1}. {run.modelId}{run.assumedMassSource?" · assumed material":""}
+                          </option>)}
+                        </select>
+                        {currentRun && compatibleRuns.length>0 && (
+                          <>
+                            <label htmlFor="worldlab-compare" className="mt-2 block font-medium">
+                              Compare to run
+                            </label>
+                            <select id="worldlab-compare" className={inputLabel} value={comparisonRunId}
+                              onChange={event=>setComparisonRunId(event.target.value)}>
+                              <option value="">Choose an earlier run</option>
+                              {compatibleRuns.map(run=><option key={run.id} value={run.id}>
+                                {run.modelId}{run.assumedMassSource?" · assumed material":""} · {run.id.slice(0,8)}
+                              </option>)}
+                            </select>
+                          </>
+                        )}
+                        <StudioNote>
+                          Up to 20 recorded runs can be stored per project on this device.
+                          Historical input values and assumptions are kept unchanged.
+                          Cloud synchronization is not available; export JSON for an independent backup.
+                        </StudioNote>
+                        {currentRun && <button type="button" className={buttonClass + " mt-2"}
+                          onClick={() => void deleteSelectedRun()}>Delete selected run</button>}
+                      </div>
+                    )}
+                    {dirty && currentRun && <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">
+                      Inputs have changed; the displayed run uses the old parameters. Press Start to calculate a new branch.
+                    </p>}
+                    {error && <p role="alert" className="mt-2 text-sm text-red-600">{error}</p>}
+                    <p role="status" className="mt-3 text-sm">{message}</p>
+                  </section>
+                <section className="mb-3 rounded-xl border border-border p-3"
+                  aria-label="Chemical reaction and temperature experiment">
+                  <h3 className="text-sm font-semibold">Reaction heat</h3>
+                  <StudioNote>
+                    Invent a hypothetical reaction. Temperature changes its rate;
+                    released reaction heat changes temperature. These are your assumptions,
+                    not proven chemical identities or real safety predictions.
+                  </StudioNote>
                   <div className="mt-2 grid grid-cols-2 gap-2">
-                    <label className="text-xs">Left speed (m/s)
-                      <input aria-label="Collision left speed" className={inputLabel}
-                        type="number" min={-100} max={100} step="any"
-                        value={collisionLeftSpeed} onChange={e=>{
-                          setCollisionLeftSpeed(Number(e.target.value));
-                          setCollisionRun(null);setCollisionPlaying(false);
-                        }}/>
-                    </label>
-                    <label className="text-xs">Right speed (m/s)
-                      <input aria-label="Collision right speed" className={inputLabel}
-                        type="number" min={-100} max={100} step="any"
-                        value={collisionRightSpeed} onChange={e=>{
-                          setCollisionRightSpeed(Number(e.target.value));
-                          setCollisionRun(null);setCollisionPlaying(false);
-                        }}/>
-                    </label>
-                    <label className="col-span-2 text-xs">Assumed restitution coefficient (0–1)
-                      <input aria-label="Collision restitution" className={inputLabel}
-                        type="number" min={0} max={1} step={0.1}
-                        value={collisionRestitution} onChange={e=>{
-                          setCollisionRestitution(Number(e.target.value));
-                          setCollisionRun(null);setCollisionPlaying(false);
-                        }}/>
-                    </label>
+                    {([
+                      ["initialReactantMol","Starting substance (mol)",0.001,10000,0.1],
+                      ["preExponentialPerS","Assumed reaction factor (1/s)",0,100000,0.1],
+                      ["activationEnergyJPerMol","Activation energy (J/mol)",0,200000,1000],
+                      ["reactionHeatReleasedJPerMol","Heat released (+) or absorbed (−) (J/mol)",-1000000,1000000,1000],
+                      ["heatCapacityJPerK","Total heat capacity (J/K)",1,1000000,50],
+                      ["coolingConductanceWPerK","Cooling (W/K)",0,10000,1],
+                      ["initialTemperatureK","Starting temperature (K)",200,1200,10],
+                      ["ambientTemperatureK","Surrounding temperature (K)",200,1200,10],
+                      ["externalHeatingW","External heating (+) or cooling (−) (W)",-10000,10000,10],
+                    ] as const).map(([field,label,min,max,step])=>
+                      <label key={field} className="text-xs">{label}
+                        <input className={inputLabel} type="number" min={min} max={max}
+                          step={step} aria-label={label} value={chemicalInput[field]}
+                          onChange={e=>{
+                            setChemicalPlaying(false);setChemicalRun(null);
+                            setChemicalInput(p=>({...p,[field]:Number(e.target.value)}));
+                          }}/>
+                      </label>)}
                   </div>
                   <button type="button" className={buttonClass+" mt-2"}
-                    disabled={!collisionPartner||collisionPartner.id===selectedEntity.id}
-                    onClick={()=>{
-                      if(!project||!collisionPartner)return;
-                      try{
-                        const run=calculateObjectCollision(project,selectedEntity.id,
-                          collisionPartner.id,collisionLeftSpeed,collisionRightSpeed,
-                          collisionRestitution);
-                        setCollisionRun(run);setCollisionTime(0);setCollisionPlaying(false);
-                        setError("");setMessage("Computed physical impact, momentum and dissipated energy from invented density.");
-                      }catch(cause){
-                        setCollisionRun(null);setCollisionPlaying(false);
-                        setError(cause instanceof Error?cause.message:"Collision assumptions unsupported.");
-                      }
-                    }}>Calculate two-body collision</button>
-                  {selectedCollision && (selectedCollision.leftEntityId===selectedEntity.id||
-                    selectedCollision.rightEntityId===selectedEntity.id)&&(
-                    <div className="mt-3 space-y-2 text-xs"
-                      aria-label="Calculated collision motion and energy">
-                      <p>Invented mass left/right: {metric(selectedCollision.leftMassKg,"kg")} / {metric(selectedCollision.rightMassKg,"kg")}</p>
-                      <p>Impact time: {metric(selectedCollision.impactTimeSeconds,"s")}. Impulse: {metric(selectedCollision.impulseNs,"N·s")}</p>
-                      <p>Velocity after impact, left/right: {metric(selectedCollision.leftFinalVelocityMps,"m/s")} / {metric(selectedCollision.rightFinalVelocityMps,"m/s")}</p>
-                      <p>Momentum before/after: {metric(selectedCollision.momentumBeforeKgMps,"kg·m/s")} / {metric(selectedCollision.momentumAfterKgMps,"kg·m/s")}</p>
-                      <p>Energy before/after: {metric(selectedCollision.energyBeforeJ,"J")} / {metric(selectedCollision.energyAfterJ,"J")}. Dissipated: {metric(selectedCollision.dissipatedEnergyJ,"J")}</p>
-                      <label className="block">Explore collision time: {collisionTime.toFixed(2)} s
-                        <input className="w-full" aria-label="Explore collision time" type="range"
-                          min={0} max={selectedCollision.durationSeconds} step={0.01}
-                          value={collisionTime} onChange={e=>{
-                            setCollisionPlaying(false);setCollisionTime(Number(e.target.value));
-                          }}/>
-                      </label>
-                      {collisionSample&&<>
-                        <p>Live centre X, left/right: {metric(collisionSample.leftCenterXM,"m")} / {metric(collisionSample.rightCenterXM,"m")}</p>
-                        <p>Phase: {collisionSample.collided?"after impact":"approaching"}</p>
-                      </>}
-                      <div className="flex flex-wrap gap-2">
-                        <button type="button" className={buttonClass}
-                          onClick={()=>{setCollisionPlaying(false);setCollisionTime(0);}}>Beginning</button>
-                        <button type="button" className={buttonClass}
-                          disabled={collisionTime<=1e-9}
-                          onClick={()=>{setCollisionPlaying(false);setCollisionTime(previousEventTime(collisionTime,selectedCollision.durationSeconds,[selectedCollision.impactTimeSeconds]));}}>
-                          Previous contact
-                        </button>
-                        <button type="button" className={buttonClass}
-                          onClick={()=>setCollisionPlaying(v=>!v)}>
-                          {collisionPlaying?"Pause":"Play"}
-                        </button>
-                        <button type="button" className={buttonClass}
-                          onClick={()=>{setCollisionPlaying(false);setCollisionTime(nextEventTime(collisionTime,selectedCollision.durationSeconds,[selectedCollision.impactTimeSeconds]));}}>
-                          Next contact
-                        </button>
-                        <button type="button" className={buttonClass}
-                          onClick={()=>{setCollisionPlaying(false);setCollisionTime(selectedCollision.durationSeconds);}}>End</button>
-                        <select className={inputLabel} aria-label="Collision playback speed"
-                          value={collisionPlaybackRate} onChange={e=>setCollisionPlaybackRate(Number(e.target.value))}>
-                          <option value={0.01}>0.01×</option><option value={0.1}>0.1×</option>
-                          <option value={1}>1×</option><option value={10}>10×</option>
-                          <option value={100}>100×</option>
-                        </select>
-                        <button type="button" className={buttonClass}
-                          onClick={()=>downloadJson("world-lab-two-body-collision-evidence.json",selectedCollision)}>
-                          Export collision evidence
-                        </button>
-                      </div>
-                      <p className="text-muted-foreground">{selectedCollision.validity}</p>
-                    </div>
-                  )}
-                </div>
-                <div className="sm:col-span-2 rounded-xl border border-border p-3"
-                  aria-label="Invented material bending experiment">
-                  <h3 className="text-sm font-semibold">Test invented material stiffness</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Treat a rectangular box as a cantilever: length along X, vertical depth along Y,
-                    width along Z, clamped at its left end and loaded at its free end.
-                    This uses your assumed Young's modulus, not a known strength or failure limit.
-                  </p>
-                  <label className="mt-2 block text-xs">
-                    Downward end load (newtons)
-                    <input type="number" className={inputLabel}
-                      aria-label="Cantilever end load" min={0} max={100000000} step="any"
-                      value={beamLoadN} onChange={event=>{
-                        setBeamLoadN(Number(event.target.value));setBeamRun(null);
+                    onClick={calculateChemicalReaction}>Calculate reaction and temperature</button>
+                  {chemicalRun&&chemicalSample&&<div className="mt-2 rounded-lg border border-border p-2 text-xs"
+                    aria-label="Computed reaction rate and thermal energy">
+                    <p>Time: {chemicalSample.timeSeconds.toFixed(3)} s</p>
+                    <p>Conversion: {(100*chemicalSample.productFormedMol/
+                      chemicalRun.input.initialReactantMol).toFixed(2)}%</p>
+                    <p>Temperature: {chemicalSample.temperatureK.toFixed(3)} K</p>
+                    <p>Reaction rate: {chemicalSample.reactionRateMolPerS.toExponential(3)} mol/s</p>
+                    <p>Reaction thermal power: {chemicalSample.reactionPowerW.toFixed(3)} W</p>
+                    <p>Stored heat change: {chemicalSample.storedThermalEnergyChangeJ.toFixed(4)} J</p>
+                    <p>Energy balance residual: {chemicalSample.energyResidualJ.toExponential(3)} J</p>
+                    <div className="mt-1 h-2 overflow-hidden rounded bg-slate-200"
+                      role="img" aria-label="Computed fraction of assumed reactant converted">
+                      <div className="h-full bg-blue-600" style={{
+                        width:(100*chemicalSample.productFormedMol/
+                          chemicalRun.input.initialReactantMol)+"%",
                       }}/>
-                  </label>
-                  <button className={buttonClass+" mt-2"} type="button"
-                    disabled={selectedEntity.shape!=="box"||
-                      selectedMaterial?.youngModulusPa==null||
-                      selectedMaterial.youngModulusPa<=0}
-                    onClick={()=>{
-                      if(!project||!selectedEntity)return;
-                      try{
-                        const computed=calculateStructuralBending(project,selectedEntity.id,beamLoadN);
-                        setBeamRun(computed);setError("");
-                        setMessage("Calculated an ideal small-deflection beam from explicitly assumed material stiffness.");
-                      }catch(cause){
-                        setBeamRun(null);
-                        setError(cause instanceof Error?cause.message:"Unsupported structural assumptions.");
-                      }
-                    }}>Calculate elastic bending</button>
-                  {selectedEntity.shape!=="box"&&<p className="text-xs text-muted-foreground">
-                    Only rectangular box beams are supported by this equation.
-                  </p>}
-                  {selectedMaterial?.youngModulusPa==null&&<p className="text-xs text-muted-foreground">
-                    Assign invented matter with a positive Young's modulus before testing stiffness.
-                  </p>}
-                  {beamRun&&beamRun.entityId===selectedEntity.id&&
-                    beamRun.projectId===project?.id&&beamRun.projectRevision===project.revision&&
-                    beamRun.appliedForceN===beamLoadN&&(
-                    <div className="mt-2 space-y-1 text-xs"
-                      aria-label="Calculated hypothetical bending results">
-                      <p>Free-end deflection: {metric(beamRun.maximumTipDeflectionM,"m")}</p>
-                      <p>Maximum bending stress: {metric(beamRun.maximumBendingStressPa,"Pa")}</p>
-                      <p>Maximum surface strain: {beamRun.maximumSurfaceStrain.toExponential(4)} (dimensionless)</p>
-                      <p>Geometric bending stiffness EI: {metric(beamRun.bendingStiffnessNm2,"N·m²")}</p>
-                      <p className="text-muted-foreground">{beamRun.validity}</p>
-                      <button type="button" className={buttonClass} onClick={()=>
-                        downloadJson("world-lab-structural-bending-evidence.json",beamRun)}>
-                        Export assumed bending evidence
+                    </div>
+                    <label className="mt-2 block">Explore reaction time
+                      <input className="w-full" type="range" min={0}
+                        max={chemicalRun.input.durationSeconds}
+                        step={chemicalRun.solverStepSeconds} value={chemicalTime}
+                        aria-label="Explore chemical time"
+                        onChange={e=>{setChemicalPlaying(false);setChemicalTime(Number(e.target.value));}}/>
+                    </label>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button type="button" className={buttonClass}
+                        onClick={()=>setChemicalPlaying(v=>!v)}>
+                        {chemicalPlaying?"Pause reaction":"Play reaction"}
+                      </button>
+                      <button type="button" className={buttonClass} onClick={()=>{
+                        setChemicalPlaying(false);setChemicalTime(t=>
+                          Math.min(chemicalRun.input.durationSeconds,t+chemicalRun.solverStepSeconds));
+                      }}>Step reaction</button>
+                      <button type="button" className={buttonClass} onClick={()=>{
+                        setChemicalPlaying(false);setChemicalTime(0);
+                      }}>Reset reaction</button>
+                      <button type="button" className={buttonClass}
+                        onClick={()=>downloadJson("world-lab-hypothetical-reaction-evidence.json",chemicalRun)}>
+                        Export reaction evidence
                       </button>
                     </div>
-                  )}
-                </div>
-                <div className="sm:col-span-2 rounded-xl border border-border p-3" aria-label="Fluid displacement and buoyancy experiment">
-                  <h3 className="text-sm font-semibold">Try floating an invention</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Calculate liquid displacement, upward force and possible floating depth from this solid's geometry.
-                    An unknown invented density stays unknown.
-                  </p>
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-                    <label className="text-xs">Assumed liquid density (kg/m³)
-                      <input type="number" className={inputLabel} aria-label="Liquid density"
-                        min={0.01} max={25000} step={50} value={fluidDensity}
-                        onChange={e=>{setFluidDensity(Number(e.target.value));setFluidRun(null);}} />
-                    </label>
-                    <label className="text-xs">Depth under liquid surface (m)
-                      <input type="number" className={inputLabel} aria-label="Immersion depth"
-                        min={0} max={selectedEntity.dimensionsMeters[1]} step={0.1}
-                        value={fluidDepth} onChange={e=>{setFluidDepth(Number(e.target.value));setFluidRun(null);}} />
-                    </label>
-                  </div>
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-                    <label className="text-xs">Level of liquid above ground (m)
-                      <input className={inputLabel} type="number" min={0} max={20} step={0.1}
-                        aria-label="Fluid surface height" value={fluidSurfaceHeight}
-                        onChange={e=>{setFluidSurfaceHeight(Number(e.target.value));setFluidMotionPlaying(false);setFluidMotionRun(null);}}/>
-                    </label>
-                    <label className="text-xs">Assumed drag (N·s/m)
-                      <input className={inputLabel} type="number" min={0} max={10000} step={10}
-                        aria-label="Fluid linear drag" value={fluidDrag}
-                        onChange={e=>{setFluidDrag(Number(e.target.value));setFluidMotionPlaying(false);setFluidMotionRun(null);}}/>
-                    </label>
-                  </div>
-                  <button type="button" className={buttonClass+" mt-2"} onClick={simulateFluidMotion}>
-                    Simulate floating or sinking over time
-                  </button>
-                  {selectedFluidMotion&&fluidMotionSample&&
-                    <div className="mt-2 rounded-lg border border-border p-2 text-xs"
-                      aria-label="Time-dependent fluid mechanics results">
-                      <p>Simulated time: {fluidMotionSample.timeSeconds.toFixed(3)} seconds</p>
-                      <p>Bottom height: {fluidMotionSample.bottomHeightM.toFixed(4)} m</p>
-                      <p>Vertical velocity: {fluidMotionSample.velocityMps.toFixed(4)} m/s</p>
-                      <p>Submerged depth: {fluidMotionSample.immersionDepthM.toFixed(4)} m</p>
-                      <p>Calculated buoyancy: {fluidMotionSample.buoyancyForceN.toFixed(3)} N</p>
-                      <p>Assumed viscous drag: {fluidMotionSample.dragForceN.toFixed(3)} N</p>
-                      <p>Energy residual: {fluidMotionSample.energyResidualJ.toExponential(3)} J</p>
-                      <label className="block">Explore fluid time
-                        <input className="w-full" type="range" aria-label="Explore fluid motion time"
-                          min={0} max={selectedFluidMotion.input.durationSeconds}
-                          step={selectedFluidMotion.stepSeconds} value={fluidMotionTime}
-                          onChange={e=>{setFluidMotionPlaying(false);setFluidMotionTime(Number(e.target.value));}}/>
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        <button type="button" className={buttonClass}
-                          onClick={()=>setFluidMotionPlaying(v=>!v)}>
-                          {fluidMotionPlaying?"Pause fluid":"Play fluid"}
-                        </button>
-                        <button type="button" className={buttonClass}
-                          onClick={()=>{setFluidMotionPlaying(false);setFluidMotionTime(0);}}>Reset fluid</button>
-                        <button type="button" className={buttonClass}
-                          onClick={()=>{setFluidMotionPlaying(false);setFluidMotionTime(t=>
-                            Math.min(selectedFluidMotion.input.durationSeconds,
-                              t+selectedFluidMotion.stepSeconds));}}>Step fluid</button>
-                        <select className={inputLabel} aria-label="Fluid playback speed"
-                          value={fluidMotionRate} onChange={e=>setFluidMotionRate(Number(e.target.value))}>
-                          <option value={0.1}>0.1× slow</option>
-                          <option value={1}>1× normal</option>
-                          <option value={4}>4× fast</option>
-                        </select>
-                        <button type="button" className={buttonClass}
-                          onClick={()=>downloadJson("world-lab-fluid-motion-evidence.json",selectedFluidMotion)}>
-                          Export fluid trajectory evidence
-                        </button>
-                      </div>
-                      <p className="mt-2 text-muted-foreground">{selectedFluidMotion.validity}</p>
-                      <p className="text-muted-foreground">The blue 3D plane is an illustrative assumed fluid surface; vertical position follows the calculated trajectory.</p>
-                    </div>}
-                  <button type="button" className={buttonClass+" mt-2"} onClick={runFluidTest}>
-                    Calculate buoyancy
-                  </button>
-                  {fluidRun && fluidRun.projectId===project?.id &&
-                    fluidRun.projectRevision===project?.revision &&
-                    fluidRun.entityId===selectedEntity.id && (
-                    <div className="mt-2 space-y-1 text-xs" aria-label="Calculated buoyancy results">
-                      <WorldLabFluidCutaway entity={selectedEntity} result={fluidRun}/>
-                      <p>Displaced liquid: {fluidRun.immersedVolumeM3.toFixed(5)} m³</p>
-                      <p>Upward buoyancy: {fluidRun.buoyancyForceN.toFixed(3)} N</p>
-                      <p>Bottom gauge pressure: {fluidRun.bottomGaugePressurePa.toFixed(1)} Pa</p>
-                      <p>Status: {fluidRun.floatingStatus.replaceAll("-"," ")}</p>
-                      <p>Net upward force: {fluidRun.netUpwardForceN===null?"Unknown material mass":fluidRun.netUpwardForceN.toFixed(3)+" N"}</p>
-                      <p>Equilibrium draft: {fluidRun.equilibriumDraftM===null?"Unknown":fluidRun.equilibriumDraftM.toFixed(4)+" m"}</p>
-                      <button type="button" className={buttonClass} onClick={()=>
-                        downloadJson("world-lab-buoyancy-evidence.json",fluidRun)}>Export fluid evidence</button>
-                      <p className="text-muted-foreground">{fluidRun.validity}</p>
-                    </div>
-                  )}
-                </div>
-                <div className="sm:col-span-2 rounded-xl border border-border p-3" aria-label="Electrical and mechanical actuator experiment">
-                  <h3 className="text-sm font-semibold">Power a lifting machine</h3>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Design a simple electric actuator. Electricity builds coil current, creates lifting force,
-                    moves your object and generates back-EMF and resistance heat. The same equations exchange
-                    energy between the electrical and physical systems.
-                  </p>
-                  <label className="mt-2 flex items-center gap-2 text-xs">
-                    <input aria-label="Include coil heating feedback" type="checkbox"
-                      checked={actuatorHeatEnabled} onChange={e=>{setActuatorHeatEnabled(e.target.checked);setActuatorRun(null);setActuatorPlaying(false);setActuatorAudit(null);}} />
-                    Include calculated coil heating and resistance feedback
-                  </label>
-                  {actuatorHeatEnabled && <details className="mt-2">
-                    <summary className="cursor-pointer text-xs">Adjust thermal assumptions</summary>
-                    <div className="grid grid-cols-2 gap-2">
-                      <label className="text-xs">Coil heat capacity (J/K)
-                        <input aria-label="Coil heat capacity" type="number" className={inputLabel}
-                          min={1} max={1000000} value={coilHeatCapacity}
-                          onChange={e=>{setCoilHeatCapacity(Number(e.target.value));setActuatorRun(null);setActuatorPlaying(false);}} />
-                      </label>
-                      <label className="text-xs">Cooling (W/K)
-                        <input aria-label="Coil cooling conductance" type="number" className={inputLabel}
-                          min={0} max={10000} step={0.1} value={coilCooling}
-                          onChange={e=>{setCoilCooling(Number(e.target.value));setActuatorRun(null);setActuatorPlaying(false);}} />
-                      </label>
-                    </div>
-                    <p className="text-xs text-muted-foreground">These are hypothetical thermal properties, not measurements.</p>
-                  </details>}
-                  <details className="mt-2">
-                    <summary className="cursor-pointer text-xs">Adjust electrical power and force</summary>
-                    <div className="mt-2 grid grid-cols-2 gap-2">
-                      <label className="text-xs">Voltage (V)
-                        <input aria-label="Actuator supply voltage" type="number" className={inputLabel}
-                          min={0} max={1000} step={1} value={actuatorVoltage}
-                          onChange={e=>{setActuatorPlaying(false);setActuatorRun(null);setActuatorVoltage(Number(e.target.value));}} />
-                      </label>
-                      <label className="text-xs">Actuator strength (N/A)
-                        <input aria-label="Actuator force constant" type="number" className={inputLabel}
-                          min={0} max={10000} step={0.5} value={actuatorConstant}
-                          onChange={e=>{setActuatorPlaying(false);setActuatorRun(null);setActuatorConstant(Number(e.target.value));}} />
-                      </label>
-                    </div>
-                  </details>
-                  <label className="mt-2 flex items-center gap-2 text-xs">
-                    <input type="checkbox" aria-label="Open motor supply switch during experiment"
-                      checked={actuatorPowerOffAt!==null}
-                      onChange={e=>{
-                        setActuatorPowerOffAt(e.target.checked?2:null);
-                        setActuatorPlaying(false);setActuatorRun(null);setActuatorAudit(null);
-                      }}/>
-                    Open the motor supply switch during the run
-                  </label>
-                  {actuatorPowerOffAt!==null&&<div className="mt-1 rounded border border-border p-2">
-                    <label className="block text-xs" htmlFor="worldlab-motor-power-off">
-                      Switch opens at {actuatorPowerOffAt.toFixed(3)} s
-                    </label>
-                    <input id="worldlab-motor-power-off" className="w-full" type="range"
-                      min="0" max="4" step={1/240} value={actuatorPowerOffAt}
-                      onChange={e=>{
-                        setActuatorPowerOffAt(Number(e.target.value));
-                        setActuatorPlaying(false);setActuatorRun(null);setActuatorAudit(null);
-                      }}/>
-                    <p className="text-[11px] text-muted-foreground">
-                      Supply voltage becomes zero at this exact event. The modeled coil current decays continuously through its R–L path; arcing, fuse damage and contact bounce are outside this model.
-                    </p>
+                    <StudioNote>{chemicalRun.validity}</StudioNote>
                   </div>}
-                  <button type="button" className={buttonClass+" mt-2"}
-                    disabled={selectedQuantities.massKg===null} onClick={()=>startActuatorWithSelectedSolid(false)}>
-                    Power this solid
-                  </button>
-                  {project?.networks?.[0] && <button type="button" className={buttonClass+" mt-2 ml-2"}
-                    disabled={selectedQuantities.massKg===null}
-                    onClick={()=>startActuatorWithSelectedSolid(true)}>
-                    Wire motor to circuit
-                  </button>}
-                  {project?.digitalNetworks?.[0]?.outputs.map(output=>
-                    <button key={output.id} type="button" className={buttonClass+" mt-2 ml-2"}
-                      disabled={selectedQuantities.massKg===null}
-                      onClick={()=>startDigitalMotor(output.id)}>
-                      Drive with invented logic: {output.label}
-                    </button>)}
-                  {selectedActuator && actuatorSample && (
-                    <div className="mt-3 space-y-2" aria-label="Coupled electromechanical results">
-                      <p className="text-xs text-muted-foreground">
-                        Computed hypothetical electromechanical system · not measured
-                      </p>
-                      <dl className="grid grid-cols-2 gap-2 text-xs">
-                        <div><dt>Height above ground</dt><dd>{actuatorSample.heightM.toFixed(3)} m</dd></div>
-                        <div><dt>Coil current</dt><dd>{actuatorSample.coilCurrentA.toFixed(3)} A</dd></div>
-                        <div><dt>Upward force</dt><dd>{actuatorSample.motorForceN.toFixed(3)} N</dd></div>
-                        <div><dt>Back-EMF</dt><dd>{actuatorSample.backEmfV.toFixed(3)} V</dd></div>
-                        <div><dt>Coil heat</dt><dd>{actuatorSample.resistiveHeatW.toFixed(3)} W</dd></div>
-                        {actuatorSample.coilTemperatureK !== undefined && actuatorSample.coilTemperatureK !== null && <>
-                          <div><dt>Coil temperature</dt><dd>{actuatorSample.coilTemperatureK.toFixed(2)} K</dd></div>
-                          <div><dt>Hot resistance</dt><dd>{actuatorSample.coilResistanceOhm?.toFixed(3)} Ω</dd></div>
-                          <div><dt>Stored coil heat</dt><dd>{actuatorSample.thermalEnergyJ?.toFixed(3)} J</dd></div>
-                          <div><dt>Cooling loss</dt><dd>{actuatorSample.coolingPowerW?.toFixed(3)} W</dd></div>
-                        </>}
-                        <div><dt>Energy balance difference</dt><dd>{actuatorSample.energyResidualJ.toFixed(4)} J</dd></div>
-                      </dl>
-                      {digitalMotorRun && digitalMotorRun.projectId===project?.id &&
-                        digitalMotorRun.projectRevision===project.revision &&
-                        digitalMotorRun.entityId===selectedEntity?.id &&
-                        digitalMotorRun.motor===actuatorRun && (
-                        <div className="rounded border border-border p-2 text-xs"
-                          aria-label="Computed invented digital controller">
-                          <p>Invented logic output: {digitalMotorRun.logicBit} (assumed Boolean)</p>
-                          <p>Applied ideal motor voltage: {digitalMotorRun.motor.input.supplyVoltageV.toFixed(3)} V</p>
-                          <p className="text-muted-foreground">{digitalMotorRun.validity}</p>
-                          <button type="button" className={buttonClass+" mt-2"}
-                            onClick={()=>downloadJson("world-lab-digital-motor-evidence.json",digitalMotorRun)}>
-                            Export linked digital-to-motion evidence
-                          </button>
-                        </div>
-                      )}
-                      {wiredMotorRun && wiredMotorRun.projectRevision===project?.revision &&
-                        wiredMotorRun.entityId===selectedEntity?.id && (
-                        <div className="text-xs" aria-label="Connected motor and source results">
-                          <p>Connected source voltage: {wiredMotorRun.motor.input.supplyVoltageV.toFixed(3)} V</p>
-                          <p>Total source current: {wiredMotorRun.samples[
-                            Math.min(wiredMotorRun.samples.length-1,Math.round(actuatorTime/wiredMotorRun.motor.solverStepSeconds))
-                          ].sourceBranchCurrentA.toFixed(4)} A (source convention)</p>
-                          <p>Parallel resistor heating: {wiredMotorRun.dc.resistivePowerW.toFixed(3)} W</p>
-                          <p>This motor is wired across an ideal voltage source; its dynamic current is counted alongside the passive loads.</p>
-                          <button type="button" className={buttonClass} onClick={()=>
-                            downloadJson("world-lab-wired-motor-evidence.json",wiredMotorRun)}>
-                            Export connected evidence
-                          </button>
-                        </div>
-                      )}
-                      {actuatorAudit && (
-                        <p className="text-xs text-muted-foreground" role={actuatorAudit.status === "outside-internal-tolerance" ? "alert" : undefined}>
-                          Numerical self-check: {actuatorAudit.status === "within-internal-tolerance"
-                            ? "within internal tolerance" : actuatorAudit.status === "unavailable"
-                              ? "not available" : "outside internal tolerance"}.
-                          {" "}{actuatorAudit.explanation}
-                          {actuatorAudit.maximumRelativeStateDifference !== null && (
-                            <> Step-refinement difference: {(100 * actuatorAudit.maximumRelativeStateDifference).toFixed(3)}%.
-                            Energy residual fraction: {(100 * (actuatorAudit.maximumEnergyResidualFraction ?? 0)).toFixed(3)}%.</>
+                </section>
+                <WorldLabElasticWavePanel project={project} onKeepEvidence={keepScientificEvidence}/>
+                <WorldLabRadiationPanel project={project} onKeepEvidence={keepScientificEvidence}/>
+                <WorldLabMaterialHeatPanel project={project}
+                  onKeepEvidence={keepScientificEvidence}
+                  onSample={(sample:MaterialHeatSample|null,run:MaterialHeatRun|null)=>{
+                    const scene=sceneRef.current;
+                    if(!scene||!sample||!run)return;
+                    const items=[[run.firstEntityId,sample.firstTemperatureK],
+                      [run.secondEntityId,sample.secondTemperatureK]] as const;
+                    for(const [id,temperature] of items){
+                      const material=scene.addedShapes.get(id)?.material;
+                      if(material instanceof B.StandardMaterial){
+                        const hot=Math.max(0,Math.min(1,(temperature-200)/1800));
+                        material.diffuseColor=new B.Color3(0.2+0.75*hot,0.4+0.35*hot,
+                          0.85-0.65*hot);
+                      }
+                    }
+                  }}/>
+                <WorldLabOpticsPanel project={project} mutateProject={mutateProject}
+                  onKeepEvidence={keepScientificEvidence} onVisualize={drawOpticalReference}
+                  onVisualizeRay={drawAuthoredOpticalTrace}/>
+                <WorldLabGravityPanel project={project} onKeepEvidence={keepScientificEvidence}
+                  remoteComputed={remoteJob?.status==="succeeded"&&
+                    remoteJob.kind==="newton-gravity"&&remoteJob.result&&
+                    typeof remoteJob.result==="object"&&"outcome" in remoteJob.result?
+                    (remoteJob.result as {outcome:GravityRun}).outcome:null}
+                  cloudEnabled={remoteJobsEnabled}
+                  cloudBusy={remoteBusy}
+                  remoteJobStatus={remoteJob?.kind==="newton-gravity"&&
+                    remoteJob.projectId===project?.id&&remoteJob.projectRevision===project?.revision
+                    ?remoteJob.status:null}
+                  onRemote={config=>{void submitRemoteJob("newton-gravity",config);}}
+                  onFrame={(frame:GravityFrame|null,bodies:readonly GravityBody[])=>{
+                    const scene=sceneRef.current;
+                    if(!scene)return;
+                    for(let i=0;i<bodies.length;i++){
+                      const mesh=scene.addedShapes.get(bodies[i].entityId);
+                      if(mesh){
+                        const pos=frame?.positionsM[i]??bodies[i].initialPositionM;
+                        mesh.position.copyFromFloats(...pos);
+                      }
+                    }
+                  }}/>
+                <WorldLabDigitalLogicPanel project={project} mutateProject={mutateProject}
+                  cloudConfigured={remoteJobsEnabled} cloudBusy={remoteBusy}
+                  remoteJobStatus={remoteJob?.kind==="exhaustive-logic"&&
+                    remoteJob.projectId===project?.id&&remoteJob.projectRevision===project?.revision
+                    ?remoteJob.status:null}
+                  onCloudVerify={()=>{void submitRemoteJob("exhaustive-logic");}}/>
+                <WorldLabVehiclePanel project={project}/>
+        </StudioGroup>
+        <StudioGroup id="results">
+                  <section className="rounded-xl border border-border p-4" aria-label="Computed observations">
+                    <h2 className="text-lg font-semibold">Observations</h2>
+                    <StudioNote>Physics Model / Computed · not measured · visual shapes are illustrative</StudioNote>
+                    {sample && currentRun ? (
+                      <>
+                        <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                          {currentRun.modelId === "damped-oscillator" ? (
+                            <>
+                              <div><dt>Position</dt><dd className="font-medium">{metric(sample.positionM, "m")}</dd></div>
+                              <div><dt>Velocity</dt><dd className="font-medium">{metric(sample.velocityMPerS, "m/s")}</dd></div>
+                              <div><dt>Mechanical energy</dt><dd className="font-medium">{metric(sample.mechanicalEnergyJ, "J")}</dd></div>
+                            </>
+                          ) : currentRun.modelId === "rc-circuit" ? (
+                            <>
+                              <div><dt>Capacitor voltage</dt><dd className="font-medium">{metric(sample.capacitorVoltageV, "V")}</dd></div>
+                              <div><dt>Current</dt><dd className="font-medium">{metric(sample.currentA, "A")}</dd></div>
+                              <div><dt>Resistor heating</dt><dd className="font-medium">{metric(sample.resistorHeatW, "W")}</dd></div>
+                              <div><dt>Stored energy</dt><dd className="font-medium">{metric(sample.storedEnergyJ, "J")}</dd></div>
+                            </>
+                          ) : (
+                            <>
+                              <div><dt>Mean temperature</dt><dd className="font-medium">{metric(sample.meanTemperatureK,"K")}</dd></div>
+                              <div><dt>Hottest cell</dt><dd className="font-medium">{metric(sample.maximumTemperatureK,"K")}</dd></div>
+                              <div className="col-span-2"><dt>Internal field (from left to right)</dt>
+                                <dd className="font-mono text-xs break-words">{sample.temperaturesK?.map(t=>t.toFixed(1)).join(", ") ?? "No computed field"}</dd>
+                              </div>
+                            </>
                           )}
-                        </p>
-                      )}
-                      <WorldLabMotorInternalsPanel run={selectedActuator}
-                        sample={actuatorSample} timeSeconds={actuatorTime}/>
-                      <label className="block text-xs">Explore motor time
-                        <input aria-label="Explore motor time" type="range" min={0} className="w-full"
-                          max={selectedActuator.input.durationSeconds} step={selectedActuator.solverStepSeconds}
-                          value={actuatorTime}
-                          onChange={e=>{setActuatorPlaying(false);setActuatorTime(Number(e.target.value));}} />
-                      </label>
+                        </dl>
+                        {currentRun.modelId === "heat-rod" && <p className="mt-2 text-xs">
+                          Color scale: <span className="font-medium">blue = cooler, yellow = warmer</span>.
+                          The 3D rod colors encode calculated temperatures, not visible thermal photons.
+                          Every color is derived from the selected time sample; inspect numeric temperatures above.
+                        </p>}
+                        {trace && (
+                          <figure className="mt-4" aria-label="Calculated scientific time trace">
+                            <figcaption className="mb-1 text-sm font-medium">
+                              {trace.label} over simulated time
+                            </figcaption>
+                            <svg viewBox="0 0 700 200" role="img" className="h-auto w-full max-w-full"
+                              aria-label={trace.label+" ("+trace.unit+") between "+trace.minimum.toPrecision(4)+
+                                " and "+trace.maximum.toPrecision(4)+" over "+
+                                currentRun.time.simulatedDurationSeconds+" seconds"}>
+                              <line x1={trace.x0} y1={trace.y1} x2={trace.x1} y2={trace.y1}
+                                stroke="currentColor" strokeOpacity="0.35" strokeWidth="1.5"/>
+                              <line x1={trace.x0} y1={trace.y0} x2={trace.x0} y2={trace.y1}
+                                stroke="currentColor" strokeOpacity="0.35" strokeWidth="1.5"/>
+                              <polyline points={trace.points} fill="none" stroke="#267F9C" strokeWidth="2.6"
+                                strokeLinejoin="round" strokeLinecap="round"/>
+                              <line x1={trace.x0+(trace.x1-trace.x0)*(timeSeconds/currentRun.time.simulatedDurationSeconds)}
+                                y1={trace.y0}
+                                x2={trace.x0+(trace.x1-trace.x0)*(timeSeconds/currentRun.time.simulatedDurationSeconds)}
+                                y2={trace.y1} stroke="currentColor" strokeOpacity="0.8" strokeDasharray="4 4"/>
+                              <text x={trace.x0} y="185" fontSize="13" fill="currentColor">0 s</text>
+                              <text x={trace.x1} y="185" fontSize="13" fill="currentColor" textAnchor="end">
+                                {currentRun.time.simulatedDurationSeconds} s
+                              </text>
+                            </svg>
+                            <StudioNote>
+                              {trace.label} ({trace.unit}): {trace.minimum.toPrecision(4)} to {trace.maximum.toPrecision(4)}.
+                              Plotted {trace.samplesPlotted} recorded samples. Dashed line shows selected time.
+                              This is computed state, not a measurement.
+                            </StudioNote>
+                          </figure>
+                        )}
+                        <p className="mt-3 text-xs">Model {currentRun.modelId} v{currentRun.modelVersion};
+                          solver Δt {currentRun.time.solverStepSeconds.toPrecision(4)} s;
+                          simulation date {currentRun.time.worldDateUTC}.</p>
+                        {comparisonRun && comparedDifference!==null && trace && (
+                          <div className="mt-3 rounded-lg border border-border p-3 text-sm"
+                            aria-label="Experiment comparison">
+                            <p className="font-medium">Difference at selected time</p>
+                            <p>{trace.label}: current {metric(currentTraceValue as number,trace.unit)};
+                              previous {metric(comparisonTraceValue as number,trace.unit)};
+                              difference {metric(comparedDifference,trace.unit)}.</p>
+                            <StudioNote>
+                              Computed values sampled from each run's recorded solver steps.
+                              Compare only the same model and duration; no measurement or interpolation.
+                            </StudioNote>
+                          </div>
+                        )}
+                        {currentRun.assumedMassSource && (
+                          <div className="mt-2 rounded-lg border border-border p-3 text-xs" aria-label="Hypothetical material provenance">
+                            <p className="font-medium">Derived from an invented solid · user-assumed</p>
+                            <p>Object: {currentRun.assumedMassSource.entityName}; material: {currentRun.assumedMassSource.materialName}.</p>
+                            <p>Volume {metric(currentRun.assumedMassSource.volumeM3,"m³")} ×
+                              assumed density {metric(currentRun.assumedMassSource.assumedDensityKgM3,"kg/m³")} =
+                              mass {metric(currentRun.assumedMassSource.derivedMassKg,"kg")}.</p>
+                            <p>{currentRun.assumedMassSource.assumption}</p>
+                          </div>
+                        )}
+                        <StudioNote>Valid only within: {currentRun.validity}</StudioNote>
+                        <button type="button" className={buttonClass + " mt-3"}
+                          onClick={() => downloadJson("world-lab-experiment.json", currentRun)}>Export recorded run JSON</button>
+                      </>
+                    ) : <p className="mt-3 text-sm">No model results yet. Press Start to run a calculation.</p>}
+                  </section>
+                <section className="mb-3 rounded-xl border border-border p-3"
+                  aria-label="Recorded scientific evidence library">
+                  <h3 className="text-sm font-semibold">Evidence</h3>
+                  <StudioNote>
+                    Gravity and material-contact results keep their original project
+                    revision, hypothetical inputs and numerical trajectory. Save or
+                    export the invention to preserve newly recorded experiments.
+                  </StudioNote>
+                  {scientificEvidence.length===0&&
+                    <p className="mt-2 text-xs">No additional scientific records yet.</p>}
+                  {scientificEvidence.map(record=>
+                    <div key={record.id}
+                      className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <span>{record.kind==="newton-gravity"?"Gravity":record.kind==="interface-optics"?"Optics":"Material heat"} ·
+                        revision {record.projectRevision} ·
+                        {new Date(record.createdAt).toLocaleString()}</span>
                       <div className="flex flex-wrap gap-2">
                         <button type="button" className={buttonClass}
-                          onClick={()=>setActuatorPlaying(v=>!v)}>
-                          {actuatorPlaying?"Pause motor":"Play motor"}
-                        </button>
+                          onClick={()=>downloadJson("world-lab-"+record.kind+"-"+record.id+".json",
+                            record.result)}>Export evidence</button>
                         <button type="button" className={buttonClass}
-                          onClick={()=>{setActuatorPlaying(false);setActuatorTime(0);}}>Reset motor</button>
-                        <select className={inputLabel} aria-label="Motor playback speed"
-                          value={actuatorRate} onChange={e=>setActuatorRate(Number(e.target.value))}>
-                          <option value={0.1}>0.1× slow</option>
-                          <option value={1}>1× normal</option>
-                          <option value={4}>4× fast</option>
-                        </select>
-                        <button type="button" className={buttonClass}
-                          onClick={()=>downloadJson("world-lab-electric-actuator-evidence.json",selectedActuator)}>
-                          Export motor evidence
+                          onClick={()=>{void discardScientificEvidence(record);}}>
+                          Discard record
                         </button>
                       </div>
-                      <p className="text-xs text-muted-foreground">{selectedActuator.validity}</p>
-                    </div>
-                  )}
-                </div>
-                <div className="sm:col-span-2 rounded-xl border border-border p-3" aria-label="Physical drop experiment">
-                  <h3 className="text-sm font-semibold">Drop & bounce experiment</h3>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Release this object, predict gravity and contact, and watch its modeled motion.
-                    Density is your assumption; air drag and the ground are simplified.
-                  </p>
-                  <details className="mt-2">
-                    <summary className="cursor-pointer text-xs">Change test conditions</summary>
-                    <div className="mt-2 grid grid-cols-2 gap-2">
-                      <label className="text-xs">Height (m)
-                        <input className={inputLabel} aria-label="Drop release height in metres"
-                          type="number" min="0" max="100" step="0.5"
-                          value={dropHeight} onChange={e => {setDropPlaying(false);setDropRun(null);setDropHeight(Number(e.target.value));}} />
-                      </label>
-                      <label className="text-xs">Bounciness
-                        <input className={inputLabel} aria-label="Drop restitution"
-                          type="number" min="0" max="1" step="0.05"
-                          value={dropBounce} onChange={e => {setDropPlaying(false);setDropRun(null);setDropBounce(Number(e.target.value));}} />
-                      </label>
-                    </div>
-                  </details>
-                  <button type="button" className={buttonClass + " mt-2"}
-                    disabled={selectedQuantities.massKg === null} onClick={startDropWithSelectedSolid}>
-                    Drop this solid
-                  </button>
-                  {selectedDrop && dropSample && (
-                    <div className="mt-3 space-y-2" aria-label="Computed drop results">
-                      <p className="text-xs">Model result · {selectedDrop.inputEvidence.replaceAll("-", " ")} · not measured</p>
-                      <dl className="grid grid-cols-2 gap-2 text-xs">
-                        <div><dt>Time</dt><dd>{dropSample.timeSeconds.toFixed(2)} s</dd></div>
-                        <div><dt>Height above surface</dt><dd>{dropSample.heightAboveGroundM.toFixed(2)} m</dd></div>
-                        <div><dt>Vertical speed</dt><dd>{dropSample.speedMps.toFixed(2)} m/s</dd></div>
-                        <div><dt>Estimated impacts</dt><dd>{selectedDrop.impactCount}</dd></div>
-                      </dl>
-                      <label className="block text-xs">Explore drop time
-                        <input type="range" aria-label="Explore drop time" className="w-full" min="0"
-                          max={selectedDrop.input.durationSeconds} step={selectedDrop.stepSeconds}
-                          value={dropTime} onChange={e=>{setDropPlaying(false);setDropTime(Number(e.target.value));}} />
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        <button type="button" className={buttonClass}
-                          onClick={()=>setDropPlaying(v=>!v)}>{dropPlaying ? "Pause drop" : "Play drop"}</button>
-                        <button type="button" className={buttonClass}
-                          onClick={()=>{setDropPlaying(false);setDropTime(0);}}>Reset drop</button>
-                        <button type="button" className={buttonClass}
-                          onClick={()=>downloadJson("the-world-lab-drop-evidence.json",selectedDrop)}>
-                          Export drop evidence
-                        </button>
-                        <select className={inputLabel} aria-label="Drop playback speed" value={dropPlaybackRate}
-                          onChange={e=>setDropPlaybackRate(Number(e.target.value))}>
-                          <option value={0.1}>0.1× slow</option>
-                          <option value={1}>1× normal</option>
-                          <option value={4}>4× fast</option>
-                        </select>
-                      </div>
-                      <p className="text-xs text-muted-foreground">{selectedDrop.validity}</p>
-                    </div>
-                  )}
-                </div>
-                <div className="sm:col-span-2">
-                  <button type="button" className={buttonClass}
-                    disabled={selectedQuantities.massKg === null}
-                    onClick={startWithSelectedSolid}>Test this solid as spring mass</button>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Treat this object's geometry and your invented density as one lumped mass.
-                    The spring stiffness remains a separate assumption. This is not deformation,
-                    collision or material certification.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-        <aside className="rounded-xl border border-border p-4" aria-label="Experiment controls">
-          <label htmlFor="worldlab-model" className="mb-1 block text-sm font-medium">Experiment</label>
-          <select id="worldlab-model" className={inputLabel} value={modelKind}
-            onChange={(event) => {
-              setModelKind(event.target.value as ModelInput["kind"]);
-              setPlaying(false); setDirty(true); setRunId(""); setComparisonRunId(""); setTimeSeconds(0);
-            }}>
-            <option value="damped-oscillator">Spring and moving mass</option>
-            <option value="rc-circuit">Battery and capacitor (RC)</option>
-            <option value="heat-rod">Heat flowing through a rod</option>
-          </select>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            {modelKind === "damped-oscillator" ? (
-              <>
-                <label className="text-sm">Mass (kg)<input className={inputLabel} type="number" min="0.001" max="10000" step="0.1"
-                  value={mechanical.massKg} onChange={(event) => changeMechanical("massKg", Number(event.target.value))} /></label>
-                <label className="text-sm">Spring (N/m)<input className={inputLabel} type="number" min="0.001" max="1000000" step="0.5"
-                  value={mechanical.springNPerM} onChange={(event) => changeMechanical("springNPerM", Number(event.target.value))} /></label>
-                <label className="text-sm">Damping (N·s/m)<input className={inputLabel} type="number" min="0" max="100000" step="0.1"
-                  value={mechanical.dampingNsPerM} onChange={(event) => changeMechanical("dampingNsPerM", Number(event.target.value))} /></label>
-                <label className="text-sm">Initial position (m)<input className={inputLabel} type="number" min="-10" max="10" step="0.1"
-                  value={mechanical.initialDisplacementM} onChange={(event) => changeMechanical("initialDisplacementM", Number(event.target.value))} /></label>
-              </>
-            ) : modelKind === "rc-circuit" ? (
-              <>
-                <label className="text-sm">Resistance (Ω)<input className={inputLabel} type="number" min="0.001" step="100"
-                  value={circuit.resistanceOhm} onChange={(event) => changeCircuit("resistanceOhm", Number(event.target.value))} /></label>
-                <label className="text-sm">Capacitance (F)<input className={inputLabel} type="number" min="0.000000001" step="0.001"
-                  value={circuit.capacitanceF} onChange={(event) => changeCircuit("capacitanceF", Number(event.target.value))} /></label>
-                <label className="text-sm">Supply (V)<input className={inputLabel} type="number" min="-1000" max="1000" step="1"
-                  value={circuit.supplyVoltageV} onChange={(event) => changeCircuit("supplyVoltageV", Number(event.target.value))} /></label>
-                <label className="text-sm">Start voltage (V)<input className={inputLabel} type="number" min="-1000" max="1000" step="1"
-                  value={circuit.initialVoltageV} onChange={(event) => changeCircuit("initialVoltageV", Number(event.target.value))} /></label>
-              </>
-            ) : (
-              <>
-                <label className="text-sm">Diffusivity (m²/s)<input className={inputLabel} type="number"
-                  min="0.0000001" max="100" step="0.01" value={heat.thermalDiffusivityM2PerS}
-                  onChange={event=>changeHeat("thermalDiffusivityM2PerS",Number(event.target.value))}/></label>
-                <label className="text-sm">Rod length (m)<input className={inputLabel} type="number"
-                  min="0.1" max="100" step="0.1" value={heat.lengthMeters}
-                  onChange={event=>changeHeat("lengthMeters",Number(event.target.value))}/></label>
-                <label className="text-sm">Initial rod temperature (K)<input className={inputLabel} type="number"
-                  min="0" max="2000" step="1" value={heat.ambientTemperatureK}
-                  onChange={event=>changeHeat("ambientTemperatureK",Number(event.target.value))}/></label>
-                <label className="text-sm">Center temperature (K)<input className={inputLabel} type="number"
-                  min="0" max="2000" step="1" value={heat.centerTemperatureK}
-                  onChange={event=>changeHeat("centerTemperatureK",Number(event.target.value))}/></label>
-              </>
-            )}
-          </div>
-          <button type="button" className={buttonClass+" bg-foreground text-background"} onClick={start}>Start / Recalculate</button>
-          <WorldLabTimeController run={currentRun} timeSeconds={timeSeconds} playing={playing}
-            rate={playbackRate} direction={playbackDirection} onDirectionChange={setPlaybackDirection}
-            timezoneDisplay={timezoneDisplay} onTimezoneDisplayChange={setTimezoneDisplay}
-            wallTimeUTC={new Date().toISOString()}
-            geodeticOrigin={project?.world.geodeticOrigin??null}
-            onTimeChange={setTimeSeconds} onPlayingChange={setPlaying}
-            onRateChange={setPlaybackRate}
-            onCheckpoint={checkpoint=>downloadJson("world-lab-time-checkpoint.json",checkpoint)}
-            onReplayExport={manifest=>downloadJson("world-lab-replay-manifest.json",manifest)}
-            onReplay={replayedRun=>{
-              setRuns(previous=>[...previous.filter(run=>run.id!==replayedRun.id),replayedRun]);
-              setRunId(replayedRun.id);setComparisonRunId("");setTimeSeconds(0);
-              setPlaying(false);setDirty(false);setModelKind(replayedRun.inputs.kind);
-            }}
-            onCreateBranch={branchReferenceRun}/>
-          {runs.length > 0 && (
-            <div className="mt-4 rounded-lg border border-border p-3 text-sm">
-              <label htmlFor="worldlab-run-history" className="block font-medium">
-                Open recorded run (local device)
-              </label>
-              <select id="worldlab-run-history" className={inputLabel} value={runId}
-                onChange={event=>{
-                  const chosen=runs.find(run=>run.id===event.target.value);
-                  if(!chosen)return;
-                  setRunId(chosen.id);setComparisonRunId("");setTimeSeconds(0);
-                  setPlaying(false);setDirty(false);setModelKind(chosen.inputs.kind);
-                  if(chosen.inputs.kind==="damped-oscillator")setMechanical(chosen.inputs);
-                  else if(chosen.inputs.kind==="rc-circuit")setCircuit(chosen.inputs);
-                  else setHeat(chosen.inputs);
-                }}>
-                <option value="">Select a recorded run</option>
-                {runs.map((run,index)=><option key={run.id} value={run.id}>
-                  {index+1}. {run.modelId}{run.assumedMassSource?" · assumed material":""}
-                </option>)}
-              </select>
-              {currentRun && compatibleRuns.length>0 && (
-                <>
-                  <label htmlFor="worldlab-compare" className="mt-2 block font-medium">
-                    Compare to run
-                  </label>
-                  <select id="worldlab-compare" className={inputLabel} value={comparisonRunId}
-                    onChange={event=>setComparisonRunId(event.target.value)}>
-                    <option value="">Choose an earlier run</option>
-                    {compatibleRuns.map(run=><option key={run.id} value={run.id}>
-                      {run.modelId}{run.assumedMassSource?" · assumed material":""} · {run.id.slice(0,8)}
-                    </option>)}
-                  </select>
-                </>
-              )}
-              <p className="mt-1 text-xs text-muted-foreground">
-                Up to 20 recorded runs can be stored per project on this device.
-                Historical input values and assumptions are kept unchanged.
-                Cloud synchronization is not available; export JSON for an independent backup.
-              </p>
-              {currentRun && <button type="button" className={buttonClass + " mt-2"}
-                onClick={() => void deleteSelectedRun()}>Delete selected run</button>}
-            </div>
-          )}
-          {dirty && currentRun && <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">
-            Inputs have changed; the displayed run uses the old parameters. Press Start to calculate a new branch.
-          </p>}
-          {error && <p role="alert" className="mt-2 text-sm text-red-600">{error}</p>}
-          <p role="status" className="mt-3 text-sm">{message}</p>
-        </aside>
-      </div>
-      <div className="mt-3 grid gap-3 md:grid-cols-2">
-        <section className="rounded-xl border border-border p-4" aria-label="Computed observations">
-          <h2 className="text-lg font-semibold">What is happening?</h2>
-          <p className="mt-1 text-xs text-muted-foreground">Physics Model / Computed · not measured · visual shapes are illustrative</p>
-          {sample && currentRun ? (
-            <>
-              <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                {currentRun.modelId === "damped-oscillator" ? (
-                  <>
-                    <div><dt>Position</dt><dd className="font-medium">{metric(sample.positionM, "m")}</dd></div>
-                    <div><dt>Velocity</dt><dd className="font-medium">{metric(sample.velocityMPerS, "m/s")}</dd></div>
-                    <div><dt>Mechanical energy</dt><dd className="font-medium">{metric(sample.mechanicalEnergyJ, "J")}</dd></div>
-                  </>
-                ) : currentRun.modelId === "rc-circuit" ? (
-                  <>
-                    <div><dt>Capacitor voltage</dt><dd className="font-medium">{metric(sample.capacitorVoltageV, "V")}</dd></div>
-                    <div><dt>Current</dt><dd className="font-medium">{metric(sample.currentA, "A")}</dd></div>
-                    <div><dt>Resistor heating</dt><dd className="font-medium">{metric(sample.resistorHeatW, "W")}</dd></div>
-                    <div><dt>Stored energy</dt><dd className="font-medium">{metric(sample.storedEnergyJ, "J")}</dd></div>
-                  </>
-                ) : (
-                  <>
-                    <div><dt>Mean temperature</dt><dd className="font-medium">{metric(sample.meanTemperatureK,"K")}</dd></div>
-                    <div><dt>Hottest cell</dt><dd className="font-medium">{metric(sample.maximumTemperatureK,"K")}</dd></div>
-                    <div className="col-span-2"><dt>Internal field (from left to right)</dt>
-                      <dd className="font-mono text-xs break-words">{sample.temperaturesK?.map(t=>t.toFixed(1)).join(", ") ?? "No computed field"}</dd>
-                    </div>
-                  </>
-                )}
-              </dl>
-              {currentRun.modelId === "heat-rod" && <p className="mt-2 text-xs">
-                Color scale: <span className="font-medium">blue = cooler, yellow = warmer</span>.
-                The 3D rod colors encode calculated temperatures, not visible thermal photons.
-                Every color is derived from the selected time sample; inspect numeric temperatures above.
-              </p>}
-              {trace && (
-                <figure className="mt-4" aria-label="Calculated scientific time trace">
-                  <figcaption className="mb-1 text-sm font-medium">
-                    {trace.label} over simulated time
-                  </figcaption>
-                  <svg viewBox="0 0 700 200" role="img" className="h-auto w-full max-w-full"
-                    aria-label={trace.label+" ("+trace.unit+") between "+trace.minimum.toPrecision(4)+
-                      " and "+trace.maximum.toPrecision(4)+" over "+
-                      currentRun.time.simulatedDurationSeconds+" seconds"}>
-                    <line x1={trace.x0} y1={trace.y1} x2={trace.x1} y2={trace.y1}
-                      stroke="currentColor" strokeOpacity="0.35" strokeWidth="1.5"/>
-                    <line x1={trace.x0} y1={trace.y0} x2={trace.x0} y2={trace.y1}
-                      stroke="currentColor" strokeOpacity="0.35" strokeWidth="1.5"/>
-                    <polyline points={trace.points} fill="none" stroke="#267F9C" strokeWidth="2.6"
-                      strokeLinejoin="round" strokeLinecap="round"/>
-                    <line x1={trace.x0+(trace.x1-trace.x0)*(timeSeconds/currentRun.time.simulatedDurationSeconds)}
-                      y1={trace.y0}
-                      x2={trace.x0+(trace.x1-trace.x0)*(timeSeconds/currentRun.time.simulatedDurationSeconds)}
-                      y2={trace.y1} stroke="currentColor" strokeOpacity="0.8" strokeDasharray="4 4"/>
-                    <text x={trace.x0} y="185" fontSize="13" fill="currentColor">0 s</text>
-                    <text x={trace.x1} y="185" fontSize="13" fill="currentColor" textAnchor="end">
-                      {currentRun.time.simulatedDurationSeconds} s
-                    </text>
-                  </svg>
-                  <p className="text-xs text-muted-foreground">
-                    {trace.label} ({trace.unit}): {trace.minimum.toPrecision(4)} to {trace.maximum.toPrecision(4)}.
-                    Plotted {trace.samplesPlotted} recorded samples. Dashed line shows selected time.
-                    This is computed state, not a measurement.
-                  </p>
-                </figure>
-              )}
-              <p className="mt-3 text-xs">Model {currentRun.modelId} v{currentRun.modelVersion};
-                solver Δt {currentRun.time.solverStepSeconds.toPrecision(4)} s;
-                simulation date {currentRun.time.worldDateUTC}.</p>
-              {comparisonRun && comparedDifference!==null && trace && (
-                <div className="mt-3 rounded-lg border border-border p-3 text-sm"
-                  aria-label="Experiment comparison">
-                  <p className="font-medium">Difference at selected time</p>
-                  <p>{trace.label}: current {metric(currentTraceValue as number,trace.unit)};
-                    previous {metric(comparisonTraceValue as number,trace.unit)};
-                    difference {metric(comparedDifference,trace.unit)}.</p>
-                  <p className="text-xs text-muted-foreground">
-                    Computed values sampled from each run's recorded solver steps.
-                    Compare only the same model and duration; no measurement or interpolation.
-                  </p>
-                </div>
-              )}
-              {currentRun.assumedMassSource && (
-                <div className="mt-2 rounded-lg border border-border p-3 text-xs" aria-label="Hypothetical material provenance">
-                  <p className="font-medium">Derived from an invented solid · user-assumed</p>
-                  <p>Object: {currentRun.assumedMassSource.entityName}; material: {currentRun.assumedMassSource.materialName}.</p>
-                  <p>Volume {metric(currentRun.assumedMassSource.volumeM3,"m³")} ×
-                    assumed density {metric(currentRun.assumedMassSource.assumedDensityKgM3,"kg/m³")} =
-                    mass {metric(currentRun.assumedMassSource.derivedMassKg,"kg")}.</p>
-                  <p>{currentRun.assumedMassSource.assumption}</p>
-                </div>
-              )}
-              <p className="mt-2 text-xs text-muted-foreground">Valid only within: {currentRun.validity}</p>
-              <button type="button" className={buttonClass + " mt-3"}
-                onClick={() => downloadJson("world-lab-experiment.json", currentRun)}>Export recorded run JSON</button>
-            </>
-          ) : <p className="mt-3 text-sm">No model results yet. Press Start to run a calculation.</p>}
-        </section>
-        <section className="rounded-xl border border-border p-4" aria-label="New material proposal">
-          <h2 className="text-lg font-semibold">{editingMaterialId?"Revise material assumptions":"Invent a material"}</h2>
-          <p className="text-xs text-muted-foreground">
-            Propose a material not in any catalog. Unknown properties remain unknown;
-            no strength, chemistry or physical success is predicted by this reference model.
-          </p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <label className="text-sm">Material name<input className={inputLabel} value={materialName}
-              maxLength={120} onChange={(event) => setMaterialName(event.target.value)} /></label>
-            <label className="text-sm">Assumed density (kg/m³), optional<input className={inputLabel}
-              type="number" min="0.001" value={density}
-              onChange={(event) => setDensity(event.target.value)} /></label>
-            <label className="text-sm">Assumed Young's modulus (Pa), optional<input className={inputLabel}
-              type="number" min="0" max="1000000000000000" step="any" value={youngModulus}
-              onChange={(event) => setYoungModulus(event.target.value)} /></label>
-            <label className="text-sm">Assumed thermal conductivity (W/m·K), optional
-              <input className={inputLabel} type="number" min="0.000001"
-                max="1000000" step="any" value={thermalConductivity}
-                onChange={event=>setThermalConductivity(event.target.value)}/></label>
-            <label className="text-sm">Assumed specific heat (J/kg·K), optional
-              <input className={inputLabel} type="number" min="0.01"
-                max="10000000" step="any" value={specificHeat}
-                onChange={event=>setSpecificHeat(event.target.value)}/></label>
-          </div>
-          <button type="button" className={buttonClass + " mt-3"} onClick={addMaterial}>
-            {editingMaterialId?"Save revised assumptions":"Record hypothetical material"}
-          </button>
-          {editingMaterialId&&<button type="button" className={buttonClass+" mt-3 ml-2"}
-            onClick={()=>{
-              setEditingMaterialId(null);setMaterialName("");setDensity("");setYoungModulus("");
-            }}>Cancel material edit</button>}
-          {materials.length > 0 && (
-            <ul className="mt-3 list-inside list-disc text-sm">
-              {materials.map((material) => <li key={material.id}>{material.name}: density {material.densityKgM3 === null ? "Unknown" : metric(material.densityKgM3, "kg/m³")};
-                modulus {material.youngModulusPa === null ? "Unknown" : metric(material.youngModulusPa,"Pa")} · Hypothetical / User-assumed
-                <button type="button" className={buttonClass+" ml-2"}
-                  aria-label={"Revise assumptions for "+material.name}
-                  onClick={()=>{
-                    setEditingMaterialId(material.id);setMaterialName(material.name);
-                    setDensity(material.densityKgM3===null?"":String(material.densityKgM3));
-                    setYoungModulus(material.youngModulusPa===null?"":String(material.youngModulusPa));
-                    setThermalConductivity(material.thermalConductivityWPerMK==null?
-                      "":String(material.thermalConductivityWPerMK));
-                    setSpecificHeat(material.specificHeatJPerKgK==null?
-                      "":String(material.specificHeatJPerKgK));
-                  }}>Revise assumptions</button>
-              </li>)}
-            </ul>
-          )}
-        </section>
-      </div>
-    </section>
+                    </div>)}
+                </section>
+        </StudioGroup>
+      </StudioDrawer>
+    </div>
   );
 }
