@@ -34,7 +34,7 @@ export function readCachedAccountProfileMediaPreview(
   if (typeof window === "undefined" || !userId) return null;
   try {
     const value = window.localStorage.getItem(previewKey(userId, kind));
-    if (!value || value.length > PREVIEW_MAX_CHARS || !value.startsWith("data:image/jpeg;base64,")) return null;
+    if (!value || value.length > PREVIEW_MAX_CHARS || !/^data:image\/(?:webp|png);base64,/.test(value)) return null;
     return value;
   } catch {
     return null;
@@ -56,10 +56,14 @@ async function persistAccountProfileMediaPreview(
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(bitmap.width * scale));
     canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-    const context = canvas.getContext("2d", { alpha: false });
+    const context = canvas.getContext("2d");
     if (!context) return;
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    const preview = canvas.toDataURL("image/jpeg", kind === "avatar" ? 0.76 : 0.68);
+    const quality = kind === "avatar" ? 0.76 : 0.68;
+    const webpPreview = canvas.toDataURL("image/webp", quality);
+    const preview = webpPreview.startsWith("data:image/webp;base64,")
+      ? webpPreview
+      : canvas.toDataURL("image/png");
     if (preview.length > PREVIEW_MAX_CHARS) return;
     window.localStorage.setItem(previewKey(userId, kind), preview);
   } catch {
