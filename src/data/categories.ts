@@ -122,7 +122,7 @@ export const CATEGORIES: CategoryMeta[] = [
     id: "productivity",
     name: "Productivity",
     description: "Timers, countdowns, focus tools, and planning calculators.",
-    blurb: "Stay on task without an account.",
+    blurb: "Stay focused with timers, planning, and daily workflows.",
     icon: "Timer",
   },
   {
