@@ -307,7 +307,7 @@ function getDailyDiscoveryToolIds(now = new Date()) {
     .map(item => item.id);
 }
 
-export function getPublicTrendingDiscoveryTools(now = new Date()) {
+function publicTrendingDiscoveryResponse(now = new Date()) {
   return {
     generatedAt: now.toISOString(),
     windowDays: 30,
@@ -316,10 +316,14 @@ export function getPublicTrendingDiscoveryTools(now = new Date()) {
   };
 }
 
+export function getPublicTrendingDiscoveryTools(now = new Date()) {
+  return publicTrendingDiscoveryResponse(now);
+}
+
 export async function getPublicTrendingTools() {
   // The public endpoint always has a useful, non-ranked discovery feed while
   // opt-in usage data is unavailable or below the privacy threshold.
-  if (process.env.ANALYTICS_ENABLED !== "true") return getPublicTrendingDiscoveryTools();
+  if (process.env.ANALYTICS_ENABLED !== "true") return publicTrendingDiscoveryResponse();
 
   try {
     const sql = await getSql();
@@ -343,7 +347,7 @@ export async function getPublicTrendingTools() {
       .map(row => String(row.tool_id ?? ""))
       .filter(id => /^[a-z0-9][a-z0-9._:-]{0,127}$/i.test(id) && activeToolIds.has(id))
       .slice(0, PUBLIC_TRENDING_TOOL_LIMIT);
-    if (!toolIds.length) return getPublicTrendingDiscoveryTools();
+    if (!toolIds.length) return publicTrendingDiscoveryResponse();
     return {
       generatedAt: new Date().toISOString(),
       windowDays: 30,
@@ -353,7 +357,7 @@ export async function getPublicTrendingTools() {
   } catch {
     // Analytics outages must not turn the Home discovery section into an empty
     // state. The ranked feed resumes automatically when the query succeeds.
-    return getPublicTrendingDiscoveryTools();
+    return publicTrendingDiscoveryResponse();
   }
 }
 
