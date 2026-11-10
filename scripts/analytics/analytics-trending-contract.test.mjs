@@ -24,8 +24,8 @@ test("public Trending falls back to a shared daily discovery shuffle, then switc
   assert.match(analyticsServer, /count\(distinct anonymous_subject_digest\) filter \(where event_name='tool_started'\) as starting_installations/);
   assert.match(analyticsServer, /where starts > 0 and starting_installations >= 3/);
   assert.match(analyticsServer, /order by starts desc, completed desc, views desc, tool_id asc/);
-  assert.match(analyticsServer, /limit \\$\\{PUBLIC_TRENDING_TOOL_LIMIT \\* 3\\}/);
-  assert.match(analyticsServer, /activeToolIds\\.has\\(id\\)/);
+  assert.ok(analyticsServer.includes("limit ${PUBLIC_TRENDING_TOOL_LIMIT * 3}"));
+  assert.ok(analyticsServer.includes("activeToolIds.has(id)"));
   assert.match(analyticsServer, /if \(!toolIds\.length\) return publicTrendingDiscoveryResponse\(\)/);
   const publicResult = analyticsServer.slice(analyticsServer.indexOf("export async function getPublicTrendingTools"), analyticsServer.indexOf("export async function runAnalyticsRetention"));
   assert.match(publicResult, /toolIds/);
