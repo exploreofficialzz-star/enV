@@ -1,4 +1,4 @@
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { dashboardSessionDigest, issueDashboardSession, readDashboardSession } from "./dashboard-session.mjs";
 import { createSessionLookup } from "../ai/server/session";
 import { getSql } from "../db";
@@ -284,7 +284,6 @@ export async function getAnalyticsSummary(request: Request) {
   };
 }
 const PUBLIC_TRENDING_TOOL_LIMIT = 500;
-type PublicTrendingMode = "discovery" | "analytics";
 
 /**
  * Before the analytics threshold is met, all platforms receive the same
