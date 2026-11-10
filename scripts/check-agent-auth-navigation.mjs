@@ -103,7 +103,7 @@ const account = requireText("src/routes/account.tsx", [
 for (const removed of ["Loading your profile", "Good to see you", "enV · Profile", "Welcome to your personal enV space", "Account status", "Your enV shortcuts", "Jump straight to the things you use most", "Need to leave?"]) {
   if (account.includes(removed)) errors.push("Account profile still contains removed text: " + removed);
 }
-if (!account.includes("user.profileImageUrl") || !account.includes("initials")) errors.push("The Account profile must show the available profile photo or a derived initials avatar.");
+if (!account.includes("profileImageUrl") || !account.includes("initials")) errors.push("The Account profile must show the available profile photo or a derived initials avatar.");
 if (!account.includes('aria-label="Edit name"') || !account.includes('aria-label="Edit email"')) errors.push("Name and email must each have an edit control.");
 if (!account.includes('aria-label="Change cover photo"') || !account.includes('aria-label="Change profile photo"')) errors.push("The cover and avatar must each have a camera upload control.");
 if (account.includes('capture="environment"') || account.includes('capture="user"')) errors.push("Profile image controls must open the platform picker instead of forcing camera capture.");
