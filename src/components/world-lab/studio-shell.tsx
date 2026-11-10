@@ -60,10 +60,11 @@ export function StudioNote({ children }: { children: ReactNode }) {
 type RailProps = {
   open: boolean;
   active: StudioGroupId | null;
+  onSelect: (group: StudioGroupId) => void;
 };
 
 /** Icon-only rail: left column on tablet and desktop, bottom bar on phones. */
-export function StudioRail({ open, active }: RailProps) {
+export function StudioRail({ open, active, onSelect }: RailProps) {
   return (
     <nav className="wl-rail" aria-label="World Lab tools">
       {GROUPS.map(({ id, label, Icon }) => (
@@ -76,6 +77,7 @@ export function StudioRail({ open, active }: RailProps) {
           aria-label={`Open ${label} tools`}
           aria-expanded={open && active === id}
           title={label[0].toUpperCase() + label.slice(1)}
+          onClick={() => onSelect(id)}
         >
           <Icon aria-hidden="true" size={22} strokeWidth={1.9} />
         </button>
