@@ -59,14 +59,26 @@ const INITIAL_THEME_SCRIPT = `(() => {
 function RootDocument() {
   useEffect(() => {
     let active = true;
-    // Start the worker registration immediately, but let the full tool engine
-    // library warm in the background after the first platform paint.
-    void registerEnVServiceWorker().catch(() => undefined);
+    try {
+      // Keep enough timing entries to capture the first-visit static assets.
+      performance.setResourceTimingBufferSize(2_000);
+    } catch {
+      // Timing capture is an optimization, not a page requirement.
+    }
+
+    // Cache the public app shell as soon as the worker takes control.
+    void registerEnVServiceWorker()
+      .then(() => active ? prepareEnVOfflineShell() : undefined)
+      .catch(() => undefined);
+
+    // Warm shipped tool-engine chunks in the background and cache them in a
+    // second pass. The core shell does not wait for this heavier work.
     void (async () => {
       const { preloadAllToolEngineModules } = await import("@/lib/tool-engine-preload");
       await preloadAllToolEngineModules();
       if (active) await prepareEnVOfflineShell();
     })().catch(() => undefined);
+
     return () => { active = false; };
   }, []);
 

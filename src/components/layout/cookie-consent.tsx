@@ -77,20 +77,20 @@ export function CookieConsent() {
             dismiss();
           }
         }}
-        className="pointer-events-auto w-full rounded-2xl border border-border bg-card px-4 py-4 text-left text-card-foreground shadow-xl outline-none sm:px-5"
+        className="pointer-events-auto w-full rounded-2xl border border-neutral-200 bg-white px-4 py-4 text-left text-neutral-950 shadow-xl outline-none dark:border-neutral-800 dark:bg-black dark:text-white sm:px-5"
       >
         <header>
-          <h2 id="env-cookie-title" className="text-lg font-semibold tracking-tight text-fg">
+          <h2 id="env-cookie-title" className="text-lg font-semibold tracking-tight text-neutral-950 dark:text-white">
             Cookie preferences
           </h2>
-          <p id="env-cookie-description" className="mt-1.5 text-sm leading-5 text-muted">
+          <p id="env-cookie-description" className="mt-1.5 text-sm leading-5 text-neutral-600 dark:text-neutral-300">
             enV uses essential browser storage for your account session and saved settings.
           </p>
         </header>
-        <footer className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
+        <footer className="mt-3 flex items-center justify-between gap-3 border-t border-neutral-200 pt-3 dark:border-neutral-800">
           <a
             href="/privacy"
-            className="inline-flex min-h-10 items-center text-sm font-medium text-muted underline underline-offset-4 hover:text-fg"
+            className="inline-flex min-h-10 items-center text-sm font-medium text-neutral-600 underline underline-offset-4 hover:text-neutral-950 dark:text-neutral-300 dark:hover:text-white"
           >
             Privacy policy
           </a>

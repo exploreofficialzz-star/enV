@@ -26,10 +26,42 @@ test("only cacheable same-origin assets are stored; APIs are excluded", () => {
   assert.match(serviceWorker, /isCacheableAsset\(request, url\)/);
 });
 
-test("unvisited tools do not receive offline navigation access", () => {
-  assert.match(serviceWorker, /findReadyPackageForPath/);
-  assert.match(serviceWorker, /item\.status === "ready" && item\.pathname === pathname/);
-  assert.match(serviceWorker, /installed\) \{/);
+test("public app assets use stale-while-revalidate and never cache private API responses", () => {
+  assert.match(serviceWorker, /event\.waitUntil\(response\.then\(\(\) => backgroundRefresh\)\)/);
+  assert.match(serviceWorker, /keepAlive\(refreshCachedAsset\(request, cached, session, toolCache, coreCache\)\)/);
+  assert.match(serviceWorker, /ASSET_REVALIDATE_AFTER_MS = 6 \* 60 \* 60 \* 1000/);
+  assert.match(serviceWorker, /needsBackgroundRefresh\(cached\)/);
+  assert.match(serviceWorker, /if \(existing && !needsBackgroundRefresh\(existing\)\) return true/);
+  assert.match(serviceWorker, /return cached;/);
+  assert.match(serviceWorker, /cacheControl\.includes\("no-store"\)/);
+  assert.match(serviceWorker, /cacheControl\.includes\("private"\)/);
+  assert.match(serviceWorker, /CORE_CACHE_LIMIT = 800/);
+  assert.match(serviceWorker, /precacheFirstVisitShell/);
+  assert.match(serviceWorker, /env-web-shell-v2/);
+  assert.match(serviceWorker, /isPublicAssetResponse\(response\) && \(url\.pathname === "\/" \|\| url\.pathname\.startsWith\("\/tools\/"\)\)/);
+  assert.match(serviceWorker, /This page response is private or not cacheable/);
+});
+
+test("first-visit shell capture begins before the complete tool-engine warmup", () => {
+  const root = readFileSync(new URL("../../src/routes/__root.tsx", import.meta.url), "utf8");
+  assert.match(root, /setResourceTimingBufferSize\(2_000\)/);
+  assert.ok(root.indexOf("prepareEnVOfflineShell()") < root.indexOf("preloadAllToolEngineModules"));
+  assert.equal((root.match(/prepareEnVOfflineShell\(\)/g) ?? []).length, 2);
+  assert.match(client, /slice\(0, 800\)/);
+  assert.match(client, /CACHE_CORE_ASSETS", \{ assets \}, 60_000\)/);
+});
+
+test("unvisited tools are rejected unless their exact version and route package is ready", () => {
+  const lookupStart = serviceWorker.indexOf('if (data.type === "GET_TOOL_PACKAGE")');
+  const openStart = serviceWorker.indexOf('if (data.type === "BEGIN_TOOL_PACKAGE" || data.type === "OPEN_TOOL_PACKAGE")');
+  assert.ok(lookupStart >= 0 && openStart > lookupStart, "package status lookup and open commands must exist");
+  const lookup = serviceWorker.slice(lookupStart, openStart);
+  assert.match(lookup, /record\.status === "ready" && record\.version === data\.version && record\.pathname === data\.pathname/);
+  const open = serviceWorker.slice(openStart, openStart + 1_600);
+  assert.match(open, /existing\.status !== "ready"/);
+  assert.match(open, /existing\.version !== data\.version/);
+  assert.match(open, /existing\.pathname !== data\.pathname/);
+  assert.match(open, /ready: false/);
   assert.match(client, /status: "not-installed"/);
 });
 
@@ -38,17 +70,18 @@ test("package readiness requires at least one installed asset and a complete eng
   assert.match(engine, /OfflinePackageReadySignal/);
 });
 
-test("tool asset capture remains active through the whole route visit", () => {
+test("tool asset capture remains active until the route explicitly ends its package session", () => {
   const completionStart = serviceWorker.indexOf('if (data.type === "COMPLETE_TOOL_PACKAGE")');
   const endStart = serviceWorker.indexOf('if (data.type === "END_TOOL_PACKAGE")');
-  assert.ok(completionStart >= 0 && endStart > completionStart, "completion and route-exit commands must exist");
-  const completion = serviceWorker.slice(completionStart, endStart);
-  assert.equal(completion.includes("removeSession(clientId)"), false, "ready packages must keep capturing lazy assets until route exit");
-  const exit = serviceWorker.slice(endStart, endStart + 600);
-  assert.ok(exit.includes("removeSession(sourceClientId)"), "leaving the tool route must close its capture session");
-  assert.ok(serviceWorker.includes("if (session && toolCache)") &&
-    serviceWorker.includes("await toolCache.put(request, response.clone())"),
-    "same-origin assets requested after initial readiness must be added to the active tool cache");
+  assert.ok(completionStart >= 0 && endStart >= 0, "completion and route-exit commands must exist");
+  const completion = serviceWorker.slice(completionStart, completionStart + 3_000);
+  assert.match(completion, /getSession\(clientId\)/);
+  assert.doesNotMatch(completion, /removeSession\(/, "completing a package must not end the route's capture session");
+  const exit = serviceWorker.slice(endStart, endStart + 400);
+  assert.match(exit, /removeSession\(sourceClientId\)/, "leaving the tool route must close its capture session");
+  assert.match(client, /sendWorkerMessage\(worker, "END_TOOL_PACKAGE"/);
+  assert.match(serviceWorker, /recordToolAsset\(session, request\)/);
+  assert.match(serviceWorker, /await toolCache\.put\(request, cached\.clone\(\)\)/);
 });
 
 test("local tools remain interactive in the pre-monetization offline rollout", () => {
@@ -56,7 +89,7 @@ test("local tools remain interactive in the pre-monetization offline rollout", (
   const offlineClient = readFileSync(new URL("../../src/lib/billing/offline-client.ts", import.meta.url), "utf8");
   assert.equal(toolShell.includes("offlineTokenLocked") || toolShell.includes("surface.inert"), false,
     "the disabled wallet verifier must not make local tools inert");
-  assert.match(toolShell, /Offline mode: the operations marked as local can run on this device/);
+  assert.match(toolShell, /offlineAwareToolDescription\(tool\)/, "tool detail descriptions must be derived from the verified offline capability policy");
   const noAllowanceStart = offlineClient.indexOf("if (!selectedAllowanceId)");
   const noAllowanceEnd = offlineClient.indexOf("\n  }", noAllowanceStart);
   assert.ok(noAllowanceStart >= 0 && noAllowanceEnd > noAllowanceStart &&
@@ -74,7 +107,7 @@ test("offline tool navigation opens the requested destination package before res
   assert.ok(packageOpen >= 0 && engineLoad > packageOpen,
     "the requested tool package must be opened before its lazy engine chunk is loaded");
   assert.match(serviceWorker, /if \(data\.type === "OPEN_TOOL_PACKAGE"\)/);
-  assert.match(serviceWorker, /await setSession\(\{ clientId, toolId, version,/);
+  assert.match(serviceWorker, /await setSession\(\{ clientId, toolId: data\.toolId, version: data\.version,/);
   assert.doesNotMatch(serviceWorker, /findReadyPackageForClient/,
     "offline assets must use the explicit destination route handshake, not a stale client URL lookup");
 });

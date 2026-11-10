@@ -8,6 +8,13 @@ import { AuthPage } from "@/components/auth/auth-page";
 import { authClient, authEnabled, signOut } from "@/lib/auth/client";
 import { auth, authConfigurationError, authConfigured } from "@/lib/auth/server";
 import { DEV_USER, type AppUser } from "@/lib/auth/use-current-user";
+import {
+  cacheAccountProfileMedia,
+  clearAccountProfileMediaCache,
+  notifyAccountProfileMediaChanged,
+  readCachedAccountProfileMedia,
+  refreshCachedAccountProfileMedia,
+} from "@/lib/offline/account-profile-media-cache";
 
 const loadAccountProfile = createServerFn({ method: "GET" }).handler(async () => {
   if (!authConfigured) return DEV_USER;
@@ -60,30 +67,82 @@ function Account() {
   const [error, setError] = useState("");
   const avatarInput = useRef<HTMLInputElement>(null);
   const coverInput = useRef<HTMLInputElement>(null);
+  const mediaObjectUrls = useRef(new Set<string>());
+
+  function createMediaObjectUrl(blob: Blob): string {
+    const url = URL.createObjectURL(blob);
+    mediaObjectUrls.current.add(url);
+    return url;
+  }
+
+  // Never render the previous session's local profile while a new loader
+  // result is being committed after an account switch.
+  const sameLoadedIdentity = user?.id === loadedUser?.id;
+  const activeUser = sameLoadedIdentity ? user : loadedUser;
+  const activeAvatarUrl = sameLoadedIdentity ? avatarUrl : loadedUser?.profileImageUrl ?? null;
+  const activeCoverUrl = sameLoadedIdentity ? coverUrl : null;
 
   useEffect(() => {
     setUser(loadedUser);
     setAvatarUrl(loadedUser?.profileImageUrl ?? null);
+    setCoverUrl(null);
+    setEditingField(null);
     setNameDraft(loadedUser?.displayName ?? "");
     setEmailDraft(loadedUser?.primaryEmail ?? "");
   }, [loadedUser]);
 
   useEffect(() => {
-    const controller = new AbortController();
-    void fetch("/api/account/profile-media", {
-      credentials: "same-origin",
-      cache: "no-store",
-      signal: controller.signal,
-    }).then(async response => {
-      if (!response.ok) return;
-      const payload = await response.json() as ProfileMediaResponse;
-      if (controller.signal.aborted || !payload.ok) return;
-      if (payload.avatarAvailable) setAvatarUrl("/api/account/profile-media?kind=avatar");
-      if (payload.coverAvailable) setCoverUrl("/api/account/profile-media?kind=cover");
-    }).catch(() => {
-      // Profile media is optional; the profile stays usable without a custom image.
-    });
-    return () => controller.abort();
+    const userId = user?.id;
+    if (!userId) return;
+    let active = true;
+
+    const showCached = async (kind: "avatar" | "cover", setter: (url: string | null) => void) => {
+      const cached = await readCachedAccountProfileMedia(userId, kind);
+      if (active && cached) setter(createMediaObjectUrl(cached));
+    };
+
+    const refresh = async (kind: "avatar" | "cover", setter: (url: string | null) => void, fallback: string | null) => {
+      const result = await refreshCachedAccountProfileMedia(userId, kind);
+      if (!active) return;
+      if (result.status === "fresh") {
+        setter(createMediaObjectUrl(result.blob));
+        notifyAccountProfileMediaChanged(userId, kind);
+      } else if (result.status === "missing") {
+        setter(fallback);
+      }
+      // Network/server errors deliberately leave the last cached image visible.
+    };
+
+    const warmAndRefresh = async () => {
+      await Promise.all([
+        showCached("avatar", setAvatarUrl),
+        showCached("cover", setCoverUrl),
+      ]);
+      if (!active || !navigator.onLine) return;
+      await Promise.all([
+        refresh("avatar", setAvatarUrl, user?.profileImageUrl ?? null),
+        refresh("cover", setCoverUrl, null),
+      ]);
+    };
+
+    void warmAndRefresh();
+    const refreshWhenOnline = () => {
+      if (!navigator.onLine) return;
+      void Promise.all([
+        refresh("avatar", setAvatarUrl, user?.profileImageUrl ?? null),
+        refresh("cover", setCoverUrl, null),
+      ]);
+    };
+    window.addEventListener("online", refreshWhenOnline);
+    return () => {
+      active = false;
+      window.removeEventListener("online", refreshWhenOnline);
+    };
+  }, [user?.id, user?.profileImageUrl]);
+
+  useEffect(() => () => {
+    for (const url of mediaObjectUrls.current) URL.revokeObjectURL(url);
+    mediaObjectUrls.current.clear();
   }, []);
 
   async function saveName(event: FormEvent<HTMLFormElement>) {
@@ -99,7 +158,7 @@ function Account() {
     try {
       const result = await authClient.updateUser({ name });
       if (result.error) throw new Error(result.error.message || "Could not update your name.");
-      setUser(current => current ? { ...current, displayName: name } : current);
+      setUser(activeUser ? { ...activeUser, displayName: name } : activeUser);
       setEditingField(null);
       setNotice("Name updated.");
     } catch (reason) {
@@ -116,7 +175,7 @@ function Account() {
       setError("Enter a valid email address.");
       return;
     }
-    if (newEmail === user?.primaryEmail?.toLowerCase()) {
+    if (newEmail === activeUser?.primaryEmail?.toLowerCase()) {
       setEditingField(null);
       return;
     }
@@ -136,6 +195,11 @@ function Account() {
   }
 
   async function uploadImage(kind: "avatar" | "cover", file: File) {
+    const accountId = activeUser?.id;
+    if (!accountId) {
+      setError("Sign in before changing your profile photo.");
+      return;
+    }
     const limit = kind === "avatar" ? 1.5 * 1024 * 1024 : 4 * 1024 * 1024;
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
       setError("Choose a JPG, PNG or WebP image.");
@@ -160,8 +224,11 @@ function Account() {
       if (!response.ok || !payload.ok || !payload.imageUrl) {
         throw new Error(payload.error || "Could not save this photo.");
       }
-      if (kind === "avatar") setAvatarUrl(payload.imageUrl);
-      else setCoverUrl(payload.imageUrl);
+      const cached = await cacheAccountProfileMedia(accountId, kind, file);
+      const displayedUrl = cached ? createMediaObjectUrl(file) : payload.imageUrl;
+      if (kind === "avatar") setAvatarUrl(displayedUrl);
+      else setCoverUrl(displayedUrl);
+      notifyAccountProfileMediaChanged(accountId, kind);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not save this photo.");
     } finally {
@@ -181,6 +248,7 @@ function Account() {
     setSigningOut(true);
     setError("");
     try {
+      if (activeUser?.id) await clearAccountProfileMediaCache(activeUser.id);
       await signOut("/");
     } catch (reason) {
       setSigningOut(false);
@@ -188,9 +256,9 @@ function Account() {
     }
   }
 
-  if (!user) return <AuthPage mode="sign-in" />;
+  if (!activeUser) return <AuthPage mode="sign-in" />;
 
-  const displayName = user.displayName?.trim() || "enV member";
+  const displayName = activeUser.displayName?.trim() || "enV member";
   const initials = initialsFor(displayName);
 
   const profileActions = [
@@ -204,7 +272,7 @@ function Account() {
       <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-9">
         <section className="overflow-hidden rounded-[28px] border border-border bg-surface shadow-sm" aria-label="Profile">
           <div className="relative h-40 bg-gradient-to-br from-neutral-800 via-neutral-700 to-neutral-950 sm:h-52">
-            {coverUrl ? <img src={coverUrl} alt="" className="absolute inset-0 size-full object-cover" /> : null}
+            {activeCoverUrl ? <img src={activeCoverUrl} alt="" className="absolute inset-0 size-full object-cover" /> : null}
             <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/20" aria-hidden="true" />
             <button
               type="button"
@@ -229,8 +297,8 @@ function Account() {
           <div className="relative px-4 pb-6 sm:px-7 sm:pb-8">
             <div className="relative z-10 mx-auto -mt-[76px] flex w-fit flex-col items-center sm:-mt-[92px]">
               <div className="relative">
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt="" className="size-32 rounded-full border-[5px] border-card bg-surface object-cover shadow-lg sm:size-40" />
+                {activeAvatarUrl ? (
+                  <img src={activeAvatarUrl} alt="" className="size-32 rounded-full border-[5px] border-card bg-surface object-cover shadow-lg sm:size-40" />
                 ) : (
                   <span className="grid size-32 place-items-center rounded-full border-[5px] border-card bg-surface-2 text-4xl font-semibold text-fg shadow-lg sm:size-40 sm:text-5xl" aria-hidden="true">
                     {initials}
@@ -306,12 +374,12 @@ function Account() {
                       className="min-w-0 flex-1 rounded-lg border border-border bg-bg px-3 py-2 text-sm text-fg outline-none focus:border-accent"
                     />
                     <button type="submit" disabled={savingField} aria-label="Save email" className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-fg disabled:opacity-50"><Check size={17} /></button>
-                    <button type="button" disabled={savingField} onClick={() => { setEditingField(null); setEmailDraft(user.primaryEmail ?? ""); }} aria-label="Cancel email edit" className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-fg"><X size={17} /></button>
+                    <button type="button" disabled={savingField} onClick={() => { setEditingField(null); setEmailDraft(activeUser.primaryEmail ?? ""); }} aria-label="Cancel email edit" className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-fg"><X size={17} /></button>
                   </form>
-                ) : <span className="block truncate whitespace-nowrap text-sm font-medium text-fg" title={user.primaryEmail || "—"}>{user.primaryEmail || "—"}</span>}
+                ) : <span className="block truncate whitespace-nowrap text-sm font-medium text-fg" title={activeUser.primaryEmail || "—"}>{activeUser.primaryEmail || "—"}</span>}
               </dd>
               {editingField !== "email" ? (
-                <button type="button" aria-label="Edit email" onClick={() => { setEmailDraft(user.primaryEmail ?? ""); setEditingField("email"); setError(""); setNotice(""); }} className="grid size-9 shrink-0 place-items-center rounded-lg text-fg transition hover:bg-surface-2">
+                <button type="button" aria-label="Edit email" onClick={() => { setEmailDraft(activeUser.primaryEmail ?? ""); setEditingField("email"); setError(""); setNotice(""); }} className="grid size-9 shrink-0 place-items-center rounded-lg text-fg transition hover:bg-surface-2">
                   <Pencil size={17} aria-hidden="true" />
                 </button>
               ) : null}

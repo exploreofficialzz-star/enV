@@ -24,7 +24,12 @@ import {
   Wallet,
   Wrench,
 } from "lucide-react";
-import { useCurrentUser } from "@/lib/auth/use-current-user";
+import { useCurrentUser, type AppUser } from "@/lib/auth/use-current-user";
+import {
+  ACCOUNT_PROFILE_MEDIA_UPDATED_EVENT,
+  readCachedAccountProfileMedia,
+  refreshCachedAccountProfileMedia,
+} from "@/lib/offline/account-profile-media-cache";
 import { usePrefs } from "@/lib/storage";
 import type { ViewMode } from "@/lib/view-mode";
 
@@ -51,6 +56,57 @@ const MENU_GROUPS = [
 
 function closeMenu(event: React.MouseEvent<HTMLElement>) {
   event.currentTarget.closest("details")?.removeAttribute("open");
+}
+
+
+function AccountAvatar({ user }: { user: AppUser }) {
+  const [cachedMedia, setCachedMedia] = useState<{ userId: string; url: string } | null>(null);
+  const objectUrls = useRef(new Set<string>());
+
+  useEffect(() => {
+    let active = true;
+    setCachedMedia(null);
+
+    const setBlob = (blob: Blob) => {
+      if (!active) return;
+      const url = URL.createObjectURL(blob);
+      objectUrls.current.add(url);
+      setCachedMedia({ userId: user.id, url });
+    };
+
+    const load = async (refreshNetwork: boolean) => {
+      const cached = await readCachedAccountProfileMedia(user.id, "avatar");
+      if (active && cached) setBlob(cached);
+      if (!active || !refreshNetwork || !navigator.onLine) return;
+
+      const refreshed = await refreshCachedAccountProfileMedia(user.id, "avatar");
+      if (!active) return;
+      if (refreshed.status === "fresh") setBlob(refreshed.blob);
+      else if (refreshed.status === "missing") setCachedMedia(null);
+    };
+
+    const handleUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ userId?: string; kind?: string }>).detail;
+      if (detail?.userId === user.id && detail.kind === "avatar") void load(true);
+    };
+    const handleOnline = () => void load(true);
+
+    void load(true);
+    window.addEventListener(ACCOUNT_PROFILE_MEDIA_UPDATED_EVENT, handleUpdated);
+    window.addEventListener("online", handleOnline);
+    return () => {
+      active = false;
+      window.removeEventListener(ACCOUNT_PROFILE_MEDIA_UPDATED_EVENT, handleUpdated);
+      window.removeEventListener("online", handleOnline);
+      for (const url of objectUrls.current) URL.revokeObjectURL(url);
+      objectUrls.current.clear();
+    };
+  }, [user.id, user.profileImageUrl]);
+
+  const source = (cachedMedia?.userId === user.id ? cachedMedia.url : null) ?? user.profileImageUrl;
+  return source
+    ? <img src={source} alt="" className="size-full object-cover" />
+    : <UserRound className="size-5" strokeWidth={2.1} aria-hidden="true" />;
 }
 
 export function Header() {
@@ -124,7 +180,7 @@ export function Header() {
                 {showNotifications ? <div role="status" className="absolute right-0 top-full z-50 mt-2 w-64 rounded-2xl border border-border bg-surface p-4 text-sm text-fg shadow-xl"><p className="font-semibold">Notifications</p><p className="mt-1 text-muted">You’re all caught up.</p></div> : null}
               </div>
               <Link to="/account" aria-label="Profile and account" title={user?.displayName ?? "Profile"} className="inline-flex size-10 items-center justify-center overflow-hidden rounded-full border border-border bg-surface-2 text-fg transition hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
-                {user?.profileImageUrl ? <img src={user.profileImageUrl} alt="" className="size-full object-cover" /> : <UserRound className="size-5" strokeWidth={2.1} aria-hidden="true" />}
+                {user ? <AccountAvatar user={user} /> : <UserRound className="size-5" strokeWidth={2.1} aria-hidden="true" />}
               </Link>
             </nav>
           </>

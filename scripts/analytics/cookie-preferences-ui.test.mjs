@@ -25,7 +25,8 @@ test("cookie preferences are a compact popup rather than a full explanatory page
   assert.match(component, /pointer-events-none fixed bottom-4 left-4 right-4/);
   assert.match(component, /pointer-events-auto w-full rounded-2xl/);
   assert.match(component, /sm:w-\[24rem\]/);
-  assert.doesNotMatch(component, /fixed inset-0|bg-black|backdrop-blur|min-h-dvh/);
+  assert.match(component, /bg-white[\s\S]*dark:bg-black[\s\S]*dark:text-white/);
+  assert.doesNotMatch(component, /fixed inset-0|bg-transparent|backdrop-blur|min-h-dvh|bg-card/);
   assert.match(component, /role="dialog"/);
   assert.match(component, /aria-modal="false"/);
   assert.match(component, /if \(event\.key === "Escape"\)/);
@@ -61,7 +62,9 @@ test("account profile is server-session aware and renders without a textual load
   assert.match(accountPage, /loadAccountProfile/);
   assert.match(accountPage, /loader: \(\) => loadAccountProfile\(\)/);
   assert.doesNotMatch(accountPage, /Loading your profile|Good to see you|enV · Profile|Welcome to your personal enV space|Account status|Your enV shortcuts|Jump straight to the things you use most|Need to leave\?/);
-  assert.match(accountPage, /if \(!user\) return <AuthPage mode="sign-in" \/>/);
+  assert.match(accountPage, /if \(!activeUser\) return <AuthPage mode="sign-in" \/>/);
+  assert.match(accountPage, /const activeUser = sameLoadedIdentity \? user : loadedUser/);
+  assert.match(accountPage, /const activeAvatarUrl = sameLoadedIdentity \? avatarUrl/);
   assert.match(accountPage, /profileImageUrl: session\.user\.image/);
   assert.match(accountPage, /initials/);
   assert.match(accountPage, /coverInput/);
