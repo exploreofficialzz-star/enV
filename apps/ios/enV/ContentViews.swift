@@ -461,6 +461,42 @@ private struct NativeAnalyticsConsentPanel: View {
     }
 }
 
+private enum NativeTrendingToolsClient {
+    static func fetchToolIDs() async -> [String] {
+        guard let raw = Bundle.main.object(forInfoDictionaryKey: "ENV_API_BASE_URL") as? String,
+              let baseURL = URL(string: raw.trimmingCharacters(in: .whitespacesAndNewlines)),
+              baseURL.scheme?.lowercased() == "https",
+              baseURL.host != nil else { return [] }
+
+        let url = baseURL.appendingPathComponent("api")
+            .appendingPathComponent("analytics")
+            .appendingPathComponent("trending")
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 10
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse,
+                  (200...299).contains(http.statusCode),
+                  let envelope = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  envelope["ok"] as? Bool == true,
+                  let payload = envelope["data"] as? [String: Any],
+                  let ids = payload["toolIds"] as? [String] else { return [] }
+
+            var seen = Set<String>()
+            return Array(ids.filter {
+                !$0.isEmpty &&
+                $0.range(of: "^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$", options: .regularExpression) != nil &&
+                seen.insert($0).inserted
+            }.prefix(12))
+        } catch {
+            return []
+        }
+    }
+}
+
 struct HomeView: View {
     @EnvironmentObject private var store: CatalogStore
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -470,6 +506,7 @@ struct HomeView: View {
     let onInformation: (String) -> Void
     let onAssistant: () -> Void
     @State private var searchText = ""
+    @State private var trendingToolIDs: [String] = []
     @State private var homePath = NavigationPath()
     @FocusState private var isHomeSearchFocused: Bool
     private var hasSearchText: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -479,8 +516,8 @@ struct HomeView: View {
         else { onSearch(searchText.trimmingCharacters(in: .whitespacesAndNewlines)) }
     }
     private var homeTools: [Tool] {
-        store.catalog.webSearch("", limit: Int.max, includeRelatedReferences: true)
-            .filter { $0.status == "active" || $0.status == "beta" }
+        trendingToolIDs.compactMap { store.catalog.displayTool(for: $0) }
+            .filter { ($0.status == "active" || $0.status == "beta") && !$0.isUnderProduction }
             .prefix(12)
             .map { $0 }
     }
@@ -596,9 +633,16 @@ struct HomeView: View {
                         enVCharacterSpacedText("Trending tools")
                             .font(.envScaled(size: 20, weight: .semibold))
                             .foregroundStyle(Color.envAccent)
-                        ResponsiveToolGrid(home: true) { visibleLimit in
-                            ForEach(homeTools.prefix(visibleLimit)) { tool in
-                                DiscoveryToolCard(tool: tool)
+                        if homeTools.isEmpty {
+                            enVCharacterSpacedText("Trending tools appear when enough people have opted in to usage analytics and started using tools.")
+                                .font(.envScaled(size: 12, weight: .regular))
+                                .foregroundStyle(Color.envMuted)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        } else {
+                            ResponsiveToolGrid(home: true) { visibleLimit in
+                                ForEach(homeTools.prefix(visibleLimit)) { tool in
+                                    DiscoveryToolCard(tool: tool)
+                                }
                             }
                         }
                         HStack {
@@ -623,6 +667,9 @@ struct HomeView: View {
                 .frame(maxWidth: .infinity)
             }
             .modifier(Screen())
+            .task {
+                trendingToolIDs = await NativeTrendingToolsClient.fetchToolIDs()
+            }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: String.self) { CategoryView(categoryID: $0) }
