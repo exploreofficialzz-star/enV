@@ -233,8 +233,9 @@ test("profile shimmer is the only visible state until an account photo is resolv
 
 
 test("profile cover remains at the top while only the avatar overlaps its lower edge", () => {
-  assert.match(accountRoute, /<div className="relative h-40 .* sm:h-52">/);
-  assert.match(accountRoute, /relative z-10 mx-auto -mt-\\[76px\\] w-fit sm:-mt-\\[92px\\]/);
-  assert.match(accountRoute, /<h1 className="relative z-0 mx-auto mt-4 .* sm:mt-7 sm:text-3xl"/);
-  assert.match(accountRoute, /<div className="env-shimmer mx-auto mt-4 h-8 w-44 rounded-lg sm:mt-7/);
+  assert.ok(accountRoute.includes('<div className="relative h-40 bg-gradient-to-br from-neutral-800 via-neutral-700 to-neutral-950 sm:h-52">'));
+  assert.ok(accountRoute.includes("relative z-10 mx-auto -mt-[76px] w-fit sm:-mt-[92px]"));
+  assert.ok(accountRoute.includes('<h1 className="relative z-0 mx-auto mt-4'));
+  assert.ok(accountRoute.includes("sm:mt-7 sm:text-3xl"));
+  assert.ok(accountRoute.includes("env-shimmer mx-auto mt-4 h-8 w-44 rounded-lg sm:mt-7"));
 });
