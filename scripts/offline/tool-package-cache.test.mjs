@@ -152,3 +152,14 @@ test("private account and authentication pages are excluded from shared navigati
   assert.ok(serviceWorker.includes("!PRIVATE_NAVIGATION_PATHS.some"));
   assert.ok(serviceWorker.includes("isPublicAssetResponse(response)"));
 });
+
+test("SPA route visits cache eligible public page documents for the next hard refresh", () => {
+  const root = readFileSync(new URL("../../src/routes/__root.tsx", import.meta.url), "utf8");
+  assert.ok(client.includes("export async function cacheCurrentEnVNavigation()"));
+  assert.ok(root.includes("useRouterState({ select: state => state.location.pathname })"));
+  assert.ok(root.includes("cacheCurrentEnVNavigation()"));
+  assert.ok(serviceWorker.includes("function isCacheablePublicNavigationPath(url)"));
+  assert.ok(serviceWorker.includes('headers: { accept: "text/html" }'));
+  assert.ok(serviceWorker.includes('fetch(request, { cache: "no-store" })'));
+  assert.ok(serviceWorker.includes("storeNavigationResponse(request, response)"));
+});
