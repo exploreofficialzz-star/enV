@@ -73,7 +73,7 @@ test("account resolves sign-in state reactively and preserves the old server-fun
   assert.match(currentUserState, /authClient\.useSession\(\)/);
   assert.match(currentUserState, /error: error \?\? null/);
   assert.match(currentUserState, /refetch,/);
-  assert.match(currentUserState, /profileImageUrl: sessionUser\.image/);
+  assert.match(currentUserState, /profileImageUrl: sessionUserImage/);
   const serverManifestPath = new URL("../../.vercel/output/functions/__server.func/_ssr/ssr.mjs", import.meta.url);
   if (existsSync(serverManifestPath)) {
     const serverManifest = readFileSync(serverManifestPath, "utf8");
@@ -119,7 +119,7 @@ test("signed-in user identity stays referentially stable to prevent the account 
   assert.match(currentUserState, /import \{ useMemo \} from "react"/);
   assert.match(currentUserState, /const sessionUser = data\?\.user/);
   assert.match(currentUserState, /const user = useMemo<AppUser \| null>\(/);
-  assert.match(currentUserState, /\[sessionUser\?\.id, sessionUser\?\.name, sessionUser\?\.email, sessionUser\?\.image\]/);
+  assert.match(currentUserState, /\[sessionUserId, sessionUserName, sessionUserEmail, sessionUserImage\]/);
   assert.match(accountPage, /useAccountMediaLayoutEffect\([\s\S]*?\}, \[loadedUser\]\)/);
 });
 
