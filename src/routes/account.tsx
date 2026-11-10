@@ -1,13 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
 import { ArrowRight, Camera, ChartNoAxesCombined, Check, LogOut, Pencil, Settings, Wallet, X } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { AuthPage } from "@/components/auth/auth-page";
 import { authClient, authEnabled, signOut } from "@/lib/auth/client";
-import { auth, authConfigurationError, authConfigured } from "@/lib/auth/server";
-import { DEV_USER, type AppUser } from "@/lib/auth/use-current-user";
+import { useCurrentUserState, type AppUser } from "@/lib/auth/use-current-user";
 import {
   cacheAccountProfileMedia,
   clearAccountProfileMediaCache,
@@ -19,30 +16,7 @@ import {
 
 const useAccountMediaLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
-const loadAccountProfile = createServerFn({ method: "GET" }).handler(async () => {
-  if (!authConfigured) return DEV_USER;
-  if (authConfigurationError) throw new Error("Account authentication is temporarily unavailable.");
-  const request = getRequest();
-  if (!request) throw new Error("Account session context is unavailable.");
-
-  // A missing session is a signed-out state. Infrastructure/auth errors must
-  // propagate instead of being mistaken for a signed-out visitor.
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session?.user) return null;
-  return {
-    id: session.user.id,
-    displayName: session.user.name ?? null,
-    primaryEmail: session.user.email ?? null,
-    profileImageUrl: session.user.image ?? null,
-    isDevFallback: false,
-  } satisfies AppUser;
-});
-
 export const Route = createFileRoute("/account")({
-  loader: () => loadAccountProfile(),
-  pendingMs: 100,
-  pendingMinMs: 250,
-  pendingComponent: AccountProfileSkeleton,
   component: Account,
 });
 
@@ -130,7 +104,14 @@ function ShimmerProfileImage({
 }
 
 function Account() {
-  const loadedUser = Route.useLoaderData();
+  const {
+    user: loadedUser,
+    isPending: sessionPending,
+    error: sessionError,
+    refetch: refreshSession,
+  } = useCurrentUserState();
+  const [sessionTimedOut, setSessionTimedOut] = useState(false);
+  const [sessionAttempt, setSessionAttempt] = useState(0);
   const [user, setUser] = useState<AppUser | null>(loadedUser);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
@@ -147,6 +128,18 @@ function Account() {
   const avatarInput = useRef<HTMLInputElement>(null);
   const coverInput = useRef<HTMLInputElement>(null);
   const mediaObjectUrls = useRef(new Set<string>());
+
+  // The account route must never wait indefinitely on auth. A slow session
+  // check remains distinct from a confirmed signed-out response.
+  useEffect(() => {
+    if (!sessionPending) {
+      setSessionTimedOut(false);
+      return;
+    }
+    setSessionTimedOut(false);
+    const timeoutId = window.setTimeout(() => setSessionTimedOut(true), 10_000);
+    return () => window.clearTimeout(timeoutId);
+  }, [sessionPending, sessionAttempt]);
 
   function createMediaObjectUrl(blob: Blob): string {
     const url = URL.createObjectURL(blob);
@@ -354,6 +347,34 @@ function Account() {
       setSigningOut(false);
       setError(reason instanceof Error ? reason.message : "Could not sign out.");
     }
+  }
+
+  if (sessionPending && !sessionTimedOut) return <AccountProfileSkeleton />;
+
+  if (sessionError || sessionTimedOut) {
+    return (
+      <AppShell>
+        <main className="mx-auto flex min-h-[calc(100dvh-8rem)] w-full max-w-xl flex-col items-center justify-center px-4 py-10 text-center">
+          <section className="w-full rounded-2xl border border-border bg-surface p-6 shadow-sm" role="alert">
+            <h1 className="text-xl font-semibold text-fg">We couldn’t check your account</h1>
+            <p className="mt-2 text-sm leading-6 text-muted">
+              Your sign-in status could not be verified. Check your connection and try again.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setSessionTimedOut(false);
+                setSessionAttempt(attempt => attempt + 1);
+                refreshSession?.();
+              }}
+              className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+            >
+              Try again
+            </button>
+          </section>
+        </main>
+      </AppShell>
+    );
   }
 
   if (!activeUser) return <AuthPage mode="sign-in" />;
