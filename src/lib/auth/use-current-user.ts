@@ -22,12 +22,16 @@ export const DEV_USER: AppUser = {
   isDevFallback: true,
 };
 
-/** `useCurrentUserState()` result: the user plus the session-loading flag. */
+/** `useCurrentUserState()` result, including auth lookup failures and retry. */
 export type CurrentUserState = {
-  /** The user — `null` BOTH while the session loads and when signed out. */
+  /** The user — `null` while loading, signed out, or when session retrieval failed. */
   user: AppUser | null;
   /** True while the session is still resolving — don't treat `user: null` as signed out yet. */
   isPending: boolean;
+  /** A failed session request is not the same thing as a confirmed signed-out state. */
+  error: unknown | null;
+  /** Re-check the current session. Null when authentication is disabled. */
+  refetch: (() => void) | null;
 };
 
 /**
@@ -52,8 +56,8 @@ export type CurrentUserState = {
  * call keeps a stable hook order across every render of a given component.
  */
 export function useCurrentUserState(): CurrentUserState {
-  if (!authEnabled) return { user: DEV_USER, isPending: false };
-  const { data, isPending } = authClient.useSession();
+  if (!authEnabled) return { user: DEV_USER, isPending: false, error: null, refetch: null };
+  const { data, isPending, error, refetch } = authClient.useSession();
   const user = data?.user;
   return {
     user: user
@@ -66,6 +70,8 @@ export function useCurrentUserState(): CurrentUserState {
         }
       : null,
     isPending,
+    error: error ?? null,
+    refetch,
   };
 }
 

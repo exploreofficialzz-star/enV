@@ -110,14 +110,18 @@ function metricDetails(metrics: Record<string, number>): string[] {
     .map(([key, value]) => `${labels[key]}: ${value.toLocaleString()}`);
 }
 
-function MetricCard({ title, value, detail, icon }: { title: string; value: string; detail: string; icon: React.ReactNode }) {
+function MetricCard({ title, value, detail, icon, loading = false }: { title: string; value: string; detail: string; icon: React.ReactNode; loading?: boolean }) {
   return (
     <article className="min-w-0 rounded-2xl border border-border bg-surface p-4 shadow-sm">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-medium text-muted">{title}</p>
         <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-surface-2 text-accent">{icon}</span>
       </div>
-      <p className="mt-3 break-words text-2xl font-semibold tracking-tight text-fg tabular-nums">{tokenUnitDisplay(value)}</p>
+      {loading ? (
+        <span className="env-shimmer mt-3 block h-8 w-36 max-w-full rounded-md" role="status" aria-label={`Loading ${title.toLowerCase()}`} />
+      ) : (
+        <p className="mt-3 break-words text-2xl font-semibold tracking-tight text-fg tabular-nums">{tokenUnitDisplay(value)}</p>
+      )}
       <p className="mt-1 text-xs leading-5 text-muted">{detail}</p>
     </article>
   );
@@ -204,21 +208,25 @@ export function TokenDashboard() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-medium text-white/75">Total token</p>
-                    <p className="mt-2 break-words text-3xl font-semibold tracking-tight tabular-nums sm:text-4xl">{tokenUnitDisplay(wallet ? tokenLabel(wallet.availableTokens) : "—")}</p>
+                    {loadState === "loading" ? (
+                      <span className="env-shimmer mt-3 block h-10 w-52 max-w-full rounded-lg" role="status" aria-label="Loading token balance" />
+                    ) : (
+                      <p className="mt-2 break-words text-3xl font-semibold tracking-tight tabular-nums sm:text-4xl">{tokenUnitDisplay(wallet ? tokenLabel(wallet.availableTokens) : "—")}</p>
+                    )}
                     <p className="mt-2 text-xs text-white/75">enV estimated reference value ≈ $0.010</p>
                   </div>
                   <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-white/10"><Coins size={23} aria-hidden="true" /></span>
                 </div>
                 <div className="mt-5 grid grid-cols-2 gap-3 border-t border-white/15 pt-3">
-                  <div><p className="text-xs text-white/70">Reserved</p><p className="mt-1 text-sm font-semibold tabular-nums">{tokenUnitDisplay(wallet ? tokenLabel(wallet.reservedTokens) : "—")}</p></div>
-                  <div><p className="text-xs text-white/70">Total used ever</p><p className="mt-1 text-sm font-semibold tabular-nums">{tokenUnitDisplay(wallet ? tokenLabel(wallet.lifetimeConsumedSubunits / 1_000) : "—")}</p></div>
+                  <div><p className="text-xs text-white/70">Reserved</p>{loadState === "loading" ? <span className="env-shimmer mt-2 block h-4 w-24 rounded" role="status" aria-label="Loading reserved tokens" /> : <p className="mt-1 text-sm font-semibold tabular-nums">{tokenUnitDisplay(wallet ? tokenLabel(wallet.reservedTokens) : "—")}</p>}</div>
+                  <div><p className="text-xs text-white/70">Total used ever</p>{loadState === "loading" ? <span className="env-shimmer mt-2 block h-4 w-24 rounded" role="status" aria-label="Loading lifetime token usage" /> : <p className="mt-1 text-sm font-semibold tabular-nums">{tokenUnitDisplay(wallet ? tokenLabel(wallet.lifetimeConsumedSubunits / 1_000) : "—")}</p>}</div>
                 </div>
               </article>
-              <MetricCard title="Today's token spent" value={summary ? tokenLabel(summary.todaySpentSubunits / 1_000) : "—"} detail="Confirmed deductions since local midnight" icon={<Clock3 size={16} aria-hidden="true" />} />
-              <MetricCard title="Last week token spent" value={summary ? tokenLabel(summary.weekSpentSubunits / 1_000) : "—"} detail="Rolling 7-day window" icon={<CalendarDays size={16} aria-hidden="true" />} />
-              <MetricCard title="Last month token spent" value={summary ? tokenLabel(summary.monthSpentSubunits / 1_000) : "—"} detail="Rolling 30-day window" icon={<Activity size={16} aria-hidden="true" />} />
-              <MetricCard title="Total deposited" value={wallet ? tokenLabel(wallet.lifetimePurchasedSubunits / 1_000) : "—"} detail={wallet ? referenceValue(wallet.lifetimePurchasedSubunits / 1_000) : "Account data unavailable"} icon={<ArrowDownLeft size={16} aria-hidden="true" />} />
-              <MetricCard title="Token deductions" value={data ? String(data.tokenUsage.charges.length) : "—"} detail="Confirmed spending records available below" icon={<ArrowUpRight size={16} aria-hidden="true" />} />
+              <MetricCard title="Today's token spent" value={summary ? tokenLabel(summary.todaySpentSubunits / 1_000) : "—"} detail="Confirmed deductions since local midnight" icon={<Clock3 size={16} aria-hidden="true" />} loading={loadState === "loading"} />
+              <MetricCard title="Last week token spent" value={summary ? tokenLabel(summary.weekSpentSubunits / 1_000) : "—"} detail="Rolling 7-day window" icon={<CalendarDays size={16} aria-hidden="true" />} loading={loadState === "loading"} />
+              <MetricCard title="Last month token spent" value={summary ? tokenLabel(summary.monthSpentSubunits / 1_000) : "—"} detail="Rolling 30-day window" icon={<Activity size={16} aria-hidden="true" />} loading={loadState === "loading"} />
+              <MetricCard title="Total deposited" value={wallet ? tokenLabel(wallet.lifetimePurchasedSubunits / 1_000) : "—"} detail={wallet ? referenceValue(wallet.lifetimePurchasedSubunits / 1_000) : "Account data unavailable"} icon={<ArrowDownLeft size={16} aria-hidden="true" />} loading={loadState === "loading"} />
+              <MetricCard title="Token deductions" value={data ? String(data.tokenUsage.charges.length) : "—"} detail="Confirmed spending records available below" icon={<ArrowUpRight size={16} aria-hidden="true" />} loading={loadState === "loading"} />
             </section>
 
             <section className="mt-4 rounded-2xl border border-border bg-surface p-4 sm:p-5" aria-labelledby="weekly-usage-heading">

@@ -288,7 +288,9 @@ assert.doesNotMatch(tokenDashboardComponent, /Loading your account token data/, 
 assert.match(tokenDashboardComponent, /loadState === "signed-out" \|\| loadState === "unavailable"/, "the account status banner must be reserved for sign-in or actual data failures");
 assert.doesNotMatch(tokenDashboardComponent, /loadState === "ready" && wallet && summary \?/, "the full dashboard layout must render even while account data is unavailable");
 assert.match(tokenDashboardComponent, /loadState === "auth-disabled"/, "the dashboard must distinguish disabled production auth from a transient API failure");
-assert.match(tokenDashboardComponent, /wallet \? tokenLabel\(wallet\.availableTokens\) : tokenLabel\(0\)/, "the empty-wallet preview must show a formatted 0.000 enV balance");
+assert.match(tokenDashboardComponent, /aria-label="Loading token balance"/, "the web wallet balance must show shimmer while the initial account request is pending");
+assert.match(tokenDashboardComponent, /loading=\{loadState === "loading"\}/, "web summary metrics must share the same initial loading state");
+assert.match(tokenDashboardComponent, /wallet \\? tokenLabel\\(wallet\\.availableTokens\\) : "—"/, "a missing wallet must not be presented as a fabricated zero balance");
 assert.match(tokenDashboardComponent, /formatTimestamp\(item\.createdAt\)/, "usage history must show recorded timestamps");
 assert.doesNotMatch(tokenDashboardComponent, /> Home|enV token activity</, "the token dashboard header must not show the Home button or token activity pill");
 assert.match(tokenDashboardComponent, /flex items-start justify-between gap-3 sm:gap-5[\s\S]*Welcome to your token dashboard[\s\S]*<Link to="\/wallet"[\s\S]*Open wallet/, "Open wallet must share the welcome heading row");
