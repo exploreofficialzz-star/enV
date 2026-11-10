@@ -244,17 +244,21 @@ function offlineUnavailableResponse() {
   });
 }
 
-function isCacheableNavigation(request, url) {
-  if (request.method !== "GET" || request.mode !== "navigate" || url.origin !== self.location.origin) return false;
+function isCacheablePublicNavigationPath(url) {
+  if (url.origin !== self.location.origin) return false;
   // Do not persist search terms or other URL-carried state.
   if (url.search) return false;
   const pathname = url.pathname.replace(/\/+$/, "") || "/";
   return !PRIVATE_NAVIGATION_PATHS.some(prefix => pathname === prefix || pathname.startsWith(prefix + "/"));
 }
 
+function isCacheableNavigation(request, url) {
+  return request.method === "GET" && request.mode === "navigate" && isCacheablePublicNavigationPath(url);
+}
+
 async function storeNavigationResponse(request, response) {
   const url = new URL(request.url);
-  if (!isCacheableNavigation(request, url) || !isPublicAssetResponse(response)) return false;
+  if (!isCacheablePublicNavigationPath(url) || !isPublicAssetResponse(response)) return false;
   try {
     const pages = await caches.open(NAVIGATION_CACHE);
     await pages.put(request, response.clone());
@@ -389,19 +393,17 @@ self.addEventListener("message", (event) => {
     try {
       if (data.type === "CACHE_CURRENT_NAVIGATION") {
         const url = new URL(data.url);
-        if (url.origin !== self.location.origin || !(url.pathname === "/" || url.pathname.startsWith("/tools/"))) {
-          return reply({ ok: false, message: "This navigation is not eligible for offline caching." });
+        if (!isCacheablePublicNavigationPath(url)) {
+          return reply({ ok: false, message: "This navigation is private or not eligible for offline caching." });
         }
-        const request = new Request(url.href, { credentials: "same-origin" });
-        const response = await fetch(request);
+        const request = new Request(url.href, {
+          credentials: "same-origin",
+          headers: { accept: "text/html" },
+        });
+        const response = await fetch(request, { cache: "no-store" });
         if (!isPublicAssetResponse(response)) return reply({ ok: false, message: "This page response is private or not cacheable." });
-        const pages = await caches.open(NAVIGATION_CACHE);
-        await pages.put(request, response.clone());
-        if (url.pathname === "/") {
-          const shell = await caches.open(CORE_CACHE);
-          await shell.put(new URL("/", self.location.origin).href, response.clone());
-        }
-        return reply({ ok: true, cached: true });
+        const cached = await storeNavigationResponse(request, response);
+        return reply({ ok: cached, cached });
       }
 
       if (data.type === "CACHE_CORE_ASSETS") {
