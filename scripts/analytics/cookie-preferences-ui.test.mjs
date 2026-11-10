@@ -118,12 +118,16 @@ test("profile photos are stored server-side per authenticated account with bound
   assert.match(authServer, /sendChangeEmailConfirmation/);
 });
 
-test("token dashboard hides its loading placeholders and has no redundant sign-in card", () => {
-  assert.doesNotMatch(tokenDashboard, /Sign in to load your real enV balance|>Sign in<\/Link>/);
+test("token dashboard uses shimmer for balances while account data is loading", () => {
+  assert.doesNotMatch(tokenDashboard, /Sign in to load your real enV balance|>Sign in<\\/Link>/);
   assert.doesNotMatch(tokenDashboard, /Sign in to load token history|Loading token activity|Loading your tokens/);
-  assert.match(tokenDashboard, /loadState === "loading" \? null/);
-  assert.match(tokenDashboard, /loadState === "signed-out" \|\| loadState === "loading" \? null/);
-  assert.match(tokenDashboard, /wallet \? tokenLabel\(wallet\.availableTokens\) : "—"/);
+  assert.match(tokenDashboard, /aria-label="Loading token balance"/);
+  assert.match(tokenDashboard, /loading=\\{loadState === "loading"\\}/);
+  assert.match(tokenDashboard, /Loading reserved tokens/);
+  assert.match(tokenDashboard, /Loading lifetime token usage/);
+  assert.match(tokenDashboard, /loadState === "loading" \\? null/);
+  assert.match(tokenDashboard, /loadState === "signed-out" \\|\\| loadState === "loading" \\? null/);
+  assert.match(tokenDashboard, /wallet \\? tokenLabel\\(wallet\\.availableTokens\\) : "—"/);
 });
 
 test("device view is detected before first paint and manual choices survive refresh", () => {
