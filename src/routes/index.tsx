@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Logo } from "@/components/brand/logo";
 import { ProductUpdatesBanner } from "@/components/layout/product-updates-banner";
@@ -11,7 +11,7 @@ import { SeeMoreLink } from "@/components/tools/see-more-link";
 import { UnderProductionDialog } from "@/components/tools/under-production";
 import { isToolUnderProduction } from "@/lib/production-notice";
 import { seoPageHead, pageSchema } from "@/lib/seo-metadata";
-import { getPopularTools, getToolById, toolPath } from "@/lib/registry";
+import { getToolById, toolPath } from "@/lib/registry";
 import { rankMostUsedToolIds, usePrefs } from "@/lib/storage";
 import type { ToolMeta } from "@/types/tool";
 
@@ -33,7 +33,43 @@ export const Route = createFileRoute("/")({
 function Home() {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
-  const trending = getPopularTools(12);
+  const [trendingTools, setTrendingTools] = useState<ToolMeta[]>([]);
+  const [trendingLoaded, setTrendingLoaded] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch("/api/analytics/trending", {
+      signal: controller.signal,
+      credentials: "same-origin",
+      headers: { accept: "application/json" },
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Trending usage is unavailable.");
+        const payload = await response.json() as {
+          ok?: boolean;
+          data?: { toolIds?: unknown };
+        };
+        if (payload.ok !== true) throw new Error("Trending usage is unavailable.");
+        const ids = Array.isArray(payload.data?.toolIds)
+          ? payload.data.toolIds.filter((id): id is string => typeof id === "string")
+          : [];
+        const ranked = ids
+          .map((id) => getToolById(id))
+          .filter((tool): tool is ToolMeta =>
+            Boolean(tool && (tool.status === "active" || tool.status === "beta")),
+          )
+          .filter((tool, index, items) => items.findIndex((item) => item.id === tool.id) === index)
+          .slice(0, 12);
+        setTrendingTools(ranked);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setTrendingTools([]);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setTrendingLoaded(true);
+      });
+    return () => controller.abort();
+  }, []);
   const recent = usePrefs((state) => state.recent);
   const usageCounts = usePrefs((state) => state.usageCounts);
   const mostUsedTools = useMemo(
@@ -88,7 +124,7 @@ function Home() {
           <span className="hidden sm:inline"> everyday work.</span>
         </h1>
       </section>
-      <ToolSection title="Trending tools" tools={trending} />
+      <ToolSection title="Trending tools" tools={trendingTools} loaded={trendingLoaded} />
     </AppShell>
   );
 }
@@ -152,15 +188,24 @@ function MostUsedToolsTray({ tools }: { tools: ToolMeta[] }) {
   );
 }
 
-function ToolSection({ title, tools }: { title: string; tools: ReturnType<typeof getPopularTools> }) {
+function ToolSection({ title, tools, loaded }: { title: string; tools: ToolMeta[]; loaded: boolean }) {
   return (
     <section className="mx-auto max-w-6xl px-4 pb-10 sm:px-6">
       <div className="flex items-end justify-between gap-4">
         <h2 className="text-xl font-semibold text-accent sm:text-2xl">{title}</h2>
       </div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-        {tools.map((tool, index) => <ToolCard key={tool.id} tool={tool} className={index >= 6 ? "hidden md:flex" : ""} />)}
-      </div>
+      <p className="mt-1 text-xs text-muted">Ranked by actual tool starts over the last 30 days.</p>
+      {tools.length ? (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+          {tools.map((tool, index) => <ToolCard key={tool.id} tool={tool} className={index >= 6 ? "hidden md:flex" : ""} />)}
+        </div>
+      ) : (
+        <p className="mt-4 rounded-xl border border-border bg-surface px-4 py-5 text-sm text-muted">
+          {loaded
+            ? "Trending tools will appear when enough opted-in users have started tools."
+            : "Checking recent tool usage…"}
+        </p>
+      )}
       <div className="mt-5"><SeeMoreLink to="/tools">See more tools</SeeMoreLink></div>
     </section>
   );

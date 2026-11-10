@@ -480,10 +480,15 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
 private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: List<String>, homeQuery: String, onQuery: (String) -> Unit, onSearch: (String) -> Unit, onTools: () -> Unit, onInformation: (String) -> Unit, darkMode: Boolean, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit, onAssistant: () -> Unit) {
     val screenWidth = LocalConfiguration.current.screenWidthDp
     val homeColumns = when { screenWidth >= 768 -> 3; screenWidth >= 640 -> 2; else -> 1 }
-    val trending = remember(catalog, screenWidth) {
-        catalog.accessibilityDiscoveryTools().filter { it.status == "active" || it.status == "beta" }
-            .sortedByDescending { it.popularity }
-            .take(12)
+    var trendingIds by remember { mutableStateOf(emptyList<String>()) }
+    LaunchedEffect(catalog.catalogVersion) {
+        trendingIds = NativeTrendingToolsClient.fetchToolIds()
+    }
+    val trending = remember(catalog, trendingIds, screenWidth) {
+        val available = catalog.accessibilityDiscoveryTools().associateBy { it.id }
+        trendingIds.mapNotNull { available[it] }
+            .filter { it.status == "active" || it.status == "beta" }
+            .distinctBy { it.id }
             .take(if (screenWidth >= 768) 12 else 6)
     }
     val mostUsed = remember(catalog, mostUsedIds) {
@@ -563,6 +568,13 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
         item {
             Column(Modifier.widthIn(max = 1152.dp).fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 SectionTitle("Trending tools", accent = true)
+                if (trending.isEmpty()) {
+                    Text(
+                        "Trending tools appear when enough people have opted in to usage analytics and started using tools.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 trending.chunked(homeColumns).forEach { rowTools ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         rowTools.forEach { tool -> WebHomeToolCard(tool, onTool, Modifier.weight(1f)) }
