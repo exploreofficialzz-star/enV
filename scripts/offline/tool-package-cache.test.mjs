@@ -31,12 +31,15 @@ test("public app assets use stale-while-revalidate and never cache private API r
   assert.match(serviceWorker, /keepAlive\(refreshCachedAsset\(request, cached, session, toolCache, coreCache\)\)/);
   assert.match(serviceWorker, /ASSET_REVALIDATE_AFTER_MS = 6 \* 60 \* 60 \* 1000/);
   assert.match(serviceWorker, /needsBackgroundRefresh\(cached\)/);
+  assert.match(serviceWorker, /if \(existing && !needsBackgroundRefresh\(existing\)\) return true/);
   assert.match(serviceWorker, /return cached;/);
   assert.match(serviceWorker, /cacheControl\.includes\("no-store"\)/);
   assert.match(serviceWorker, /cacheControl\.includes\("private"\)/);
   assert.match(serviceWorker, /CORE_CACHE_LIMIT = 800/);
   assert.match(serviceWorker, /precacheFirstVisitShell/);
   assert.match(serviceWorker, /env-web-shell-v2/);
+  assert.match(serviceWorker, /isPublicAssetResponse\(response\) && \(url\.pathname === "\/" \|\| url\.pathname\.startsWith\("\/tools\/"\)\)/);
+  assert.match(serviceWorker, /This page response is private or not cacheable/);
 });
 
 test("first-visit shell capture begins before the complete tool-engine warmup", () => {
