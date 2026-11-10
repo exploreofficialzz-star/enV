@@ -41,6 +41,11 @@ test("public app assets use stale-while-revalidate and never cache private API r
   assert.ok(serviceWorker.includes("isCacheableNavigation(request, url)"));
   assert.ok(serviceWorker.includes("PRIVATE_NAVIGATION_PATHS"));
   assert.ok(serviceWorker.includes("NAVIGATION_CACHE_LIMIT = 120"));
+  assert.ok(serviceWorker.includes('url.pathname === "/api"'));
+  assert.ok(serviceWorker.includes('url.pathname.startsWith("/api/")'));
+  assert.ok(serviceWorker.includes('url.pathname === "/_serverFn"'));
+  assert.ok(serviceWorker.includes('url.pathname.startsWith("/_serverFn/")'));
+  assert.ok(serviceWorker.includes('startsWith("text/html")'));
   assert.ok(serviceWorker.includes("if (url.search) return false"));
   assert.ok(serviceWorker.includes("authorization"));
   assert.ok(serviceWorker.includes("accept"));
@@ -152,6 +157,21 @@ test("private account and authentication pages are excluded from shared navigati
   assert.ok(serviceWorker.includes("if (url.search) return false"));
   assert.ok(serviceWorker.includes("!PRIVATE_NAVIGATION_PATHS.some"));
   assert.ok(serviceWorker.includes("isPublicAssetResponse(response)"));
+});
+
+
+test("navigation document cache rejects API routes and non-HTML responses", () => {
+  const start = serviceWorker.indexOf("function isCacheablePublicNavigationPath(url)");
+  const end = serviceWorker.indexOf("function isPublicNavigationResponse(response)", start);
+  assert.ok(start >= 0 && end > start);
+  const pathPolicy = serviceWorker.slice(start, end);
+  assert.match(pathPolicy, /url\\.pathname === "\\/api"/);
+  assert.match(pathPolicy, /url\\.pathname\\.startsWith\\("\\/api\\/"/);
+  assert.match(pathPolicy, /url\\.pathname === "\\/_serverFn"/);
+  assert.match(pathPolicy, /url\\.pathname\\.startsWith\\("\\/_serverFn\\/"/);
+  const responsePolicy = serviceWorker.slice(end, serviceWorker.indexOf("async function storeNavigationResponse", end));
+  assert.match(responsePolicy, /content-type/);
+  assert.match(responsePolicy, /startsWith\\("text\\/html"\\)/);
 });
 
 test("SPA route visits cache eligible public page documents for the next hard refresh", () => {
