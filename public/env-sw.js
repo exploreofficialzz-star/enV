@@ -246,6 +246,9 @@ function offlineUnavailableResponse() {
 
 function isCacheablePublicNavigationPath(url) {
   if (url.origin !== self.location.origin) return false;
+  // API and server-function URLs are data endpoints, never page documents.
+  if (url.pathname === "/api" || url.pathname.startsWith("/api/") ||
+      url.pathname === "/_serverFn" || url.pathname.startsWith("/_serverFn/")) return false;
   // Do not persist search terms or other URL-carried state.
   if (url.search) return false;
   const pathname = url.pathname.replace(/\/+$/, "") || "/";
@@ -256,9 +259,14 @@ function isCacheableNavigation(request, url) {
   return request.method === "GET" && request.mode === "navigate" && isCacheablePublicNavigationPath(url);
 }
 
+function isPublicNavigationResponse(response) {
+  if (!isPublicAssetResponse(response)) return false;
+  return (response.headers.get("content-type") || "").toLowerCase().startsWith("text/html");
+}
+
 async function storeNavigationResponse(request, response) {
   const url = new URL(request.url);
-  if (!isCacheablePublicNavigationPath(url) || !isPublicAssetResponse(response)) return false;
+  if (!isCacheablePublicNavigationPath(url) || !isPublicNavigationResponse(response)) return false;
   try {
     const pages = await caches.open(NAVIGATION_CACHE);
     await pages.put(request, stampedCacheResponse(response));
@@ -330,7 +338,7 @@ async function handleNavigation(event, keepAlive) {
 async function precacheFirstVisitShell() {
   const homeUrl = new URL("/", self.location.origin);
   const response = await fetch(homeUrl);
-  if (!isPublicAssetResponse(response)) return;
+  if (!isPublicNavigationResponse(response)) return;
   const cache = await caches.open(CORE_CACHE);
   await cache.put(homeUrl.href, response.clone());
 
@@ -406,7 +414,7 @@ self.addEventListener("message", (event) => {
           return reply({ ok: true, cached: true, refreshed: false });
         }
         const response = await fetch(request, { cache: "no-store" });
-        if (!isPublicAssetResponse(response)) return reply({ ok: false, message: "This page response is private or not cacheable." });
+        if (!isPublicNavigationResponse(response)) return reply({ ok: false, message: "This page response is private or not cacheable HTML." });
         const cached = await storeNavigationResponse(request, response);
         return reply({ ok: cached, cached, refreshed: cached });
       }
