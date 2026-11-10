@@ -1,10 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { ArrowRight, Camera, ChartNoAxesCombined, Check, LogOut, Pencil, Settings, Wallet, X } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { AuthPage } from "@/components/auth/auth-page";
 import { authClient, authEnabled, signOut } from "@/lib/auth/client";
-import { useCurrentUserState, type AppUser } from "@/lib/auth/use-current-user";
+import { auth, authConfigurationError, authConfigured } from "@/lib/auth/server";
+import { DEV_USER, type AppUser } from "@/lib/auth/use-current-user";
 import {
   cacheAccountProfileMedia,
   clearAccountProfileMediaCache,
@@ -15,6 +18,31 @@ import {
 } from "@/lib/offline/account-profile-media-cache";
 
 const useAccountMediaLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+// Backward-compatible endpoint for account pages that were already open when
+// the reactive-session release shipped. Keep this function's name and handler
+// intact so old cached clients continue to resolve their original serverFn ID.
+// New account navigation does NOT call this function or wait for its response.
+const loadAccountProfile = createServerFn({ method: "GET" }).handler(async () => {
+  if (!authConfigured) return DEV_USER;
+  if (authConfigurationError) throw new Error("Account authentication is temporarily unavailable.");
+  const request = getRequest();
+  if (!request) throw new Error("Account session context is unavailable.");
+
+  const session = await auth.api.getSession({ headers: request.headers });
+  if (!session?.user) return null;
+  return {
+    id: session.user.id,
+    displayName: session.user.name ?? null,
+    primaryEmail: session.user.email ?? null,
+    profileImageUrl: session.user.image ?? null,
+    isDevFallback: false,
+  } satisfies AppUser;
+});
+
+// Keep the legacy server function in the compiled server manifest even though
+// the current route no longer uses it as a loader.
+export const legacyAccountProfileServerFunction = loadAccountProfile;
 
 export const Route = createFileRoute("/account")({
   component: Account,
