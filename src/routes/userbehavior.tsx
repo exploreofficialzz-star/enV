@@ -107,8 +107,8 @@ function downloadAnalyticsReport(summary: Summary) {
     ["Daily activity", "Events", "Failures"],
     ...summary.daily.map(row => [row.day, row.events, row.failures]),
     [],
-    ["Tool activity", "Views", "Completed", "Failures"],
-    ...summary.tools.map(row => [row.toolId, row.views, row.completed, row.failures]),
+    ["Tool activity", "Starts", "Views", "Completed", "Failures"],
+    ...summary.tools.map(row => [row.toolId, row.starts, row.views, row.completed, row.failures]),
     [],
     ["Platform breakdown", "Events"],
     ...summary.platforms.map(row => [row.name, row.events]),
@@ -278,7 +278,8 @@ function UserBehaviorDashboard() {
           </div>
         </section>
         <section className="rounded-xl border border-border bg-surface p-4">
-          <h2 className="text-sm font-semibold text-fg">Tool performance</h2>\n          <p className="mt-1 text-[11px] text-muted">Ranked by actual starts over the last 30 days; completed runs and views break ties. Home trending also requires at least three opted-in installations per tool.</p>
+          <h2 className="text-sm font-semibold text-fg">Tool performance</h2>
+          <p className="mt-1 text-[11px] text-muted">Ranked by actual starts over the last 30 days; completed runs and views break ties. Home trending also requires at least three opted-in installations per tool.</p>
           <div className="mt-4 space-y-3">
             {summary.tools.slice(0, 8).map(row => (
               <div key={row.toolId}>
