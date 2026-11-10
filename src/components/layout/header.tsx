@@ -60,18 +60,18 @@ function closeMenu(event: React.MouseEvent<HTMLElement>) {
 
 
 function AccountAvatar({ user }: { user: AppUser }) {
-  const [cachedUrl, setCachedUrl] = useState<string | null>(null);
+  const [cachedMedia, setCachedMedia] = useState<{ userId: string; url: string } | null>(null);
   const objectUrls = useRef(new Set<string>());
 
   useEffect(() => {
     let active = true;
-    setCachedUrl(null);
+    setCachedMedia(null);
 
     const setBlob = (blob: Blob) => {
       if (!active) return;
       const url = URL.createObjectURL(blob);
       objectUrls.current.add(url);
-      setCachedUrl(url);
+      setCachedMedia({ userId: user.id, url });
     };
 
     const load = async (refreshNetwork: boolean) => {
@@ -82,12 +82,12 @@ function AccountAvatar({ user }: { user: AppUser }) {
       const refreshed = await refreshCachedAccountProfileMedia(user.id, "avatar");
       if (!active) return;
       if (refreshed.status === "fresh") setBlob(refreshed.blob);
-      else if (refreshed.status === "missing") setCachedUrl(null);
+      else if (refreshed.status === "missing") setCachedMedia(null);
     };
 
     const handleUpdated = (event: Event) => {
-      const detail = (event as CustomEvent<{ userId?: string }>).detail;
-      if (detail?.userId === user.id) void load(true);
+      const detail = (event as CustomEvent<{ userId?: string; kind?: string }>).detail;
+      if (detail?.userId === user.id && detail.kind === "avatar") void load(true);
     };
     const handleOnline = () => void load(true);
 
@@ -103,7 +103,7 @@ function AccountAvatar({ user }: { user: AppUser }) {
     };
   }, [user.id, user.profileImageUrl]);
 
-  const source = cachedUrl ?? user.profileImageUrl;
+  const source = (cachedMedia?.userId === user.id ? cachedMedia.url : null) ?? user.profileImageUrl;
   return source
     ? <img src={source} alt="" className="size-full object-cover" />
     : <UserRound className="size-5" strokeWidth={2.1} aria-hidden="true" />;
