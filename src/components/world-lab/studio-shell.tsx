@@ -73,6 +73,7 @@ export function StudioRail({ open, active, onSelect }: RailProps) {
           type="button"
           className="wl-icon-btn"
           data-active={open && active === id ? "true" : "false"}
+          data-group={id}
           aria-label={`Open ${label} tools`}
           aria-expanded={open && active === id}
           title={label[0].toUpperCase() + label.slice(1)}

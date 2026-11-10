@@ -2141,7 +2141,13 @@ export default function WorldLab() {
   const inputLabel = "w-full rounded-lg border border-border bg-bg px-3 py-2 text-fg";
   const buttonClass = "rounded-lg border border-border px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2";
   return (
-    <div ref={studioRef} className="wl-studio" data-open={studioPanel?"true":"false"} role="region" aria-label="The World Lab">
+    <div ref={studioRef} className="wl-studio" data-open={studioPanel?"true":"false"} role="region" aria-label="The World Lab"
+      onClickCapture={event=>{
+        const target=(event.target as HTMLElement).closest<HTMLButtonElement>(".wl-rail button[data-group]");
+        const group=target?.dataset.group;
+        if(group==="project"||group==="build"||group==="experiments"||group==="results")
+          setStudioPanel(group);
+      }}>
       <h1 className="sr-only">The World Lab</h1>
       <div className="wl-stage">
         <canvas ref={canvasRef} className="wl-canvas"
