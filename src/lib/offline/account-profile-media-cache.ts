@@ -131,8 +131,15 @@ export async function refreshCachedAccountProfileMedia(
       headers: { accept: "image/jpeg,image/png,image/webp" },
     });
     if (response.status === 404 || response.status === 401 || response.status === 403) {
-      const cache = await caches.open(cacheName(userId)).catch(() => null);
-      if (cache) await cache.delete(cacheKey(kind)).catch(() => false);
+      if ("caches" in window) {
+        const cache = await caches.open(cacheName(userId)).catch(() => null);
+        if (cache) await cache.delete(cacheKey(kind)).catch(() => false);
+      }
+      try {
+        window.localStorage.removeItem(previewKey(userId, kind));
+      } catch {
+        // Ignore preview cleanup failures; the endpoint's authorization result remains authoritative.
+      }
       return { status: "missing" };
     }
     if (!response.ok) return { status: "unavailable" };
@@ -146,11 +153,13 @@ export async function refreshCachedAccountProfileMedia(
 }
 
 export async function clearAccountProfileMediaCache(userId: string): Promise<void> {
-  if (typeof window === "undefined" || !("caches" in window) || !userId) return;
-  try {
-    await caches.delete(cacheName(userId));
-  } catch {
-    // Sign-out must still proceed if browser cache cleanup is unavailable.
+  if (typeof window === "undefined" || !userId) return;
+  if ("caches" in window) {
+    try {
+      await caches.delete(cacheName(userId));
+    } catch {
+      // Sign-out must still proceed if browser cache cleanup is unavailable.
+    }
   }
   try {
     window.localStorage.removeItem(previewKey(userId, "avatar"));
