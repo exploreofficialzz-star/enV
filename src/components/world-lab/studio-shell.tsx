@@ -75,8 +75,10 @@ export function StudioRail({ open, active, onSelect, onClose }: RailProps) {
           className="wl-icon-btn"
           data-active={open && active === id ? "true" : "false"}
           aria-label={`Open ${label} tools`}
+          aria-expanded={open && active === id}
           title={label[0].toUpperCase() + label.slice(1)}
-          onClick={() => (open && active === id ? onClose() : onSelect(id))}
+          onPointerUp={() => onSelect(id)}
+          onClick={() => onSelect(id)}
         >
           <Icon aria-hidden="true" size={22} strokeWidth={1.9} />
         </button>
