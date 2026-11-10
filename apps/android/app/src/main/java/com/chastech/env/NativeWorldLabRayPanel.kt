@@ -52,10 +52,9 @@ fun NativeWorldLabRayPanel(project:NativeWorldLabProject,onMessage:(String)->Uni
     Column(verticalArrangement=Arrangement.spacedBy(8.dp)){
         Text("Trace light through invented 3D geometry",
             style=MaterialTheme.typography.titleSmall)
-        Text("This runs on the phone, using the geometry and refractive "+
+        LabNote("This runs on the phone, using the geometry and refractive "+
             "assumptions you already invented. One primary ray only; other "+
-            "reflected rays, absorption and diffraction are not traced.",
-            style=MaterialTheme.typography.bodySmall)
+            "reflected rays, absorption and diffraction are not traced.")
         Text("Eligible indexed boxes or spheres: "+eligible.size)
         if(eligible.isNotEmpty()){
             OutlinedButton(onClick={
@@ -110,8 +109,7 @@ fun NativeWorldLabRayPanel(project:NativeWorldLabProject,onMessage:(String)->Uni
             val minY=points.minOf{it.y}
             val maxY=points.maxOf{it.y}
             val span=kotlin.math.max(1.0,kotlin.math.max(maxX-minX,maxY-minY))
-            Text("XY projection of real calculated 3D rays; Z is not visible here.",
-                style=MaterialTheme.typography.bodySmall)
+            LabNote("XY projection of real calculated 3D rays; Z is not visible here.")
             Canvas(modifier=Modifier.fillMaxWidth().height(184.dp)){
                 fun pos(vector:NativeRayVector):Offset{
                     val scale=0.9f*kotlin.math.min(size.width,size.height)/span.toFloat()
@@ -148,7 +146,7 @@ fun NativeWorldLabRayPanel(project:NativeWorldLabProject,onMessage:(String)->Uni
                     export.launch("world-lab-invented-3d-light-trace.json")
                 }.onFailure{onMessage(it.message?:"Unable to export ray evidence.")}
             }){Text("Export 3D light trace evidence")}
-            Text(record.validity,style=MaterialTheme.typography.bodySmall)
+            LabNote(record.validity)
         }
     }
 }

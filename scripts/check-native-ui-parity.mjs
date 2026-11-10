@@ -91,7 +91,8 @@ assert.ok(webToolRoute.indexOf("await prepareOfflineToolPackage(") < webToolRout
 assert.doesNotMatch(webOfflinePackageClient, /offlineEligible/, "Tool UI caching must not depend on local-operation eligibility");
 assert.doesNotMatch(webToolEngine, /isOfflineLocalTool|offlineEligible/, "Every visited tool interface must be packaged regardless of its operation execution mode");
 assert.match(webToolEngine, /Cache every visited tool interface/, "All visited tools must quietly prepare their page and interface assets");
-assert.match(webWorldLabEntry, /preloadWorldLabWorkspace\(\)/, "World Lab must warm its workspace before Enter is selected");
+assert.match(webToolRoute, /await preloadWorldLabWorkspace\(\)/, "World Lab must load its workspace before the route commits so it opens straight into the world");
+assert.doesNotMatch(webWorldLabEntry, /Enter<|setHasEntered|world-lab-entry__cta/, "World Lab must not gate the world behind an Enter screen");
 assert.match(webGameStudioRoute, /await loadGameStudio\(\)/, "3D Game Studio must prepare its engine before route commit");
 assert.doesNotMatch(webToolRoute, /await loadPublicCommunityToolFeed/, "Community preload must not delay opening the tool");
 assert.doesNotMatch(webToolEngine, /Loading \{props\.tool\.name\}|Preparing \{tool\.name\}|Offline package ready on this device|OfflineToolUnavailable/, "Offline package state must not gate or decorate the tool screen");
@@ -103,7 +104,7 @@ assert.match(webABookEngine, /if \(showWelcome \|\| !libraryReady\)/, "A Book mu
 assert.match(webABookEngine, /disabled=\{!libraryReady\}/, "A Book must prevent library actions until the active local profile is loaded");
 assert.doesNotMatch(webMusicSandbox, /Opening your workspace|className="ms-loading"/, "Music Sandbox must not show an entry loading indicator");
 assert.match(webMusicSandbox, /canEnter=\{ready && !error\}/, "Music Sandbox entry must wait silently for local data and surface actual storage failures");
-assert.match(webWorldLabEntry, /<Suspense fallback=\{null\}>/, "World Lab workspace chunks must load beneath its entry surface");
+assert.match(webWorldLabEntry, /<Suspense fallback=\{<div className="wl-boot" aria-hidden="true" \/>\}>/, "World Lab workspace chunks must resolve beneath a text-free sky boot layer");
 assert.doesNotMatch(webWorldLabEntry, /Opening The World Lab|world-lab-entry__loading/, "World Lab must not show a workspace-opening loader");
 assert.match(webGameStudioRoute, /<Suspense fallback=\{null\}>/, "3D Game Studio route chunks must load without a visible entry fallback");
 assert.doesNotMatch(webGameStudioRoute, /Loading 3D Game Studio/, "3D Game Studio must not show a route-opening loader");

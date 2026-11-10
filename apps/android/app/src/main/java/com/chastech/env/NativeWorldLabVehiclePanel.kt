@@ -86,8 +86,7 @@ fun NativeWorldLabVehiclePanel(project:NativeWorldLabProject,onProblem:(String)-
     }
     Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(8.dp)) {
         Text("Build, run and diagnose a vehicle",style=MaterialTheme.typography.titleMedium)
-        Text("Independent Kotlin reference model. All vehicle, material, motor and battery inputs are inventor assumptions; this is not flight certification.",
-            style=MaterialTheme.typography.bodySmall)
+        LabNote("Independent Kotlin reference model. All vehicle, material, motor and battery inputs are inventor assumptions; this is not flight certification.")
         Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
             listOf("road-only","rotorcraft","fixed-wing").forEach { value ->
                 OutlinedButton(onClick={
@@ -162,7 +161,7 @@ fun NativeWorldLabVehiclePanel(project:NativeWorldLabProject,onProblem:(String)-
             run.events.forEach { Text(it,style=MaterialTheme.typography.bodySmall) }
             run.failureReasons.forEach { Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall) }
             OutlinedButton(onClick={export.launch("world-lab-native-vehicle-"+run.runId+".json")}) { Text("Export vehicle evidence JSON") }
-            Text(run.validity,style=MaterialTheme.typography.bodySmall)
+            LabNote(run.validity)
         }
     }
 }

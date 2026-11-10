@@ -1114,7 +1114,7 @@ private fun ToolDetail(
                                 }
                             }
                             Column(
-                                Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+                                Modifier.weight(1f).fillMaxWidth().then(if (tool.id == "the-world-lab") Modifier else Modifier.verticalScroll(rememberScrollState())),
                                 verticalArrangement = Arrangement.spacedBy(0.dp),
                             ) {
                                 NativeToolInterfaceContent(tool, backend, supported, onRelatedTool, startInWorkspace = true)

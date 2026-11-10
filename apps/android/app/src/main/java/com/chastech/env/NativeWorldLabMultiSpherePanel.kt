@@ -65,9 +65,8 @@ fun NativeWorldLabMultiSpherePanel(
         }
     }
     Text("Collide a group of spheres",style=MaterialTheme.typography.titleSmall)
-    Text("Invent each sphere's starting speed. Consecutive 3D contacts transfer momentum and energy. "+
-        "Frictionless isolated or independent simultaneous impacts are calculated; shared-sphere contacts are rejected.",
-        style=MaterialTheme.typography.bodySmall)
+    LabNote("Invent each sphere's starting speed. Consecutive 3D contacts transfer momentum and energy. "+
+        "Frictionless isolated or independent simultaneous impacts are calculated; shared-sphere contacts are rejected.")
     if(spheres.size !in 2..12){
         Text("Add 2–12 spherical objects and assign density to each.")
         return
@@ -185,11 +184,10 @@ fun NativeWorldLabMultiSpherePanel(
                 }
             }
         }
-        Text("Playback stops at every computed contact event.",
-            style=MaterialTheme.typography.bodySmall)
+        LabNote("Playback stops at every computed contact event.")
         OutlinedButton(onClick={export.launch("world-lab-multi-sphere-evidence.json")}){
             Text("Export group evidence")
         }
-        Text(active.validity,style=MaterialTheme.typography.bodySmall)
+        LabNote(active.validity)
     }
 }

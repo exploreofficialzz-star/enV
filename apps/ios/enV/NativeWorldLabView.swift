@@ -314,6 +314,11 @@ struct NativeWorldLabView:View {
     @State private var motorSpeed=1.0
     @State private var scene=SCNScene()
     @State private var sceneCameraNode=SCNNode()
+    @State private var observerEyeRange:Double?=nil
+    @State private var studioPanel:String?=nil
+    @State private var lastLookDrag=CGSize.zero
+    @State private var lastWalkScale:CGFloat=1
+    @Environment(\.dismiss) private var dismissWorld
     @State private var observerVerticalOffset=0.0
     @State private var observerPanX=0.0
     @State private var observerPanZ=0.0
@@ -631,22 +636,43 @@ struct NativeWorldLabView:View {
     }
     var body:some View { importExportView }
     private var coreView:some View {
-        ScrollView{
-            VStack(alignment:.leading,spacing:12) {
-                Text("The World Lab").font(.title2.bold())
-                Text("Real bounded science models in a representative 3D scene. Not measured or certified.")
-                    .font(.footnote).foregroundStyle(.secondary)
-                SceneView(scene:scene,options:[.allowsCameraControl,.autoenablesDefaultLighting])
-                    .frame(height:260).clipShape(RoundedRectangle(cornerRadius:12))
-                    .accessibilityLabel("Interactive native 3D invention scene; drag to orbit and pinch to zoom.")
+        GeometryReader{ proxy in
+            let phone=proxy.size.width<640
+            let wide=proxy.size.width>=1024
+            ZStack{
+                SceneView(scene:scene,pointOfView:sceneCameraNode,options:[])
+                    .ignoresSafeArea()
+                    .gesture(DragGesture(minimumDistance:2).onChanged{value in
+                        let dx=Double(value.translation.width-lastLookDrag.width)
+                        let dy=Double(value.translation.height-lastLookDrag.height)
+                        lastLookDrag=value.translation
+                        eyeTurn(headingDelta:dx*0.005,pitchDelta:-dy*0.005)
+                    }.onEnded{_ in lastLookDrag = .zero})
+                    .simultaneousGesture(MagnificationGesture().onChanged{scale in
+                        let delta=Double(scale-lastWalkScale)
+                        lastWalkScale=scale
+                        eyeTravel(meters:delta*(observerEyeRange ?? currentObserverRangeMeters())*1.5)
+                    }.onEnded{_ in lastWalkScale=1})
+                    .accessibilityLabel("Interactive native 3D world seen from eye height. Drag to look around; pinch to walk.")
+                worldHud(phone:phone)
+                worldRail(phone:phone)
+                worldPanel(proxy:proxy,phone:phone,wide:wide)
+            }
+            .background(Color(red:0.66,green:0.80,blue:0.93))
+            .onReceive(Timer.publish(every:30,on:.main,in:.common).autoconnect()){_ in
+                NativeWorldLabSkyRenderer.installSky(in:scene,at:Date())
+            }
+        }
+    }
+    @ViewBuilder private var worldPanelContent:some View {
+        Color.clear.frame(height:0).id("wl-project")
                 if let project=project,let source=projectData {
                     NativeWorldLabMultiCadPanel(project:project,source:source){data in
                         applyProject{_ in data}
                     }
                 }
                 Text("Earth reference (WGS84)").font(.headline)
-                Text("Set a mathematical local ENU origin. No terrain, imagery or device location is fetched.")
-                    .font(.caption).foregroundStyle(.secondary)
+                NativeWorldLabNote("Set a mathematical local ENU origin. No terrain, imagery or device location is fetched.")
                 HStack{
                     TextField("Latitude °",text:$earthLatitude).keyboardType(.decimalPad)
                     TextField("Longitude °",text:$earthLongitude).keyboardType(.decimalPad)
@@ -706,6 +732,7 @@ struct NativeWorldLabView:View {
                 Slider(value:$observerVerticalOffset,in:-20000...20000)
                     .accessibilityLabel("World Lab observer vertical offset")
                     .onChange(of:observerVerticalOffset){_ in applyObserverVerticalOffset()}
+                Color.clear.frame(height:0).id("wl-experiments")
                 Picker("Experiment",selection:$mode){
                     Text("Spring").tag(0);Text("Circuit").tag(1);Text("Heat").tag(2)
                 }.pickerStyle(.segmented)
@@ -773,7 +800,7 @@ struct NativeWorldLabView:View {
                     Slider(value:Binding(get:{inspectionCutawayFraction},set:{value in
                         var next=currentInspectionView;next.cutawayFraction=value;applyInspectionView(next)
                     }),in:-1...1).accessibilityLabel("Cutaway plane position")
-                    Text("The selected primitive is clipped in world coordinates with a generated cut face.").font(.caption).foregroundStyle(.secondary)
+                    NativeWorldLabNote("The selected primitive is clipped in world coordinates with a generated cut face.")
                 }
                 if inspectionMode == .exploded {
                     Text("Assembly separation \(String(format:"%.1f",inspectionExplodeDistance)) m").font(.caption)
@@ -804,8 +831,7 @@ struct NativeWorldLabView:View {
                 }
                 if showInspectionOverlays,inspectionMode == .isolate,
                    project?.entities.indices.contains(selected) != true {
-                    Text("Select a part first; the full scene remains visible until a valid selection exists.")
-                        .font(.caption).foregroundStyle(.secondary)
+                    NativeWorldLabNote("Select a part first; the full scene remains visible until a valid selection exists.")
                 }
                 HStack{
                     Button(playing ? "Pause":"Play"){
@@ -861,8 +887,7 @@ struct NativeWorldLabView:View {
                 }
                 GroupBox("Experiment branches") {
                     VStack(alignment:.leading,spacing:8) {
-                        Text("Capture the current native model inputs as a source, change model assumptions, then calculate a separate child run at the same simulation time. The source snapshot is preserved.")
-                            .font(.caption).foregroundStyle(.secondary)
+                        NativeWorldLabNote("Capture the current native model inputs as a source, change model assumptions, then calculate a separate child run at the same simulation time. The source snapshot is preserved.")
                         HStack {
                             Button("Capture source") {
                                 branchSourceInput=input
@@ -911,7 +936,7 @@ struct NativeWorldLabView:View {
                         }
                     }
                 }
-                Text("Computed observations").font(.headline)
+                Text("Computed observations").font(.headline).id("wl-results")
                 if let reading=values {
                     if mode==0 {
                         value("Position",reading.xMeters,"m")
@@ -933,8 +958,7 @@ struct NativeWorldLabView:View {
                     }
                 }else{Text("Model exceeds its supported numerical limits.").foregroundStyle(.red)}
                 if seeInside && mode != 2 {
-                    Text("See inside is visual transparency, not an X-ray or molecular measurement.")
-                        .font(.caption).foregroundStyle(.secondary)
+                    NativeWorldLabNote("See inside is visual transparency, not an X-ray or molecular measurement.")
                 }
                 if let project=project {
                     NativeWorldLabElasticWavePanel(project:project)
@@ -978,8 +1002,7 @@ struct NativeWorldLabView:View {
                 }
                 if !recoveryDrafts.isEmpty {
                     Text("Recover unfinished inventions").font(.headline)
-                    Text("Drafts are device-private. Restore only after explicit selection.")
-                        .font(.caption).foregroundStyle(.secondary)
+                    NativeWorldLabNote("Drafts are device-private. Restore only after explicit selection.")
                     ForEach(recoveryDrafts.prefix(10),id:\.id){draft in
                         HStack {
                             Text(draft.title).font(.caption)
@@ -994,15 +1017,129 @@ struct NativeWorldLabView:View {
                     }
                 }
                 if hasUnsavedWork {
-                    Text("Unsaved on this device. Save locally or export JSON to preserve these changes.")
-                        .font(.caption).foregroundStyle(.secondary)
+                    NativeWorldLabNote("Unsaved on this device. Save locally or export JSON to preserve these changes.")
                 }
+                Color.clear.frame(height:0).id("wl-build")
                 if let project { projectContent(project) }
                 if !successMessage.isEmpty {Text(successMessage).font(.caption).foregroundStyle(.secondary)}
                 if !problem.isEmpty {Text(problem).foregroundStyle(.red)}
-                Text("Model 1.0.0 · computed with assumed parameters · not a safety assessment.")
-                    .font(.caption2).foregroundStyle(.secondary)
-            }.padding(14)
+                NativeWorldLabNote("Model 1.0.0 · computed with assumed parameters · not a safety assessment.")
+    }
+    private func worldHud(phone:Bool)->some View {
+        VStack(spacing:0){
+            HStack{
+                NativeWorldLabGlassButton(label:"Leave World Lab",systemImage:"chevron.left"){dismissWorld()}
+                Spacer()
+                TimelineView(.periodic(from:.now,by:0.5)){_ in
+                    Text(String(format:"%.1f m view scale · illustrative, not mapped",currentObserverRangeMeters()))
+                        .font(.caption).foregroundStyle(.white).lineLimit(1)
+                        .padding(.horizontal,12).padding(.vertical,6)
+                        .background(Color.black.opacity(0.45),in:Capsule())
+                }
+                Spacer()
+                Color.clear.frame(width:48,height:48)
+            }
+            Spacer()
+            if !(phone && studioPanel != nil) {
+                HStack(alignment:.bottom,spacing:14){
+                    VStack(spacing:5){
+                        HStack(spacing:5){
+                            Color.clear.frame(width:48,height:48)
+                            NativeWorldLabHoldButton(label:"Tilt up",systemImage:"chevron.up"){eyeTurn(headingDelta:0,pitchDelta:0.04)}
+                            Color.clear.frame(width:48,height:48)
+                        }
+                        HStack(spacing:5){
+                            NativeWorldLabHoldButton(label:"Turn left",systemImage:"chevron.left"){eyeTurn(headingDelta:-0.05,pitchDelta:0)}
+                            NativeWorldLabHoldButton(label:"Level horizon",systemImage:"scope",once:true){eyeLevel()}
+                            NativeWorldLabHoldButton(label:"Turn right",systemImage:"chevron.right"){eyeTurn(headingDelta:0.05,pitchDelta:0)}
+                        }
+                        HStack(spacing:5){
+                            Color.clear.frame(width:48,height:48)
+                            NativeWorldLabHoldButton(label:"Tilt down",systemImage:"chevron.down"){eyeTurn(headingDelta:0,pitchDelta:-0.04)}
+                            Color.clear.frame(width:48,height:48)
+                        }
+                    }
+                    VStack(spacing:5){
+                        NativeWorldLabHoldButton(label:"Step forward",systemImage:"arrow.up"){eyeWalk(forward:1)}
+                        NativeWorldLabHoldButton(label:"Step back",systemImage:"arrow.down"){eyeWalk(forward:-1)}
+                    }
+                    Spacer()
+                    TimelineView(.periodic(from:.now,by:0.25)){_ in
+                        let heading=eyeHeadingDegrees()
+                        Text(String(format:"%03d°",Int(heading)%360))
+                            .font(.footnote.monospacedDigit()).foregroundStyle(.white)
+                            .padding(.horizontal,12).padding(.vertical,12)
+                            .background(Color.black.opacity(0.45),in:RoundedRectangle(cornerRadius:14))
+                            .accessibilityLabel("Heading \(Int(heading)) degrees")
+                    }
+                }
+                .padding(.leading,phone ? 0 : 76)
+                .padding(.bottom,phone ? 72 : 0)
+            }
+        }
+        .padding(12)
+    }
+    @ViewBuilder private func worldRail(phone:Bool)->some View {
+        if !(phone && studioPanel != nil) {
+            let items:[(String,String,String)]=[
+                ("project","folder","Open project tools"),("build","hammer","Open build tools"),
+                ("experiments","testtube.2","Open experiment tools"),("results","chart.xyaxis.line","Open results")]
+            let buttons=ForEach(items,id:\.0){item in
+                NativeWorldLabGlassButton(label:item.2,systemImage:item.1,active:studioPanel==item.0){
+                    studioPanel=(studioPanel==item.0) ? nil : item.0
+                }
+            }
+            if phone {
+                VStack{
+                    Spacer()
+                    HStack(spacing:6){buttons}.padding(6)
+                        .background(Color.black.opacity(0.45),in:RoundedRectangle(cornerRadius:22))
+                        .padding(.bottom,10)
+                }
+            } else {
+                HStack{
+                    VStack(spacing:6){buttons}.padding(6)
+                        .background(Color.black.opacity(0.45),in:RoundedRectangle(cornerRadius:22))
+                        .padding(.leading,12)
+                    Spacer()
+                }.frame(maxWidth:.infinity,maxHeight:.infinity)
+            }
+        }
+    }
+    @ViewBuilder private func worldPanel(proxy:GeometryProxy,phone:Bool,wide:Bool)->some View {
+        if let panel=studioPanel {
+            let panelBody=ScrollViewReader{reader in
+                ScrollView{
+                    VStack(alignment:.leading,spacing:12){ worldPanelContent }.padding(14).padding(.top,phone ? 6 : 0)
+                }
+                .onAppear{DispatchQueue.main.async{reader.scrollTo("wl-"+panel,anchor:.top)}}
+                .onChange(of:studioPanel){id in
+                    if let id {withAnimation{reader.scrollTo("wl-"+id,anchor:.top)}}
+                }
+            }
+            let closeButton=Button{studioPanel=nil}label:{
+                Image(systemName:"xmark.circle.fill").font(.title2).foregroundStyle(.secondary).padding(8)
+            }.accessibilityLabel("Close tools")
+            if phone {
+                VStack{
+                    Spacer()
+                    panelBody.frame(maxHeight:proxy.size.height*0.76)
+                        .background(Color(.systemBackground))
+                        .clipShape(RoundedRectangle(cornerRadius:22))
+                        .overlay(alignment:.topTrailing){closeButton}
+                        .shadow(radius:10)
+                }.frame(maxWidth:.infinity,maxHeight:.infinity)
+            } else {
+                HStack{
+                    Spacer()
+                    panelBody.frame(width:wide ? 440 : 380)
+                        .background(Color(.systemBackground))
+                        .clipShape(RoundedRectangle(cornerRadius:20))
+                        .overlay(alignment:.topTrailing){closeButton}
+                        .shadow(radius:10)
+                        .padding(12)
+                }
+            }
         }
     }
     private var sceneSettingsView:some View {
@@ -1275,18 +1412,15 @@ struct NativeWorldLabView:View {
                 Text("TT · TT−UTC \(String(format:"%.3f",reading.ttMinusUtcSeconds)) s")
                     .font(.caption.monospaced())
             } else {
-                Text("TAI/TT unavailable outside the certified leap-second table.")
-                    .font(.caption).foregroundStyle(.secondary)
+                NativeWorldLabNote("TAI/TT unavailable outside the certified leap-second table.")
             }
             if let tcg=try? NativeWorldLabTimeScales.utcToTcg(utc) {
                 Text("TCG · "+tcg.tcg+" · IAU 2000 fixed-rate relation")
                     .font(.caption.monospaced())
             } else {
-                Text("TCG is unavailable outside the certified UTC→TAI/TT interval.")
-                    .font(.caption).foregroundStyle(.secondary)
+                NativeWorldLabNote("TCG is unavailable outside the certified UTC→TAI/TT interval.")
             }
-            Text("TCB↔TDB uses the IAU 2006 linear MJD relation. UTC↔TDB is not derived without a barycentric ephemeris.")
-                .font(.caption2).foregroundStyle(.secondary)
+            NativeWorldLabNote("TCB↔TDB uses the IAU 2006 linear MJD relation. UTC↔TDB is not derived without a barycentric ephemeris.")
             Button("Import IERS Bulletin A (ser7.dat)"){importingIersBulletin=true}
                 .buttonStyle(.bordered)
             if let series=iersEarthOrientation {
@@ -1299,8 +1433,7 @@ struct NativeWorldLabView:View {
                     Text("\(reading.bulletin ?? "IERS Bulletin A") · issued \(series.issuedDateUTC)")
                         .font(.caption2).foregroundStyle(.secondary)
                 } else {
-                    Text("UT1−UTC is outside this imported Bulletin A coverage.")
-                        .font(.caption).foregroundStyle(.secondary)
+                    NativeWorldLabNote("UT1−UTC is outside this imported Bulletin A coverage.")
                 }
             }
             if !iersImportStatus.isEmpty {
@@ -1308,8 +1441,7 @@ struct NativeWorldLabView:View {
                     .accessibilityAddTraits(.updatesFrequently)
             }
             NativeWorldLabFieldImportPanel(timeSeconds:demoClock?.simulationTimeSeconds ?? seconds)
-            Text("UTC is the civil reference. TAI/TT use the bounded IERS leap table; UT1 requires dated IERS Earth-orientation data. No value is extrapolated beyond published coverage.")
-                .font(.caption2).foregroundStyle(.secondary)
+            NativeWorldLabNote("UTC is the civil reference. TAI/TT use the bounded IERS leap table; UT1 requires dated IERS Earth-orientation data. No value is extrapolated beyond published coverage.")
         }
         .padding(10)
         .background(Color.secondary.opacity(0.06),in:RoundedRectangle(cornerRadius:10))
@@ -1360,8 +1492,7 @@ struct NativeWorldLabView:View {
                     Text(error.localizedDescription).font(.caption).foregroundStyle(.red)
                 }
             } else {
-                Text("Save a WGS84 Earth reference to calculate solar events for this project.")
-                    .font(.caption).foregroundStyle(.secondary)
+                NativeWorldLabNote("Save a WGS84 Earth reference to calculate solar events for this project.")
             }
         }
         .padding(10)
@@ -1582,8 +1713,7 @@ struct NativeWorldLabView:View {
 
     @ViewBuilder private func digitalContent(_ project:NativeWorldLabProject)->some View {
         Text("Invent digital logic").font(.headline)
-        Text("Boolean truth tables from your assumptions, not measured chip behavior.")
-            .font(.caption).foregroundStyle(.secondary)
+        NativeWorldLabNote("Boolean truth tables from your assumptions, not measured chip behavior.")
         if let network=project.digitalNetworks?.first {
             ForEach(network.inputs,id:\.id){input in
                 Toggle(input.label,isOn:Binding(
@@ -1634,8 +1764,7 @@ struct NativeWorldLabView:View {
                     in:.whitespacesAndNewlines).isEmpty ||
                     network.gates.count>=32 || Set(ports).count != ports.count ||
                     !ports.allSatisfy({available.contains($0)}))
-            Text("Choose upstream signals, edit each truth-table row, and connect an indicator.")
-                .font(.caption).foregroundStyle(.secondary)
+            NativeWorldLabNote("Choose upstream signals, edit each truth-table row, and connect an indicator.")
             ForEach(network.outputs,id:\.id){output in
                 Picker(output.label+" reads",selection:Binding<String>(
                     get:{output.sourceNodeId},
@@ -1673,8 +1802,7 @@ struct NativeWorldLabView:View {
                             .font(.caption)
                     }
                 }else {
-                    Text("Exhaustive check supports at most eight switches.")
-                        .font(.caption).foregroundStyle(.secondary)
+                    NativeWorldLabNote("Exhaustive check supports at most eight switches.")
                 }
             }
             if let values=try? NativeWorldLabDigitalLogic.evaluate(network) {
@@ -1714,8 +1842,7 @@ struct NativeWorldLabView:View {
     }
     @ViewBuilder private func projectAssemblyControls(_ project:NativeWorldLabProject)->some View {
                     Text("Build from visual parts").font(.headline)
-                    Text("Connect solid shapes for coordinated movement, not a calculated mechanical joint.")
-                        .font(.caption).foregroundStyle(.secondary)
+                    NativeWorldLabNote("Connect solid shapes for coordinated movement, not a calculated mechanical joint.")
                     if let chosen=solid {
                         let available=project.entities.filter{candidate in
                             candidate.id != chosen.id && !(project.assemblies ?? []).contains(where:{
@@ -1865,14 +1992,12 @@ struct NativeWorldLabView:View {
                             inventedName="";inventedDensity="";inventedModulus=""
                         }.buttonStyle(.bordered)
                     }
-                    Text("An invented Young's modulus can power a bounded analytical beam model. Unknown strength, fractures and chemical behavior remain unverified.")
-                        .font(.caption).foregroundStyle(.secondary)
+                    NativeWorldLabNote("An invented Young's modulus can power a bounded analytical beam model. Unknown strength, fractures and chemical behavior remain unverified.")
                 
     }
     @ViewBuilder private func chemicalContent()->some View {
 Text("Invent chemical heat").font(.headline)
-                    Text("Invent assumed reaction properties; the model cannot identify real chemicals.")
-                        .font(.caption).foregroundStyle(.secondary)
+                    NativeWorldLabNote("Invent assumed reaction properties; the model cannot identify real chemicals.")
                     value("Assumed heat released",reactionHeat,"J/mol")
                     Slider(value:$reactionHeat,in:-50000...100000)
                         .accessibilityLabel("Hypothetical reaction heat")
@@ -1920,7 +2045,7 @@ Text("Invent chemical heat").font(.headline)
                                     chemicalTime+chemical.stepSeconds)
                             }
                         }.buttonStyle(.bordered)
-                        Text(chemical.validity).font(.caption).foregroundStyle(.secondary)
+                        NativeWorldLabNote(chemical.validity)
                     }
                     
     }
@@ -1969,8 +2094,7 @@ Text("Invent chemical heat").font(.headline)
                         }.buttonStyle(.bordered)
                             .disabled(deviceName.isEmpty || deviceAssumption.isEmpty ||
                                 circuit.components.count>=48)
-                        Text("Unverified inventions require explicit assumed electrical behavior.")
-                            .font(.caption).foregroundStyle(.secondary)
+                        NativeWorldLabNote("Unverified inventions require explicit assumed electrical behavior.")
                         ForEach(circuit.components.filter{$0.kind=="hypothetical-device"},id:\.id){part in
                             Text(part.name ?? "Unknown component")
                                 .font(.caption)
@@ -2056,8 +2180,7 @@ Text("Invent chemical heat").font(.headline)
                                 }.pickerStyle(.menu)
                             }
                         }
-                        Text("Only real shared circuit node IDs create connections; no measured wiring geometry is claimed.")
-                            .font(.caption).foregroundStyle(.secondary)
+                        NativeWorldLabNote("Only real shared circuit node IDs create connections; no measured wiring geometry is claimed.")
                         ForEach(circuit.components.filter{$0.kind=="dc-source"||$0.kind=="resistor"},
                             id:\.id){part in
                             HStack {
@@ -2105,9 +2228,8 @@ Text("Invent chemical heat").font(.headline)
                                     }
                                 }
                             }
-                            Text("Direction follows the calculated signed conventional branch current; these are circuit-topology indicators, not a measured 3D electromagnetic field.")
-                                .font(.caption).foregroundStyle(.secondary)
-                            Text(run.validity).font(.caption).foregroundStyle(.secondary)
+                            NativeWorldLabNote("Direction follows the calculated signed conventional branch current; these are circuit-topology indicators, not a measured 3D electromagnetic field.")
+                            NativeWorldLabNote(run.validity)
                         }
                     
     }
@@ -2239,7 +2361,7 @@ Text("Invent chemical heat").font(.headline)
                     Text(String(format:"%.1f×",rate)).tag(rate)
                 }
             }.pickerStyle(.segmented)
-            Text(run.validity).font(.caption).foregroundStyle(.secondary)
+            NativeWorldLabNote(run.validity)
         }
     }
     @ViewBuilder private func solidOpticsContent(
@@ -2289,7 +2411,7 @@ Text("Invent chemical heat").font(.headline)
                         problem="Saved portable optical evidence with this device's invention."
                     }catch{problem=error.localizedDescription}
                 }.buttonStyle(.bordered)
-                Text(run.validity).font(.caption).foregroundStyle(.secondary)
+                NativeWorldLabNote(run.validity)
             }
         }else{
             Text("Invent at least two materials and add their assumed refractive indices.")
@@ -2379,7 +2501,7 @@ Text("Invent chemical heat").font(.headline)
                     problem="Saved portable 3D ray evidence with this invention."
                 }catch{problem=error.localizedDescription}
             }.buttonStyle(.bordered)
-            Text(run.validity).font(.caption).foregroundStyle(.secondary)
+            NativeWorldLabNote(run.validity)
         }
     }
     private func updateGravityScene(){
@@ -2492,7 +2614,7 @@ Text("Invent chemical heat").font(.headline)
                     Text(String(format:"%.1f×",rate)).tag(rate)
                 }
             }.pickerStyle(.segmented)
-            Text(run.validity).font(.caption).foregroundStyle(.secondary)
+            NativeWorldLabNote(run.validity)
         }
     }
     private func updateGroupSphereScene() {
@@ -2510,8 +2632,7 @@ Text("Invent chemical heat").font(.headline)
         project:NativeWorldLabProject)->some View {
         let spheres=project.entities.filter{$0.shape=="sphere"}
         Text("Collide a group of spheres").font(.headline)
-        Text("An event-driven free-flight calculation: each sphere has an invented density and X/Y/Z velocity. Successive or independent simultaneous impacts transfer momentum. Shared-sphere contacts, spin, gravity and breakage are not modeled.")
-            .font(.caption).foregroundStyle(.secondary)
+        NativeWorldLabNote("An event-driven free-flight calculation: each sphere has an invented density and X/Y/Z velocity. Successive or independent simultaneous impacts transfer momentum. Shared-sphere contacts, spin, gravity and breakage are not modeled.")
         if spheres.count<2 || spheres.count>12 {
             Text("Create 2–12 spheres and assign an invented density to each.")
                 .font(.caption)
@@ -2607,7 +2728,7 @@ Text("Invent chemical heat").font(.headline)
             }.pickerStyle(.segmented)
             Button("Export group collision evidence"){exportingGroupEvidence=true}
                 .buttonStyle(.bordered)
-            Text(run.validity).font(.caption).foregroundStyle(.secondary)
+            NativeWorldLabNote(run.validity)
         }
     }
 
@@ -2638,8 +2759,7 @@ Text("Invent chemical heat").font(.headline)
         project:NativeWorldLabProject,solid:NativeLabSolid)->some View {
         let other=project.entities.first(where:{$0.id==sphereOtherId})
         Text("Collide invented spheres in 3D").font(.headline)
-        Text("Real off-axis first contact for two smooth ideal spheres. User-assumed density and restitution; no gravity, rolling, breakage or other contacts.")
-            .font(.caption).foregroundStyle(.secondary)
+        NativeWorldLabNote("Real off-axis first contact for two smooth ideal spheres. User-assumed density and restitution; no gravity, rolling, breakage or other contacts.")
         Picker("Other sphere for 3D impact",selection:$sphereOtherId){
             Text("Choose another sphere").tag("")
             ForEach(project.entities.filter{$0.shape=="sphere"&&$0.id != solid.id},
@@ -2737,7 +2857,7 @@ Text("Invent chemical heat").font(.headline)
             Button("Export 3D impact evidence"){
                 exportingSphereImpact=true
             }.buttonStyle(.bordered)
-            Text(run.validity).font(.caption).foregroundStyle(.secondary)
+            NativeWorldLabNote(run.validity)
         }
     }
 
@@ -2758,8 +2878,7 @@ Text("Invent chemical heat").font(.headline)
         project:NativeWorldLabProject,solid:NativeLabSolid)->some View {
         let other=project.entities.first(where:{$0.id==collisionOtherId})
         Text("Collide two invented solids").font(.headline)
-        Text("Single 1D central impact along X between shapes with aligned Y/Z centres. Hypothetical densities give masses; no spin, fracture or other 3D contacts.")
-            .font(.caption).foregroundStyle(.secondary)
+        NativeWorldLabNote("Single 1D central impact along X between shapes with aligned Y/Z centres. Hypothetical densities give masses; no spin, fracture or other 3D contacts.")
         Picker("Other solid to collide with",selection:$collisionOtherId){
             Text("Choose another solid").tag("")
             ForEach(project.entities.filter{$0.id != solid.id},id:\.id){item in
@@ -2849,7 +2968,7 @@ Text("Invent chemical heat").font(.headline)
             }.pickerStyle(.segmented)
             Button("Export collision evidence"){exportingCollision=true}
                 .buttonStyle(.bordered)
-            Text(run.validity).font(.caption).foregroundStyle(.secondary)
+            NativeWorldLabNote(run.validity)
         }
     }
 
@@ -2857,8 +2976,7 @@ Text("Invent chemical heat").font(.headline)
         project:NativeWorldLabProject,solid:NativeLabSolid)->some View {
         let chosen=project.materials.first(where:{$0.id==solid.materialId})
         Text("Test hypothetical elastic beam bending").font(.headline)
-        Text("Assume a rectangular cantilever: X length, Y vertical depth, Z width, fixed at one end, with a static downward force at the free end.")
-            .font(.caption).foregroundStyle(.secondary)
+        NativeWorldLabNote("Assume a rectangular cantilever: X length, Y vertical depth, Z width, fixed at one end, with a static downward force at the free end.")
         value("Assumed Young's modulus",chosen?.youngModulusPa,"Pa")
         TextField("Downward beam tip load in newtons",text:$beamForce)
             .keyboardType(.decimalPad).textFieldStyle(.roundedBorder)
@@ -2879,7 +2997,7 @@ Text("Invent chemical heat").font(.headline)
             value("Free-end deflection",run.tipDeflectionM,"m")
             value("Maximum bending stress",run.maximumStressPa,"Pa")
             value("Maximum surface strain",run.surfaceStrain,"")
-            Text(run.validity).font(.caption).foregroundStyle(.secondary)
+            NativeWorldLabNote(run.validity)
         }
     }
 
@@ -2934,8 +3052,7 @@ Text("Invent chemical heat").font(.headline)
                         Text("Rotation: "+solid.effectiveRotationRadians.map{String(format:"%.3f",$0)}.joined(separator:" / ")+" rad")
                             .font(.caption).foregroundStyle(.secondary)
                         Text("2D sketch and extrusion").font(.headline)
-                        Text("Draw a closed rectangle or circle in the X/Z plane and extrude along Y.")
-                            .font(.caption).foregroundStyle(.secondary)
+                        NativeWorldLabNote("Draw a closed rectangle or circle in the X/Z plane and extrude along Y.")
                         HStack{
                             TextField("Width m",text:$cadSketchWidth).keyboardType(.decimalPad)
                             TextField("Depth m",text:$cadSketchDepth).keyboardType(.decimalPad)
@@ -3032,8 +3149,7 @@ Text("Invent chemical heat").font(.headline)
                                             .joined(separator:" / ")
                                         Text("Box overlap X/Y/Z: \(overlapText) m")
                                     }
-                                    Text(clearance.validity)
-                                        .font(.caption).foregroundStyle(.secondary)
+                                    NativeWorldLabNote(clearance.validity)
                                 }
                             }
                         }
@@ -3106,9 +3222,8 @@ Text("Invent chemical heat").font(.headline)
                                         fluidTime+run.stepSeconds)
                                 }
                             }.buttonStyle(.bordered)
-                            Text(run.validity).font(.caption).foregroundStyle(.secondary)
-                            Text("Blue 3D plane is an assumed flat fluid surface, not measured water.")
-                                .font(.caption).foregroundStyle(.secondary)
+                            NativeWorldLabNote(run.validity)
+                            NativeWorldLabNote("Blue 3D plane is an assumed flat fluid surface, not measured water.")
                         }
 
     }
@@ -3139,7 +3254,7 @@ Text("Invent chemical heat").font(.headline)
                             Text("Floating status: "+liquid.status)
                             value("Net upward force",liquid.netUpwardForceN,"N")
                             value("Equilibrium draft",liquid.equilibriumDraftM,"m")
-                            Text(liquid.validity).font(.caption).foregroundStyle(.secondary)
+                            NativeWorldLabNote(liquid.validity)
                         }
 
     }
@@ -3181,8 +3296,7 @@ Text("Invent chemical heat").font(.headline)
                                         motorRun=nil;motorAudit=nil;motorPlaying=false
                                     }
                                 ),in:0...4)
-                                Text("The coil current remains continuous and decays through the R-L model after isolation. Fuse arcing and contact bounce are not modeled.")
-                                    .font(.caption).foregroundStyle(.secondary)
+                                NativeWorldLabNote("The coil current remains continuous and decays through the R-L model after isolation. Fuse arcing and contact bounce are not modeled.")
                             }
                             Button("Power this solid"){
                                 do {
@@ -3258,7 +3372,7 @@ Text("Invent chemical heat").font(.headline)
                                     linked.entityId==solid.id {
                                     Text("Invented digital output: "+String(linked.logicBit))
                                     value("Applied ideal voltage",linked.input.supplyVoltageV,"V")
-                                    Text(linked.validity).font(.caption).foregroundStyle(.secondary)
+                                    NativeWorldLabNote(linked.validity)
                                 }
                                 value("Applied source voltage",sample.sourceVoltageV,"V")
                                 if run.modelVersion=="1.2.0" {
@@ -3288,7 +3402,7 @@ Text("Invent chemical heat").font(.headline)
                                     value("Total source current",observation.totalSourceCurrentA,"A")
                                     value("Parallel resistor heat",observation.passiveResistorHeatW,"W")
                                     value("Combined energy residual",observation.combinedEnergyResidualJ,"J")
-                                    Text(wired.validity).font(.caption).foregroundStyle(.secondary)
+                                    NativeWorldLabNote(wired.validity)
                                 }
                                 if let audit=motorAudit {
                                     Text("Numerical self-check: \(audit.status). \(audit.explanation)")
@@ -3364,10 +3478,8 @@ Text("Invent chemical heat").font(.headline)
                                 if !motorCheckpointStatus.isEmpty {
                                     Text(motorCheckpointStatus).font(.caption).foregroundStyle(.secondary)
                                 }
-                                Text("A motor checkpoint restores only against its matching in-memory solver run; it does not recreate the run from parameters.")
-                                    .font(.caption).foregroundStyle(.secondary)
-                                Text("Electricity and physical motion are coupled in one 1D solver. Material and actuator parameters are hypothetical, not measurements.")
-                                    .font(.caption).foregroundStyle(.secondary)
+                                NativeWorldLabNote("A motor checkpoint restores only against its matching in-memory solver run; it does not recreate the run from parameters.")
+                                NativeWorldLabNote("Electricity and physical motion are coupled in one 1D solver. Material and actuator parameters are hypothetical, not measurements.")
                             }
 
     }
@@ -3385,8 +3497,7 @@ Text("Invent chemical heat").font(.headline)
                                     Button(dropPlaying ? "Pause drop":"Play drop"){dropPlaying.toggle()}
                                     Button("Reset drop"){dropPlaying=false;dropTime=0}
                                 }.buttonStyle(.bordered)
-                                Text("Gravity, drag and contact are simplified. Invented material density is an assumption, not verified strength.")
-                                    .font(.caption).foregroundStyle(.secondary)
+                                NativeWorldLabNote("Gravity, drag and contact are simplified. Invented material density is an assumption, not verified strength.")
                             }
 
     }
@@ -3418,6 +3529,10 @@ Text("Invent chemical heat").font(.headline)
         node.position.y=Float(solid.dimensionsMeters[1]/2+run.samples[index].heightAboveGroundM)
     }
     private func currentObserverTarget()->[Double]{
+        if let range=observerEyeRange {
+            let p=sceneCameraNode.position,f=sceneCameraNode.simdWorldFront
+            return [Double(p.x)+Double(f.x)*range,Double(p.y)+Double(f.y)*range,Double(p.z)+Double(f.z)*range]
+        }
         var target=project?.camera.lookingAtMeters ?? [0,1.2,0]
         target[0]+=observerPanX
         target[2]+=observerPanZ
@@ -3425,6 +3540,7 @@ Text("Invent chemical heat").font(.headline)
         return target
     }
     private func currentObserverRangeMeters()->Double{
+        if let range=observerEyeRange {return range}
         let target=currentObserverTarget(),position=sceneCameraNode.position
         return max(0.25,hypot(hypot(Double(position.x)-target[0],
             Double(position.y)-target[1]),Double(position.z)-target[2]))
@@ -3465,15 +3581,67 @@ Text("Invent chemical heat").font(.headline)
     private func updateObserverCameraClip(){
         let target=currentObserverTarget(),position=sceneCameraNode.position
         let distance=max(0.25,hypot(hypot(Double(position.x)-target[0],Double(position.y)-target[1]),Double(position.z)-target[2]))
+        let surface=distance<=400
         sceneCameraNode.camera?.zNear=max(0.005,min(0.25,distance*0.0001))
-        sceneCameraNode.camera?.zFar=max(1000,min(50_000_000,distance*128))
+        sceneCameraNode.camera?.zFar=max(surface ? 8000 : 1000,min(50_000_000,distance*128))
+        let underground=Double(position.y)<0
+        for name in ["representative-sky","representative-sun"] {
+            scene.rootNode.childNode(withName:name,recursively:false)?.isHidden = !surface || underground
+        }
+    }
+    private func enterEyeMode(){
+        if observerEyeRange==nil {observerEyeRange=currentObserverRangeMeters()}
+    }
+    /// Turn the head at the eye: heading grows clockwise (right), pitch grows upward.
+    private func eyeTurn(headingDelta:Double,pitchDelta:Double){
+        guard headingDelta.isFinite,pitchDelta.isFinite else{return}
+        enterEyeMode()
+        let f=sceneCameraNode.simdWorldFront
+        let dx=Double(f.x),dy=Double(f.y),dz=Double(f.z)
+        let heading=atan2(-dx,dz)+headingDelta
+        let pitch=max(-1.2,min(1.45,atan2(dy,hypot(dx,dz))+pitchDelta))
+        let range=observerEyeRange ?? 8
+        let p=sceneCameraNode.position
+        sceneCameraNode.look(at:SCNVector3(
+            p.x+Float(-sin(heading)*cos(pitch)*range),
+            p.y+Float(sin(pitch)*range),
+            p.z+Float(cos(heading)*cos(pitch)*range)))
+        updateObserverCameraClip()
+    }
+    private func eyeLevel(){
+        enterEyeMode()
+        let f=sceneCameraNode.simdWorldFront
+        eyeTurn(headingDelta:0,pitchDelta:-atan2(Double(f.y),hypot(Double(f.x),Double(f.z))))
+    }
+    private func eyeHeadingDegrees()->Double {
+        let f=sceneCameraNode.simdWorldFront
+        let degrees=atan2(-Double(f.x),Double(f.z))*180/Double.pi
+        return degrees.truncatingRemainder(dividingBy:360)+(degrees<0 ? 360 : 0)
+    }
+    /// Move along the heading (forward) and across it (strafe) by one comfortable walking step.
+    private func eyeWalk(forward:Double,strafe:Double=0){
+        enterEyeMode()
+        eyeTravel(meters:forward*max(0.06,min(40,(observerEyeRange ?? 8)*0.015)),strafeMeters:strafe*max(0.06,min(40,(observerEyeRange ?? 8)*0.015)))
+    }
+    private func eyeTravel(meters:Double,strafeMeters:Double=0){
+        guard meters.isFinite,strafeMeters.isFinite else{return}
+        enterEyeMode()
+        let f=sceneCameraNode.simdWorldFront
+        let length=hypot(Double(f.x),Double(f.z))
+        guard length>1e-6 else{return}
+        let fx=Double(f.x)/length,fz=Double(f.z)/length
+        let p=sceneCameraNode.position
+        sceneCameraNode.position=SCNVector3(
+            p.x+Float(fx*meters-fz*strafeMeters),p.y,p.z+Float(fz*meters+fx*strafeMeters))
+        updateObserverCameraClip()
     }
     private func applyObserverVerticalOffset(){
-        let target=currentObserverTarget()
         let delta=observerVerticalOffset-appliedObserverVerticalOffset
         let position=sceneCameraNode.position
+        let eyeTarget=currentObserverTarget()
         sceneCameraNode.position=SCNVector3(position.x,position.y+Float(delta),position.z)
         appliedObserverVerticalOffset=observerVerticalOffset
+        let target=observerEyeRange != nil ? [eyeTarget[0],eyeTarget[1]+delta,eyeTarget[2]] : currentObserverTarget()
         sceneCameraNode.look(at:SCNVector3(Float(target[0]),Float(target[1]),Float(target[2])))
         updateObserverCameraClip()
     }
@@ -3484,6 +3652,7 @@ Text("Invent chemical heat").font(.headline)
         let dx=Double(position.x)-target[0],dy=Double(position.y)-target[1],dz=Double(position.z)-target[2]
         let old=max(0.25,hypot(hypot(dx,dy),dz))
         let next=max(0.5,min(100000,old*0.35))
+        if observerEyeRange != nil {observerEyeRange=next}
         let ratio=next/old
         sceneCameraNode.position=SCNVector3(
             Float(target[0]+dx*ratio),Float(target[1]+dy*ratio),Float(target[2]+dz*ratio))
@@ -3496,6 +3665,7 @@ Text("Invent chemical heat").font(.headline)
         let dx=Double(position.x)-target[0],dy=Double(position.y)-target[1],dz=Double(position.z)-target[2]
         let old=max(0.25,hypot(hypot(dx,dy),dz))
         let next=max(0.25,min(100000,old*factor))
+        if observerEyeRange != nil {observerEyeRange=next}
         let ratio=next/old
         sceneCameraNode.position=SCNVector3(Float(target[0]+dx*ratio),Float(target[1]+dy*ratio),Float(target[2]+dz*ratio))
         sceneCameraNode.look(at:SCNVector3(Float(target[0]),Float(target[1]),Float(target[2])))
@@ -3516,6 +3686,7 @@ Text("Invent chemical heat").font(.headline)
         }catch{problem=error.localizedDescription}
     }
     private func restoreObserverViewpoint(){
+        observerEyeRange=nil
         guard let current=project else{return}
         observerVerticalOffset=0;observerPanX=0;observerPanZ=0;appliedObserverVerticalOffset=0
         sceneCameraNode.position=SCNVector3(
@@ -3527,16 +3698,17 @@ Text("Invent chemical heat").font(.headline)
         updateObserverCameraClip()
     }
     private func returnObserverToSurface(){
+        observerEyeRange=nil
         observerVerticalOffset=0;observerPanX=0;observerPanZ=0;appliedObserverVerticalOffset=0
         sceneCameraNode.position=SCNVector3(0,1.65,-8)
         sceneCameraNode.look(at:SCNVector3(0,1.2,0))
         updateObserverCameraClip()
     }
     private func redraw(){
+        let keptEye:(SCNVector3,SCNQuaternion,Double)?=observerEyeRange.map{(sceneCameraNode.position,sceneCameraNode.orientation,$0)}
         let next=SCNScene()
-        let floor=SCNNode(geometry:SCNFloor())
-        floor.geometry?.firstMaterial?.diffuse.contents=UIColor.systemGreen
-        next.rootNode.addChildNode(floor)
+        NativeWorldLabSkyRenderer.installGround(in:next)
+        NativeWorldLabSkyRenderer.installSky(in:next,at:Date())
         let savedCamera=SCNNode()
         savedCamera.name="world-lab-observer-camera"
         savedCamera.camera=SCNCamera()
@@ -3546,6 +3718,10 @@ Text("Invent chemical heat").font(.headline)
         savedCamera.camera?.zNear=0.03
         savedCamera.camera?.zFar=5_000_000
         savedCamera.look(at:SCNVector3(Float(target[0]),Float(target[1]),Float(target[2])))
+        if let keptEye {
+            savedCamera.position=keptEye.0
+            savedCamera.orientation=keptEye.1
+        }
         next.rootNode.addChildNode(savedCamera)
         sceneCameraNode=savedCamera
         if let project {
@@ -3643,6 +3819,7 @@ Text("Invent chemical heat").font(.headline)
             }
         }
         scene=next
+        observerEyeRange=keptEye?.2
         observerVerticalOffset=0;observerPanX=0;observerPanZ=0;appliedObserverVerticalOffset=0
         updateObserverCameraClip()
         applyDropPosition()
@@ -3678,8 +3855,7 @@ private struct NativeWorldLabElasticWavePanel:View {
     var body:some View {
         VStack(alignment:.leading,spacing:8){
             Text("Make waves inside invented matter").font(.headline)
-            Text("Analytic 1D standing waves from inventor-assumed density and stiffness. No measured material response, bending or fracture.")
-                .font(.caption).foregroundStyle(.secondary)
+            NativeWorldLabNote("Analytic 1D standing waves from inventor-assumed density and stiffness. No measured material response, bending or fracture.")
             if !rods.isEmpty {
                 Button("Rod: "+rods[rodIndex%rods.count].name){
                     rodIndex=(rodIndex+1)%rods.count
@@ -3775,7 +3951,7 @@ private struct NativeWorldLabElasticWavePanel:View {
                             exporting=true;problem=""
                         }catch{problem=error.localizedDescription}
                     }.buttonStyle(.bordered)
-                    Text(r.validity).font(.caption).foregroundStyle(.secondary)
+                    NativeWorldLabNote(r.validity)
                 }
             } else {
                 Text("Invent a box or cylinder and assume density and Young's modulus.")
@@ -3918,7 +4094,7 @@ private struct NativeWorldLabRadiationPanel:View {
                             exporting=true;problem=""
                         }catch{problem=error.localizedDescription}
                     }.buttonStyle(.bordered)
-                    Text(r.validity).font(.caption).foregroundStyle(.secondary)
+                    NativeWorldLabNote(r.validity)
                 }
             } else {
                 Text("Invent a solid and thermal material before radiating.")
@@ -3998,16 +4174,14 @@ private struct NativeWorldLabMultiCadPanel:View {
                         measurement.offsetXM,measurement.offsetYM,measurement.offsetZM))
                 }.font(.caption)
             }else{
-                Text("Select exactly two parts to measure their centre-to-centre distance.")
-                    .font(.caption).foregroundStyle(.secondary)
+                NativeWorldLabNote("Select exactly two parts to measure their centre-to-centre distance.")
             }
         }
     }
     var body:some View{
         VStack(alignment:.leading,spacing:8){
             Text("Multi-part CAD").font(.headline)
-            Text("Select several parts and transform them together. Each action is one atomic project revision. This changes geometry, not physical joints.")
-                .font(.caption).foregroundStyle(.secondary)
+            NativeWorldLabNote("Select several parts and transform them together. Each action is one atomic project revision. This changes geometry, not physical joints.")
             ForEach(project.entities,id:\.id){solid in
                 Toggle(isOn:Binding(
                     get:{selected.contains(solid.id)},
@@ -4439,8 +4613,7 @@ private struct NativeWorldLabVehiclePanel:View {
     var body:some View {
         VStack(alignment:.leading,spacing:10){
             Text("Build, run and diagnose a vehicle").font(.headline)
-            Text("Independent native Swift model. Every vehicle, motor and battery value is an inventor assumption; results are not flight certification.")
-                .font(.caption).foregroundStyle(.secondary)
+            NativeWorldLabNote("Independent native Swift model. Every vehicle, motor and battery value is an inventor assumption; results are not flight certification.")
             Picker("Vehicle mode",selection:$input.mode){
                 ForEach(NativeWorldLabVehicleMode.allCases){mode in Text(mode.title).tag(mode)}
             }.pickerStyle(.segmented).onChange(of:input.mode){_ in run=nil;playing=false}
@@ -4510,7 +4683,7 @@ private struct NativeWorldLabVehiclePanel:View {
                         evidenceFile=NativeWorldLabJsonFile(content:bytes);exporting=true
                     }catch{problem=error.localizedDescription}
                 }.buttonStyle(.bordered)
-                Text(run.validity).font(.caption).foregroundStyle(.secondary)
+                NativeWorldLabNote(run.validity)
             }
         }
         .padding(10).background(.thinMaterial,in:RoundedRectangle(cornerRadius:12))
@@ -4638,14 +4811,13 @@ private struct NativeWorldLabFieldImportPanel:View {
                 .accessibilityLabel(layer.accessibleDescription+" · "+plane.rawValue.uppercased()+" slice")
                 Text("Source: \(layer.sourceDescription) · calibration: \(layer.calibrationStatus) (\(layer.calibrationMethod))")
                     .font(.caption)
-                Text(layer.validity).font(.caption2).foregroundStyle(.secondary)
+                NativeWorldLabNote(layer.validity)
                 if let frame=sliceFrame {
                     Text("Recorded sample \(frame.sampleIndex+1)/\(layer.sampleTimesSeconds.count) · \(frame.sampleTimeSeconds) s")
                         .font(.caption.monospaced())
                 }
                 if layer.kind == .vector,layer.rendererKind=="streamlines",streamlines?.paths.isEmpty != false {
-                    Text("No complete streamline crosses this slice at the selected time; missing data terminates a path.")
-                        .font(.caption).foregroundStyle(.secondary)
+                    NativeWorldLabNote("No complete streamline crosses this slice at the selected time; missing data terminates a path.")
                 }
             }
         }
@@ -4676,73 +4848,240 @@ private struct NativeWorldLabFieldImportPanel:View {
 
 
 /// Native World Lab entry matching the exact supplied wordmark and artwork.
-struct NativeWorldLabEntryView: View {
-    @State private var entered = false
-
-    private let outerColor = Color(red: 241.0 / 255.0, green: 244.0 / 255.0, blue: 249.0 / 255.0)
-    private let canvasColor = Color(red: 249.0 / 255.0, green: 250.0 / 255.0, blue: 252.0 / 255.0)
-    private let buttonColor = Color(red: 219.0 / 255.0, green: 234.0 / 255.0, blue: 255.0 / 255.0)
-    private let buttonInk = Color(red: 16.0 / 255.0, green: 23.0 / 255.0, blue: 41.0 / 255.0)
-
+/// Quiet explanation: a single tappable "i". The full sentence stays available to VoiceOver and
+/// opens inline on tap, so panels read like a studio inspector instead of a page of prose.
+struct NativeWorldLabNote: View {
+    let text: String
+    @State private var open = false
+    init(_ text: String) { self.text = text }
     var body: some View {
-        Group {
-            if entered {
-                NativeWorldLabView()
-            } else {
-                GeometryReader { geometry in
-                    ZStack {
-                        outerColor.ignoresSafeArea()
-
-                        VStack(spacing: 0) {
-                            Image("WorldLabTitle")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 236, height: 50)
-                                .accessibilityLabel("The World Lab")
-
-                            Spacer().frame(height: 6)
-
-                            ZStack(alignment: .topLeading) {
-                                Image("WorldLabLogo")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 120, height: 45)
-                                    .offset(x: 40, y: 37)
-                                    .accessibilityLabel("enV")
-
-                                Text("🪐")
-                                    .font(.system(size: 84))
-                                    .frame(width: 100, height: 82, alignment: .topLeading)
-                                    .offset(x: 0, y: -7)
-                                    .accessibilityHidden(true)
-                            }
-                            .frame(width: 160, height: 82)
-
-                            Spacer().frame(height: 28)
-
-                            Button {
-                                entered = true
-                            } label: {
-                                Text("Enter")
-                                    .font(.system(size: 22, weight: .semibold))
-                                    .foregroundStyle(buttonInk)
-                                    .frame(width: 214, height: 52)
-                                    .background(buttonColor)
-                                    .clipShape(Capsule())
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Enter")
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(canvasColor)
-                        .padding(10)
-                        .offset(y: -geometry.size.height * 0.04)
-                    }
-                }
-                .ignoresSafeArea()
+        VStack(alignment: .leading, spacing: 2) {
+            Button { open.toggle() } label: {
+                Image(systemName: "info.circle").font(.system(size: 16)).foregroundStyle(.secondary)
+                    .frame(width: 34, height: 34).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(text)
+            .accessibilityHint(open ? "Hides the note" : "Shows the note")
+            if open {
+                Text(text).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true).accessibilityHidden(true)
             }
         }
-        .toolbar(entered ? .automatic : .hidden, for: .navigationBar)
-        .navigationBarBackButtonHidden(!entered)
+    }
+}
+
+/// Round frosted button used by the HUD and the tool rail.
+private struct NativeWorldLabGlassButton: View {
+    let label: String
+    let systemImage: String
+    var active = false
+    let action: () -> Void
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemImage).font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(active ? Color(red: 0.02, green: 0.13, blue: 0.12) : .white)
+                .frame(width: 48, height: 48)
+                .background(active ? Color(red: 0.18, green: 0.77, blue: 0.71) : Color.black.opacity(0.45),
+                            in: RoundedRectangle(cornerRadius: 15))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+}
+
+/// Press-and-hold HUD button for looking and walking; a single tap takes one step.
+private struct NativeWorldLabHoldButton: View {
+    let label: String
+    let systemImage: String
+    var once = false
+    let action: () -> Void
+    @State private var timer: Timer?
+    @State private var ticks = 0
+    var body: some View {
+        Image(systemName: systemImage).font(.system(size: 20, weight: .semibold)).foregroundStyle(.white)
+            .frame(width: 48, height: 48)
+            .background(Color.black.opacity(0.45), in: RoundedRectangle(cornerRadius: 15))
+            .contentShape(RoundedRectangle(cornerRadius: 15))
+            .gesture(DragGesture(minimumDistance: 0).onChanged { _ in
+                guard timer == nil else { return }
+                action()
+                if !once {
+                    ticks = 0
+                    timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
+                        ticks += 1
+                        if ticks > 6 { action() }
+                    }
+                }
+            }.onEnded { _ in
+                timer?.invalidate()
+                timer = nil
+                if once { timer = nil }
+            })
+            .accessibilityElement()
+            .accessibilityLabel(label)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { action() }
+    }
+}
+
+/// Sky dome, sun, daylight and textured ground for the representative world. Everything here is
+/// schematic: it shows the right sun for the device clock at an equatorial site, not a mapped place.
+private enum NativeWorldLabSkyRenderer {
+    static let domeRadius: CGFloat = 4000
+    private static let names = ["representative-sky", "representative-sun", "representative-sun-light", "representative-ambient"]
+
+    static func installGround(in scene: SCNScene) {
+        scene.rootNode.childNode(withName: "representative-floor", recursively: false)?.removeFromParentNode()
+        let floor = SCNFloor()
+        floor.reflectivity = 0
+        let material = SCNMaterial()
+        material.diffuse.contents = groundImage
+        material.diffuse.wrapS = .repeat
+        material.diffuse.wrapT = .repeat
+        material.diffuse.contentsTransform = SCNMatrix4MakeScale(0.125, 0.125, 1)
+        material.specular.contents = UIColor.black
+        material.lightingModel = .lambert
+        floor.materials = [material]
+        let node = SCNNode(geometry: floor)
+        node.name = "representative-floor"
+        scene.rootNode.addChildNode(node)
+    }
+
+    static func installSky(in scene: SCNScene, at date: Date) {
+        for name in names { scene.rootNode.childNode(withName: name, recursively: false)?.removeFromParentNode() }
+        let offset = TimeZone.current.secondsFromGMT(for: date)
+        let position = NativeWorldLabSky.solarPosition(
+            epochSeconds: date.timeIntervalSince1970, latitudeDegrees: 0,
+            longitudeDegrees: NativeWorldLabSky.representativeLongitude(timezoneOffsetSeconds: offset))
+        let palette = NativeWorldLabSky.palette(altitudeDegrees: position.altitudeDegrees)
+        let light = NativeWorldLabSky.lighting(altitudeDegrees: position.altitudeDegrees)
+        let direction = NativeWorldLabSky.sunDirection(position)
+        // SceneKit is right-handed: facing +z puts east on the left, so mirror x to keep sunrise on the right.
+        let sun = SCNVector3(Float(-direction[0]), Float(direction[1]), Float(direction[2]))
+        scene.background.contents = UIColor(red: CGFloat(palette.horizon[0]), green: CGFloat(palette.horizon[1]),
+                                            blue: CGFloat(palette.horizon[2]), alpha: 1)
+
+        let dome = SCNSphere(radius: domeRadius)
+        dome.segmentCount = 48
+        let domeMaterial = SCNMaterial()
+        domeMaterial.diffuse.contents = gradientImage(palette: palette)
+        domeMaterial.lightingModel = .constant
+        domeMaterial.cullMode = .front
+        domeMaterial.writesToDepthBuffer = false
+        domeMaterial.readsFromDepthBuffer = false
+        dome.materials = [domeMaterial]
+        let domeNode = SCNNode(geometry: dome)
+        domeNode.name = "representative-sky"
+        domeNode.renderingOrder = -100
+        scene.rootNode.addChildNode(domeNode)
+
+        if light.sunVisible {
+            let plane = SCNPlane(width: 1500, height: 1500)
+            let material = SCNMaterial()
+            material.diffuse.contents = sunImage(glow: palette.glowStrength)
+            material.lightingModel = .constant
+            material.isDoubleSided = true
+            material.writesToDepthBuffer = false
+            material.readsFromDepthBuffer = false
+            plane.materials = [material]
+            let node = SCNNode(geometry: plane)
+            node.name = "representative-sun"
+            node.renderingOrder = -90
+            node.position = SCNVector3(sun.x * 3600, sun.y * 3600, sun.z * 3600)
+            let billboard = SCNBillboardConstraint()
+            billboard.freeAxes = .all
+            node.constraints = [billboard]
+            scene.rootNode.addChildNode(node)
+        }
+
+        let ambient = SCNNode()
+        ambient.name = "representative-ambient"
+        ambient.light = SCNLight()
+        ambient.light?.type = .ambient
+        ambient.light?.intensity = CGFloat(800 * light.ambient)
+        scene.rootNode.addChildNode(ambient)
+
+        let sunLight = SCNNode()
+        sunLight.name = "representative-sun-light"
+        sunLight.light = SCNLight()
+        sunLight.light?.type = .directional
+        sunLight.light?.intensity = CGFloat(1200 * light.sun)
+        sunLight.position = SCNVector3(sun.x * 100, max(5, sun.y * 100), sun.z * 100)
+        sunLight.look(at: SCNVector3Zero)
+        scene.rootNode.addChildNode(sunLight)
+    }
+
+    private static func gradientImage(palette: NativeSkyPalette) -> UIImage {
+        let rows = 256
+        return UIGraphicsImageRenderer(size: CGSize(width: 4, height: rows)).image { context in
+            for row in 0..<rows {
+                let elevation = Double.pi / 2 - (Double(row) + 0.5) / Double(rows) * Double.pi
+                var color = palette.horizon
+                if elevation >= 0 {
+                    let t = sin(elevation).squareRoot()
+                    color = (0..<3).map { palette.horizon[$0] + (palette.zenith[$0] - palette.horizon[$0]) * t }
+                } else {
+                    let fade = min(1, -sin(elevation) * 4)
+                    color = palette.horizon.map { $0 * (1 - 0.25 * fade) }
+                }
+                UIColor(red: CGFloat(color[0]), green: CGFloat(color[1]), blue: CGFloat(color[2]), alpha: 1).setFill()
+                context.fill(CGRect(x: 0, y: row, width: 4, height: 1))
+            }
+        }
+    }
+
+    private static func sunImage(glow: Double) -> UIImage {
+        let size = CGSize(width: 256, height: 256)
+        return UIGraphicsImageRenderer(size: size).image { context in
+            let cg = context.cgContext
+            let alpha = CGFloat(min(0.7, 0.15 + 0.5 * glow))
+            let colors = [UIColor(red: 1, green: 0.85, blue: 0.55, alpha: alpha).cgColor,
+                          UIColor(red: 1, green: 0.85, blue: 0.55, alpha: 0).cgColor] as CFArray
+            if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors, locations: [0, 1]) {
+                cg.drawRadialGradient(gradient, startCenter: CGPoint(x: 128, y: 128), startRadius: 0,
+                                      endCenter: CGPoint(x: 128, y: 128), endRadius: 128, options: [])
+            }
+            UIColor(red: 1, green: 0.96, blue: 0.84, alpha: 1).setFill()
+            cg.fillEllipse(in: CGRect(x: 116, y: 116, width: 24, height: 24))
+        }
+    }
+
+    /// Deterministic grass-and-soil texture so the ground gives scale and motion cues.
+    private static let groundImage: UIImage = {
+        let size = CGSize(width: 256, height: 256)
+        return UIGraphicsImageRenderer(size: size).image { context in
+            UIColor(red: 0.43, green: 0.56, blue: 0.45, alpha: 1).setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+            var seed: UInt32 = 20260109
+            func next() -> Double {
+                seed = seed &* 1664525 &+ 1013904223
+                return Double(seed) / 4294967296.0
+            }
+            for _ in 0..<3200 {
+                let v = CGFloat(next() * 0.12 - 0.06)
+                UIColor(red: 0.43 + v, green: 0.56 + v, blue: 0.45 + v, alpha: 1).setFill()
+                context.fill(CGRect(x: CGFloat(Int(next() * 256)), y: CGFloat(Int(next() * 256)), width: 2, height: 2))
+            }
+            UIColor(white: 1, alpha: 0.07).setStroke()
+            let path = UIBezierPath()
+            for i in 0...8 {
+                let p = CGFloat(i) * 32
+                path.move(to: CGPoint(x: p, y: 0)); path.addLine(to: CGPoint(x: p, y: 256))
+                path.move(to: CGPoint(x: 0, y: p)); path.addLine(to: CGPoint(x: 256, y: p))
+            }
+            path.lineWidth = 1
+            path.stroke()
+        }
+    }()
+}
+
+/// Opens straight into the world: there is no entry screen. The navigation bar is replaced by a
+/// floating back button inside the world view.
+struct NativeWorldLabEntryView: View {
+    var body: some View {
+        NativeWorldLabView()
+            .toolbar(.hidden, for: .navigationBar)
+            .navigationBarBackButtonHidden(true)
     }
 }

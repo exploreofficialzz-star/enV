@@ -59,9 +59,8 @@ fun NativeWorldLabRadiationPanel(project:NativeWorldLabProject,onError:(String)-
         }
     }
     Text("Radiate heat from invented matter",style=MaterialTheme.typography.titleSmall)
-    Text("Ideal Stefan-Boltzmann net heating/cooling. All emissivity, "+
-        "density, heat capacity and environmental conditions are assumptions.",
-        style=MaterialTheme.typography.bodySmall)
+    LabNote("Ideal Stefan-Boltzmann net heating/cooling. All emissivity, "+
+        "density, heat capacity and environmental conditions are assumptions.")
     if(project.entities.isEmpty()){
         Text("Create a solid and assign invented density and heat capacity.")
         return
@@ -141,6 +140,6 @@ fun NativeWorldLabRadiationPanel(project:NativeWorldLabProject,onError:(String)-
         OutlinedButton(onClick={export.launch("world-lab-radiative-heat.json")}){
             Text("Export radiative evidence")
         }
-        Text(active.validity,style=MaterialTheme.typography.bodySmall)
+        LabNote(active.validity)
     }
 }

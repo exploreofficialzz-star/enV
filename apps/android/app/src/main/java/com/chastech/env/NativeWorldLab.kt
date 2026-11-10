@@ -3,6 +3,21 @@ package com.chastech.env
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.CenterFocusStrong
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Science
+import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -359,6 +374,7 @@ fun NativeWorldLabForm() {
             editHistory.clear()
         }.onFailure{warning=it.message?:"Could not create a World Lab project."}
     }
+    LaunchedEffect(Unit){ if(project==null) newProject() }
     fun loadSavedProject(){
         scope.launch {
             runCatching { withContext(Dispatchers.IO){localProjects.loadLatest()} }
@@ -958,8 +974,7 @@ fun NativeWorldLabForm() {
     // Keep the two largest editor panels out of NativeWorldLabForm's bytecode.
     val digitalCircuitContent: @Composable () -> Unit = {
             Text("Invent digital logic",style=MaterialTheme.typography.titleSmall)
-            Text("Create hypothetical truth-table components. These are Boolean outcomes, not a physical chip.",
-                style=MaterialTheme.typography.bodySmall)
+            LabNote("Create hypothetical truth-table components. These are Boolean outcomes, not a physical chip.")
             if(project!!.digitalNetworks.isEmpty()){
                 OutlinedButton(onClick={applyProjectEdit{
                     NativeWorldLabEditor.startDigitalInvention(it)
@@ -1022,9 +1037,8 @@ fun NativeWorldLabForm() {
                     ports.distinct().size==ports.size){
                     Text("Connect a new invented gate")
                 }
-                Text("Choose source switches or earlier gates. Define the new truth-table rows,"+
-                    " then wire an output indicator.",
-                    style=MaterialTheme.typography.bodySmall)
+                LabNote("Choose source switches or earlier gates. Define the new truth-table rows,"+
+                    " then wire an output indicator.")
                 digital.outputs.forEach{output->
                     val current=signalNodes.indexOfFirst{it.first==output.sourceNodeId}
                     OutlinedButton(onClick={
@@ -1067,8 +1081,7 @@ fun NativeWorldLabForm() {
                         color=MaterialTheme.colorScheme.error)}
             }
             Text("Invent chemical heat",style=MaterialTheme.typography.titleSmall)
-            Text("Hypothetical chemistry only. Reaction rate and heat feedback use your assumptions.",
-                style=MaterialTheme.typography.bodySmall)
+            LabNote("Hypothetical chemistry only. Reaction rate and heat feedback use your assumptions.")
             Text("Assumed heat released: "+labNumber(reactionHeat.toDouble())+" J/mol")
             Slider(value=reactionHeat,onValueChange={reactionHeat=it;reactionPlaying=false;
                 reactionResult=null},valueRange=-50000f..100000f,
@@ -1111,7 +1124,7 @@ fun NativeWorldLabForm() {
                         Text("Reset reaction")
                     }
                 }
-                Text(run.validity,style=MaterialTheme.typography.bodySmall)
+                LabNote(run.validity)
             }
             Text("Connected DC circuits",style=MaterialTheme.typography.titleSmall)
             if(project!!.networks.isEmpty()){
@@ -1153,8 +1166,7 @@ fun NativeWorldLabForm() {
                     deviceAssumption.isNotBlank()){
                     Text("Add hypothetical component")
                 }
-                Text("A new material has no electrical law unless you explicitly assume one.",
-                    style=MaterialTheme.typography.bodySmall)
+                LabNote("A new material has no electrical law unless you explicitly assume one.")
                 Text("Connect more parts and wires",style=MaterialTheme.typography.titleSmall)
                 OutlinedTextField(value=junctionName,onValueChange={junctionName=it},
                     label={Text("New junction name")},singleLine=true)
@@ -1241,7 +1253,7 @@ fun NativeWorldLabForm() {
                     Text("Delivered DC power: "+labNumber(result.deliveredPowerW)+" W")
                     Text("Resistor heat: "+labNumber(result.resistorHeatW)+" W")
                     Text("Power residual: "+labNumber(result.powerResidualW)+" W")
-                    Text(result.validity,style=MaterialTheme.typography.bodySmall)
+                    LabNote(result.validity)
                 }
             }
     }
@@ -1280,8 +1292,7 @@ fun NativeWorldLabForm() {
                 Text("Rotation X/Y/Z: "+listOf(solid.rotationRadians.x,solid.rotationRadians.y,solid.rotationRadians.z)
                     .joinToString(" / "){labNumber(it)}+" rad",style=MaterialTheme.typography.bodySmall)
                 Text("2D sketch and extrusion",style=MaterialTheme.typography.titleSmall)
-                Text("Create a closed rectangle or circle on the X/Z plane and extrude along Y.",
-                    style=MaterialTheme.typography.bodySmall)
+                LabNote("Create a closed rectangle or circle on the X/Z plane and extrude along Y.")
                 Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
                     OutlinedTextField(value=cadSketchWidth,onValueChange={cadSketchWidth=it},
                         label={Text("Width m")},singleLine=true,modifier=Modifier.weight(1f))
@@ -1294,13 +1305,13 @@ fun NativeWorldLabForm() {
                     OutlinedTextField(value=cadSketchRadius,onValueChange={cadSketchRadius=it},
                         label={Text("Circle radius m")},singleLine=true,modifier=Modifier.weight(1f))
                 }
-                Text("Sketch centre on base plane (X/Y/Z metres)",style=MaterialTheme.typography.bodySmall)
+                LabNote("Sketch centre on base plane (X/Y/Z metres)")
                 Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
                     OutlinedTextField(value=cadSketchX,onValueChange={cadSketchX=it},label={Text("X m")},singleLine=true,modifier=Modifier.weight(1f))
                     OutlinedTextField(value=cadSketchY,onValueChange={cadSketchY=it},label={Text("Y m")},singleLine=true,modifier=Modifier.weight(1f))
                     OutlinedTextField(value=cadSketchZ,onValueChange={cadSketchZ=it},label={Text("Z m")},singleLine=true,modifier=Modifier.weight(1f))
                 }
-                Text("Extrusion orientation (X/Y/Z degrees)",style=MaterialTheme.typography.bodySmall)
+                LabNote("Extrusion orientation (X/Y/Z degrees)")
                 Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
                     OutlinedTextField(value=cadSketchRotationX,onValueChange={cadSketchRotationX=it},label={Text("X °")},singleLine=true,modifier=Modifier.weight(1f))
                     OutlinedTextField(value=cadSketchRotationY,onValueChange={cadSketchRotationY=it},label={Text("Y °")},singleLine=true,modifier=Modifier.weight(1f))
@@ -1355,12 +1366,11 @@ fun NativeWorldLabForm() {
                     if(clearance.status=="box-intersection")
                         Text("Overlap X/Y/Z: "+clearance.overlapDepthMeters
                             .joinToString(" / "){labNumber(it)}+" m")
-                    Text(clearance.validity,style=MaterialTheme.typography.bodySmall)
+                    LabNote(clearance.validity)
                 }
                 Text("Collide spheres in three dimensions",
                     style=MaterialTheme.typography.titleSmall)
-                Text("One true off-axis first contact between smooth spheres. Assumed inventor densities and restitution; no arbitrary shape physics, rolling, fracture or gravity.",
-                    style=MaterialTheme.typography.bodySmall)
+                LabNote("One true off-axis first contact between smooth spheres. Assumed inventor densities and restitution; no arbitrary shape physics, rolling, fracture or gravity.")
                 val sphereCandidates=project!!.entities.filter{
                     it.shape=="sphere"&&it.id!=solid.id
                 }
@@ -1482,7 +1492,7 @@ fun NativeWorldLabForm() {
                     OutlinedButton(onClick={
                         sphereEvidencePicker.launch("world-lab-spatial-sphere-impact.json")
                     }){Text("Export 3D impact evidence")}
-                    Text(run.validity,style=MaterialTheme.typography.bodySmall)
+                    LabNote(run.validity)
                 }
                 NativeWorldLabMultiSpherePanel(project!!){ warning=it }
                 NativeWorldLabGravityPanel(project!!){ warning=it }
@@ -1494,8 +1504,7 @@ fun NativeWorldLabForm() {
                 NativeWorldLabEvidencePanel(project!!){ warning=it }
                 NativeWorldLabVehiclePanel(project!!){ warning=it }
                 Text("Object-to-object collision",style=MaterialTheme.typography.titleSmall)
-                Text("Impact of two invented solids along one X lane. Assumed masses and restitution; no 3D rotation or breakage.",
-                    style=MaterialTheme.typography.bodySmall)
+                LabNote("Impact of two invented solids along one X lane. Assumed masses and restitution; no 3D rotation or breakage.")
                 val collisionCandidates=project!!.entities.filter{it.id!=solid.id}
                 if(collisionCandidates.isNotEmpty()){
                     val other=collisionCandidates[collisionTargetIndex%collisionCandidates.size]
@@ -1604,7 +1613,7 @@ fun NativeWorldLabForm() {
                     OutlinedButton(onClick={
                         collisionEvidencePicker.launch("world-lab-two-body-collision-evidence.json")
                     }){Text("Export collision evidence")}
-                    Text(run.validity,style=MaterialTheme.typography.bodySmall)
+                    LabNote(run.validity)
                 }
                 Text("Material: "+(material?.name?:"Unknown")+" (hypothetical)")
                 if(material!=null) OutlinedButton(onClick={
@@ -1620,9 +1629,8 @@ fun NativeWorldLabForm() {
                 Text("Assumed Young's modulus: "+labNumber(material?.youngModulusPa)+" Pa")
                 Text("Calculate how an invented elastic beam bends",
                     style=MaterialTheme.typography.titleSmall)
-                Text("Rectangular beam: X = clamped length, Y = vertical depth, Z = width. "+
-                    "Downward tip load and linear elasticity are assumed, not observed.",
-                    style=MaterialTheme.typography.bodySmall)
+                LabNote("Rectangular beam: X = clamped length, Y = vertical depth, Z = width. "+
+                    "Downward tip load and linear elasticity are assumed, not observed.")
                 OutlinedTextField(value=beamForce,onValueChange={beamForce=it;beamRun=null},
                     label={Text("Downward cantilever end load (newtons)")},
                     singleLine=true,modifier=Modifier.fillMaxWidth())
@@ -1644,7 +1652,7 @@ fun NativeWorldLabForm() {
                     Text("Free-end deflection: "+labNumber(run.tipDeflectionM)+" m")
                     Text("Maximum bending stress: "+labNumber(run.maximumStressPa)+" Pa")
                     Text("Maximum surface strain: "+labNumber(run.surfaceStrain))
-                    Text(run.validity,style=MaterialTheme.typography.bodySmall)
+                    LabNote(run.validity)
                 }
                 Text("Try floating your invention",style=MaterialTheme.typography.titleSmall)
                 Text("Fluid surface above ground: "+labNumber(waterSurfaceHeight.toDouble())+" m")
@@ -1690,7 +1698,7 @@ fun NativeWorldLabForm() {
                             Text("Reset fluid")
                         }
                     }
-                    Text(motion.validity,style=MaterialTheme.typography.bodySmall)
+                    LabNote(motion.validity)
                 }
                 Text("Assumed fluid density: "+labNumber(fluidDensity)+" kg/m³")
                 Slider(value=fluidDensity.toFloat(),onValueChange={
@@ -1718,7 +1726,7 @@ fun NativeWorldLabForm() {
                     Text("Status: "+fluid.status)
                     Text("Net upward force: "+labNumber(fluid.netUpwardForceN)+" N")
                     Text("Equilibrium draft: "+labNumber(fluid.equilibriumDraftM)+" m")
-                    Text(fluid.validity,style=MaterialTheme.typography.bodySmall)
+                    LabNote(fluid.validity)
                 }
                 if(derivedMass!=null && derivedMass in 0.001..10000.0){
                     OutlinedButton(onClick={mass=derivedMass.toFloat();kind="spring";time=0f;playing=false}) {
@@ -1756,8 +1764,7 @@ fun NativeWorldLabForm() {
                         },valueRange=0f..4f,modifier=Modifier.semantics {
                             contentDescription="Motor supply isolation event time"
                         })
-                        Text("The modeled coil current remains continuous and decays after source isolation; fuse arcing and contact bounce are not modeled.",
-                            style=MaterialTheme.typography.bodySmall)
+                        LabNote("The modeled coil current remains continuous and decays after source isolation; fuse arcing and contact bounce are not modeled.")
                     }
                     OutlinedButton(onClick={
                         runCatching {
@@ -1832,7 +1839,7 @@ fun NativeWorldLabForm() {
                             Text("Invented logic output: "+linked.logicBit)
                             Text("Applied ideal voltage: "+
                                 labNumber(linked.input.supplyVoltageV)+" V")
-                            Text(linked.validity,style=MaterialTheme.typography.bodySmall)
+                            LabNote(linked.validity)
                         }
                         Text("Applied source voltage: "+labNumber(sample.sourceVoltageV)+" V")
                         if(run.modelVersion=="1.2.0"){
@@ -1859,7 +1866,7 @@ fun NativeWorldLabForm() {
                             Text("Total DC source current: "+labNumber(observed.totalSourceCurrentA)+" A")
                             Text("Passive resistor heat: "+labNumber(observed.passiveResistorHeatW)+" W")
                             Text("Combined energy residual: "+labNumber(observed.combinedEnergyResidualJ)+" J")
-                            Text(wired.validity,style=MaterialTheme.typography.bodySmall)
+                            LabNote(wired.validity)
                         }
                         motorAudit?.let { audit ->
                             Text("Numerical self-check: "+audit.status+". "+audit.explanation)
@@ -1894,8 +1901,7 @@ fun NativeWorldLabForm() {
                         }
                         if(motorCheckpointStatus.isNotBlank())Text(motorCheckpointStatus,
                             style=MaterialTheme.typography.bodySmall)
-                        Text("A motor checkpoint restores only against its matching in-memory solver run; it does not recreate the run from parameters.",
-                            style=MaterialTheme.typography.bodySmall)
+                        LabNote("A motor checkpoint restores only against its matching in-memory solver run; it does not recreate the run from parameters.")
                         Text("Playback rate: "+labNumber(motorSpeed.toDouble())+"×")
                         Slider(value=motorSpeed,onValueChange={motorSpeed=it},
                             valueRange=0.01f..100f,modifier=Modifier.semantics {
@@ -1949,8 +1955,7 @@ fun NativeWorldLabForm() {
                             Text("Wall UTC "+clock.wallTimeUTC+" · local zone "+clock.timezoneDisplay+
                                 " · cached solver output",style=MaterialTheme.typography.bodySmall)
                         }
-                        Text("Hypothetical values, coupled 1D coil and lift calculation. Not measured or certified.",
-                            style=MaterialTheme.typography.bodySmall)
+                        LabNote("Hypothetical values, coupled 1D coil and lift calculation. Not measured or certified.")
                     }
                     if(dropEntityId==solid.id && dropRun!=null) {
                         val drop=checkNotNull(dropRun)
@@ -1977,527 +1982,603 @@ fun NativeWorldLabForm() {
                             }
                             OutlinedButton(onClick={dropPlaying=false;dropFrame=0}){Text("Reset drop")}
                         }
-                        Text("Simplified gravity, drag and flat-ground contact; assumed density, not verified strength.",
-                            style=MaterialTheme.typography.bodySmall)
+                        LabNote("Simplified gravity, drag and flat-ground contact; assumed density, not verified strength.")
                     }
                 }
             }
     }
-    Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        Text("The World Lab",style=MaterialTheme.typography.titleLarge)
-        Text("Native offline reference models. Ground and shapes are illustrative, not measured or certified.",
-            style=MaterialTheme.typography.bodySmall)
-        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
-            listOf("spring" to "Spring","rc" to "Circuit","heat" to "Heat").forEach { pair ->
-                if(kind==pair.first) Button(onClick={playing=false;time=0f;kind=pair.first;demoClock=null},
-                    modifier=Modifier.weight(1f)) { Text(pair.second) }
-                else OutlinedButton(onClick={playing=false;time=0f;kind=pair.first;demoClock=null},
-                    modifier=Modifier.weight(1f)) { Text(pair.second) }
-            }
-        }
-        Canvas(Modifier.fillMaxWidth().height(170.dp)
-            .background(Color(0xFF16232B),RoundedCornerShape(12.dp))
-            .semantics { contentDescription="Computed experiment schematic. Numeric model values are available below." }) {
-        if(kind=="spring") {
-                drawLine(Color.LightGray,Offset(size.width*0.1f,size.height/2),
-                    Offset(size.width*0.9f,size.height/2),strokeWidth=3f)
-                val x=((observation?.xMeters?:0.0).coerceIn(-1.0,1.0)*size.width*0.3).toFloat()
-                drawCircle(Color(0xFFF2B877),size.minDimension*0.11f,
-                    Offset(size.width/2+x,size.height/2))
-            }else if(kind=="rc") {
-                drawRect(Color.Gray,Offset(size.width*0.28f,size.height*0.2f),
-                    Size(size.width*0.44f,size.height*0.6f))
-                val ratio=((observation?.voltageV?:0.0)/10.0).coerceIn(0.0,1.0).toFloat()
-                drawRect(Color(0xFF65B7CD),
-                    Offset(size.width*0.28f,size.height*(0.8f-0.6f*ratio)),
-                    Size(size.width*0.44f,size.height*0.6f*ratio))
-            }else {
-                val temperatures=observation?.temperatureK?:List(21){293.15}
-                temperatures.forEachIndexed { i,kelvin ->
-                    val hot=((kelvin-293.15)/80.0).coerceIn(0.0,1.0).toFloat()
-                    drawRect(Color(0.2f+0.78f*hot,0.32f+0.47f*hot,0.56f),
-                        Offset(size.width*(0.07f+0.86f*i/21),size.height*0.38f),
-                        Size(size.width*0.86f/21*0.96f,size.height*0.24f))
+    val viewState=project?.let{rememberNativeWorldLabViewState(it)}
+    var studioPanel by remember{mutableStateOf<String?>(null)}
+    var skyClock by remember{mutableLongStateOf(System.currentTimeMillis())}
+    LaunchedEffect(Unit){while(true){delay(30_000);skyClock=System.currentTimeMillis()}}
+    BoxWithConstraints(Modifier.fillMaxSize()){
+        val phone=maxWidth<640.dp
+        val wide=maxWidth>=1024.dp
+        val shown=project
+        // The world: full-bleed sky, horizon and ground seen from eye height.
+        if(shown!=null&&viewState!=null)NativeWorldLabViewportCanvas(shown,shown.entities.getOrNull(selected)?.id,viewState,
+            onSelect={id->selected=shown.entities.indexOfFirst{it.id==id}.coerceAtLeast(0)},
+            inspection=inspection,skyEpochMillis=skyClock,modifier=Modifier.fillMaxSize())
+        else Box(Modifier.fillMaxSize().background(Color(0xFFA9CDEE)))
+        if(viewState!=null){
+            // HUD: one quiet chip, look pad, heading and walk pad.
+            Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(12.dp)){
+                Text(String.format(Locale.US,"%.1f m view scale · illustrative, not mapped",45.0*8.0/viewState.zoom),
+                    color=Color.White,style=MaterialTheme.typography.labelMedium,
+                    modifier=Modifier.align(Alignment.TopCenter).background(LabGlass,RoundedCornerShape(999.dp))
+                        .padding(horizontal=12.dp,vertical=6.dp))
+                if(studioPanel==null||!phone){
+                    Row(Modifier.align(Alignment.BottomStart).padding(start=if(phone)0.dp else 64.dp,bottom=if(phone)72.dp else 0.dp),
+                        horizontalArrangement=Arrangement.spacedBy(14.dp),verticalAlignment=Alignment.Bottom){
+                        Column(verticalArrangement=Arrangement.spacedBy(5.dp)){
+                            Row(horizontalArrangement=Arrangement.spacedBy(5.dp)){
+                                Spacer(Modifier.size(48.dp))
+                                LabHoldButton("Look up",Icons.Filled.KeyboardArrowUp,{viewState.elevation=(viewState.elevation-2.2f).coerceAtLeast(-60f)})
+                                Spacer(Modifier.size(48.dp))
+                            }
+                            Row(horizontalArrangement=Arrangement.spacedBy(5.dp)){
+                                LabHoldButton("Turn left",Icons.Filled.KeyboardArrowLeft,{viewState.yaw-=0.05f})
+                                LabHoldButton("Level horizon",Icons.Filled.CenterFocusStrong,{viewState.elevation=0f},once=true)
+                                LabHoldButton("Turn right",Icons.Filled.KeyboardArrowRight,{viewState.yaw+=0.05f})
+                            }
+                            Row(horizontalArrangement=Arrangement.spacedBy(5.dp)){
+                                Spacer(Modifier.size(48.dp))
+                                LabHoldButton("Look down",Icons.Filled.KeyboardArrowDown,{viewState.elevation=(viewState.elevation+2.2f).coerceAtMost(85f)})
+                                Spacer(Modifier.size(48.dp))
+                            }
+                        }
+                        Column(verticalArrangement=Arrangement.spacedBy(5.dp)){
+                            LabHoldButton("Step forward",Icons.Filled.ArrowUpward,{viewState.walk(1.0)})
+                            LabHoldButton("Step back",Icons.Filled.ArrowDownward,{viewState.walk(-1.0)})
+                        }
+                    }
+                    val heading=((Math.toDegrees(viewState.yaw.toDouble())%360.0)+360.0)%360.0
+                    Text(String.format(Locale.US,"%03d°",heading.toInt()%360),color=Color.White,
+                        style=MaterialTheme.typography.labelLarge,
+                        modifier=Modifier.align(if(phone)Alignment.BottomEnd else Alignment.BottomCenter)
+                            .padding(bottom=if(phone)84.dp else 12.dp)
+                            .background(LabGlass,RoundedCornerShape(14.dp)).padding(horizontal=12.dp,vertical=12.dp)
+                            .semantics{contentDescription="Heading "+heading.toInt()+" degrees"})
                 }
             }
         }
-        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
-            OutlinedButton(onClick={
-                runCatching{
-                    pendingTimelineJson=NativeWorldLabDemoCheckpointCodec.encode(
-                        NativeWorldLabDemoCheckpoint(kind,time.toDouble(),mass.toDouble(),
-                            spring.toDouble(),resistance.toDouble(),diffusivity.toDouble(),
-                            wallTimeUTC=java.time.Instant.now().toString(),worldEpochUTC=worldEpochUTC,
-                            solverInternalTimeSeconds=time.toDouble(),displaySampleTimeSeconds=time.toDouble(),
-                            playbackRate=speed.toDouble(),
-                            playbackDirection=if(reversePlayback)"reverse-recording" else "forward",
-                            timezoneDisplay=java.time.ZoneId.systemDefault().id,
-                            solverStepSeconds=observation?.solverStepSeconds?:1.0/240.0))
-                    timelineExportPicker.launch("world-lab-time-checkpoint.json")
-                }.onFailure{timelineStatus=it.message?:"Checkpoint could not be created."}
-            }){Text("Save checkpoint")}
-            OutlinedButton(onClick={timelineImportPicker.launch(arrayOf("application/json"))}){
-                Text("Restore checkpoint")
-            }
-            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                Button(onClick={runCatching{
-                    val manifest=NativeWorldLabReplayCodec.create(model,worldEpochUTC,java.time.ZoneId.systemDefault().id)
-                    pendingReplayJson=NativeWorldLabReplayCodec.encode(manifest).toString(Charsets.UTF_8)
-                    replayExportPicker.launch("world-lab-replay-manifest.json")
-                    replayManifestStatus=""
-                }.onFailure{replayManifestStatus=it.message?:"Replay manifest could not be created."}}){
-                    Text("Save deterministic replay")
-                }
-                OutlinedButton(onClick={replayImportPicker.launch(arrayOf("application/json"))}){
-                    Text("Open & replay manifest")
+        // Tool rail: icons only. Left column on tablets and desktops, bottom bar on phones.
+        if(studioPanel==null||!phone){
+            val railItems=listOf(
+                Triple("project",Icons.Filled.Folder,"Open project tools"),
+                Triple("build",Icons.Filled.Build,"Open build tools"),
+                Triple("experiments",Icons.Filled.Science,"Open experiment tools"),
+                Triple("results",Icons.Filled.ShowChart,"Open results"))
+            val railBody:@Composable (Boolean)->Unit={vertical->
+                railItems.forEach{(id,icon,label)->
+                    LabGlassButton(label,icon,{studioPanel=if(studioPanel==id)null else id},active=studioPanel==id)
                 }
             }
-            if(replayManifestStatus.isNotBlank())Text(replayManifestStatus,style=MaterialTheme.typography.bodySmall)
+            if(phone)Row(Modifier.align(Alignment.BottomCenter).windowInsetsPadding(WindowInsets.safeDrawing).padding(12.dp)
+                .background(LabGlass,RoundedCornerShape(22.dp)).padding(6.dp),horizontalArrangement=Arrangement.spacedBy(6.dp)){railBody(false)}
+            else Column(Modifier.align(Alignment.CenterStart).windowInsetsPadding(WindowInsets.safeDrawing).padding(12.dp)
+                .background(LabGlass,RoundedCornerShape(22.dp)).padding(6.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){railBody(true)}
         }
-        if(timelineStatus.isNotBlank())Text(timelineStatus,style=MaterialTheme.typography.bodySmall)
-        demoClock?.let{clock->
-            Text("Wall UTC "+clock.wallTimeUTC+" · World UTC "+clock.worldDateUTC+
-                " · "+clock.timezoneDisplay,style=MaterialTheme.typography.bodySmall)
-            Text("Simulation "+labNumber(clock.simulationTimeSeconds)+" s · display sample "+
-                labNumber(clock.displaySampleTimeSeconds)+" s · cached model output",
-                style=MaterialTheme.typography.bodySmall)
-        }
-        Text("Astronomical time scales · UTC / TAI / TT / UT1",style=MaterialTheme.typography.titleSmall)
-        val currentWorldUTC=demoClock?.worldDateUTC?:worldEpochUTC
-        val taiTtResult=remember(currentWorldUTC){runCatching{NativeWorldLabTimeScales.utcToTaiTt(currentWorldUTC)}}
-        val tcgResult=remember(currentWorldUTC){runCatching{NativeWorldLabTimeScales.utcToTcg(currentWorldUTC)}}
-        taiTtResult.fold(onSuccess={times->
-            Text("TAI ${times.first} · TT ${times.second}",style=MaterialTheme.typography.bodySmall)
-        },onFailure={error->
-            Text(error.message?: "TAI/TT unavailable.",style=MaterialTheme.typography.bodySmall,
-                color=MaterialTheme.colorScheme.error)
-        })
-        tcgResult.fold(onSuccess={tcg->Text("TCG ${tcg.tcg} · IAU 2000 fixed-rate relation",style=MaterialTheme.typography.bodySmall)},
-            onFailure={error->Text(error.message?: "TCG conversion unavailable.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.error)})
-        Text("TCB↔TDB uses the IAU 2006 linear MJD relation. UTC↔TDB is not derived here without a barycentric ephemeris.",
-            style=MaterialTheme.typography.bodySmall)
-        OutlinedButton(onClick={iersBulletinPicker.launch(arrayOf("text/plain","application/octet-stream"))}){
-            Text("Import IERS Bulletin A (ser7.dat)")
-        }
-        if(earthOrientation!=null){
-            val ut1Result=remember(currentWorldUTC,earthOrientation){
-                runCatching{NativeWorldLabTimeScales.utcToUt1(currentWorldUTC,earthOrientation!!)}
-            }
-            ut1Result.fold(onSuccess={reading->
-                Text("UT1 ${reading.ut1} · DUT1 ${labNumber(reading.dut1Seconds!!)} s ± ${labNumber(reading.ut1UncertaintySeconds!!)} s · ${reading.quality}",
-                    style=MaterialTheme.typography.bodySmall)
-                Text("${reading.bulletin} · issued ${reading.issuedDateUTC}",
-                    style=MaterialTheme.typography.bodySmall)
-            },onFailure={error->
-                Text(error.message?: "UT1 is unavailable for this date.",style=MaterialTheme.typography.bodySmall)
-            })
-        }
-        if(earthOrientationStatus.isNotBlank())Text(earthOrientationStatus,style=MaterialTheme.typography.bodySmall)
-        NativeWorldLabFieldImportPanel(timeSeconds=demoClock?.simulationTimeSeconds?:time.toDouble())
-        Text("Approximate sunrise and sunset",style=MaterialTheme.typography.titleSmall)
-        OutlinedTextField(value=solarDateUTC,onValueChange={solarDateUTC=it.take(10)},
-            label={Text("UTC date · YYYY-MM-DD")},singleLine=true,
-            modifier=Modifier.fillMaxWidth())
-        val solarOrigin=project?.geodeticOrigin
-        if(solarOrigin==null){
-            Text("Save a WGS84 Earth reference to calculate solar events for this project.",
-                style=MaterialTheme.typography.bodySmall)
-        }else{
-            val solarResult=remember(solarDateUTC,solarOrigin){
-                runCatching{NativeWorldLabSolarEvents.calculate(solarDateUTC,
-                    solarOrigin.latitudeDegrees,solarOrigin.longitudeDegrees)}
-            }
-            val solarZone=remember(demoClock?.timezoneDisplay){
-                runCatching{java.time.ZoneId.of(demoClock?.timezoneDisplay?:java.time.ZoneId.systemDefault().id)}
-                    .getOrDefault(java.time.ZoneId.systemDefault())
-            }
-            val solarFormatter=remember(solarZone){
-                java.time.format.DateTimeFormatter.ofPattern("HH:mm z",Locale.getDefault()).withZone(solarZone)
-            }
-            solarResult.fold(onSuccess={events->
-                when(events.status){
-                    NativeWorldLabSolarStatus.NORMAL->{
-                        Text("Sunrise "+solarFormatter.format(java.time.Instant.parse(events.sunriseUTC!!))+
-                            " · Sunset "+solarFormatter.format(java.time.Instant.parse(events.sunsetUTC!!)),
-                            style=MaterialTheme.typography.bodyMedium)
-                        Text("Solar noon "+solarFormatter.format(java.time.Instant.parse(events.solarNoonUTC))+
-                            " · Daylight "+labNumber(events.daylightMinutes!!/60.0)+" h",
+        // Tool panel: a side panel on tablets and desktops, a bottom sheet on phones.
+        if(studioPanel!=null){
+            val panelScroll=rememberScrollState()
+            Surface(
+                modifier=(if(phone)Modifier.align(Alignment.BottomCenter).fillMaxWidth().heightIn(max=maxHeight*0.76f)
+                    else Modifier.align(Alignment.CenterEnd).windowInsetsPadding(WindowInsets.safeDrawing).padding(12.dp)
+                        .width(if(wide)440.dp else 380.dp).fillMaxHeight()),
+                shape=if(phone)RoundedCornerShape(topStart=22.dp,topEnd=22.dp) else RoundedCornerShape(20.dp),
+                color=MaterialTheme.colorScheme.background,shadowElevation=10.dp,tonalElevation=2.dp){
+                Box{
+                    Column(Modifier.fillMaxWidth().verticalScroll(panelScroll).padding(start=14.dp,end=14.dp,top=10.dp,bottom=24.dp)){
+                        if(phone)Box(Modifier.align(Alignment.CenterHorizontally).width(38.dp).height(4.dp)
+                            .background(MaterialTheme.colorScheme.outline,RoundedCornerShape(999.dp)))
+                        Spacer(Modifier.height(10.dp))
+                        Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                    listOf("spring" to "Spring","rc" to "Circuit","heat" to "Heat").forEach { pair ->
+                        if(kind==pair.first) Button(onClick={playing=false;time=0f;kind=pair.first;demoClock=null},
+                            modifier=Modifier.weight(1f)) { Text(pair.second) }
+                        else OutlinedButton(onClick={playing=false;time=0f;kind=pair.first;demoClock=null},
+                            modifier=Modifier.weight(1f)) { Text(pair.second) }
+                    }
+                }
+                Canvas(Modifier.fillMaxWidth().height(170.dp)
+                    .background(Color(0xFF16232B),RoundedCornerShape(12.dp))
+                    .semantics { contentDescription="Computed experiment schematic. Numeric model values are available below." }) {
+                if(kind=="spring") {
+                        drawLine(Color.LightGray,Offset(size.width*0.1f,size.height/2),
+                            Offset(size.width*0.9f,size.height/2),strokeWidth=3f)
+                        val x=((observation?.xMeters?:0.0).coerceIn(-1.0,1.0)*size.width*0.3).toFloat()
+                        drawCircle(Color(0xFFF2B877),size.minDimension*0.11f,
+                            Offset(size.width/2+x,size.height/2))
+                    }else if(kind=="rc") {
+                        drawRect(Color.Gray,Offset(size.width*0.28f,size.height*0.2f),
+                            Size(size.width*0.44f,size.height*0.6f))
+                        val ratio=((observation?.voltageV?:0.0)/10.0).coerceIn(0.0,1.0).toFloat()
+                        drawRect(Color(0xFF65B7CD),
+                            Offset(size.width*0.28f,size.height*(0.8f-0.6f*ratio)),
+                            Size(size.width*0.44f,size.height*0.6f*ratio))
+                    }else {
+                        val temperatures=observation?.temperatureK?:List(21){293.15}
+                        temperatures.forEachIndexed { i,kelvin ->
+                            val hot=((kelvin-293.15)/80.0).coerceIn(0.0,1.0).toFloat()
+                            drawRect(Color(0.2f+0.78f*hot,0.32f+0.47f*hot,0.56f),
+                                Offset(size.width*(0.07f+0.86f*i/21),size.height*0.38f),
+                                Size(size.width*0.86f/21*0.96f,size.height*0.24f))
+                        }
+                    }
+                }
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                    OutlinedButton(onClick={
+                        runCatching{
+                            pendingTimelineJson=NativeWorldLabDemoCheckpointCodec.encode(
+                                NativeWorldLabDemoCheckpoint(kind,time.toDouble(),mass.toDouble(),
+                                    spring.toDouble(),resistance.toDouble(),diffusivity.toDouble(),
+                                    wallTimeUTC=java.time.Instant.now().toString(),worldEpochUTC=worldEpochUTC,
+                                    solverInternalTimeSeconds=time.toDouble(),displaySampleTimeSeconds=time.toDouble(),
+                                    playbackRate=speed.toDouble(),
+                                    playbackDirection=if(reversePlayback)"reverse-recording" else "forward",
+                                    timezoneDisplay=java.time.ZoneId.systemDefault().id,
+                                    solverStepSeconds=observation?.solverStepSeconds?:1.0/240.0))
+                            timelineExportPicker.launch("world-lab-time-checkpoint.json")
+                        }.onFailure{timelineStatus=it.message?:"Checkpoint could not be created."}
+                    }){Text("Save checkpoint")}
+                    OutlinedButton(onClick={timelineImportPicker.launch(arrayOf("application/json"))}){
+                        Text("Restore checkpoint")
+                    }
+                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                        Button(onClick={runCatching{
+                            val manifest=NativeWorldLabReplayCodec.create(model,worldEpochUTC,java.time.ZoneId.systemDefault().id)
+                            pendingReplayJson=NativeWorldLabReplayCodec.encode(manifest).toString(Charsets.UTF_8)
+                            replayExportPicker.launch("world-lab-replay-manifest.json")
+                            replayManifestStatus=""
+                        }.onFailure{replayManifestStatus=it.message?:"Replay manifest could not be created."}}){
+                            Text("Save deterministic replay")
+                        }
+                        OutlinedButton(onClick={replayImportPicker.launch(arrayOf("application/json"))}){
+                            Text("Open & replay manifest")
+                        }
+                    }
+                    if(replayManifestStatus.isNotBlank())Text(replayManifestStatus,style=MaterialTheme.typography.bodySmall)
+                }
+                if(timelineStatus.isNotBlank())Text(timelineStatus,style=MaterialTheme.typography.bodySmall)
+                demoClock?.let{clock->
+                    Text("Wall UTC "+clock.wallTimeUTC+" · World UTC "+clock.worldDateUTC+
+                        " · "+clock.timezoneDisplay,style=MaterialTheme.typography.bodySmall)
+                    Text("Simulation "+labNumber(clock.simulationTimeSeconds)+" s · display sample "+
+                        labNumber(clock.displaySampleTimeSeconds)+" s · cached model output",
+                        style=MaterialTheme.typography.bodySmall)
+                }
+                Text("Astronomical time scales · UTC / TAI / TT / UT1",style=MaterialTheme.typography.titleSmall)
+                val currentWorldUTC=demoClock?.worldDateUTC?:worldEpochUTC
+                val taiTtResult=remember(currentWorldUTC){runCatching{NativeWorldLabTimeScales.utcToTaiTt(currentWorldUTC)}}
+                val tcgResult=remember(currentWorldUTC){runCatching{NativeWorldLabTimeScales.utcToTcg(currentWorldUTC)}}
+                taiTtResult.fold(onSuccess={times->
+                    Text("TAI ${times.first} · TT ${times.second}",style=MaterialTheme.typography.bodySmall)
+                },onFailure={error->
+                    Text(error.message?: "TAI/TT unavailable.",style=MaterialTheme.typography.bodySmall,
+                        color=MaterialTheme.colorScheme.error)
+                })
+                tcgResult.fold(onSuccess={tcg->Text("TCG ${tcg.tcg} · IAU 2000 fixed-rate relation",style=MaterialTheme.typography.bodySmall)},
+                    onFailure={error->Text(error.message?: "TCG conversion unavailable.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.error)})
+                LabNote("TCB↔TDB uses the IAU 2006 linear MJD relation. UTC↔TDB is not derived here without a barycentric ephemeris.")
+                OutlinedButton(onClick={iersBulletinPicker.launch(arrayOf("text/plain","application/octet-stream"))}){
+                    Text("Import IERS Bulletin A (ser7.dat)")
+                }
+                if(earthOrientation!=null){
+                    val ut1Result=remember(currentWorldUTC,earthOrientation){
+                        runCatching{NativeWorldLabTimeScales.utcToUt1(currentWorldUTC,earthOrientation!!)}
+                    }
+                    ut1Result.fold(onSuccess={reading->
+                        Text("UT1 ${reading.ut1} · DUT1 ${labNumber(reading.dut1Seconds!!)} s ± ${labNumber(reading.ut1UncertaintySeconds!!)} s · ${reading.quality}",
+                            style=MaterialTheme.typography.bodySmall)
+                        Text("${reading.bulletin} · issued ${reading.issuedDateUTC}",
+                            style=MaterialTheme.typography.bodySmall)
+                    },onFailure={error->
+                        Text(error.message?: "UT1 is unavailable for this date.",style=MaterialTheme.typography.bodySmall)
+                    })
+                }
+                if(earthOrientationStatus.isNotBlank())Text(earthOrientationStatus,style=MaterialTheme.typography.bodySmall)
+                NativeWorldLabFieldImportPanel(timeSeconds=demoClock?.simulationTimeSeconds?:time.toDouble())
+                Text("Approximate sunrise and sunset",style=MaterialTheme.typography.titleSmall)
+                OutlinedTextField(value=solarDateUTC,onValueChange={solarDateUTC=it.take(10)},
+                    label={Text("UTC date · YYYY-MM-DD")},singleLine=true,
+                    modifier=Modifier.fillMaxWidth())
+                val solarOrigin=project?.geodeticOrigin
+                if(solarOrigin==null){
+                    LabNote("Save a WGS84 Earth reference to calculate solar events for this project.")
+                }else{
+                    val solarResult=remember(solarDateUTC,solarOrigin){
+                        runCatching{NativeWorldLabSolarEvents.calculate(solarDateUTC,
+                            solarOrigin.latitudeDegrees,solarOrigin.longitudeDegrees)}
+                    }
+                    val solarZone=remember(demoClock?.timezoneDisplay){
+                        runCatching{java.time.ZoneId.of(demoClock?.timezoneDisplay?:java.time.ZoneId.systemDefault().id)}
+                            .getOrDefault(java.time.ZoneId.systemDefault())
+                    }
+                    val solarFormatter=remember(solarZone){
+                        java.time.format.DateTimeFormatter.ofPattern("HH:mm z",Locale.getDefault()).withZone(solarZone)
+                    }
+                    solarResult.fold(onSuccess={events->
+                        when(events.status){
+                            NativeWorldLabSolarStatus.NORMAL->{
+                                Text("Sunrise "+solarFormatter.format(java.time.Instant.parse(events.sunriseUTC!!))+
+                                    " · Sunset "+solarFormatter.format(java.time.Instant.parse(events.sunsetUTC!!)),
+                                    style=MaterialTheme.typography.bodyMedium)
+                                Text("Solar noon "+solarFormatter.format(java.time.Instant.parse(events.solarNoonUTC))+
+                                    " · Daylight "+labNumber(events.daylightMinutes!!/60.0)+" h",
+                                    style=MaterialTheme.typography.bodySmall)
+                            }
+                            NativeWorldLabSolarStatus.POLAR_DAY->LabNote("Polar day · Sun remains above the model's apparent horizon for this UTC date.")
+                            NativeWorldLabSolarStatus.POLAR_NIGHT->LabNote("Polar night · Sun remains below the model's apparent horizon for this UTC date.")
+                        }
+                        Text("NOAA general solar-position estimate · WGS84 project origin · "+
+                            "local display zone "+solarZone.id+
+                            ". Not an observed horizon, weather forecast or precision ephemeris.",
+                            style=MaterialTheme.typography.bodySmall)
+                    },onFailure={error->
+                        Text(error.message?: "Solar estimate is unavailable.",style=MaterialTheme.typography.bodySmall,
+                            color=MaterialTheme.colorScheme.error)
+                    })
+                }
+                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                    OutlinedButton(onClick={
+                        playing=false;reversePlayback=false
+                        demoRecording?.let{recording->demoClock?.let{clock->
+                            demoClock=NativeWorldLabRecordedTime.seek(recording.clockRun,clock,0.0)
+                            time=demoClock!!.simulationTimeSeconds.toFloat()
+                        }}
+                    }) { Text("Beginning") }
+                    OutlinedButton(onClick={
+                        playing=false
+                        demoRecording?.let{recording->demoClock?.let{clock->
+                            demoClock=NativeWorldLabRecordedTime.step(recording.clockRun,clock,-1)
+                            time=demoClock!!.simulationTimeSeconds.toFloat()
+                        }}
+                    }) { Text("Previous") }
+                    Button(onClick={
+                        reversePlayback=false
+                        demoRecording?.let{recording->demoClock?.let{clock->
+                            if(clock.simulationTimeSeconds>=recording.clockRun.durationSeconds-1e-9){
+                                demoClock=NativeWorldLabRecordedTime.seek(recording.clockRun,clock,0.0)
+                                time=0f
+                            }
+                        }}
+                        playing=!playing
+                    }) { Text(if(playing&&!reversePlayback)"Pause" else "Play forward") }
+                    OutlinedButton(onClick={
+                        reversePlayback=true
+                        demoRecording?.let{recording->demoClock?.let{clock->
+                            if(clock.simulationTimeSeconds<=1e-9){
+                                demoClock=NativeWorldLabRecordedTime.seek(recording.clockRun,clock,
+                                    recording.clockRun.durationSeconds)
+                                time=demoClock!!.simulationTimeSeconds.toFloat()
+                            }
+                        }}
+                        playing=true
+                    }) { Text("Rewind recording") }
+                    OutlinedButton(onClick={
+                        playing=false
+                        demoRecording?.let{recording->demoClock?.let{clock->
+                            demoClock=NativeWorldLabRecordedTime.step(recording.clockRun,clock,1)
+                            time=demoClock!!.simulationTimeSeconds.toFloat()
+                        }}
+                    }) { Text("Next") }
+                    OutlinedButton(onClick={
+                        playing=false;reversePlayback=false
+                        demoRecording?.let{recording->demoClock?.let{clock->
+                            demoClock=NativeWorldLabRecordedTime.seek(recording.clockRun,clock,
+                                recording.clockRun.durationSeconds)
+                            time=demoClock!!.simulationTimeSeconds.toFloat()
+                        }}
+                    }) { Text("End") }
+                }
+                Text("Simulated time: "+labNumber(time.toDouble())+" s")
+                Slider(value=time,onValueChange={value->
+                    playing=false
+                    demoRecording?.let{recording->demoClock?.let{clock->
+                        demoClock=NativeWorldLabRecordedTime.seek(recording.clockRun,clock,value.toDouble())
+                        time=demoClock!!.simulationTimeSeconds.toFloat()
+                    }}
+                },valueRange=0f..12f,
+                    modifier=Modifier.semantics { contentDescription="Recorded simulation sample position" })
+                Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+                    listOf(0.01f,0.1f,1f,10f,100f).forEach { rate ->
+                        OutlinedButton(onClick={speed=rate},modifier=Modifier.weight(1f),
+                            contentPadding=PaddingValues(horizontal=2.dp,vertical=8.dp)) {
+                            Text(labNumber(rate.toDouble())+"×",style=MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+                if(kind=="spring") {
+                    Text("Assumed mass: "+labNumber(mass.toDouble())+" kg")
+                    Slider(value=mass.coerceIn(0.1f,100f),onValueChange={mass=it;playing=false},
+                        valueRange=0.1f..100f)
+                    Text("Spring stiffness: "+labNumber(spring.toDouble())+" N/m")
+                    Slider(value=spring,onValueChange={spring=it;playing=false},valueRange=0.1f..30f)
+                }else if(kind=="rc") {
+                    Text("Resistance: "+labNumber(resistance.toDouble())+" Ω")
+                    Slider(value=resistance,onValueChange={resistance=it;playing=false},valueRange=100f..10000f)
+                }else{
+                    Text("Thermal diffusivity: "+labNumber(diffusivity.toDouble())+" m²/s")
+                    Slider(value=diffusivity,onValueChange={diffusivity=it;playing=false},valueRange=0.001f..0.08f)
+                }
+                HorizontalDivider()
+                Text("Experiment branches",style=MaterialTheme.typography.titleMedium)
+                LabNote("Capture the current model inputs as an immutable source, edit inputs, then calculate a separate child run at the same simulation time. Rewind remains cached playback only.")
+                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                    OutlinedButton(onClick={captureBranchSource()}){Text("Capture source")}
+                    OutlinedButton(onClick={calculateNativeBranch()},
+                        enabled=branchSourceInput!=null&&branchSourceInput!=model){Text("Calculate new branch")}
+                }
+                branchRecord?.let{branch->
+                    Text("Branch "+branch.branchId+" · "+branch.sourceModelId+" → "+branch.targetModelId,
+                        style=MaterialTheme.typography.bodySmall)
+                    Text("Source run "+branch.sourceRunId+" · "+branch.inputDiff.size+" changed inputs · "+
+                        branch.targetTimeSeconds+" s · "+branch.fidelity,style=MaterialTheme.typography.bodySmall)
+                    branch.inputDiff.forEach{change->
+                        Text(change.field+": "+(change.previous?.let{labNumber(it)}?:"unset")+
+                            " → "+(change.next?.let{labNumber(it)}?:"unset"),
                             style=MaterialTheme.typography.bodySmall)
                     }
-                    NativeWorldLabSolarStatus.POLAR_DAY->Text(
-                        "Polar day · Sun remains above the model's apparent horizon for this UTC date.",
-                        style=MaterialTheme.typography.bodySmall)
-                    NativeWorldLabSolarStatus.POLAR_NIGHT->Text(
-                        "Polar night · Sun remains below the model's apparent horizon for this UTC date.",
-                        style=MaterialTheme.typography.bodySmall)
+                    OutlinedButton(onClick={branchExportPicker.launch("world-lab-native-branch.json")}){
+                        Text("Export branch evidence")
+                    }
                 }
-                Text("NOAA general solar-position estimate · WGS84 project origin · "+
-                    "local display zone "+solarZone.id+
-                    ". Not an observed horizon, weather forecast or precision ephemeris.",
-                    style=MaterialTheme.typography.bodySmall)
-            },onFailure={error->
-                Text(error.message?: "Solar estimate is unavailable.",style=MaterialTheme.typography.bodySmall,
+                if(branchStatus.isNotBlank())Text(branchStatus,style=MaterialTheme.typography.bodySmall)
+                Text("Computed observations",style=MaterialTheme.typography.titleMedium)
+                if(observation==null) Text(result.exceptionOrNull()?.message?:"Unsupported input",
                     color=MaterialTheme.colorScheme.error)
-            })
-        }
-        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
-            OutlinedButton(onClick={
-                playing=false;reversePlayback=false
-                demoRecording?.let{recording->demoClock?.let{clock->
-                    demoClock=NativeWorldLabRecordedTime.seek(recording.clockRun,clock,0.0)
-                    time=demoClock!!.simulationTimeSeconds.toFloat()
-                }}
-            }) { Text("Beginning") }
-            OutlinedButton(onClick={
-                playing=false
-                demoRecording?.let{recording->demoClock?.let{clock->
-                    demoClock=NativeWorldLabRecordedTime.step(recording.clockRun,clock,-1)
-                    time=demoClock!!.simulationTimeSeconds.toFloat()
-                }}
-            }) { Text("Previous") }
-            Button(onClick={
-                reversePlayback=false
-                demoRecording?.let{recording->demoClock?.let{clock->
-                    if(clock.simulationTimeSeconds>=recording.clockRun.durationSeconds-1e-9){
-                        demoClock=NativeWorldLabRecordedTime.seek(recording.clockRun,clock,0.0)
-                        time=0f
-                    }
-                }}
-                playing=!playing
-            }) { Text(if(playing&&!reversePlayback)"Pause" else "Play forward") }
-            OutlinedButton(onClick={
-                reversePlayback=true
-                demoRecording?.let{recording->demoClock?.let{clock->
-                    if(clock.simulationTimeSeconds<=1e-9){
-                        demoClock=NativeWorldLabRecordedTime.seek(recording.clockRun,clock,
-                            recording.clockRun.durationSeconds)
-                        time=demoClock!!.simulationTimeSeconds.toFloat()
-                    }
-                }}
-                playing=true
-            }) { Text("Rewind recording") }
-            OutlinedButton(onClick={
-                playing=false
-                demoRecording?.let{recording->demoClock?.let{clock->
-                    demoClock=NativeWorldLabRecordedTime.step(recording.clockRun,clock,1)
-                    time=demoClock!!.simulationTimeSeconds.toFloat()
-                }}
-            }) { Text("Next") }
-            OutlinedButton(onClick={
-                playing=false;reversePlayback=false
-                demoRecording?.let{recording->demoClock?.let{clock->
-                    demoClock=NativeWorldLabRecordedTime.seek(recording.clockRun,clock,
-                        recording.clockRun.durationSeconds)
-                    time=demoClock!!.simulationTimeSeconds.toFloat()
-                }}
-            }) { Text("End") }
-        }
-        Text("Simulated time: "+labNumber(time.toDouble())+" s")
-        Slider(value=time,onValueChange={value->
-            playing=false
-            demoRecording?.let{recording->demoClock?.let{clock->
-                demoClock=NativeWorldLabRecordedTime.seek(recording.clockRun,clock,value.toDouble())
-                time=demoClock!!.simulationTimeSeconds.toFloat()
-            }}
-        },valueRange=0f..12f,
-            modifier=Modifier.semantics { contentDescription="Recorded simulation sample position" })
-        Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) {
-            listOf(0.01f,0.1f,1f,10f,100f).forEach { rate ->
-                OutlinedButton(onClick={speed=rate},modifier=Modifier.weight(1f),
-                    contentPadding=PaddingValues(horizontal=2.dp,vertical=8.dp)) {
-                    Text(labNumber(rate.toDouble())+"×",style=MaterialTheme.typography.labelSmall)
+                else if(kind=="spring") {
+                    Text("Position: "+labNumber(observation.xMeters)+" m")
+                    Text("Velocity: "+labNumber(observation.velocityMPerS)+" m/s")
+                    Text("Mechanical energy: "+labNumber(observation.mechanicalEnergyJ)+" J")
+                }else if(kind=="rc") {
+                    Text("Capacitor voltage: "+labNumber(observation.voltageV)+" V")
+                    Text("Current: "+labNumber(observation.currentA)+" A")
+                    Text("Resistor heating: "+labNumber(observation.resistorHeatW)+" W")
+                }else{
+                    Text("Mean temperature: "+labNumber(observation.meanTemperatureK)+" K")
+                    Text("Hottest cell: "+labNumber(observation.peakTemperatureK)+" K")
+                    if(inside) Text("21 computed internal cell temperatures (K): "+
+                        observation.temperatureK.orEmpty().joinToString(", "){labNumber(it)},
+                        style=MaterialTheme.typography.bodySmall)
                 }
-            }
-        }
-        if(kind=="spring") {
-            Text("Assumed mass: "+labNumber(mass.toDouble())+" kg")
-            Slider(value=mass.coerceIn(0.1f,100f),onValueChange={mass=it;playing=false},
-                valueRange=0.1f..100f)
-            Text("Spring stiffness: "+labNumber(spring.toDouble())+" N/m")
-            Slider(value=spring,onValueChange={spring=it;playing=false},valueRange=0.1f..30f)
-        }else if(kind=="rc") {
-            Text("Resistance: "+labNumber(resistance.toDouble())+" Ω")
-            Slider(value=resistance,onValueChange={resistance=it;playing=false},valueRange=100f..10000f)
-        }else{
-            Text("Thermal diffusivity: "+labNumber(diffusivity.toDouble())+" m²/s")
-            Slider(value=diffusivity,onValueChange={diffusivity=it;playing=false},valueRange=0.001f..0.08f)
-        }
-        HorizontalDivider()
-        Text("Experiment branches",style=MaterialTheme.typography.titleMedium)
-        Text("Capture the current model inputs as an immutable source, edit inputs, then calculate a separate child run at the same simulation time. Rewind remains cached playback only.",
-            style=MaterialTheme.typography.bodySmall)
-        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-            OutlinedButton(onClick={captureBranchSource()}){Text("Capture source")}
-            OutlinedButton(onClick={calculateNativeBranch()},
-                enabled=branchSourceInput!=null&&branchSourceInput!=model){Text("Calculate new branch")}
-        }
-        branchRecord?.let{branch->
-            Text("Branch "+branch.branchId+" · "+branch.sourceModelId+" → "+branch.targetModelId,
-                style=MaterialTheme.typography.bodySmall)
-            Text("Source run "+branch.sourceRunId+" · "+branch.inputDiff.size+" changed inputs · "+
-                branch.targetTimeSeconds+" s · "+branch.fidelity,style=MaterialTheme.typography.bodySmall)
-            branch.inputDiff.forEach{change->
-                Text(change.field+": "+(change.previous?.let{labNumber(it)}?:"unset")+
-                    " → "+(change.next?.let{labNumber(it)}?:"unset"),
-                    style=MaterialTheme.typography.bodySmall)
-            }
-            OutlinedButton(onClick={branchExportPicker.launch("world-lab-native-branch.json")}){
-                Text("Export branch evidence")
-            }
-        }
-        if(branchStatus.isNotBlank())Text(branchStatus,style=MaterialTheme.typography.bodySmall)
-        Text("Computed observations",style=MaterialTheme.typography.titleMedium)
-        if(observation==null) Text(result.exceptionOrNull()?.message?:"Unsupported input",
-            color=MaterialTheme.colorScheme.error)
-        else if(kind=="spring") {
-            Text("Position: "+labNumber(observation.xMeters)+" m")
-            Text("Velocity: "+labNumber(observation.velocityMPerS)+" m/s")
-            Text("Mechanical energy: "+labNumber(observation.mechanicalEnergyJ)+" J")
-        }else if(kind=="rc") {
-            Text("Capacitor voltage: "+labNumber(observation.voltageV)+" V")
-            Text("Current: "+labNumber(observation.currentA)+" A")
-            Text("Resistor heating: "+labNumber(observation.resistorHeatW)+" W")
-        }else{
-            Text("Mean temperature: "+labNumber(observation.meanTemperatureK)+" K")
-            Text("Hottest cell: "+labNumber(observation.peakTemperatureK)+" K")
-            if(inside) Text("21 computed internal cell temperatures (K): "+
-                observation.temperatureK.orEmpty().joinToString(", "){labNumber(it)},
-                style=MaterialTheme.typography.bodySmall)
-        }
-        if(inside && kind!="heat") Text("This is a model illustration, not X-ray imaging.",
-            style=MaterialTheme.typography.bodySmall)
-        HorizontalDivider()
-        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-            Button(onClick={askReplace("new")}){Text("New project")}
-            OutlinedButton(onClick={projectJson?.let{exportPicker.launch("world-lab-project.json")}},
-                enabled=projectJson!=null){Text("Export JSON")}
-            OutlinedButton(onClick={projectJson?.let{cadExportPicker.launch("world-lab-cad.envcad.json")}},
-                enabled=projectJson!=null&&project!!.entities.isNotEmpty()){Text("Export CAD")}
-            OutlinedButton(onClick={
-                if(projectJson!=null)archiveExportPicker.launch(
-                    "world-lab-complete-archive.json")
-            },enabled=projectJson!=null){Text("Export complete archive")}
-        }
-        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-            OutlinedButton(onClick={askReplace("import")}) {
-                Text("Import project or archive")
-            }
-            OutlinedButton(onClick={picker.launch(arrayOf("application/json"))}){
-                Text("Import CAD geometry")
-            }
-        }
-        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            Button(onClick={
-                val json=projectJson
-                if(json!=null)scope.launch{
-                    val prior=savedSnapshot
-                    runCatching { withContext(Dispatchers.IO){
-                        val savedBaseline=prior?.let{NativeWorldLabProjectCodec.decode(it)}
-                        val current=NativeWorldLabProjectCodec.decode(json)
-                        val expected=savedBaseline?.takeIf{it.id==current.id}?.revision
-                        localProjects.save(json,expectedSavedRevision=expected)
-                        localProjects.deleteDraft(current.id)
-                        localProjects.listProjects()
-                    } }.onSuccess{items->
-                        savedSnapshot=json;savedProjects=items
-                        selectedSavedId=project?.id?:""
-                        warning="";editHistory.clear()
-                        scope.launch {
-                            runCatching{withContext(Dispatchers.IO){localProjects.listDrafts()}}
-                                .onSuccess{recoveryDrafts=it}
-                        }
-                    }
-                        .onFailure{warning=it.message?:"Could not save the project locally."}
-                }
-            },enabled=projectJson!=null){Text("Save locally")}
-            OutlinedButton(onClick={askReplace("open")}){Text("Open last saved")}
-        }
-        if(savedProjects.isNotEmpty()){
-            Box {
-                OutlinedButton(onClick={savedMenuOpen=true}){
-                    Text("Saved projects: "+
-                        (savedProjects.firstOrNull{it.id==selectedSavedId}?.title?:"Choose"))
-                }
-                DropdownMenu(expanded=savedMenuOpen,onDismissRequest={savedMenuOpen=false}){
-                    savedProjects.forEach{item->
-                        DropdownMenuItem(
-                            text={Text(item.title+" · revision "+item.revision)},
-                            onClick={selectedSavedId=item.id;savedMenuOpen=false})
-                    }
-                }
-            }
-            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                OutlinedButton(onClick={askReplace("open-selected")},
-                    enabled=selectedSavedId.isNotEmpty()){Text("Open selected")}
-                OutlinedButton(onClick={confirmingSavedDelete=true},
-                    enabled=selectedSavedId.isNotEmpty()){Text("Delete saved copy")}
-            }
-        }
-        if(recoveryDrafts.isNotEmpty()){
-            Text("Recover unfinished inventions",style=MaterialTheme.typography.titleSmall)
-            Text("Cached drafts never replace the open project unless you choose Restore.",
-                style=MaterialTheme.typography.bodySmall)
-            recoveryDrafts.take(10).forEach{draft->
-                Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
-                    Text(draft.title,modifier=Modifier.weight(1f))
+                if(inside && kind!="heat") LabNote("This is a model illustration, not X-ray imaging.")
+                HorizontalDivider()
+                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                    Button(onClick={askReplace("new")}){Text("New project")}
+                    OutlinedButton(onClick={projectJson?.let{exportPicker.launch("world-lab-project.json")}},
+                        enabled=projectJson!=null){Text("Export JSON")}
+                    OutlinedButton(onClick={projectJson?.let{cadExportPicker.launch("world-lab-cad.envcad.json")}},
+                        enabled=projectJson!=null&&project!!.entities.isNotEmpty()){Text("Export CAD")}
                     OutlinedButton(onClick={
-                        selectedDraftId=draft.id;askReplace("restore-draft")
-                    }){Text("Restore")}
-                    OutlinedButton(onClick={
-                        selectedDraftId=draft.id;confirmingDraftDelete=true
-                    }){Text("Discard")}
+                        if(projectJson!=null)archiveExportPicker.launch(
+                            "world-lab-complete-archive.json")
+                    },enabled=projectJson!=null){Text("Export complete archive")}
                 }
-            }
-            if(recoveryDrafts.size>10)Text("Older cached drafts: "+
-                (recoveryDrafts.size-10)+" (export or clean up your project cache).")
-        }
-        if(projectJson!=null && savedSnapshot!=projectJson)
-            Text("Unsaved changes on this device. Export JSON or Save locally to preserve this project.",
-                style=MaterialTheme.typography.bodySmall)
-        if(project!=null){
-            Text(project!!.title+" · "+project!!.entities.size+" solids",style=MaterialTheme.typography.titleSmall)
-            NativeWorldLabViewport(project!!,project!!.entities.getOrNull(selected)?.id,
-                onSelect={id->selected=project!!.entities.indexOfFirst{it.id==id}.coerceAtLeast(0)},
-                onSaveView={position,target->applyProjectEdit{
-                    NativeWorldLabEditor.saveCameraViewpoint(it,position,target)
-                }},
-                onResetView={applyProjectEdit{
-                    NativeWorldLabEditor.saveCameraViewpoint(it,listOf(0.0,1.65,-8.0),listOf(0.0,1.2,0.0))
-                }},
-                onSaveGeodeticOrigin={origin->applyProjectEdit{NativeWorldLabEditor.setGeodeticOrigin(it,origin)}},
-                onClearGeodeticOrigin={applyProjectEdit{NativeWorldLabEditor.setGeodeticOrigin(it,null)}},
-                inspection=inspection,onInspectionChange={updateInspection(it)},
-                canUndoInspectionView=inspectionHistory.past.isNotEmpty(),
-                canRedoInspectionView=inspectionHistory.future.isNotEmpty(),
-                onUndoInspectionView={travelInspection(false)},
-                onRedoInspectionView={travelInspection(true)})
-            NativeWorldLabMultiCadPanel(project!!,projectJson!!,project!!.entities.getOrNull(selected)?.id){ transform ->
-                applyProjectEdit(transform)
-            }
-            digitalCircuitContent()
-            Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
-                listOf("box" to "Add cube","sphere" to "Add sphere","cylinder" to "Add cylinder")
-                    .forEach { (shape,label) ->
-                        OutlinedButton(onClick={applyProjectEdit { NativeWorldLabEditor.addSolid(it,shape) }},
-                            enabled=project!!.entities.size<200,modifier=Modifier.weight(1f)){
-                            Text(label)
+                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                    OutlinedButton(onClick={askReplace("import")}) {
+                        Text("Import project or archive")
+                    }
+                    OutlinedButton(onClick={picker.launch(arrayOf("application/json"))}){
+                        Text("Import CAD geometry")
+                    }
+                }
+                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                    Button(onClick={
+                        val json=projectJson
+                        if(json!=null)scope.launch{
+                            val prior=savedSnapshot
+                            runCatching { withContext(Dispatchers.IO){
+                                val savedBaseline=prior?.let{NativeWorldLabProjectCodec.decode(it)}
+                                val current=NativeWorldLabProjectCodec.decode(json)
+                                val expected=savedBaseline?.takeIf{it.id==current.id}?.revision
+                                localProjects.save(json,expectedSavedRevision=expected)
+                                localProjects.deleteDraft(current.id)
+                                localProjects.listProjects()
+                            } }.onSuccess{items->
+                                savedSnapshot=json;savedProjects=items
+                                selectedSavedId=project?.id?:""
+                                warning="";editHistory.clear()
+                                scope.launch {
+                                    runCatching{withContext(Dispatchers.IO){localProjects.listDrafts()}}
+                                        .onSuccess{recoveryDrafts=it}
+                                }
+                            }
+                                .onFailure{warning=it.message?:"Could not save the project locally."}
+                        }
+                    },enabled=projectJson!=null){Text("Save locally")}
+                    OutlinedButton(onClick={askReplace("open")}){Text("Open last saved")}
+                }
+                if(savedProjects.isNotEmpty()){
+                    Box {
+                        OutlinedButton(onClick={savedMenuOpen=true}){
+                            Text("Saved projects: "+
+                                (savedProjects.firstOrNull{it.id==selectedSavedId}?.title?:"Choose"))
+                        }
+                        DropdownMenu(expanded=savedMenuOpen,onDismissRequest={savedMenuOpen=false}){
+                            savedProjects.forEach{item->
+                                DropdownMenuItem(
+                                    text={Text(item.title+" · revision "+item.revision)},
+                                    onClick={selectedSavedId=item.id;savedMenuOpen=false})
+                            }
                         }
                     }
-            }
-            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                OutlinedButton(onClick={travelEdit(false)},enabled=editHistory.canUndo){
-                    Text("Undo")
+                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                        OutlinedButton(onClick={askReplace("open-selected")},
+                            enabled=selectedSavedId.isNotEmpty()){Text("Open selected")}
+                        OutlinedButton(onClick={confirmingSavedDelete=true},
+                            enabled=selectedSavedId.isNotEmpty()){Text("Delete saved copy")}
+                    }
                 }
-                OutlinedButton(onClick={travelEdit(true)},enabled=editHistory.canRedo){
-                    Text("Redo")
+                if(recoveryDrafts.isNotEmpty()){
+                    Text("Recover unfinished inventions",style=MaterialTheme.typography.titleSmall)
+                    LabNote("Cached drafts never replace the open project unless you choose Restore.")
+                    recoveryDrafts.take(10).forEach{draft->
+                        Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                            Text(draft.title,modifier=Modifier.weight(1f))
+                            OutlinedButton(onClick={
+                                selectedDraftId=draft.id;askReplace("restore-draft")
+                            }){Text("Restore")}
+                            OutlinedButton(onClick={
+                                selectedDraftId=draft.id;confirmingDraftDelete=true
+                            }){Text("Discard")}
+                        }
+                    }
+                    if(recoveryDrafts.size>10)Text("Older cached drafts: "+
+                        (recoveryDrafts.size-10)+" (export or clean up your project cache).")
                 }
-            }
-            Text("Build from connected visual parts",style=MaterialTheme.typography.titleSmall)
-            Text("Group solids and move them together. A visual assembly is not a simulated joint.",
-                style=MaterialTheme.typography.bodySmall)
-            if(solid!=null){
-                val candidates=project!!.entities.filter{it.id!=solid.id &&
-                    project!!.assemblies.none{a->a.entityIds.contains(it.id)}}
-                if(candidates.isNotEmpty()){
-                    val other=candidates[secondAssemblyIndex%candidates.size]
-                    OutlinedTextField(value=assemblyName,onValueChange={assemblyName=it},
-                        label={Text("Invention group name")},singleLine=true)
-                    Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
-                        OutlinedButton(onClick={
-                            secondAssemblyIndex=(secondAssemblyIndex+1)%candidates.size
-                        }){Text("Second part: "+other.name)}
+                if(projectJson!=null && savedSnapshot!=projectJson)
+                    LabNote("Unsaved changes on this device. Export JSON or Save locally to preserve this project.")
+                if(project!=null){
+                    Text(project!!.title+" · "+project!!.entities.size+" solids",style=MaterialTheme.typography.titleSmall)
+                    NativeWorldLabViewportControls(project!!,project!!.entities.getOrNull(selected)?.id,viewState!!,
+                        onSaveView={position,target->applyProjectEdit{
+                            NativeWorldLabEditor.saveCameraViewpoint(it,position,target)
+                        }},
+                        onResetView={applyProjectEdit{
+                            NativeWorldLabEditor.saveCameraViewpoint(it,listOf(0.0,1.65,-8.0),listOf(0.0,1.2,0.0))
+                        }},
+                        onSaveGeodeticOrigin={origin->applyProjectEdit{NativeWorldLabEditor.setGeodeticOrigin(it,origin)}},
+                        onClearGeodeticOrigin={applyProjectEdit{NativeWorldLabEditor.setGeodeticOrigin(it,null)}},
+                        inspection=inspection,onInspectionChange={updateInspection(it)},
+                        canUndoInspectionView=inspectionHistory.past.isNotEmpty(),
+                        canRedoInspectionView=inspectionHistory.future.isNotEmpty(),
+                        onUndoInspectionView={travelInspection(false)},
+                        onRedoInspectionView={travelInspection(true)})
+                    NativeWorldLabMultiCadPanel(project!!,projectJson!!,project!!.entities.getOrNull(selected)?.id){ transform ->
+                        applyProjectEdit(transform)
+                    }
+                    digitalCircuitContent()
+                    Row(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
+                        listOf("box" to "Add cube","sphere" to "Add sphere","cylinder" to "Add cylinder")
+                            .forEach { (shape,label) ->
+                                OutlinedButton(onClick={applyProjectEdit { NativeWorldLabEditor.addSolid(it,shape) }},
+                                    enabled=project!!.entities.size<200,modifier=Modifier.weight(1f)){
+                                    Text(label)
+                                }
+                            }
+                    }
+                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
+                        OutlinedButton(onClick={travelEdit(false)},enabled=editHistory.canUndo){
+                            Text("Undo")
+                        }
+                        OutlinedButton(onClick={travelEdit(true)},enabled=editHistory.canRedo){
+                            Text("Redo")
+                        }
+                    }
+                    Text("Build from connected visual parts",style=MaterialTheme.typography.titleSmall)
+                    LabNote("Group solids and move them together. A visual assembly is not a simulated joint.")
+                    if(solid!=null){
+                        val candidates=project!!.entities.filter{it.id!=solid.id &&
+                            project!!.assemblies.none{a->a.entityIds.contains(it.id)}}
+                        if(candidates.isNotEmpty()){
+                            val other=candidates[secondAssemblyIndex%candidates.size]
+                            OutlinedTextField(value=assemblyName,onValueChange={assemblyName=it},
+                                label={Text("Invention group name")},singleLine=true)
+                            Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
+                                OutlinedButton(onClick={
+                                    secondAssemblyIndex=(secondAssemblyIndex+1)%candidates.size
+                                }){Text("Second part: "+other.name)}
+                                OutlinedButton(onClick={applyProjectEdit{
+                                    NativeWorldLabEditor.createVisualAssembly(
+                                        it,assemblyName,listOf(solid.id,other.id))
+                                }},enabled=project!!.assemblies.size<50&&assemblyName.isNotBlank()&&
+                                    project!!.assemblies.none{it.entityIds.contains(solid.id)}){
+                                    Text("Group parts")
+                                }
+                            }
+                        }
+                    }
+                    project!!.assemblies.forEach{group->
+                        Text(group.name+" · "+group.entityIds.size+" parts",
+                            style=MaterialTheme.typography.bodyMedium)
+                        Row(horizontalArrangement=Arrangement.spacedBy(5.dp)){
+                            listOf(0 to "X",1 to "Y",2 to "Z").forEach{(axis,label)->
+                                OutlinedButton(onClick={applyProjectEdit{
+                                    NativeWorldLabEditor.moveVisualAssembly(it,group.id,
+                                        List(3){j->if(j==axis)assemblyMoveStep else 0.0})
+                                }}){Text("Move +"+label)}
+                            }
+                        }
                         OutlinedButton(onClick={applyProjectEdit{
-                            NativeWorldLabEditor.createVisualAssembly(
-                                it,assemblyName,listOf(solid.id,other.id))
-                        }},enabled=project!!.assemblies.size<50&&assemblyName.isNotBlank()&&
-                            project!!.assemblies.none{it.entityIds.contains(solid.id)}){
-                            Text("Group parts")
-                        }
+                            NativeWorldLabEditor.ungroupVisualAssembly(it,group.id)
+                        }}){Text("Ungroup safely")}
                     }
-                }
-            }
-            project!!.assemblies.forEach{group->
-                Text(group.name+" · "+group.entityIds.size+" parts",
-                    style=MaterialTheme.typography.bodyMedium)
-                Row(horizontalArrangement=Arrangement.spacedBy(5.dp)){
-                    listOf(0 to "X",1 to "Y",2 to "Z").forEach{(axis,label)->
-                        OutlinedButton(onClick={applyProjectEdit{
-                            NativeWorldLabEditor.moveVisualAssembly(it,group.id,
-                                List(3){j->if(j==axis)assemblyMoveStep else 0.0})
-                        }}){Text("Move +"+label)}
-                    }
-                }
-                OutlinedButton(onClick={applyProjectEdit{
-                    NativeWorldLabEditor.ungroupVisualAssembly(it,group.id)
-                }}){Text("Ungroup safely")}
-            }
-            selectedSolidContent()
-            OutlinedTextField(value=proposedName,onValueChange={proposedName=it},
-                label={Text("Invented material name")},singleLine=true,
-                modifier=Modifier.fillMaxWidth())
-            OutlinedTextField(value=proposedDensity,onValueChange={proposedDensity=it},
-                label={Text("Hypothetical density (kg/m³), or blank")},singleLine=true,
-                modifier=Modifier.fillMaxWidth())
-            OutlinedTextField(value=proposedModulus,onValueChange={proposedModulus=it},
-                label={Text("Hypothetical Young's modulus (Pa), or blank")},
-                singleLine=true,modifier=Modifier.fillMaxWidth())
-            OutlinedTextField(value=proposedConductivity,
-                onValueChange={proposedConductivity=it},
-                label={Text("Assumed thermal conductivity (W/m K), or blank")},
-                singleLine=true,modifier=Modifier.fillMaxWidth())
-            OutlinedTextField(value=proposedSpecificHeat,
-                onValueChange={proposedSpecificHeat=it},
-                label={Text("Assumed specific heat (J/kg K), or blank")},
-                singleLine=true,modifier=Modifier.fillMaxWidth())
-            OutlinedTextField(value=proposedRefraction,
-                onValueChange={proposedRefraction=it},
-                label={Text("Assumed optical refractive index 1–5, or blank")},
-                singleLine=true,modifier=Modifier.fillMaxWidth())
-            Button(onClick={
-                runCatching {
-                    require(proposedName.isNotBlank()){"Name your invented material first."}
-                    val density=proposedDensity.trim().takeIf{it.isNotEmpty()}?.toDouble()
-                    val modulus=proposedModulus.trim().takeIf{it.isNotEmpty()}?.toDouble()
-                    val conductivity=proposedConductivity.trim().takeIf{it.isNotEmpty()}?.toDouble()
-                    val heatCapacity=proposedSpecificHeat.trim().takeIf{it.isNotEmpty()}?.toDouble()
-                    val refraction=proposedRefraction.trim().takeIf{it.isNotEmpty()}?.toDouble()
-                    val materialId=editingMaterialId
-                    val freshId=java.util.UUID.randomUUID().toString()
-                    val previous=projectJson
-                    applyProjectEdit{json->
-                        if(materialId!=null){
-                            NativeWorldLabEditor.reviseHypotheticalMaterial(
-                                json,materialId,proposedName,density,modulus,
-                                thermalConductivityWPerMK=conductivity,
-                                specificHeatJPerKgK=heatCapacity,
-                                refractiveIndex=refraction)
-                        }else{
-                            val proposed=NativeWorldLabEditor.addHypotheticalMaterial(
-                                json,proposedName,density,youngModulusPa=modulus,id=freshId,
-                                thermalConductivityWPerMK=conductivity,
-                                specificHeatJPerKgK=heatCapacity,
-                                refractiveIndex=refraction)
-                            solid?.let{NativeWorldLabEditor.assignMaterial(
-                                proposed,it.id,freshId)}?:proposed
-                        }
-                    }
-                    if(projectJson!=previous){
-                        proposedName="";proposedDensity="";proposedModulus=""
+                    selectedSolidContent()
+                    OutlinedTextField(value=proposedName,onValueChange={proposedName=it},
+                        label={Text("Invented material name")},singleLine=true,
+                        modifier=Modifier.fillMaxWidth())
+                    OutlinedTextField(value=proposedDensity,onValueChange={proposedDensity=it},
+                        label={Text("Hypothetical density (kg/m³), or blank")},singleLine=true,
+                        modifier=Modifier.fillMaxWidth())
+                    OutlinedTextField(value=proposedModulus,onValueChange={proposedModulus=it},
+                        label={Text("Hypothetical Young's modulus (Pa), or blank")},
+                        singleLine=true,modifier=Modifier.fillMaxWidth())
+                    OutlinedTextField(value=proposedConductivity,
+                        onValueChange={proposedConductivity=it},
+                        label={Text("Assumed thermal conductivity (W/m K), or blank")},
+                        singleLine=true,modifier=Modifier.fillMaxWidth())
+                    OutlinedTextField(value=proposedSpecificHeat,
+                        onValueChange={proposedSpecificHeat=it},
+                        label={Text("Assumed specific heat (J/kg K), or blank")},
+                        singleLine=true,modifier=Modifier.fillMaxWidth())
+                    OutlinedTextField(value=proposedRefraction,
+                        onValueChange={proposedRefraction=it},
+                        label={Text("Assumed optical refractive index 1–5, or blank")},
+                        singleLine=true,modifier=Modifier.fillMaxWidth())
+                    Button(onClick={
+                        runCatching {
+                            require(proposedName.isNotBlank()){"Name your invented material first."}
+                            val density=proposedDensity.trim().takeIf{it.isNotEmpty()}?.toDouble()
+                            val modulus=proposedModulus.trim().takeIf{it.isNotEmpty()}?.toDouble()
+                            val conductivity=proposedConductivity.trim().takeIf{it.isNotEmpty()}?.toDouble()
+                            val heatCapacity=proposedSpecificHeat.trim().takeIf{it.isNotEmpty()}?.toDouble()
+                            val refraction=proposedRefraction.trim().takeIf{it.isNotEmpty()}?.toDouble()
+                            val materialId=editingMaterialId
+                            val freshId=java.util.UUID.randomUUID().toString()
+                            val previous=projectJson
+                            applyProjectEdit{json->
+                                if(materialId!=null){
+                                    NativeWorldLabEditor.reviseHypotheticalMaterial(
+                                        json,materialId,proposedName,density,modulus,
+                                        thermalConductivityWPerMK=conductivity,
+                                        specificHeatJPerKgK=heatCapacity,
+                                        refractiveIndex=refraction)
+                                }else{
+                                    val proposed=NativeWorldLabEditor.addHypotheticalMaterial(
+                                        json,proposedName,density,youngModulusPa=modulus,id=freshId,
+                                        thermalConductivityWPerMK=conductivity,
+                                        specificHeatJPerKgK=heatCapacity,
+                                        refractiveIndex=refraction)
+                                    solid?.let{NativeWorldLabEditor.assignMaterial(
+                                        proposed,it.id,freshId)}?:proposed
+                                }
+                            }
+                            if(projectJson!=previous){
+                                proposedName="";proposedDensity="";proposedModulus=""
+                                proposedConductivity="";proposedSpecificHeat="";proposedRefraction=""
+                                editingMaterialId=null;beamRun=null
+                            }
+                        }.onFailure{warning=it.message?:"Material edit was not saved."}
+                    }){Text(if(editingMaterialId==null)"Save invented material" else "Save revised material")}
+                    if(editingMaterialId!=null)OutlinedButton(onClick={
+                        editingMaterialId=null;proposedName="";proposedDensity="";proposedModulus=""
                         proposedConductivity="";proposedSpecificHeat="";proposedRefraction=""
-                        editingMaterialId=null;beamRun=null
+                    }){Text("Cancel material revision")}
+                    LabNote("Beam bending is computed only for slender, linearly elastic boxes with an explicitly assumed modulus; real strength and unknown material behavior remain unverified.")
+                }
+                if(warning.isNotBlank()) Text(warning,color=MaterialTheme.colorScheme.error)
+                LabNote("Science model 1.0.0 · hypothesis, not engineering certification.")
+                        }
                     }
-                }.onFailure{warning=it.message?:"Material edit was not saved."}
-            }){Text(if(editingMaterialId==null)"Save invented material" else "Save revised material")}
-            if(editingMaterialId!=null)OutlinedButton(onClick={
-                editingMaterialId=null;proposedName="";proposedDensity="";proposedModulus=""
-                proposedConductivity="";proposedSpecificHeat="";proposedRefraction=""
-            }){Text("Cancel material revision")}
-            Text("Beam bending is computed only for slender, linearly elastic boxes with an explicitly assumed modulus; real strength and unknown material behavior remain unverified.",
-                style=MaterialTheme.typography.bodySmall)
+                    IconButton(onClick={studioPanel=null},modifier=Modifier.align(Alignment.TopEnd).padding(4.dp)){
+                        Icon(Icons.Filled.Close,contentDescription="Close tools")
+                    }
+                }
+            }
         }
-        if(warning.isNotBlank()) Text(warning,color=MaterialTheme.colorScheme.error)
-        Text("Science model 1.0.0 · hypothesis, not engineering certification.",
-            style=MaterialTheme.typography.labelSmall)
     }
 }
 private fun labNumber(n:Double?):String =
@@ -2513,68 +2594,8 @@ private fun nativeLabImpactVelocity(text:String):NativeLabVector {
 
 
 /** Native World Lab entry matching the exact supplied wordmark and artwork. */
+/** Opens straight into the world: there is no entry screen. */
 @Composable
 fun NativeWorldLabEntryForm() {
-    var entered by remember { mutableStateOf(false) }
-    if (entered) {
-        NativeWorldLabForm()
-        return
-    }
-
-    val outer = Color(0xFFF1F4F9)
-    val canvas = Color(0xFFF9FAFC)
-    val buttonFill = Color(0xFFDBEAFF)
-    val buttonInk = Color(0xFF101729)
-
-    Surface(modifier = Modifier.fillMaxSize(), color = outer) {
-        BoxWithConstraints(
-            modifier = Modifier.fillMaxSize().padding(10.dp).background(canvas)
-        ) {
-            Column(
-                modifier = Modifier.align(Alignment.Center).offset(y = -(maxHeight * 0.04f)),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Image(
-                    painter = painterResource(R.drawable.world_lab_title),
-                    contentDescription = "The World Lab",
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.width(236.dp).height(50.dp)
-                )
-                Spacer(Modifier.height(6.dp))
-                Box(Modifier.width(160.dp).height(82.dp)) {
-                    Image(
-                        painter = painterResource(R.drawable.world_lab_logo),
-                        contentDescription = "enV",
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.align(Alignment.BottomEnd).width(120.dp).height(45.dp)
-                    )
-                    Text(
-                        text = "🪐",
-                        fontSize = 84.sp,
-                        modifier = Modifier.align(Alignment.TopStart).offset(y = (-7).dp)
-                    )
-                }
-                Spacer(Modifier.height(28.dp))
-                Button(
-                    onClick = { entered = true },
-                    modifier = Modifier.width(214.dp).height(52.dp),
-                    shape = RoundedCornerShape(999.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = buttonFill,
-                        contentColor = buttonInk
-                    ),
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp),
-                    contentPadding = PaddingValues(0.dp)
-                ) {
-                    Text(
-                        text = "Enter",
-                        color = buttonInk,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 0.sp
-                    )
-                }
-            }
-        }
-    }
+    NativeWorldLabForm()
 }

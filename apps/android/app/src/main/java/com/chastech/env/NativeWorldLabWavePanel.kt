@@ -60,9 +60,8 @@ fun NativeWorldLabWavePanel(project:NativeWorldLabProject,onError:(String)->Unit
         }
     }
     Text("Make waves inside invented matter",style=MaterialTheme.typography.titleSmall)
-    Text("Exact 1D free-ended standing mode from invented density and stiffness. "+
-        "Not a measurement, bending/fracture model or sound propagation in air.",
-        style=MaterialTheme.typography.bodySmall)
+    LabNote("Exact 1D free-ended standing mode from invented density and stiffness. "+
+        "Not a measurement, bending/fracture model or sound propagation in air.")
     if(rods.isEmpty()){
         Text("Invent a box or cylinder and assign density and Young's modulus.")
         return
@@ -133,6 +132,6 @@ fun NativeWorldLabWavePanel(project:NativeWorldLabProject,onError:(String)->Unit
         OutlinedButton(onClick={export.launch("world-lab-elastic-wave.json")}){
             Text("Export elastic-wave evidence")
         }
-        Text(active.validity,style=MaterialTheme.typography.bodySmall)
+        LabNote(active.validity)
     }
 }

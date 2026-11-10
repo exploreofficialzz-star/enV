@@ -12,79 +12,72 @@ page.on("pageerror",err=>pageErrors.push(err.message));
 try{
   await page.goto(origin+"/tools/developer/the-world-lab",{waitUntil:"domcontentloaded",timeout:90000});
   await page.waitForLoadState("load",{timeout:90000});
-  await page.getByRole("heading",{name:"The World Lab"}).waitFor({state:"visible",timeout:90000});
-  await page.getByRole("button",{name:"Enter"}).waitFor({state:"visible",timeout:90000});
-  await page.locator('.world-lab-entry[data-world-lab-entry-ready="true"]').waitFor({state:"visible",timeout:90000});
-  const readEntryLayout=()=>page.locator(".world-lab-entry").evaluate((root)=>{
-    const content=root.querySelector(".world-lab-entry__content")?.getBoundingClientRect();
-    const entry=root.getBoundingClientRect();
-    const title=root.querySelector("h1")?.getBoundingClientRect();
-    const artwork=root.querySelector(".world-lab-entry__artwork")?.getBoundingClientRect();
-    const planet=root.querySelector(".world-lab-entry__planet")?.getBoundingClientRect();
-    const brand=root.querySelector(".world-lab-entry__brand")?.getBoundingClientRect();
-    const button=root.querySelector("button")?.getBoundingClientRect();
-    const buttonStyle=button?getComputedStyle(root.querySelector("button")):null;
+  // The world opens directly: no entry gate, no app chrome, canvas fills the viewport on every device size.
+  await page.getByRole("heading",{name:"The World Lab"}).waitFor({state:"attached",timeout:90000});
+  await page.locator(".wl-studio canvas").waitFor({state:"visible",timeout:90000});
+  assert.equal(await page.getByRole("button",{name:"Enter"}).count(),0,"The world must open without an Enter screen");
+  const readStudioLayout=()=>page.evaluate(()=>{
+    const canvas=document.querySelector(".wl-studio canvas").getBoundingClientRect();
+    const rail=document.querySelector(".wl-rail").getBoundingClientRect();
     return {
-      contentCenterRatio:content&&entry.height?(content.top+content.height/2-entry.top)/entry.height:null,
-      titleBottom:title?.bottom,artworkTop:artwork?.top,
-      artworkBottom:artwork?.bottom,buttonTop:button?.top,
-      buttonWidth:button?.width,buttonHeight:button?.height,
-      buttonBackground:buttonStyle?.backgroundColor,buttonColor:buttonStyle?.color,
-      pageBackground:getComputedStyle(root).backgroundColor,
-      canvasBackground:getComputedStyle(root.querySelector(".world-lab-entry__inner")).backgroundColor,
-      titleSrc:root.querySelector(".world-lab-entry__title img")?.getAttribute("src"),
-      brandSrc:root.querySelector(".world-lab-entry__brand")?.getAttribute("src"),
-      brandFilter:getComputedStyle(root.querySelector(".world-lab-entry__brand")).filter,
-      planetFilter:getComputedStyle(root.querySelector(".world-lab-entry__planet")).filter,
-      artworkOverlaps:!!(planet&&brand&&planet.right>brand.left&&planet.bottom>brand.top),
-      hasHeader:!!document.querySelector("header"),
-      hasFooter:!!document.querySelector("footer"),
+      canvasWidth:canvas.width,canvasHeight:canvas.height,viewportWidth:window.innerWidth,viewportHeight:window.innerHeight,
+      railInside:rail.left>=0&&rail.top>=0&&rail.right<=window.innerWidth&&rail.bottom<=window.innerHeight,
+      documentWidth:document.documentElement.scrollWidth,
+      hasHeader:!!document.querySelector("header"),hasFooter:!!document.querySelector("footer"),
+      visibleParagraphs:[...document.querySelectorAll(".wl-studio p")].filter(node=>{
+        const box=node.getBoundingClientRect(),style=getComputedStyle(node);
+        return !node.classList.contains("wl-chip")&&box.width>0&&box.height>0&&style.visibility!=="hidden"&&node.textContent.trim().length>90;
+      }).length,
     };
   });
-  const desktopEntryLayout=await readEntryLayout();
-  assert.ok(desktopEntryLayout.contentCenterRatio>=0.445 && desktopEntryLayout.contentCenterRatio<=0.475,
-    "The entry composition must sit in the upper third like the supplied screenshot");
-  assert.ok(desktopEntryLayout.titleBottom<=desktopEntryLayout.artworkTop,
-    "The exact title wordmark must sit above the Saturn/logo artwork");
-  assert.ok(desktopEntryLayout.artworkBottom<=desktopEntryLayout.buttonTop,
-    "The artwork must sit above the Enter button");
-  assert.equal(desktopEntryLayout.buttonBackground,"rgb(219, 234, 255)",
-    "The Enter button must use the reference pale-blue fill");
-  assert.equal(desktopEntryLayout.buttonColor,"rgb(16, 23, 41)",
-    "The Enter label must use the reference dark ink");
-  assert.ok(Math.abs(desktopEntryLayout.buttonWidth-214)<3 && Math.abs(desktopEntryLayout.buttonHeight-52)<3,
-    "The Enter button must match the reference pill dimensions");
-  assert.equal(desktopEntryLayout.pageBackground,"rgb(241, 244, 249)",
-    "The entry surround must use the reference cool-grey tint");
-  assert.equal(desktopEntryLayout.canvasBackground,"rgb(249, 250, 252)",
-    "The inner canvas must use the reference near-white tone");
-  assert.ok(desktopEntryLayout.titleSrc?.endsWith("/world-lab-title.svg"),
-    "The title must use the exact supplied screenshot wordmark vector");
-  assert.ok(desktopEntryLayout.brandSrc?.endsWith("/logo-home-transparent.png"),
-    "The artwork must use the original enV logo asset");
-  assert.equal(desktopEntryLayout.brandFilter,"none","The enV logo must retain its original colours");
-  assert.equal(desktopEntryLayout.planetFilter,"none","Saturn must retain its full-colour emoji");
-  assert.ok(desktopEntryLayout.artworkOverlaps,"Saturn must overlap the left edge of the enV logo");
-  assert.equal(desktopEntryLayout.hasHeader,false,"The reference entry must not show the app header");
-  assert.equal(desktopEntryLayout.hasFooter,false,"The reference entry must not show the app footer");
-  await page.setViewportSize({width:390,height:844});
-  const mobileEntryLayout=await readEntryLayout();
-  assert.ok(mobileEntryLayout.contentCenterRatio>=0.445 && mobileEntryLayout.contentCenterRatio<=0.475,
-    "The mobile entry composition must match the reference's slightly-above-centre placement");
-  assert.ok(mobileEntryLayout.titleBottom<=mobileEntryLayout.artworkTop,
-    "The mobile World Lab heading must not be covered by its artwork");
-  assert.ok(mobileEntryLayout.artworkBottom<=mobileEntryLayout.buttonTop,
-    "The mobile World Lab artwork must not cover the Enter button");
-  const entryViewport=await page.evaluate(()=>({
-    documentWidth:document.documentElement.scrollWidth,viewportWidth:window.innerWidth,
-  }));
-  assert.ok(entryViewport.documentWidth<=entryViewport.viewportWidth+3,
-    "The World Lab entry must not horizontally overflow on mobile");
+  for(const size of [{width:390,height:844},{width:820,height:1180},{width:1280,height:900}]){
+    await page.setViewportSize(size);
+    const layout=await readStudioLayout();
+    assert.ok(layout.canvasWidth>=layout.viewportWidth-1&&layout.canvasHeight>=layout.viewportHeight-1,
+      `The world must fill the whole ${size.width}px viewport`);
+    assert.ok(layout.railInside,`The tool rail must stay on screen at ${size.width}px`);
+    assert.ok(layout.documentWidth<=layout.viewportWidth+3,`The World Lab must not overflow horizontally at ${size.width}px`);
+    assert.equal(layout.hasHeader||layout.hasFooter,false,"The world must not show app header or footer chrome");
+    assert.equal(layout.visibleParagraphs,0,`No long explanatory paragraphs may be visible on the opening screen at ${size.width}px`);
+  }
   await page.setViewportSize({width:1280,height:900});
-  await page.getByRole("button",{name:"Enter"}).click();
-  await page.locator(".world-lab-entry").waitFor({state:"detached",timeout:90000});
-  await page.getByRole("heading",{name:"The World Lab"}).waitFor({state:"visible",timeout:90000});
-  await page.getByRole("button",{name:"Save on device"}).waitFor({state:"visible",timeout:90000});
+  // Every tool lives in one scrolling panel opened from the rail.
+  const worldLabRoot=page.locator(".wl-studio").first();
+  await page.evaluate(()=>{
+    document.addEventListener("click",event=>{
+      const button=(event.target instanceof Element)?event.target.closest('button[aria-label="Open project tools"]'):null;
+      if(button)button.setAttribute("data-audit-click-seen","true");
+    },true);
+  });
+  await worldLabRoot.getByRole("button",{name:"Open project tools"}).click();
+  try {
+    await page.getByRole("button",{name:"Save on device"}).waitFor({state:"visible",timeout:15000});
+  } catch (error) {
+    const diagnostic=await page.locator(".wl-studio").first().evaluate(root=>{
+      const drawer=root.querySelector(".wl-drawer");
+      const rail=root.querySelector(".wl-rail");
+      const save=[...root.querySelectorAll("button")].find(node=>node.getAttribute("aria-label")==="Save on device");
+      const describe=node=>{
+        if(!node)return null;
+        const style=getComputedStyle(node),rect=node.getBoundingClientRect();
+        return {tag:node.tagName,ariaHidden:node.getAttribute("aria-hidden"),inert:node.hasAttribute("inert"),
+          display:style.display,visibility:style.visibility,opacity:style.opacity,transform:style.transform,
+          rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height},disabled:node.disabled};
+      };
+      return {rootCount:document.querySelectorAll(".wl-studio").length,
+        allRootStates:[...document.querySelectorAll(".wl-studio")].map(node=>({open:node.getAttribute("data-open"),railClicks:node.querySelectorAll('[data-audit-click-seen="true"]').length})),
+        rootOpen:root.getAttribute("data-open"),railListener:root.getAttribute("data-rail-listener"),
+        railLastGroup:root.getAttribute("data-rail-last-group"),rail:describe(rail),
+        projectButton:[...root.querySelectorAll("button")].filter(node=>node.getAttribute("aria-label")==="Open project tools").map(describe),
+        drawer:describe(drawer),
+        drawerOpen:drawer?.getAttribute("data-open"),drawerBody:describe(drawer?.querySelector(".wl-drawer__body")),
+        save:describe(save),groups:[...root.querySelectorAll(".wl-group")].map(node=>({
+          id:node.getAttribute("data-wl-group"),rect:(()=>{const r=node.getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height};})()
+        }))};
+    });
+    console.error("WORLD_LAB_DRAWER_DIAGNOSTIC:",JSON.stringify(diagnostic));
+    throw error;
+  }
   await page.getByRole("button",{name:"Add cube"}).click();
   await page.getByRole("button",{name:"Add sphere"}).click();
 
