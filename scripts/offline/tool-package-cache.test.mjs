@@ -38,7 +38,12 @@ test("public app assets use stale-while-revalidate and never cache private API r
   assert.match(serviceWorker, /CORE_CACHE_LIMIT = 800/);
   assert.match(serviceWorker, /precacheFirstVisitShell/);
   assert.match(serviceWorker, /env-web-shell-v2/);
-  assert.match(serviceWorker, /isPublicAssetResponse\(response\) && \(url\.pathname === "\/" \|\| url\.pathname\.startsWith\("\/tools\/"\)\)/);
+  assert.ok(serviceWorker.includes("isCacheableNavigation(request, url)"));
+  assert.ok(serviceWorker.includes("PRIVATE_NAVIGATION_PATHS"));
+  assert.ok(serviceWorker.includes("NAVIGATION_CACHE_LIMIT = 120"));
+  assert.ok(serviceWorker.includes("if (url.search) return false"));
+  assert.ok(serviceWorker.includes("authorization"));
+  assert.ok(serviceWorker.includes("isPublicAssetResponse(response)"));
   assert.match(serviceWorker, /This page response is private or not cacheable/);
 });
 
@@ -123,4 +128,27 @@ test("A book's deferred PDF worker is warmed and included before offline readine
   assert.match(engine, /warmABookPdfWorker/);
   assert.match(pdfWorkerClient, /action: "warmup"/);
   assert.match(pdfWorkerClient, /return workerUrl\.href/);
+});
+
+
+test("public page refreshes are stale-first and revalidate in the background", () => {
+  const start = serviceWorker.indexOf("async function handleNavigation(event, keepAlive)");
+  const end = serviceWorker.indexOf("async function precacheFirstVisitShell()", start);
+  assert.ok(start >= 0 && end > start, "shared navigation handler must exist");
+  const navigation = serviceWorker.slice(start, end);
+  assert.ok(navigation.indexOf("pages.match(request)") < navigation.indexOf("fetch(request)"),
+    "cached navigation must be checked before a network request");
+  assert.ok(navigation.includes("keepAlive(refreshCachedNavigation(request))"));
+  assert.ok(navigation.includes("return cached;"));
+  assert.ok(navigation.includes('fetch(request, { cache: "no-store" })'));
+  assert.ok(serviceWorker.includes("event.waitUntil(response.then(() => backgroundRefresh))"));
+});
+
+test("private account and authentication pages are excluded from shared navigation caching", () => {
+  for (const path of ["/account", "/favorites", "/history", "/settings", "/wallet", "/token-dashboard", "/userbehavior", "/login", "/signup", "/search"]) {
+    assert.ok(serviceWorker.includes('"' + path + '"'), path + " must be excluded");
+  }
+  assert.ok(serviceWorker.includes("if (url.search) return false"));
+  assert.ok(serviceWorker.includes("!PRIVATE_NAVIGATION_PATHS.some"));
+  assert.ok(serviceWorker.includes("isPublicAssetResponse(response)"));
 });
