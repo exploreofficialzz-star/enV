@@ -26,6 +26,25 @@ test("only cacheable same-origin assets are stored; APIs are excluded", () => {
   assert.match(serviceWorker, /isCacheableAsset\(request, url\)/);
 });
 
+test("public app assets use stale-while-revalidate and never cache private API responses", () => {
+  assert.match(serviceWorker, /event\.waitUntil\(fetchAndStoreAsset\(request, session, toolCache, coreCache\)/);
+  assert.match(serviceWorker, /return cached;/);
+  assert.match(serviceWorker, /cacheControl\.includes\("no-store"\)/);
+  assert.match(serviceWorker, /cacheControl\.includes\("private"\)/);
+  assert.match(serviceWorker, /CORE_CACHE_LIMIT = 800/);
+  assert.match(serviceWorker, /precacheFirstVisitShell/);
+  assert.match(serviceWorker, /env-web-shell-v2/);
+});
+
+test("first-visit shell capture begins before the complete tool-engine warmup", () => {
+  const root = readFileSync(new URL("../../src/routes/__root.tsx", import.meta.url), "utf8");
+  assert.match(root, /setResourceTimingBufferSize\(2_000\)/);
+  assert.ok(root.indexOf("prepareEnVOfflineShell()") < root.indexOf("preloadAllToolEngineModules"));
+  assert.equal((root.match(/prepareEnVOfflineShell\(\)/g) ?? []).length, 2);
+  assert.match(client, /slice\(0, 800\)/);
+  assert.match(client, /CACHE_CORE_ASSETS", \{ assets \}, 60_000\)/);
+});
+
 test("unvisited tools do not receive offline navigation access", () => {
   assert.match(serviceWorker, /findReadyPackageForPath/);
   assert.match(serviceWorker, /item\.status === "ready" && item\.pathname === pathname/);
