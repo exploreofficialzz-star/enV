@@ -309,17 +309,16 @@ export default function WorldLab() {
   useEffect(()=>{
     const root=studioRef.current;
     if(!root)return;
-    root.dataset.railListener="ready";
     const selectRailGroup=(event:MouseEvent)=>{
-      if(!(event.target instanceof Element))return;
-      const group=event.target.closest<HTMLButtonElement>(".wl-rail button[data-group]")?.dataset.group;
-      if(group==="project"||group==="build"||group==="experiments"||group==="results"){
-        root.dataset.railLastGroup=group;
-        setStudioPanel(group);
-      }
+      const button=event.composedPath().find((node):node is HTMLButtonElement=>
+        node instanceof HTMLButtonElement&&node.matches(".wl-rail button[data-group]"));
+      if(!button||!root.contains(button))return;
+      const group=button.dataset.group;
+      if(group==="project"||group==="build"||group==="experiments"||group==="results")
+        setStudioPanel(current=>current===group?null:group);
     };
-    root.addEventListener("click",selectRailGroup,true);
-    return ()=>root.removeEventListener("click",selectRailGroup,true);
+    document.addEventListener("click",selectRailGroup,true);
+    return ()=>document.removeEventListener("click",selectRailGroup,true);
   },[]);
   useEffect(()=>{if(studioPanel)scrollToStudioGroup(studioRef.current,studioPanel);},[studioPanel]);
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
@@ -2192,7 +2191,7 @@ export default function WorldLab() {
           <StudioHoldButton label="Step back" onStep={()=>walkBy(-1)}><ArrowDown aria-hidden="true" size={22}/></StudioHoldButton>
         </div>
       </div>
-      <StudioRail open={!!studioPanel} active={studioPanel} onSelect={setStudioPanel}/>
+      <StudioRail open={!!studioPanel} active={studioPanel}/>
       <StudioDrawer open={!!studioPanel} onClose={()=>setStudioPanel(null)}>
         <StudioGroup id="project">
           <div className="wl-toolbar" role="toolbar" aria-label="Project">
