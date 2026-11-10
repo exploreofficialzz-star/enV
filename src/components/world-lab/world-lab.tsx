@@ -312,11 +312,17 @@ export default function WorldLab() {
     root.dataset.railListener="ready";
     const selectRailGroup=(event:MouseEvent)=>{
       if(!(event.target instanceof Element))return;
-      const button=event.target.closest<HTMLButtonElement>(".wl-rail button[data-group]");
-      const group=button?.dataset.group;
-      if(group==="project"||group==="build"||group==="experiments"||group==="results"){
+      const button=event.target.closest<HTMLButtonElement>(
+        'button[aria-label="Open project tools"],button[aria-label="Open build tools"],button[aria-label="Open experiments tools"],button[aria-label="Open results tools"]'
+      );
+      const label=button?.getAttribute("aria-label");
+      const group=label==="Open project tools"?"project"
+        :label==="Open build tools"?"build"
+        :label==="Open experiments tools"?"experiments"
+        :label==="Open results tools"?"results":null;
+      if(group){
         root.dataset.railLastGroup=group;
-        setStudioPanel(current=>current===group?null:group);
+        setStudioPanel(group);
       }
     };
     document.addEventListener("click",selectRailGroup,true);
