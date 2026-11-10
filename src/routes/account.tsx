@@ -66,10 +66,10 @@ function AccountProfileSkeleton() {
         <section className="overflow-hidden rounded-[28px] border border-border bg-surface shadow-sm">
           <div className="env-shimmer relative h-40 sm:h-52" />
           <div className="relative px-4 pb-6 sm:px-7 sm:pb-8">
-            <div className="relative z-10 mx-auto -mt-[76px] flex w-fit flex-col items-center sm:-mt-[92px]">
+            <div className="relative z-10 mx-auto -mt-[76px] w-fit sm:-mt-[92px]">
               <div className="env-shimmer size-32 rounded-full border-[5px] border-card sm:size-40" />
-              <div className="env-shimmer mt-4 h-8 w-44 rounded-lg sm:h-9 sm:w-56" />
             </div>
+            <div className="env-shimmer mx-auto mt-4 h-8 w-44 rounded-lg sm:mt-7 sm:h-9 sm:w-56" />
           </div>
         </section>
         <section className="mt-7">
@@ -399,7 +399,7 @@ function Account() {
           </div>
 
           <div className="relative px-4 pb-6 sm:px-7 sm:pb-8">
-            <div className="relative z-10 mx-auto -mt-[76px] flex w-fit flex-col items-center sm:-mt-[92px]">
+            <div className="relative z-10 mx-auto -mt-[76px] w-fit sm:-mt-[92px]">
               <div className="relative">
                 {activeAvatarUrl ? (
                   <ShimmerProfileImage
@@ -438,10 +438,10 @@ function Account() {
                   tabIndex={-1}
                 />
               </div>
-              <h1 className="mt-4 max-w-[min(80vw,30rem)] truncate whitespace-nowrap text-center text-2xl font-bold tracking-tight text-fg sm:text-3xl" title={displayName}>
-                {displayName}
-              </h1>
             </div>
+            <h1 className="relative z-0 mx-auto mt-4 max-w-[min(80vw,30rem)] truncate whitespace-nowrap text-center text-2xl font-bold tracking-tight text-fg sm:mt-7 sm:text-3xl" title={displayName}>
+              {displayName}
+            </h1>
           </div>
         </section>
 
