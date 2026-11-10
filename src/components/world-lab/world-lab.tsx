@@ -306,6 +306,18 @@ export default function WorldLab() {
   const studioRef=useRef<HTMLDivElement>(null);
   const [studioPanel,setStudioPanel]=useState<StudioGroupId|null>(null);
   const [lookState,setLookState]=useState({heading:0,pitch:0});
+  useEffect(()=>{
+    const root=studioRef.current;
+    if(!root)return;
+    const selectRailGroup=(event:MouseEvent)=>{
+      if(!(event.target instanceof Element))return;
+      const group=event.target.closest<HTMLButtonElement>(".wl-rail button[data-group]")?.dataset.group;
+      if(group==="project"||group==="build"||group==="experiments"||group==="results")
+        setStudioPanel(group);
+    };
+    root.addEventListener("click",selectRailGroup,true);
+    return ()=>root.removeEventListener("click",selectRailGroup,true);
+  },[]);
   useEffect(()=>{if(studioPanel)scrollToStudioGroup(studioRef.current,studioPanel);},[studioPanel]);
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
   const shapeCount = project?.entities.length ?? 0;
@@ -2141,13 +2153,7 @@ export default function WorldLab() {
   const inputLabel = "w-full rounded-lg border border-border bg-bg px-3 py-2 text-fg";
   const buttonClass = "rounded-lg border border-border px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2";
   return (
-    <div ref={studioRef} className="wl-studio" data-open={studioPanel?"true":"false"} role="region" aria-label="The World Lab"
-      onClickCapture={event=>{
-        const target=(event.target as HTMLElement).closest<HTMLButtonElement>(".wl-rail button[data-group]");
-        const group=target?.dataset.group;
-        if(group==="project"||group==="build"||group==="experiments"||group==="results")
-          setStudioPanel(group);
-      }}>
+    <div ref={studioRef} className="wl-studio" data-open={studioPanel?"true":"false"} role="region" aria-label="The World Lab">
       <h1 className="sr-only">The World Lab</h1>
       <div className="wl-stage">
         <canvas ref={canvasRef} className="wl-canvas"
