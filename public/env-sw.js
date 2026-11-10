@@ -261,7 +261,7 @@ async function storeNavigationResponse(request, response) {
   if (!isCacheablePublicNavigationPath(url) || !isPublicAssetResponse(response)) return false;
   try {
     const pages = await caches.open(NAVIGATION_CACHE);
-    await pages.put(request, response.clone());
+    await pages.put(request, stampedCacheResponse(response));
     await trimCache(pages, NAVIGATION_CACHE_LIMIT);
     if (url.pathname === "/") {
       const shell = await caches.open(CORE_CACHE);
@@ -400,10 +400,15 @@ self.addEventListener("message", (event) => {
           credentials: "same-origin",
           headers: { accept: "text/html" },
         });
+        const pages = await caches.open(NAVIGATION_CACHE);
+        const existing = await pages.match(request);
+        if (existing && !needsBackgroundRefresh(existing)) {
+          return reply({ ok: true, cached: true, refreshed: false });
+        }
         const response = await fetch(request, { cache: "no-store" });
         if (!isPublicAssetResponse(response)) return reply({ ok: false, message: "This page response is private or not cacheable." });
         const cached = await storeNavigationResponse(request, response);
-        return reply({ ok: cached, cached });
+        return reply({ ok: cached, cached, refreshed: cached });
       }
 
       if (data.type === "CACHE_CORE_ASSETS") {
