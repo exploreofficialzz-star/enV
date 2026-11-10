@@ -165,13 +165,13 @@ test("navigation document cache rejects API routes and non-HTML responses", () =
   const end = serviceWorker.indexOf("function isPublicNavigationResponse(response)", start);
   assert.ok(start >= 0 && end > start);
   const pathPolicy = serviceWorker.slice(start, end);
-  assert.match(pathPolicy, /url\\.pathname === "\\/api"/);
-  assert.match(pathPolicy, /url\\.pathname\\.startsWith\\("\\/api\\/"/);
-  assert.match(pathPolicy, /url\\.pathname === "\\/_serverFn"/);
-  assert.match(pathPolicy, /url\\.pathname\\.startsWith\\("\\/_serverFn\\/"/);
+  assert.ok(pathPolicy.includes('url.pathname === "/api"'));
+  assert.ok(pathPolicy.includes('url.pathname.startsWith("/api/")'));
+  assert.ok(pathPolicy.includes('url.pathname === "/_serverFn"'));
+  assert.ok(pathPolicy.includes('url.pathname.startsWith("/_serverFn/")'));
   const responsePolicy = serviceWorker.slice(end, serviceWorker.indexOf("async function storeNavigationResponse", end));
-  assert.match(responsePolicy, /content-type/);
-  assert.match(responsePolicy, /startsWith\\("text\\/html"\\)/);
+  assert.ok(responsePolicy.includes("content-type"));
+  assert.ok(responsePolicy.includes('startsWith("text/html")'));
 });
 
 test("SPA route visits cache eligible public page documents for the next hard refresh", () => {
