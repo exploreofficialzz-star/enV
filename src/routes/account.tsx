@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
@@ -13,8 +13,11 @@ import {
   clearAccountProfileMediaCache,
   notifyAccountProfileMediaChanged,
   readCachedAccountProfileMedia,
+  readCachedAccountProfileMediaPreview,
   refreshCachedAccountProfileMedia,
 } from "@/lib/offline/account-profile-media-cache";
+
+const useAccountMediaLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 const loadAccountProfile = createServerFn({ method: "GET" }).handler(async () => {
   if (!authConfigured) return DEV_USER;
@@ -82,10 +85,12 @@ function Account() {
   const activeAvatarUrl = sameLoadedIdentity ? avatarUrl : loadedUser?.profileImageUrl ?? null;
   const activeCoverUrl = sameLoadedIdentity ? coverUrl : null;
 
-  useEffect(() => {
+  useAccountMediaLayoutEffect(() => {
     setUser(loadedUser);
-    setAvatarUrl(loadedUser?.profileImageUrl ?? null);
-    setCoverUrl(null);
+    const cachedAvatar = loadedUser?.id ? readCachedAccountProfileMediaPreview(loadedUser.id, "avatar") : null;
+    const cachedCover = loadedUser?.id ? readCachedAccountProfileMediaPreview(loadedUser.id, "cover") : null;
+    setAvatarUrl(cachedAvatar ?? loadedUser?.profileImageUrl ?? null);
+    setCoverUrl(cachedCover);
     setEditingField(null);
     setNameDraft(loadedUser?.displayName ?? "");
     setEmailDraft(loadedUser?.primaryEmail ?? "");
