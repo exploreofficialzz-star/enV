@@ -83,9 +83,12 @@ if (!preferences.includes("viewport.content = DEFAULT_VIEWPORT")) errors.push("M
 for (const path of ["src/routes/account.tsx", "src/routes/wallet.tsx", "src/routes/login.tsx", "src/routes/signup.tsx", "src/routes/forgot-password.tsx", "src/routes/reset-password.tsx", "src/routes/api/auth/$.ts", "src/routes/agent.tsx", "src/routes/token-dashboard.tsx", "src/routes/token-guide.tsx", "src/components/billing/token-dashboard.tsx", "server/routes/api/billing/token-usage.get.ts", "src/lib/billing/token-usage.server.ts"]) if (!existsSync(resolve(path))) errors.push(`Missing route: ${path}`);
 const account = requireText("src/routes/account.tsx", [
   'createFileRoute("/account")',
-  'createServerFn({ method: "GET" })',
-  "loadAccountProfile",
-  'if (!user) return <AuthPage mode="sign-in" />',
+  "component: Account",
+  "useCurrentUserState()",
+  'if (!activeUser) return <AuthPage mode="sign-in" />',
+  "setSessionTimedOut",
+  "setTimeout(() => setSessionTimedOut(true), 10_000)",
+  "if (sessionError || sessionTimedOut)",
   "Profile details",
   "coverInput",
   "avatarInput",
