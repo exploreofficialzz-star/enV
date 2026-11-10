@@ -362,6 +362,8 @@ self.addEventListener("message", (event) => {
               if (url.origin !== self.location.origin || url.pathname.startsWith("/api/") || url.pathname.startsWith("/_serverFn/") ||
                   !/\.(?:m?js|css|wasm|woff2?|ttf|otf|svg|png|jpe?g|webp|avif)$/i.test(url.pathname)) return false;
               const request = new Request(url.href, { credentials: "same-origin" });
+              const existing = await cache.match(request);
+              if (existing && !needsBackgroundRefresh(existing)) return true;
               const response = await fetch(request);
               if (!isPublicAssetResponse(response)) return false;
               await cache.put(request, stampedCacheResponse(response));
