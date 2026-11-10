@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 const component = readFileSync(new URL("../../src/components/layout/cookie-consent.tsx", import.meta.url), "utf8");
 const appShell = readFileSync(new URL("../../src/components/layout/app-shell.tsx", import.meta.url), "utf8");
@@ -58,8 +58,13 @@ test("popup is mounted globally and can be reopened from Privacy", () => {
   assert.match(component, /addEventListener\(OPEN_EVENT, reopen\)/);
 });
 
-test("account resolves sign-in state reactively and cannot remain on an endless shimmer", () => {
-  assert.doesNotMatch(accountPage, /createServerFn|getRequest|loadAccountProfile|Route\.useLoaderData/);
+test("account resolves sign-in state reactively and preserves the old server-function ID for cached clients", () => {
+  assert.match(accountPage, /const loadAccountProfile = createServerFn\(\{ method: "GET" \}\)\.handler/);
+  assert.match(accountPage, /legacyAccountProfileServerFunction = loadAccountProfile/);
+  assert.match(accountPage, /getRequest\(\)/);
+  assert.match(accountPage, /auth\.api\.getSession\(\{ headers: request\.headers \}\)/);
+  assert.doesNotMatch(accountPage, /loader:\s*\(\)\s*=>\s*loadAccountProfile\(\)/);
+  assert.match(accountPage, /useCurrentUserState\(\)/);
   assert.match(accountPage, /useCurrentUserState\(\)/);
   assert.match(accountPage, /if \(sessionPending && !sessionTimedOut\) return <AccountProfileSkeleton \/>/);
   assert.match(accountPage, /if \(sessionError \|\| sessionTimedOut\)/);
@@ -69,6 +74,12 @@ test("account resolves sign-in state reactively and cannot remain on an endless 
   assert.match(currentUserState, /error: error \?\? null/);
   assert.match(currentUserState, /refetch,/);
   assert.match(currentUserState, /profileImageUrl: user\.image/);
+  const serverManifestPath = new URL("../../.vercel/output/functions/__server.func/_ssr/ssr.mjs", import.meta.url);
+  if (existsSync(serverManifestPath)) {
+    const serverManifest = readFileSync(serverManifestPath, "utf8");
+    assert.match(serverManifest, /"a2dbc261c9dbc9b2103f8740422ed59d4843b2d1c5fef0c17a2d6c651130f9e3":/);
+    assert.match(serverManifest, /functionName: "loadAccountProfile_createServerFn_handler"/);
+  }
   assert.doesNotMatch(accountPage, /Good to see you|enV · Profile|Welcome to your personal enV space|Account status|Your enV shortcuts|Jump straight to the things you use most|Need to leave\?/);
   assert.match(accountPage, /if \(!activeUser\) return <AuthPage mode="sign-in" \/>/);
   assert.match(accountPage, /const activeUser = sameLoadedIdentity \? user : loadedUser/);
