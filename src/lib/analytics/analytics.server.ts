@@ -295,12 +295,12 @@ export async function getPublicTrendingTools() {
          count(*) filter (where event_name='tool_started') as starts,
          count(*) filter (where event_name='tool_completed') as completed,
          count(*) filter (where event_name='tool_viewed') as views,
-         count(distinct anonymous_subject_digest) as installations
+         count(distinct anonymous_subject_digest) filter (where event_name='tool_started') as starting_installations
        from product_analytics_events
        where received_at >= now() - interval '30 days' and tool_id is not null
        group by tool_id
      ) ranked
-     where starts > 0 and installations >= 3
+     where starts > 0 and starting_installations >= 3
      order by starts desc, completed desc, views desc, tool_id asc
      limit 12`,
   );
