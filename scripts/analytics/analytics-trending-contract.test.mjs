@@ -20,7 +20,9 @@ test("public trending is derived from opt-in starts, with an aggregate privacy t
   assert.match(analyticsServer, /where starts > 0 and installations >= 3/);
   assert.match(analyticsServer, /order by starts desc, completed desc, views desc, tool_id asc/);
   assert.match(analyticsServer, /toolIds \}/);
-  assert.doesNotMatch(analyticsServer.slice(analyticsServer.indexOf("export async function getPublicTrendingTools"), analyticsServer.indexOf("export async function runAnalyticsRetention")), /user_id|anonymous_subject_digest|session_digest/);
+  const publicResult = analyticsServer.slice(analyticsServer.indexOf("const toolIds = rows"), analyticsServer.indexOf("export async function runAnalyticsRetention"));
+  assert.match(publicResult, /return \{ generatedAt: new Date\(\)\.toISOString\(\), windowDays: 30, toolIds \}/);
+  assert.doesNotMatch(publicResult, /user_id|anonymous_subject_digest|session_digest/);
 });
 
 test("the public endpoint is read-only, same-origin for browsers and safely cacheable", () => {
