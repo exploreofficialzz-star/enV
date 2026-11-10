@@ -309,13 +309,15 @@ export default function WorldLab() {
   useEffect(()=>{
     const root=studioRef.current;
     if(!root)return;
+    root.dataset.railListener="ready";
     const selectRailGroup=(event:MouseEvent)=>{
-      const button=event.composedPath().find((node):node is HTMLButtonElement=>
-        node instanceof HTMLButtonElement&&node.matches(".wl-rail button[data-group]"));
-      if(!button||!root.contains(button))return;
-      const group=button.dataset.group;
-      if(group==="project"||group==="build"||group==="experiments"||group==="results")
+      if(!(event.target instanceof Element))return;
+      const button=event.target.closest<HTMLButtonElement>(".wl-rail button[data-group]");
+      const group=button?.dataset.group;
+      if(group==="project"||group==="build"||group==="experiments"||group==="results"){
+        root.dataset.railLastGroup=group;
         setStudioPanel(current=>current===group?null:group);
+      }
     };
     document.addEventListener("click",selectRailGroup,true);
     return ()=>document.removeEventListener("click",selectRailGroup,true);
