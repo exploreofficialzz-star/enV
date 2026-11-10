@@ -66,7 +66,8 @@ try{
       };
       return {rootCount:document.querySelectorAll(".wl-studio").length,
         allRootStates:[...document.querySelectorAll(".wl-studio")].map(node=>({open:node.getAttribute("data-open"),railClicks:node.querySelectorAll('[data-audit-click-seen="true"]').length})),
-        rootOpen:root.getAttribute("data-open"),rail:describe(rail),
+        rootOpen:root.getAttribute("data-open"),railListener:root.getAttribute("data-rail-listener"),
+        railLastGroup:root.getAttribute("data-rail-last-group"),rail:describe(rail),
         projectButton:[...root.querySelectorAll("button")].filter(node=>node.getAttribute("aria-label")==="Open project tools").map(describe),
         drawer:describe(drawer),
         drawerOpen:drawer?.getAttribute("data-open"),drawerBody:describe(drawer?.querySelector(".wl-drawer__body")),
