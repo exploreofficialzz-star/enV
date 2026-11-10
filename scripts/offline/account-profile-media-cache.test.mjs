@@ -33,6 +33,8 @@ test("uploaded custom profile photos update the global header avatar", () => {
   assert.match(account, /notifyAccountProfileMediaChanged\(accountId\)/);
   assert.match(header, /<AccountAvatar user=\{user\} \/>/);
   assert.match(header, /ACCOUNT_PROFILE_MEDIA_UPDATED_EVENT/);
+  assert.match(header, /detail\.kind === "avatar"/);
+  assert.match(header, /cachedMedia\?\.userId === user\.id/);
   assert.match(header, /refreshCachedAccountProfileMedia\(user\.id, "avatar"\)/);
 });
 
