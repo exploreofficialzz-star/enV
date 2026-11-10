@@ -111,7 +111,7 @@ function isPublicAssetResponse(response) {
   const cacheControl = (response.headers.get("cache-control") || "").toLowerCase();
   if (cacheControl.includes("no-store") || cacheControl.includes("private")) return false;
   const vary = response.headers.get("vary") || "";
-  if (vary.trim() === "*" || /(?:^|,)\s*(?:cookie|authorization)\s*(?:,|$)/i.test(vary)) return false;
+  if (vary.trim() === "*" || /(?:^|,)\s*(?:cookie|authorization|accept)\s*(?:,|$)/i.test(vary)) return false;
   return true;
 }
 
