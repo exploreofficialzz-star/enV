@@ -115,6 +115,14 @@ test("account resolves sign-in state reactively and preserves the old server-fun
   assert.match(accountPage, /signOut\("\/"/);
 });
 
+test("signed-in user identity stays referentially stable to prevent the account profile layout-effect loop", () => {
+  assert.match(currentUserState, /import \{ useMemo \} from "react"/);
+  assert.match(currentUserState, /const sessionUser = data\?\.user/);
+  assert.match(currentUserState, /const user = useMemo<AppUser \| null>\(/);
+  assert.match(currentUserState, /\[sessionUser\?\.id, sessionUser\?\.name, sessionUser\?\.email, sessionUser\?\.image\]/);
+  assert.match(accountPage, /useAccountMediaLayoutEffect\([\s\S]*?\}, \[loadedUser\]\)/);
+});
+
 test("profile photos are stored server-side per authenticated account with bounded image validation", () => {
   assert.match(profileMediaRoute, /auth\.api\.getSession/);
   assert.match(profileMediaRoute, /account_profile_media/);
