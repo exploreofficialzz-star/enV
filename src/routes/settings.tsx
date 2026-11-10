@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Check, Monitor, Moon, Settings as SettingsIcon, Smartphone, Sun, Tablet, RotateCcw } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { usePrefs, type ThemePreference } from "@/lib/storage";
-import type { ViewModePreference } from "@/lib/view-mode";
+import type { ViewMode } from "@/lib/view-mode";
 
 export const Route = createFileRoute("/settings")({ component: Settings });
 
@@ -12,8 +12,7 @@ const themeOptions: { value: ThemePreference; title: string; description: string
   { value: "dark", title: "Dark", description: "Use the dark enV theme.", icon: Moon },
 ];
 
-const viewOptions: { value: ViewModePreference; title: string; description: string; icon: typeof Monitor }[] = [
-  { value: "auto", title: "Automatic", description: "Match the actual phone, tablet or computer using enV.", icon: SettingsIcon },
+const viewOptions: { value: ViewMode; title: string; description: string; icon: typeof Monitor }[] = [
   { value: "mobile", title: "Mobile view", description: "Use the compact phone layout on this device.", icon: Smartphone },
   { value: "tablet", title: "Tablet view", description: "Use the tablet layout on this device.", icon: Tablet },
   { value: "desktop", title: "Desktop view", description: "Use the desktop layout, even on a smaller screen.", icon: Monitor },
@@ -22,7 +21,7 @@ const viewOptions: { value: ViewModePreference; title: string; description: stri
 function Settings() {
   const hydrated = usePrefs((state) => state.hydrated);
   const themePreference = usePrefs((state) => state.themePreference);
-  const viewModePreference = usePrefs((state) => state.viewModePreference);
+  const viewMode = usePrefs((state) => state.viewMode);
   const storageAvailable = usePrefs((state) => state.storageAvailable);
   const setThemePreference = usePrefs((state) => state.setThemePreference);
   const setViewMode = usePrefs((state) => state.setViewMode);
@@ -89,14 +88,14 @@ function Settings() {
                 <div>
                   <h2 id="layout-heading" className="text-lg font-semibold text-fg">Display mode</h2>
                   <p className="mt-1 text-sm leading-6 text-muted">
-                    Automatic detects the actual device: phones open in mobile view, tablets in tablet view, and computers in desktop view. Choose a manual mode to override that default.
+                    enV matches the layout to the device running this browser. Choose another layout below to override the detected device layout.
                   </p>
                 </div>
               </div>
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {viewOptions.map((option) => {
                   const Icon = option.icon;
-                  const selected = viewModePreference === option.value;
+                  const selected = viewMode === option.value;
                   return (
                     <button
                       key={option.value}
@@ -116,7 +115,7 @@ function Settings() {
                 })}
               </div>
               <p className="mt-4 text-xs leading-5 text-muted">
-                Automatic follows the device this browser is running on. Manual choices are saved locally and restored before the page is first displayed, including after a refresh.
+                The device-matched layout stays active until you choose another one. Manual choices are saved locally and restored before the first page is displayed, including after a refresh.
               </p>
             </section>
 
