@@ -42,3 +42,19 @@ test("sign-out clears only the current account's private media cache", () => {
   assert.match(account, /clearAccountProfileMediaCache\(activeUser\.id\)/);
   assert.match(cache, /caches\.delete\(cacheName\(userId\)\)/);
 });
+
+
+test("account profile previews are small, account-specific and restored before first paint", () => {
+  assert.match(cache, /env-account-profile-preview-v1-/);
+  assert.match(cache, /readCachedAccountProfileMediaPreview/);
+  assert.match(cache, /localStorage\\.getItem/);
+  assert.match(cache, /PREVIEW_MAX_CHARS = 160_000/);
+  assert.match(cache, /createImageBitmap/);
+  assert.match(cache, /toDataURL\\("image\\/jpeg"/);
+  assert.match(account, /readCachedAccountProfileMediaPreview/);
+  assert.match(account, /useAccountMediaLayoutEffect/);
+  assert.match(header, /readCachedAccountProfileMediaPreview/);
+  assert.match(header, /useHeaderMediaLayoutEffect/);
+  assert.match(cache, /localStorage\\.removeItem\\(previewKey\\(userId, "avatar"\\)\\)/);
+  assert.match(cache, /localStorage\\.removeItem\\(previewKey\\(userId, "cover"\\)\\)/);
+});
