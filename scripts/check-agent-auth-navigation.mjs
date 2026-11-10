@@ -26,6 +26,8 @@ if (webMenu.includes("Select an active mode again") || webMenu.includes("overflo
 if (!header.includes('document.addEventListener("pointerdown", closeFromOutside)')) errors.push("Overflow menu must close after an outside click.");
 if (!webMenu.includes("fixed right-3") || !webMenu.includes("w-[15.5rem]") || !webMenu.includes("max-w-[calc(100vw_-_5rem)]")) errors.push("Overflow card must remain right-aligned and compact on mobile instead of spanning nearly the whole screen.");
 const viewModeBlock = webMenu.slice(webMenu.indexOf('aria-label="View mode"'), webMenu.indexOf("</section>", webMenu.indexOf('aria-label="View mode"')));
+if (webMenu.includes("Automatic view") || webMenu.includes('chooseViewMode("auto")')) errors.push("Device detection must remain the default, not a selectable fourth view mode.");
+if (viewModeBlock.split('<button type="button"').length - 1 !== 3) errors.push("The overflow menu must expose exactly three selectable view modes.");
 if (!viewModeBlock.includes("<Smartphone size={16}") || !viewModeBlock.includes("<Tablet size={16}") || !viewModeBlock.includes("<Monitor size={16}")) errors.push("Mobile, tablet, and desktop views must have distinct device icons.");
 if ((viewModeBlock.match(/className=\{MENU_VIEW_ITEM_CLASS\}/g) ?? []).length !== 3 || !header.includes('const MENU_VIEW_ITEM_CLASS = `${MENU_ITEM_BASE_CLASS} justify-start gap-2.5`;') || (viewModeBlock.match(/className="flex min-w-0 flex-1 items-center gap-2.5"/g) ?? []).length !== 3) errors.push("Mobile, tablet, and desktop icons must have consistent small spacing before their labels, matching Settings and Help & feedback.");
 if (!webMenu.includes("text-accent") || !header.includes("MENU_ITEM_CLASS")) errors.push("Overflow section headings and all menu rows must use the shared visual styles.");
@@ -51,6 +53,12 @@ for (const path of ["src/routes/settings.tsx", "src/routes/help-feedback.tsx", "
   if (!existsSync(resolve(path))) errors.push("Missing requested settings/support feature: " + path);
 }
 const settingsPage = requireText("src/routes/settings.tsx", ['createFileRoute("/settings")', "themePreference", "setThemePreference", "setViewMode", "Reset appearance and display mode"], "Settings page");
+const viewOptionsStart = settingsPage.indexOf("const viewOptions:");
+const viewOptionsEnd = settingsPage.indexOf("\n];", viewOptionsStart);
+const viewOptionsBlock = viewOptionsStart >= 0 && viewOptionsEnd > viewOptionsStart ? settingsPage.slice(viewOptionsStart, viewOptionsEnd) : "";
+const viewChoicePositions = ["mobile", "tablet", "desktop"].map((mode) => viewOptionsBlock.indexOf('value: "' + mode + '"'));
+if (viewChoicePositions.some((position) => position < 0) || !(viewChoicePositions[0] < viewChoicePositions[1] && viewChoicePositions[1] < viewChoicePositions[2]) || viewOptionsBlock.includes("Automatic") || viewOptionsBlock.includes('value: "auto"')) errors.push("Settings must offer only Mobile, Tablet and Desktop view choices, in that order.");
+if (!settingsPage.includes("const viewMode = usePrefs((state) => state.viewMode)") || !settingsPage.includes("const selected = viewMode === option.value")) errors.push("Settings must show the detected or manually selected effective device mode.");
 const feedbackPage = requireText("src/routes/help-feedback.tsx", ['createFileRoute("/help-feedback")', "mailto:envtoolkit@gmail.com", "Nothing is sent until you review", "required", "maxLength={3000}"], "Help and feedback page");
 const focusedFeedbackPages = requireText("src/components/feedback/feedback-request-page.tsx", ["Report bugs", "Suggest a tool", "mailto:envtoolkit@gmail.com", "Nothing is sent until you review it", "maxLength={3000}"], "Report bugs and suggest a tool pages");
 requireText("src/routes/report-bugs.tsx", ['createFileRoute("/report-bugs")', 'kind="bug"'], "Report bugs route");
