@@ -302,7 +302,7 @@ export async function getPublicTrendingTools() {
      ) ranked
      where starts > 0 and starting_installations >= 3
      order by starts desc, completed desc, views desc, tool_id asc
-     limit 12`,
+     limit 500`,
   );
   const toolIds = rows
     .map(row => String(row.tool_id ?? ""))

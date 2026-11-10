@@ -19,6 +19,7 @@ test("public trending is derived from opt-in starts, with an aggregate privacy t
   assert.match(analyticsServer, /count\(distinct anonymous_subject_digest\) filter \(where event_name='tool_started'\) as starting_installations/);
   assert.match(analyticsServer, /where starts > 0 and starting_installations >= 3/);
   assert.match(analyticsServer, /order by starts desc, completed desc, views desc, tool_id asc/);
+  assert.match(analyticsServer.slice(analyticsServer.indexOf("export async function getPublicTrendingTools"), analyticsServer.indexOf("export async function runAnalyticsRetention")), /limit 500/);
   assert.match(analyticsServer, /toolIds \}/);
   const publicResult = analyticsServer.slice(analyticsServer.indexOf("const toolIds = rows"), analyticsServer.indexOf("export async function runAnalyticsRetention"));
   assert.match(publicResult, /return \{ generatedAt: new Date\(\)\.toISOString\(\), windowDays: 30, toolIds \}/);
@@ -55,6 +56,7 @@ test("Android Home obtains trending IDs from the shared API without sorting by p
   assert.doesNotMatch(homeSource, /sortedByDescending \{ it\.popularity \}/);
   assert.match(androidClient, /https:\/\//);
   assert.match(androidClient, /api\/analytics\/trending/);
+  assert.match(androidClient, /seen\.take\(500\)/);
 });
 
 test("iOS Home obtains trending IDs from the same aggregate API", () => {
@@ -63,4 +65,6 @@ test("iOS Home obtains trending IDs from the same aggregate API", () => {
   assert.match(homeSource, /NativeTrendingToolsClient\.fetchToolIDs\(\)/);
   assert.match(homeSource, /trendingToolIDs\.compactMap/);
   assert.doesNotMatch(homeSource, /store\.catalog\.webSearch\("", limit: Int\.max/);
+  const clientSource = ios.slice(ios.indexOf("private enum NativeTrendingToolsClient"), ios.indexOf("struct HomeView: View"));
+  assert.match(clientSource, /prefix\(500\)/);
 });

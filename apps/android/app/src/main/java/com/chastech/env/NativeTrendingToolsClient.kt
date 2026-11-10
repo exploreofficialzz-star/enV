@@ -37,7 +37,7 @@ object NativeTrendingToolsClient {
                 val id = ids.optString(index, "")
                 if (id.matches(Regex("[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}"))) seen.add(id)
             }
-            seen.take(12)
+            seen.take(500)
         } catch (_: Exception) {
             emptyList()
         } finally {

@@ -490,7 +490,7 @@ private enum NativeTrendingToolsClient {
                 !$0.isEmpty &&
                 $0.range(of: "^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$", options: .regularExpression) != nil &&
                 seen.insert($0).inserted
-            }.prefix(12))
+            }.prefix(500))
         } catch {
             return []
         }
