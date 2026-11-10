@@ -43,6 +43,7 @@ test("public app assets use stale-while-revalidate and never cache private API r
   assert.ok(serviceWorker.includes("NAVIGATION_CACHE_LIMIT = 120"));
   assert.ok(serviceWorker.includes("if (url.search) return false"));
   assert.ok(serviceWorker.includes("authorization"));
+  assert.ok(serviceWorker.includes("accept"));
   assert.ok(serviceWorker.includes("isPublicAssetResponse(response)"));
   assert.match(serviceWorker, /This page response is private or not cacheable/);
 });
