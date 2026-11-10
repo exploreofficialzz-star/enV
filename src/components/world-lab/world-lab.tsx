@@ -306,28 +306,6 @@ export default function WorldLab() {
   const studioRef=useRef<HTMLDivElement>(null);
   const [studioPanel,setStudioPanel]=useState<StudioGroupId|null>(null);
   const [lookState,setLookState]=useState({heading:0,pitch:0});
-  useEffect(()=>{
-    const root=studioRef.current;
-    if(!root)return;
-    root.dataset.railListener="ready";
-    const selectRailGroup=(event:MouseEvent)=>{
-      if(!(event.target instanceof Element))return;
-      const button=event.target.closest<HTMLButtonElement>(
-        'button[aria-label="Open project tools"],button[aria-label="Open build tools"],button[aria-label="Open experiments tools"],button[aria-label="Open results tools"]'
-      );
-      const label=button?.getAttribute("aria-label");
-      const group=label==="Open project tools"?"project"
-        :label==="Open build tools"?"build"
-        :label==="Open experiments tools"?"experiments"
-        :label==="Open results tools"?"results":null;
-      if(group){
-        root.dataset.railLastGroup=group;
-        setStudioPanel(group);
-      }
-    };
-    document.addEventListener("click",selectRailGroup,true);
-    return ()=>document.removeEventListener("click",selectRailGroup,true);
-  },[]);
   useEffect(()=>{if(studioPanel)scrollToStudioGroup(studioRef.current,studioPanel);},[studioPanel]);
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
   const shapeCount = project?.entities.length ?? 0;
@@ -2199,7 +2177,7 @@ export default function WorldLab() {
           <StudioHoldButton label="Step back" onStep={()=>walkBy(-1)}><ArrowDown aria-hidden="true" size={22}/></StudioHoldButton>
         </div>
       </div>
-      <StudioRail open={!!studioPanel} active={studioPanel}/>
+      <StudioRail open={!!studioPanel} active={studioPanel} onSelect={setStudioPanel}/>
       <StudioDrawer open={!!studioPanel} onClose={()=>setStudioPanel(null)}>
         <StudioGroup id="project">
           <div className="wl-toolbar" role="toolbar" aria-label="Project">
