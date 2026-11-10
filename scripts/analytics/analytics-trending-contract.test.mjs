@@ -16,8 +16,8 @@ test("public trending is derived from opt-in starts, with an aggregate privacy t
   assert.match(analyticsServer, /export async function getPublicTrendingTools\(\)/);
   assert.match(analyticsServer, /ANALYTICS_ENABLED !== "true"/);
   assert.match(analyticsServer, /count\(\*\) filter \(where event_name='tool_started'\) as starts/);
-  assert.match(analyticsServer, /count\(distinct anonymous_subject_digest\) as installations/);
-  assert.match(analyticsServer, /where starts > 0 and installations >= 3/);
+  assert.match(analyticsServer, /count\(distinct anonymous_subject_digest\) filter \(where event_name='tool_started'\) as starting_installations/);
+  assert.match(analyticsServer, /where starts > 0 and starting_installations >= 3/);
   assert.match(analyticsServer, /order by starts desc, completed desc, views desc, tool_id asc/);
   assert.match(analyticsServer, /toolIds \}/);
   const publicResult = analyticsServer.slice(analyticsServer.indexOf("const toolIds = rows"), analyticsServer.indexOf("export async function runAnalyticsRetention"));
