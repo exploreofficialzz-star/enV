@@ -337,11 +337,13 @@ export async function getPublicTrendingTools() {
        ) ranked
        where starts > 0 and starting_installations >= 3
        order by starts desc, completed desc, views desc, tool_id asc
-       limit ${PUBLIC_TRENDING_TOOL_LIMIT}`,
+       limit ${PUBLIC_TRENDING_TOOL_LIMIT * 3}`,
     );
+    const activeToolIds = new Set(getActiveTools().map(tool => tool.id));
     const toolIds = rows
       .map(row => String(row.tool_id ?? ""))
-      .filter(id => /^[a-z0-9][a-z0-9._:-]{0,127}$/i.test(id));
+      .filter(id => /^[a-z0-9][a-z0-9._:-]{0,127}$/i.test(id) && activeToolIds.has(id))
+      .slice(0, PUBLIC_TRENDING_TOOL_LIMIT);
     if (!toolIds.length) return publicTrendingDiscoveryResponse();
     return {
       generatedAt: new Date().toISOString(),
