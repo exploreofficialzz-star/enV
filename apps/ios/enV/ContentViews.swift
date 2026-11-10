@@ -825,7 +825,7 @@ private struct WebHomeFooter: View {
     private var brandBlock: some View {
         VStack(alignment: .leading, spacing: 12) {
             EnVLogo().frame(width: 84, height: 56)
-            enVCharacterSpacedText("Useful tools. One place. \(activeCount) browser tools you can use without an account. Files and text stay on your device unless a tool says otherwise.")
+            enVCharacterSpacedText("Useful tools. One place. \(activeCount) browser tools for everyday tasks. Some tools require an account; others are available without one. Files and text stay on your device unless a tool says otherwise.")
                 .font(.envScaled(size: 14, weight: .regular))
                 .foregroundStyle(Color.envMuted)
                 .lineSpacing(4)
