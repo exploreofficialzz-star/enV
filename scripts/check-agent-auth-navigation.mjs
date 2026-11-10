@@ -85,6 +85,8 @@ const account = requireText("src/routes/account.tsx", [
   'createFileRoute("/account")',
   "component: Account",
   "useCurrentUserState()",
+  "const loadAccountProfile = createServerFn({ method: \"GET\" }).handler",
+  "legacyAccountProfileServerFunction = loadAccountProfile",
   'if (!activeUser) return <AuthPage mode="sign-in" />',
   "setSessionTimedOut",
   "setTimeout(() => setSessionTimedOut(true), 10_000)",
@@ -100,6 +102,7 @@ const account = requireText("src/routes/account.tsx", [
   "bg-red-600",
   "signOut",
 ], "Session-aware editable Account profile");
+if (account.includes('loader: () => loadAccountProfile()')) errors.push("New account visits must not wait on the backward-compatible server-function endpoint.");
 for (const removed of ["Loading your profile", "Good to see you", "enV · Profile", "Welcome to your personal enV space", "Account status", "Your enV shortcuts", "Jump straight to the things you use most", "Need to leave?"]) {
   if (account.includes(removed)) errors.push("Account profile still contains removed text: " + removed);
 }
