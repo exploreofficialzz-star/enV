@@ -49,6 +49,17 @@ async function accountDisplayName(userId: string): Promise<string> {
   const name = rows[0]?.name?.normalize("NFC").replace(/\s+/g, " ").trim().slice(0, 32) ?? "";
   return name.length >= 2 ? name : "enV member";
 }
+
+function safePublicProfileImage(value: unknown): string | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || url.username || url.password) return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
 async function actorFor(request: Request, visitorId: string, secret: string) {
   const userId = await communityUserId(request);
   return { userId, actorDigest: digest(userId ? "user:"+userId : "visitor:"+visitorId, secret) };
@@ -104,8 +115,12 @@ export async function getCommunityFeed(request: Request, rawToolId: unknown, raw
       `select c.id,c.parent_id as "parentId",c.body,
         case when c.identity_mode='anonymous' then 'Anonymous' else c.display_name end as "authorLabel",
         c.identity_mode as "identityMode",c.created_at as "createdAt",
-        (c.author_digest=$2) as "isMine"
+        (c.author_digest=$2) as "isMine",
+        case when c.identity_mode='public' and media.avatar_bytes is not null then true else false end as "hasProfileAvatar",
+        account.image as "providerAvatarUrl"
        from tool_community_comments c
+       left join "user" account on account.id=c.author_user_id
+       left join public.account_profile_media media on media.user_id=c.author_user_id
        where c.tool_id=$1 and c.moderation_status='visible'
          and (c.parent_id is null or c.parent_id in
            (select root.id from tool_community_comments root where root.tool_id=$1 and root.parent_id is null and root.moderation_status='visible'))
@@ -135,15 +150,24 @@ export async function getCommunityFeed(request: Request, rawToolId: unknown, raw
     toolId,
     counts:{comments:num(counts[0]?.comments),likes:num(counts[0]?.likes),dislikes:num(counts[0]?.dislikes),views:num(views[0]?.total),views30Days:num(views[0]?.recent)},
     myReaction:reaction[0]?.reaction_type === "like" || reaction[0]?.reaction_type === "dislike" ? reaction[0].reaction_type : null,
-    comments:comments.map(row=>({
-      id:String(row.id),
-      parentId:row.parentId?String(row.parentId):null,
-      body:String(row.body),
-      authorLabel:String(row.authorLabel),
-      identityMode:row.identityMode === "anonymous" ? "anonymous" as const : "public" as const,
-      createdAt:row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt),
-      isMine:row.isMine===true
-    })),
+    comments: comments.map(row => {
+      const id = String(row.id);
+      const identityMode = row.identityMode === "anonymous" ? "anonymous" as const : "public" as const;
+      return {
+        id,
+        parentId: row.parentId ? String(row.parentId) : null,
+        body: String(row.body),
+        authorLabel: String(row.authorLabel),
+        identityMode,
+        authorAvatarUrl: identityMode === "anonymous"
+          ? null
+          : row.hasProfileAvatar === true
+            ? `/api/community/avatar?commentId=${encodeURIComponent(id)}`
+            : safePublicProfileImage(row.providerAvatarUrl),
+        createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt),
+        isMine: row.isMine === true,
+      };
+    }),
     generatedAt:new Date().toISOString(),
   };
 }

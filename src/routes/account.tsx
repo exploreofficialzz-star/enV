@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
@@ -40,6 +40,9 @@ const loadAccountProfile = createServerFn({ method: "GET" }).handler(async () =>
 
 export const Route = createFileRoute("/account")({
   loader: () => loadAccountProfile(),
+  pendingMs: 100,
+  pendingMinMs: 250,
+  pendingComponent: AccountProfileSkeleton,
   component: Account,
 });
 
@@ -53,6 +56,77 @@ type ProfileMediaResponse = {
 
 function initialsFor(name: string): string {
   return name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]!.toUpperCase()).join("") || "E";
+}
+
+function AccountProfileSkeleton() {
+  return (
+    <AppShell>
+      <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-9" role="status" aria-live="polite" aria-busy="true">
+        <span className="sr-only">Loading your profile</span>
+        <section className="overflow-hidden rounded-[28px] border border-border bg-surface shadow-sm">
+          <div className="env-shimmer relative h-40 sm:h-52" />
+          <div className="relative px-4 pb-6 sm:px-7 sm:pb-8">
+            <div className="relative z-10 mx-auto -mt-[76px] flex w-fit flex-col items-center sm:-mt-[92px]">
+              <div className="env-shimmer size-32 rounded-full border-[5px] border-card sm:size-40" />
+              <div className="env-shimmer mt-4 h-8 w-44 rounded-lg sm:h-9 sm:w-56" />
+            </div>
+          </div>
+        </section>
+        <section className="mt-7">
+          <div className="env-shimmer mb-2 h-6 w-36 rounded-md" />
+          <div className="divide-y divide-border rounded-2xl border border-border bg-surface px-4 sm:px-6">
+            {[0, 1].map((row) => (
+              <div key={row} className="flex min-h-[68px] items-center gap-3 py-3">
+                <div className="env-shimmer h-4 w-20 rounded" />
+                <div className="env-shimmer h-4 min-w-0 flex-1 rounded" />
+              </div>
+            ))}
+          </div>
+        </section>
+        <section className="mt-7 grid gap-3 sm:grid-cols-3">
+          {[0, 1, 2].map((card) => (
+            <div key={card} className="flex min-h-[76px] items-center gap-3 rounded-2xl border border-border bg-surface p-4">
+              <div className="env-shimmer size-10 shrink-0 rounded-xl" />
+              <div className="env-shimmer h-4 flex-1 rounded" />
+            </div>
+          ))}
+        </section>
+        <div className="env-shimmer mt-8 h-11 w-full rounded-xl sm:w-36" />
+      </div>
+    </AppShell>
+  );
+}
+
+function ShimmerProfileImage({
+  src,
+  className,
+  fallback,
+}: {
+  src: string;
+  className: string;
+  fallback?: ReactNode;
+}) {
+  const [loadedSource, setLoadedSource] = useState<string | null>(null);
+  const [failedSource, setFailedSource] = useState<string | null>(null);
+  const loaded = loadedSource === src;
+  const failed = failedSource === src;
+
+  return (
+    <span className={`relative block overflow-hidden ${className}`}>
+      {!loaded && !failed ? <span className="env-shimmer absolute inset-0 z-0" aria-hidden="true" /> : null}
+      {failed ? fallback ?? null : (
+        <img
+          src={src}
+          alt=""
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onLoad={() => setLoadedSource(src)}
+          onError={() => setFailedSource(src)}
+          className={`relative z-10 size-full object-cover transition-opacity duration-200 ${loaded ? "opacity-100" : "opacity-0"}`}
+        />
+      )}
+    </span>
+  );
 }
 
 function Account() {
@@ -102,6 +176,9 @@ function Account() {
     let active = true;
 
     const showCached = async (kind: "avatar" | "cover", setter: (url: string | null) => void) => {
+      // The synchronous preview is already painted. Do not swap its image src
+      // to a new blob URL on every refresh; read the full cache only as fallback.
+      if (readCachedAccountProfileMediaPreview(userId, kind)) return;
       const cached = await readCachedAccountProfileMedia(userId, kind);
       if (active && cached) setter(createMediaObjectUrl(cached));
     };
@@ -110,7 +187,8 @@ function Account() {
       const result = await refreshCachedAccountProfileMedia(userId, kind);
       if (!active) return;
       if (result.status === "fresh") {
-        setter(createMediaObjectUrl(result.blob));
+        const preview = readCachedAccountProfileMediaPreview(userId, kind);
+        setter(preview ?? createMediaObjectUrl(result.blob));
         notifyAccountProfileMediaChanged(userId, kind);
       } else if (result.status === "missing") {
         setter(fallback);
@@ -277,7 +355,9 @@ function Account() {
       <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-9">
         <section className="overflow-hidden rounded-[28px] border border-border bg-surface shadow-sm" aria-label="Profile">
           <div className="relative h-40 bg-gradient-to-br from-neutral-800 via-neutral-700 to-neutral-950 sm:h-52">
-            {activeCoverUrl ? <img src={activeCoverUrl} alt="" className="absolute inset-0 size-full object-cover" /> : null}
+            {activeCoverUrl ? (
+              <ShimmerProfileImage key={activeCoverUrl} src={activeCoverUrl} className="absolute inset-0" />
+            ) : null}
             <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/20" aria-hidden="true" />
             <button
               type="button"
@@ -303,7 +383,16 @@ function Account() {
             <div className="relative z-10 mx-auto -mt-[76px] flex w-fit flex-col items-center sm:-mt-[92px]">
               <div className="relative">
                 {activeAvatarUrl ? (
-                  <img src={activeAvatarUrl} alt="" className="size-32 rounded-full border-[5px] border-card bg-surface object-cover shadow-lg sm:size-40" />
+                  <ShimmerProfileImage
+                    key={activeAvatarUrl}
+                    src={activeAvatarUrl}
+                    className="size-32 rounded-full border-[5px] border-card bg-surface shadow-lg sm:size-40"
+                    fallback={
+                      <span className="relative z-10 grid size-full place-items-center bg-surface-2 text-4xl font-semibold text-fg sm:text-5xl" aria-hidden="true">
+                        {initials}
+                      </span>
+                    }
+                  />
                 ) : (
                   <span className="grid size-32 place-items-center rounded-full border-[5px] border-card bg-surface-2 text-4xl font-semibold text-fg shadow-lg sm:size-40 sm:text-5xl" aria-hidden="true">
                     {initials}

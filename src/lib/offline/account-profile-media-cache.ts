@@ -1,7 +1,7 @@
 export type AccountProfileMediaKind = "avatar" | "cover";
 export type AccountProfileMediaRefresh =
   | { status: "fresh"; blob: Blob }
-  | { status: "missing" | "unavailable"; blob?: undefined };
+  | { status: "unchanged" | "missing" | "unavailable"; blob?: undefined };
 
 const CACHE_PREFIX = "env-account-profile-media-v1-";
 const PREVIEW_PREFIX = "env-account-profile-preview-v1-";
@@ -101,18 +101,18 @@ export async function cacheAccountProfileMedia(
   userId: string,
   kind: AccountProfileMediaKind,
   blob: Blob,
+  etag?: string | null,
 ): Promise<boolean> {
   if (typeof window === "undefined" || !("caches" in window) || !validBlob(kind, blob)) return false;
   try {
     const cache = await caches.open(cacheName(userId));
-    const response = new Response(blob, {
-      status: 200,
-      headers: {
-        "content-type": blob.type.toLowerCase(),
-        "cache-control": "private, no-store",
-        "x-content-type-options": "nosniff",
-      },
+    const headers = new Headers({
+      "content-type": blob.type.toLowerCase(),
+      "cache-control": "private, no-store",
+      "x-content-type-options": "nosniff",
     });
+    if (etag && etag.length <= 256) headers.set("etag", etag);
+    const response = new Response(blob, { status: 200, headers });
     await cache.put(cacheKey(kind), response);
     await persistAccountProfileMediaPreview(userId, kind, blob);
     return true;
@@ -122,38 +122,77 @@ export async function cacheAccountProfileMedia(
   }
 }
 
-export async function refreshCachedAccountProfileMedia(
+const profileMediaRefreshes = new Map<string, Promise<AccountProfileMediaRefresh>>();
+
+export function refreshCachedAccountProfileMedia(
   userId: string,
   kind: AccountProfileMediaKind,
 ): Promise<AccountProfileMediaRefresh> {
-  if (typeof window === "undefined" || !navigator.onLine) return { status: "unavailable" };
-  try {
-    const response = await fetch("/api/account/profile-media?kind=" + kind, {
-      method: "GET",
-      credentials: "same-origin",
-      cache: "no-store",
-      headers: { accept: "image/jpeg,image/png,image/webp" },
-    });
-    if (response.status === 404 || response.status === 401 || response.status === 403) {
-      if ("caches" in window) {
-        const cache = await caches.open(cacheName(userId)).catch(() => null);
-        if (cache) await cache.delete(cacheKey(kind)).catch(() => false);
-      }
-      try {
-        window.localStorage.removeItem(previewKey(userId, kind));
-      } catch {
-        // Ignore preview cleanup failures; the endpoint's authorization result remains authoritative.
-      }
-      return { status: "missing" };
-    }
-    if (!response.ok) return { status: "unavailable" };
-    const blob = await response.blob();
-    if (!validBlob(kind, blob)) return { status: "unavailable" };
-    await cacheAccountProfileMedia(userId, kind, blob);
-    return { status: "fresh", blob };
-  } catch {
-    return { status: "unavailable" };
+  if (typeof window === "undefined" || !navigator.onLine) {
+    return Promise.resolve({ status: "unavailable" });
   }
+
+  // The header and account page can request the same photo at once. Share one
+  // conditional request so refresh does not duplicate database reads/transfers.
+  const key = cacheName(userId) + ":" + kind;
+  const pending = profileMediaRefreshes.get(key);
+  if (pending) return pending;
+
+  let request!: Promise<AccountProfileMediaRefresh>;
+  request = (async (): Promise<AccountProfileMediaRefresh> => {
+    try {
+      let cachedResponse: Response | undefined;
+      if ("caches" in window) {
+        const localCache = await caches.open(cacheName(userId));
+        cachedResponse = await localCache.match(cacheKey(kind));
+      }
+
+      const headers = new Headers({ accept: "image/jpeg,image/png,image/webp" });
+      const etag = cachedResponse?.headers.get("etag");
+      if (etag) headers.set("if-none-match", etag);
+
+      const response = await fetch("/api/account/profile-media?kind=" + kind, {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers,
+      });
+
+      if (response.status === 304) {
+        return cachedResponse ? { status: "unchanged" } : { status: "unavailable" };
+      }
+
+      // Only a confirmed missing media row may evict the last good image.
+      // Authorization failures and transient server errors must preserve it.
+      if (response.status === 404) {
+        if ("caches" in window) {
+          const localCache = await caches.open(cacheName(userId)).catch(() => null);
+          if (localCache) await localCache.delete(cacheKey(kind)).catch(() => false);
+        }
+        try {
+          window.localStorage.removeItem(previewKey(userId, kind));
+        } catch {
+          // Preview cleanup is best-effort after a confirmed missing response.
+        }
+        return { status: "missing" };
+      }
+      if (response.status === 401 || response.status === 403 || !response.ok) {
+        return { status: "unavailable" };
+      }
+
+      const blob = await response.blob();
+      if (!validBlob(kind, blob)) return { status: "unavailable" };
+      await cacheAccountProfileMedia(userId, kind, blob, response.headers.get("etag"));
+      return { status: "fresh", blob };
+    } catch {
+      return { status: "unavailable" };
+    }
+  })().finally(() => {
+    if (profileMediaRefreshes.get(key) === request) profileMediaRefreshes.delete(key);
+  });
+
+  profileMediaRefreshes.set(key, request);
+  return request;
 }
 
 export async function clearAccountProfileMediaCache(userId: string): Promise<void> {

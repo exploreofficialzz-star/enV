@@ -9,7 +9,7 @@ const read = (path) => readFile(resolve(root, path), "utf8");
 const [
   web, android, ios, androidWallet, iosWallet, server, identityRoute,
   publicFeed, publicIndex, publicDetail, toolRoute, footer, seoGenerator, seoMetadata,
-  toolShell, androidDetail,
+  toolShell, androidDetail, avatarComponent, avatarRoute, accountRoute, styles,
 ] = await Promise.all([
   read("src/components/tools/tool-community-panel.tsx"),
   read("apps/android/app/src/main/java/com/chastech/env/NativeToolCommunityPanel.kt"),
@@ -27,6 +27,10 @@ const [
   read("src/lib/seo-metadata.ts"),
   read("src/components/tools/tool-shell.tsx"),
   read("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt"),
+  read("src/components/community/comment-author-avatar.tsx"),
+  read("server/routes/api/community/avatar.get.ts"),
+  read("src/routes/account.tsx"),
+  read("src/styles.css"),
 ]);
 
 function assertOrdered(source, like, comments, dislike, platform) {
@@ -185,4 +189,30 @@ test("engagement counters remain wired to likes, dislikes, comments and views", 
   assert.match(iosPanel, /counts\.views/);
   assert.match(server, /views:num\(views\[0\]\?\.total\)/);
   assert.match(server, /views30Days:num\(views\[0\]\?\.recent\)/);
+});
+
+
+test("tool comments show account photos only for explicitly public identities", () => {
+  assert.match(web, /CommentAuthorAvatar/);
+  assert.match(publicDetail, /CommentAuthorAvatar/);
+  assert.match(publicFeed, /authorAvatarUrl: string \| null/);
+  assert.match(server, /identityMode === "anonymous"[\s\S]*?authorAvatarUrl/);
+  assert.match(server, /hasProfileAvatar/);
+  assert.match(server, /safePublicProfileImage/);
+  assert.match(avatarRoute, /identity_mode\s*=\s*'public'/);
+  assert.match(avatarRoute, /moderation_status\s*=\s*'visible'/);
+  assert.match(avatarRoute, /createProfileMediaEtag/);
+  assert.match(avatarRoute, /cross-origin-resource-policy/);
+  assert.match(avatarComponent, /identityMode === "public"/);
+  assert.match(avatarComponent, /referrerPolicy="no-referrer"/);
+  assert.match(avatarComponent, /env-shimmer/);
+});
+
+test("account page uses a shimmer loading skeleton and reduced-motion-aware photo shimmer", () => {
+  assert.match(accountRoute, /pendingComponent:\s*AccountProfileSkeleton/);
+  assert.match(accountRoute, /function AccountProfileSkeleton/);
+  assert.match(accountRoute, /function ShimmerProfileImage/);
+  assert.match(accountRoute, /<ShimmerProfileImage/);
+  assert.match(styles, /\.env-shimmer\s*\{/);
+  assert.match(styles, /prefers-reduced-motion:\s*reduce/);
 });

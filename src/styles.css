@@ -3380,3 +3380,28 @@ html[data-env-view-mode="mobile"] .env-app-shell .account-shortcut-title {
   place-items:center !important;
   padding:0 !important;
 }
+
+
+/* Shared shimmer used by profile skeletons and lazy-loaded account/comment photos. */
+.env-shimmer {
+  background-image: linear-gradient(
+    100deg,
+    var(--color-surface-2) 0%,
+    var(--color-surface) 48%,
+    var(--color-surface-2) 100%
+  );
+  background-size: 200% 100%;
+  animation: env-profile-shimmer 1.35s ease-in-out infinite;
+}
+
+@keyframes env-profile-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .env-shimmer {
+    animation: none;
+    background-position: 0 0;
+  }
+}

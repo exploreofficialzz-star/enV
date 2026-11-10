@@ -1,5 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { AppShell } from "@/components/layout/app-shell";
+import { CommentAuthorAvatar } from "@/components/community/comment-author-avatar";
 import { loadPublicCommunityToolFeed } from "@/lib/community/public-feed.functions";
 import { getToolByPath } from "@/lib/registry";
 import { isIndexableTool, SITE_ORIGIN, seoPageHead } from "@/lib/seo-metadata";
@@ -84,7 +85,10 @@ function PublicToolDiscussionPage() {
           {roots.map((comment) => (
             <li key={comment.id} id={"comment-" + comment.id} className="rounded-2xl border border-border bg-surface p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-sm font-semibold text-fg">{comment.authorLabel}</span>
+                <div className="flex min-w-0 items-center gap-2">
+                  <CommentAuthorAvatar label={comment.authorLabel} identityMode={comment.identityMode} imageUrl={comment.authorAvatarUrl} />
+                  <span className="text-sm font-semibold text-fg">{comment.authorLabel}</span>
+                </div>
                 <time className="text-xs text-muted" dateTime={comment.createdAt}>{new Date(comment.createdAt).toLocaleDateString()}</time>
               </div>
               <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-fg">{comment.body}</p>
@@ -93,7 +97,10 @@ function PublicToolDiscussionPage() {
                   {feed.comments.filter((reply) => reply.parentId === comment.id).map((reply) => (
                     <li key={reply.id} id={"comment-" + reply.id}>
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-xs font-semibold text-fg">{reply.authorLabel}</span>
+                        <div className="flex min-w-0 items-center gap-2">
+                          <CommentAuthorAvatar label={reply.authorLabel} identityMode={reply.identityMode} imageUrl={reply.authorAvatarUrl} size="small" />
+                          <span className="text-xs font-semibold text-fg">{reply.authorLabel}</span>
+                        </div>
                         <time className="text-[11px] text-muted" dateTime={reply.createdAt}>{new Date(reply.createdAt).toLocaleDateString()}</time>
                       </div>
                       <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-fg">{reply.body}</p>

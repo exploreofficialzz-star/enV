@@ -8,6 +8,7 @@ export type PublicCommunityComment = {
   body: string;
   authorLabel: string;
   identityMode: "public" | "anonymous";
+  authorAvatarUrl: string | null;
   createdAt: string;
   isMine: boolean;
 };

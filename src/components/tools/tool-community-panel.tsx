@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Ban, Eye, MessageCircle, RefreshCw, Send, ThumbsDown, ThumbsUp, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CommentAuthorAvatar } from "@/components/community/comment-author-avatar";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { recordAnalyticsEvent } from "@/lib/analytics/client";
 
@@ -11,6 +12,7 @@ type CommunityComment = {
   body: string;
   authorLabel: string;
   identityMode: "public" | "anonymous";
+  authorAvatarUrl: string | null;
   createdAt: string;
   isMine: boolean;
 };
@@ -260,9 +262,17 @@ export function ToolCommunityPanel({ toolId, discussionHref, initialFeed }: { to
     return (
       <article key={comment.id} className={nested ? "ml-5 border-l-2 border-border pl-3" : "rounded-xl border border-border bg-surface px-3 py-3"}>
         <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0 text-xs font-semibold text-fg">
-            {comment.authorLabel}
-            {comment.isMine ? <span className="ml-2 font-normal text-muted">You</span> : null}
+          <div className="flex min-w-0 items-center gap-2">
+            <CommentAuthorAvatar
+              label={comment.authorLabel}
+              identityMode={comment.identityMode}
+              imageUrl={comment.authorAvatarUrl}
+              size={nested ? "small" : "normal"}
+            />
+            <div className="min-w-0 text-xs font-semibold text-fg">
+              {comment.authorLabel}
+              {comment.isMine ? <span className="ml-2 font-normal text-muted">You</span> : null}
+            </div>
           </div>
           <time className="shrink-0 text-[11px] text-muted" dateTime={comment.createdAt}>
             {new Date(comment.createdAt).toLocaleDateString()}
