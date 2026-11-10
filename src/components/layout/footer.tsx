@@ -18,7 +18,7 @@ export function Footer() {
         <div className="md:col-span-2">
           <Logo />
           <p className="mt-3 max-w-sm text-sm leading-6 text-muted">
-            Useful tools. One place. {count} browser tools you can use without an account.
+            Useful tools. One place. {count} browser tools for everyday tasks. Some tools require an account; others are available without one.
             Files and text stay on your device unless a tool says otherwise.
           </p>
         </div>
