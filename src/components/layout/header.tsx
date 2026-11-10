@@ -64,11 +64,15 @@ function closeMenu(event: React.MouseEvent<HTMLElement>) {
 
 function AccountAvatar({ user }: { user: AppUser }) {
   const [cachedMedia, setCachedMedia] = useState<{ userId: string; url: string } | null>(null);
+  const [resolvedUserId, setResolvedUserId] = useState<string | null>(null);
+  const [loadedSource, setLoadedSource] = useState<string | null>(null);
+  const [failedSource, setFailedSource] = useState<string | null>(null);
   const objectUrls = useRef(new Set<string>());
 
   useHeaderMediaLayoutEffect(() => {
     const preview = readCachedAccountProfileMediaPreview(user.id, "avatar");
     setCachedMedia(preview ? { userId: user.id, url: preview } : null);
+    setResolvedUserId(preview ? user.id : null);
   }, [user.id]);
 
   useEffect(() => {
@@ -79,15 +83,21 @@ function AccountAvatar({ user }: { user: AppUser }) {
       const url = URL.createObjectURL(blob);
       objectUrls.current.add(url);
       setCachedMedia({ userId: user.id, url });
+      setResolvedUserId(user.id);
     };
 
     const load = async (refreshNetwork: boolean) => {
       const preview = readCachedAccountProfileMediaPreview(user.id, "avatar");
+      let hasCachedPhoto = Boolean(preview);
       if (active && preview) {
         setCachedMedia({ userId: user.id, url: preview });
+        setResolvedUserId(user.id);
       } else {
         const cached = await readCachedAccountProfileMedia(user.id, "avatar");
-        if (active && cached) setBlob(cached);
+        if (active && cached) {
+          hasCachedPhoto = true;
+          setBlob(cached);
+        }
       }
       if (!active || !refreshNetwork || !navigator.onLine) return;
 
@@ -97,10 +107,16 @@ function AccountAvatar({ user }: { user: AppUser }) {
         const freshPreview = readCachedAccountProfileMediaPreview(user.id, "avatar");
         if (freshPreview) setCachedMedia({ userId: user.id, url: freshPreview });
         else setBlob(refreshed.blob);
+        setResolvedUserId(user.id);
+      } else if (refreshed.status === "unchanged") {
+        if (hasCachedPhoto) setResolvedUserId(user.id);
       } else if (refreshed.status === "missing") {
         setCachedMedia(null);
+        setResolvedUserId(user.id);
+      } else if (hasCachedPhoto) {
+        // Retain a cached photo through transient auth/server errors.
+        setResolvedUserId(user.id);
       }
-      // An unchanged 304 or temporary error keeps the current image source intact.
     };
 
     const handleUpdated = (event: Event) => {
@@ -121,12 +137,31 @@ function AccountAvatar({ user }: { user: AppUser }) {
     };
   }, [user.id, user.profileImageUrl]);
 
-  const source = (cachedMedia?.userId === user.id ? cachedMedia.url : null) ?? user.profileImageUrl;
-  return source
-    ? <img src={source} alt="" className="size-full object-cover" />
-    : <UserRound className="size-5" strokeWidth={2.1} aria-hidden="true" />;
-}
+  const resolved = resolvedUserId === user.id;
+  const source = (cachedMedia?.userId === user.id ? cachedMedia.url : null) ?? (resolved ? user.profileImageUrl : null);
+  const imageLoaded = source !== null && loadedSource === source && failedSource !== source;
 
+  return (
+    <span className="relative grid size-full place-items-center overflow-hidden rounded-full">
+      {!resolved || (source && !imageLoaded && failedSource !== source) ? (
+        <span className="env-shimmer absolute inset-0" aria-hidden="true" />
+      ) : null}
+      {source && failedSource !== source ? (
+        <img
+          src={source}
+          alt=""
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onLoad={() => setLoadedSource(source)}
+          onError={() => setFailedSource(source)}
+          className={`relative size-full object-cover transition-opacity duration-200 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
+        />
+      ) : resolved ? (
+        <UserRound className="relative z-10 size-5" strokeWidth={2.1} aria-hidden="true" />
+      ) : null}
+    </span>
+  );
+}
 export function Header() {
   const pathname = useRouterState({ select: state => state.location.pathname });
   const isWalletPage = pathname === "/wallet";

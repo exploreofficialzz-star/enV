@@ -9,7 +9,7 @@ const read = (path) => readFile(resolve(root, path), "utf8");
 const [
   web, android, ios, androidWallet, iosWallet, server, identityRoute,
   publicFeed, publicIndex, publicDetail, toolRoute, footer, seoGenerator, seoMetadata,
-  toolShell, androidDetail, avatarComponent, avatarRoute, accountRoute, styles,
+  toolShell, androidDetail, avatarComponent, avatarRoute, accountRoute, styles, header,
 ] = await Promise.all([
   read("src/components/tools/tool-community-panel.tsx"),
   read("apps/android/app/src/main/java/com/chastech/env/NativeToolCommunityPanel.kt"),
@@ -31,6 +31,7 @@ const [
   read("server/routes/api/community/avatar.get.ts"),
   read("src/routes/account.tsx"),
   read("src/styles.css"),
+  read("src/components/layout/header.tsx"),
 ]);
 
 function assertOrdered(source, like, comments, dislike, platform) {
@@ -215,4 +216,17 @@ test("account page uses a shimmer loading skeleton and reduced-motion-aware phot
   assert.match(accountRoute, /<ShimmerProfileImage/);
   assert.match(styles, /\.env-shimmer\s*\{/);
   assert.match(styles, /prefers-reduced-motion:\s*reduce/);
+});
+
+
+test("profile shimmer is the only visible state until an account photo is resolved", () => {
+  assert.match(accountRoute, /useState<string \\| null>\\(null\\)/);
+  assert.match(accountRoute, /const activeAvatarUrl = sameLoadedIdentity \\? avatarUrl : null/);
+  assert.match(accountRoute, /setAvatarResolving\\(true\\)/);
+  assert.match(accountRoute, /avatarResolving \\?/);
+  assert.doesNotMatch(accountRoute, /useState<string \\| null>\\(loadedUser\\?\\.profileImageUrl/);
+  assert.match(header, /resolvedUserId/);
+  assert.match(header, /env-shimmer absolute inset-0/);
+  assert.match(header, /resolved \\? user\\.profileImageUrl : null/);
+  assert.doesNotMatch(header, /\\?\\? user\\.profileImageUrl/);
 });

@@ -132,8 +132,10 @@ function ShimmerProfileImage({
 function Account() {
   const loadedUser = Route.useLoaderData();
   const [user, setUser] = useState<AppUser | null>(loadedUser);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(loadedUser?.profileImageUrl ?? null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [avatarResolving, setAvatarResolving] = useState(true);
+  const [coverResolving, setCoverResolving] = useState(true);
   const [editingField, setEditingField] = useState<"name" | "email" | null>(null);
   const [nameDraft, setNameDraft] = useState(loadedUser?.displayName ?? "");
   const [emailDraft, setEmailDraft] = useState(loadedUser?.primaryEmail ?? "");
@@ -156,15 +158,20 @@ function Account() {
   // result is being committed after an account switch.
   const sameLoadedIdentity = user?.id === loadedUser?.id;
   const activeUser = sameLoadedIdentity ? user : loadedUser;
-  const activeAvatarUrl = sameLoadedIdentity ? avatarUrl : loadedUser?.profileImageUrl ?? null;
+  // Do not expose Better Auth's fallback image while the account-scoped photo
+  // cache/API is still resolving. The shimmer stays visible until a real source
+  // has been found or the API confirms that this account has no uploaded photo.
+  const activeAvatarUrl = sameLoadedIdentity ? avatarUrl : null;
   const activeCoverUrl = sameLoadedIdentity ? coverUrl : null;
 
   useAccountMediaLayoutEffect(() => {
     setUser(loadedUser);
     const cachedAvatar = loadedUser?.id ? readCachedAccountProfileMediaPreview(loadedUser.id, "avatar") : null;
     const cachedCover = loadedUser?.id ? readCachedAccountProfileMediaPreview(loadedUser.id, "cover") : null;
-    setAvatarUrl(cachedAvatar ?? loadedUser?.profileImageUrl ?? null);
+    setAvatarUrl(cachedAvatar);
     setCoverUrl(cachedCover);
+    setAvatarResolving(!cachedAvatar);
+    setCoverResolving(!cachedCover);
     setEditingField(null);
     setNameDraft(loadedUser?.displayName ?? "");
     setEmailDraft(loadedUser?.primaryEmail ?? "");
@@ -178,9 +185,10 @@ function Account() {
     const showCached = async (kind: "avatar" | "cover", setter: (url: string | null) => void) => {
       // The synchronous preview is already painted. Do not swap its image src
       // to a new blob URL on every refresh; read the full cache only as fallback.
-      if (readCachedAccountProfileMediaPreview(userId, kind)) return;
+      if (readCachedAccountProfileMediaPreview(userId, kind)) return true;
       const cached = await readCachedAccountProfileMedia(userId, kind);
       if (active && cached) setter(createMediaObjectUrl(cached));
+      return Boolean(cached);
     };
 
     const refresh = async (kind: "avatar" | "cover", setter: (url: string | null) => void, fallback: string | null) => {
@@ -189,18 +197,27 @@ function Account() {
       if (result.status === "fresh") {
         const preview = readCachedAccountProfileMediaPreview(userId, kind);
         setter(preview ?? createMediaObjectUrl(result.blob));
+        if (kind === "avatar") setAvatarResolving(false);
+        else setCoverResolving(false);
         notifyAccountProfileMediaChanged(userId, kind);
       } else if (result.status === "missing") {
         setter(fallback);
+        if (kind === "avatar") setAvatarResolving(false);
+        else setCoverResolving(false);
       }
-      // Network/server errors deliberately leave the last cached image visible.
+      // A transient API/auth failure keeps the shimmer (or last cached photo)
+      // instead of briefly showing the provider's default image.
     };
 
     const warmAndRefresh = async () => {
-      await Promise.all([
+      const [hasCachedAvatar, hasCachedCover] = await Promise.all([
         showCached("avatar", setAvatarUrl),
         showCached("cover", setCoverUrl),
       ]);
+      if (active) {
+        if (hasCachedAvatar) setAvatarResolving(false);
+        if (hasCachedCover) setCoverResolving(false);
+      }
       if (!active || !navigator.onLine) return;
       await Promise.all([
         refresh("avatar", setAvatarUrl, user?.profileImageUrl ?? null),
@@ -357,6 +374,8 @@ function Account() {
           <div className="relative h-40 bg-gradient-to-br from-neutral-800 via-neutral-700 to-neutral-950 sm:h-52">
             {activeCoverUrl ? (
               <ShimmerProfileImage key={activeCoverUrl} src={activeCoverUrl} className="absolute inset-0" />
+            ) : coverResolving ? (
+              <div className="env-shimmer absolute inset-0" aria-hidden="true" />
             ) : null}
             <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/20" aria-hidden="true" />
             <button
@@ -393,6 +412,8 @@ function Account() {
                       </span>
                     }
                   />
+                ) : avatarResolving ? (
+                  <span className="env-shimmer block size-32 rounded-full border-[5px] border-card shadow-lg sm:size-40" aria-hidden="true" />
                 ) : (
                   <span className="grid size-32 place-items-center rounded-full border-[5px] border-card bg-surface-2 text-4xl font-semibold text-fg shadow-lg sm:size-40 sm:text-5xl" aria-hidden="true">
                     {initials}
