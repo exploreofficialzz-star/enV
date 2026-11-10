@@ -389,6 +389,19 @@ self.addEventListener("activate", (event) => {
       }
       return Promise.resolve(false);
     }));
+
+    // Purge navigation entries created by older worker versions that may have
+    // included query strings or pages which the stricter cache policy excludes.
+    const navigationCache = await caches.open(NAVIGATION_CACHE);
+    const navigationRequests = await navigationCache.keys();
+    await Promise.all(navigationRequests.map(async request => {
+      const url = new URL(request.url);
+      const response = await navigationCache.match(request);
+      if (!isCacheablePublicNavigationPath(url) || !isPublicNavigationResponse(response)) {
+        await navigationCache.delete(request);
+      }
+    }));
+    await trimCache(navigationCache, NAVIGATION_CACHE_LIMIT);
     await self.clients.claim();
   })());
 });
