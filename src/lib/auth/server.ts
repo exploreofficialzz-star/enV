@@ -190,10 +190,7 @@ export const auth = betterAuth({
     encryptOAuthTokens: true,
     accountLinking: {
       enabled: true,
-      trustedProviders: [
-        ...OAUTH_PROVIDERS.map((provider) => provider.providerId),
-        ...(googleConfigured ? ["google"] : []),
-      ],
+      trustedProviders: OAUTH_PROVIDERS.map((provider) => provider.providerId),
       requireLocalEmailVerified: true,
     },
   },
