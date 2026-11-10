@@ -7,7 +7,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { AuthPage } from "@/components/auth/auth-page";
 import { authClient, authEnabled, signOut } from "@/lib/auth/client";
 import { auth, authConfigurationError, authConfigured } from "@/lib/auth/server";
-import { DEV_USER, type AppUser } from "@/lib/auth/use-current-user";
+import { DEV_USER, useCurrentUserState, type AppUser } from "@/lib/auth/use-current-user";
 import {
   cacheAccountProfileMedia,
   clearAccountProfileMediaCache,
