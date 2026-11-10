@@ -43,7 +43,29 @@ try{
   await page.setViewportSize({width:1280,height:900});
   // Every tool lives in one scrolling panel opened from the rail.
   await page.getByRole("button",{name:"Open project tools"}).click();
-  await page.getByRole("button",{name:"Save on device"}).waitFor({state:"visible",timeout:90000});
+  try {
+    await page.getByRole("button",{name:"Save on device"}).waitFor({state:"visible",timeout:15000});
+  } catch (error) {
+    const diagnostic=await page.locator(".wl-studio").evaluate(root=>{
+      const drawer=root.querySelector(".wl-drawer");
+      const rail=root.querySelector(".wl-rail");
+      const save=[...root.querySelectorAll("button")].find(node=>node.getAttribute("aria-label")==="Save on device");
+      const describe=node=>{
+        if(!node)return null;
+        const style=getComputedStyle(node),rect=node.getBoundingClientRect();
+        return {tag:node.tagName,ariaHidden:node.getAttribute("aria-hidden"),inert:node.hasAttribute("inert"),
+          display:style.display,visibility:style.visibility,opacity:style.opacity,transform:style.transform,
+          rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height},disabled:node.disabled};
+      };
+      return {rootOpen:root.getAttribute("data-open"),rail:describe(rail),drawer:describe(drawer),
+        drawerOpen:drawer?.getAttribute("data-open"),drawerBody:describe(drawer?.querySelector(".wl-drawer__body")),
+        save:describe(save),groups:[...root.querySelectorAll(".wl-group")].map(node=>({
+          id:node.getAttribute("data-wl-group"),rect:(()=>{const r=node.getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height};})()
+        }))};
+    });
+    console.error("WORLD_LAB_DRAWER_DIAGNOSTIC:",JSON.stringify(diagnostic));
+    throw error;
+  }
   await page.getByRole("button",{name:"Add cube"}).click();
   await page.getByRole("button",{name:"Add sphere"}).click();
 
