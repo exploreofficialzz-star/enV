@@ -128,8 +128,8 @@ test("token dashboard uses shimmer for balances while account data is loading", 
   assert.ok(tokenDashboard.includes('loading={loadState === "loading"}'));
   assert.ok(tokenDashboard.includes("Loading reserved tokens"));
   assert.ok(tokenDashboard.includes("Loading lifetime token usage"));
-  assert.match(tokenDashboard, /loadState === "loading" \\? null/);
-  assert.match(tokenDashboard, /loadState === "signed-out" \\|\\| loadState === "loading" \\? null/);
+  assert.ok(tokenDashboard.includes('loadState === "loading" ? null'));
+  assert.ok(tokenDashboard.includes('loadState === "signed-out" || loadState === "loading" ? null'));
   assert.ok(tokenDashboard.includes('wallet ? tokenLabel(wallet.availableTokens) : "—"'));
 });
 
