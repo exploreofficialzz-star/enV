@@ -220,13 +220,13 @@ test("account page uses a shimmer loading skeleton and reduced-motion-aware phot
 
 
 test("profile shimmer is the only visible state until an account photo is resolved", () => {
-  assert.match(accountRoute, /useState<string \\| null>\\(null\\)/);
-  assert.match(accountRoute, /const activeAvatarUrl = sameLoadedIdentity \\? avatarUrl : null/);
-  assert.match(accountRoute, /setAvatarResolving\\(true\\)/);
-  assert.match(accountRoute, /avatarResolving \\?/);
-  assert.doesNotMatch(accountRoute, /useState<string \\| null>\\(loadedUser\\?\\.profileImageUrl/);
-  assert.match(header, /resolvedUserId/);
-  assert.match(header, /env-shimmer absolute inset-0/);
-  assert.match(header, /resolved \\? user\\.profileImageUrl : null/);
-  assert.doesNotMatch(header, /\\?\\? user\\.profileImageUrl/);
+  assert.ok(accountRoute.includes("useState<string | null>(null)"));
+  assert.ok(accountRoute.includes("const activeAvatarUrl = sameLoadedIdentity ? avatarUrl : null"));
+  assert.ok(accountRoute.includes("setAvatarResolving(!cachedAvatar)"));
+  assert.ok(accountRoute.includes("avatarResolving ?"));
+  assert.ok(!accountRoute.includes("useState<string | null>(loadedUser?.profileImageUrl"));
+  assert.ok(header.includes("resolvedUserId"));
+  assert.ok(header.includes("env-shimmer absolute inset-0"));
+  assert.ok(header.includes("(resolved ? user.profileImageUrl : null)"));
+  assert.ok(!header.includes("?? user.profileImageUrl"));
 });
