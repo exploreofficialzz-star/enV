@@ -119,15 +119,18 @@ test("profile photos are stored server-side per authenticated account with bound
 });
 
 test("token dashboard uses shimmer for balances while account data is loading", () => {
-  assert.doesNotMatch(tokenDashboard, /Sign in to load your real enV balance|>Sign in<\\/Link>/);
-  assert.doesNotMatch(tokenDashboard, /Sign in to load token history|Loading token activity|Loading your tokens/);
-  assert.match(tokenDashboard, /aria-label="Loading token balance"/);
-  assert.match(tokenDashboard, /loading=\\{loadState === "loading"\\}/);
-  assert.match(tokenDashboard, /Loading reserved tokens/);
-  assert.match(tokenDashboard, /Loading lifetime token usage/);
+  assert.ok(!tokenDashboard.includes("Sign in to load your real enV balance"));
+  assert.ok(!tokenDashboard.includes(">Sign in</Link>"));
+  assert.ok(!tokenDashboard.includes("Sign in to load token history"));
+  assert.ok(!tokenDashboard.includes("Loading token activity"));
+  assert.ok(!tokenDashboard.includes("Loading your tokens"));
+  assert.ok(tokenDashboard.includes('aria-label="Loading token balance"'));
+  assert.ok(tokenDashboard.includes('loading={loadState === "loading"}'));
+  assert.ok(tokenDashboard.includes("Loading reserved tokens"));
+  assert.ok(tokenDashboard.includes("Loading lifetime token usage"));
   assert.match(tokenDashboard, /loadState === "loading" \\? null/);
   assert.match(tokenDashboard, /loadState === "signed-out" \\|\\| loadState === "loading" \\? null/);
-  assert.match(tokenDashboard, /wallet \\? tokenLabel\\(wallet\\.availableTokens\\) : "—"/);
+  assert.ok(tokenDashboard.includes('wallet ? tokenLabel(wallet.availableTokens) : "—"'));
 });
 
 test("device view is detected before first paint and manual choices survive refresh", () => {
