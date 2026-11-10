@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { dashboardSessionDigest, issueDashboardSession, readDashboardSession } from "./dashboard-session.mjs";
 import { createSessionLookup } from "../ai/server/session";
 import { getSql } from "../db";
