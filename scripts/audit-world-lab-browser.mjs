@@ -42,11 +42,18 @@ try{
   }
   await page.setViewportSize({width:1280,height:900});
   // Every tool lives in one scrolling panel opened from the rail.
-  await page.getByRole("button",{name:"Open project tools"}).click();
+  const worldLabRoot=page.locator(".wl-studio").first();
+  await page.evaluate(()=>{
+    document.addEventListener("click",event=>{
+      const button=(event.target instanceof Element)?event.target.closest('button[aria-label="Open project tools"]'):null;
+      if(button)button.setAttribute("data-audit-click-seen","true");
+    },true);
+  });
+  await worldLabRoot.getByRole("button",{name:"Open project tools"}).click();
   try {
     await page.getByRole("button",{name:"Save on device"}).waitFor({state:"visible",timeout:15000});
   } catch (error) {
-    const diagnostic=await page.locator(".wl-studio").evaluate(root=>{
+    const diagnostic=await page.locator(".wl-studio").first().evaluate(root=>{
       const drawer=root.querySelector(".wl-drawer");
       const rail=root.querySelector(".wl-rail");
       const save=[...root.querySelectorAll("button")].find(node=>node.getAttribute("aria-label")==="Save on device");
@@ -57,7 +64,11 @@ try{
           display:style.display,visibility:style.visibility,opacity:style.opacity,transform:style.transform,
           rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height},disabled:node.disabled};
       };
-      return {rootOpen:root.getAttribute("data-open"),rail:describe(rail),drawer:describe(drawer),
+      return {rootCount:document.querySelectorAll(".wl-studio").length,
+        allRootStates:[...document.querySelectorAll(".wl-studio")].map(node=>({open:node.getAttribute("data-open"),railClicks:node.querySelectorAll('[data-audit-click-seen="true"]').length})),
+        rootOpen:root.getAttribute("data-open"),rail:describe(rail),
+        projectButton:[...root.querySelectorAll("button")].filter(node=>node.getAttribute("aria-label")==="Open project tools").map(describe),
+        drawer:describe(drawer),
         drawerOpen:drawer?.getAttribute("data-open"),drawerBody:describe(drawer?.querySelector(".wl-drawer__body")),
         save:describe(save),groups:[...root.querySelectorAll(".wl-group")].map(node=>({
           id:node.getAttribute("data-wl-group"),rect:(()=>{const r=node.getBoundingClientRect();return{x:r.x,y:r.y,w:r.width,h:r.height};})()
