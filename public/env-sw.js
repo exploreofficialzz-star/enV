@@ -251,7 +251,8 @@ async function precacheFirstVisitShell() {
   for (const match of html.matchAll(/(?:src|href)=["']([^"'#]+)["']/gi)) {
     try {
       const url = new URL(match[1], homeUrl);
-      if (url.origin !== self.location.origin || !/\.(?:m?js|css|wasm|woff2?|ttf|otf|svg|png|jpe?g|webp|avif)$/i.test(url.pathname)) continue;
+      if (url.origin !== self.location.origin || url.pathname.startsWith("/api/") || url.pathname.startsWith("/_serverFn/") ||
+          !/\.(?:m?js|css|wasm|woff2?|ttf|otf|svg|png|jpe?g|webp|avif)$/i.test(url.pathname)) continue;
       urls.add(url.href);
     } catch {
       // Ignore malformed and cross-origin references.
@@ -326,7 +327,8 @@ self.addEventListener("message", (event) => {
           const results = await Promise.allSettled(assets.slice(index, index + 8).map(async value => {
             try {
               const url = new URL(value);
-              if (url.origin !== self.location.origin || !/\.(?:m?js|css|wasm|woff2?|ttf|otf|svg|png|jpe?g|webp|avif)$/i.test(url.pathname)) return false;
+              if (url.origin !== self.location.origin || url.pathname.startsWith("/api/") || url.pathname.startsWith("/_serverFn/") ||
+                  !/\.(?:m?js|css|wasm|woff2?|ttf|otf|svg|png|jpe?g|webp|avif)$/i.test(url.pathname)) return false;
               const request = new Request(url.href, { credentials: "same-origin" });
               const response = await fetch(request);
               if (!isPublicAssetResponse(response)) return false;
