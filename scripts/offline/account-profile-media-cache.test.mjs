@@ -10,7 +10,7 @@ const endpoint = readFileSync(new URL("../../server/routes/api/account/profile-m
 test("account profile media cache is partitioned by user and validates image kinds and size", () => {
   assert.match(cache, /env-account-profile-media-v1-/);
   assert.match(cache, /encodeURIComponent\(userId\)/);
-  assert.match(cache, /profile-media" \+ kind/);
+  assert.match(cache, /profile-media\/" \+ kind/);
   assert.match(cache, /avatar: 1\.5 \* 1024 \* 1024/);
   assert.match(cache, /cover: 4 \* 1024 \* 1024/);
   assert.match(cache, /image\/jpeg/);
@@ -30,7 +30,7 @@ test("profile page reads its local photo first and refreshes from the authentica
 
 test("uploaded custom profile photos update the global header avatar", () => {
   assert.match(account, /cacheAccountProfileMedia\(accountId, kind, file\)/);
-  assert.match(account, /notifyAccountProfileMediaChanged\(accountId\)/);
+  assert.match(account, /notifyAccountProfileMediaChanged\(accountId, kind\)/);
   assert.match(header, /<AccountAvatar user=\{user\} \/>/);
   assert.match(header, /ACCOUNT_PROFILE_MEDIA_UPDATED_EVENT/);
   assert.match(header, /detail\.kind === "avatar"/);
