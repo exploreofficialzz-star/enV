@@ -255,7 +255,7 @@ async function handleNavigation(request) {
     return offlineUnavailableResponse();
   }
 
-  if (response && response.ok && (url.pathname === "/" || url.pathname.startsWith("/tools/"))) {
+  if (isPublicAssetResponse(response) && (url.pathname === "/" || url.pathname.startsWith("/tools/"))) {
     try {
       const cache = await caches.open(NAVIGATION_CACHE);
       await cache.put(request, response.clone());
@@ -273,7 +273,7 @@ async function handleNavigation(request) {
 async function precacheFirstVisitShell() {
   const homeUrl = new URL("/", self.location.origin);
   const response = await fetch(homeUrl);
-  if (!response.ok) return;
+  if (!isPublicAssetResponse(response)) return;
   const cache = await caches.open(CORE_CACHE);
   await cache.put(homeUrl.href, response.clone());
 
@@ -341,7 +341,7 @@ self.addEventListener("message", (event) => {
         }
         const request = new Request(url.href, { credentials: "same-origin" });
         const response = await fetch(request);
-        if (!response.ok) return reply({ ok: false, message: "The current page could not be saved for offline navigation." });
+        if (!isPublicAssetResponse(response)) return reply({ ok: false, message: "This page response is private or not cacheable." });
         const pages = await caches.open(NAVIGATION_CACHE);
         await pages.put(request, response.clone());
         if (url.pathname === "/") {
