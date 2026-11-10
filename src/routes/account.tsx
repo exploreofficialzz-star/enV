@@ -378,6 +378,7 @@ function Account() {
               <div className="env-shimmer absolute inset-0" aria-hidden="true" />
             ) : null}
             <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/20" aria-hidden="true" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 hidden h-16 bg-gradient-to-b from-transparent to-surface sm:block" aria-hidden="true" />
             <button
               type="button"
               onClick={() => coverInput.current?.click()}

@@ -248,6 +248,8 @@ test("cover photo picker matches the avatar camera size and remains at the origi
 test("profile cover stays inside the same 160px frame on every viewport and preserves the source photo ratio", () => {
   assert.ok(accountRoute.includes('className="relative h-40 w-full overflow-hidden bg-gradient-to-br from-neutral-800 via-neutral-700 to-neutral-950"'));
   assert.ok(accountRoute.includes('className="absolute inset-0 h-full w-full [&_img]:object-center"'));
+  assert.ok(accountRoute.includes('className="pointer-events-none absolute inset-x-0 bottom-0 z-10 hidden h-16 bg-gradient-to-b from-transparent to-surface sm:block"'));
+  assert.ok(accountRoute.includes("bg-gradient-to-b from-transparent to-surface sm:block"));
   assert.ok(accountRoute.includes("relative block overflow-hidden"));
   assert.ok(accountRoute.includes("object-cover transition-opacity duration-200"));
   assert.ok(accountRoute.includes('className="env-shimmer relative h-40 w-full overflow-hidden"'));
