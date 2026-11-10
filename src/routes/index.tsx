@@ -194,9 +194,18 @@ function ToolSection({ title, tools, loaded }: { title: string; tools: ToolMeta[
       <div className="flex items-end justify-between gap-4">
         <h2 className="text-xl font-semibold text-accent sm:text-2xl">{title}</h2>
       </div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-        {tools.map((tool, index) => <ToolCard key={tool.id} tool={tool} className={index >= 6 ? "hidden md:flex" : ""} />)}
-      </div>
+      <p className="mt-1 text-xs text-muted">Ranked by actual tool starts over the last 30 days.</p>
+      {tools.length ? (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+          {tools.map((tool, index) => <ToolCard key={tool.id} tool={tool} className={index >= 6 ? "hidden md:flex" : ""} />)}
+        </div>
+      ) : (
+        <p className="mt-4 rounded-xl border border-border bg-surface px-4 py-5 text-sm text-muted">
+          {loaded
+            ? "Trending tools will appear when enough opted-in users have started tools."
+            : "Checking recent tool usage…"}
+        </p>
+      )}
       <div className="mt-5"><SeeMoreLink to="/tools">See more tools</SeeMoreLink></div>
     </section>
   );
