@@ -162,4 +162,7 @@ test("SPA route visits cache eligible public page documents for the next hard re
   assert.ok(serviceWorker.includes('headers: { accept: "text/html" }'));
   assert.ok(serviceWorker.includes('fetch(request, { cache: "no-store" })'));
   assert.ok(serviceWorker.includes("storeNavigationResponse(request, response)"));
+  assert.ok(serviceWorker.includes("if (existing && !needsBackgroundRefresh(existing))"));
+  assert.ok(serviceWorker.includes("refreshed: false"));
+  assert.ok(client.includes("activeWorker(false, false)"));
 });
