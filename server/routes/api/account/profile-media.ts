@@ -2,6 +2,7 @@ import { Buffer } from "node:buffer";
 import { defineHandler } from "nitro/h3";
 import { auth, authConfigurationError, authConfigured } from "../../../../src/lib/auth/server";
 import { getSql } from "../../../../src/lib/db";
+import { createProfileMediaEtag, matchesProfileMediaEtag } from "../../../utils/profile-media-etag";
 
 const AVATAR_LIMIT = 1.5 * 1024 * 1024;
 const COVER_LIMIT = 4 * 1024 * 1024;
@@ -82,22 +83,43 @@ async function authorize(request: Request): Promise<{ userId: string | null; sta
   }
 }
 
-function imageResponse(bytes: unknown, mime: string | null): Response {
+function imageResponse(
+  bytes: unknown,
+  mime: string | null,
+  userId: string,
+  kind: "avatar" | "cover",
+  ifNoneMatch: string | null,
+): Response {
   if (!bytes || !mime) {
-    return new Response(null, { status: 404, headers: { "cache-control": "private, no-store" } });
+    return new Response(null, {
+      status: 404,
+      headers: {
+        "cache-control": "private, no-store",
+        "x-content-type-options": "nosniff",
+        "cross-origin-resource-policy": "same-origin",
+      },
+    });
   }
+
   const imageBytes = Uint8Array.from(bytes as Uint8Array);
-  return new Response(imageBytes, {
-    status: 200,
-    headers: {
-      "content-type": mime,
-      "content-length": String(imageBytes.byteLength),
-      "cache-control": "private, no-store",
-      "x-content-type-options": "nosniff",
-      "content-disposition": "inline",
-      "cross-origin-resource-policy": "same-origin",
-    },
+  const etag = createProfileMediaEtag(userId, kind, imageBytes);
+  const headers = new Headers({
+    etag,
+    "content-type": mime,
+    "cache-control": "private, no-store",
+    "x-content-type-options": "nosniff",
+    "content-disposition": "inline",
+    "cross-origin-resource-policy": "same-origin",
   });
+
+  // Conditional requests save the image transfer while retaining the private,
+  // account-authorized endpoint and its existing no-store HTTP cache policy.
+  if (matchesProfileMediaEtag(ifNoneMatch, etag)) {
+    return new Response(null, { status: 304, headers });
+  }
+
+  headers.set("content-length", String(imageBytes.byteLength));
+  return new Response(imageBytes, { status: 200, headers });
 }
 
 export default defineHandler(async event => {
@@ -123,8 +145,8 @@ export default defineHandler(async event => {
         );
         const media = rows[0];
         return kind === "avatar"
-          ? imageResponse(media?.avatar_bytes, media?.avatar_mime ?? null)
-          : imageResponse(media?.cover_bytes, media?.cover_mime ?? null);
+          ? imageResponse(media?.avatar_bytes, media?.avatar_mime ?? null, authorization.userId, kind, request.headers.get("if-none-match"))
+          : imageResponse(media?.cover_bytes, media?.cover_mime ?? null, authorization.userId, kind, request.headers.get("if-none-match"));
       }
 
       const rows = await sql.query<{

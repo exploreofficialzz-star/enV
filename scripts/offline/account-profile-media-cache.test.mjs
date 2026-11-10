@@ -6,6 +6,7 @@ const cache = readFileSync(new URL("../../src/lib/offline/account-profile-media-
 const account = readFileSync(new URL("../../src/routes/account.tsx", import.meta.url), "utf8");
 const header = readFileSync(new URL("../../src/components/layout/header.tsx", import.meta.url), "utf8");
 const endpoint = readFileSync(new URL("../../server/routes/api/account/profile-media.ts", import.meta.url), "utf8");
+const etagHelper = readFileSync(new URL("../../server/utils/profile-media-etag.ts", import.meta.url), "utf8");
 
 test("account profile media cache is partitioned by user and validates image kinds and size", () => {
   assert.match(cache, /env-account-profile-media-v1-/);
@@ -59,4 +60,35 @@ test("account profile previews are small, account-specific and restored before f
   assert.ok(header.includes("useHeaderMediaLayoutEffect"));
   assert.ok(cache.includes('window.localStorage.removeItem(previewKey(userId, "avatar"))'));
   assert.ok(cache.includes('window.localStorage.removeItem(previewKey(userId, "cover"))'));
+});
+
+
+test("unchanged authenticated profile photos use user-scoped ETags and return 304 without image bytes", () => {
+  assert.match(etagHelper, /createHash\("sha256"\)/);
+  assert.match(etagHelper, /update\(imageBytes\)/);
+  assert.match(etagHelper, /update\(userId\)/);
+  assert.match(endpoint, /matchesProfileMediaEtag\(ifNoneMatch, etag\)/);
+  assert.match(endpoint, /new Response\(null, \{ status: 304, headers \}\)/);
+  assert.match(endpoint, /headers\.set\("content-length"/);
+  assert.match(endpoint, /request\.headers\.get\("if-none-match"\)/);
+});
+
+test("profile media refresh sends ETags, preserves cached images on auth failures, and evicts only confirmed missing media", () => {
+  assert.match(cache, /headers\.set\("if-none-match", etag\)/);
+  assert.match(cache, /response\.status === 304/);
+  assert.match(cache, /status: "unchanged"/);
+  assert.match(cache, /response\.status === 404/);
+  assert.match(cache, /response\.status === 401 \|\| response\.status === 403 \|\| !response\.ok/);
+  assert.doesNotMatch(cache, /response\.status === 404 \|\| response\.status === 401/);
+  assert.match(cache, /profileMediaRefreshes\.get\(key\)/);
+  assert.match(cache, /profileMediaRefreshes\.set\(key, request\)/);
+});
+
+test("account and header keep the already-painted preview source stable during an unchanged refresh", () => {
+  assert.match(account, /if \(readCachedAccountProfileMediaPreview\(userId, kind\)\) return/);
+  assert.match(account, /setter\(preview \?\? createMediaObjectUrl\(result\.blob\)\)/);
+  assert.match(header, /const preview = readCachedAccountProfileMediaPreview\(user\.id, "avatar"\)/);
+  assert.match(header, /if \(active && preview\)/);
+  assert.match(header, /if \(freshPreview\) setCachedMedia\(\{ userId: user\.id, url: freshPreview \}\)/);
+  assert.match(header, /An unchanged 304 or temporary error keeps the current image source intact/);
 });

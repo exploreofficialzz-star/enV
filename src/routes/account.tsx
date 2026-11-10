@@ -102,6 +102,9 @@ function Account() {
     let active = true;
 
     const showCached = async (kind: "avatar" | "cover", setter: (url: string | null) => void) => {
+      // The synchronous preview is already painted. Do not swap its image src
+      // to a new blob URL on every refresh; read the full cache only as fallback.
+      if (readCachedAccountProfileMediaPreview(userId, kind)) return;
       const cached = await readCachedAccountProfileMedia(userId, kind);
       if (active && cached) setter(createMediaObjectUrl(cached));
     };
@@ -110,7 +113,8 @@ function Account() {
       const result = await refreshCachedAccountProfileMedia(userId, kind);
       if (!active) return;
       if (result.status === "fresh") {
-        setter(createMediaObjectUrl(result.blob));
+        const preview = readCachedAccountProfileMediaPreview(userId, kind);
+        setter(preview ?? createMediaObjectUrl(result.blob));
         notifyAccountProfileMediaChanged(userId, kind);
       } else if (result.status === "missing") {
         setter(fallback);

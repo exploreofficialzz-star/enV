@@ -82,14 +82,25 @@ function AccountAvatar({ user }: { user: AppUser }) {
     };
 
     const load = async (refreshNetwork: boolean) => {
-      const cached = await readCachedAccountProfileMedia(user.id, "avatar");
-      if (active && cached) setBlob(cached);
+      const preview = readCachedAccountProfileMediaPreview(user.id, "avatar");
+      if (active && preview) {
+        setCachedMedia({ userId: user.id, url: preview });
+      } else {
+        const cached = await readCachedAccountProfileMedia(user.id, "avatar");
+        if (active && cached) setBlob(cached);
+      }
       if (!active || !refreshNetwork || !navigator.onLine) return;
 
       const refreshed = await refreshCachedAccountProfileMedia(user.id, "avatar");
       if (!active) return;
-      if (refreshed.status === "fresh") setBlob(refreshed.blob);
-      else if (refreshed.status === "missing") setCachedMedia(null);
+      if (refreshed.status === "fresh") {
+        const freshPreview = readCachedAccountProfileMediaPreview(user.id, "avatar");
+        if (freshPreview) setCachedMedia({ userId: user.id, url: freshPreview });
+        else setBlob(refreshed.blob);
+      } else if (refreshed.status === "missing") {
+        setCachedMedia(null);
+      }
+      // An unchanged 304 or temporary error keeps the current image source intact.
     };
 
     const handleUpdated = (event: Event) => {
