@@ -25,7 +25,8 @@ test("cookie preferences are a compact popup rather than a full explanatory page
   assert.match(component, /pointer-events-none fixed bottom-4 left-4 right-4/);
   assert.match(component, /pointer-events-auto w-full rounded-2xl/);
   assert.match(component, /sm:w-\[24rem\]/);
-  assert.doesNotMatch(component, /fixed inset-0|bg-black|backdrop-blur|min-h-dvh/);
+  assert.match(component, /bg-white[\s\S]*dark:bg-black[\s\S]*dark:text-white/);
+  assert.doesNotMatch(component, /fixed inset-0|bg-transparent|backdrop-blur|min-h-dvh|bg-card/);
   assert.match(component, /role="dialog"/);
   assert.match(component, /aria-modal="false"/);
   assert.match(component, /if \(event\.key === "Escape"\)/);
