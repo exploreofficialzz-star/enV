@@ -98,13 +98,13 @@ async function sendWorkerMessage<T extends WorkerReply>(
 
 export async function cacheCurrentEnVNavigation(): Promise<void> {
   if (typeof window === "undefined" || !navigator.onLine) return;
-  const controller = navigator.serviceWorker?.controller;
+  const controller = await activeWorker(false, false);
   if (!controller) return;
   await sendWorkerMessage(controller, "CACHE_CURRENT_NAVIGATION", { url: window.location.href }, 15_000).catch(() => undefined);
 }
 
 export async function prepareEnVOfflineShell(): Promise<void> {
-  await activeWorker(true, true);
+  await activeWorker(false, true);
 }
 
 export async function prepareOfflineToolPackage(input: {
