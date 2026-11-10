@@ -64,12 +64,12 @@ function AccountProfileSkeleton() {
       <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-9" role="status" aria-live="polite" aria-busy="true">
         <span className="sr-only">Loading your profile</span>
         <section className="overflow-hidden rounded-[28px] border border-border bg-surface shadow-sm">
-          <div className="env-shimmer relative h-40 sm:h-52" />
-          <div className="relative px-4 pb-6 sm:px-7 sm:pb-8">
-            <div className="relative z-10 mx-auto -mt-[76px] w-fit sm:-mt-[92px]">
-              <div className="env-shimmer size-32 rounded-full border-[5px] border-card sm:size-40" />
+          <div className="env-shimmer relative h-40" />
+          <div className="relative px-4 pb-6 sm:px-7">
+            <div className="relative z-10 mx-auto -mt-[76px] w-fit">
+              <div className="env-shimmer size-32 rounded-full border-[5px] border-card" />
             </div>
-            <div className="env-shimmer mx-auto mt-4 h-8 w-44 rounded-lg sm:mt-7 sm:h-9 sm:w-56" />
+            <div className="env-shimmer mx-auto mt-4 h-8 w-44 rounded-lg" />
           </div>
         </section>
         <section className="mt-7">
@@ -371,9 +371,9 @@ function Account() {
     <AppShell>
       <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-9">
         <section className="overflow-hidden rounded-[28px] border border-border bg-surface shadow-sm" aria-label="Profile">
-          <div className="relative h-40 bg-gradient-to-br from-neutral-800 via-neutral-700 to-neutral-950 sm:h-52">
+          <div className="relative h-40 bg-gradient-to-br from-neutral-800 via-neutral-700 to-neutral-950">
             {activeCoverUrl ? (
-              <ShimmerProfileImage key={activeCoverUrl} src={activeCoverUrl} className="absolute inset-0" />
+              <ShimmerProfileImage key={activeCoverUrl} src={activeCoverUrl} className="absolute inset-0 [&_img]:object-top" />
             ) : coverResolving ? (
               <div className="env-shimmer absolute inset-0" aria-hidden="true" />
             ) : null}
@@ -405,17 +405,17 @@ function Account() {
                   <ShimmerProfileImage
                     key={activeAvatarUrl}
                     src={activeAvatarUrl}
-                    className="size-32 rounded-full border-[5px] border-card bg-surface shadow-lg sm:size-40"
+                    className="size-32 rounded-full border-[5px] border-card bg-surface shadow-lg"
                     fallback={
-                      <span className="relative z-10 grid size-full place-items-center bg-surface-2 text-4xl font-semibold text-fg sm:text-5xl" aria-hidden="true">
+                      <span className="relative z-10 grid size-full place-items-center bg-surface-2 text-4xl font-semibold text-fg" aria-hidden="true">
                         {initials}
                       </span>
                     }
                   />
                 ) : avatarResolving ? (
-                  <span className="env-shimmer block size-32 rounded-full border-[5px] border-card shadow-lg sm:size-40" aria-hidden="true" />
+                  <span className="env-shimmer block size-32 rounded-full border-[5px] border-card shadow-lg" aria-hidden="true" />
                 ) : (
-                  <span className="grid size-32 place-items-center rounded-full border-[5px] border-card bg-surface-2 text-4xl font-semibold text-fg shadow-lg sm:size-40 sm:text-5xl" aria-hidden="true">
+                  <span className="grid size-32 place-items-center rounded-full border-[5px] border-card bg-surface-2 text-4xl font-semibold text-fg shadow-lg" aria-hidden="true">
                     {initials}
                   </span>
                 )}
@@ -439,7 +439,7 @@ function Account() {
                 />
               </div>
             </div>
-            <h1 className="relative z-0 mx-auto mt-4 max-w-[min(80vw,30rem)] truncate whitespace-nowrap text-center text-2xl font-bold tracking-tight text-fg sm:mt-7 sm:text-3xl" title={displayName}>
+            <h1 className="relative z-20 mx-auto mt-4 block min-h-8 w-full max-w-[min(80vw,30rem)] truncate whitespace-nowrap text-center text-2xl font-bold leading-8 tracking-tight text-fg" title={displayName}>
               {displayName}
             </h1>
           </div>

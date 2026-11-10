@@ -232,10 +232,15 @@ test("profile shimmer is the only visible state until an account photo is resolv
 });
 
 
-test("profile cover remains at the top while only the avatar overlaps its lower edge", () => {
-  assert.ok(accountRoute.includes('<div className="relative h-40 bg-gradient-to-br from-neutral-800 via-neutral-700 to-neutral-950 sm:h-52">'));
-  assert.ok(accountRoute.includes("relative z-10 mx-auto -mt-[76px] w-fit sm:-mt-[92px]"));
-  assert.ok(accountRoute.includes('<h1 className="relative z-0 mx-auto mt-4'));
-  assert.ok(accountRoute.includes("sm:mt-7 sm:text-3xl"));
-  assert.ok(accountRoute.includes("env-shimmer mx-auto mt-4 h-8 w-44 rounded-lg sm:mt-7"));
+test("profile cover and avatar preserve mobile geometry at every viewport and keep the name visible", () => {
+  assert.ok(accountRoute.includes('<div className="relative h-40 bg-gradient-to-br from-neutral-800 via-neutral-700 to-neutral-950">'));
+  assert.ok(!accountRoute.includes("sm:h-52"));
+  assert.ok(accountRoute.includes('className="absolute inset-0 [&_img]:object-top"'));
+  assert.ok(accountRoute.includes("relative z-10 mx-auto -mt-[76px] w-fit"));
+  assert.ok(!accountRoute.includes("sm:-mt-[92px]"));
+  assert.ok(accountRoute.includes("size-32 rounded-full border-[5px] border-card"));
+  assert.ok(!accountRoute.includes("sm:size-40"));
+  assert.ok(accountRoute.includes('<h1 className="relative z-20 mx-auto mt-4 block min-h-8'));
+  assert.ok(accountRoute.includes("truncate whitespace-nowrap text-center text-2xl font-bold leading-8"));
+  assert.ok(accountRoute.includes("env-shimmer mx-auto mt-4 h-8 w-44 rounded-lg"));
 });
