@@ -73,7 +73,7 @@ test("account resolves sign-in state reactively and preserves the old server-fun
   assert.match(currentUserState, /authClient\.useSession\(\)/);
   assert.match(currentUserState, /error: error \?\? null/);
   assert.match(currentUserState, /refetch,/);
-  assert.match(currentUserState, /profileImageUrl: user\.image/);
+  assert.match(currentUserState, /profileImageUrl: sessionUser\.image/);
   const serverManifestPath = new URL("../../.vercel/output/functions/__server.func/_ssr/ssr.mjs", import.meta.url);
   if (existsSync(serverManifestPath)) {
     const serverManifest = readFileSync(serverManifestPath, "utf8");
