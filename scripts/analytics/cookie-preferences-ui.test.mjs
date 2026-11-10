@@ -61,7 +61,9 @@ test("account profile is server-session aware and renders without a textual load
   assert.match(accountPage, /loadAccountProfile/);
   assert.match(accountPage, /loader: \(\) => loadAccountProfile\(\)/);
   assert.doesNotMatch(accountPage, /Loading your profile|Good to see you|enV · Profile|Welcome to your personal enV space|Account status|Your enV shortcuts|Jump straight to the things you use most|Need to leave\?/);
-  assert.match(accountPage, /if \(!user\) return <AuthPage mode="sign-in" \/>/);
+  assert.match(accountPage, /if \(!activeUser\) return <AuthPage mode="sign-in" \/>/);
+  assert.match(accountPage, /const activeUser = sameLoadedIdentity \? user : loadedUser/);
+  assert.match(accountPage, /const activeAvatarUrl = sameLoadedIdentity \? avatarUrl/);
   assert.match(accountPage, /profileImageUrl: session\.user\.image/);
   assert.match(accountPage, /initials/);
   assert.match(accountPage, /coverInput/);
