@@ -20,7 +20,7 @@ type Summary = {
     failures: number;
   };
   daily: Array<{ day: string; events: number; failures: number }>;
-  tools: Array<{ toolId: string; views: number; failures: number; completed: number }>;
+  tools: Array<{ toolId: string; starts: number; views: number; failures: number; completed: number }>;
   platforms: Breakdown[];
   devices: Breakdown[];
   browsers: Breakdown[];
@@ -238,7 +238,7 @@ function UserBehaviorDashboard() {
   const o = summary.overview;
   const dailyChart = summary.daily.slice(-90);
   const maxDaily = Math.max(1, ...dailyChart.map(row => row.events));
-  const maxToolViews = Math.max(1, ...summary.tools.map(row => row.views));
+  const maxToolStarts = Math.max(1, ...summary.tools.map(row => row.starts));
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -278,16 +278,16 @@ function UserBehaviorDashboard() {
           </div>
         </section>
         <section className="rounded-xl border border-border bg-surface p-4">
-          <h2 className="text-sm font-semibold text-fg">Tool performance</h2>
+          <h2 className="text-sm font-semibold text-fg">Tool performance</h2>\n          <p className="mt-1 text-[11px] text-muted">Ranked by actual starts over the last 30 days; completed runs and views break ties. Home trending also requires at least three opted-in installations per tool.</p>
           <div className="mt-4 space-y-3">
             {summary.tools.slice(0, 8).map(row => (
               <div key={row.toolId}>
                 <div className="flex items-center justify-between gap-3 text-xs">
                   <span className="truncate text-muted">{row.toolId}</span>
-                  <span className="shrink-0 text-fg">{row.views.toLocaleString()} views · {row.completed.toLocaleString()} done · {row.failures.toLocaleString()} failed</span>
+                  <span className="shrink-0 text-fg">{row.starts.toLocaleString()} starts · {row.views.toLocaleString()} views · {row.completed.toLocaleString()} done · {row.failures.toLocaleString()} failed</span>
                 </div>
                 <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-2">
-                  <div className="h-full rounded-full bg-accent" style={{ width: `${Math.max(1,row.views/maxToolViews*100)}%` }} />
+                  <div className="h-full rounded-full bg-accent" style={{ width: `${Math.max(1,row.starts/maxToolStarts*100)}%` }} />
                 </div>
               </div>
             ))}
