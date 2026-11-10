@@ -27,7 +27,10 @@ test("only cacheable same-origin assets are stored; APIs are excluded", () => {
 });
 
 test("public app assets use stale-while-revalidate and never cache private API responses", () => {
-  assert.match(serviceWorker, /event\.waitUntil\(fetchAndStoreAsset\(request, session, toolCache, coreCache\)/);
+  assert.match(serviceWorker, /event\.waitUntil\(response\.then\(\(\) => backgroundRefresh\)\)/);
+  assert.match(serviceWorker, /keepAlive\(refreshCachedAsset\(request, cached, session, toolCache, coreCache\)\)/);
+  assert.match(serviceWorker, /ASSET_REVALIDATE_AFTER_MS = 6 \* 60 \* 60 \* 1000/);
+  assert.match(serviceWorker, /needsBackgroundRefresh\(cached\)/);
   assert.match(serviceWorker, /return cached;/);
   assert.match(serviceWorker, /cacheControl\.includes\("no-store"\)/);
   assert.match(serviceWorker, /cacheControl\.includes\("private"\)/);
@@ -66,8 +69,9 @@ test("tool asset capture remains active through the whole route visit", () => {
   const exit = serviceWorker.slice(endStart, endStart + 600);
   assert.ok(exit.includes("removeSession(sourceClientId)"), "leaving the tool route must close its capture session");
   assert.ok(serviceWorker.includes("if (session && toolCache)") &&
-    serviceWorker.includes("await toolCache.put(request, response.clone())"),
-    "same-origin assets requested after initial readiness must be added to the active tool cache");
+    serviceWorker.includes("await toolCache.put(request, stampedCacheResponse(response))") &&
+    serviceWorker.includes("await toolCache.put(request, cached.clone())"),
+    "same-origin assets requested after initial readiness, including already cached shared assets, must be added to the active tool cache");
 });
 
 test("local tools remain interactive in the pre-monetization offline rollout", () => {
