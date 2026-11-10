@@ -8,6 +8,13 @@ import { AuthPage } from "@/components/auth/auth-page";
 import { authClient, authEnabled, signOut } from "@/lib/auth/client";
 import { auth, authConfigurationError, authConfigured } from "@/lib/auth/server";
 import { DEV_USER, type AppUser } from "@/lib/auth/use-current-user";
+import {
+  cacheAccountProfileMedia,
+  clearAccountProfileMediaCache,
+  notifyAccountProfileMediaChanged,
+  readCachedAccountProfileMedia,
+  refreshCachedAccountProfileMedia,
+} from "@/lib/offline/account-profile-media-cache";
 
 const loadAccountProfile = createServerFn({ method: "GET" }).handler(async () => {
   if (!authConfigured) return DEV_USER;
@@ -60,30 +67,75 @@ function Account() {
   const [error, setError] = useState("");
   const avatarInput = useRef<HTMLInputElement>(null);
   const coverInput = useRef<HTMLInputElement>(null);
+  const mediaObjectUrls = useRef(new Set<string>());
+
+  function createMediaObjectUrl(blob: Blob): string {
+    const url = URL.createObjectURL(blob);
+    mediaObjectUrls.current.add(url);
+    return url;
+  }
 
   useEffect(() => {
     setUser(loadedUser);
     setAvatarUrl(loadedUser?.profileImageUrl ?? null);
+    setCoverUrl(null);
+    setEditingField(null);
     setNameDraft(loadedUser?.displayName ?? "");
     setEmailDraft(loadedUser?.primaryEmail ?? "");
   }, [loadedUser]);
 
   useEffect(() => {
-    const controller = new AbortController();
-    void fetch("/api/account/profile-media", {
-      credentials: "same-origin",
-      cache: "no-store",
-      signal: controller.signal,
-    }).then(async response => {
-      if (!response.ok) return;
-      const payload = await response.json() as ProfileMediaResponse;
-      if (controller.signal.aborted || !payload.ok) return;
-      if (payload.avatarAvailable) setAvatarUrl("/api/account/profile-media?kind=avatar");
-      if (payload.coverAvailable) setCoverUrl("/api/account/profile-media?kind=cover");
-    }).catch(() => {
-      // Profile media is optional; the profile stays usable without a custom image.
-    });
-    return () => controller.abort();
+    const userId = user?.id;
+    if (!userId) return;
+    let active = true;
+
+    const showCached = async (kind: "avatar" | "cover", setter: (url: string | null) => void) => {
+      const cached = await readCachedAccountProfileMedia(userId, kind);
+      if (active && cached) setter(createMediaObjectUrl(cached));
+    };
+
+    const refresh = async (kind: "avatar" | "cover", setter: (url: string | null) => void, fallback: string | null) => {
+      const result = await refreshCachedAccountProfileMedia(userId, kind);
+      if (!active) return;
+      if (result.status === "fresh") {
+        setter(createMediaObjectUrl(result.blob));
+        notifyAccountProfileMediaChanged(userId);
+      } else if (result.status === "missing") {
+        setter(fallback);
+      }
+      // Network/server errors deliberately leave the last cached image visible.
+    };
+
+    const warmAndRefresh = async () => {
+      await Promise.all([
+        showCached("avatar", setAvatarUrl),
+        showCached("cover", setCoverUrl),
+      ]);
+      if (!active || !navigator.onLine) return;
+      await Promise.all([
+        refresh("avatar", setAvatarUrl, user?.profileImageUrl ?? null),
+        refresh("cover", setCoverUrl, null),
+      ]);
+    };
+
+    void warmAndRefresh();
+    const refreshWhenOnline = () => {
+      if (!navigator.onLine) return;
+      void Promise.all([
+        refresh("avatar", setAvatarUrl, user?.profileImageUrl ?? null),
+        refresh("cover", setCoverUrl, null),
+      ]);
+    };
+    window.addEventListener("online", refreshWhenOnline);
+    return () => {
+      active = false;
+      window.removeEventListener("online", refreshWhenOnline);
+    };
+  }, [user?.id, user?.profileImageUrl]);
+
+  useEffect(() => () => {
+    for (const url of mediaObjectUrls.current) URL.revokeObjectURL(url);
+    mediaObjectUrls.current.clear();
   }, []);
 
   async function saveName(event: FormEvent<HTMLFormElement>) {
@@ -136,6 +188,11 @@ function Account() {
   }
 
   async function uploadImage(kind: "avatar" | "cover", file: File) {
+    const accountId = user?.id;
+    if (!accountId) {
+      setError("Sign in before changing your profile photo.");
+      return;
+    }
     const limit = kind === "avatar" ? 1.5 * 1024 * 1024 : 4 * 1024 * 1024;
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
       setError("Choose a JPG, PNG or WebP image.");
@@ -160,8 +217,11 @@ function Account() {
       if (!response.ok || !payload.ok || !payload.imageUrl) {
         throw new Error(payload.error || "Could not save this photo.");
       }
-      if (kind === "avatar") setAvatarUrl(payload.imageUrl);
-      else setCoverUrl(payload.imageUrl);
+      const cached = await cacheAccountProfileMedia(accountId, kind, file);
+      const displayedUrl = cached ? createMediaObjectUrl(file) : payload.imageUrl;
+      if (kind === "avatar") setAvatarUrl(displayedUrl);
+      else setCoverUrl(displayedUrl);
+      notifyAccountProfileMediaChanged(accountId);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not save this photo.");
     } finally {
@@ -181,6 +241,7 @@ function Account() {
     setSigningOut(true);
     setError("");
     try {
+      if (user?.id) await clearAccountProfileMediaCache(user.id);
       await signOut("/");
     } catch (reason) {
       setSigningOut(false);
