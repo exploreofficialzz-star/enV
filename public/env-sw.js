@@ -3,6 +3,8 @@
 const CORE_CACHE = "env-web-shell-v2";
 const NAVIGATION_CACHE = "env-web-navigation-v2";
 const CORE_CACHE_LIMIT = 800;
+const CACHE_STORED_AT_HEADER = "x-env-cache-stored-at";
+const ASSET_REVALIDATE_AFTER_MS = 6 * 60 * 60 * 1000;
 const TOOL_CACHE_PREFIX = "env-tool-package-";
 const PACKAGE_DB = "env-tool-package-registry";
 const PACKAGE_DB_VERSION = 1;
@@ -97,11 +99,23 @@ function isCacheableAsset(request, url) {
 }
 
 function isPublicAssetResponse(response) {
-  if (!response || !response.ok || response.type === "opaque" || response.type === "opaqueredirect") return false;
+  if (!response || response.status !== 200 || response.type === "opaque" || response.type === "opaqueredirect") return false;
   const cacheControl = (response.headers.get("cache-control") || "").toLowerCase();
   if (cacheControl.includes("no-store") || cacheControl.includes("private")) return false;
   if ((response.headers.get("vary") || "").trim() === "*") return false;
   return true;
+}
+
+function stampedCacheResponse(response) {
+  const copy = response.clone();
+  const headers = new Headers(copy.headers);
+  headers.set(CACHE_STORED_AT_HEADER, String(Date.now()));
+  return new Response(copy.body, { status: copy.status, statusText: copy.statusText, headers });
+}
+
+function needsBackgroundRefresh(cached) {
+  const storedAt = Number(cached.headers.get(CACHE_STORED_AT_HEADER));
+  return !Number.isFinite(storedAt) || storedAt <= 0 || Date.now() - storedAt >= ASSET_REVALIDATE_AFTER_MS;
 }
 
 async function trimCache(cache, limit = CORE_CACHE_LIMIT) {
@@ -142,7 +156,7 @@ async function fetchAndStoreAsset(request, session, toolCache, coreCache) {
   if (!isPublicAssetResponse(response)) return response;
 
   try {
-    await coreCache.put(request, response.clone());
+    await coreCache.put(request, stampedCacheResponse(response));
     await trimCache(coreCache);
   } catch {
     // The asset is still delivered; browser storage may simply be full.
@@ -150,13 +164,30 @@ async function fetchAndStoreAsset(request, session, toolCache, coreCache) {
 
   if (session && toolCache) {
     try {
-      await toolCache.put(request, response.clone());
+      await toolCache.put(request, stampedCacheResponse(response));
       await recordToolAsset(session, request);
     } catch {
       // The tool remains usable online even when package storage is full.
     }
   }
   return response;
+}
+
+async function retainToolAssetFromCoreCache(request, cached, session, toolCache) {
+  if (!session || !toolCache) return;
+  try {
+    if (await toolCache.match(request)) return;
+    await toolCache.put(request, cached.clone());
+    await recordToolAsset(session, request);
+  } catch {
+    // Tool package capture remains best-effort when storage is constrained.
+  }
+}
+
+async function refreshCachedAsset(request, cached, session, toolCache, coreCache) {
+  await retainToolAssetFromCoreCache(request, cached, session, toolCache);
+  if (!needsBackgroundRefresh(cached)) return;
+  await fetchAndStoreAsset(request, session, toolCache, coreCache).catch(() => undefined);
 }
 
 async function handleAssetRequest(event, keepAlive) {
@@ -178,8 +209,9 @@ async function handleAssetRequest(event, keepAlive) {
   }
 
   if (cached) {
-    // Return the last good asset immediately, while the network refreshes it.
-    keepAlive(fetchAndStoreAsset(request, session, toolCache, coreCache).catch(() => undefined));
+    // Return the last good asset immediately. Only old assets revalidate in
+    // the background; fresh shared assets can still be copied into tool packages.
+    keepAlive(refreshCachedAsset(request, cached, session, toolCache, coreCache));
     return cached;
   }
 
@@ -265,7 +297,7 @@ async function precacheFirstVisitShell() {
     await Promise.allSettled(assets.slice(index, index + 8).map(async value => {
       const request = new Request(value, { credentials: "same-origin" });
       const asset = await fetch(request);
-      if (isPublicAssetResponse(asset)) await cache.put(request, asset.clone());
+      if (isPublicAssetResponse(asset)) await cache.put(request, stampedCacheResponse(asset));
     }));
   }
   await trimCache(cache);
@@ -332,7 +364,7 @@ self.addEventListener("message", (event) => {
               const request = new Request(url.href, { credentials: "same-origin" });
               const response = await fetch(request);
               if (!isPublicAssetResponse(response)) return false;
-              await cache.put(request, response.clone());
+              await cache.put(request, stampedCacheResponse(response));
               return true;
             } catch {
               return false;
