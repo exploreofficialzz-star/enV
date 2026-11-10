@@ -1,7 +1,7 @@
-import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
+import { createRootRoute, HeadContent, Outlet, Scripts, useRouterState } from "@tanstack/react-router";
 import { AssistantStateProvider } from "@/components/assistant/assistant-state";
 import { useEffect } from "react";
-import { prepareEnVOfflineShell, registerEnVServiceWorker } from "@/lib/offline/tool-package-client";
+import { cacheCurrentEnVNavigation, prepareEnVOfflineShell, registerEnVServiceWorker } from "@/lib/offline/tool-package-client";
 import appCss from "../styles.css?url";
 import { webmasterVerificationMeta, websiteSchema, isIndexableTool } from "@/lib/seo-metadata";
 import { getToolByPath, getToolsByCategory } from "@/lib/registry";
@@ -57,6 +57,14 @@ const INITIAL_THEME_SCRIPT = `(() => {
 
 
 function RootDocument() {
+  const pathname = useRouterState({ select: state => state.location.pathname });
+
+  // Save eligible SPA destinations as soon as they are visited. On a hard
+  // refresh, the service worker can then render this exact page from cache.
+  useEffect(() => {
+    void cacheCurrentEnVNavigation();
+  }, [pathname]);
+
   useEffect(() => {
     let active = true;
     try {
