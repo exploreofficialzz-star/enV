@@ -6,6 +6,7 @@ const component = readFileSync(new URL("../../src/components/layout/cookie-conse
 const appShell = readFileSync(new URL("../../src/components/layout/app-shell.tsx", import.meta.url), "utf8");
 const privacyControls = readFileSync(new URL("../../src/components/layout/privacy-controls.tsx", import.meta.url), "utf8");
 const accountPage = readFileSync(new URL("../../src/routes/account.tsx", import.meta.url), "utf8");
+const currentUserState = readFileSync(new URL("../../src/lib/auth/use-current-user.ts", import.meta.url), "utf8");
 const profileMediaRoute = readFileSync(new URL("../../server/routes/api/account/profile-media.ts", import.meta.url), "utf8");
 const profileMigration = readFileSync(new URL("../../migrations/0021_account_profile_media.sql", import.meta.url), "utf8");
 const authServer = readFileSync(new URL("../../src/lib/auth/server.ts", import.meta.url), "utf8");
@@ -57,15 +58,21 @@ test("popup is mounted globally and can be reopened from Privacy", () => {
   assert.match(component, /addEventListener\(OPEN_EVENT, reopen\)/);
 });
 
-test("account profile is server-session aware and renders without a textual loading state", () => {
-  assert.match(accountPage, /createServerFn\(\{ method: "GET" \}\)/);
-  assert.match(accountPage, /loadAccountProfile/);
-  assert.match(accountPage, /loader: \(\) => loadAccountProfile\(\)/);
-  assert.doesNotMatch(accountPage, /Loading your profile|Good to see you|enV · Profile|Welcome to your personal enV space|Account status|Your enV shortcuts|Jump straight to the things you use most|Need to leave\?/);
+test("account resolves sign-in state reactively and cannot remain on an endless shimmer", () => {
+  assert.doesNotMatch(accountPage, /createServerFn|getRequest|loadAccountProfile|Route\.useLoaderData/);
+  assert.match(accountPage, /useCurrentUserState\(\)/);
+  assert.match(accountPage, /if \(sessionPending && !sessionTimedOut\) return <AccountProfileSkeleton \/>/);
+  assert.match(accountPage, /if \(sessionError \|\| sessionTimedOut\)/);
+  assert.match(accountPage, /setTimeout\(\(\) => setSessionTimedOut\(true\), 10_000\)/);
+  assert.match(accountPage, /refreshSession\?\.\(\)/);
+  assert.match(currentUserState, /authClient\.useSession\(\)/);
+  assert.match(currentUserState, /error: error \?\? null/);
+  assert.match(currentUserState, /refetch,/);
+  assert.match(currentUserState, /profileImageUrl: user\.image/);
+  assert.doesNotMatch(accountPage, /Good to see you|enV · Profile|Welcome to your personal enV space|Account status|Your enV shortcuts|Jump straight to the things you use most|Need to leave\?/);
   assert.match(accountPage, /if \(!activeUser\) return <AuthPage mode="sign-in" \/>/);
   assert.match(accountPage, /const activeUser = sameLoadedIdentity \? user : loadedUser/);
   assert.match(accountPage, /const activeAvatarUrl = sameLoadedIdentity \? avatarUrl/);
-  assert.match(accountPage, /profileImageUrl: session\.user\.image/);
   assert.match(accountPage, /initials/);
   assert.match(accountPage, /coverInput/);
   assert.match(accountPage, /avatarInput/);
