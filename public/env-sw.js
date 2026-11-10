@@ -2,6 +2,14 @@
    tool visit enter that tool's cache. The app shell and navigation are cached separately. */
 const CORE_CACHE = "env-web-shell-v2";
 const NAVIGATION_CACHE = "env-web-navigation-v2";
+const NAVIGATION_CACHE_LIMIT = 120;
+// Never put identity-specific pages into the shared navigation cache.
+const PRIVATE_NAVIGATION_PATHS = [
+  "/account", "/agent", "/assistant", "/developer", "/favorites", "/feedback",
+  "/forgot-password", "/help-feedback", "/history", "/login", "/pair-native",
+  "/report-bugs", "/reset-password", "/settings", "/signup", "/token-dashboard",
+  "/tokens", "/wallet", "/userbehavior", "/updates", "/3d-game-studio", "/search",
+];
 const CORE_CACHE_LIMIT = 800;
 const CACHE_STORED_AT_HEADER = "x-env-cache-stored-at";
 const ASSET_REVALIDATE_AFTER_MS = 6 * 60 * 60 * 1000;
@@ -102,7 +110,8 @@ function isPublicAssetResponse(response) {
   if (!response || response.status !== 200 || response.type === "opaque" || response.type === "opaqueredirect") return false;
   const cacheControl = (response.headers.get("cache-control") || "").toLowerCase();
   if (cacheControl.includes("no-store") || cacheControl.includes("private")) return false;
-  if ((response.headers.get("vary") || "").trim() === "*") return false;
+  const vary = response.headers.get("vary") || "";
+  if (vary.trim() === "*" || /(?:^|,)\s*(?:cookie|authorization)\s*(?:,|$)/i.test(vary)) return false;
   return true;
 }
 
@@ -235,40 +244,84 @@ function offlineUnavailableResponse() {
   });
 }
 
-async function handleNavigation(request) {
+function isCacheableNavigation(request, url) {
+  if (request.method !== "GET" || request.mode !== "navigate" || url.origin !== self.location.origin) return false;
+  // Do not persist search terms or other URL-carried state.
+  if (url.search) return false;
+  const pathname = url.pathname.replace(/\/+$/, "") || "/";
+  return !PRIVATE_NAVIGATION_PATHS.some(prefix => pathname === prefix || pathname.startsWith(prefix + "/"));
+}
+
+async function storeNavigationResponse(request, response) {
   const url = new URL(request.url);
+  if (!isCacheableNavigation(request, url) || !isPublicAssetResponse(response)) return false;
+  try {
+    const pages = await caches.open(NAVIGATION_CACHE);
+    await pages.put(request, response.clone());
+    await trimCache(pages, NAVIGATION_CACHE_LIMIT);
+    if (url.pathname === "/") {
+      const shell = await caches.open(CORE_CACHE);
+      await shell.put(new URL("/", self.location.origin).href, response.clone());
+    }
+    return true;
+  } catch {
+    // Navigation remains usable if browser storage is full or disabled.
+    return false;
+  }
+}
+
+async function refreshCachedNavigation(request) {
+  try {
+    // Bypass the browser HTTP cache so this request actually revalidates the page.
+    const response = await fetch(request, { cache: "no-store" });
+    await storeNavigationResponse(request, response);
+  } catch {
+    // Keep serving the last successful navigation when the network is unavailable.
+  }
+}
+
+async function handleNavigation(event, keepAlive) {
+  const request = event.request;
+  const url = new URL(request.url);
+  const cacheable = isCacheableNavigation(request, url);
+  let pages = null;
+
+  if (cacheable) {
+    try {
+      pages = await caches.open(NAVIGATION_CACHE);
+      const cached = await pages.match(request);
+      if (cached) {
+        // Serve the previously rendered public page immediately; refresh the
+        // cache in the background for the next navigation or reload.
+        keepAlive(refreshCachedNavigation(request));
+        return cached;
+      }
+    } catch {
+      pages = null;
+    }
+  }
+
   let response;
   try {
     response = await fetch(request);
   } catch {
-    if (url.pathname.startsWith("/tools/")) {
-      // A tool URL is still an enV route while offline. Prefer its exact cached
-      // navigation when available; otherwise serve the same application shell and
-      // let the client router render the tool page. Never replace a tool with a
-      // standalone "not available offline" page.
-      const pages = await caches.open(NAVIGATION_CACHE);
-      const exact = await pages.match(request);
-      if (exact) return exact;
-      return await shellResponse();
+    if (cacheable) {
+      // A racing request may have populated the exact page while this request ran.
+      try {
+        const exact = pages ? await pages.match(request) : await (await caches.open(NAVIGATION_CACHE)).match(request);
+        if (exact) return exact;
+      } catch {
+        // Fall through to the app-shell fallback.
+      }
+      if (url.pathname === "/" || url.pathname.startsWith("/tools/")) return await shellResponse();
     }
-    if (url.pathname === "/") return await shellResponse();
     return offlineUnavailableResponse();
   }
 
-  if (isPublicAssetResponse(response) && (url.pathname === "/" || url.pathname.startsWith("/tools/"))) {
-    try {
-      const cache = await caches.open(NAVIGATION_CACHE);
-      await cache.put(request, response.clone());
-      if (url.pathname === "/") {
-        const shell = await caches.open(CORE_CACHE);
-        await shell.put(new URL("/", self.location.origin).href, response.clone());
-      }
-    } catch {
-      // Page delivery remains online even when browser storage is full.
-    }
-  }
+  if (cacheable) await storeNavigationResponse(request, response.clone());
   return response;
 }
+
 
 async function precacheFirstVisitShell() {
   const homeUrl = new URL("/", self.location.origin);
@@ -511,7 +564,11 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
   if (request.mode === "navigate") {
-    event.respondWith(handleNavigation(request));
+    let backgroundRefresh = Promise.resolve();
+    const response = handleNavigation(event, promise => { backgroundRefresh = promise; });
+    event.respondWith(response);
+    // Register the background refresh while the fetch event is still active.
+    event.waitUntil(response.then(() => backgroundRefresh));
     return;
   }
   if (isCacheableAsset(request, url)) {
