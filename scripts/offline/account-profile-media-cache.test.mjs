@@ -39,6 +39,6 @@ test("uploaded custom profile photos update the global header avatar", () => {
 });
 
 test("sign-out clears only the current account's private media cache", () => {
-  assert.match(account, /clearAccountProfileMediaCache\(user\.id\)/);
+  assert.match(account, /clearAccountProfileMediaCache\(activeUser\.id\)/);
   assert.match(cache, /caches\.delete\(cacheName\(userId\)\)/);
 });
