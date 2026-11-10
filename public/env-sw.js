@@ -1,7 +1,8 @@
 /* enV visit-triggered offline tool packages. Only assets requested during an eligible
    tool visit enter that tool's cache. The app shell and navigation are cached separately. */
-const CORE_CACHE = "env-web-shell-v1";
-const NAVIGATION_CACHE = "env-web-navigation-v1";
+const CORE_CACHE = "env-web-shell-v2";
+const NAVIGATION_CACHE = "env-web-navigation-v2";
+const CORE_CACHE_LIMIT = 800;
 const TOOL_CACHE_PREFIX = "env-tool-package-";
 const PACKAGE_DB = "env-tool-package-registry";
 const PACKAGE_DB_VERSION = 1;
@@ -95,46 +96,95 @@ function isCacheableAsset(request, url) {
     url.pathname.startsWith("/assets/");
 }
 
-async function handleAssetRequest(event) {
-  const request = event.request;
-  const session = await getSession(event.clientId);
-  const toolCache = session ? await caches.open(packageCacheName(session.toolId, session.version)) : null;
-  const coreCache = await caches.open(CORE_CACHE);
-  let response;
-  try {
-    response = await fetch(request);
-  } catch (networkError) {
-    const cached = (toolCache && await toolCache.match(request)) || await coreCache.match(request);
-    if (cached) return cached;
-    throw networkError;
-  }
+function isPublicAssetResponse(response) {
+  if (!response || !response.ok || response.type === "opaque" || response.type === "opaqueredirect") return false;
+  const cacheControl = (response.headers.get("cache-control") || "").toLowerCase();
+  if (cacheControl.includes("no-store") || cacheControl.includes("private")) return false;
+  if ((response.headers.get("vary") || "").trim() === "*") return false;
+  return true;
+}
 
-  if (response && response.ok) {
-    // Storage quota/cache failures must never break an online tool operation.
+async function trimCache(cache, limit = CORE_CACHE_LIMIT) {
+  try {
+    const keys = await cache.keys();
+    const excess = Math.max(0, keys.length - limit);
+    for (let index = 0; index < excess; index += 1) await cache.delete(keys[index]);
+  } catch {
+    // Cache pruning is best-effort; a quota error cannot affect online delivery.
+  }
+}
+
+async function recordToolAsset(session, request) {
+  if (!session) return;
+  try {
+    const db = await openPackageDb();
     try {
-      if (session && toolCache) {
-        await toolCache.put(request, response.clone());
-        const db = await openPackageDb();
-        try {
-          const record = await readRow(db, "packages", session.toolId);
-          if (record) {
-            const writingPendingVersion = record.pendingVersion === session.version;
-            if (writingPendingVersion || record.version === session.version) {
-              const field = writingPendingVersion ? "pendingAssets" : "assets";
-              const assets = Array.isArray(record[field]) ? record[field] : [];
-              if (!assets.includes(request.url)) assets.push(request.url);
-              await writeRow(db, "packages", { ...record, [field]: assets, updatedAt: new Date().toISOString() });
-            }
-          }
-        } finally {
-          db.close();
+      const record = await readRow(db, "packages", session.toolId);
+      if (record) {
+        const writingPendingVersion = record.pendingVersion === session.version;
+        if (writingPendingVersion || record.version === session.version) {
+          const field = writingPendingVersion ? "pendingAssets" : "assets";
+          const assets = Array.isArray(record[field]) ? record[field] : [];
+          if (!assets.includes(request.url)) assets.push(request.url);
+          await writeRow(db, "packages", { ...record, [field]: assets, updatedAt: new Date().toISOString() });
         }
       }
+    } finally {
+      db.close();
+    }
+  } catch {
+    // Shared assets can still be cached if package metadata is temporarily unavailable.
+  }
+}
+
+async function fetchAndStoreAsset(request, session, toolCache, coreCache) {
+  const response = await fetch(request);
+  if (!isPublicAssetResponse(response)) return response;
+
+  try {
+    await coreCache.put(request, response.clone());
+    await trimCache(coreCache);
+  } catch {
+    // The asset is still delivered; browser storage may simply be full.
+  }
+
+  if (session && toolCache) {
+    try {
+      await toolCache.put(request, response.clone());
+      await recordToolAsset(session, request);
     } catch {
-      // The requested asset was delivered; a quota failure only prevents offline readiness.
+      // The tool remains usable online even when package storage is full.
     }
   }
   return response;
+}
+
+async function handleAssetRequest(event) {
+  const request = event.request;
+  let session = null;
+  let toolCache = null;
+  try {
+    session = await getSession(event.clientId);
+    if (session) toolCache = await caches.open(packageCacheName(session.toolId, session.version));
+  } catch {
+    // IndexedDB may be unavailable; the shared app asset cache can still work.
+  }
+  const coreCache = await caches.open(CORE_CACHE);
+  let cached = null;
+  try {
+    cached = (toolCache && await toolCache.match(request)) || await coreCache.match(request);
+  } catch {
+    cached = null;
+  }
+
+  if (cached) {
+    // Return the last good asset immediately, while the network refreshes it.
+    event.waitUntil(fetchAndStoreAsset(request, session, toolCache, coreCache).catch(() => undefined));
+    return cached;
+  }
+
+  // First request: fetch online and populate the core cache for later visits.
+  return await fetchAndStoreAsset(request, session, toolCache, coreCache);
 }
 
 async function shellResponse() {
@@ -188,23 +238,61 @@ async function handleNavigation(request) {
   return response;
 }
 
+async function precacheFirstVisitShell() {
+  const homeUrl = new URL("/", self.location.origin);
+  const response = await fetch(homeUrl);
+  if (!response.ok) return;
+  const cache = await caches.open(CORE_CACHE);
+  await cache.put(homeUrl.href, response.clone());
+
+  // Cache CSS, scripts, fonts and images referenced by the public app shell.
+  const html = await response.clone().text();
+  const urls = new Set();
+  for (const match of html.matchAll(/(?:src|href)=["']([^"'#]+)["']/gi)) {
+    try {
+      const url = new URL(match[1], homeUrl);
+      if (url.origin !== self.location.origin || !/\.(?:m?js|css|wasm|woff2?|ttf|otf|svg|png|jpe?g|webp|avif)$/i.test(url.pathname)) continue;
+      urls.add(url.href);
+    } catch {
+      // Ignore malformed and cross-origin references.
+    }
+    if (urls.size >= 80) break;
+  }
+
+  const assets = [...urls];
+  for (let index = 0; index < assets.length; index += 8) {
+    await Promise.allSettled(assets.slice(index, index + 8).map(async value => {
+      const request = new Request(value, { credentials: "same-origin" });
+      const asset = await fetch(request);
+      if (isPublicAssetResponse(asset)) await cache.put(request, asset.clone());
+    }));
+  }
+  await trimCache(cache);
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil((async () => {
     try {
-      const response = await fetch(new URL("/", self.location.origin));
-      if (response.ok) {
-        const cache = await caches.open(CORE_CACHE);
-        await cache.put(new URL("/", self.location.origin).href, response.clone());
-      }
+      await precacheFirstVisitShell();
     } catch {
-      // Installation may still succeed; the online shell will be cached on the next visit.
+      // The first online client visit retries the cache if install precaching fails.
     }
     await self.skipWaiting();
   })());
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil((async () => {
+    const keep = new Set([CORE_CACHE, NAVIGATION_CACHE]);
+    const names = await caches.keys();
+    await Promise.all(names.map(name => {
+      if ((name.startsWith("env-web-shell-") || name.startsWith("env-web-navigation-")) && !keep.has(name)) {
+        return caches.delete(name);
+      }
+      return Promise.resolve(false);
+    }));
+    await self.clients.claim();
+  })());
 });
 
 self.addEventListener("message", (event) => {
@@ -232,20 +320,26 @@ self.addEventListener("message", (event) => {
 
       if (data.type === "CACHE_CORE_ASSETS") {
         const cache = await caches.open(CORE_CACHE);
-        const assets = Array.isArray(data.assets) ? data.assets.slice(0, 300) : [];
+        const assets = Array.isArray(data.assets) ? [...new Set(data.assets)].slice(0, CORE_CACHE_LIMIT) : [];
         let cached = 0;
-        for (const value of assets) {
-          try {
-            const url = new URL(value);
-            if (url.origin !== self.location.origin || !/\.(?:m?js|css|wasm|woff2?|ttf|otf|svg|png|jpe?g|webp|avif)$/i.test(url.pathname)) continue;
-            const request = new Request(url.href, { credentials: "same-origin" });
-            const response = await fetch(request);
-            if (response.ok) { await cache.put(request, response.clone()); cached += 1; }
-          } catch {
-            // A failed optional shell asset is retried automatically on the next visit.
-          }
+        for (let index = 0; index < assets.length; index += 8) {
+          const results = await Promise.allSettled(assets.slice(index, index + 8).map(async value => {
+            try {
+              const url = new URL(value);
+              if (url.origin !== self.location.origin || !/\.(?:m?js|css|wasm|woff2?|ttf|otf|svg|png|jpe?g|webp|avif)$/i.test(url.pathname)) return false;
+              const request = new Request(url.href, { credentials: "same-origin" });
+              const response = await fetch(request);
+              if (!isPublicAssetResponse(response)) return false;
+              await cache.put(request, response.clone());
+              return true;
+            } catch {
+              return false;
+            }
+          }));
+          cached += results.filter(result => result.status === "fulfilled" && result.value).length;
         }
-        return reply({ ok: true, cached });
+        await trimCache(cache);
+        return reply({ ok: true, cached, attempted: assets.length });
       }
 
       if (data.type === "END_TOOL_PACKAGE") {
