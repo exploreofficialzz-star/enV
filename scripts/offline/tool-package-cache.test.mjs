@@ -150,6 +150,18 @@ test("public page refreshes are stale-first and revalidate in the background", (
   assert.ok(serviceWorker.includes("event.waitUntil(response.then(() => backgroundRefresh))"));
 });
 
+test("service-worker activation removes legacy private or query-bearing navigation cache entries", () => {
+  const activateStart = serviceWorker.indexOf('self.addEventListener("activate", (event) => {');
+  const activateEnd = serviceWorker.indexOf('self.addEventListener("message"', activateStart);
+  assert.ok(activateStart >= 0 && activateEnd > activateStart);
+  const activate = serviceWorker.slice(activateStart, activateEnd);
+  assert.ok(activate.includes("const navigationRequests = await navigationCache.keys()"));
+  assert.ok(activate.includes("!isCacheablePublicNavigationPath(url)"));
+  assert.ok(activate.includes("!isPublicNavigationResponse(response)"));
+  assert.ok(activate.includes("await navigationCache.delete(request)"));
+  assert.ok(activate.includes("await trimCache(navigationCache, NAVIGATION_CACHE_LIMIT)"));
+});
+
 test("private account and authentication pages are excluded from shared navigation caching", () => {
   for (const path of ["/account", "/favorites", "/history", "/settings", "/wallet", "/token-dashboard", "/userbehavior", "/login", "/signup", "/search"]) {
     assert.ok(serviceWorker.includes('"' + path + '"'), path + " must be excluded");
