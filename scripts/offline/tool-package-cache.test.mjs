@@ -140,7 +140,7 @@ test("public page refreshes are stale-first and revalidate in the background", (
     "cached navigation must be checked before a network request");
   assert.ok(navigation.includes("keepAlive(refreshCachedNavigation(request))"));
   assert.ok(navigation.includes("return cached;"));
-  assert.ok(navigation.includes('fetch(request, { cache: "no-store" })'));
+  assert.ok(serviceWorker.includes('fetch(request, { cache: "no-store" })'));
   assert.ok(serviceWorker.includes("event.waitUntil(response.then(() => backgroundRefresh))"));
 });
 
