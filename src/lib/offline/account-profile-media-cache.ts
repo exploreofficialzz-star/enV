@@ -4,6 +4,8 @@ export type AccountProfileMediaRefresh =
   | { status: "missing" | "unavailable"; blob?: undefined };
 
 const CACHE_PREFIX = "env-account-profile-media-v1-";
+const PREVIEW_PREFIX = "env-account-profile-preview-v1-";
+const PREVIEW_MAX_CHARS = 160_000;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_BYTES: Record<AccountProfileMediaKind, number> = {
   avatar: 1.5 * 1024 * 1024,
@@ -20,6 +22,53 @@ function cacheKey(kind: AccountProfileMediaKind): Request {
   return new Request(new URL("/.env-private-cache/profile-media/" + kind, window.location.origin).href);
 }
 
+function previewKey(userId: string, kind: AccountProfileMediaKind): string {
+  return PREVIEW_PREFIX + encodeURIComponent(userId) + "-" + kind;
+}
+
+/** Synchronous, account-partitioned thumbnail read for the first painted frame. */
+export function readCachedAccountProfileMediaPreview(
+  userId: string,
+  kind: AccountProfileMediaKind,
+): string | null {
+  if (typeof window === "undefined" || !userId) return null;
+  try {
+    const value = window.localStorage.getItem(previewKey(userId, kind));
+    if (!value || value.length > PREVIEW_MAX_CHARS || !value.startsWith("data:image/jpeg;base64,")) return null;
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+async function persistAccountProfileMediaPreview(
+  userId: string,
+  kind: AccountProfileMediaKind,
+  blob: Blob,
+): Promise<void> {
+  if (typeof window === "undefined" || typeof createImageBitmap !== "function") return;
+  let bitmap: ImageBitmap | null = null;
+  try {
+    bitmap = await createImageBitmap(blob);
+    const maxWidth = kind === "avatar" ? 192 : 720;
+    const maxHeight = kind === "avatar" ? 192 : 360;
+    const scale = Math.min(1, maxWidth / bitmap.width, maxHeight / bitmap.height);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext("2d", { alpha: false });
+    if (!context) return;
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const preview = canvas.toDataURL("image/jpeg", kind === "avatar" ? 0.76 : 0.68);
+    if (preview.length > PREVIEW_MAX_CHARS) return;
+    window.localStorage.setItem(previewKey(userId, kind), preview);
+  } catch {
+    // The full-quality CacheStorage copy remains the fallback if thumbnails cannot be made.
+  } finally {
+    bitmap?.close();
+  }
+}
+
 function validBlob(kind: AccountProfileMediaKind, blob: Blob): boolean {
   return ALLOWED_TYPES.has(blob.type.toLowerCase()) && blob.size > 0 && blob.size <= MAX_BYTES[kind];
 }
@@ -34,7 +83,11 @@ export async function readCachedAccountProfileMedia(
     const response = await cache.match(cacheKey(kind));
     if (!response) return null;
     const blob = await response.blob();
-    return validBlob(kind, blob) ? blob : null;
+    if (!validBlob(kind, blob)) return null;
+    if (!readCachedAccountProfileMediaPreview(userId, kind)) {
+      void persistAccountProfileMediaPreview(userId, kind, blob);
+    }
+    return blob;
   } catch {
     return null;
   }
@@ -57,6 +110,7 @@ export async function cacheAccountProfileMedia(
       },
     });
     await cache.put(cacheKey(kind), response);
+    await persistAccountProfileMediaPreview(userId, kind, blob);
     return true;
   } catch {
     // Browser storage pressure must not turn a successful upload into a failed one.
@@ -97,6 +151,12 @@ export async function clearAccountProfileMediaCache(userId: string): Promise<voi
     await caches.delete(cacheName(userId));
   } catch {
     // Sign-out must still proceed if browser cache cleanup is unavailable.
+  }
+  try {
+    window.localStorage.removeItem(previewKey(userId, "avatar"));
+    window.localStorage.removeItem(previewKey(userId, "cover"));
+  } catch {
+    // Preview cleanup is best-effort when local storage is unavailable.
   }
 }
 
