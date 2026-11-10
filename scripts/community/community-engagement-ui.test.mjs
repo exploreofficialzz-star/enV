@@ -232,20 +232,22 @@ test("profile shimmer is the only visible state until an account photo is resolv
 });
 
 
-test("cover photo picker control stays visible above the cover image and overlay", () => {
+test("cover photo picker matches the avatar camera size and remains at the original cover corner", () => {
   const coverStart = accountRoute.indexOf('aria-label="Change cover photo"');
   const coverEnd = accountRoute.indexOf('aria-label="Select cover image"', coverStart);
   assert.ok(coverStart >= 0 && coverEnd > coverStart, "Cover photo action and file input remain present");
   const coverControl = accountRoute.slice(coverStart - 350, coverEnd + 120);
   assert.ok(coverControl.includes("onClick={() => coverInput.current?.click()}"));
-  assert.ok(coverControl.includes('className="absolute right-4 top-4 z-20 grid size-11'));
-  assert.ok(coverControl.includes("<Camera size={21} aria-hidden=\"true\" />"));
+  assert.ok(coverControl.includes('className="absolute right-4 top-4 z-20 grid size-12'));
+  assert.ok(coverControl.includes("border-4 border-card bg-surface-2 text-fg"));
+  assert.ok(coverControl.includes("<Camera size={22} aria-hidden=\"true\" />"));
 });
 
-test("profile cover and avatar preserve mobile geometry at every viewport and keep the name visible", () => {
-  assert.ok(accountRoute.includes('<div className="relative h-40 bg-gradient-to-br from-neutral-800 via-neutral-700 to-neutral-950">'));
-  assert.ok(!accountRoute.includes("sm:h-52"));
-  assert.ok(accountRoute.includes('className="absolute inset-0 [&_img]:object-top"'));
+test("profile cover stays mobile-sized and uses a clipped 16:5 ratio on tablet and desktop", () => {
+  assert.ok(accountRoute.includes('className="relative h-40 w-full overflow-hidden bg-gradient-to-br from-neutral-800 via-neutral-700 to-neutral-950 sm:aspect-[16/5] sm:h-auto"'));
+  assert.ok(accountRoute.includes('className="absolute inset-0 h-full w-full [&_img]:object-center"'));
+  assert.ok(accountRoute.includes("relative block overflow-hidden"));
+  assert.ok(accountRoute.includes('className="env-shimmer relative h-40 w-full overflow-hidden sm:aspect-[16/5] sm:h-auto"'));
   assert.ok(accountRoute.includes("relative z-10 mx-auto -mt-[76px] w-fit"));
   assert.ok(!accountRoute.includes("sm:-mt-[92px]"));
   assert.ok(accountRoute.includes("size-32 rounded-full border-[5px] border-card"));

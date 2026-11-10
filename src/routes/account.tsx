@@ -64,7 +64,7 @@ function AccountProfileSkeleton() {
       <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-9" role="status" aria-live="polite" aria-busy="true">
         <span className="sr-only">Loading your profile</span>
         <section className="overflow-hidden rounded-[28px] border border-border bg-surface shadow-sm">
-          <div className="env-shimmer relative h-40" />
+          <div className="env-shimmer relative h-40 w-full overflow-hidden sm:aspect-[16/5] sm:h-auto" />
           <div className="relative px-4 pb-6 sm:px-7">
             <div className="relative z-10 mx-auto -mt-[76px] w-fit">
               <div className="env-shimmer size-32 rounded-full border-[5px] border-card" />
@@ -371,9 +371,9 @@ function Account() {
     <AppShell>
       <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-9">
         <section className="overflow-hidden rounded-[28px] border border-border bg-surface shadow-sm" aria-label="Profile">
-          <div className="relative h-40 bg-gradient-to-br from-neutral-800 via-neutral-700 to-neutral-950">
+          <div className="relative h-40 w-full overflow-hidden bg-gradient-to-br from-neutral-800 via-neutral-700 to-neutral-950 sm:aspect-[16/5] sm:h-auto">
             {activeCoverUrl ? (
-              <ShimmerProfileImage key={activeCoverUrl} src={activeCoverUrl} className="absolute inset-0 [&_img]:object-top" />
+              <ShimmerProfileImage key={activeCoverUrl} src={activeCoverUrl} className="absolute inset-0 h-full w-full [&_img]:object-center" />
             ) : coverResolving ? (
               <div className="env-shimmer absolute inset-0" aria-hidden="true" />
             ) : null}
@@ -383,9 +383,9 @@ function Account() {
               onClick={() => coverInput.current?.click()}
               disabled={uploadingImage}
               aria-label="Change cover photo"
-              className="absolute right-4 top-4 z-20 grid size-11 place-items-center rounded-full bg-white text-black shadow-lg transition hover:scale-105 disabled:opacity-60"
+              className="absolute right-4 top-4 z-20 grid size-12 place-items-center rounded-full border-4 border-card bg-surface-2 text-fg shadow-md transition hover:scale-105 disabled:opacity-60"
             >
-              <Camera size={21} aria-hidden="true" />
+              <Camera size={22} aria-hidden="true" />
             </button>
             <input
               ref={coverInput}
