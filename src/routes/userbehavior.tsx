@@ -279,11 +279,11 @@ function UserBehaviorDashboard() {
         </section>
         <section className="rounded-xl border border-border bg-surface p-4">
           <h2 className="text-sm font-semibold text-fg">Tool performance</h2>
-          <p className="mt-1 text-[11px] text-muted">Ranked by actual starts over the last 30 days; completed runs and views break ties. Home trending also requires at least three opted-in installations per tool.</p>
+          <p className="mt-1 text-[11px] text-muted">Ranked by actual starts over the last 30 days; completed runs and views break ties. Home trending also requires at least three distinct opted-in installations to have started each tool.</p>
           <div className="mt-4 space-y-3">
             {summary.tools.slice(0, 8).map(row => (
               <div key={row.toolId}>
-                <div className="flex items-center justify-between gap-3 text-xs">
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
                   <span className="truncate text-muted">{row.toolId}</span>
                   <span className="shrink-0 text-fg">{row.starts.toLocaleString()} starts · {row.views.toLocaleString()} views · {row.completed.toLocaleString()} done · {row.failures.toLocaleString()} failed</span>
                 </div>
