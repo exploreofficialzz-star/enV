@@ -481,8 +481,11 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
     val screenWidth = LocalConfiguration.current.screenWidthDp
     val homeColumns = when { screenWidth >= 768 -> 3; screenWidth >= 640 -> 2; else -> 1 }
     var trendingIds by remember { mutableStateOf(emptyList<String>()) }
+    var trendingMode by remember { mutableStateOf("discovery") }
     LaunchedEffect(catalog.catalogVersion) {
-        trendingIds = NativeTrendingToolsClient.fetchToolIds()
+        val feed = NativeTrendingToolsClient.fetchFeed()
+        trendingIds = feed.toolIds
+        trendingMode = feed.mode
     }
     val trending = remember(catalog, trendingIds, screenWidth) {
         val available = catalog.accessibilityDiscoveryTools().associateBy { it.id }
@@ -568,9 +571,15 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
         item {
             Column(Modifier.widthIn(max = 1152.dp).fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 SectionTitle("Trending tools", accent = true)
+                Text(
+                    if (trendingMode == "analytics") "Ranked by actual tool starts over the last 30 days."
+                    else "A daily rotating selection of tools to explore.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 if (trending.isEmpty()) {
                     Text(
-                        "Trending tools appear when enough people have opted in to usage analytics and started using tools.",
+                        "The tool selection is temporarily unavailable. Please try again.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

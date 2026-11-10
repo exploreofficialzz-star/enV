@@ -7,13 +7,15 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Read-only public aggregate ranking for Home. It does not enable or collect
- * analytics; the server only returns tool IDs from consented aggregate activity.
+ * Shared Home feed. The server selects one daily discovery order until enough
+ * consented activity exists, then returns the same analytics ranking to all apps.
  */
+data class NativeTrendingFeed(val toolIds: List<String>, val mode: String)
+
 object NativeTrendingToolsClient {
-    suspend fun fetchToolIds(): List<String> = withContext(Dispatchers.IO) {
+    suspend fun fetchFeed(): NativeTrendingFeed = withContext(Dispatchers.IO) {
         val base = BuildConfig.ENV_API_BASE_URL.trimEnd('/')
-        if (!base.startsWith("https://", ignoreCase = true)) return@withContext emptyList()
+        if (!base.startsWith("https://", ignoreCase = true)) return@withContext NativeTrendingFeed(emptyList(), "discovery")
 
         var connection: HttpURLConnection? = null
         try {
@@ -24,22 +26,25 @@ object NativeTrendingToolsClient {
                 setRequestProperty("Accept", "application/json")
             }
             connection = activeConnection
-            if (activeConnection.responseCode !in 200..299) return@withContext emptyList()
+            if (activeConnection.responseCode !in 200..299) return@withContext NativeTrendingFeed(emptyList(), "discovery")
 
             val envelope = activeConnection.inputStream.bufferedReader(Charsets.UTF_8).use {
                 JSONObject(it.readText())
             }
-            if (!envelope.optBoolean("ok")) return@withContext emptyList()
-            val ids = envelope.optJSONObject("data")?.optJSONArray("toolIds")
-                ?: return@withContext emptyList()
+            if (!envelope.optBoolean("ok")) return@withContext NativeTrendingFeed(emptyList(), "discovery")
+            val data = envelope.optJSONObject("data")
+                ?: return@withContext NativeTrendingFeed(emptyList(), "discovery")
+            val mode = if (data.optString("mode") == "analytics") "analytics" else "discovery"
+            val ids = data.optJSONArray("toolIds")
+                ?: return@withContext NativeTrendingFeed(emptyList(), mode)
             val seen = linkedSetOf<String>()
             for (index in 0 until ids.length()) {
                 val id = ids.optString(index, "")
                 if (id.matches(Regex("[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}"))) seen.add(id)
             }
-            seen.take(500)
+            NativeTrendingFeed(seen.take(500), mode)
         } catch (_: Exception) {
-            emptyList()
+            NativeTrendingFeed(emptyList(), "discovery")
         } finally {
             connection?.disconnect()
         }

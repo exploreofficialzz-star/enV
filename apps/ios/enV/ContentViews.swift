@@ -461,12 +461,17 @@ private struct NativeAnalyticsConsentPanel: View {
     }
 }
 
+private struct NativeTrendingFeed {
+    let toolIDs: [String]
+    let mode: String
+}
+
 private enum NativeTrendingToolsClient {
-    static func fetchToolIDs() async -> [String] {
+    static func fetchFeed() async -> NativeTrendingFeed {
         guard let raw = Bundle.main.object(forInfoDictionaryKey: "ENV_API_BASE_URL") as? String,
               let baseURL = URL(string: raw.trimmingCharacters(in: .whitespacesAndNewlines)),
               baseURL.scheme?.lowercased() == "https",
-              baseURL.host != nil else { return [] }
+              baseURL.host != nil else { return NativeTrendingFeed(toolIDs: [], mode: "discovery") }
 
         let url = baseURL.appendingPathComponent("api")
             .appendingPathComponent("analytics")
@@ -483,16 +488,20 @@ private enum NativeTrendingToolsClient {
                   let envelope = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                   envelope["ok"] as? Bool == true,
                   let payload = envelope["data"] as? [String: Any],
-                  let ids = payload["toolIds"] as? [String] else { return [] }
+                  let ids = payload["toolIds"] as? [String] else {
+                return NativeTrendingFeed(toolIDs: [], mode: "discovery")
+            }
 
+            let mode = payload["mode"] as? String == "analytics" ? "analytics" : "discovery"
             var seen = Set<String>()
-            return Array(ids.filter {
+            let toolIDs = Array(ids.filter {
                 !$0.isEmpty &&
                 $0.range(of: "^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$", options: .regularExpression) != nil &&
                 seen.insert($0).inserted
             }.prefix(500))
+            return NativeTrendingFeed(toolIDs: toolIDs, mode: mode)
         } catch {
-            return []
+            return NativeTrendingFeed(toolIDs: [], mode: "discovery")
         }
     }
 }
@@ -507,6 +516,7 @@ struct HomeView: View {
     let onAssistant: () -> Void
     @State private var searchText = ""
     @State private var trendingToolIDs: [String] = []
+    @State private var trendingMode = "discovery"
     @State private var homePath = NavigationPath()
     @FocusState private var isHomeSearchFocused: Bool
     private var hasSearchText: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -633,8 +643,14 @@ struct HomeView: View {
                         enVCharacterSpacedText("Trending tools")
                             .font(.envScaled(size: 20, weight: .semibold))
                             .foregroundStyle(Color.envAccent)
+                        enVCharacterSpacedText(trendingMode == "analytics"
+                            ? "Ranked by actual tool starts over the last 30 days."
+                            : "A daily rotating selection of tools to explore.")
+                            .font(.envScaled(size: 12, weight: .regular))
+                            .foregroundStyle(Color.envMuted)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         if homeTools.isEmpty {
-                            enVCharacterSpacedText("Trending tools appear when enough people have opted in to usage analytics and started using tools.")
+                            enVCharacterSpacedText("The tool selection is temporarily unavailable. Please try again.")
                                 .font(.envScaled(size: 12, weight: .regular))
                                 .foregroundStyle(Color.envMuted)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -668,7 +684,9 @@ struct HomeView: View {
             }
             .modifier(Screen())
             .task {
-                trendingToolIDs = await NativeTrendingToolsClient.fetchToolIDs()
+                let feed = await NativeTrendingToolsClient.fetchFeed()
+                trendingToolIDs = feed.toolIDs
+                trendingMode = feed.mode
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
