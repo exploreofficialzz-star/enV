@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   Bell,
   BookOpen,
@@ -28,6 +28,7 @@ import { useCurrentUser, type AppUser } from "@/lib/auth/use-current-user";
 import {
   ACCOUNT_PROFILE_MEDIA_UPDATED_EVENT,
   readCachedAccountProfileMedia,
+  readCachedAccountProfileMediaPreview,
   refreshCachedAccountProfileMedia,
 } from "@/lib/offline/account-profile-media-cache";
 import { usePrefs } from "@/lib/storage";
@@ -54,6 +55,8 @@ const MENU_GROUPS = [
   ] },
 ] as const;
 
+const useHeaderMediaLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
 function closeMenu(event: React.MouseEvent<HTMLElement>) {
   event.currentTarget.closest("details")?.removeAttribute("open");
 }
@@ -63,9 +66,13 @@ function AccountAvatar({ user }: { user: AppUser }) {
   const [cachedMedia, setCachedMedia] = useState<{ userId: string; url: string } | null>(null);
   const objectUrls = useRef(new Set<string>());
 
+  useHeaderMediaLayoutEffect(() => {
+    const preview = readCachedAccountProfileMediaPreview(user.id, "avatar");
+    setCachedMedia(preview ? { userId: user.id, url: preview } : null);
+  }, [user.id]);
+
   useEffect(() => {
     let active = true;
-    setCachedMedia(null);
 
     const setBlob = (blob: Blob) => {
       if (!active) return;
