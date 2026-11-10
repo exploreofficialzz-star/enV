@@ -100,9 +100,9 @@ export async function clearAccountProfileMediaCache(userId: string): Promise<voi
   }
 }
 
-export function notifyAccountProfileMediaChanged(userId: string): void {
+export function notifyAccountProfileMediaChanged(userId: string, kind: AccountProfileMediaKind): void {
   if (typeof window === "undefined" || !userId) return;
-  window.dispatchEvent(new CustomEvent(MEDIA_UPDATED_EVENT, { detail: { userId } }));
+  window.dispatchEvent(new CustomEvent(MEDIA_UPDATED_EVENT, { detail: { userId, kind } }));
 }
 
 export const ACCOUNT_PROFILE_MEDIA_UPDATED_EVENT = MEDIA_UPDATED_EVENT;
