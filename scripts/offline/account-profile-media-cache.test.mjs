@@ -50,7 +50,9 @@ test("account profile previews are small, account-specific and restored before f
   assert.ok(cache.includes("window.localStorage.getItem"));
   assert.ok(cache.includes("PREVIEW_MAX_CHARS = 160_000"));
   assert.ok(cache.includes("createImageBitmap"));
-  assert.ok(cache.includes('canvas.toDataURL("image/jpeg"'));
+  assert.ok(cache.includes('canvas.toDataURL("image/webp"'));
+  assert.ok(cache.includes("data:image/webp;base64,"));
+  assert.ok(cache.includes("data:image/png;base64,"));
   assert.ok(account.includes("readCachedAccountProfileMediaPreview"));
   assert.ok(account.includes("useAccountMediaLayoutEffect"));
   assert.ok(header.includes("readCachedAccountProfileMediaPreview"));
