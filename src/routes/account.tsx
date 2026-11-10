@@ -75,6 +75,13 @@ function Account() {
     return url;
   }
 
+  // Never render the previous session's local profile while a new loader
+  // result is being committed after an account switch.
+  const sameLoadedIdentity = user?.id === loadedUser?.id;
+  const activeUser = sameLoadedIdentity ? user : loadedUser;
+  const activeAvatarUrl = sameLoadedIdentity ? avatarUrl : loadedUser?.profileImageUrl ?? null;
+  const activeCoverUrl = sameLoadedIdentity ? coverUrl : null;
+
   useEffect(() => {
     setUser(loadedUser);
     setAvatarUrl(loadedUser?.profileImageUrl ?? null);
@@ -151,7 +158,7 @@ function Account() {
     try {
       const result = await authClient.updateUser({ name });
       if (result.error) throw new Error(result.error.message || "Could not update your name.");
-      setUser(current => current ? { ...current, displayName: name } : current);
+      setUser(activeUser ? { ...activeUser, displayName: name } : activeUser);
       setEditingField(null);
       setNotice("Name updated.");
     } catch (reason) {
@@ -168,7 +175,7 @@ function Account() {
       setError("Enter a valid email address.");
       return;
     }
-    if (newEmail === user?.primaryEmail?.toLowerCase()) {
+    if (newEmail === activeUser?.primaryEmail?.toLowerCase()) {
       setEditingField(null);
       return;
     }
@@ -188,7 +195,7 @@ function Account() {
   }
 
   async function uploadImage(kind: "avatar" | "cover", file: File) {
-    const accountId = user?.id;
+    const accountId = activeUser?.id;
     if (!accountId) {
       setError("Sign in before changing your profile photo.");
       return;
@@ -241,7 +248,7 @@ function Account() {
     setSigningOut(true);
     setError("");
     try {
-      if (user?.id) await clearAccountProfileMediaCache(user.id);
+      if (activeUser?.id) await clearAccountProfileMediaCache(activeUser.id);
       await signOut("/");
     } catch (reason) {
       setSigningOut(false);
@@ -249,9 +256,9 @@ function Account() {
     }
   }
 
-  if (!user) return <AuthPage mode="sign-in" />;
+  if (!activeUser) return <AuthPage mode="sign-in" />;
 
-  const displayName = user.displayName?.trim() || "enV member";
+  const displayName = activeUser.displayName?.trim() || "enV member";
   const initials = initialsFor(displayName);
 
   const profileActions = [
@@ -265,7 +272,7 @@ function Account() {
       <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-9">
         <section className="overflow-hidden rounded-[28px] border border-border bg-surface shadow-sm" aria-label="Profile">
           <div className="relative h-40 bg-gradient-to-br from-neutral-800 via-neutral-700 to-neutral-950 sm:h-52">
-            {coverUrl ? <img src={coverUrl} alt="" className="absolute inset-0 size-full object-cover" /> : null}
+            {activeCoverUrl ? <img src={activeCoverUrl} alt="" className="absolute inset-0 size-full object-cover" /> : null}
             <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/20" aria-hidden="true" />
             <button
               type="button"
@@ -290,8 +297,8 @@ function Account() {
           <div className="relative px-4 pb-6 sm:px-7 sm:pb-8">
             <div className="relative z-10 mx-auto -mt-[76px] flex w-fit flex-col items-center sm:-mt-[92px]">
               <div className="relative">
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt="" className="size-32 rounded-full border-[5px] border-card bg-surface object-cover shadow-lg sm:size-40" />
+                {activeAvatarUrl ? (
+                  <img src={activeAvatarUrl} alt="" className="size-32 rounded-full border-[5px] border-card bg-surface object-cover shadow-lg sm:size-40" />
                 ) : (
                   <span className="grid size-32 place-items-center rounded-full border-[5px] border-card bg-surface-2 text-4xl font-semibold text-fg shadow-lg sm:size-40 sm:text-5xl" aria-hidden="true">
                     {initials}
@@ -367,12 +374,12 @@ function Account() {
                       className="min-w-0 flex-1 rounded-lg border border-border bg-bg px-3 py-2 text-sm text-fg outline-none focus:border-accent"
                     />
                     <button type="submit" disabled={savingField} aria-label="Save email" className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-fg disabled:opacity-50"><Check size={17} /></button>
-                    <button type="button" disabled={savingField} onClick={() => { setEditingField(null); setEmailDraft(user.primaryEmail ?? ""); }} aria-label="Cancel email edit" className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-fg"><X size={17} /></button>
+                    <button type="button" disabled={savingField} onClick={() => { setEditingField(null); setEmailDraft(activeUser.primaryEmail ?? ""); }} aria-label="Cancel email edit" className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-fg"><X size={17} /></button>
                   </form>
-                ) : <span className="block truncate whitespace-nowrap text-sm font-medium text-fg" title={user.primaryEmail || "—"}>{user.primaryEmail || "—"}</span>}
+                ) : <span className="block truncate whitespace-nowrap text-sm font-medium text-fg" title={activeUser.primaryEmail || "—"}>{activeUser.primaryEmail || "—"}</span>}
               </dd>
               {editingField !== "email" ? (
-                <button type="button" aria-label="Edit email" onClick={() => { setEmailDraft(user.primaryEmail ?? ""); setEditingField("email"); setError(""); setNotice(""); }} className="grid size-9 shrink-0 place-items-center rounded-lg text-fg transition hover:bg-surface-2">
+                <button type="button" aria-label="Edit email" onClick={() => { setEmailDraft(activeUser.primaryEmail ?? ""); setEditingField("email"); setError(""); setNotice(""); }} className="grid size-9 shrink-0 place-items-center rounded-lg text-fg transition hover:bg-surface-2">
                   <Pencil size={17} aria-hidden="true" />
                 </button>
               ) : null}
