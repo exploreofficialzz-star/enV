@@ -241,13 +241,18 @@ test("cover photo picker matches the avatar camera size and remains at the origi
   assert.ok(coverControl.includes('className="absolute right-4 top-4 z-20 grid size-12'));
   assert.ok(coverControl.includes("border-4 border-card bg-surface-2 text-fg"));
   assert.ok(coverControl.includes("<Camera size={22} aria-hidden=\"true\" />"));
+  assert.ok(accountRoute.includes('className="absolute bottom-1 right-0 grid size-12 place-items-center rounded-full border-4 border-card bg-surface-2 text-fg shadow-md transition hover:scale-105 disabled:opacity-60"'));
+  assert.equal((coverControl.match(/size-12/g) ?? []).length, 1);
 });
 
-test("profile cover stays mobile-sized and uses a clipped 16:5 ratio on tablet and desktop", () => {
-  assert.ok(accountRoute.includes('className="relative h-40 w-full overflow-hidden bg-gradient-to-br from-neutral-800 via-neutral-700 to-neutral-950 sm:aspect-[16/5] sm:h-auto"'));
+test("profile cover stays inside the same 160px frame on every viewport and preserves the source photo ratio", () => {
+  assert.ok(accountRoute.includes('className="relative h-40 w-full overflow-hidden bg-gradient-to-br from-neutral-800 via-neutral-700 to-neutral-950"'));
   assert.ok(accountRoute.includes('className="absolute inset-0 h-full w-full [&_img]:object-center"'));
   assert.ok(accountRoute.includes("relative block overflow-hidden"));
-  assert.ok(accountRoute.includes('className="env-shimmer relative h-40 w-full overflow-hidden sm:aspect-[16/5] sm:h-auto"'));
+  assert.ok(accountRoute.includes("object-cover transition-opacity duration-200"));
+  assert.ok(accountRoute.includes('className="env-shimmer relative h-40 w-full overflow-hidden"'));
+  assert.ok(!accountRoute.includes("sm:aspect-[16/5]"));
+  assert.ok(!accountRoute.includes("sm:h-auto"));
   assert.ok(accountRoute.includes("relative z-10 mx-auto -mt-[76px] w-fit"));
   assert.ok(!accountRoute.includes("sm:-mt-[92px]"));
   assert.ok(accountRoute.includes("size-32 rounded-full border-[5px] border-card"));

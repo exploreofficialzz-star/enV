@@ -64,7 +64,7 @@ function AccountProfileSkeleton() {
       <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-9" role="status" aria-live="polite" aria-busy="true">
         <span className="sr-only">Loading your profile</span>
         <section className="overflow-hidden rounded-[28px] border border-border bg-surface shadow-sm">
-          <div className="env-shimmer relative h-40 w-full overflow-hidden sm:aspect-[16/5] sm:h-auto" />
+          <div className="env-shimmer relative h-40 w-full overflow-hidden" />
           <div className="relative px-4 pb-6 sm:px-7">
             <div className="relative z-10 mx-auto -mt-[76px] w-fit">
               <div className="env-shimmer size-32 rounded-full border-[5px] border-card" />
@@ -371,7 +371,7 @@ function Account() {
     <AppShell>
       <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-9">
         <section className="overflow-hidden rounded-[28px] border border-border bg-surface shadow-sm" aria-label="Profile">
-          <div className="relative h-40 w-full overflow-hidden bg-gradient-to-br from-neutral-800 via-neutral-700 to-neutral-950 sm:aspect-[16/5] sm:h-auto">
+          <div className="relative h-40 w-full overflow-hidden bg-gradient-to-br from-neutral-800 via-neutral-700 to-neutral-950">
             {activeCoverUrl ? (
               <ShimmerProfileImage key={activeCoverUrl} src={activeCoverUrl} className="absolute inset-0 h-full w-full [&_img]:object-center" />
             ) : coverResolving ? (
@@ -399,7 +399,7 @@ function Account() {
           </div>
 
           <div className="relative px-4 pb-6 sm:px-7 sm:pb-8">
-            <div className="relative z-10 mx-auto -mt-[76px] w-fit sm:-mt-[92px]">
+            <div className="relative z-10 mx-auto -mt-[76px] w-fit">
               <div className="relative">
                 {activeAvatarUrl ? (
                   <ShimmerProfileImage
