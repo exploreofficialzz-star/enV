@@ -35,6 +35,7 @@ function Home() {
   const [query, setQuery] = useState("");
   const [trendingTools, setTrendingTools] = useState<ToolMeta[]>([]);
   const [trendingLoaded, setTrendingLoaded] = useState(false);
+  const [trendingMode, setTrendingMode] = useState<"discovery" | "analytics">("discovery");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -47,9 +48,10 @@ function Home() {
         if (!response.ok) throw new Error("Trending usage is unavailable.");
         const payload = await response.json() as {
           ok?: boolean;
-          data?: { toolIds?: unknown };
+          data?: { mode?: unknown; toolIds?: unknown };
         };
         if (payload.ok !== true) throw new Error("Trending usage is unavailable.");
+        setTrendingMode(payload.data?.mode === "analytics" ? "analytics" : "discovery");
         const ids = Array.isArray(payload.data?.toolIds)
           ? payload.data.toolIds.filter((id): id is string => typeof id === "string")
           : [];
@@ -63,7 +65,10 @@ function Home() {
         setTrendingTools(ranked);
       })
       .catch(() => {
-        if (!controller.signal.aborted) setTrendingTools([]);
+        if (!controller.signal.aborted) {
+          setTrendingTools([]);
+          setTrendingMode("discovery");
+        }
       })
       .finally(() => {
         if (!controller.signal.aborted) setTrendingLoaded(true);
@@ -124,7 +129,7 @@ function Home() {
           <span className="hidden sm:inline"> everyday work.</span>
         </h1>
       </section>
-      <ToolSection title="Trending tools" tools={trendingTools} loaded={trendingLoaded} />
+      <ToolSection title="Trending tools" tools={trendingTools} loaded={trendingLoaded} mode={trendingMode} />
     </AppShell>
   );
 }
@@ -188,13 +193,13 @@ function MostUsedToolsTray({ tools }: { tools: ToolMeta[] }) {
   );
 }
 
-function ToolSection({ title, tools, loaded }: { title: string; tools: ToolMeta[]; loaded: boolean }) {
+function ToolSection({ title, tools, loaded, mode }: { title: string; tools: ToolMeta[]; loaded: boolean; mode: "discovery" | "analytics" }) {
   return (
     <section className="mx-auto max-w-6xl px-4 pb-10 sm:px-6">
       <div className="flex items-end justify-between gap-4">
         <h2 className="text-xl font-semibold text-accent sm:text-2xl">{title}</h2>
       </div>
-      <p className="mt-1 text-xs text-muted">Ranked by actual tool starts over the last 30 days.</p>
+      <p className="mt-1 text-xs text-muted">{mode === "analytics" ? "Ranked by actual tool starts over the last 30 days." : "A daily rotating selection of tools to explore."}</p>
       {tools.length ? (
         <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
           {tools.map((tool, index) => <ToolCard key={tool.id} tool={tool} className={index >= 6 ? "hidden md:flex" : ""} />)}
@@ -202,7 +207,7 @@ function ToolSection({ title, tools, loaded }: { title: string; tools: ToolMeta[
       ) : (
         <p className="mt-4 rounded-xl border border-border bg-surface px-4 py-5 text-sm text-muted">
           {loaded
-            ? "Trending tools will appear when enough opted-in users have started tools."
+            ? "The tool selection is temporarily unavailable. Please try again."
             : "Checking recent tool usage…"}
         </p>
       )}
