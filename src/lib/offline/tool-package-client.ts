@@ -58,6 +58,7 @@ async function activeWorker(captureCurrentPage = false, captureShellAssets = fal
         try {
           const url = new URL(name);
           return url.origin === window.location.origin &&
+            !url.pathname.startsWith("/api/") && !url.pathname.startsWith("/_serverFn/") &&
             /\.(?:m?js|css|wasm|woff2?|ttf|otf|svg|png|jpe?g|webp|avif)$/i.test(url.pathname);
         } catch { return false; }
       })
