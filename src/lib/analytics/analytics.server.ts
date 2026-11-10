@@ -248,9 +248,14 @@ export async function getAnalyticsSummary(request: Request) {
         where snapshot_day>=current_date-364 and snapshot_day<current_date-29
         group by snapshot_day
       ) historical group by day order by day`),
-    sql.query(`select tool_id,count(*) filter(where event_name='tool_viewed') views,count(*) filter(where outcome='failure') failures,
-      count(*) filter(where event_name='tool_completed') completed from product_analytics_events
-      where received_at>=now()-interval '30 days' and tool_id is not null group by tool_id order by views desc limit 25`),
+    sql.query(`select tool_id,
+      count(*) filter(where event_name='tool_started') starts,
+      count(*) filter(where event_name='tool_viewed') views,
+      count(*) filter(where event_name='tool_completed') completed,
+      count(*) filter(where outcome='failure') failures
+      from product_analytics_events
+      where received_at>=now()-interval '30 days' and tool_id is not null
+      group by tool_id order by starts desc, completed desc, views desc, tool_id asc limit 25`),
     ...["platform","device_class","browser_family","network_type","referrer_source"].map(column =>
       sql.query(`select ${column} name,count(*) events from product_analytics_events where received_at>=now()-interval '30 days' group by ${column} order by events desc`)),
     sql.query(`select tool_id,coalesce(error_code,'UNSPECIFIED') code,count(*) count from product_analytics_events
@@ -266,7 +271,7 @@ export async function getAnalyticsSummary(request: Request) {
     overview:{totalEvents:num(o.total_events),optedInInstallations:num(o.installations),signedInUsers:num(o.signed_in_users),
       sessions:num(o.sessions),toolsUsed:num(o.tools_used),failures:num(o.failures)},
     daily:daily.map(r=>({day:String(r.day),events:num(r.events),failures:num(r.failures)})),
-    tools:tools.map(r=>({toolId:String(r.tool_id),views:num(r.views),failures:num(r.failures),completed:num(r.completed)})),
+    tools:tools.map(r=>({toolId:String(r.tool_id),starts:num(r.starts),views:num(r.views),failures:num(r.failures),completed:num(r.completed)})),
     platforms:breakdown(platforms),devices:breakdown(devices),browsers:breakdown(browsers),networks:breakdown(networks),
     searchSources:breakdown(referrers),
     failureCodes:failures.map(r=>({toolId:String(r.tool_id??""),code:String(r.code),count:num(r.count)})),
@@ -277,6 +282,34 @@ export async function getAnalyticsSummary(request: Request) {
     })),
   };
 }
+export async function getPublicTrendingTools() {
+  // Public Home consumes only aggregate tool IDs. Collection remains fully opt-in;
+  // when the service is disabled, do not publish old rankings as current trends.
+  if (process.env.ANALYTICS_ENABLED !== "true") {
+    return { generatedAt: new Date().toISOString(), windowDays: 30, toolIds: [] as string[] };
+  }
+  const sql = await getSql();
+  const rows = await sql.query<{ tool_id: string }>(
+    `select tool_id from (
+       select tool_id,
+         count(*) filter (where event_name='tool_started') as starts,
+         count(*) filter (where event_name='tool_completed') as completed,
+         count(*) filter (where event_name='tool_viewed') as views,
+         count(distinct anonymous_subject_digest) as installations
+       from product_analytics_events
+       where received_at >= now() - interval '30 days' and tool_id is not null
+       group by tool_id
+     ) ranked
+     where starts > 0 and installations >= 3
+     order by starts desc, completed desc, views desc, tool_id asc
+     limit 12`,
+  );
+  const toolIds = rows
+    .map(row => String(row.tool_id ?? ""))
+    .filter(id => /^[a-z0-9][a-z0-9._:-]{0,127}$/i.test(id));
+  return { generatedAt: new Date().toISOString(), windowDays: 30, toolIds };
+}
+
 export async function runAnalyticsRetention(request: Request) {
   // Retention remains mandatory even when new analytics collection is disabled.
   signingSecret();
