@@ -138,7 +138,8 @@ test("device view is detected before first paint and manual choices survive refr
   const viewModeEnd = header.indexOf("</section>", viewModeStart);
   const viewModeMenu = viewModeStart >= 0 && viewModeEnd > viewModeStart ? header.slice(viewModeStart, viewModeEnd) : "";
   assert.equal(viewModeMenu.split('<button type="button"').length - 1, 3);
-  assert.doesNotMatch(viewModeMenu, /Automatic view|chooseViewMode\\("auto"\\)/);
+  assert.ok(!viewModeMenu.includes("Automatic view"));
+  assert.ok(!viewModeMenu.includes('chooseViewMode("auto")'));
   assert.ok(header.includes('aria-pressed={viewMode === "mobile"}'));
   assert.ok(header.includes('aria-pressed={viewMode === "tablet"}'));
   assert.ok(header.includes('aria-pressed={viewMode === "desktop"}'));
