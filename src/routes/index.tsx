@@ -10,12 +10,14 @@ import { ToolAppIcon } from "@/components/tools/tool-app-icon";
 import { SeeMoreLink } from "@/components/tools/see-more-link";
 import { UnderProductionDialog } from "@/components/tools/under-production";
 import { isToolUnderProduction } from "@/lib/production-notice";
+import { loadHomeTrendingDiscovery } from "@/lib/analytics/trending.functions";
 import { seoPageHead, pageSchema } from "@/lib/seo-metadata";
 import { getToolById, toolPath } from "@/lib/registry";
 import { rankMostUsedToolIds, usePrefs } from "@/lib/storage";
 import type { ToolMeta } from "@/types/tool";
 
 export const Route = createFileRoute("/")({
+  loader: () => loadHomeTrendingDiscovery(),
   head: () => seoPageHead({
     title: "enV Digital Toolkit by chAs Technologies | Online Tools",
     description: "enV Digital Toolkit by chAs Technologies LLC brings calculators, converters, developer utilities, media and productivity tools to Web, Android and iOS.",
@@ -33,9 +35,19 @@ export const Route = createFileRoute("/")({
 function Home() {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
-  const [trendingTools, setTrendingTools] = useState<ToolMeta[]>([]);
-  const [trendingLoaded, setTrendingLoaded] = useState(false);
-  const [trendingMode, setTrendingMode] = useState<"discovery" | "analytics">("discovery");
+  const initialTrendingFeed = Route.useLoaderData();
+  const initialTrendingTools = useMemo(
+    () => initialTrendingFeed.toolIds
+      .map((id) => getToolById(id))
+      .filter((tool): tool is ToolMeta =>
+        Boolean(tool && (tool.status === "active" || tool.status === "beta")),
+      )
+      .filter((tool, index, items) => items.findIndex((item) => item.id === tool.id) === index)
+      .slice(0, 12),
+    [initialTrendingFeed.toolIds],
+  );
+  const [trendingTools, setTrendingTools] = useState<ToolMeta[]>(initialTrendingTools);
+  const [trendingMode, setTrendingMode] = useState<"discovery" | "analytics">(initialTrendingFeed.mode);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -66,15 +78,13 @@ function Home() {
       })
       .catch(() => {
         if (!controller.signal.aborted) {
-          setTrendingTools([]);
+          // Keep the server-rendered shared discovery feed visible if refresh fails.
+          setTrendingTools(initialTrendingTools);
           setTrendingMode("discovery");
         }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setTrendingLoaded(true);
       });
     return () => controller.abort();
-  }, []);
+  }, [initialTrendingTools]);
   const recent = usePrefs((state) => state.recent);
   const usageCounts = usePrefs((state) => state.usageCounts);
   const mostUsedTools = useMemo(
@@ -129,7 +139,7 @@ function Home() {
           <span className="hidden sm:inline"> everyday work.</span>
         </h1>
       </section>
-      <ToolSection title="Trending tools" tools={trendingTools} loaded={trendingLoaded} mode={trendingMode} />
+      <ToolSection title="Trending tools" tools={trendingTools} mode={trendingMode} />
     </AppShell>
   );
 }
@@ -193,7 +203,7 @@ function MostUsedToolsTray({ tools }: { tools: ToolMeta[] }) {
   );
 }
 
-function ToolSection({ title, tools, loaded, mode }: { title: string; tools: ToolMeta[]; loaded: boolean; mode: "discovery" | "analytics" }) {
+function ToolSection({ title, tools, mode }: { title: string; tools: ToolMeta[]; mode: "discovery" | "analytics" }) {
   return (
     <section className="mx-auto max-w-6xl px-4 pb-10 sm:px-6">
       <div className="flex items-end justify-between gap-4">
@@ -204,13 +214,7 @@ function ToolSection({ title, tools, loaded, mode }: { title: string; tools: Too
         <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
           {tools.map((tool, index) => <ToolCard key={tool.id} tool={tool} className={index >= 6 ? "hidden md:flex" : ""} />)}
         </div>
-      ) : (
-        <p className="mt-4 rounded-xl border border-border bg-surface px-4 py-5 text-sm text-muted">
-          {loaded
-            ? "The tool selection is temporarily unavailable. Please try again."
-            : "Checking recent tool usage…"}
-        </p>
-      )}
+      ) : null}
       <div className="mt-5"><SeeMoreLink to="/tools">See more tools</SeeMoreLink></div>
     </section>
   );

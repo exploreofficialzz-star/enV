@@ -316,6 +316,10 @@ function publicTrendingDiscoveryResponse(now = new Date()) {
   };
 }
 
+export function getPublicTrendingDiscoveryTools(now = new Date()) {
+  return publicTrendingDiscoveryResponse(now);
+}
+
 export async function getPublicTrendingTools() {
   // The public endpoint always has a useful, non-ranked discovery feed while
   // opt-in usage data is unavailable or below the privacy threshold.
