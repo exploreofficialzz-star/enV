@@ -18,16 +18,17 @@ for (const removed of ["Explore enV", "Product, help, and account links", 'to="/
   if (webMenu.includes(removed)) errors.push(`Web overflow menu still contains removed item: ${removed}`);
 }
 if (!webMenu.includes('to="/account"') || !webMenu.includes('to="/wallet"')) errors.push("Account must appear before Wallet at the top of the overflow menu.");
+const automaticViewPosition = webMenu.indexOf("Automatic view");
 const mobileViewPosition = webMenu.indexOf("Mobile view");
 const tabletViewPosition = webMenu.indexOf("Tablet view");
 const desktopViewPosition = webMenu.indexOf("Desktop view");
-if (!(mobileViewPosition >= 0 && mobileViewPosition < tabletViewPosition && tabletViewPosition < desktopViewPosition)) errors.push("View modes must be ordered Mobile, Tablet, then Desktop.");
+if (!(automaticViewPosition >= 0 && automaticViewPosition < mobileViewPosition && mobileViewPosition < tabletViewPosition && tabletViewPosition < desktopViewPosition)) errors.push("View modes must be ordered Automatic, Mobile, Tablet, then Desktop.");
 if (webMenu.includes("Select an active mode again") || webMenu.includes("overflow-y-auto") || webMenu.includes("max-h-")) errors.push("Overflow card must not include its removed reset hint or internal vertical scrolling.");
 if (!header.includes('document.addEventListener("pointerdown", closeFromOutside)')) errors.push("Overflow menu must close after an outside click.");
 if (!webMenu.includes("fixed right-3") || !webMenu.includes("w-[15.5rem]") || !webMenu.includes("max-w-[calc(100vw_-_5rem)]")) errors.push("Overflow card must remain right-aligned and compact on mobile instead of spanning nearly the whole screen.");
 const viewModeBlock = webMenu.slice(webMenu.indexOf('aria-label="View mode"'), webMenu.indexOf("</section>", webMenu.indexOf('aria-label="View mode"')));
-if (!viewModeBlock.includes("<Smartphone size={16}") || !viewModeBlock.includes("<Tablet size={16}") || !viewModeBlock.includes("<Monitor size={16}")) errors.push("Mobile, tablet, and desktop views must have distinct device icons.");
-if ((viewModeBlock.match(/className=\{MENU_VIEW_ITEM_CLASS\}/g) ?? []).length !== 3 || !header.includes('const MENU_VIEW_ITEM_CLASS = `${MENU_ITEM_BASE_CLASS} justify-start gap-2.5`;') || (viewModeBlock.match(/className="flex min-w-0 flex-1 items-center gap-2.5"/g) ?? []).length !== 3) errors.push("Mobile, tablet, and desktop icons must have consistent small spacing before their labels, matching Settings and Help & feedback.");
+if (!viewModeBlock.includes("<SettingsIcon size={16}") || !viewModeBlock.includes("<Smartphone size={16}") || !viewModeBlock.includes("<Tablet size={16}") || !viewModeBlock.includes("<Monitor size={16}")) errors.push("Automatic, mobile, tablet, and desktop views must have distinct device/preference icons.");
+if ((viewModeBlock.match(/className=\{MENU_VIEW_ITEM_CLASS\}/g) ?? []).length !== 4 || !header.includes('const MENU_VIEW_ITEM_CLASS = `${MENU_ITEM_BASE_CLASS} justify-start gap-2.5`;') || (viewModeBlock.match(/className="flex min-w-0 flex-1 items-center gap-2.5"/g) ?? []).length !== 4) errors.push("All four view-mode rows must have consistent small icon spacing before their labels, matching Settings and Help & feedback.");
 if (!webMenu.includes("text-accent") || !header.includes("MENU_ITEM_CLASS")) errors.push("Overflow section headings and all menu rows must use the shared visual styles.");
 for (const [label, iconMarkup] of [
   ["Account", '<UserRound size={16}'], ["Wallet", '<Wallet size={16}'],
@@ -44,7 +45,7 @@ for (const [label, iconName] of [
 }
 
 if (!header.includes('label: "Report bugs", icon: Bug') || !header.includes('label: "Suggest a tool", icon: Lightbulb')) errors.push("Overflow menu must expose Report bugs and Suggest a tool through the shared menu link configuration.");
-for (const item of ["Mobile view", "Tablet view", "Desktop view", "Settings", "Help & feedback"]) {
+for (const item of ["Automatic view", "Mobile view", "Tablet view", "Desktop view", "Settings", "Help & feedback"]) {
   if (!webMenu.includes(item)) errors.push("Web overflow menu is missing requested item: " + item);
 }
 for (const path of ["src/routes/settings.tsx", "src/routes/help-feedback.tsx", "src/routes/report-bugs.tsx", "src/routes/suggest-tool.tsx", "src/components/feedback/feedback-request-page.tsx"]) {
