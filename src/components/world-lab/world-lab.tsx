@@ -2177,7 +2177,7 @@ export default function WorldLab() {
           <StudioHoldButton label="Step back" onStep={()=>walkBy(-1)}><ArrowDown aria-hidden="true" size={22}/></StudioHoldButton>
         </div>
       </div>
-      <StudioRail open={!!studioPanel} active={studioPanel} onSelect={setStudioPanel} onClose={()=>setStudioPanel(null)}/>
+      <StudioRail open={!!studioPanel} active={studioPanel} onSelect={setStudioPanel}/>
       <StudioDrawer open={!!studioPanel} onClose={()=>setStudioPanel(null)}>
         <StudioGroup id="project">
           <div className="wl-toolbar" role="toolbar" aria-label="Project">
