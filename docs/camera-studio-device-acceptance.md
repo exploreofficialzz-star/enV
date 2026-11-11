@@ -47,6 +47,7 @@ A result without this evidence remains NOT RUN.
 | Scenario | Required acceptance behaviour | Status |
 |---|---|---|
 | Dual-camera capability and graceful fallback | Detect actual concurrent-camera support; never duplicate one stream to fake dual capture; keep single camera usable if unsupported | NOT RUN |
+| Dual-camera preview/export parity | Confirm the same distinct front and rear frames appear in preview and the saved composition; PiP placement, crop, orientation and mirroring match; iOS dual mode keeps the Natural look until live filtered preview is supported | NOT RUN |
 | Adaptive dual-camera quality fallback | Android retries 720p then SD; iOS retries 720p/30 then 480p/24; browser retries 720p/30, 480p/24 and 240p/15; preview and exported output must match the selected profile | NOT RUN |
 | Front/rear orientation and mirroring | Portrait and landscape clips are upright; front inset mirroring is intentional; PiP does not crop the subject unexpectedly | NOT RUN |
 | Microphone permission and audio synchronization | Ask only when recording with sound; silent recording works after denial; audio stays synchronized with the exported video | NOT RUN |
