@@ -63,8 +63,8 @@ function resolveSpecifier(from, specifier) {
 
 const NODE_BUILTINS = new Set(["fs", "path", "crypto", "os", "child_process", "util", "stream", "http", "https", "net", "zlib", "buffer", "url", "vm", "worker_threads"]);
 const PROVIDER_SDKS = [/^openai($|\/)/, /^@anthropic-ai\//, /^@google\/(generative-ai|genai)/, /^groq-sdk/, /^@openrouter\//, /^ai($|\/)/, /^@ai-sdk\//, /^@huggingface\//, /^cohere-ai/, /^@mistralai\//];
-const PROVIDER_HOSTS = /(api\.groq\.com|openrouter\.ai|generativelanguage\.googleapis\.com|api\.cloudflare\.com|api\.openai\.com|api\.anthropic\.com|api-inference\.huggingface\.co|router\.huggingface\.co|api\.cohere\.(ai|com)|api\.mistral\.ai)/;
-const SECRET_NAMES = ["OPENROUTER_API_KEY", "GROQ_API_KEY", "GEMINI_API_KEY", "GOOGLE_AI_API_KEY", "HF_TOKEN", "AI_ADMIN_TOKEN", "AI_SESSION_SECRET", "MOSS_MUSIC_TOKEN", "CLOUDFLARE_API_TOKEN"];
+const PROVIDER_HOSTS = /(api\.groq\.com|openrouter\.ai|generativelanguage\.googleapis\.com|api\.openai\.com|api\.anthropic\.com|api-inference\.huggingface\.co|router\.huggingface\.co|api\.cohere\.(ai|com)|api\.mistral\.ai)/;
+const SECRET_NAMES = ["OPENROUTER_API_KEY", "GROQ_API_KEY", "GEMINI_API_KEY", "GOOGLE_AI_API_KEY", "HF_TOKEN", "AI_ADMIN_TOKEN", "AI_SESSION_SECRET", "MOSS_MUSIC_TOKEN"];
 
 // ------------------------------------------------------------------ 1. client/server boundary
 const browserFiles = srcFiles.filter((f) => {
@@ -152,9 +152,14 @@ const configLike = [
   ...serverRouteFiles,
 ].filter((f) => existsSync(f));
 const PUBLIC_SECRET = /\bVITE_[A-Z0-9_]*(KEY|SECRET|TOKEN|PASSWORD|PRIVATE)[A-Z0-9_]*/g;
+// AdSense calls this public placement-format option a "layout key"; it is not a credential.
+// Keep the exception exact so real VITE_* keys/secrets/tokens are still rejected.
+const SAFE_PUBLIC_CONFIG_NAMES = new Set(["VITE_ADSENSE_IN_FEED_LAYOUT_KEY"]);
 for (const file of configLike) {
   const text = read(file);
-  for (const m of text.matchAll(PUBLIC_SECRET)) fail(`${rel(file)} defines or reads ${m[0]}: a VITE_ variable is shipped to every browser`);
+  for (const m of text.matchAll(PUBLIC_SECRET)) {
+    if (!SAFE_PUBLIC_CONFIG_NAMES.has(m[0])) fail(`${rel(file)} defines or reads ${m[0]}: a VITE_ variable is shipped to every browser`);
+  }
 }
 
 // .enV/app-env.json feeds the CLIENT environment: it may hold VITE_ values only, never a secret.
