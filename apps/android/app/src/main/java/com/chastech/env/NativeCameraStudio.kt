@@ -112,11 +112,10 @@ import androidx.media3.effect.Brightness
 import androidx.media3.effect.Contrast
 import androidx.media3.effect.HslAdjustment
 import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.face.Face
-import com.google.mlkit.vision.face.FaceDetection
-import com.google.mlkit.vision.face.FaceDetector
-import com.google.mlkit.vision.face.FaceDetectorOptions
-import com.google.mlkit.vision.face.FaceLandmark
+import com.google.mlkit.vision.facemesh.FaceMesh
+import com.google.mlkit.vision.facemesh.FaceMeshDetection
+import com.google.mlkit.vision.facemesh.FaceMeshDetector
+import com.google.mlkit.vision.facemesh.FaceMeshDetectorOptions
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import androidx.core.util.Consumer
@@ -124,6 +123,7 @@ import androidx.media3.effect.RgbFilter
 import androidx.compose.runtime.livedata.observeAsState
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -164,7 +164,9 @@ private fun nativeCameraEffects(look: NativeCameraLook): List<Effect> = when (lo
 private data class NativeFaceOverlayGeometry(
     val bounds: RectF,
     val leftEye: PointF?,
-    val rightEye: PointF?
+    val rightEye: PointF?,
+    val nose: PointF?,
+    val mouth: PointF?
 )
 
 private fun mlKitPointToSensor(
@@ -186,7 +188,7 @@ private fun mlKitPointToSensor(
 }
 
 private fun mapNativeFaceToSensor(
-    face: Face,
+    face: FaceMesh,
     imageWidth: Int,
     imageHeight: Int,
     rotationDegrees: Int,
@@ -210,16 +212,29 @@ private fun mapNativeFaceToSensor(
     val xs = listOf(corners[0], corners[2], corners[4], corners[6])
     val ys = listOf(corners[1], corners[3], corners[5], corners[7])
     val sensorBounds = RectF(xs.minOrNull() ?: 0f, ys.minOrNull() ?: 0f, xs.maxOrNull() ?: 0f, ys.maxOrNull() ?: 0f)
-    fun eye(type: Int): PointF? = face.getLandmark(type)?.position?.let { position ->
-        mlKitPointToSensor(
-            position.x, position.y,
-            imageWidth, imageHeight, rotationDegrees, analysisToSensor
+
+    fun contourCenter(type: Int): PointF? {
+        val points = face.getPoints(type)
+        if (points.isEmpty()) return null
+        val mapped = points.map { meshPoint ->
+            val position = meshPoint.position
+            mlKitPointToSensor(
+                position.x, position.y,
+                imageWidth, imageHeight, rotationDegrees, analysisToSensor
+            )
+        }
+        return PointF(
+            mapped.sumOf { it.x.toDouble() }.div(mapped.size).toFloat(),
+            mapped.sumOf { it.y.toDouble() }.div(mapped.size).toFloat()
         )
     }
+
     return NativeFaceOverlayGeometry(
         bounds = sensorBounds,
-        leftEye = eye(FaceLandmark.LEFT_EYE),
-        rightEye = eye(FaceLandmark.RIGHT_EYE)
+        leftEye = contourCenter(FaceMesh.LEFT_EYE),
+        rightEye = contourCenter(FaceMesh.RIGHT_EYE),
+        nose = contourCenter(FaceMesh.NOSE_BRIDGE),
+        mouth = contourCenter(FaceMesh.UPPER_LIP_BOTTOM)
     )
 }
 
@@ -286,6 +301,50 @@ private fun drawNativeFaceOverlay(
             }
             canvas.drawPath(path, fill)
             canvas.drawPath(path, outline)
+        }
+        "Bunny ears" -> {
+            val eyeAngle = if (face.leftEye != null && face.rightEye != null) {
+                Math.toDegrees(kotlin.math.atan2(
+                    (face.rightEye.y - face.leftEye.y).toDouble(),
+                    (face.rightEye.x - face.leftEye.x).toDouble()
+                )).toFloat()
+            } else 0f
+            val centerX = bounds.centerX()
+            val headTop = bounds.top - bounds.height() * 0.025f
+            val earWidth = bounds.width() * 0.19f
+            val earHeight = bounds.height() * 0.42f
+            val outer = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.rgb(247, 238, 229) }
+            val inner = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.rgb(244, 137, 165) }
+            canvas.save()
+            canvas.rotate(eyeAngle, centerX, headTop)
+            for (side in listOf(-1f, 1f)) {
+                val ear = RectF(
+                    centerX + side * bounds.width() * 0.15f - earWidth / 2,
+                    headTop - earHeight * 0.9f,
+                    centerX + side * bounds.width() * 0.15f + earWidth / 2,
+                    headTop + earHeight * 0.08f
+                )
+                canvas.drawRoundRect(ear, earWidth / 2, earWidth / 2, outer)
+                val inset = RectF(ear.left + earWidth * 0.27f, ear.top + earHeight * 0.16f, ear.right - earWidth * 0.27f, ear.bottom - earHeight * 0.16f)
+                canvas.drawRoundRect(inset, earWidth / 2, earWidth / 2, inner)
+            }
+            canvas.restore()
+        }
+        "Moustache" -> {
+            val anchor = face.mouth ?: face.nose ?: PointF(bounds.centerX(), bounds.centerY() + bounds.height() * 0.12f)
+            val width = bounds.width() * 0.24f
+            val height = bounds.height() * 0.095f
+            val path = AndroidPath().apply {
+                moveTo(anchor.x, anchor.y)
+                cubicTo(anchor.x - width * 0.25f, anchor.y - height * 0.15f, anchor.x - width * 0.48f, anchor.y - height * 0.95f, anchor.x - width, anchor.y - height * 0.2f)
+                cubicTo(anchor.x - width * 0.82f, anchor.y + height * 0.8f, anchor.x - width * 0.3f, anchor.y + height * 0.42f, anchor.x, anchor.y)
+                moveTo(anchor.x, anchor.y)
+                cubicTo(anchor.x + width * 0.25f, anchor.y - height * 0.15f, anchor.x + width * 0.48f, anchor.y - height * 0.95f, anchor.x + width, anchor.y - height * 0.2f)
+                cubicTo(anchor.x + width * 0.82f, anchor.y + height * 0.8f, anchor.x + width * 0.3f, anchor.y + height * 0.42f, anchor.x, anchor.y)
+                close()
+            }
+            val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.rgb(49, 35, 31) }
+            canvas.drawPath(path, fill)
         }
         "Soft glow" -> {
             val radius = bounds.width() * 0.62f
@@ -371,63 +430,69 @@ fun NativeCameraStudioScreen() {
             }
         }
     }
-    val faceDetector = remember {
-        FaceDetection.getClient(
-            FaceDetectorOptions.Builder()
-                .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
-                .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
-                .enableTracking()
-                .build()
-        )
+    // ML Kit Face Mesh supplies 468 3D landmarks for more stable AR mask placement.
+    // It is only processing camera frames while an optional face effect is enabled.
+    val faceMeshDetector = remember {
+        FaceMeshDetection.getClient(FaceMeshDetectorOptions.DEFAULT_OPTIONS)
     }
+    val lastFaceAnalysisNanos = remember { AtomicLong(0L) }
     val faceAnalysisExecutor = remember { Executors.newSingleThreadExecutor() }
-    val faceAnalyzer = remember(faceDetector, faceOverlayEffect, faceAnalysisExecutor) {
+    val faceAnalyzer = remember(faceMeshDetector, faceOverlayEffect, faceAnalysisExecutor, lastFaceAnalysisNanos) {
         ImageAnalysis.Analyzer { imageProxy ->
             val mediaImage = imageProxy.image
             if (mediaImage == null) {
                 imageProxy.close()
             } else {
-                val timestamp = imageProxy.imageInfo.timestamp
-                val rotation = imageProxy.imageInfo.rotationDegrees
-                val analysisToSensor = AndroidMatrix()
-                if (!imageProxy.imageInfo.sensorToBufferTransformMatrix.invert(analysisToSensor)) {
+                // Cap mesh inference to ~15 fps on constrained devices; CameraX also
+                // keeps only the latest analysis frame, avoiding an ever-growing queue.
+                val nowNanos = System.nanoTime()
+                val previousNanos = lastFaceAnalysisNanos.get()
+                if (nowNanos - previousNanos < 66_000_000L) {
                     imageProxy.close()
                 } else {
-                    try {
-                        val input = InputImage.fromMediaImage(mediaImage, rotation)
-                        faceDetector.process(input)
-                            .addOnSuccessListener(faceAnalysisExecutor) { detectedFaces ->
-                                val geometries = detectedFaces.map { face ->
-                                    mapNativeFaceToSensor(
-                                        face,
-                                        imageProxy.width,
-                                        imageProxy.height,
-                                        rotation,
-                                        analysisToSensor
-                                    )
-                                }
-                                faceFrameResults[timestamp] = geometries
-                                while (faceFrameResults.size > 8) {
-                                    faceFrameResults.keys.minOrNull()?.let(faceFrameResults::remove) ?: break
-                                }
-                                faceOverlayEffect.drawFrameAsync(timestamp)
-                            }
-                            .addOnFailureListener(faceAnalysisExecutor) { failure ->
-                                faceFrameResults[timestamp] = emptyList()
-                                faceOverlayEffect.drawFrameAsync(timestamp)
-                                Handler(Looper.getMainLooper()).post {
-                                    faceOverlayError = failure.message ?: "Face tracking could not process this frame."
-                                }
-                            }
-                            .addOnCompleteListener(faceAnalysisExecutor) {
-                                imageProxy.close()
-                            }
-                    } catch (failure: Throwable) {
+                    lastFaceAnalysisNanos.set(nowNanos)
+                    val timestamp = imageProxy.imageInfo.timestamp
+                    val rotation = imageProxy.imageInfo.rotationDegrees
+                    val analysisToSensor = AndroidMatrix()
+                    if (!imageProxy.imageInfo.sensorToBufferTransformMatrix.invert(analysisToSensor)) {
                         imageProxy.close()
-                        faceFrameResults[timestamp] = emptyList()
-                        faceOverlayEffect.drawFrameAsync(timestamp)
-                        Handler(Looper.getMainLooper()).post {
-                            faceOverlayError = failure.message ?: "Face tracking could not process this frame."
+                    } else {
+                        try {
+                            val input = InputImage.fromMediaImage(mediaImage, rotation)
+                            faceMeshDetector.process(input)
+                                .addOnSuccessListener(faceAnalysisExecutor) { detectedFaces ->
+                                    val geometries = detectedFaces.map { face ->
+                                        mapNativeFaceToSensor(
+                                            face,
+                                            imageProxy.width,
+                                            imageProxy.height,
+                                            rotation,
+                                            analysisToSensor
+                                        )
+                                    }
+                                    faceFrameResults[timestamp] = geometries
+                                    while (faceFrameResults.size > 8) {
+                                        faceFrameResults.keys.minOrNull()?.let(faceFrameResults::remove) ?: break
+                                    }
+                                    faceOverlayEffect.drawFrameAsync(timestamp)
+                                }
+                                .addOnFailureListener(faceAnalysisExecutor) { failure ->
+                                    faceFrameResults[timestamp] = emptyList()
+                                    faceOverlayEffect.drawFrameAsync(timestamp)
+                                    Handler(Looper.getMainLooper()).post {
+                                        faceOverlayError = failure.message ?: "Face mesh tracking could not process this frame."
+                                    }
+                                }
+                                .addOnCompleteListener(faceAnalysisExecutor) {
+                                    imageProxy.close()
+                                }
+                        } catch (failure: Throwable) {
+                            imageProxy.close()
+                            faceFrameResults[timestamp] = emptyList()
+                            faceOverlayEffect.drawFrameAsync(timestamp)
+                            Handler(Looper.getMainLooper()).post {
+                                faceOverlayError = failure.message ?: "Face mesh tracking could not process this frame."
+                            }
                         }
                     }
                 }
@@ -467,12 +532,12 @@ fun NativeCameraStudioScreen() {
             }
         }
     }
-    DisposableEffect(faceDetector, faceOverlayEffect, faceAnalysisExecutor, faceOverlayThread, controller) {
+    DisposableEffect(faceMeshDetector, faceOverlayEffect, faceAnalysisExecutor, faceOverlayThread, controller) {
         onDispose {
             runCatching { controller.clearImageAnalysisAnalyzer() }
             runCatching { controller.setEffects(emptySet()) }
             faceFrameResults.clear()
-            faceDetector.close()
+            faceMeshDetector.close()
             faceOverlayEffect.close()
             faceAnalysisExecutor.shutdown()
             faceOverlayThread.quitSafely()
@@ -1120,14 +1185,18 @@ fun NativeCameraStudioScreen() {
         }
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Face effects", style = MaterialTheme.typography.labelMedium)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf("Off", "Glasses", "Crown", "Soft glow").forEach { effect ->
-                    OutlinedButton(
-                        onClick = { faceEffectMode = effect },
-                        enabled = cameraGranted && !recordingActive && !dualCameraMode && mode == NativeCameraMode.VIDEO,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(if (faceEffectMode == effect) "✓ $effect" else effect)
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("Off", "Glasses", "Crown", "Bunny ears", "Moustache", "Soft glow").chunked(3).forEach { effects ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        effects.forEach { effect ->
+                            OutlinedButton(
+                                onClick = { faceEffectMode = effect },
+                                enabled = cameraGranted && !recordingActive && !dualCameraMode && mode == NativeCameraMode.VIDEO,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(if (faceEffectMode == effect) "✓ $effect" else effect)
+                            }
+                        }
                     }
                 }
             }
@@ -1135,7 +1204,8 @@ fun NativeCameraStudioScreen() {
                 when (faceEffectMode) {
                     "Off" -> if (mode == NativeCameraMode.VIDEO) "Face tracking is off." else "Face effects are available in Video mode."
                     "Soft glow" -> "Adds a subtle face-tracked light effect. Face analysis stays on this device."
-                    else -> "Tracks facial landmarks and applies the selected mask to the live preview and recorded video. Colour filters pause while a mask is active."
+                    "Bunny ears", "Moustache" -> "Uses a 468-point on-device face mesh to keep the selected effect aligned with your face."
+                    else -> "Uses a 468-point on-device face mesh to align the selected effect with your face in preview and recorded video. Colour filters pause while a mask is active."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1418,10 +1488,20 @@ private fun NativeDualCameraStudioScreen(
     LaunchedEffect(previewView) {
         val targetPreview = previewView ?: return@LaunchedEffect
         try {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R ||
-                !context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_CONCURRENT)
-            ) {
-                throw IllegalStateException("This phone does not support simultaneous front and rear camera recording.")
+            // CameraX's public concurrent-camera pair discovery is backed by
+            // CameraManager.getConcurrentCameraIds(), which is only available from
+            // Android 11 (API 30). Some older devices may advertise the feature flag,
+            // but this CameraX implementation cannot discover their pair; a separate
+            // legacy Camera2 adapter would be required and is not silently simulated.
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+                throw IllegalStateException(
+                    "This Android version cannot expose concurrent camera pairs to the current CameraX engine. Normal single-camera recording remains available."
+                )
+            }
+            if (!context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_CONCURRENT)) {
+                throw IllegalStateException(
+                    "This phone does not report simultaneous front + rear camera support. Normal single-camera recording remains available."
+                )
             }
 
             val cameraProvider = withContext(Dispatchers.IO) {
@@ -1445,29 +1525,59 @@ private fun NativeDualCameraStudioScreen(
                 infos.filter { Camera2CameraInfo.from(it).cameraId == frontCameraId }
             }.build()
 
-            // CameraX composition mode records both live feeds into one video file.
-            // The same Preview and VideoCapture use cases must be shared by both camera configs.
-            val preview = Preview.Builder().build().also {
-                it.setSurfaceProvider(targetPreview.surfaceProvider)
-            }
-            val recorder = Recorder.Builder()
-                .setQualitySelector(
-                    QualitySelector.from(Quality.HD, FallbackStrategy.lowerQualityOrHigherThan(Quality.SD))
-                )
-                .build()
-            val video = VideoCapture.withOutput(recorder)
-            val group = UseCaseGroup.Builder()
-                .addUseCase(preview)
-                .addUseCase(video)
-                .addEffect(cameraEffect)
-                .build()
+            // Use CameraX composition mode so both distinct camera feeds become one
+            // encoded video. Start at 720p, then retry at SD if the device cannot bind
+            // both streams at the higher quality. This is especially important on
+            // low-memory and lower-bandwidth camera/encoder combinations.
+            var bound: Triple<Preview, VideoCapture<Recorder>, ConcurrentCamera>? = null
+            var selectedQuality: Quality? = null
+            var lastBindFailure: Throwable? = null
 
-            val concurrentCamera = cameraProvider.bindToLifecycle(
-                listOf(
-                    ConcurrentCamera.SingleCameraConfig(backSelector, group, lifecycleOwner),
-                    ConcurrentCamera.SingleCameraConfig(frontSelector, group, lifecycleOwner)
-                )
+            for (quality in listOf(Quality.HD, Quality.SD)) {
+                val preview = Preview.Builder().build().also {
+                    it.setSurfaceProvider(targetPreview.surfaceProvider)
+                }
+                val recorder = Recorder.Builder()
+                    .setQualitySelector(
+                        QualitySelector.from(
+                            quality,
+                            FallbackStrategy.lowerQualityOrHigherThan(Quality.SD)
+                        )
+                    )
+                    .build()
+                val video = VideoCapture.withOutput(recorder)
+                val group = UseCaseGroup.Builder()
+                    .addUseCase(preview)
+                    .addUseCase(video)
+                    .addEffect(cameraEffect)
+                    .build()
+
+                try {
+                    val concurrent = cameraProvider.bindToLifecycle(
+                        listOf(
+                            ConcurrentCamera.SingleCameraConfig(backSelector, group, lifecycleOwner),
+                            ConcurrentCamera.SingleCameraConfig(frontSelector, group, lifecycleOwner)
+                        )
+                    )
+                    bound = Triple(preview, video, concurrent)
+                    selectedQuality = quality
+                    break
+                } catch (failure: Throwable) {
+                    lastBindFailure = failure
+                    // A failed high-quality bind can leave partial use cases attached.
+                    // Clear them before trying the lower-cost SD profile.
+                    runCatching { cameraProvider.unbindAll() }
+                }
+            }
+
+            val activeBinding = bound ?: throw IllegalStateException(
+                "This phone reports front/rear camera concurrency, but could not start both streams even at low-power SD quality. Normal single-camera recording remains available.",
+                lastBindFailure
             )
+            val preview = activeBinding.first
+            val video = activeBinding.second
+            val concurrentCamera = activeBinding.third
+            val qualityLabel = if (selectedQuality == Quality.SD) "low-power SD" else "HD"
             // Request hardware video stabilization independently for each stream when
             // that camera advertises support. Unsupported cameras continue normally.
             concurrentCamera.cameras.forEach { activeCamera ->
@@ -1497,7 +1607,7 @@ private fun NativeDualCameraStudioScreen(
             previewUseCase = preview
             videoCapture = video
             cameraReady = true
-            localStatus = "Both cameras are live. Video quality is automatically limited to a supported dual-camera mode."
+            localStatus = "Both cameras are live in $qualityLabel mode. If recording becomes unstable, use the normal camera or lower the device load."
             localError = null
         } catch (failure: Throwable) {
             cameraReady = false
