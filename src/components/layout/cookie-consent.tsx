@@ -103,7 +103,7 @@ export function CookieConsent() {
       aria-label="Cookie preferences"
       aria-labelledby="env-cookie-title"
       aria-describedby="env-cookie-description"
-      className="fixed inset-x-3 bottom-3 z-[100] mx-auto max-w-2xl rounded-2xl border border-border bg-card p-4 text-card-foreground shadow-2xl sm:inset-x-4 sm:bottom-4 sm:p-5"
+      className="mx-auto my-3 w-[calc(100%-1.5rem)] max-w-2xl rounded-2xl border border-border bg-card p-4 text-card-foreground shadow-[var(--shadow-border)] sm:my-4 sm:p-5"
     >
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0 flex-1">
