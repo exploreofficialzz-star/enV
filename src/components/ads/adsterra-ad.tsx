@@ -3,6 +3,7 @@ import { isApplicationOnline } from "@/lib/ads/policy";
 import {
   ADSTERRA_BANNER_UNITS,
   ADSTERRA_NATIVE_BANNER,
+  canRequestAdsterraAds,
   getAdsterraConsent,
   isAdsterraEnabled,
   type AdsterraBannerFormat,
@@ -29,13 +30,15 @@ function useAdsterraReady(): boolean {
 
   useEffect(() => {
     let active = true;
+    let requestVersion = 0;
     const refresh = async () => {
-      if (!isAdsterraEnabled() || getAdsterraConsent() !== "granted" || !navigator.onLine) {
-        if (active) setReady(false);
+      const version = ++requestVersion;
+      if (!canRequestAdsterraAds(isAdsterraEnabled(), getAdsterraConsent(), navigator.onLine)) {
+        if (active && version === requestVersion) setReady(false);
         return;
       }
       const online = await isApplicationOnline();
-      if (active) setReady(online);
+      if (active && version === requestVersion) setReady(online);
     };
     const onChange = () => { void refresh(); };
     void refresh();
@@ -44,6 +47,7 @@ function useAdsterraReady(): boolean {
     window.addEventListener("env:adsterra-consent-changed", onChange);
     return () => {
       active = false;
+      requestVersion += 1;
       window.removeEventListener("online", onChange);
       window.removeEventListener("offline", onChange);
       window.removeEventListener("env:adsterra-consent-changed", onChange);
@@ -89,6 +93,10 @@ export function AdsterraBanner({ format }: { format: AdsterraBannerFormat }) {
   const slotRef = useRef<HTMLDivElement | null>(null);
   const [failed, setFailed] = useState(false);
   const unit = ADSTERRA_BANNER_UNITS[format];
+
+  useEffect(() => {
+    if (!ready) setFailed(false);
+  }, [ready]);
 
   useEffect(() => {
     const slot = slotRef.current;
@@ -139,6 +147,10 @@ export function AdsterraNativeBanner() {
   const scriptRef = useRef<HTMLScriptElement | null>(null);
 
   useEffect(() => {
+    if (!ready) setFailed(false);
+  }, [ready]);
+
+  useEffect(() => {
     if (!ready || scriptRef.current) return;
     const container = document.getElementById(ADSTERRA_NATIVE_BANNER.containerId);
     if (!container || container.dataset.envAdsterraRequested === "true") return;
@@ -153,7 +165,13 @@ export function AdsterraNativeBanner() {
     }, { once: true });
     container.insertAdjacentElement("afterend", script);
     scriptRef.current = script;
-    return () => { active = false; };
+    return () => {
+      active = false;
+      script.remove();
+      container.replaceChildren();
+      delete container.dataset.envAdsterraRequested;
+      if (scriptRef.current === script) scriptRef.current = null;
+    };
   }, [ready]);
 
   if (!ready || failed) return null;
