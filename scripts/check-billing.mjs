@@ -8,6 +8,10 @@ const migration = await read("migrations/0002_billing.sql");
 const rewardsMigration = await read("migrations/0007_wallet_rewards.sql");
 const rewardsService = await read("src/lib/billing/rewards.server.ts");
 const paystackService = await read("src/lib/billing/paystack.server.ts");
+const countryRouting = await read("src/lib/billing/country-routing.ts");
+const flutterwaveService = await read("src/lib/billing/flutterwave.server.ts");
+const flutterwaveWebhook = await read("server/routes/api/billing/flutterwave/webhook.post.ts");
+const flutterwaveVerify = await read("server/routes/api/billing/flutterwave/verify.get.ts");
 const paystackWebhookRoute = await read("server/routes/api/billing/paystack/webhook.post.ts");
 const paystackProviderConfig = await read("src/lib/billing/provider-config.ts");
 const cryptomusService = await read("src/lib/billing/cryptomus.server.ts");
@@ -164,7 +168,7 @@ for (const [platform, ids] of [["Android", nativeInventory.androidToolIds], ["iO
 }
 assert.match(purchasesRoute, /initializePaystackCheckout/);
 assert.match(purchasesRoute, /initializeCryptomusCheckout/);
-assert.match(purchasesRoute, /provider !== "paystack" && provider !== "cryptomus"/);
+assert.match(purchasesRoute, /provider !== "paystack" && provider !== "flutterwave" && provider !== "cryptomus"/);
 assert.match(purchasesRoute, /No payment was taken/);
 assert.match(paystackService, /PAYSTACK_PROVIDER_APPROVED === "true"/, "Paystack checkout must require explicit merchant approval");
 assert.match(paystackService, /CRYPTOMUS_PROVIDER_APPROVED === "true"/, "crypto checkout must require explicit merchant approval");
@@ -225,6 +229,34 @@ for (const status of ["refund_process", "refund_fail", "refund_paid"]) {
 }
 assert.match(paystackWebhookRoute, /billing-paystack-webhook/);
 assert.match(cryptomusWebhook, /CRYPTOMUS_REFUND_RECONCILIATION_REQUIRED/);
+assert.match(fundingOptionsRoute, /getCustomerCountry/);
+assert.match(purchasesRoute, /getCustomerCountry/);
+assert.match(purchasesRoute, /getFundingOptions\(countryCode\)/);
+assert.match(purchasesRoute, /initializeFlutterwaveCheckout/);
+assert.match(walletDashboard, /checkout\.hostname !== expectedHost/);
+assert.match(walletDashboard, /checkout\.flutterwave\.com/);
+assert.match(walletDashboard, /option\.id === "flutterwave"/);
+assert.match(countryRouting, /x-vercel-ip-country/);
+assert.match(countryRouting, /cf-ipcountry/);
+assert.match(countryRouting, /getCountryPaymentProfile/);
+assert.match(countryRouting, /parseMajorUnitsToMinor/);
+for (const country of ["NG", "GH", "KE", "ZA", "MW", "UG", "RW", "TZ", "CI", "SN", "CM", "EG", "GB", "US"]) {
+  assert.ok(countryRouting.includes(country + ":"), "country routing must include " + country);
+}
+assert.match(flutterwaveService, /FLW_SECRET_KEY/);
+assert.match(flutterwaveService, /FLW_SECRET_HASH/);
+assert.match(flutterwaveService, /FLUTTERWAVE_ENABLED_CURRENCIES/);
+assert.match(flutterwaveService, /payment_options: profile\.paymentOptions\.join/);
+assert.match(flutterwaveService, /verifyAndCreditFlutterwaveReference/);
+assert.match(flutterwaveService, /timingSafeEqual/);
+assert.match(flutterwaveService, /readBoundedBytes\(request, 256_000\)/);
+assert.match(flutterwaveService, /FLUTTERWAVE_REFUND_DISPUTE_HANDLING_APPROVED/);
+assert.match(flutterwaveWebhook, /handleFlutterwaveWebhook/);
+assert.match(flutterwaveVerify, /verifyAndCreditFlutterwaveReference/);
+assert.match(envExample, /FLUTTERWAVE_ENABLED_CURRENCIES=/);
+assert.match(envExample, /FLUTTERWAVE_REFUND_DISPUTE_HANDLING_APPROVED=false/);
+assert.match(envExample, /PAYSTACK_INTERNATIONAL_ENABLED=false/);
+
 assert.match(paystackProviderConfig, /requirePaystackVerificationSecret/);
 assert.match(paystackProviderConfig, /readSafePackPrice/);
 assert.match(paystackService, /readSafePackPrice\(process\.env\.PAYSTACK_TOKEN_PRICE_NGN_KOBO, TOKEN_PACKS\)/,
