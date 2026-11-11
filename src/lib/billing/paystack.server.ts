@@ -175,13 +175,14 @@ export function getFundingOptions(countryCode: string | null = null) {
 
 function requireLiveFunding(countryCode: string | null) {
   const configuration = resolvePaystackConfiguration(countryCode);
-  if (!configuration?.enabled || !configuration.secret ||
-      !configuration.pricePerTokenMinor || !configuration.origin) {
+  const pricePerTokenMinor = configuration?.pricePerTokenMinor ?? null;
+  if (!configuration || !configuration.enabled || !configuration.secret ||
+      pricePerTokenMinor === null || !configuration.origin) {
     throw Object.assign(new Error("Paystack is not enabled for the detected country and currency."), {
       code: "PAYMENTS_NOT_CONFIGURED", status: 503,
     });
   }
-  return configuration;
+  return { ...configuration, pricePerTokenMinor };
 }
 
 function validIdempotencyKey(value: unknown): value is string {
