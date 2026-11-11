@@ -240,7 +240,12 @@ assert.match(countryRouting, /x-vercel-ip-country/);
 assert.match(countryRouting, /cf-ipcountry/);
 assert.match(countryRouting, /getCountryPaymentProfile/);
 assert.match(countryRouting, /parseMajorUnitsToMinor/);
-for (const country of ["NG", "GH", "KE", "ZA", "MW", "UG", "RW", "TZ", "CI", "SN", "CM", "EG", "GB", "US"]) {
+assert.match(countryRouting, /toFlutterwaveMajorAmount/);
+assert.match(countryRouting, /CLOUDFLARE_ORIGIN_LOCKDOWN_APPROVED/);
+assert.match(paystackService, /PAYSTACK_MERCHANT_COUNTRY/);
+assert.match(paystackService, /PAYSTACK_MERCHANT_CURRENCIES/);
+assert.match(paystackService, /PAYSTACK_INTERNATIONAL_ENABLED === "true"/);
+for (const country of ["NG", "GH", "KE", "ZA", "MW", "UG", "RW", "TZ", "BF", "CI", "SN", "CM", "CF", "CG", "GQ", "GA", "ZM", "EG", "GB", "US", "BG"]) {
   assert.ok(countryRouting.includes(country + ":"), "country routing must include " + country);
 }
 assert.match(flutterwaveService, /FLW_SECRET_KEY/);
@@ -251,16 +256,21 @@ assert.match(flutterwaveService, /verifyAndCreditFlutterwaveReference/);
 assert.match(flutterwaveService, /timingSafeEqual/);
 assert.match(flutterwaveService, /readBoundedBytes\(request, 256_000\)/);
 assert.match(flutterwaveService, /FLUTTERWAVE_REFUND_DISPUTE_HANDLING_APPROVED/);
+assert.match(flutterwaveService, /AmountRefunded/);
+assert.match(flutterwaveService, /amount: amountMajor/);
 assert.match(flutterwaveWebhook, /handleFlutterwaveWebhook/);
 assert.match(flutterwaveVerify, /verifyAndCreditFlutterwaveReference/);
 assert.match(envExample, /FLUTTERWAVE_ENABLED_CURRENCIES=/);
 assert.match(envExample, /FLUTTERWAVE_REFUND_DISPUTE_HANDLING_APPROVED=false/);
 assert.match(envExample, /PAYSTACK_INTERNATIONAL_ENABLED=false/);
+assert.match(envExample, /PAYSTACK_MERCHANT_COUNTRY=NG/);
+assert.match(envExample, /CLOUDFLARE_ORIGIN_LOCKDOWN_APPROVED=false/);
+assert.match(envExample, /FLUTTERWAVE_TOKEN_PRICE_ZMW_MINOR=/);
 
 assert.match(paystackProviderConfig, /requirePaystackVerificationSecret/);
 assert.match(paystackProviderConfig, /readSafePackPrice/);
-assert.match(paystackService, /readSafePackPrice\(process\.env\.PAYSTACK_TOKEN_PRICE_NGN_KOBO, TOKEN_PACKS\)/,
-  "Paystack prices must stay within safe integer bounds for every token pack");
+assert.match(paystackService, /readSafePackPrice\(configuredPrice, TOKEN_PACKS\)/,
+  "Paystack market prices must stay within safe integer bounds for every token pack");
 assert.match(paystackService, /readSafePackPrice\(process\.env\.CRYPTOMUS_TOKEN_PRICE_USD_CENTS, TOKEN_PACKS\)/,
   "Cryptomus prices must stay within safe integer bounds for every token pack");
 assert.match(paystackService, /PAYSTACK_SECRET_KEY\?\.trim\(\)/,
