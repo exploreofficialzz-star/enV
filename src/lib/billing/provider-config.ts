@@ -19,6 +19,13 @@ export function requirePaystackVerificationSecret(
 }
 
 /** Parse a positive minor-unit price only when every offered token pack fits safely in integer arithmetic. */
+/** Per-transaction Flutterwave payment_options work only after dashboard payment options are disabled. */
+export function isFlutterwavePaymentOptionsConfigured(
+  env: Record<string, string | undefined>,
+): boolean {
+  return env.FLUTTERWAVE_PAYMENT_OPTIONS_DASHBOARD_DISABLED === "true";
+}
+
 export function readSafePackPrice(
   value: string | undefined,
   packSizes: readonly number[],
