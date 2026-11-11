@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ChevronDown } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
+import { AdsterraBanner } from "@/components/ads/adsterra-ad";
 import { ToolCard } from "@/components/tools/tool-card";
 import { SearchBox } from "@/components/tools/search-box";
 import { CATEGORIES } from "@/data/categories";
@@ -54,6 +55,7 @@ function Tools() {
           </div>
         </div>
         <p className="mt-2 text-muted">Find a tool by name or browse the categories below.</p>
+        <AdsterraBanner format="300x250" />
         {sections.length === 0 ? (
           <p className="mt-8 rounded-xl bg-surface p-6 text-sm text-muted shadow-[var(--shadow-border)]">No tools match your search. Try another name or keyword.</p>
         ) : (
