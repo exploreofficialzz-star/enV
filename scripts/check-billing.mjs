@@ -244,7 +244,7 @@ assert.match(countryRouting, /toFlutterwaveMajorAmount/);
 assert.match(countryRouting, /CLOUDFLARE_ORIGIN_LOCKDOWN_APPROVED/);
 assert.match(paystackProviderConfig, /PAYSTACK_MERCHANT_COUNTRY/);
 assert.match(paystackProviderConfig, /PAYSTACK_MERCHANT_ACCEPTED_CURRENCIES/);
-assert.match(paystackService, /PAYSTACK_INTERNATIONAL_ENABLED === "true"/);
+assert.match(paystackProviderConfig, /PAYSTACK_INTERNATIONAL_ENABLED === "true"/);
 for (const country of ["NG", "GH", "KE", "ZA", "MW", "UG", "RW", "TZ", "BF", "CI", "SN", "CM", "CF", "CG", "GQ", "GA", "ZM", "EG", "GB", "US", "BG"]) {
   assert.ok(countryRouting.includes(country + ":"), "country routing must include " + country);
 }
