@@ -39,6 +39,7 @@ assert.match(toolShell, /import \{ AdsterraNativeBanner \} from "@\/components\/
 assert.match(toolShell, /VITE_ADSTERRA_ENABLED === "true"[\s\S]*?<AdsterraNativeBanner \/>/, "Tool pages must use the configured Adsterra native banner rather than a disabled AdSense slot.");
 assert.match(adsterraWeb, /retryAttempt < 3/, "Failed Adsterra banner requests must retry a bounded number of times.");
 assert.match(adsterraWeb, /retryHandle = window\.setInterval/, "A failed Popunder request must be retried while the page is visible.");
+assert.match(adsterraWeb, /attempts >= 4/, "Popunder retries must be bounded to avoid repeated provider requests.");
 
 assert.match(slot, /isApplicationOnline\(\)/, "Ads must not be requested unless the application origin is reachable.");
 assert.match(shell, /!isFullscreen \? \([\s\S]*?VITE_ADSTERRA_ENABLED === "true"[\s\S]*?<AdsterraNativeBanner \/>[\s\S]*?<AdSlot tool=\{tool\} \/>[\s\S]*?\) : null/, "Web ad placement must stay outside fullscreen and select one configured provider.");
