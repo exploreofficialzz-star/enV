@@ -9,9 +9,19 @@
 - Proxy/self-hosted compute costs: unknown until a cost-allocation or invoice integration exists.
 - Purchased-token and promotional-token distinction: should remain explicit when promotions are introduced.
 
+## Country-aware provider routing
+
+The Web funding-options and purchase routes use the hosting-edge country header. They do not accept a browser-provided country or currency, and they do not default an unknown visitor to Nigeria. Review `docs/payment-provider-routing.md` before changing country, currency or provider settings.
+
+Paystack local markets require the appropriate merchant account currency, currency-specific key, approval and finance price. A fallback for international cards is separately disabled unless the merchant has enabled international acceptance in the Paystack dashboard. It does not provide local payment rails for the visitor's country.
+
+Flutterwave checkout is configured with a country-specific currency and allowlisted `payment_options`. Set `FLUTTERWAVE_ENABLED_CURRENCIES` only to currencies enabled on the actual merchant account. Configure `FLW_SECRET_KEY`, the exact dashboard webhook `FLW_SECRET_HASH`, and the finance-approved `FLUTTERWAVE_TOKEN_PRICE_<CURRENCY>_MINOR` for every currency. The Flutterwave adapter also requires `FLUTTERWAVE_REFUND_DISPUTE_HANDLING_APPROVED=true`; keep it false until refund/chargeback events, wallet reversals, webhook retries, already-spent credits and recovery have been implemented and tested.
+
+The user-country signal is for checkout routing only. It is not residency verification, KYC, tax determination or a guarantee that a provider supports the visitor's bank. Provider account configuration, settlement eligibility and channel activation remain authoritative.
+
 ## Payment release blockers — keep checkout disabled
 
-The server-side Paystack and Cryptomus web checkout adapters are present, but that is not sufficient for real-money launch. The current release does not yet implement complete refund/dispute reconciliation or a tested wallet-credit reversal policy. Paystack's webhook handler currently processes successful charges; Cryptomus refund-state callbacks are not fully reconciled into wallet reversals. A refunded or disputed charge must never be allowed to leave spendable credits without an explicit, audited decision.
+The server-side Paystack, Flutterwave and Cryptomus web checkout adapters are present, but that is not sufficient for real-money launch. The current release does not yet implement complete refund/dispute reconciliation or a tested wallet-credit reversal policy. Paystack's webhook handler currently processes successful charges; Cryptomus refund-state callbacks are not fully reconciled into wallet reversals. A refunded or disputed charge must never be allowed to leave spendable credits without an explicit, audited decision.
 
 Until that work is complete, signed Paystack refund/dispute events and Cryptomus `refund_process`, `refund_fail` and `refund_paid` callbacks deliberately return HTTP 503 with `REFUND_DISPUTE_RECONCILIATION_REQUIRED` or `CRYPTOMUS_REFUND_RECONCILIATION_REQUIRED`. They are not acknowledged as successfully handled or silently ignored. This is a delivery/reconciliation guard, **not** refund processing: no wallet balance is reversed by these callbacks, and operators must use provider delivery history plus the purchase ledger for manual investigation. Keep new checkout disabled.
 
