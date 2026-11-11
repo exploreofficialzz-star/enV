@@ -4,7 +4,7 @@
 
 Payment routing uses the visitor's country as observed by the hosting edge, not a country or currency sent in the browser request.
 
-1. The funding-options API reads `x-vercel-ip-country`; `cf-ipcountry` is a fallback for a deployment behind Cloudflare.
+1. The funding-options API reads Vercel's `x-vercel-ip-country`. It reads `cf-ipcountry` only when `COUNTRY_GEO_PROVIDER=cloudflare` and `CLOUDFLARE_ORIGIN_LOCKDOWN_APPROVED=true`; direct Vercel-origin access must be blocked before enabling that fallback.
 2. The purchase API repeats that lookup on the server. A client-supplied country, currency, payment method list, or amount is ignored.
 3. A country profile maps to one currency and a provider-specific set of methods.
 4. A provider is offered only when its merchant account, server credential, finance-approved price, supported currency, provider approval and billing release gates are all configured.
@@ -26,12 +26,13 @@ The current country profile catalogue is deliberately explicit. Flutterwave's St
 | Uganda | UGX | Card, Uganda mobile money |
 | Rwanda | RWF | Card, Rwanda mobile money |
 | Tanzania | TZS | Card, Tanzania mobile money |
-| Côte d'Ivoire, Senegal | XOF | Card, West African mobile money |
-| Cameroon | XAF | Card, Central African mobile money |
+| Burkina Faso, Côte d'Ivoire, Senegal | XOF | Card, West African mobile money |
+| Cameroon, Central African Republic, Republic of the Congo, Equatorial Guinea, Gabon | XAF | Card, Central African mobile money |
+| Zambia | ZMW | Card, Zambia mobile money |
 | Egypt | EGP | Card, FawryPay |
 | United Kingdom | GBP | Card, bank account |
 | United States | USD | Card, bank account |
-| Selected EUR/SEPA account markets | EUR | Card, bank account |
+| Euro-area countries (including Bulgaria from 1 January 2026) | EUR | Card, bank account |
 
 Only currencies listed in `FLUTTERWAVE_ENABLED_CURRENCIES` are made purchasable, and each needs `FLUTTERWAVE_TOKEN_PRICE_<CURRENCY>_MINOR`. The deployment also requires `FLW_SECRET_KEY`, `FLW_SECRET_HASH`, `FLUTTERWAVE_PROVIDER_APPROVED=true`, the global billing gates, and `FLUTTERWAVE_REFUND_DISPUTE_HANDLING_APPROVED=true`. The last flag is intentionally false by default: the provider's refund/chargeback reconciliation and wallet reversal policy must be implemented and tested before activation.
 
@@ -39,13 +40,15 @@ The country-to-method table is a request allowlist, not a guarantee that the mer
 
 ## Paystack coverage and account boundaries
 
-Paystack serves businesses registered in Nigeria, Ghana, South Africa and Kenya. This must not be confused with the customer's location: a Nigerian enV merchant can receive an international card payment from a customer abroad only after Paystack enables international payments for the merchant.
+Paystack's supported merchant registration countries are Nigeria, Ghana, South Africa and Kenya. Paystack also describes Côte d'Ivoire and Egypt as private-beta markets; they are not enabled as ordinary enV merchant-country profiles by this implementation. Merchant registration country is not the same as customer location.
 
-- Customer in Nigeria: use the configured NGN merchant account. Existing `PAYSTACK_SECRET_KEY`, `PAYSTACK_PROVIDER_APPROVED` and `PAYSTACK_TOKEN_PRICE_NGN_KOBO` remain the Nigeria configuration.
-- Customer in Ghana, Kenya or South Africa: use a local merchant currency only when the matching currency-specific secret, approval and price are configured: `PAYSTACK_SECRET_KEY_GHS/KES/ZAR`, `PAYSTACK_PROVIDER_APPROVED_GHS/KES/ZAR`, and `PAYSTACK_TOKEN_PRICE_GHS/KES/ZAR_MINOR`.
-- Customer outside a configured local Paystack market: Paystack is offered only when `PAYSTACK_INTERNATIONAL_ENABLED=true`, the merchant has enabled international acceptance in the Paystack dashboard, and the configured international currency has a matching server key and price. That route is card-only; it does not claim to offer the customer's local bank, USSD or mobile-money rail.
+- Set `PAYSTACK_MERCHANT_COUNTRY` to the country where the actual Paystack merchant account is registered. Local Paystack checkout is offered only to a customer detected in that same country, and uses that merchant country's local currency.
+- Nigeria uses `PAYSTACK_SECRET_KEY`, `PAYSTACK_PROVIDER_APPROVED` and `PAYSTACK_TOKEN_PRICE_NGN_KOBO`.
+- Ghana, Kenya and South Africa merchant accounts use their currency-specific server key, approval and integer minor-unit price: `PAYSTACK_SECRET_KEY_GHS/KES/ZAR`, `PAYSTACK_PROVIDER_APPROVED_GHS/KES/ZAR`, and `PAYSTACK_TOKEN_PRICE_GHS/KES/ZAR_MINOR`.
+- For customers outside the merchant's registration country, Paystack is offered only when `PAYSTACK_INTERNATIONAL_ENABLED=true`, international acceptance is approved in the Paystack dashboard, and the selected currency is permitted for that merchant country. Paystack documents NGN/USD for Nigeria, GHS for Ghana, KES/USD for Kenya, and ZAR for South Africa. Use `PAYSTACK_INTERNATIONAL_CURRENCY` only within that table. An international route is card-only; it does not claim to offer the customer's local bank, USSD or mobile-money rail.
+- A Paystack customer in Ghana does not receive Ghana mobile-money rails from a Nigerian merchant account just because the visitor is in Ghana. The checkout currency and local methods belong to the merchant account. The customer's bank or card provider may convert an international card charge.
 
-Paystack's local channels are controlled by the merchant account and dashboard. enV does not claim that every method is available for every Paystack market. Currency-specific credentials and prices are kept server-side; no secret is exposed to the browser.
+Paystack's local channels are controlled by the merchant account and dashboard. enV does not claim that every method is available for every Paystack merchant. Currency-specific credentials and prices are kept server-side; no secret is exposed to the browser.
 
 ## Flutterwave and Paystack checkout integrity
 
