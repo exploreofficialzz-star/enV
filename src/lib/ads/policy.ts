@@ -77,6 +77,11 @@ function isEligibleHybridToolRecord(toolId: string, tool: AdEligibleTool): boole
     classifyOfflineToolRecord(tool).execution === "device-local";
 }
 
+/** Adsterra may appear only on active, public, device-local tools in the approved offline-capable cohort. */
+export function isAdsterraQualifiedTool(tool: AdEligibleTool): boolean {
+  return isEligibleHybridToolRecord(tool.id, tool);
+}
+
 /** A selected hybrid tool must remain metered offline even while ad serving is disabled. */
 export function isHybridAccessToolId(toolId: string, env: AdEnvironment, tool: AdEligibleTool): boolean {
   return parseAllowedToolIds(env.toolIds).has(toolId) && isEligibleHybridToolRecord(toolId, tool);
