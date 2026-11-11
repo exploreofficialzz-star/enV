@@ -55,8 +55,8 @@ A result without this evidence remains NOT RUN.
 | Thermal and battery behaviour | Run repeated and sustained recording; note thermal warnings, throttling, dropped frames and battery drain; do not advertise unmeasured performance | NOT RUN |
 | Filter preview-to-export parity | Each native color look is visible in preview and present in the saved photo/video; Natural resets correctly; no stale filter after mode changes | NOT RUN |
 | Video stabilization | Verify Android Camera2 and iOS AVFoundation enable stabilization only when reported by the active camera/format, including each concurrent feed; compare supported modes and exported motion at the same resolution/frame rate | NOT RUN |
-| Face tracking and original AR effects | Test one and multiple faces, glasses/crown alignment, face movement/entry/exit, rotation, low light, processing latency, frame drops and exact preview-to-export parity | NOT RUN |
-| Beauty / soft-light effects | Verify iOS face-only softening is subtle and bounded; verify Android soft glow stays attached to the detected face; confirm no effect is applied to unsupported photo/dual modes | NOT RUN |
+| Face tracking and original AR effects | Test 468-point Android mesh and Vision landmarks on iOS; glasses, crown, bunny ears and moustache alignment; face movement/entry/exit, rotation, low light, thermal load, processing latency, frame drops and exact preview-to-export parity | NOT RUN |
+| Beauty / soft-light effects | Verify iOS face-only softening is subtle and bounded; verify Android soft glow is not described as skin smoothing; measure face-mesh inference overhead on low-end phones and confirm effects stay off in photo/dual modes | NOT RUN |
 | Face-effect privacy and lifecycle | Confirm no face data leaves device; disabling effects stops analysis; leaving Camera Studio releases Vision/ML Kit resources and camera outputs | NOT RUN |
 | Manual camera controls | Verify actual sensor capability gating; ISO/shutter, white balance, focus distance/lock and optical lens selection change capture output; unsupported controls are hidden | NOT RUN |
 | Permission revoked in Settings | Return to Camera Studio after revocation; camera is not bound until permission returns; retry/settings route works | NOT RUN |
@@ -86,10 +86,10 @@ These are source-level implementations, not device acceptance. A green build sti
 ### Still not implemented — do not advertise as available
 
 - A licensed Snapchat Lens catalogue or Snap Camera Kit integration. The included glasses, crown and soft-light examples are original enV effects and must not be described as Snapchat lenses.
-- Expression-driven blendshape effects, detailed 3D face meshes, occlusion-aware accessories, skin-tone-aware retouching and a full beauty studio. The current iOS Beauty mode is subtle face-only softening; Android Soft glow is a face-following light overlay, not skin smoothing.
+- Expression-driven blendshape effects, depth-aware 3D accessories/occlusion, skin-tone-aware retouching and a full beauty studio. Android now uses an on-device 468-point ML Kit face mesh for original 2D masks; the SDK is beta and adds about 6.4 MB to the app bundle. The mesh is limited to close selfie-like framing (about 2 metres) and is throttled to around 15 inference frames per second. iOS continues to use Vision landmarks. The current iOS Beauty mode is subtle face-only softening; Android Soft glow remains a face-following light overlay, not skin smoothing.
 - Face masks during simultaneous front-and-rear recording. Dual-camera mode and face-effect mode are currently separate modes.
 
-Face detection is off by default. Keep capability/performance fallbacks visible and never claim advanced retouching, proprietary Snapchat effects or device-wide support before further implementation and testing.
+Face effects are off by default. Keep capability/performance fallbacks visible and never claim advanced retouching, licensed Snapchat effects or device-wide support before further implementation and testing. Validate mesh latency and heat on Tecno/Infinix-class low-end phones before enabling it by default.
 
 ## Safe execution notes
 
