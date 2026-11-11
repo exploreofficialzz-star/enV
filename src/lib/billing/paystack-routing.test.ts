@@ -34,7 +34,6 @@ test("Paystack international visitors use card-only merchant settlement currency
 test("Paystack USD international settlement is restricted to merchant countries that support USD", () => {
   const ghanaUsd = resolvePaystackCountryConfiguration("US", {
     PAYSTACK_MERCHANT_COUNTRY: "GH",
-    PAYSTACK_SECRET_KEY_USD: "sk_test_usd",
     PAYSTACK_PROVIDER_APPROVED: "true",
     PAYSTACK_PROVIDER_APPROVED_USD: "true",
     PAYSTACK_TOKEN_PRICE_USD_MINOR: "1",
@@ -54,10 +53,15 @@ test("Paystack USD international settlement requires currency approval as well a
     PAYSTACK_INTERNATIONAL_CURRENCY: "USD",
   };
   assert.equal(resolvePaystackCountryConfiguration("US", usdConfig, PACKS)?.enabled, false);
+  assert.equal(resolvePaystackCountryConfiguration("US", usdConfig, PACKS)?.secret, "sk_test_nigeria");
   assert.equal(resolvePaystackCountryConfiguration("US", {
     ...usdConfig,
     PAYSTACK_PROVIDER_APPROVED_USD: "true",
   }, PACKS)?.enabled, true);
+  assert.equal(resolvePaystackCountryConfiguration("US", {
+    ...usdConfig,
+    PAYSTACK_PROVIDER_APPROVED_USD: "true",
+  }, PACKS)?.secret, "sk_test_nigeria");
 });
 
 test("unknown customers and unsupported merchant countries fail closed", () => {
