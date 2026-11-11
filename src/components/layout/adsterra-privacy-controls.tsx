@@ -29,7 +29,7 @@ export function AdsterraPrivacyControls() {
     <section className="rounded-xl border border-border bg-surface p-4 sm:p-5" aria-labelledby="adsterra-privacy-heading">
       <h2 id="adsterra-privacy-heading" className="text-lg font-semibold text-fg">Adsterra advertising choices</h2>
       <p className="mt-2 text-sm leading-6 text-muted">
-        Advertising helps support enV. When you allow it, Adsterra and its advertising partners may process your IP address, browser and device information, page URL and referrer, and may use cookies or similar storage for ad delivery, frequency capping, fraud prevention and measurement.
+        Advertising helps support enV. When you allow it, Adsterra banner, native and Popunder ads may load on supported Web pages. A Popunder may open a separate browser tab after a page interaction. Adsterra and its advertising partners may process your IP address, browser and device information, page URL and referrer, and may use cookies or similar storage for delivery, frequency capping, fraud prevention and measurement.
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <span className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-fg">
