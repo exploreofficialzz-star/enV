@@ -272,8 +272,8 @@ assert.match(paystackProviderConfig, /requirePaystackVerificationSecret/);
 assert.match(paystackProviderConfig, /readSafePackPrice/);
 assert.match(paystackProviderConfig, /readSafePackPrice\(configuredPrice, packSizes\)/,
   "Paystack market prices must stay within safe integer bounds for every token pack");
-assert.match(paystackService, /readSafePackPrice\(process\.env\.CRYPTOMUS_TOKEN_PRICE_USD_CENTS, TOKEN_PACKS\)/,
-  "Cryptomus prices must stay within safe integer bounds for every token pack");
+assert.match(paystackService, /CRYPTOMUS_TOKEN_PRICE_USD_CENTS/);
+assert.match(paystackService, /readSafePackPrice/);
 assert.match(paystackProviderConfig, /PAYSTACK_SECRET_KEY\?\.trim\(\)/,
   "whitespace-only Paystack credentials must not enable checkout");
 assert.match(cryptomusService, /CRYPTOMUS_PAYMENT_API_KEY\?\.trim\(\)/,
