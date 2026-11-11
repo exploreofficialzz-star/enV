@@ -244,8 +244,10 @@ assert.match(countryRouting, /toFlutterwaveMajorAmount/);
 assert.match(countryRouting, /CLOUDFLARE_ORIGIN_LOCKDOWN_APPROVED/);
 assert.match(paystackProviderConfig, /PAYSTACK_MERCHANT_COUNTRY/);
 assert.match(paystackProviderConfig, /PAYSTACK_MERCHANT_ACCEPTED_CURRENCIES/);
+assert.match(paystackProviderConfig, /env.PAYSTACK_PROVIDER_APPROVED === "true" && currencyApproved/);
+assert.match(paystackProviderConfig, /FLUTTERWAVE_PAYMENT_OPTIONS_DASHBOARD_DISABLED/);
 assert.match(paystackProviderConfig, /PAYSTACK_INTERNATIONAL_ENABLED/);
-for (const country of ["NG", "GH", "KE", "ZA", "MW", "UG", "RW", "TZ", "BF", "CI", "SN", "CM", "CF", "CG", "GQ", "GA", "ZM", "EG", "GB", "US"]) {
+for (const country of ["NG", "GH", "KE", "ZA", "MW", "UG", "RW", "TZ", "BJ", "BF", "CI", "GW", "ML", "NE", "SN", "TG", "CM", "TD", "CF", "CG", "GQ", "GA", "ZM", "EG", "GB", "US"]) {
   assert.ok(countryRouting.includes(country + ":"), "country routing must include " + country);
 }
 assert.ok(countryRouting.includes('"BG"'), "Bulgaria must resolve through the Euro-area membership set");
@@ -267,6 +269,7 @@ assert.match(envExample, /PAYSTACK_INTERNATIONAL_ENABLED=false/);
 assert.match(envExample, /PAYSTACK_MERCHANT_COUNTRY=NG/);
 assert.match(envExample, /CLOUDFLARE_ORIGIN_LOCKDOWN_APPROVED=false/);
 assert.match(envExample, /FLUTTERWAVE_TOKEN_PRICE_ZMW_MINOR=/);
+assert.match(envExample, /FLUTTERWAVE_PAYMENT_OPTIONS_DASHBOARD_DISABLED=false/);
 
 assert.match(paystackProviderConfig, /requirePaystackVerificationSecret/);
 assert.match(paystackProviderConfig, /readSafePackPrice/);
