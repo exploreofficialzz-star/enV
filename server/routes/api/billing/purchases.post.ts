@@ -3,6 +3,9 @@ import { randomUUID } from "node:crypto";
 import { isSameOriginRequest, jsonResponse, readJsonObject, requireBillingUser } from "../../../../src/lib/billing/http.server";
 import { initializePaystackCheckout } from "../../../../src/lib/billing/paystack.server";
 import { initializeCryptomusCheckout } from "../../../../src/lib/billing/cryptomus.server";
+import { initializeFlutterwaveCheckout } from "../../../../src/lib/billing/flutterwave.server";
+import { getCustomerCountry } from "../../../../src/lib/billing/country-routing";
+import { getFundingOptions } from "../../../../src/lib/billing/paystack.server";
 
 const SAFE_CHECKOUT_FAILURES: Record<string, { status: number; message: string }> = {
   PAYMENTS_NOT_CONFIGURED: { status: 503, message: "Token purchases are not enabled for this deployment yet." },
@@ -15,6 +18,9 @@ const SAFE_CHECKOUT_FAILURES: Record<string, { status: number; message: string }
   CRYPTOMUS_NOT_CONFIGURED: { status: 503, message: "Crypto checkout is not available yet. No payment was taken." },
   CRYPTOMUS_INITIALIZATION_FAILED: { status: 502, message: "Crypto checkout could not be initialized. No wallet tokens were added." },
   CRYPTOMUS_PROVIDER_ERROR: { status: 502, message: "The crypto provider could not initialize checkout. Please retry shortly." },
+  FLUTTERWAVE_NOT_CONFIGURED: { status: 503, message: "Flutterwave is not enabled for your detected country or currency. No payment was taken." },
+  FLUTTERWAVE_INITIALIZATION_FAILED: { status: 502, message: "Flutterwave checkout could not be initialized. No wallet tokens were added." },
+  PAYMENT_METHOD_NOT_AVAILABLE_FOR_COUNTRY: { status: 422, message: "That payment method is not available for your detected country." },
 };
 
 /** Checkout is opened server-side and remains closed until launch, enforcement, auth, and pricing are configured. */
@@ -27,14 +33,27 @@ export default defineHandler(async (event) => {
   const body = await readJsonObject(request, 2_048);
   const provider = body?.provider === undefined ? "paystack" : body.provider;
   if (!body || typeof body.tokenPack !== "number" || !Number.isInteger(body.tokenPack) ||
-      typeof body.idempotencyKey !== "string" || (provider !== "paystack" && provider !== "cryptomus")) {
+      typeof body.idempotencyKey !== "string" ||
+      (provider !== "paystack" && provider !== "flutterwave" && provider !== "cryptomus")) {
     return jsonResponse({ ok: false, error: "INVALID_PURCHASE", message: "Choose a supported payment method and token pack, then retry checkout." }, 400);
+  }
+  const countryCode = getCustomerCountry(request);
+  const funding = getFundingOptions(countryCode);
+  const providerOption = funding.providers.find((item) => item.id === provider);
+  if (!providerOption?.enabled) {
+    return jsonResponse({
+      ok: false,
+      error: "PAYMENT_METHOD_NOT_AVAILABLE_FOR_COUNTRY",
+      message: providerOption?.message ?? funding.message,
+    }, 422);
   }
   try {
     const input = { userId: auth.userId, tokenPack: body.tokenPack, idempotencyKey: body.idempotencyKey };
     const checkout = provider === "cryptomus"
       ? await initializeCryptomusCheckout(input)
-      : await initializePaystackCheckout(input);
+      : provider === "flutterwave"
+        ? await initializeFlutterwaveCheckout({ ...input, countryCode })
+        : await initializePaystackCheckout(input, countryCode);
     return jsonResponse({ ok: true, data: { ...checkout, provider } }, 201);
   } catch (error) {
     const candidate = error as { code?: unknown };
