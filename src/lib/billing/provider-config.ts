@@ -33,3 +33,70 @@ export function readSafePackPrice(
   }
   return parsed;
 }
+
+
+const PAYSTACK_MERCHANT_LOCAL_CURRENCIES: Record<string, string> = {
+  NG: "NGN",
+  GH: "GHS",
+  KE: "KES",
+  ZA: "ZAR",
+};
+
+const PAYSTACK_MERCHANT_ACCEPTED_CURRENCIES: Record<string, readonly string[]> = {
+  NG: ["NGN", "USD"],
+  GH: ["GHS"],
+  KE: ["KES", "USD"],
+  ZA: ["ZAR"],
+};
+
+/**
+ * Resolve the one configured Paystack merchant account against the customer's
+ * edge-detected country. Local rails are restricted to the merchant's country;
+ * international checkout is card-only and currency-limited by merchant country.
+ */
+export function resolvePaystackCountryConfiguration(
+  customerCountryCode: string | null | undefined,
+  env: Record<string, string | undefined>,
+  packSizes: readonly number[],
+) {
+  const country = customerCountryCode?.trim().toUpperCase() ?? "";
+  const merchantCountry = env.PAYSTACK_MERCHANT_COUNTRY?.trim().toUpperCase() ?? "";
+  if (!/^[A-Z]{2}$/.test(country) || country === "XX" || country === "ZZ" ||
+      !/^[A-Z]{2}$/.test(merchantCountry) || merchantCountry === "XX" || merchantCountry === "ZZ") {
+    return null;
+  }
+
+  const merchantLocalCurrency = PAYSTACK_MERCHANT_LOCAL_CURRENCIES[merchantCountry];
+  const acceptedCurrencies = PAYSTACK_MERCHANT_ACCEPTED_CURRENCIES[merchantCountry];
+  if (!merchantLocalCurrency || !acceptedCurrencies) return null;
+
+  const international = country !== merchantCountry;
+  if (international && env.PAYSTACK_INTERNATIONAL_ENABLED !== "true") return null;
+
+  const currency = international
+    ? env.PAYSTACK_INTERNATIONAL_CURRENCY?.trim().toUpperCase() || merchantLocalCurrency
+    : merchantLocalCurrency;
+  if (!acceptedCurrencies.includes(currency)) return null;
+
+  const secret = env["PAYSTACK_SECRET_KEY_" + currency]?.trim() ??
+    (currency === "NGN" ? env.PAYSTACK_SECRET_KEY?.trim() : undefined) ?? "";
+  const configuredPrice = env["PAYSTACK_TOKEN_PRICE_" + currency + "_MINOR"] ??
+    (currency === "NGN" ? env.PAYSTACK_TOKEN_PRICE_NGN_KOBO : undefined);
+  const pricePerTokenMinor = readSafePackPrice(configuredPrice, packSizes);
+  const currencyApproved = currency === "NGN"
+    ? env.PAYSTACK_PROVIDER_APPROVED === "true"
+    : env["PAYSTACK_PROVIDER_APPROVED_" + currency] === "true";
+  const approved = currencyApproved &&
+    (!international || env.PAYSTACK_PROVIDER_APPROVED === "true");
+
+  return {
+    country,
+    merchantCountry,
+    currency,
+    international,
+    secret,
+    pricePerTokenMinor,
+    approved,
+    enabled: approved && Boolean(secret) && pricePerTokenMinor !== null,
+  };
+}
