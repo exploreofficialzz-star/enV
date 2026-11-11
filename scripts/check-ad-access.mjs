@@ -52,7 +52,8 @@ assert.match(adsterraWeb, /retryHandle = window\.setInterval/, "A failed Popunde
 assert.match(adsterraWeb, /attempts >= 4/, "Popunder retries must be bounded to avoid repeated provider requests.");
 
 assert.match(slot, /isApplicationOnline\(\)/, "Ads must not be requested unless the application origin is reachable.");
-assert.match(shell, /!isFullscreen \? \([\s\S]*?VITE_ADSTERRA_ENABLED === "true"[\s\S]*?<AdsterraNativeBanner \/>[\s\S]*?<AdSlot tool=\{tool\} \/>[\s\S]*?\) : null/, "Web ad placement must stay outside fullscreen and select one configured provider.");
+assert.match(shell, /!isFullscreen && adsterraQualified[\s\S]*?<AdsterraBanner format="300x250" \/>[\s\S]*?<AdsterraNativeBanner \/>[\s\S]*?<AdsterraToolPopunder \/>/, "Every Adsterra placement must remain outside fullscreen and inside qualified tool pages.");
+assert.match(shell, /!isFullscreen && import\.meta\.env\.VITE_ADSTERRA_ENABLED !== "true" \? <AdSlot tool=\{tool\} \/>/, "The Google fallback must remain tool-only when Adsterra is disabled.");
 
 assert.match(slot, /whenGooglePrivacyConsentDataReady/, "Web ad requests must wait for the CMP consent-data-ready callback.");
 assert.match(slot, /pauseAdRequests = 1/, "Web must pause ad requests before consent data is ready.");
