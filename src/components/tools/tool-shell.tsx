@@ -287,7 +287,7 @@ export function ToolShell({
           const isFileDownload = action instanceof HTMLAnchorElement && action.hasAttribute("download");
           const isOutputAction =
             isFileDownload ||
-            /\b(copy|download|export)\b|\bsave\s+(?:as|file|image|audio|video|document|pdf|output|result|zip|json|csv|png|jpeg|webp|mp3|mp4)\b/i.test(label);
+            /\b(copy|download|export|save|output|result|calculate|convert|generate|analy[sz]e|process|format|validate|inspect|scan|encode|decode|resize|compress|extract|transcribe|create|execute|compare|merge|split|apply|build|render)\b/i.test(label);
           if (adsterraQualified && isOutputAction) {
             // Open the supplied Smartlink synchronously within the visitor's
             // explicit output-button gesture, before async generation can
