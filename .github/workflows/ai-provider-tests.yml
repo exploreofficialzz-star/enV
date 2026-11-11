@@ -1,0 +1,45 @@
+name: AI provider platform tests
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/ai-provider-tests.yml"
+      - "src/lib/ai/**"
+      - "scripts/check-ai.mjs"
+      - "package.json"
+      - "package-lock.json"
+  push:
+    branches:
+      - main
+    paths:
+      - "src/lib/ai/**"
+      - "scripts/check-ai.mjs"
+      - "package.json"
+      - "package-lock.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-provider-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ai-provider-tests:
+    name: AI provider registry, routing and adapter tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Audit AI boundaries and provider configuration
+        run: npm run check:ai
+      - name: Run isolated AI provider unit and integration tests
+        run: node --experimental-strip-types --test 'src/lib/ai/**/*.test.ts'
