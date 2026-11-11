@@ -36,6 +36,8 @@ The current country profile catalogue is deliberately explicit. Flutterwave's St
 
 Only currencies listed in `FLUTTERWAVE_ENABLED_CURRENCIES` are made purchasable, and each needs `FLUTTERWAVE_TOKEN_PRICE_<CURRENCY>_MINOR`. Flutterwave's current documentation also requires the account-level **Enable Dashboard Payment Options** switch to be unchecked before per-payment `payment_options` are applied. Set `FLUTTERWAVE_PAYMENT_OPTIONS_DASHBOARD_DISABLED=true` only after verifying that dashboard setting. The deployment also requires `FLW_SECRET_KEY`, `FLW_SECRET_HASH`, `FLUTTERWAVE_PROVIDER_APPROVED=true`, the global billing gates, and `FLUTTERWAVE_REFUND_DISPUTE_HANDLING_APPROVED=true`. The last flag is intentionally false by default: the provider's refund/chargeback reconciliation and wallet reversal policy must be implemented and tested before activation.
 
+Flutterwave method identifiers are currency-region specific: Ghana uses `ghanamobilemoney`; West African XOF uses `mobilemoneyxof`; Central African XAF uses `mobilemoneyxaf`. Flutterwave's documentation lists these identifiers separately from its country/currency matrix, so enV does not interchange XOF and XAF method names.
+
 The country-to-method table is a request allowlist, not a guarantee that the merchant's Flutterwave account has every method activated. The account's live eligibility, settlement currencies, dashboard settings and provider onboarding remain authoritative.
 
 ## Paystack coverage and account boundaries
@@ -80,6 +82,8 @@ Native Android and iOS digital token purchases remain separate. This web checkou
 - Paystack merchant countries and international-payment eligibility: https://support.paystack.com/en/articles/2130562 and https://support.paystack.com/en/articles/2130690
 - Paystack payment channels: https://paystack.com/docs/payments/payment-channels/
 - Flutterwave payment methods and country/currency mapping: https://developer.flutterwave.com/docs/payment-methods
+- Flutterwave Standard hosted checkout and integer amount field: https://developer.flutterwave.com/reference/checkout
+- Flutterwave V3 webhook secret-hash (`verif-hash`) verification: https://developer.flutterwave.com/docs/webhooks
 - Flutterwave hosted Standard checkout: https://developer.flutterwave.com/reference/checkout
 - Flutterwave transaction verification: https://developer.flutterwave.com/docs/transaction-verification
 - Flutterwave webhook signature verification: https://developer.flutterwave.com/docs/webhooks
