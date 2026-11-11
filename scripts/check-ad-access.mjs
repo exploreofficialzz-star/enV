@@ -16,6 +16,7 @@ const env = read(".env.example");
 const privacy = read("src/routes/privacy.tsx");
 const cookieConsent = read("src/components/layout/cookie-consent.tsx");
 const homePage = read("src/routes/index.tsx");
+const downloadUtils = read("src/lib/utils.ts");
 const toolDirectory = read("src/routes/tools/index.tsx");
 const blogArticle = read("src/routes/blog.$slug.tsx");
 const blogIndex = read("src/routes/blog.index.tsx");
@@ -45,6 +46,8 @@ assert.match(toolShell, /AdsterraBanner format="300x250"/, "Qualified tool pages
 assert.match(toolShell, /AdsterraToolPopunder/, "Qualified tool pages must be the only Popunder mount.");
 assert.match(toolShell, /isAdsterraQualifiedTool\(tool\)/, "Each placement must be limited to the approved tool cohort.");
 assert.match(toolShell, /openAdsterraSmartlinkFromOutput/, "Output actions must trigger the publisher Smartlink from a direct click.");
+assert.match(toolShell, /\\b\\(copy\\|download\\|export\\)\\b/, "Output triggers must include copy, download and export actions.");
+assert.doesNotMatch(downloadUtils, /openAdsterraSmartlinkFromOutput/, "The download helper must not open a popup after an asynchronous download begins.");
 assert.match(toolShell, /data-env-ad-eligible=\{adsterraQualified \? "true" : undefined\}/, "The output trigger must be restricted to the same qualified tool interface.");
 assert.doesNotMatch(rootRoute, /AdsterraPopunder/, "The Popunder must not be loaded site-wide.");
 assert.match(adsterraWeb, /retryAttempt < 3/, "Failed Adsterra banner requests must retry a bounded number of times.");
