@@ -330,3 +330,6 @@ for (const gate of [
 }
 
 console.log("Camera Studio checks passed: web dual-camera composition, Android CameraX concurrent recording, native live filters and manual controls, iOS AVFoundation filtered recording and optical lenses, plus explicit physical-device release gates.");
+
+// Keep the local AR face-effects checks in every Camera Studio verification path.
+await import("./check-camera-studio-face-effects.mjs");
