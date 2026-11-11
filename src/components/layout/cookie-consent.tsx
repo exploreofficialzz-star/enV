@@ -65,9 +65,14 @@ export function CookieConsent() {
   }
 
   function chooseAdvertising(allowed: boolean) {
+    const previouslyAllowed = getAdsterraConsent() === "granted";
     const choice = allowed ? "granted" : "denied";
     setAdsterraConsent(choice);
     markNoticeSeen();
+    if (!allowed && previouslyAllowed) {
+      window.location.reload();
+      return;
+    }
     setVisible(false);
   }
 
@@ -96,7 +101,7 @@ export function CookieConsent() {
           </h2>
           <p id="env-cookie-description" className="mt-1.5 text-sm leading-5 text-neutral-600 dark:text-neutral-300">
             {adsterraEnabled
-              ? "Advertising helps support enV and keep its tools available. Choose whether Adsterra may load ads in this browser. If you allow ads, Adsterra and its partners may process your IP address, browser and device details, page URL and referrer, and use cookies or similar storage for delivery, frequency capping, fraud prevention and measurement. Your choice does not affect access to enV tools and can be changed in Privacy settings."
+              ? "Advertising helps support enV and keep its tools available. Choose whether Adsterra may load ads in this browser. Popunder ads may open a separate browser tab after a page interaction. If you allow ads, Adsterra and its partners may process your IP address, browser and device details, page URL and referrer, and use cookies or similar storage for delivery, frequency capping, fraud prevention and measurement. Your choice does not affect access to enV tools and can be changed in Privacy settings."
               : "enV uses essential browser storage for your account session and saved settings."}
           </p>
         </header>
