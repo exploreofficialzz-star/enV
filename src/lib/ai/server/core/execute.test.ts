@@ -161,16 +161,16 @@ test("cancellation: aborting the caller stops the work, does not fall back and d
 test("circuit breaker: repeated failures open the circuit, and calls resume after the cooldown", async () => {
   let clock = 1_000_000;
   const env = { GROQ_API_KEY: "", GEMINI_API_KEY: "", AI_DISABLED_MODELS: "openrouter:openai/gpt-oss-20b" }; // one candidate left
-  const { core, adapters } = testCore({ env, scripts: { openrouter: Array.from({ length: 4 }, () => fail("AI_PROVIDER_UNAVAILABLE")) }, now: () => clock });
+  const { core, adapters } = testCore({ env, scripts: { openrouter: [fail("AI_PROVIDER_UNAVAILABLE"), fail("AI_PROVIDER_UNAVAILABLE"), fail("AI_PROVIDER_UNAVAILABLE"), okStep(captionJson())] }, now: () => clock });
   for (let i = 0; i < 2; i += 1) await assert.rejects(run(core, { input: { topic: `launch number ${i}` } }), { code: "AI_ALL_PROVIDERS_FAILED" });
-  assert.equal(adapters.openrouter.calls.length, 4); // each run: first attempt plus one transient retry
+  assert.equal(adapters.openrouter.calls.length, 3); // the third consecutive failure opens the circuit
   await assert.rejects(run(core), { code: "AI_ALL_PROVIDERS_FAILED" });
-  assert.equal(adapters.openrouter.calls.length, 4, "an open circuit must not be called");
+  assert.equal(adapters.openrouter.calls.length, 3, "an open circuit must not be called");
   assert.equal(core.availability()["creator.caption.generate"]!.available, false);
   clock += 31_000;
   const result = await run(core);
   assert.equal(result.attempts, 1);
-  assert.equal(adapters.openrouter.calls.length, 5);
+  assert.equal(adapters.openrouter.calls.length, 4);
   assert.equal(core.availability()["creator.caption.generate"]!.available, true);
 });
 

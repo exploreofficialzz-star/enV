@@ -86,7 +86,7 @@ test("pros-cons worksheet only treats supplied details as evidence", () => {
   assert.match(output, /RISKS \/ COSTS TO CHECK\n• Support load may increase/);
   assert.match(output, /DECISION CRITERIA\n• Weekly active use/);
   assert.match(output, /Separate measured results from assumptions/);
-  assert.match(generateAiMicroTool("pros-cons", { option: "A or B" }), /\[Add known risks, costs or trade-offs\]/);
+  assert.match(generateAiMicroTool("pros-cons", { option: "A or B" }), /\[Add known risks, costs or trade-offs\.\]/);
 });
 
 test("shorten helper honors a target and keeps sentence boundaries when available", () => {

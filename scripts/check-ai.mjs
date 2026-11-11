@@ -152,9 +152,14 @@ const configLike = [
   ...serverRouteFiles,
 ].filter((f) => existsSync(f));
 const PUBLIC_SECRET = /\bVITE_[A-Z0-9_]*(KEY|SECRET|TOKEN|PASSWORD|PRIVATE)[A-Z0-9_]*/g;
+// AdSense calls this public placement-format option a "layout key"; it is not a credential.
+// Keep the exception exact so real VITE_* keys/secrets/tokens are still rejected.
+const SAFE_PUBLIC_CONFIG_NAMES = new Set(["VITE_ADSENSE_IN_FEED_LAYOUT_KEY"]);
 for (const file of configLike) {
   const text = read(file);
-  for (const m of text.matchAll(PUBLIC_SECRET)) fail(`${rel(file)} defines or reads ${m[0]}: a VITE_ variable is shipped to every browser`);
+  for (const m of text.matchAll(PUBLIC_SECRET)) {
+    if (!SAFE_PUBLIC_CONFIG_NAMES.has(m[0])) fail(`${rel(file)} defines or reads ${m[0]}: a VITE_ variable is shipped to every browser`);
+  }
 }
 
 // .enV/app-env.json feeds the CLIENT environment: it may hold VITE_ values only, never a secret.

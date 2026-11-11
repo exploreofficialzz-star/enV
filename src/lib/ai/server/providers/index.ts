@@ -1,27 +1,55 @@
-/** SERVER ONLY. Builds the adapter set for a configuration. Only this folder knows provider APIs. */
-import type { ProviderAdapter, ProviderId } from "../../types.ts";
-import type { AiConfig } from "../config.ts";
+/** SERVER ONLY. Builds a connection-scoped adapter set for configured provider accounts. */
+import type { ProviderAdapter, ProviderAdapterMap, ProviderId } from "../../types.ts";
+import type { AiConfig, ProviderConnectionConfig } from "../config.ts";
 import { createGeminiAdapter } from "./gemini.ts";
 import { createGroqAdapter } from "./groq.ts";
-import type { FetchLike } from "./http.ts";
+import { createCloudflareAdapter } from "./cloudflare.ts";
 import { createMockAdapter } from "./mock.ts";
 import { createMossMusicAdapter } from "./moss_music.ts";
 import { createOpenRouterAdapter } from "./openrouter.ts";
+import type { FetchLike } from "./http.ts";
 
-export type AdapterSet = Partial<Record<ProviderId, ProviderAdapter>>;
+export type AdapterSet = ProviderAdapterMap;
+
+function adapterFor(connection: ProviderConnectionConfig, config: AiConfig, fetchImpl?: FetchLike): ProviderAdapter {
+  const apiKey = () => connection.apiKey.reveal();
+  let adapter: ProviderAdapter;
+  switch (connection.provider) {
+    case "openrouter":
+      adapter = createOpenRouterAdapter({ apiKey, fetchImpl });
+      break;
+    case "groq":
+      adapter = createGroqAdapter({ apiKey, fetchImpl });
+      break;
+    case "gemini":
+      adapter = createGeminiAdapter({ apiKey, fetchImpl });
+      break;
+    case "moss_music":
+      adapter = createMossMusicAdapter({ endpoint: () => config.mossMusicEndpoint, token: apiKey, fetchImpl });
+      break;
+    case "cloudflare":
+      adapter = createCloudflareAdapter({ apiKey, accountId: () => connection.accountId ?? null, fetchImpl });
+      break;
+    default:
+      throw new Error("Unsupported AI provider connection");
+  }
+  return {
+    ...adapter,
+    connectionId: connection.id,
+    quotaScope: connection.provider + ":" + connection.quotaScope,
+    ...(connection.requestQuota ? { requestQuota: connection.requestQuota } : {}),
+  };
+}
 
 export function createAdapters(config: AiConfig, fetchImpl?: FetchLike): AdapterSet {
+  const grouped: Partial<Record<ProviderId, ProviderAdapter[]>> = {};
+  for (const connection of config.connections) {
+    const adapter = adapterFor(connection, config, fetchImpl);
+    (grouped[connection.provider] ??= []).push(adapter);
+  }
   const adapters: AdapterSet = {};
-  const key = (provider: "openrouter" | "groq" | "gemini") => () => config.keys[provider]?.reveal() ?? null;
-  if (config.keys.openrouter) adapters.openrouter = createOpenRouterAdapter({ apiKey: key("openrouter"), fetchImpl });
-  if (config.keys.groq) adapters.groq = createGroqAdapter({ apiKey: key("groq"), fetchImpl });
-  if (config.keys.gemini) adapters.gemini = createGeminiAdapter({ apiKey: key("gemini"), fetchImpl });
-  if (config.mossMusicEndpoint && config.keys.moss_music) {
-    adapters.moss_music = createMossMusicAdapter({
-      endpoint: () => config.mossMusicEndpoint,
-      token: () => config.keys.moss_music?.reveal() ?? null,
-      fetchImpl,
-    });
+  for (const [provider, list] of Object.entries(grouped) as [ProviderId, ProviderAdapter[]][]) {
+    adapters[provider] = list.length === 1 ? list[0] : list;
   }
   if (!config.production && config.providerOrder.includes("mock")) adapters.mock = createMockAdapter();
   return adapters;

@@ -7,6 +7,7 @@ import { audioFilename, createGroqAdapter } from "./groq.ts";
 import { parseRetryAfter } from "./http.ts";
 import type { FetchLike } from "./http.ts";
 import { createOpenRouterAdapter } from "./openrouter.ts";
+import { createCloudflareAdapter } from "./cloudflare.ts";
 
 const KEY = "sk-test-SECRETKEY-0123456789";
 const schema = { type: "object", additionalProperties: false, required: ["a"], properties: { a: { type: "string", minLength: 1, maxLength: 10 } } };
@@ -255,4 +256,20 @@ test("gemini interactions: output_text fallback, incomplete and bad responses ar
   assert.throws(() => parseGeminiInteractionResponse({ status: "failed", steps: [] }, { model: "m" }), { code: "AI_PROVIDER_BAD_RESPONSE" });
   assert.throws(() => parseGeminiInteractionResponse({ status: "completed", steps: [] }, { model: "m" }), { code: "AI_PROVIDER_BAD_RESPONSE" });
   assert.throws(() => buildGeminiInteractionBody(request({ capability: "AUDIO_UNDERSTANDING", user: [{ type: "text", text: "no audio" }] })), { code: "AI_INVALID_INPUT" });
+});
+
+
+test("Cloudflare Workers AI uses the account-scoped OpenAI-compatible endpoint and JSON Mode", async () => {
+  const accountId = "abcdef0123456789abcdef0123456789";
+  const { calls, fetchImpl } = recorder([chatOk()]);
+  const adapter = createCloudflareAdapter({ apiKey: () => KEY, accountId: () => accountId, fetchImpl });
+  const result = await adapter.execute(request({ model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast" }));
+  assert.equal(calls[0]!.url, "https://api.cloudflare.com/client/v4/accounts/" + accountId + "/ai/v1/chat/completions");
+  assert.equal(headerOf(calls[0]!, "authorization"), "Bearer " + KEY);
+  const sent = body(calls[0]!);
+  assert.equal(sent.model, "@cf/meta/llama-3.3-70b-instruct-fp8-fast");
+  assert.equal(sent.max_tokens, 100);
+  assert.deepEqual(sent.response_format, { type: "json_object" });
+  assert.equal(result.text, '{"a":"x"}');
+  assert.equal(adapter.supports("STRUCTURED_TEXT", "@cf/meta/llama-3.3-70b-instruct-fp8-fast"), true);
 });

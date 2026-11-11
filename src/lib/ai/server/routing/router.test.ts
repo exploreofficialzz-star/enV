@@ -16,7 +16,7 @@ const task = (id: string): TaskMeta => ALL_TASKS.find((t) => t.id === id)!;
 
 function context(env: Record<string, string> = {}, models: readonly ModelRecord[] = MODEL_REGISTRY): RouteContext {
   const adapters: RouteContext["adapters"] = {};
-  for (const id of ["moss_music", "groq", "openrouter", "gemini"] as ProviderId[]) adapters[id] = createMockAdapter({ id });
+  for (const id of ["moss_music", "groq", "openrouter", "gemini", "cloudflare"] as ProviderId[]) adapters[id] = createMockAdapter({ id });
   return { config: testConfig(env), models, adapters, health: createHealthTracker(), usage: createUsageLedger() };
 }
 const keys = (ctx: RouteContext, id: string, opts?: { inputBytes?: number }) => routeTask(task(id), ctx, opts).candidates.map((m) => `${m.provider}:${m.modelId}`);
@@ -117,4 +117,70 @@ test("the mock provider is only reachable when explicitly ordered in non-product
   const prod = context({ NODE_ENV: "production", AI_PROVIDER_ORDER: "mock", GROQ_API_KEY: "", OPENROUTER_API_KEY: "", GEMINI_API_KEY: "" });
   prod.adapters.mock = createMockAdapter();
   assert.deepEqual(keys(prod, "creator.caption.generate"), []);
+});
+
+
+test("multiple provider keys share quota counters and circuit state across one account scope", () => {
+  const ctx = context({
+    AI_PROVIDER_ORDER: "groq",
+    AI_PROVIDER_CONNECTIONS_JSON: JSON.stringify([
+      { id: "groq-primary", provider: "groq", apiKeyEnv: "GROQ_API_KEY", quotaScope: "org-a" },
+      { id: "groq-secondary", provider: "groq", apiKeyEnv: "GROQ_API_KEY_SECONDARY", quotaScope: "org-a" },
+    ]),
+    GROQ_API_KEY: "primary-groq-key",
+    GROQ_API_KEY_SECONDARY: "secondary-groq-key",
+  });
+  const mock = createMockAdapter({ id: "groq" });
+  ctx.adapters.groq = [
+    { ...mock, connectionId: "groq-primary", quotaScope: "groq:org-a" },
+    { ...mock, connectionId: "groq-secondary", quotaScope: "groq:org-a" },
+  ];
+  const first = routeTask(task("creator.caption.generate"), ctx);
+  const routes = first.routes.filter((route) => route.model.modelId === "openai/gpt-oss-20b");
+  assert.deepEqual(routes.map((route) => route.connectionId), ["groq-primary", "groq-secondary"]);
+  assert.equal(routes[0]!.healthKey, routes[1]!.healthKey);
+
+  ctx.health.recordFailure(routes[0]!.healthKey, new AiError("AI_AUTH_ERROR"));
+  const retry = routeTask(task("creator.caption.generate"), ctx);
+  assert.ok(!retry.routes.some((route) => route.model.modelId === "openai/gpt-oss-20b"));
+  assert.ok(retry.rejected.some((item) => item.reason === "circuit-open" && item.connectionId === "groq-secondary"));
+});
+
+test("operator-defined account request quotas block every key in the same scope", () => {
+  const ctx = context({
+    AI_PROVIDER_ORDER: "groq",
+    AI_PROVIDER_CONNECTIONS_JSON: JSON.stringify([
+      { id: "groq-primary", provider: "groq", apiKeyEnv: "GROQ_API_KEY", quotaScope: "org-a", requestQuota: { dailyRequests: 1 } },
+      { id: "groq-secondary", provider: "groq", apiKeyEnv: "GROQ_API_KEY_SECONDARY", quotaScope: "org-a", requestQuota: { dailyRequests: 1 } },
+    ]),
+    GROQ_API_KEY: "primary-groq-key",
+    GROQ_API_KEY_SECONDARY: "secondary-groq-key",
+  });
+  const mock = createMockAdapter({ id: "groq" });
+  ctx.adapters.groq = [
+    { ...mock, connectionId: "groq-primary", quotaScope: "groq:org-a", requestQuota: { dailyRequests: 1 } },
+    { ...mock, connectionId: "groq-secondary", quotaScope: "groq:org-a", requestQuota: { dailyRequests: 1 } },
+  ];
+  ctx.usage.recordAttempt("groq:some-model", "groq:org-a");
+  const decision = routeTask(task("creator.caption.generate"), ctx);
+  assert.ok(!decision.routes.some((route) => route.model.provider === "groq"));
+  assert.ok(decision.rejected.some((item) => item.reason === "connection-quota-exhausted"));
+});
+
+
+test("Gemini Free tier is zero-cost only for standard-privacy text tasks", () => {
+  const freeText = context({ AI_PROVIDER_ORDER: "gemini", AI_GEMINI_TIER: "free", AI_DAILY_BUDGET_USD: "0" });
+  const textDecision = routeTask(task("creator.caption.generate"), freeText);
+  assert.deepEqual(keys(freeText, "creator.caption.generate"), ["gemini:gemini-3.8-flash"]);
+  assert.equal(textDecision.routes[0]!.model.costClass, "FREE");
+  assert.equal(textDecision.routes[0]!.model.free, true);
+  assert.deepEqual(textDecision.routes[0]!.model.pricing, { inputPerMTok: 0, outputPerMTok: 0 });
+
+  const sensitive = context({ AI_PROVIDER_ORDER: "gemini", AI_GEMINI_TIER: "free", AI_MAX_COST_CLASS: "STANDARD" });
+  const sensitiveDecision = routeTask(task("developer.json.explain"), sensitive);
+  assert.deepEqual(sensitiveDecision.candidates, []);
+  assert.equal(sensitiveDecision.rejected.find((item) => item.model === "gemini:gemini-3.8-flash")!.reason, "privacy-not-allowed");
+
+  const paid = context({ AI_PROVIDER_ORDER: "gemini", AI_GEMINI_TIER: "paid" });
+  assert.deepEqual(keys(paid, "creator.caption.generate"), []);
 });

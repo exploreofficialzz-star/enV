@@ -17,7 +17,7 @@ export const CAPABILITIES = [
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
-export const PROVIDER_IDS = ["moss_music", "openrouter", "groq", "gemini", "mock"] as const;
+export const PROVIDER_IDS = ["moss_music", "openrouter", "groq", "gemini", "cloudflare", "mock"] as const;
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 
 export const COST_CLASSES = ["FREE", "LOW", "STANDARD", "PREMIUM"] as const;
@@ -31,8 +31,8 @@ export const QUALITY_RANK: Record<QualityTier, number> = { fast: 0, balanced: 1,
 export type LatencyClass = "fast" | "normal" | "slow";
 export type Modality = "text" | "image" | "audio";
 export type PrivacyLevel = "standard" | "sensitive";
-/** strict = provider enforces the schema, json-schema = best-effort schema, none = prompt only. */
-export type StructuredSupport = "strict" | "json-schema" | "none";
+/** strict/json-schema = schema enforcement, json-mode = JSON object mode only (validate locally), none = prompt only. */
+export type StructuredSupport = "strict" | "json-schema" | "json-mode" | "none";
 export type FinishReason = "stop" | "length" | "content-filter" | "error" | "unknown";
 export type JsonSchema = { [key: string]: unknown };
 
@@ -99,11 +99,25 @@ export interface AdapterResult {
  */
 export interface ProviderAdapter {
   readonly id: ProviderId;
+  /** Stable deployment-side connection label; never contains credential material. */
+  readonly connectionId?: string;
+  /** Provider-qualified shared upstream quota group. */
+  readonly quotaScope?: string;
+  /** Optional operator-configured account-wide request limits. */
+  readonly requestQuota?: Pick<ModelQuota, "dailyRequests" | "monthlyRequests">;
   /** True when credentials/config are present. Never throws. */
   isConfigured(): boolean;
   /** The adapter must report what it can really do; never pretend. */
   supports(capability: Capability, modelId: string): boolean;
   execute(request: AdapterRequest): Promise<AdapterResult>;
+}
+
+export type ProviderAdapterEntry = ProviderAdapter | readonly ProviderAdapter[];
+export type ProviderAdapterMap = Partial<Record<ProviderId, ProviderAdapterEntry>>;
+
+export function providerAdapters(entry: ProviderAdapterEntry | undefined): ProviderAdapter[] {
+  if (!entry) return [];
+  return Array.isArray(entry) ? [...entry] : [entry as ProviderAdapter];
 }
 
 export interface ModelPricing {
@@ -118,9 +132,12 @@ export interface ModelPricing {
 }
 
 export interface ModelQuota {
-  /** Requests per UTC day this deployment allows itself on this model. */
+  /** Requests per UTC day allowed for this model or shared upstream account. */
   dailyRequests?: number;
+  /** Requests per UTC month allowed for this model or shared upstream account. */
   monthlyRequests?: number;
+  /** Model-local by default; quota-scope shares limits across connections for one provider account. */
+  scope?: "model" | "quota-scope";
 }
 
 /** One row of the model registry. Contains no secrets. */

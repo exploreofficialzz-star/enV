@@ -10,7 +10,7 @@ test("defaults are safe: enabled, no providers, LOW cost ceiling, no auth requir
   assert.equal(config.maxCostClass, "LOW");
   assert.equal(config.requireAuth, false);
   assert.equal(config.limits.maxBodyBytes, 4_000_000);
-  assert.deepEqual(config.providerOrder, ["moss_music", "groq", "openrouter", "gemini"]);
+  assert.deepEqual(config.providerOrder, ["moss_music", "groq", "openrouter", "gemini", "cloudflare"]);
 });
 
 test("MOSS-Music is configured only with a valid HTTPS endpoint and server-only token", () => {
@@ -89,4 +89,53 @@ test("the per-IP limit defaults to five times the session limit and can be set o
   const bad = loadAiConfig({ AI_RATE_LIMIT_PER_MINUTE: "10", AI_RATE_LIMIT_PER_IP_PER_MINUTE: "0" });
   assert.equal(bad.limits.perIpPerMinute, 50);
   assert.ok(bad.issues.some((i) => i.includes("AI_RATE_LIMIT_PER_IP_PER_MINUTE")));
+});
+
+
+test("provider connections support multiple keys while redacting credentials and enforcing shared quota scopes", () => {
+  const config = loadAiConfig({
+    NODE_ENV: "test",
+    AI_PROVIDER_CONNECTIONS_JSON: JSON.stringify([
+      { id: "groq-primary", provider: "groq", apiKeyEnv: "GROQ_API_KEY", quotaScope: "groq-org", requestQuota: { dailyRequests: 80, monthlyRequests: 2000 } },
+      { id: "groq-secondary", provider: "groq", apiKeyEnv: "GROQ_API_KEY_SECONDARY", quotaScope: "groq-org", requestQuota: { dailyRequests: 80, monthlyRequests: 2000 } },
+    ]),
+    GROQ_API_KEY: "groq-secret-primary-token",
+    GROQ_API_KEY_SECONDARY: "groq-secret-secondary-token",
+  });
+  assert.deepEqual(config.connections.map((connection) => connection.id), ["groq-primary", "groq-secondary"]);
+  assert.deepEqual(config.connections.map((connection) => connection.quotaScope), ["groq-org", "groq-org"]);
+  assert.equal(configuredProviders(config).includes("groq"), true);
+  const safe = JSON.stringify({ config, diagnostics: describeConfig(config) });
+  assert.ok(!safe.includes("groq-secret-primary-token"));
+  assert.ok(!safe.includes("groq-secret-secondary-token"));
+  assert.ok(safe.includes("groq-primary"));
+  assert.ok(safe.includes("groq-org"));
+});
+
+test("a repeated credential cannot be assigned to a second quota scope", () => {
+  const config = loadAiConfig({
+    NODE_ENV: "test",
+    AI_PROVIDER_CONNECTIONS_JSON: JSON.stringify([
+      { id: "groq-one", provider: "groq", apiKeyEnv: "GROQ_API_KEY", quotaScope: "org-one" },
+      { id: "groq-two", provider: "groq", apiKeyEnv: "GROQ_API_KEY", quotaScope: "org-two" },
+    ]),
+    GROQ_API_KEY: "one-shared-groq-token",
+  });
+  assert.deepEqual(config.connections.map((connection) => connection.id), ["groq-one"]);
+  assert.ok(config.issues.some((issue) => issue.includes("prevent quota rotation")));
+});
+
+test("Cloudflare API connections for the same account cannot be split across quota scopes", () => {
+  const config = loadAiConfig({
+    NODE_ENV: "test",
+    AI_PROVIDER_CONNECTIONS_JSON: JSON.stringify([
+      { id: "cf-one", provider: "cloudflare", apiKeyEnv: "CLOUDFLARE_API_TOKEN", accountIdEnv: "CLOUDFLARE_ACCOUNT_ID", quotaScope: "cf-scope-a" },
+      { id: "cf-two", provider: "cloudflare", apiKeyEnv: "CLOUDFLARE_API_TOKEN_SECONDARY", accountIdEnv: "CLOUDFLARE_ACCOUNT_ID", quotaScope: "cf-scope-b" },
+    ]),
+    CLOUDFLARE_API_TOKEN: "cf-secret-one",
+    CLOUDFLARE_API_TOKEN_SECONDARY: "cf-secret-two",
+    CLOUDFLARE_ACCOUNT_ID: "abcdef0123456789abcdef0123456789",
+  });
+  assert.deepEqual(config.connections.map((connection) => connection.id), ["cf-one"]);
+  assert.ok(config.issues.some((issue) => issue.includes("same account must share one quotaScope")));
 });

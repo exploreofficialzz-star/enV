@@ -225,7 +225,7 @@ function Account() {
         if (kind === "avatar") setAvatarResolving(false);
         else setCoverResolving(false);
       }
-      // A transient API/auth failure keeps the shimmer (or last cached photo)
+      // Network/server errors deliberately leave the last cached image visible
       // instead of briefly showing the provider's default image.
     };
 

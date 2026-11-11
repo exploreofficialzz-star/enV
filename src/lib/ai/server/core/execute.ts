@@ -13,9 +13,9 @@ import type {
   CostEstimate,
   ModelRecord,
   ProviderAdapter,
-  ProviderId,
+  ProviderAdapterMap,
 } from "../../types.ts";
-import { PROVIDER_IDS } from "../../types.ts";
+import { PROVIDER_IDS, providerAdapters } from "../../types.ts";
 import { configuredProviders, describeConfig, isProviderConfigured, isTaskDisabledByFlag, validateAiConfig } from "../config.ts";
 import type { AiConfig } from "../config.ts";
 import { noopLogger } from "../observability.ts";
@@ -38,7 +38,7 @@ export const MAX_ATTEMPTS = 4;
 
 export interface AiCoreDeps {
   config: AiConfig;
-  adapters: Partial<Record<ProviderId, ProviderAdapter>>;
+  adapters: ProviderAdapterMap;
   models?: readonly ModelRecord[];
   tasks?: TaskRegistry;
   health?: HealthTracker;
@@ -116,7 +116,7 @@ export function createAiCore(deps: AiCoreDeps): AiCore {
   function unavailableError(reasons: string[]): AiError {
     if (configuredProviders(config).length === 0) return new AiError("AI_CONFIGURATION_ERROR");
     if (reasons.includes("circuit-open")) return new AiError("AI_ALL_PROVIDERS_FAILED");
-    if (reasons.includes("budget-paid-models-blocked") || reasons.includes("model-quota-exhausted")) return new AiError("AI_QUOTA_EXCEEDED");
+    if (reasons.includes("budget-paid-models-blocked") || reasons.includes("model-quota-exhausted") || reasons.includes("connection-quota-exhausted")) return new AiError("AI_QUOTA_EXCEEDED");
     return new AiError("AI_UNSUPPORTED_CAPABILITY");
   }
 
@@ -132,9 +132,11 @@ export function createAiCore(deps: AiCoreDeps): AiCore {
     let attempts = 0;
 
     candidates: for (let index = 0; index < decision.candidates.length; index += 1) {
-      const model = decision.candidates[index]!;
-      const adapter = adapters[model.provider]!;
+      const route = decision.routes[index]!;
+      const model = route.model;
+      const adapter = route.adapter;
       const key = modelKey(model);
+      const healthKey = route.healthKey;
       const moreModels = index < decision.candidates.length - 1;
       let repairs = 0;
       let transientRetries = 0;
@@ -142,10 +144,25 @@ export function createAiCore(deps: AiCoreDeps): AiCore {
 
       for (;;) {
         if (signal?.aborted) throw new AiError("AI_REQUEST_CANCELLED");
+        // The decision is a snapshot; re-check a shared account circuit before every attempt.
+        if (!health.canAttempt(healthKey)) continue candidates;
         const remaining = deadline - now();
         if (attempts >= MAX_ATTEMPTS || remaining <= 0) break candidates;
         attempts += 1;
-        usage.recordAttempt(key);
+        const modelQuota = model.quota;
+        if (modelQuota) {
+          const scoped = modelQuota.scope === "quota-scope";
+          const dailyUsed = scoped ? usage.quotaScopeRequestsToday(route.quotaScope) : usage.modelRequestsToday(key);
+          const monthlyUsed = scoped ? usage.quotaScopeRequestsThisMonth(route.quotaScope) : usage.modelRequestsThisMonth(key);
+          if ((modelQuota.dailyRequests !== undefined && dailyUsed >= modelQuota.dailyRequests)
+            || (modelQuota.monthlyRequests !== undefined && monthlyUsed >= modelQuota.monthlyRequests)) continue candidates;
+        }
+        const connectionQuota = adapter.requestQuota;
+        if (connectionQuota && ((connectionQuota.dailyRequests !== undefined && usage.quotaScopeRequestsToday(route.quotaScope) >= connectionQuota.dailyRequests)
+          || (connectionQuota.monthlyRequests !== undefined && usage.quotaScopeRequestsThisMonth(route.quotaScope) >= connectionQuota.monthlyRequests))) continue candidates;
+        // Re-check immediately before incrementing: parallel connection candidates cannot exceed
+        // the same in-instance shared counter just because routing was planned earlier.
+        usage.recordAttempt(key, route.quotaScope);
 
         const user: AiContentPart[] = repairNote ? [...prepared.user, { type: "text", text: repairInstruction(repairNote) }] : prepared.user;
         const request: AdapterRequest = {
@@ -168,7 +185,7 @@ export function createAiCore(deps: AiCoreDeps): AiCore {
           const result = await adapter.execute(request);
           const accepted = prepared.accept(result, boundary);
           if (!accepted.ok) {
-            health.recordFailure(key, new AiError("AI_OUTPUT_VALIDATION_FAILED", { provider: model.provider, model: model.modelId }));
+            health.recordFailure(healthKey, new AiError("AI_OUTPUT_VALIDATION_FAILED", { provider: model.provider, model: model.modelId }));
             log({ event: "ai.attempt", requestId, taskId: task.id, provider: model.provider, model: model.modelId, status: "error", errorCode: "AI_OUTPUT_VALIDATION_FAILED", attempt: attempts, latencyMs: now() - attemptStarted });
             if (repairs < 1 && task.structured) {
               repairs += 1;
@@ -179,7 +196,7 @@ export function createAiCore(deps: AiCoreDeps): AiCore {
             continue candidates;
           }
 
-          health.recordSuccess(key);
+          health.recordSuccess(healthKey);
           const cost: CostEstimate = estimateCost(model, result.usage, now());
           usage.recordSuccess({ taskId: task.id, modelKey: key, cost, usage: result.usage });
           const latencyMs = now() - started;
@@ -205,7 +222,7 @@ export function createAiCore(deps: AiCoreDeps): AiCore {
         } catch (raw) {
           const error = normalizeError(raw);
           if (error.code === "AI_REQUEST_CANCELLED" || signal?.aborted) throw new AiError("AI_REQUEST_CANCELLED");
-          health.recordFailure(key, error);
+          health.recordFailure(healthKey, error);
           errors.push(error);
           log({ event: "ai.attempt", requestId, taskId: task.id, provider: model.provider, model: model.modelId, status: "error", errorCode: error.code, upstreamStatus: error.upstreamStatus, attempt: attempts, latencyMs: now() - attemptStarted });
 
@@ -296,7 +313,14 @@ export function createAiCore(deps: AiCoreDeps): AiCore {
       validation: validateAiConfig(config),
       modelRegistryProblems: validateModelRegistry(models),
       capabilities: capabilityMatrix(models, config, adapters),
-      providers: PROVIDER_IDS.map((id) => ({ id, inOrder: config.providerOrder.includes(id), configured: isProviderConfigured(config, id), adapterLoaded: Boolean(adapters[id]), adapterReady: adapters[id]?.isConfigured() ?? false })),
+      providers: PROVIDER_IDS.map((id) => {
+        const list = providerAdapters(adapters[id]);
+        return {
+          id, inOrder: config.providerOrder.includes(id), configured: isProviderConfigured(config, id),
+          adapterLoaded: list.length > 0, adapterReady: list.some((adapter) => adapter.isConfigured()),
+          connections: list.map((adapter) => ({ connectionId: adapter.connectionId ?? id + "-legacy", quotaScope: adapter.quotaScope ?? id + ":legacy", requestQuota: adapter.requestQuota ?? null })),
+        };
+      }),
       routing: Object.fromEntries(
         [...tasks.values()].map((task) => {
           const decision = routeTask(task, routeContext);

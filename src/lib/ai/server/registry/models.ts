@@ -12,6 +12,8 @@ import { CAPABILITIES, COST_CLASSES, PROVIDER_IDS } from "../../types.ts";
 
 const CHECKED = "Checked against provider docs on 2026-09-30.";
 const MOSS_CHECKED = "Checked against the OpenMOSS MOSS-Music README and SGLang serving guide on 2026-10-25.";
+const GEMINI_CHECKED = "Pricing and tier terms rechecked against the Google Gemini API pricing page on 2026-11-11.";
+const CLOUDFLARE_CHECKED = "Checked against Cloudflare Workers AI model, JSON Mode and pricing docs on 2026-11-11.";
 
 export const MODEL_REGISTRY: readonly ModelRecord[] = [
   {
@@ -184,7 +186,7 @@ export const MODEL_REGISTRY: readonly ModelRecord[] = [
     reasoning: true,
     outputHeadroomTokens: 2500,
     sensitiveOk: false,
-    notes: `${CHECKED} Model id and the two-stage pricing ($0.75/$3.75 per 1M tokens through 2026-12-31, $1.50/$7.50 from 2027-01-01) are from ai.google.dev/gemini-api/docs/latest-model. The 1M context window comes from third-party listings and was not confirmed on the official page; the 16384 output cap is enV's own. Gemini Interactions API supports audio input and structured JSON output; see ai.google.dev/gemini-api/docs/audio and ai.google.dev/api/interactions-api. A free tier exists and Google may use free-tier content to improve its products, so sensitive tasks only use this model when AI_GEMINI_TIER=paid.`,
+    notes: `${GEMINI_CHECKED} Model id and the two-stage paid pricing ($0.75/$3.75 per 1M tokens through 2026-12-31, $1.50/$7.50 from 2027-01-01), Free-tier zero input/output pricing, and the Free-versus-Paid data-use distinction are from ai.google.dev/gemini-api/docs/pricing. The 1M context window comes from third-party listings and was not confirmed on the official page; the 16384 output cap is enV's own. Gemini Interactions API supports audio input and structured JSON output; see ai.google.dev/gemini-api/docs/audio and ai.google.dev/api/interactions-api. A free tier exists and Google may use free-tier content to improve its products, so sensitive tasks only use this model when AI_GEMINI_TIER=paid.`,
   },
   {
     provider: "moss_music",
@@ -210,6 +212,30 @@ export const MODEL_REGISTRY: readonly ModelRecord[] = [
     sensitiveOk: true,
     maxAudioBytes: 2_800_000,
     notes: `${MOSS_CHECKED} The Instruct checkpoint is about 9.1B parameters, Apache-2.0, and the project's guide recommends SGLang with the OpenMOSS moss-audio branch. Modal A100 40 GB GPU list rate was $0.000583/second ($2.0988/hour) on this date. This estimate uses measured inference wall time and excludes GPU container cold start, warm-idle time, CPU/RAM and other charges; use Modal's billing dashboard as the source of truth. Free Starter credits offset eligible compute, they do not make the listed service unlimited or zero-cost.`,
+  },
+  {
+    provider: "cloudflare",
+    modelId: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    displayName: "Llama 3.3 70B on Cloudflare Workers AI",
+    capabilities: ["TEXT_GENERATION", "STRUCTURED_TEXT"],
+    inputModalities: ["text"],
+    outputModalities: ["text"],
+    contextWindow: 24_000,
+    maxOutputTokens: 4_096,
+    structuredOutput: "json-mode",
+    toolCalling: true,
+    streaming: false,
+    costClass: "STANDARD",
+    free: false,
+    pricing: { inputPerMTok: 0.293, outputPerMTok: 2.253 },
+    quality: "best",
+    latency: "normal",
+    priority: 30,
+    enabled: true,
+    reasoning: false,
+    outputHeadroomTokens: 0,
+    sensitiveOk: true,
+    notes: `${CLOUDFLARE_CHECKED} Official Cloudflare model documentation lists a 24,000-token context, JSON Mode support, Zero Data Retention, and $0.293/M input plus $2.253/M output pricing. JSON Schema adherence is best-effort and remains validated by enV's task schema/repair path. Workers AI includes 10,000 Neurons per day; overage is $0.011/1,000 Neurons on Workers Paid, while requests stop at the Free-plan allowance. enV keeps this model STANDARD-cost and estimates usage from the published token rates rather than treating the allowance as unlimited free inference.`,
   },
   {
     provider: "mock",

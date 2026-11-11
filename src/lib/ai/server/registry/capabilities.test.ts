@@ -15,7 +15,7 @@ test("the matrix has one row per capability and never lists the mock provider as
   for (const r of rows) assert.ok(r.models.every((m) => !m.startsWith("mock:")), r.capability);
   assert.deepEqual(row(rows, "VISION_ANALYSIS").providers, ["gemini"]);
   assert.deepEqual(row(rows, "SPEECH_TO_TEXT").providers, ["groq"]);
-  assert.deepEqual(row(rows, "STRUCTURED_TEXT").providers.sort(), ["gemini", "groq", "openrouter"]);
+  assert.deepEqual(row(rows, "STRUCTURED_TEXT").providers.sort(), ["cloudflare", "gemini", "groq", "openrouter"]);
 });
 
 test("usableNow follows configuration: keys, provider order, disabled models", () => {
