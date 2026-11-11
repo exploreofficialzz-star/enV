@@ -116,7 +116,6 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.facemesh.FaceMesh
 import com.google.mlkit.vision.facemesh.FaceMeshDetection
 import com.google.mlkit.vision.facemesh.FaceMeshDetector
-import com.google.mlkit.vision.facemesh.FaceMeshDetectorOptions
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 import androidx.core.util.Consumer
