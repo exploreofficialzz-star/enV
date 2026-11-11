@@ -26,29 +26,44 @@ const PAYSTACK_MARKET_CURRENCIES: Record<string, string> = {
   ZA: "ZAR",
 };
 
-function resolvePaystackConfiguration(countryCode: string | null | undefined) {
-  const country = normalizeCountryCode(countryCode);
-  if (!country) return null;
-
-  const localCurrency = PAYSTACK_MARKET_CURRENCIES[country];
-  const international = !localCurrency && process.env.PAYSTACK_INTERNATIONAL_ENABLED === "true";
-  if (!localCurrency && !international) return null;
-
-  const currency = localCurrency ??
-    (process.env.PAYSTACK_INTERNATIONAL_CURRENCY?.trim().toUpperCase() || "NGN");
-  if (!["NGN", "GHS", "KES", "ZAR", "USD"].includes(currency)) return null;
-
+function paystackCurrencyConfiguration(currency: string, country: string, international: boolean) {
   const secret = process.env["PAYSTACK_SECRET_KEY_" + currency]?.trim() ??
     (currency === "NGN" ? process.env.PAYSTACK_SECRET_KEY?.trim() : undefined) ?? "";
   const configuredPrice = process.env["PAYSTACK_TOKEN_PRICE_" + currency + "_MINOR"] ??
     (currency === "NGN" ? process.env.PAYSTACK_TOKEN_PRICE_NGN_KOBO : undefined);
   const pricePerTokenMinor = readSafePackPrice(configuredPrice, TOKEN_PACKS);
-
   const approved = international
     ? process.env.PAYSTACK_PROVIDER_APPROVED === "true"
     : currency === "NGN"
       ? process.env.PAYSTACK_PROVIDER_APPROVED === "true"
       : process.env["PAYSTACK_PROVIDER_APPROVED_" + currency] === "true";
+  return { currency, international, secret, pricePerTokenMinor, approved };
+}
+
+function resolvePaystackConfiguration(countryCode: string | null | undefined) {
+  const country = normalizeCountryCode(countryCode);
+  if (!country) return null;
+
+  const localCurrency = PAYSTACK_MARKET_CURRENCIES[country];
+  const internationalEnabled = process.env.PAYSTACK_INTERNATIONAL_ENABLED === "true";
+  const internationalCurrency = process.env.PAYSTACK_INTERNATIONAL_CURRENCY?.trim().toUpperCase() || "NGN";
+  if (!["NGN", "GHS", "KES", "ZAR", "USD"].includes(internationalCurrency)) return null;
+
+  let selected = localCurrency
+    ? paystackCurrencyConfiguration(localCurrency, country, false)
+    : null;
+
+  // Local settlement accounts take precedence. If the visitor is in another
+  // Paystack market but this deployment has no configured local merchant
+  // account, an explicitly approved international-card route may be used.
+  if ((!selected || !selected.secret || selected.pricePerTokenMinor === null || !selected.approved) &&
+      internationalEnabled && country !== "NG") {
+    selected = paystackCurrencyConfiguration(internationalCurrency, country, true);
+  }
+  if (!selected && internationalEnabled) {
+    selected = paystackCurrencyConfiguration(internationalCurrency, country, true);
+  }
+  if (!selected) return null;
 
   const launchChecksPassed =
     process.env.BILLING_LAUNCH_ENABLED === "true" &&
@@ -56,18 +71,15 @@ function resolvePaystackConfiguration(countryCode: string | null | undefined) {
     process.env.BILLING_REFUND_DISPUTE_HANDLING_APPROVED === "true" &&
     Boolean(publicOrigin());
 
-  const enabled = launchChecksPassed && approved && Boolean(secret) && pricePerTokenMinor !== null;
+  const enabled = launchChecksPassed && selected.approved &&
+    Boolean(selected.secret) && selected.pricePerTokenMinor !== null;
   return {
     country,
-    currency,
-    international,
-    secret,
-    pricePerTokenMinor,
+    ...selected,
     enabled,
     origin: publicOrigin(),
   };
 }
-
 /** Build the Paystack option from the visitor's detected country and configured merchant currency. */
 export function getPaystackFundingOption(countryCode: string | null | undefined) {
   const configuration = resolvePaystackConfiguration(countryCode);
