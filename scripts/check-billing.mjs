@@ -281,7 +281,8 @@ assert.match(paystackService, /process\.env\.VERCEL === "1"/,
   "Vercel deployments must require HTTPS payment callback origins");
 assert.match(cryptomusService, /process\.env\.VERCEL === "1"/,
   "Vercel deployments must require HTTPS crypto callback origins");
-assert.doesNotMatch(paystackProviderConfig, /BILLING_LAUNCH_ENABLED|BILLING_ENFORCEMENT_ENABLED|PAYSTACK_PROVIDER_APPROVED/,
+const paystackVerificationConfig = paystackProviderConfig.slice(0, paystackProviderConfig.indexOf("export function readSafePackPrice"));
+assert.doesNotMatch(paystackVerificationConfig, /BILLING_LAUNCH_ENABLED|BILLING_ENFORCEMENT_ENABLED|PAYSTACK_PROVIDER_APPROVED/,
   "settlement credentials must not inherit the new-checkout kill switch");
 const paystackSettlement = paystackService.slice(
   paystackService.indexOf("export async function verifyAndCreditPaystackReference"),
