@@ -33,7 +33,7 @@ type WalletActivity = {
 };
 
 type WalletState = { status: "loading" | "ready" | "unavailable"; message?: string; wallet?: WalletData; activity?: WalletActivity[] };
-type FundingProviderId = "paystack" | "cryptomus";
+type FundingProviderId = "paystack" | "flutterwave" | "cryptomus";
 type FundingProviderOption = {
   id: FundingProviderId; label: string; enabled: boolean; currency: string; pricePerTokenMinor: number | null;
   packs: Array<{ tokens: number; amountMinor: number | null; currency: string }>; message: string;
@@ -202,7 +202,7 @@ function Account() {
           throw new Error(payload?.message ?? "Payment options could not be loaded.");
         }
         const providers = payload.data.providers.filter((item) =>
-          item && (item.id === "paystack" || item.id === "cryptomus")
+          item && (item.id === "paystack" || item.id === "flutterwave" || item.id === "cryptomus")
         );
         if (!providers.length) throw new Error("Payment options are not available.");
         setFundingOptionsState({ status: "ready", providers });
@@ -217,7 +217,8 @@ function Account() {
         setFundingOptionsState({
           status: "unavailable",
           providers: [
-            { id: "paystack", label: "Pay with cards", enabled: false, currency: "NGN", pricePerTokenMinor: null, packs: [], message: "Secure card checkout could not be loaded. Refresh and try again." },
+            { id: "paystack", label: "Paystack", enabled: false, currency: "NGN", pricePerTokenMinor: null, packs: [], message: "Paystack options could not be loaded. Refresh and try again." },
+            { id: "flutterwave", label: "Flutterwave", enabled: false, currency: "NGN", pricePerTokenMinor: null, packs: [], message: "Flutterwave options could not be loaded. Refresh and try again." },
             { id: "cryptomus", label: "Pay with crypto", enabled: false, currency: "USD", pricePerTokenMinor: null, packs: [], message: "Secure crypto checkout could not be loaded. Refresh and try again." },
           ],
           message: error instanceof Error ? error.message : "Secure payment options could not be loaded.",
@@ -298,7 +299,7 @@ function Account() {
       setReloadKey(value => value + 1);
       window.history.replaceState({}, "", "/wallet");
     } else if (paymentState === "pending") {
-      setFundingFeedback({ kind: "success", message: "The payment is still processing. No tokens were added yet; refresh after provider confirmation." });
+      setFundingFeedback({ kind: "info", message: "The payment is still processing. No tokens have been added yet; your wallet will update after the provider confirms the payment." });
       window.history.replaceState({}, "", "/wallet");
     } else if (paymentState === "failed" || paymentState === "unverified") {
       setFundingFeedback({ kind: "error", message: "The payment could not be verified. Your wallet was not credited. Contact support if you were charged." });
@@ -491,7 +492,7 @@ function Account() {
         message?: string;
       } | null;
       const target = payload?.data?.authorizationUrl;
-      const expectedHost = provider === "paystack" ? "checkout.paystack.com" : "pay.cryptomus.com";
+      const expectedHost = provider === "paystack" ? "checkout.paystack.com" : provider === "flutterwave" ? "checkout.flutterwave.com" : "pay.cryptomus.com";
       let checkout: URL | null = null;
       try { if (target) checkout = new URL(target); } catch { checkout = null; }
       if (!response.ok || !payload?.ok || payload.data?.provider !== provider ||
@@ -501,7 +502,7 @@ function Account() {
       window.location.assign(checkout.href);
     } catch (error) {
       const detail = error instanceof Error ? error.message : "";
-      const requiresSetup = /PAYMENTS_NOT_CONFIGURED|CRYPTOMUS_NOT_CONFIGURED|BILLING_AUTH_NOT_CONFIGURED|AUTH_REQUIRED|provider approval|checkout is not configured|approved NGN token price|persistent database|billing launch checks|sign in is required/i.test(detail);
+      const requiresSetup = /PAYMENTS_NOT_CONFIGURED|CRYPTOMUS_NOT_CONFIGURED|FLUTTERWAVE_NOT_CONFIGURED|BILLING_AUTH_NOT_CONFIGURED|AUTH_REQUIRED|provider approval|checkout is not configured|approved NGN token price|persistent database|billing launch checks|sign in is required/i.test(detail);
       setFundingFeedback({
         kind: "error",
         message: requiresSetup
@@ -761,7 +762,7 @@ function Account() {
                       (!option.enabled ? " opacity-80" : "")}
                   >
                     <span className="mt-0.5 grid size-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-fg">
-                      {option.id === "paystack" ? <CreditCard size={19} aria-hidden="true"/> : <Coins size={19} aria-hidden="true"/>}
+                      {option.id === "cryptomus" ? <Coins size={19} aria-hidden="true"/> : <CreditCard size={19} aria-hidden="true"/>}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-center justify-between gap-2">
@@ -773,8 +774,10 @@ function Account() {
                       </span>
                       <span className="mt-1 block text-xs leading-5 text-muted">
                         {option.id === "paystack"
-                          ? "Pay by card and any local channels enabled on enV’s approved Paystack account."
-                          : "Pay through a hosted crypto invoice. The available coins and networks are shown by the provider."}
+                          ? "Cards and eligible local channels for the detected country and configured Paystack merchant account."
+                          : option.id === "flutterwave"
+                            ? "Local cards, bank and mobile-money options where enabled for your country and currency."
+                            : "Pay through a hosted crypto invoice. The available coins and networks are shown by the provider."}
                       </span>
                       {selectedFundingProvider === option.id && !option.enabled ? (
                         <span className="mt-2 block text-xs leading-5 text-muted">{option.message}</span>

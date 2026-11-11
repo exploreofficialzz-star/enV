@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readSafePackPrice, requirePaystackVerificationSecret } from "./provider-config.ts";
+import { isFlutterwavePaymentOptionsConfigured, readSafePackPrice, requirePaystackVerificationSecret } from "./provider-config.ts";
 
 test("Paystack settlement credentials remain usable with new-checkout switches disabled", () => {
   assert.equal(requirePaystackVerificationSecret({
@@ -32,4 +32,14 @@ test("token-pack pricing rejects values that overflow safe integer arithmetic", 
   assert.equal(readSafePackPrice("9007199254741", packs), null);
   assert.equal(readSafePackPrice("1", []), null);
   assert.equal(readSafePackPrice("1", [0]), null);
+});
+
+test("Flutterwave per-payment methods stay disabled until dashboard-wide methods are turned off", () => {
+  assert.equal(isFlutterwavePaymentOptionsConfigured({}), false);
+  assert.equal(isFlutterwavePaymentOptionsConfigured({
+    FLUTTERWAVE_PAYMENT_OPTIONS_DASHBOARD_DISABLED: "false",
+  }), false);
+  assert.equal(isFlutterwavePaymentOptionsConfigured({
+    FLUTTERWAVE_PAYMENT_OPTIONS_DASHBOARD_DISABLED: "true",
+  }), true);
 });
