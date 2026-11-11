@@ -32,6 +32,10 @@ export const ADSTERRA_NATIVE_BANNER = {
   src: "https://bauval.org/21/78a40bc1026f57ead96fcab42af6c0b0",
 } as const;
 
+export const ADSTERRA_POPUNDER_SCRIPT = {
+  src: "https://abscloud.org/1/b39264253fbfc622884c9a3b81882853",
+} as const;
+
 export type AdsterraBannerFormat = keyof typeof ADSTERRA_BANNER_UNITS;
 
 /**
