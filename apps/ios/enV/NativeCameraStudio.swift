@@ -1244,6 +1244,8 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
     private var latestBackTime = CMTime.invalid
     private var latestFrontTime = CMTime.invalid
     private var lastAppendedTime = CMTime.invalid
+    private var lastAppendedBackTime = CMTime.invalid
+    private var lastAppendedFrontTime = CMTime.invalid
     private var writerStartTime = CMTime.invalid
 
     private var writer: AVAssetWriter?
@@ -1681,6 +1683,8 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
                 self.latestBackTime = .invalid
                 self.latestFrontTime = .invalid
                 self.lastAppendedTime = .invalid
+                self.lastAppendedBackTime = .invalid
+                self.lastAppendedFrontTime = .invalid
                 self.writerStartTime = .invalid
 
                 Task { @MainActor in
@@ -1821,6 +1825,8 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
         writerSessionStarted = false
         writerStartTime = .invalid
         lastAppendedTime = .invalid
+        lastAppendedBackTime = .invalid
+        lastAppendedFrontTime = .invalid
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
@@ -1855,8 +1861,17 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
         guard recordingRequested,
               let backBuffer = latestBackBuffer,
               let frontBuffer = latestFrontBuffer,
+              latestBackTime.isValid,
+              latestFrontTime.isValid,
               let videoWriterInput,
               let pixelBufferAdaptor else { return }
+
+        // Never reuse either camera's previous frame. Emit a composite only after
+        // both sources have advanced beyond the last pair written to the file.
+        if lastAppendedBackTime.isValid &&
+            CMTimeCompare(latestBackTime, lastAppendedBackTime) <= 0 { return }
+        if lastAppendedFrontTime.isValid &&
+            CMTimeCompare(latestFrontTime, lastAppendedFrontTime) <= 0 { return }
 
         let difference = abs(CMTimeGetSeconds(CMTimeSubtract(latestBackTime, latestFrontTime)))
         guard difference.isFinite, difference <= 0.15 else { return }
@@ -1873,6 +1888,8 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
         }
         if pixelBufferAdaptor.append(outputBuffer, withPresentationTime: timestamp) {
             lastAppendedTime = timestamp
+            lastAppendedBackTime = latestBackTime
+            lastAppendedFrontTime = latestFrontTime
         } else if let writerError = writer?.error {
             Task { @MainActor in self.error = writerError.localizedDescription }
         }
@@ -1890,7 +1907,14 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
 
         let canvas = CGRect(x: 0, y: 0, width: outputWidth, height: outputHeight)
         let background = aspectFill(CIImage(cvPixelBuffer: back), into: canvas)
-        let pipRect = CGRect(x: outputWidth - 232 - 24, y: 24, width: 232, height: 330)
+        // Core Image uses a bottom-left origin. Move the inset upward so the saved
+        // PiP placement matches the top-right live preview layers.
+        let pipRect = CGRect(
+            x: outputWidth - 232 - 24,
+            y: outputHeight - 330 - 24,
+            width: 232,
+            height: 330
+        )
         let inset = aspectFill(CIImage(cvPixelBuffer: front), into: CGRect(origin: .zero, size: pipRect.size))
             .transformed(by: CGAffineTransform(translationX: pipRect.minX, y: pipRect.minY))
         let composite = inset.composited(over: background).cropped(to: canvas)
@@ -2205,6 +2229,10 @@ struct NativeCameraStudioView: View {
                 if NativeDualCameraCapture.isSupported {
                     Button("Record with front + rear cameras") {
                         capture.pauseForMultiCamera {
+                            // Dual preview layers are not passed through the single-camera
+                            // Core Image filter path. Keep preview and exported frames alike.
+                            look = .natural
+                            capture.setLook(.natural)
                             dualCameraMode = true
                             dualCapture.start()
                         }
@@ -2282,12 +2310,14 @@ struct NativeCameraStudioView: View {
                 }.pickerStyle(.menu)
             }
 
-            HStack {
-                Text("Photo look").font(.envScaled(size: 12, weight: .medium)).foregroundStyle(Color.envInk)
-                Spacer()
-                Picker("Photo look", selection: $look) {
-                    ForEach(NativeCameraLook.allCases) { item in Text(item.rawValue).tag(item) }
-                }.pickerStyle(.menu)
+            if !dualCameraMode {
+                HStack {
+                    Text("Photo look").font(.envScaled(size: 12, weight: .medium)).foregroundStyle(Color.envInk)
+                    Spacer()
+                    Picker("Photo look", selection: $look) {
+                        ForEach(NativeCameraLook.allCases) { item in Text(item.rawValue).tag(item) }
+                    }.pickerStyle(.menu)
+                }
             }
             if !dualCameraMode && mode == "Video" {
                 HStack {
