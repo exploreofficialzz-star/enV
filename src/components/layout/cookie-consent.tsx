@@ -86,10 +86,10 @@ export function CookieConsent() {
         }
       }
 
-      if (!markNoticeSeen()) {
-        throw new Error("Your cookie choices could not be saved in this browser. Check site storage and try again.");
-      }
-
+      // Storage can be unavailable in a restricted browser context. That must
+      // not block tool access: choices which could not be persisted fail closed,
+      // and the dialog may be shown again on the next visit.
+      markNoticeSeen();
       setVisible(false);
 
       // Reload after withdrawal so provider-installed scripts and listeners
