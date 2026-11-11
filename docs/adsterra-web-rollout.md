@@ -27,7 +27,7 @@ Each placement is labelled as an advertisement and is requested only when the pr
 - 468x60, 160x300 and 160x600 banners: not needed in the initial layout; the selected placements cover mobile, desktop and directory use without duplicate banners.
 - Social Bar: a persistent floating overlay is too intrusive for the toolkit interface.
 - Popunder is page-level and can react to general page interactions. It is not a rewarded-ad callback and is not proof that a tool output was completed; never gate, replace or delay downloads and exports behind it.
-- Smartlink: placement ID 32202122 is recorded, but it is not itself a destination URL. Adsterra's active Smartlink URL or generated code is needed before wiring it to an explicit output action. Never replace or delay the real download/export action with a Smartlink redirect.
+- Smartlink: the publisher-supplied destination opens in a separate tab when a shared Web download helper is called from an explicit output action. It is gated by the same production flag, explicit advertising consent and online state. The actual download continues independently; browsers may block the additional tab, in which case the download still proceeds. Smartlink is not a verified rewarded-ad completion callback and does not unlock or gate tool output.
 - `ads.txt`: the existing file contains the Google seller line. Add Adsterra only from the exact seller record shown for this publisher/site in the Adsterra dashboard; do not manufacture a seller record from a placement ID.
 
 ## Verification
