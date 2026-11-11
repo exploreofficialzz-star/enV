@@ -271,6 +271,9 @@ assert.match(iosDualCamera, /AVCaptureSessionWasInterrupted/, "iOS dual-camera m
 assert.match(iosDualCamera, /AVCaptureSessionInterruptionEnded/, "iOS dual-camera mode reconnects after interruption ends.");
 assert.match(iosDualCamera, /AVCaptureSessionRuntimeError/, "iOS dual-camera mode handles capture runtime errors.");
 assert.match(iosDualCamera, /configureBestAvailableSession/);
+assert.match(iosDualCamera, /lastAppendedBackTime/, "iOS dual capture never reuses an already-written rear frame.");
+assert.match(iosDualCamera, /lastAppendedFrontTime/, "iOS dual capture never reuses an already-written front frame.");
+assert.match(iosDualCamera, /outputHeight - 330 - 24/, "iOS dual export places PiP at the top-right, like the preview layers.");
 assert.match(iosDualCamera, /configureSession\(maxWidth: 1280, maxHeight: 720, frameRate: 30\)/);
 assert.match(iosDualCamera, /configureSession\(maxWidth: 640, maxHeight: 480, frameRate: 24\)/);
 assert.match(iosDualCamera, /format\.isMultiCamSupported/);
@@ -281,6 +284,8 @@ assert.match(engine, /max: profile\.frameRate/);
 assert.match(iosDualCamera, /mediaServicesWereReset/, "iOS dual-camera mode handles media-services resets.");
 assert.match(iosDualCamera, /resumeAfterFinalization/, "iOS dual-camera mode resumes only after an interrupted clip has finalized.");
 assert.match(iosDualCamera, /restartSessionLocked/, "iOS dual-camera mode has a guarded session recovery path.");
+assert.match(iosCamera, /look = \.natural[\s\S]*?capture\.setLook\(\.natural\)[\s\S]*?dualCameraMode = true/, "iOS dual preview and export start with the same Natural look.");
+assert.match(iosCamera, /if !dualCameraMode \{\s*HStack \{\s*Text\("Photo look"/, "The look selector stays hidden while dual preview cannot process it.");
 assert.match(iosCamera, /mediaServicesWereReset/);
 assert.match(iosCamera, /PHPhotoLibrary\.shared\(\)\.performChanges/);
 assert.match(iosCamera, /requestAccess\(for: \.audio\)/);
