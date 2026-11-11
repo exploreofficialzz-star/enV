@@ -3,6 +3,8 @@ import { getSql } from "../db";
 import { readWallet, creditVerifiedPurchase } from "./ledger.server";
 import { readSafePackPrice, requirePaystackVerificationSecret } from "./provider-config";
 import { readBoundedBytes } from "./bounded-json.server";
+import { getCountryPaymentProfile, normalizeCountryCode } from "./country-routing";
+import { getFlutterwaveFundingOption } from "./flutterwave.server";
 
 export const TOKEN_PACKS = [100, 250, 500, 1_000] as const;
 
@@ -17,23 +19,99 @@ function publicOrigin(): string | null {
   } catch { return null; }
 }
 
-export function getFundingOptions() {
-  // Do not accept new payments until refund/dispute reconciliation and the
-  // support runbook are explicitly signed off. Existing transactions can still
-  // be verified and settled by the separate Paystack settlement credential path.
-  const refundDisputeHandlingApproved = process.env.BILLING_REFUND_DISPUTE_HANDLING_APPROVED === "true";
-  const launchChecksPassed = process.env.BILLING_LAUNCH_ENABLED === "true" &&
+const PAYSTACK_MARKET_CURRENCIES: Record<string, string> = {
+  NG: "NGN",
+  GH: "GHS",
+  KE: "KES",
+  ZA: "ZAR",
+};
+
+function resolvePaystackConfiguration(countryCode: string | null | undefined) {
+  const country = normalizeCountryCode(countryCode);
+  if (!country) return null;
+
+  const localCurrency = PAYSTACK_MARKET_CURRENCIES[country];
+  const international = !localCurrency && process.env.PAYSTACK_INTERNATIONAL_ENABLED === "true";
+  if (!localCurrency && !international) return null;
+
+  const currency = localCurrency ??
+    (process.env.PAYSTACK_INTERNATIONAL_CURRENCY?.trim().toUpperCase() || "NGN");
+  if (!["NGN", "GHS", "KES", "ZAR", "USD"].includes(currency)) return null;
+
+  const secret = process.env["PAYSTACK_SECRET_KEY_" + currency]?.trim() ??
+    (currency === "NGN" ? process.env.PAYSTACK_SECRET_KEY?.trim() : undefined) ?? "";
+  const configuredPrice = process.env["PAYSTACK_TOKEN_PRICE_" + currency + "_MINOR"] ??
+    (currency === "NGN" ? process.env.PAYSTACK_TOKEN_PRICE_NGN_KOBO : undefined);
+  const pricePerTokenMinor = readSafePackPrice(configuredPrice, TOKEN_PACKS);
+
+  const approved = international
+    ? process.env.PAYSTACK_PROVIDER_APPROVED === "true"
+    : currency === "NGN"
+      ? process.env.PAYSTACK_PROVIDER_APPROVED === "true"
+      : process.env["PAYSTACK_PROVIDER_APPROVED_" + currency] === "true";
+
+  const launchChecksPassed =
+    process.env.BILLING_LAUNCH_ENABLED === "true" &&
+    process.env.BILLING_ENFORCEMENT_ENABLED === "true" &&
+    process.env.BILLING_REFUND_DISPUTE_HANDLING_APPROVED === "true" &&
+    Boolean(publicOrigin());
+
+  const enabled = launchChecksPassed && approved && Boolean(secret) && pricePerTokenMinor !== null;
+  return {
+    country,
+    currency,
+    international,
+    secret,
+    pricePerTokenMinor,
+    enabled,
+    origin: publicOrigin(),
+  };
+}
+
+/** Build the Paystack option from the visitor's detected country and configured merchant currency. */
+export function getPaystackFundingOption(countryCode: string | null | undefined) {
+  const configuration = resolvePaystackConfiguration(countryCode);
+  if (!configuration) return null;
+  const { currency, international, pricePerTokenMinor, enabled } = configuration;
+  const message = enabled
+    ? "Choose a token pack. enV verifies the payment with Paystack before adding tokens."
+    : !configuration.secret
+      ? "Paystack credentials for " + currency + " are not configured on this deployment."
+      : !pricePerTokenMinor
+        ? "Token pricing for " + currency + " has not been configured."
+        : "Paystack checkout is disabled until merchant, billing and refund/dispute recovery checks are approved.";
+  return {
+    id: "paystack" as const,
+    label: international ? "Paystack · international cards (" + currency + ")" : "Paystack · " + currency,
+    enabled,
+    currency,
+    pricePerTokenMinor,
+    packs: TOKEN_PACKS.map((tokens) => ({
+      tokens,
+      amountMinor: pricePerTokenMinor === null ? null : tokens * pricePerTokenMinor,
+      currency,
+    })),
+    message,
+  };
+}
+
+export function getFundingOptions(countryCode: string | null = null) {
+  const paystack = getPaystackFundingOption(countryCode);
+  const flutterwave = getFlutterwaveFundingOption(countryCode);
+
+  const refundDisputeHandlingApproved =
+    process.env.BILLING_REFUND_DISPUTE_HANDLING_APPROVED === "true";
+  const launchChecksPassed =
+    process.env.BILLING_LAUNCH_ENABLED === "true" &&
     process.env.BILLING_ENFORCEMENT_ENABLED === "true" &&
     refundDisputeHandlingApproved && Boolean(publicOrigin());
-  const pricePerTokenMinor = readSafePackPrice(process.env.PAYSTACK_TOKEN_PRICE_NGN_KOBO, TOKEN_PACKS);
-  const paystackApproved = process.env.PAYSTACK_PROVIDER_APPROVED === "true";
-  const paystackSecret = process.env.PAYSTACK_SECRET_KEY?.trim() ?? "";
+
   const cryptomusMerchantId = process.env.CRYPTOMUS_MERCHANT_ID?.trim() ?? "";
   const cryptomusApiKey = process.env.CRYPTOMUS_PAYMENT_API_KEY?.trim() ?? "";
-  const enabled = launchChecksPassed && paystackApproved &&
-    Boolean(paystackSecret) && pricePerTokenMinor !== null;
-
-  const cryptoPricePerTokenMinor = readSafePackPrice(process.env.CRYPTOMUS_TOKEN_PRICE_USD_CENTS, TOKEN_PACKS);
+  const cryptoPricePerTokenMinor = readSafePackPrice(
+    process.env.CRYPTOMUS_TOKEN_PRICE_USD_CENTS,
+    TOKEN_PACKS,
+  );
   const cryptomusEnabled = launchChecksPassed &&
     process.env.CRYPTOMUS_PROVIDER_APPROVED === "true" &&
     /^[a-f0-9-]{36}$/i.test(cryptomusMerchantId) &&
@@ -45,59 +123,53 @@ export function getFundingOptions() {
     amountMinor: price !== null ? tokens * price : null,
     currency,
   }));
-  const paystackMessage = enabled
-    ? "Choose a token pack. Payment is verified by enV before tokens are added."
-    : !paystackApproved
-      ? "Card and local payments are unavailable until Paystack has explicitly approved enV's token-wallet business model."
-      : !refundDisputeHandlingApproved
-        ? "Payments are disabled until refund and dispute reconciliation has been implemented, tested, and approved."
-        : "Secure card checkout is not configured for this deployment. No payment was taken.";
+
   const cryptomusMessage = cryptomusEnabled
-    ? "Choose a token pack. enV verifies the final crypto invoice with Cryptomus before crediting your wallet."
+    ? "Choose a token pack. enV verifies the final crypto invoice before crediting your wallet."
     : process.env.CRYPTOMUS_PROVIDER_APPROVED !== "true"
-      ? "Crypto payments are unavailable until Cryptomus onboarding and the required compliance review are approved."
+      ? "Crypto payments are unavailable until Cryptomus onboarding and compliance approval are complete."
       : !refundDisputeHandlingApproved
-        ? "Crypto payments are disabled until refund and dispute reconciliation has been implemented, tested, and approved."
-        : "Secure crypto checkout is not configured for this deployment. No payment was taken.";
+        ? "Crypto payments are disabled until refund and dispute reconciliation has been approved."
+        : "Secure crypto checkout is not configured for this deployment.";
+
+  const providers = [
+    ...(paystack ? [paystack] : []),
+    ...(flutterwave ? [flutterwave] : []),
+    {
+      id: "cryptomus" as const,
+      label: "Pay with crypto",
+      enabled: cryptomusEnabled,
+      currency: "USD",
+      pricePerTokenMinor: cryptoPricePerTokenMinor,
+      packs: packsFor(cryptoPricePerTokenMinor, "USD"),
+      message: cryptomusMessage,
+    },
+  ];
+  const firstEnabled = providers.find((provider) => provider.enabled);
+  const country = normalizeCountryCode(countryCode);
 
   return {
-    enabled,
-    provider: "paystack",
-    currency: "NGN",
-    pricePerTokenMinor: pricePerTokenMinor ?? null,
-    packs: packsFor(pricePerTokenMinor, "NGN"),
-    providers: [
-      {
-        id: "paystack",
-        label: "Pay with cards",
-        enabled,
-        currency: "NGN",
-        pricePerTokenMinor: pricePerTokenMinor ?? null,
-        packs: packsFor(pricePerTokenMinor, "NGN"),
-        message: paystackMessage,
-      },
-      {
-        id: "cryptomus",
-        label: "Pay with crypto",
-        enabled: cryptomusEnabled,
-        currency: "USD",
-        pricePerTokenMinor: cryptoPricePerTokenMinor ?? null,
-        packs: packsFor(cryptoPricePerTokenMinor, "USD"),
-        message: cryptomusMessage,
-      },
-    ],
-    anyEnabled: enabled || cryptomusEnabled,
-    message: paystackMessage,
+    countryCode: country,
+    currency: firstEnabled?.currency ?? getCountryPaymentProfile(country)?.currency ?? null,
+    enabled: Boolean(firstEnabled),
+    provider: firstEnabled?.id ?? null,
+    providers,
+    anyEnabled: providers.some((provider) => provider.enabled),
+    message: country
+      ? "Payment methods are selected for your detected country. Only configured and approved provider currencies are enabled."
+      : "Your country could not be detected. Retry from an online connection to show local payment methods.",
   };
 }
 
-function requireLiveFunding() {
-  const options = getFundingOptions();
-  const secret = process.env.PAYSTACK_SECRET_KEY?.trim();
-  if (!options.enabled || !secret || !options.pricePerTokenMinor) {
-    throw Object.assign(new Error(options.message), { code: "PAYMENTS_NOT_CONFIGURED", status: 503 });
+function requireLiveFunding(countryCode: string | null) {
+  const configuration = resolvePaystackConfiguration(countryCode);
+  if (!configuration?.enabled || !configuration.secret ||
+      !configuration.pricePerTokenMinor || !configuration.origin) {
+    throw Object.assign(new Error("Paystack is not enabled for the detected country and currency."), {
+      code: "PAYMENTS_NOT_CONFIGURED", status: 503,
+    });
   }
-  return { secret, pricePerTokenMinor: options.pricePerTokenMinor, origin: publicOrigin()! };
+  return configuration;
 }
 
 function validIdempotencyKey(value: unknown): value is string {
@@ -109,8 +181,8 @@ export async function initializePaystackCheckout(input: {
   userId: string;
   tokenPack: number;
   idempotencyKey: unknown;
-}) {
-  const configuration = requireLiveFunding();
+}, countryCode: string | null) {
+  const configuration = requireLiveFunding(countryCode);
   if (!(TOKEN_PACKS as readonly number[]).includes(input.tokenPack) || !validIdempotencyKey(input.idempotencyKey)) {
     throw Object.assign(new Error("Choose a supported token pack and retry the checkout."), { code: "INVALID_PURCHASE", status: 400 });
   }
@@ -133,7 +205,7 @@ export async function initializePaystackCheckout(input: {
   );
   if (existing[0]) {
     const prior = existing[0];
-    if (prior.product_id !== `tokens-${input.tokenPack}` || Number(prior.amount_minor) !== amountMinor || prior.currency !== "NGN") {
+    if (prior.product_id !== `tokens-${input.tokenPack}` || Number(prior.amount_minor) !== amountMinor || prior.currency.toUpperCase() !== configuration.currency) {
       throw Object.assign(new Error("This checkout key was already used for a different purchase."), { code: "IDEMPOTENCY_CONFLICT", status: 409 });
     }
     if (prior.status === "pending" && prior.checkout_url) return { authorizationUrl: prior.checkout_url, reference: prior.id, tokens: input.tokenPack };
@@ -151,9 +223,10 @@ export async function initializePaystackCheckout(input: {
     `insert into billing_purchase_intents
       (id, user_id, provider, platform, product_id, amount_minor, currency, credits_subunits,
        status, idempotency_key, provider_metadata)
-     values ($1, $2, 'paystack', 'web', $3, $4, 'NGN', $5, 'created', $6, $7::jsonb)`,
+     values ($1, $2, 'paystack', 'web', $3, $4, $8, $5, 'created', $6, $7::jsonb)`,
     [intentId, input.userId, `tokens-${input.tokenPack}`, amountMinor, creditsSubunits, input.idempotencyKey,
-      JSON.stringify({ reference: intentId, tokenPack: input.tokenPack })],
+      JSON.stringify({ reference: intentId, tokenPack: input.tokenPack, currency: configuration.currency }),
+      configuration.currency],
   );
 
   try {
@@ -161,9 +234,10 @@ export async function initializePaystackCheckout(input: {
       method: "POST",
       headers: { Authorization: `Bearer ${configuration.secret}`, "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({
-        email, amount: String(amountMinor), currency: "NGN", reference: intentId,
+        email, amount: String(amountMinor), currency: configuration.currency, reference: intentId,
         callback_url: `${configuration.origin}/api/billing/paystack/verify`,
-        metadata: { purchaseIntentId: intentId, tokenPack: input.tokenPack },
+        metadata: { purchaseIntentId: intentId, tokenPack: input.tokenPack, currency: configuration.currency },
+        ...(configuration.international ? { channels: ["card"] } : {}),
       }),
       signal: AbortSignal.timeout(12_000),
     });
