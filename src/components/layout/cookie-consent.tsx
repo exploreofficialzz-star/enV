@@ -79,11 +79,16 @@ export function CookieConsent() {
       }
 
       if (advertisingEnabled || previousAdvertising !== "unset") {
-        setAdsterraConsent(nextAdvertisingAllowed ? "granted" : "denied");
+        const saved = setAdsterraConsent(nextAdvertisingAllowed ? "granted" : "denied");
         const storedChoice = getAdsterraConsent();
-        if (storedChoice !== (nextAdvertisingAllowed ? "granted" : "denied")) {
+        if (
+          (saved && storedChoice !== (nextAdvertisingAllowed ? "granted" : "denied")) ||
+          (!saved && (nextAdvertisingAllowed || previousAdvertising === "granted"))
+        ) {
           throw new Error("Your advertising choice could not be saved in this browser. Check site storage and try again.");
         }
+        // A first-visit decline is safe even when storage is blocked: the
+        // provider remains in its default unset/denied state for this session.
       }
 
       // Storage can be unavailable in a restricted browser context. That must
