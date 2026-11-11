@@ -96,7 +96,7 @@ export function CookieConsent() {
           </h2>
           <p id="env-cookie-description" className="mt-1.5 text-sm leading-5 text-neutral-600 dark:text-neutral-300">
             {adsterraEnabled
-              ? "Advertising is optional. If you allow it, Adsterra and its partners may process your IP address, browser and device details, page URL and referrer, and use cookies or similar storage for ad delivery, frequency capping, fraud prevention and measurement. Declining does not limit enV tools."
+              ? "Advertising helps support enV and keep its tools available. Choose whether Adsterra may load ads in this browser. If you allow ads, Adsterra and its partners may process your IP address, browser and device details, page URL and referrer, and use cookies or similar storage for delivery, frequency capping, fraud prevention and measurement. Your choice does not affect access to enV tools and can be changed in Privacy settings."
               : "enV uses essential browser storage for your account session and saved settings."}
           </p>
         </header>
@@ -114,7 +114,7 @@ export function CookieConsent() {
                 onClick={() => chooseAdvertising(false)}
                 className="inline-flex min-h-10 items-center justify-center rounded-xl border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-800 transition hover:bg-neutral-100 dark:border-neutral-700 dark:text-white dark:hover:bg-neutral-900"
               >
-                Not now
+                Decline ads
               </button>
               <button
                 type="button"
