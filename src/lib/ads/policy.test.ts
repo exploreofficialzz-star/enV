@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canShowAdForTool, isHybridAccessToolId, isHybridAdSupportedToolId, resolveAdConfig } from "./policy.ts";
+import { canShowAdForTool, isAdsterraQualifiedTool, isHybridAccessToolId, isHybridAdSupportedToolId, resolveAdConfig } from "./policy.ts";
 
 const goodEnvironment = {
   enabled: "true",
@@ -77,4 +77,17 @@ test("only explicitly selected, active, public device-local tools can show an ad
   assert.equal(canShowAdForTool(eligibleTool({ category: "fitness" }), config), false);
   assert.equal(canShowAdForTool(eligibleTool({ id: "finance-apr-calculator" }), config), false);
   assert.equal(canShowAdForTool(eligibleTool({ engine: { type: "url-media", op: "inspect" } }), config), false);
+});
+
+
+test("Adsterra qualification is based on active public device-local tools in the shared cross-platform cohort", () => {
+  assert.equal(isAdsterraQualifiedTool(eligibleTool()), true);
+  assert.equal(isAdsterraQualifiedTool(eligibleTool({ status: "beta" })), false);
+  assert.equal(isAdsterraQualifiedTool(eligibleTool({ requiresBackend: true })), false);
+  assert.equal(isAdsterraQualifiedTool(eligibleTool({ requiresAuth: true })), false);
+  assert.equal(isAdsterraQualifiedTool(eligibleTool({ clientSide: false })), false);
+  assert.equal(isAdsterraQualifiedTool(eligibleTool({ disclaimer: "health" })), false);
+  assert.equal(isAdsterraQualifiedTool(eligibleTool({ disclaimer: "finance" })), false);
+  assert.equal(isAdsterraQualifiedTool(eligibleTool({ category: "fitness" })), false);
+  assert.equal(isAdsterraQualifiedTool(eligibleTool({ id: "finance-apr-calculator" })), false);
 });
