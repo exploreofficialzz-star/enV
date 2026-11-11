@@ -25,7 +25,7 @@ export function CookieConsent() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const analyticsEnabled = import.meta.env.VITE_ANALYTICS_ENABLED === "true";
   const advertisingEnabled = isAdsterraEnabled();
-  const toolPathMatch = /^\\/tools\\/([^/]+)\\/([^/]+)$/.exec(pathname);
+  const toolPathMatch = /^\/tools\/([^/]+)\/([^/]+)$/.exec(pathname);
   const qualifiedTool = toolPathMatch
     ? getToolByPath(toolPathMatch[1], toolPathMatch[2])
     : undefined;
