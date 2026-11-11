@@ -299,7 +299,7 @@ function Account() {
       setReloadKey(value => value + 1);
       window.history.replaceState({}, "", "/wallet");
     } else if (paymentState === "pending") {
-      setFundingFeedback({ kind: "success", message: "The payment is still processing. No tokens were added yet; refresh after provider confirmation." });
+      setFundingFeedback({ kind: "info", message: "The payment is still processing. No tokens have been added yet; your wallet will update after the provider confirms the payment." });
       window.history.replaceState({}, "", "/wallet");
     } else if (paymentState === "failed" || paymentState === "unverified") {
       setFundingFeedback({ kind: "error", message: "The payment could not be verified. Your wallet was not credited. Contact support if you were charged." });
