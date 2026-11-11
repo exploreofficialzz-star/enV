@@ -2188,8 +2188,10 @@ struct NativeCameraStudioView: View {
                 .disabled(!(dualCameraMode ? dualCapture.ready : capture.ready) || countdown != nil)
                 Spacer()
                 VStack(alignment: .trailing, spacing: 3) {
-                    Text(capture.actualQuality).font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.envInk)
-                    if capture.zoomMaximum > 1 {
+                    if !dualCameraMode {
+                        Text(capture.actualQuality).font(.envScaled(size: 11, weight: .medium)).foregroundStyle(Color.envInk)
+                    }
+                    if !dualCameraMode && capture.zoomMaximum > 1 {
                         Slider(value: $zoom, in: 1...Double(capture.zoomMaximum), onEditingChanged: { editing in if !editing { capture.setZoom(zoom) } })
                             .frame(width: 132)
                     }
@@ -2208,7 +2210,7 @@ struct NativeCameraStudioView: View {
                 .disabled(capture.recording)
             }
 
-            if let exposureRange = capture.exposureBiasRange {
+            if !dualCameraMode, let exposureRange = capture.exposureBiasRange {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Text("Exposure compensation").font(.envScaled(size: 12, weight: .medium)).foregroundStyle(Color.envInk)
@@ -2246,7 +2248,8 @@ struct NativeCameraStudioView: View {
                 }
             }
 
-            DisclosureGroup("Advanced controls", isExpanded: $showAdvancedControls) {
+            if !dualCameraMode {
+                DisclosureGroup("Advanced controls", isExpanded: $showAdvancedControls) {
                 VStack(alignment: .leading, spacing: 12) {
                     if capture.lensOptions.count > 1 {
                         HStack {
@@ -2300,14 +2303,17 @@ struct NativeCameraStudioView: View {
                 }
                 .padding(.top, 8)
             }
-            .font(.envScaled(size: 12, weight: .medium))
+                .font(.envScaled(size: 12, weight: .medium))
+            }
 
-            HStack {
-                Text("Photo timer").font(.envScaled(size: 12, weight: .medium)).foregroundStyle(Color.envInk)
+            if !dualCameraMode && mode == "Photo" {
+                HStack {
+                    Text("Photo timer").font(.envScaled(size: 12, weight: .medium)).foregroundStyle(Color.envInk)
                 Spacer()
                 Picker("Timer", selection: $delaySeconds) {
                     Text("Off").tag(0); Text("3 sec").tag(3); Text("10 sec").tag(10)
-                }.pickerStyle(.menu)
+                    }.pickerStyle(.menu)
+                }
             }
 
             if !dualCameraMode {
