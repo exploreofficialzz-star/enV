@@ -16,7 +16,7 @@ assert.match(android, /CompositionSettings\.Builder\(\)[\s\S]*?\.setOffset\(0\.6
 assert.match(android, /SingleCameraConfig\(backSelector, group, rearComposition, lifecycleOwner\)/);
 assert.match(android, /SingleCameraConfig\(frontSelector, group, frontComposition, lifecycleOwner\)/);
 assert.match(android, /FaceMeshDetection\.getClient/);
-assert.match(android, /FaceMeshDetectorOptions\.DEFAULT_OPTIONS/);
+assert.match(android, /FaceMeshDetection\.getClient\(\)/, "Android uses the SDK-supported default Face Mesh client.");
 assert.match(android, /contourCenter\(FaceMesh\.LEFT_EYE\)/);
 assert.match(android, /contourCenter\(FaceMesh\.RIGHT_EYE\)/);
 assert.match(android, /contourCenter\(FaceMesh\.NOSE_BRIDGE\)/);
