@@ -192,7 +192,7 @@ assert.match(cryptomusVerifyRoute, /verifyAndCreditCryptomusReference/);
 assert.match(walletDashboard, /api\/billing\/cryptomus\/verify/);
 assert.match(walletDashboard, /The crypto payment is still processing/);
 assert.match(walletDashboard, /Choose how you want to pay/);
-assert.match(walletDashboard, /Pay with cards/);
+assert.match(walletDashboard, /Paystack/);
 assert.match(walletDashboard, /Pay with crypto/);
 assert.match(walletDashboard, /option\.enabled/);
 assert.match(walletDashboard, /checkout\.hostname !== expectedHost/);
