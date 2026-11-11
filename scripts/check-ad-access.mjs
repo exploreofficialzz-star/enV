@@ -6,6 +6,7 @@ const root = process.cwd();
 const read = (path) => readFileSync(resolve(root, path), "utf8");
 const rootRoute = read("src/routes/__root.tsx");
 const slot = read("src/components/tools/ad-slot.tsx");
+const adsterraWeb = read("src/components/ads/adsterra-ad.tsx");
 const webAdPrivacy = read("src/components/layout/ad-privacy-controls.tsx");
 const adsBrowser = read("src/lib/ads/browser.ts");
 const shell = read("src/components/tools/tool-shell.tsx");
@@ -65,6 +66,9 @@ assert.match(offlinePolicy, /tokenPolicy: "monetization-pending"/, "Offline exec
 assert.match(offline, /BILLING_OFFLINE_ENABLED !== "true"/, "Production offline token spending must remain fail-closed.");
 assert.match(env, /VITE_ADS_ENABLED=false/, "Ads must remain off by default in the environment template.");
 assert.match(env, /VITE_ADSENSE_PRIVACY_CONFIGURED=false/, "CMP readiness must remain off by default.");
+assert.match(adsterraWeb, /window\.addEventListener\("focus", onChange\)/, "Adsterra must retry when a mobile browser tab regains focus.");
+assert.match(adsterraWeb, /document\.addEventListener\("visibilitychange", onVisibilityChange\)/, "Adsterra must retry when the page becomes visible again.");
+assert.match(adsterraWeb, /window\.setInterval\([\s\S]*?15_000\)/, "Adsterra must retry transient same-origin reachability failures while visible.");
 assert.match(privacy, /advertisingEnabled = import\.meta\.env\.VITE_ADS_ENABLED === "true"/, "Privacy disclosure must appear when ad serving is enabled.");
 assert.match(privacy, /frequency capping and aggregated reporting/, "Privacy disclosure must explain NPA identifier use.");
 assert.match(privacyControls, /separate provider and CMP privacy choices/, "Analytics consent must be distinct from advertising consent.");
