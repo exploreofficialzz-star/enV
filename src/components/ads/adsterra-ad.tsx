@@ -42,16 +42,29 @@ function useAdsterraReady(): boolean {
       if (active && version === requestVersion) setReady(online);
     };
     const onChange = () => { void refresh(); };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
     void refresh();
+    // Mobile browsers can resume a tab without firing an online event. Retry
+    // same-origin reachability when the page returns and at a bounded interval.
+    const retryHandle = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refresh();
+    }, 15_000);
     window.addEventListener("online", onChange);
     window.addEventListener("offline", onChange);
+    window.addEventListener("focus", onChange);
     window.addEventListener("env:adsterra-consent-changed", onChange);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       active = false;
       requestVersion += 1;
+      window.clearInterval(retryHandle);
       window.removeEventListener("online", onChange);
       window.removeEventListener("offline", onChange);
+      window.removeEventListener("focus", onChange);
       window.removeEventListener("env:adsterra-consent-changed", onChange);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
 
