@@ -39,11 +39,11 @@ function paystackCurrencyConfiguration(currency: string, international: boolean)
   const configuredPrice = process.env["PAYSTACK_TOKEN_PRICE_" + currency + "_MINOR"] ??
     (currency === "NGN" ? process.env.PAYSTACK_TOKEN_PRICE_NGN_KOBO : undefined);
   const pricePerTokenMinor = readSafePackPrice(configuredPrice, TOKEN_PACKS);
-  const approved = international
+  const currencyApproved = currency === "NGN"
     ? process.env.PAYSTACK_PROVIDER_APPROVED === "true"
-    : currency === "NGN"
-      ? process.env.PAYSTACK_PROVIDER_APPROVED === "true"
-      : process.env["PAYSTACK_PROVIDER_APPROVED_" + currency] === "true";
+    : process.env["PAYSTACK_PROVIDER_APPROVED_" + currency] === "true";
+  const approved = currencyApproved &&
+    (!international || process.env.PAYSTACK_PROVIDER_APPROVED === "true");
   return { currency, international, secret, pricePerTokenMinor, approved };
 }
 
