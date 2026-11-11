@@ -46,14 +46,14 @@ test("country profiles expose the documented Flutterwave local currencies and me
   assert.equal(getCountryPaymentProfile("GH")?.paymentOptions.includes("mobilemoneyghana"), true);
   assert.equal(getCountryPaymentProfile("KE")?.paymentOptions.includes("mpesa"), true);
   assert.equal(getCountryPaymentProfile("ZA")?.currency, "ZAR");
-  assert.equal(getCountryPaymentProfile("BF")?.currency, "XOF");
-  assert.equal(getCountryPaymentProfile("CI")?.currency, "XOF");
-  assert.equal(getCountryPaymentProfile("SN")?.currency, "XOF");
-  assert.equal(getCountryPaymentProfile("CM")?.currency, "XAF");
-  assert.equal(getCountryPaymentProfile("CF")?.currency, "XAF");
-  assert.equal(getCountryPaymentProfile("CG")?.currency, "XAF");
-  assert.equal(getCountryPaymentProfile("GA")?.currency, "XAF");
-  assert.equal(getCountryPaymentProfile("GQ")?.currency, "XAF");
+  for (const country of ["BJ", "BF", "CI", "GW", "ML", "NE", "SN", "TG"]) {
+    assert.equal(getCountryPaymentProfile(country)?.currency, "XOF", country + " must use the XOF profile");
+    assert.equal(getCountryPaymentProfile(country)?.paymentOptions.includes("mobilemoneyxof"), true);
+  }
+  for (const country of ["CM", "TD", "CF", "CG", "GQ", "GA"]) {
+    assert.equal(getCountryPaymentProfile(country)?.currency, "XAF", country + " must use the XAF profile");
+    assert.equal(getCountryPaymentProfile(country)?.paymentOptions.includes("mobilemoneyxaf"), true);
+  }
   assert.equal(getCountryPaymentProfile("ZM")?.paymentOptions.includes("mobilemoneyzambia"), true);
   assert.equal(getCountryPaymentProfile("DE")?.currency, "EUR");
   assert.equal(getCountryPaymentProfile("BG")?.currency, "EUR");
