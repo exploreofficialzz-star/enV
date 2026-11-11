@@ -61,7 +61,7 @@ Honest behaviour notes:
 
 ## Providers and models
 
-Most registry rows were checked against provider documentation on **2026-09-30**; the MOSS-Music/Modal row was researched on **2026-10-25**. Prices and model lists change: re-verify before relying on them, and record what you checked in the row's `notes`.
+Most registry rows were checked against provider documentation on **2026-09-30**; the MOSS-Music/Modal row was researched on **2026-10-25**, and Cloudflare Workers AI on **2026-11-11**. Prices and model lists change: re-verify before relying on them, and record what you checked in the row's `notes`.
 
 | Provider | Model id | Used for | Cost class | List price | Sensitive tasks |
 | --- | --- | --- | --- | --- | --- |
@@ -72,7 +72,7 @@ Most registry rows were checked against provider documentation on **2026-09-30**
 | Groq | `whisper-large-v3` | speech-to-text | LOW | $0.111 per audio hour | yes |
 | OpenRouter | `openai/gpt-oss-20b:free` | text, structured | FREE | $0 (rate limited; providers may log) | **no** |
 | OpenRouter | `openai/gpt-oss-20b` | text, structured | LOW | about $0.02 / $0.10 (varies by upstream) | yes (`data_collection: deny` is sent) |
-| Gemini | `gemini-3.8-flash` | vision, structured | STANDARD | $0.75 / $3.75 through 2026-12-31, then $1.50 / $7.50 | only with `AI_GEMINI_TIER=paid` |
+| Gemini | `gemini-3.8-flash` | text, structured, vision | FREE when explicitly configured as Free tier for standard-privacy text tasks; STANDARD for paid tier | Free input/output with limited access; Paid $0.75 / $3.75 per 1M tokens through 2026-12-31, then $1.50 / $7.50 from 2027-01-01 | Free tier may use submitted content to improve Google products; sensitive tasks remain blocked unless explicitly acknowledged |
 | Cloudflare Workers AI | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` | text, JSON Mode (best-effort) | STANDARD | $0.293 / $2.253 per 1M input/output tokens; 10,000 Neurons/day included, then paid overage | documented Zero Data Retention for this model |
 
 Cost classes come from list price: FREE = zero; LOW ≤ $1 per 1M tokens (input + output) or ≤ $0.25 per audio hour; GPU compute rates up to $1/hour are LOW and up to $10/hour are STANDARD; above that PREMIUM. GPU cost estimates use the model service's measured inference time and exclude cold-start/idle time and non-GPU charges. Gemini's date-based price change is encoded (`pricingUntil`).
@@ -96,7 +96,7 @@ All optional. See `.env.example`. Never prefix a secret with `VITE_`.
 | `AI_ENABLED` | `true` | Master switch. |
 | `AI_PROVIDER_ORDER` | `moss_music,groq,openrouter,gemini,cloudflare` | Providers allowed to be used and the tie-break order. `mock` is accepted outside production for local development. |
 | `AI_MAX_COST_CLASS` | `LOW` | Highest cost class allowed (`FREE`, `LOW`, `STANDARD`, `PREMIUM`). Set `STANDARD` to allow Modal MOSS-Music and the registered vision model. |
-| `AI_GEMINI_TIER` | unknown | `paid` if billing is on for the Gemini project; `free` otherwise. Unknown is treated as free for privacy routing. |
+| `AI_GEMINI_TIER` | unknown | Set to `free` only when the configured Gemini project uses the Free tier, or `paid` when billing is enabled. Unknown does not activate Free-tier routes. Free tier is enabled only for standard-privacy text/structured-text tasks; it is excluded from sensitive tasks and image/audio usage. |
 | `AI_SENSITIVE_ALLOW_FREE_TIER` | `false` | Accept routing sensitive tasks to free-tier / may-train models. |
 | `AI_DAILY_BUDGET_USD` | `2` | Estimated daily spend after which paid models stop being used. `0` means free models only. |
 | `AI_DAILY_REQUEST_LIMIT` | `2000` | Deployment-wide daily request failsafe (uncached requests). |

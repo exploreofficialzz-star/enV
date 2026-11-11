@@ -166,3 +166,21 @@ test("operator-defined account request quotas block every key in the same scope"
   assert.ok(!decision.routes.some((route) => route.model.provider === "groq"));
   assert.ok(decision.rejected.some((item) => item.reason === "connection-quota-exhausted"));
 });
+
+
+test("Gemini Free tier is zero-cost only for standard-privacy text tasks", () => {
+  const freeText = context({ AI_PROVIDER_ORDER: "gemini", AI_GEMINI_TIER: "free", AI_DAILY_BUDGET_USD: "0" });
+  const textDecision = routeTask(task("creator.caption.generate"), freeText);
+  assert.deepEqual(keys(freeText, "creator.caption.generate"), ["gemini:gemini-3.8-flash"]);
+  assert.equal(textDecision.routes[0]!.model.costClass, "FREE");
+  assert.equal(textDecision.routes[0]!.model.free, true);
+  assert.deepEqual(textDecision.routes[0]!.model.pricing, { inputPerMTok: 0, outputPerMTok: 0 });
+
+  const sensitive = context({ AI_PROVIDER_ORDER: "gemini", AI_GEMINI_TIER: "free", AI_MAX_COST_CLASS: "STANDARD" });
+  const sensitiveDecision = routeTask(task("developer.json.explain"), sensitive);
+  assert.deepEqual(sensitiveDecision.candidates, []);
+  assert.equal(sensitiveDecision.rejected.find((item) => item.model === "gemini:gemini-3.8-flash")!.reason, "privacy-not-allowed");
+
+  const paid = context({ AI_PROVIDER_ORDER: "gemini", AI_GEMINI_TIER: "paid" });
+  assert.deepEqual(keys(paid, "creator.caption.generate"), []);
+});

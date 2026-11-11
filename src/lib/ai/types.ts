@@ -31,7 +31,7 @@ export const QUALITY_RANK: Record<QualityTier, number> = { fast: 0, balanced: 1,
 export type LatencyClass = "fast" | "normal" | "slow";
 export type Modality = "text" | "image" | "audio";
 export type PrivacyLevel = "standard" | "sensitive";
-/** strict = provider enforces the schema, json-schema = best-effort schema, none = prompt only. */
+/** strict/json-schema = schema enforcement, json-mode = JSON object mode only (validate locally), none = prompt only. */
 export type StructuredSupport = "strict" | "json-schema" | "json-mode" | "none";
 export type FinishReason = "stop" | "length" | "content-filter" | "error" | "unknown";
 export type JsonSchema = { [key: string]: unknown };

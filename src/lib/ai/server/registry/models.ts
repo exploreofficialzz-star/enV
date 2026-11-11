@@ -12,6 +12,7 @@ import { CAPABILITIES, COST_CLASSES, PROVIDER_IDS } from "../../types.ts";
 
 const CHECKED = "Checked against provider docs on 2026-09-30.";
 const MOSS_CHECKED = "Checked against the OpenMOSS MOSS-Music README and SGLang serving guide on 2026-10-25.";
+const CLOUDFLARE_CHECKED = "Checked against Cloudflare Workers AI model, JSON Mode and pricing docs on 2026-11-11.";
 
 export const MODEL_REGISTRY: readonly ModelRecord[] = [
   {
@@ -233,7 +234,7 @@ export const MODEL_REGISTRY: readonly ModelRecord[] = [
     reasoning: false,
     outputHeadroomTokens: 0,
     sensitiveOk: true,
-    notes: `${CHECKED} Official Cloudflare model documentation lists a 24,000-token context, JSON Mode support, Zero Data Retention, and $0.293/M input plus $2.253/M output pricing. JSON Schema adherence is best-effort and remains validated by enV's task schema/repair path. Workers AI includes 10,000 Neurons per day; overage is $0.011/1,000 Neurons on Workers Paid, while requests stop at the Free-plan allowance. enV keeps this model STANDARD-cost and estimates usage from the published token rates rather than treating the allowance as unlimited free inference.`,
+    notes: `${CLOUDFLARE_CHECKED} Official Cloudflare model documentation lists a 24,000-token context, JSON Mode support, Zero Data Retention, and $0.293/M input plus $2.253/M output pricing. JSON Schema adherence is best-effort and remains validated by enV's task schema/repair path. Workers AI includes 10,000 Neurons per day; overage is $0.011/1,000 Neurons on Workers Paid, while requests stop at the Free-plan allowance. enV keeps this model STANDARD-cost and estimates usage from the published token rates rather than treating the allowance as unlimited free inference.`,
   },
   {
     provider: "mock",

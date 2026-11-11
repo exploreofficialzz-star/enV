@@ -71,7 +71,16 @@ export function routeTask(task: TaskMeta, ctx: RouteContext, options: { inputByt
   const rejected: Rejection[] = [];
   const budgetSpent = config.limits.dailyBudgetUsd <= 0 || usage.spendTodayUsd() >= config.limits.dailyBudgetUsd;
 
-  for (const model of models) {
+  for (const registeredModel of models) {
+    // Gemini Free tier has free input/output, limited access, and may use submitted content to improve Google products.
+    // Apply its zero-price tier only to standard-privacy text tasks; sensitive and multimodal tasks stay excluded.
+    const useGeminiFreeTextTier = registeredModel.provider === "gemini"
+      && config.geminiTier === "free"
+      && task.privacy !== "sensitive"
+      && (task.capability === "TEXT_GENERATION" || task.capability === "STRUCTURED_TEXT");
+    const model: ModelRecord = useGeminiFreeTextTier
+      ? { ...registeredModel, costClass: "FREE", free: true, pricing: { inputPerMTok: 0, outputPerMTok: 0 }, pricingUntil: undefined, pricingAfter: undefined }
+      : registeredModel;
     const key = modelKey(model);
     const reject = (reason: RejectionReason) => void rejected.push({ model: key, reason });
     const connections = providerAdapters(adapters[model.provider]);
