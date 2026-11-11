@@ -19,7 +19,7 @@ export function AdsterraPrivacyControls() {
     setAdsterraConsent(granted ? "granted" : "denied");
     setChoice(granted ? "granted" : "denied");
     if (granted) {
-      setMessage("Advertising is allowed in this browser. Adsterra placements load only on supported online pages.");
+      setMessage("Advertising is enabled for this browser. Adsterra placements load on supported online pages.");
     } else {
       window.location.reload();
     }
@@ -29,7 +29,7 @@ export function AdsterraPrivacyControls() {
     <section className="rounded-xl border border-border bg-surface p-4 sm:p-5" aria-labelledby="adsterra-privacy-heading">
       <h2 id="adsterra-privacy-heading" className="text-lg font-semibold text-fg">Adsterra advertising choices</h2>
       <p className="mt-2 text-sm leading-6 text-muted">
-        When allowed, Adsterra and its advertising partners may process your IP address, browser and device information, page URL and referrer, and may use cookies or similar storage for ad delivery, frequency capping, fraud prevention and measurement.
+        Advertising helps support enV. When you allow it, Adsterra and its advertising partners may process your IP address, browser and device information, page URL and referrer, and may use cookies or similar storage for ad delivery, frequency capping, fraud prevention and measurement.
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <span className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-fg">
