@@ -245,9 +245,10 @@ assert.match(countryRouting, /CLOUDFLARE_ORIGIN_LOCKDOWN_APPROVED/);
 assert.match(paystackProviderConfig, /PAYSTACK_MERCHANT_COUNTRY/);
 assert.match(paystackProviderConfig, /PAYSTACK_MERCHANT_ACCEPTED_CURRENCIES/);
 assert.match(paystackProviderConfig, /PAYSTACK_INTERNATIONAL_ENABLED/);
-for (const country of ["NG", "GH", "KE", "ZA", "MW", "UG", "RW", "TZ", "BF", "CI", "SN", "CM", "CF", "CG", "GQ", "GA", "ZM", "EG", "GB", "US", "BG"]) {
+for (const country of ["NG", "GH", "KE", "ZA", "MW", "UG", "RW", "TZ", "BF", "CI", "SN", "CM", "CF", "CG", "GQ", "GA", "ZM", "EG", "GB", "US"]) {
   assert.ok(countryRouting.includes(country + ":"), "country routing must include " + country);
 }
+assert.ok(countryRouting.includes('"BG"'), "Bulgaria must resolve through the Euro-area membership set");
 assert.match(flutterwaveService, /FLW_SECRET_KEY/);
 assert.match(flutterwaveService, /FLW_SECRET_HASH/);
 assert.match(flutterwaveService, /FLUTTERWAVE_ENABLED_CURRENCIES/);
