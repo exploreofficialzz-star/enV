@@ -31,6 +31,9 @@ test("country profiles expose country-specific Flutterwave currencies and method
   assert.equal(getCountryPaymentProfile("CI")?.currency, "XOF");
   assert.equal(getCountryPaymentProfile("CM")?.currency, "XAF");
   assert.equal(getCountryPaymentProfile("DE")?.currency, "EUR");
+  assert.equal(getCountryPaymentProfile("DK")?.currency, "EUR");
+  assert.equal(getCountryPaymentProfile("NO")?.currency, "EUR");
+  assert.equal(getCountryPaymentProfile("PL")?.currency, "EUR");
   assert.equal(getCountryPaymentProfile("JP"), null);
 });
 
