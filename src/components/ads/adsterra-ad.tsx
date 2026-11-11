@@ -218,7 +218,7 @@ export function AdsterraNativeBanner() {
         }, delay);
       }
     }, { once: true });
-    container.insertAdjacentElement("afterend", script);
+    container.insertAdjacentElement("beforebegin", script);
     scriptRef.current = script;
     return () => {
       active = false;
@@ -258,10 +258,11 @@ export function AdsterraPopunder() {
     let active = true;
     let loading = false;
     let loaded = false;
+    let attempts = 0;
     let script: HTMLScriptElement | null = null;
 
     const refresh = async () => {
-      if (!active || loaded || loading) return;
+      if (!active || loaded || loading || attempts >= 4) return;
       if (!canRequestAdsterraAds(isAdsterraEnabled(), getAdsterraConsent(), navigator.onLine)) return;
 
       loading = true;
@@ -275,6 +276,7 @@ export function AdsterraPopunder() {
         return;
       }
 
+      attempts += 1;
       const nextScript = document.createElement("script");
       nextScript.async = true;
       nextScript.setAttribute("data-cfasync", "false");
