@@ -93,8 +93,10 @@ export function resolvePaystackCountryConfiguration(
   const currencyApproved = currency === "NGN"
     ? env.PAYSTACK_PROVIDER_APPROVED === "true"
     : env["PAYSTACK_PROVIDER_APPROVED_" + currency] === "true";
-  const approved = currencyApproved &&
-    (!international || env.PAYSTACK_PROVIDER_APPROVED === "true");
+  // The global approval is the merchant-level business-model gate for every
+  // Paystack country. Currency-specific approval adds a second gate for
+  // non-NGN merchant settlement accounts.
+  const approved = env.PAYSTACK_PROVIDER_APPROVED === "true" && currencyApproved;
 
   return {
     country,
