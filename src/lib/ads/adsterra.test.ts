@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   ADSTERRA_BANNER_UNITS,
   ADSTERRA_NATIVE_BANNER,
+  ADSTERRA_POPUNDER_SCRIPT,
   canRequestAdsterraAds,
 } from "./adsterra.ts";
 
@@ -25,4 +26,12 @@ test("Adsterra requests require deployment enablement, explicit advertising cons
   assert.equal(canRequestAdsterraAds(true, "unset", true), false);
   assert.equal(canRequestAdsterraAds(true, "denied", true), false);
   assert.equal(canRequestAdsterraAds(true, "granted", false), false);
+});
+
+
+test("Popunder uses the exact publisher-supplied Web script", () => {
+  assert.equal(
+    ADSTERRA_POPUNDER_SCRIPT.src,
+    "https://abscloud.org/1/b39264253fbfc622884c9a3b81882853",
+  );
 });
