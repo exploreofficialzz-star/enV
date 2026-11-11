@@ -1185,7 +1185,7 @@ fun NativeCameraStudioScreen() {
         }
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Face effects", style = MaterialTheme.typography.labelMedium)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf("Off", "Glasses", "Crown", "Bunny ears", "Moustache", "Soft glow").chunked(3).forEach { effects ->
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         effects.forEach { effect ->
