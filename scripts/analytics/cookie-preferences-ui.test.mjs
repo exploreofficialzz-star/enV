@@ -18,13 +18,15 @@ const viewMode = readFileSync(new URL("../../src/lib/view-mode.ts", import.meta.
 const settingsPage = readFileSync(new URL("../../src/routes/settings.tsx", import.meta.url), "utf8");
 const header = readFileSync(new URL("../../src/components/layout/header.tsx", import.meta.url), "utf8");
 
-test("one global cookie dialog controls essential storage, optional analytics and Adsterra advertising", () => {
+test("one global non-blocking cookie banner controls essential storage, optional analytics and Adsterra advertising", () => {
   assert.match(rootDocument, /<CookieConsent \/>/, "The unified cookie dialog must be mounted once for all Web routes.");
   assert.match(cookieConsent, /Cookie preferences/);
-  assert.match(cookieConsent, /Essential cookies and storage/);
+  assert.match(cookieConsent, /Essential storage/);
+  assert.match(cookieConsent, /role="region"/);
+  assert.doesNotMatch(cookieConsent, /<dialog|showModal|backdrop:/);
   assert.match(cookieConsent, /Always active/);
   assert.match(cookieConsent, /Optional analytics/);
-  assert.match(cookieConsent, /Advertising cookies and technologies/);
+  assert.match(cookieConsent, /Adsterra advertising/);
   assert.match(cookieConsent, /Allow Adsterra advertising/);
   assert.match(cookieConsent, /Accept all/);
   assert.match(cookieConsent, /Reject optional/);
