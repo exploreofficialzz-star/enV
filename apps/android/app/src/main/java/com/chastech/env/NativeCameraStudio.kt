@@ -434,7 +434,7 @@ fun NativeCameraStudioScreen() {
     // ML Kit Face Mesh supplies 468 3D landmarks for more stable AR mask placement.
     // It is only processing camera frames while an optional face effect is enabled.
     val faceMeshDetector = remember {
-        FaceMeshDetection.getClient(FaceMeshDetectorOptions.DEFAULT_OPTIONS)
+        FaceMeshDetection.getClient()
     }
     val lastFaceAnalysisNanos = remember { AtomicLong(0L) }
     val faceAnalysisExecutor = remember { Executors.newSingleThreadExecutor() }
