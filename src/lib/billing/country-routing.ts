@@ -28,9 +28,9 @@ const COUNTRY_PROFILES: Record<string, CountryPaymentProfile> = {
   US: { countryCode: "US", currency: "USD", paymentOptions: ["card", "account"] },
 };
 
-const EURO_COUNTRIES = new Set([
-  "AT", "BE", "CY", "DE", "EE", "ES", "FI", "FR", "GR", "HR", "IE", "IT",
-  "LT", "LU", "LV", "MT", "NL", "PT", "SI", "SK",
+const EURO_ACCOUNT_COUNTRIES = new Set([
+  "AT", "BE", "DK", "DE", "EE", "ES", "FI", "FR", "IE", "IT", "LV", "LT",
+  "NL", "NO", "PL", "PT", "SE",
 ]);
 
 export function normalizeCountryCode(value: string | null | undefined): string | null {
@@ -51,7 +51,7 @@ export function getCountryPaymentProfile(countryCode: string | null | undefined)
   if (!country) return null;
   const direct = COUNTRY_PROFILES[country];
   if (direct) return direct;
-  if (EURO_COUNTRIES.has(country)) {
+  if (EURO_ACCOUNT_COUNTRIES.has(country)) {
     return { countryCode: country, currency: "EUR", paymentOptions: ["card", "account"] };
   }
   return null;
