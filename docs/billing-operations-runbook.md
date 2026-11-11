@@ -11,9 +11,9 @@
 
 ## Country-aware provider routing
 
-The Web funding-options and purchase routes use the hosting-edge country header. They do not accept a browser-provided country or currency, and they do not default an unknown visitor to Nigeria. Review `docs/payment-provider-routing.md` before changing country, currency or provider settings.
+The Web funding-options and purchase routes use Vercel's `x-vercel-ip-country` edge header. Cloudflare's `cf-ipcountry` is ignored unless `COUNTRY_GEO_PROVIDER=cloudflare` and `CLOUDFLARE_ORIGIN_LOCKDOWN_APPROVED=true`; direct access to the Vercel origin must be blocked before enabling that fallback. The API does not accept a browser-provided country or currency and never defaults an unknown visitor to Nigeria. Review `docs/payment-provider-routing.md` before changing country, currency or provider settings.
 
-Paystack local markets require the appropriate merchant account currency, currency-specific key, approval and finance price. A fallback for international cards is separately disabled unless the merchant has enabled international acceptance in the Paystack dashboard. It does not provide local payment rails for the visitor's country.
+Set `PAYSTACK_MERCHANT_COUNTRY` to the actual registration country of the configured merchant account. Paystack local checkout is offered only to customers detected in that country. Customers elsewhere can use Paystack only with `PAYSTACK_INTERNATIONAL_ENABLED=true`, the merchant's dashboard approval and a receiving currency allowed for that merchant country. International checkout is card-only; it does not give a foreign customer the merchant's local USSD, bank-transfer or mobile-money methods.
 
 Flutterwave checkout is configured with a country-specific currency and allowlisted `payment_options`. Set `FLUTTERWAVE_ENABLED_CURRENCIES` only to currencies enabled on the actual merchant account. Configure `FLW_SECRET_KEY`, the exact dashboard webhook `FLW_SECRET_HASH`, and the finance-approved `FLUTTERWAVE_TOKEN_PRICE_<CURRENCY>_MINOR` for every currency. The Flutterwave adapter also requires `FLUTTERWAVE_REFUND_DISPUTE_HANDLING_APPROVED=true`; keep it false until refund/chargeback events, wallet reversals, webhook retries, already-spent credits and recovery have been implemented and tested.
 
