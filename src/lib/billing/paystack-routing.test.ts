@@ -21,6 +21,26 @@ test("Paystack local checkout is available only in the configured merchant regis
   assert.equal(resolvePaystackCountryConfiguration("GH", approvedNigeria, PACKS), null);
 });
 
+test("Paystack local merchant account requires both global and currency-specific approval", () => {
+  const ghana = {
+    PAYSTACK_MERCHANT_COUNTRY: "GH",
+    PAYSTACK_SECRET_KEY_GHS: "sk_test_ghana",
+    PAYSTACK_PROVIDER_APPROVED: "false",
+    PAYSTACK_PROVIDER_APPROVED_GHS: "true",
+    PAYSTACK_TOKEN_PRICE_GHS_MINOR: "1",
+  };
+  assert.equal(resolvePaystackCountryConfiguration("GH", ghana, PACKS)?.enabled, false);
+  assert.equal(resolvePaystackCountryConfiguration("GH", {
+    ...ghana,
+    PAYSTACK_PROVIDER_APPROVED: "true",
+  }, PACKS)?.enabled, true);
+  assert.equal(resolvePaystackCountryConfiguration("GH", {
+    ...ghana,
+    PAYSTACK_PROVIDER_APPROVED: "true",
+    PAYSTACK_PROVIDER_APPROVED_GHS: "false",
+  }, PACKS)?.enabled, false);
+});
+
 test("Paystack international visitors use card-only merchant settlement currency", () => {
   const foreign = resolvePaystackCountryConfiguration("GH", {
     ...approvedNigeria,
