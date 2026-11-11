@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { getSql } from "../db";
 import { readWallet, creditVerifiedPurchase } from "./ledger.server";
-import { readSafePackPrice, requirePaystackVerificationSecret } from "./provider-config";
+import { readSafePackPrice, requirePaystackVerificationSecret, resolvePaystackCountryConfiguration } from "./provider-config";
 import { readBoundedBytes } from "./bounded-json.server";
 import { getCountryPaymentProfile, normalizeCountryCode } from "./country-routing";
 import { getFlutterwaveFundingOption } from "./flutterwave.server";
@@ -19,70 +19,19 @@ function publicOrigin(): string | null {
   } catch { return null; }
 }
 
-const PAYSTACK_MARKET_CURRENCIES: Record<string, string> = {
-  NG: "NGN",
-  GH: "GHS",
-  KE: "KES",
-  ZA: "ZAR",
-};
-
-const PAYSTACK_MERCHANT_CURRENCIES: Record<string, readonly string[]> = {
-  NG: ["NGN", "USD"],
-  GH: ["GHS"],
-  KE: ["KES", "USD"],
-  ZA: ["ZAR"],
-};
-
-function paystackCurrencyConfiguration(currency: string, international: boolean) {
-  const secret = process.env["PAYSTACK_SECRET_KEY_" + currency]?.trim() ??
-    (currency === "NGN" ? process.env.PAYSTACK_SECRET_KEY?.trim() : undefined) ?? "";
-  const configuredPrice = process.env["PAYSTACK_TOKEN_PRICE_" + currency + "_MINOR"] ??
-    (currency === "NGN" ? process.env.PAYSTACK_TOKEN_PRICE_NGN_KOBO : undefined);
-  const pricePerTokenMinor = readSafePackPrice(configuredPrice, TOKEN_PACKS);
-  const currencyApproved = currency === "NGN"
-    ? process.env.PAYSTACK_PROVIDER_APPROVED === "true"
-    : process.env["PAYSTACK_PROVIDER_APPROVED_" + currency] === "true";
-  const approved = currencyApproved &&
-    (!international || process.env.PAYSTACK_PROVIDER_APPROVED === "true");
-  return { currency, international, secret, pricePerTokenMinor, approved };
-}
-
 function resolvePaystackConfiguration(countryCode: string | null | undefined) {
-  const country = normalizeCountryCode(countryCode);
-  const merchantCountry = normalizeCountryCode(process.env.PAYSTACK_MERCHANT_COUNTRY);
-  if (!country || !merchantCountry) return null;
+  const selected = resolvePaystackCountryConfiguration(countryCode, process.env, TOKEN_PACKS);
+  if (!selected) return null;
 
-  const merchantLocalCurrency = PAYSTACK_MARKET_CURRENCIES[merchantCountry];
-  const acceptedCurrencies = PAYSTACK_MERCHANT_CURRENCIES[merchantCountry];
-  if (!merchantLocalCurrency || !acceptedCurrencies) return null;
-
-  const customerIsInMerchantCountry = country === merchantCountry;
-  const international = !customerIsInMerchantCountry;
-  if (international && process.env.PAYSTACK_INTERNATIONAL_ENABLED !== "true") return null;
-
-  // Local methods are offered only to customers in the country where the
-  // configured Paystack merchant account is registered. Customers elsewhere
-  // can use card checkout only, settled in a currency approved for that
-  // merchant country (for example, Nigeria supports NGN/USD; Ghana supports GHS).
-  const currency = customerIsInMerchantCountry
-    ? merchantLocalCurrency
-    : process.env.PAYSTACK_INTERNATIONAL_CURRENCY?.trim().toUpperCase() || merchantLocalCurrency;
-  if (!acceptedCurrencies.includes(currency)) return null;
-
-  const selected = paystackCurrencyConfiguration(currency, international);
   const launchChecksPassed =
     process.env.BILLING_LAUNCH_ENABLED === "true" &&
     process.env.BILLING_ENFORCEMENT_ENABLED === "true" &&
     process.env.BILLING_REFUND_DISPUTE_HANDLING_APPROVED === "true" &&
     Boolean(publicOrigin());
 
-  const enabled = launchChecksPassed && selected.approved &&
-    Boolean(selected.secret) && selected.pricePerTokenMinor !== null;
   return {
-    country,
-    merchantCountry,
     ...selected,
-    enabled,
+    enabled: launchChecksPassed && selected.enabled,
     origin: publicOrigin(),
   };
 }
