@@ -274,6 +274,7 @@ assert.match(iosDualCamera, /configureBestAvailableSession/);
 assert.match(iosDualCamera, /lastAppendedBackTime/, "iOS dual capture never reuses an already-written rear frame.");
 assert.match(iosDualCamera, /lastAppendedFrontTime/, "iOS dual capture never reuses an already-written front frame.");
 assert.match(iosDualCamera, /outputHeight - 330 - 24/, "iOS dual export places PiP at the top-right, like the preview layers.");
+assert.match(iosCamera, /\.aspectRatio\(dualCameraMode \? 9\.0 \/ 16\.0 : 4\.0 \/ 3\.0, contentMode: \.fit\)/, "iOS dual preview uses the same portrait aspect ratio as the exported video.");
 assert.match(iosDualCamera, /configureSession\(maxWidth: 1280, maxHeight: 720, frameRate: 30\)/);
 assert.match(iosDualCamera, /configureSession\(maxWidth: 640, maxHeight: 480, frameRate: 24\)/);
 assert.match(iosDualCamera, /format\.isMultiCamSupported/);
