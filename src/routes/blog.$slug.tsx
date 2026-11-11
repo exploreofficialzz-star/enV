@@ -119,7 +119,6 @@ function BlogResourcePage() {
 }
 
 function BlogArticlePage({ article }: { article: BlogArticle }) {
-  const firstEligibleAdSection = article.sections.findIndex((section) => section.paragraphs.length >= 2);
   return (
     <AppShell>
       <article className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
@@ -135,7 +134,7 @@ function BlogArticlePage({ article }: { article: BlogArticle }) {
           <p className="mt-4 text-base leading-7 text-muted">{article.summary}</p>
         </header>
         <div className="mt-8 space-y-8">
-          {article.sections.map((section, sectionIndex) => (
+          {article.sections.map((section) => (
             <section key={section.heading} className="space-y-3">
               <h2 className="text-xl font-semibold text-fg">{section.heading}</h2>
               {section.paragraphs.map((paragraph, paragraphIndex) => (
