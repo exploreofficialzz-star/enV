@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "@tanstack/react-router";
-import { getAdsterraConsent, isAdsterraEnabled, setAdsterraConsent, type AdsterraConsent } from "@/lib/ads/adsterra";
+import { getAdsterraConsent, isAdsterraEnabled, setAdsterraConsent } from "@/lib/ads/adsterra";
 
 const NOTICE_KEY = "env.cookie-preferences.seen.v2";
 const OPEN_EVENT = "env:open-cookie-preferences";
