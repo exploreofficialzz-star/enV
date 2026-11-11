@@ -14,10 +14,6 @@ export function PrivacyControls() {
 
   useEffect(()=>{setChoice(getAnalyticsConsent());},[]);
 
-  function openCookiePreferences() {
-    window.dispatchEvent(new Event("env:open-cookie-preferences"));
-  }
-
   async function update(granted:boolean) {
     setSaving(true);setError("");setMessage("");
     try {
@@ -31,12 +27,11 @@ export function PrivacyControls() {
 
   return (
     <section className="rounded-xl border border-border bg-surface p-4 sm:p-5" aria-labelledby="privacy-controls-heading">
-      <h2 id="privacy-controls-heading" className="text-lg font-semibold text-fg">Cookie and analytics preferences</h2>
+      <h2 id="privacy-controls-heading" className="text-lg font-semibold text-fg">Product analytics</h2>
       <p className="mt-2 text-sm leading-6 text-muted">
         Review product analytics separately from essential account/session handling. Advertising, when enabled, uses separate provider and CMP privacy choices.
       </p>
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <Button type="button" size="sm" variant="outline" onClick={openCookiePreferences}>Open cookie preferences</Button>
         <span className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-fg">
           {choice==="granted"?"Analytics allowed":choice==="denied"?"Analytics declined":"No choice recorded"}
         </span>
