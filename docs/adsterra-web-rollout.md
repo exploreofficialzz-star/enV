@@ -11,7 +11,7 @@ The Web rollout uses a limited set of publisher-provided placements to keep the 
 | Blog articles | Native Banner | 32202120 | One contextual placement after the second paragraph of the first eligible section |
 | Supported Web pages | Popunder | Publisher script | Loads only after explicit ad consent and same-origin reachability; may open a separate tab after a page interaction |
 
-Each placement is labelled as an advertisement and is requested only when the production flag is enabled, the visitor has explicitly allowed advertising in that browser, and the same-origin page is reachable. Declining advertising does not block tools. No advertising script is requested while offline. The advertising choice is separate from product analytics.
+Each placement is labelled as an advertisement and is requested only when the production flag is enabled, the visitor has explicitly allowed advertising in that browser, and the same-origin page is reachable. The choice is made in the inline Advertising section of the Privacy page; enV does not show a global advertising-preference popup. Declining advertising does not block tools. No advertising script is requested while offline. The advertising choice is separate from product analytics.
 
 ## Production boundaries
 
