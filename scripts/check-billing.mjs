@@ -257,6 +257,8 @@ assert.match(flutterwaveService, /FLW_SECRET_HASH/);
 assert.match(flutterwaveService, /FLUTTERWAVE_ENABLED_CURRENCIES/);
 assert.match(flutterwaveService, /payment_options: profile\.paymentOptions\.join/);
 assert.match(flutterwaveService, /verifyAndCreditFlutterwaveReference/);
+assert.match(flutterwaveService, /updateFlutterwaveIntentStatus/);
+assert.match(flutterwaveService, /data.status === "failed"/);
 assert.match(flutterwaveService, /timingSafeEqual/);
 assert.match(flutterwaveService, /readBoundedBytes\(request, 256_000\)/);
 assert.match(flutterwaveService, /FLUTTERWAVE_REFUND_DISPUTE_HANDLING_APPROVED/);
