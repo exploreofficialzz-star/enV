@@ -107,8 +107,9 @@ dependencies {
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
     // Bundled on-device OCR model; no runtime model download or remote service.
     implementation("com.google.mlkit:text-recognition:16.0.1")
-    // Bundled, on-device face landmarks and tracking for original local camera effects.
-    implementation("com.google.mlkit:face-detection:16.1.7")
+    // Bundled, on-device face mesh (468 3D landmarks) for original local AR camera effects.
+    // Google currently marks this SDK beta; it is used only when a face effect is enabled.
+    implementation("com.google.mlkit:face-mesh-detection:16.0.0-beta1")
     implementation("com.google.android.gms:play-services-nearby:19.3.0")
     // The play preview uses the native Godot runtime, not a WebView.
     implementation("org.godotengine:godot:4.6.3.stable")
