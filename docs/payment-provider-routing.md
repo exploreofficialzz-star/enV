@@ -26,15 +26,15 @@ The current country profile catalogue is deliberately explicit. Flutterwave's St
 | Uganda | UGX | Card, Uganda mobile money |
 | Rwanda | RWF | Card, Rwanda mobile money |
 | Tanzania | TZS | Card, Tanzania mobile money |
-| Burkina Faso, Côte d'Ivoire, Senegal | XOF | Card, West African mobile money |
-| Cameroon, Central African Republic, Republic of the Congo, Equatorial Guinea, Gabon | XAF | Card, Central African mobile money |
+| Benin, Burkina Faso, Côte d'Ivoire, Guinea-Bissau, Mali, Niger, Senegal, Togo | XOF | Card, West African mobile money |
+| Cameroon, Central African Republic, Chad, Republic of the Congo, Equatorial Guinea, Gabon | XAF | Card, Central African mobile money |
 | Zambia | ZMW | Card, Zambia mobile money |
 | Egypt | EGP | Card, FawryPay |
 | United Kingdom | GBP | Card, bank account |
 | United States | USD | Card, bank account |
 | Euro-area countries (including Bulgaria from 1 January 2026) | EUR | Card, bank account |
 
-Only currencies listed in `FLUTTERWAVE_ENABLED_CURRENCIES` are made purchasable, and each needs `FLUTTERWAVE_TOKEN_PRICE_<CURRENCY>_MINOR`. The deployment also requires `FLW_SECRET_KEY`, `FLW_SECRET_HASH`, `FLUTTERWAVE_PROVIDER_APPROVED=true`, the global billing gates, and `FLUTTERWAVE_REFUND_DISPUTE_HANDLING_APPROVED=true`. The last flag is intentionally false by default: the provider's refund/chargeback reconciliation and wallet reversal policy must be implemented and tested before activation.
+Only currencies listed in `FLUTTERWAVE_ENABLED_CURRENCIES` are made purchasable, and each needs `FLUTTERWAVE_TOKEN_PRICE_<CURRENCY>_MINOR`. Flutterwave's current documentation also requires the account-level **Enable Dashboard Payment Options** switch to be unchecked before per-payment `payment_options` are applied. Set `FLUTTERWAVE_PAYMENT_OPTIONS_DASHBOARD_DISABLED=true` only after verifying that dashboard setting. The deployment also requires `FLW_SECRET_KEY`, `FLW_SECRET_HASH`, `FLUTTERWAVE_PROVIDER_APPROVED=true`, the global billing gates, and `FLUTTERWAVE_REFUND_DISPUTE_HANDLING_APPROVED=true`. The last flag is intentionally false by default: the provider's refund/chargeback reconciliation and wallet reversal policy must be implemented and tested before activation.
 
 The country-to-method table is a request allowlist, not a guarantee that the merchant's Flutterwave account has every method activated. The account's live eligibility, settlement currencies, dashboard settings and provider onboarding remain authoritative.
 
