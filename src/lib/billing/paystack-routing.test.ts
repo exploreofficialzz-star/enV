@@ -79,6 +79,29 @@ test("Paystack international visitors receive a card-only route in an approved m
   });
 });
 
+test("Paystack USD international settlement requires its own currency approval as well as global merchant approval", () => {
+  const configuration = {
+    BETTER_AUTH_URL: "https://envtools.store",
+    BILLING_LAUNCH_ENABLED: "true",
+    BILLING_ENFORCEMENT_ENABLED: "true",
+    BILLING_REFUND_DISPUTE_HANDLING_APPROVED: "true",
+    PAYSTACK_MERCHANT_COUNTRY: "NG",
+    PAYSTACK_SECRET_KEY_USD: "sk_test_usd",
+    PAYSTACK_PROVIDER_APPROVED: "true",
+    PAYSTACK_PROVIDER_APPROVED_USD: "false",
+    PAYSTACK_TOKEN_PRICE_USD_MINOR: "1",
+    PAYSTACK_INTERNATIONAL_ENABLED: "true",
+    PAYSTACK_INTERNATIONAL_CURRENCY: "USD",
+  };
+  withEnvironment(configuration, () => {
+    assert.equal(getPaystackFundingOption("US")?.enabled, false);
+  });
+  withEnvironment({ ...configuration, PAYSTACK_PROVIDER_APPROVED_USD: "true" }, () => {
+    assert.equal(getPaystackFundingOption("US")?.enabled, true);
+    assert.equal(getPaystackFundingOption("US")?.currency, "USD");
+  });
+});
+
 test("Paystack USD international settlement is restricted to merchant countries that support USD", () => {
   withEnvironment({
     BETTER_AUTH_URL: "https://envtools.store",
