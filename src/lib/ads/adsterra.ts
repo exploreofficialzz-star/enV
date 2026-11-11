@@ -32,7 +32,32 @@ export const ADSTERRA_NATIVE_BANNER = {
   src: "https://bauval.org/21/78a40bc1026f57ead96fcab42af6c0b0",
 } as const;
 
+export const ADSTERRA_POPUNDER_SCRIPT = {
+  src: "https://abscloud.org/1/b39264253fbfc622884c9a3b81882853",
+} as const;
+
+export const ADSTERRA_SMARTLINK_URL = "https://araplhn.org/4/ae13eae40d577a3e29863b4ca80a9f2e";
+
 export type AdsterraBannerFormat = keyof typeof ADSTERRA_BANNER_UNITS;
+
+/**
+ * Ad delivery is enabled for this deployment, the visitor has granted the
+ * required advertising choice, and the browser is online. This deliberately
+ * does not change guest access or the availability of enV tools.
+ */
+export function canRequestAdsterraAds(
+  enabled: boolean,
+  consent: AdsterraConsent,
+  online: boolean,
+): boolean {
+  return enabled && consent === "granted" && online;
+}
+
+/** Open the publisher's Smartlink in a separate tab from an explicit output action. */
+export function openAdsterraSmartlinkFromOutput(): void {
+  if (!canRequestAdsterraAds(isAdsterraEnabled(), getAdsterraConsent(), navigator.onLine)) return;
+  window.open(ADSTERRA_SMARTLINK_URL, "_blank", "noopener,noreferrer");
+}
 
 export function isAdsterraEnabled(): boolean {
   return import.meta.env.VITE_ADSTERRA_ENABLED === "true";

@@ -1,5 +1,6 @@
 import { createRootRoute, HeadContent, Outlet, Scripts, useRouterState } from "@tanstack/react-router";
 import { AssistantStateProvider } from "@/components/assistant/assistant-state";
+import { AdsterraPopunder } from "@/components/ads/adsterra-ad";
 import { useEffect } from "react";
 import { cacheCurrentEnVNavigation, prepareEnVOfflineShell, registerEnVServiceWorker } from "@/lib/offline/tool-package-client";
 import appCss from "../styles.css?url";
@@ -99,6 +100,7 @@ function RootDocument() {
       </head>
       <body>
         <AssistantStateProvider>
+          <AdsterraPopunder />
           <Outlet />
         </AssistantStateProvider>
         <Scripts />
