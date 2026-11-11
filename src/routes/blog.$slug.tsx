@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { AdSensePageUnit } from "@/components/layout/ad-sense-page-unit";
+import { AdsterraNativeBanner } from "@/components/ads/adsterra-ad";
 import { getBlogArticle, type BlogArticle } from "@/data/blog-articles";
 import {
   getRelatedTools,
@@ -143,7 +144,9 @@ function BlogArticlePage({ article }: { article: BlogArticle }) {
                 <Fragment key={section.heading + "-p-" + paragraphIndex}>
                   <p className="text-base leading-7 text-muted">{paragraph}</p>
                   {sectionIndex === firstEligibleAdSection && paragraphIndex === 1
-                    ? <AdSensePageUnit format="in-article" />
+                    ? (import.meta.env.VITE_ADSTERRA_ENABLED === "true"
+                      ? <AdsterraNativeBanner />
+                      : <AdSensePageUnit format="in-article" />)
                     : null}
                 </Fragment>
               ))}
@@ -155,7 +158,7 @@ function BlogArticlePage({ article }: { article: BlogArticle }) {
             </section>
           ))}
         </div>
-        <AdSensePageUnit format="multiplex" />
+        {import.meta.env.VITE_ADSTERRA_ENABLED === "true" ? null : <AdSensePageUnit format="multiplex" />}
         <aside className="mt-10 rounded-2xl border border-border bg-surface-2 p-5">
           <h2 className="font-semibold text-fg">Need a hand?</h2>
           <p className="mt-2 text-sm leading-6 text-muted">

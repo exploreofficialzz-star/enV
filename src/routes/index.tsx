@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
+import { AdsterraResponsiveBanner } from "@/components/ads/adsterra-ad";
 import { Logo } from "@/components/brand/logo";
 import { ProductUpdatesBanner } from "@/components/layout/product-updates-banner";
 import { SearchBox } from "@/components/tools/search-box";
@@ -139,6 +140,7 @@ function Home() {
           <span className="hidden sm:inline"> everyday work.</span>
         </h1>
       </section>
+      <AdsterraResponsiveBanner />
       <ToolSection title="Trending tools" tools={trendingTools} mode={trendingMode} />
     </AppShell>
   );

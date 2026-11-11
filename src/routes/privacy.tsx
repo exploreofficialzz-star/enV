@@ -3,6 +3,7 @@ import { InfoPage } from "@/components/layout/info-page";
 import { seoPageHead, pageSchema } from "@/lib/seo-metadata";
 import { PrivacyControls } from "@/components/layout/privacy-controls";
 import { AdPrivacyControls } from "@/components/layout/ad-privacy-controls";
+import { AdsterraPrivacyControls } from "@/components/layout/adsterra-privacy-controls";
 
 export const Route = createFileRoute("/privacy")({
   head: () => seoPageHead({
@@ -16,6 +17,7 @@ export const Route = createFileRoute("/privacy")({
 
 function Privacy() {
   const advertisingEnabled = import.meta.env.VITE_ADS_ENABLED === "true";
+  const adsterraAdvertisingEnabled = import.meta.env.VITE_ADSTERRA_ENABLED === "true";
   return (
     <InfoPage title="Privacy">
       <p><strong className="font-semibold text-fg">chAs Technologies LLC</strong>, a company registered in Delaware, USA, develops and operates enV. This notice describes the information handled by the enV Web, Android, and iOS experiences and how feature-specific processing works.</p>
@@ -44,6 +46,7 @@ function Privacy() {
           <li><strong className="font-semibold text-fg">AI features:</strong> when enabled, the task input needed to produce a response is sent through the enV server to the AI provider configured for that deployment. The code supports Groq, OpenRouter, and Google Gemini; the provider used can vary by task and server configuration. AI results may be cached briefly when caching is enabled. Provider handling and retention are governed in part by the provider’s terms and privacy practices.</li>
           <li><strong className="font-semibold text-fg">Sign-in:</strong> an account is not required for ordinary toolkit use. If sign-in is enabled for a deployment and you choose to use it, the identity provider and configured database process account and session information such as your email and profile details. Authentication uses session cookies.</li>
           {advertisingEnabled ? <li><strong className="font-semibold text-fg">Advertising on selected Web tools:</strong> Google AdSense may load on explicitly allowlisted, online, device-local tool pages. The ad provider may process request context and technical identifiers for ad delivery, fraud prevention, frequency capping and aggregated reporting. enV requests non-personalized ads, which are not based on your past behavior, but that setting does not mean no cookies or identifiers are used.</li> : null}
+          {adsterraAdvertisingEnabled ? <li><strong className="font-semibold text-fg">Adsterra advertising:</strong> selected Adsterra banner and native placements may load on the Home page, All tools directory and eligible Blog articles after you allow advertising. Adsterra and its advertising partners may process your IP address, browser and device information, page URL and referrer, and may use cookies or similar storage for delivery, frequency capping, fraud prevention and measurement. Declining advertising does not limit access to enV tools.</li> : null}
           <li><strong className="font-semibold text-fg">Operational infrastructure:</strong> hosting, network, and service providers may process connection and diagnostic data needed to deliver, secure, and troubleshoot the service.</li>
         </ul>
         <p>Provider availability, settings, and retention can change by deployment. enV does not promise that an external provider will retain or delete submitted content on a particular schedule. Review the provider information shown for the feature before sending information you consider sensitive.</p>
@@ -56,6 +59,7 @@ function Privacy() {
       </section>
 
       <PrivacyControls />
+      <AdsterraPrivacyControls />
       <AdPrivacyControls />
 
       <section className="space-y-2">
