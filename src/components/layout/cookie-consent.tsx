@@ -72,16 +72,18 @@ export function CookieConsent() {
     const previousAnalytics = getAnalyticsConsent();
 
     try {
+      // Save analytics first. Do not activate Adsterra if another selected
+      // consent category cannot be completed.
+      if (analyticsEnabled || previousAnalytics !== "unset") {
+        await chooseAnalyticsConsent(nextAnalyticsAllowed);
+      }
+
       if (advertisingEnabled || previousAdvertising !== "unset") {
         setAdsterraConsent(nextAdvertisingAllowed ? "granted" : "denied");
         const storedChoice = getAdsterraConsent();
         if (storedChoice !== (nextAdvertisingAllowed ? "granted" : "denied")) {
           throw new Error("Your advertising choice could not be saved in this browser. Check site storage and try again.");
         }
-      }
-
-      if (analyticsEnabled || previousAnalytics !== "unset") {
-        await chooseAnalyticsConsent(nextAnalyticsAllowed);
       }
 
       if (!markNoticeSeen()) {
