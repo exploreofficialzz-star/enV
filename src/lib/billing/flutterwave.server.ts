@@ -73,7 +73,7 @@ export function getFlutterwaveFundingOption(countryCode: string | null | undefin
         : !packPricingSupported
           ? "Each token pack must convert to an exact whole-unit Flutterwave amount within its integer amount limit."
           : !paymentOptionsConfigured
-            ? "Disable \\u201cEnable Dashboard Payment Options\\u201d in Flutterwave account settings before enabling country-specific payment methods."
+            ? "Disable “Enable Dashboard Payment Options” in Flutterwave account settings before enabling country-specific payment methods."
             : !launchChecksPassed()
           ? "Checkout is disabled until billing, refund and dispute recovery checks are approved."
           : "Flutterwave credentials are not fully configured.";
