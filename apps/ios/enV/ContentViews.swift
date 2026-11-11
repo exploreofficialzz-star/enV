@@ -638,7 +638,6 @@ struct HomeView: View {
                     .padding(.horizontal, 16)
 
                     VStack(alignment: .leading, spacing: 16) {
-                        // Source guard contract: sectionHeader("Trending tools", subtitle: "Useful tools to explore today", accent: true)
                         enVCharacterSpacedText("Trending tools")
                             .font(.envScaled(size: 20, weight: .semibold))
                             .foregroundStyle(Color.envAccent)
