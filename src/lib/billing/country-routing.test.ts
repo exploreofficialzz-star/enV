@@ -43,7 +43,7 @@ test("country profiles expose the documented Flutterwave local currencies and me
     countryCode: "NG", currency: "NGN",
     paymentOptions: ["card", "ussd", "banktransfer", "account", "internetbanking", "nqr", "enaira", "opay"],
   });
-  assert.equal(getCountryPaymentProfile("GH")?.paymentOptions.includes("mobilemoneyghana"), true);
+  assert.equal(getCountryPaymentProfile("GH")?.paymentOptions.includes("ghanamobilemoney"), true);
   assert.equal(getCountryPaymentProfile("KE")?.paymentOptions.includes("mpesa"), true);
   assert.equal(getCountryPaymentProfile("ZA")?.currency, "ZAR");
   for (const country of ["BJ", "BF", "CI", "GW", "ML", "NE", "SN", "TG"]) {
