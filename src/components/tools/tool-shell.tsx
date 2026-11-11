@@ -15,6 +15,7 @@ import { ToolAppIcon } from "@/components/tools/tool-app-icon";
 import { AiAssistPanel } from "@/components/ai/ai-assist-panel";
 import { ToolCommunityPanel } from "@/components/tools/tool-community-panel";
 import { AdSlot } from "@/components/tools/ad-slot";
+import { AdsterraNativeBanner } from "@/components/ads/adsterra-ad";
 import type { PublicCommunityFeed } from "@/lib/community/public-feed.functions";
 import { ToolExecutionTelemetryContext, type ToolExecutionTelemetry, type ToolExecutionOutcome } from "@/components/tools/tool-execution-context";
 import { UnderProductionDialog } from "@/components/tools/under-production";
@@ -309,7 +310,11 @@ export function ToolShell({
 
       {tool.category !== "creators" ? (
         <>
-      {!isFullscreen ? <AdSlot tool={tool} /> : null}
+      {!isFullscreen ? (
+        import.meta.env.VITE_ADSTERRA_ENABLED === "true"
+          ? <AdsterraNativeBanner />
+          : <AdSlot tool={tool} />
+      ) : null}
       <AiAssistPanel toolId={tool.id} />
 
       <section className="mt-10" aria-labelledby="tool-guide-heading">

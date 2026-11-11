@@ -2,13 +2,13 @@
 
 ## Selected placements
 
-The Web rollout uses a limited set of publisher-provided placements to keep the toolkit usable.
+The Web rollout uses a limited set of publisher-provided placements to keep the toolkit usable. The responsive banners cover Home and the All tools directory; the supplied Native Banner also appears below tool interfaces and within eligible Blog articles.
 
 | Surface | Format | Placement ID | Purpose |
 |---|---|---:|---|
 | Home | Responsive 320x50 mobile / 728x90 desktop | 32202130 / 32202131 | One horizontal display placement below the hero |
 | All tools directory | 300x250 | 32202127 | One medium rectangle below the directory heading |
-| Blog articles | Native Banner | 32202120 | One contextual placement after the second paragraph of the first eligible section |
+| Tool pages and Blog articles | Native Banner | 32202120 | One contextual placement below eligible tool interfaces and in eligible articles |
 | Supported Web pages | Popunder | Publisher script | Loads only after explicit ad consent and same-origin reachability; may open a separate tab after a page interaction |
 
 Each placement is labelled as an advertisement and is requested only when the production flag is enabled, the visitor has explicitly allowed advertising in that browser, and the same-origin page is reachable. The choice is made in the inline Advertising section of the Privacy page; enV does not show a global advertising-preference popup. Declining advertising does not block tools. No advertising script is requested while offline. The advertising choice is separate from product analytics.
@@ -35,4 +35,4 @@ Each placement is labelled as an advertisement and is requested only when the pr
 - `src/lib/ads/adsterra.test.ts` checks the selected provider placements and the deployment, consent and online-state requirements before ad requests.
 - `AdsterraBanner` and `AdsterraNativeBanner` are Web-only.
 - Native placement cleanup removes the injected script and rendered creative when consent is withdrawn or the component unmounts, allowing a later re-grant to load the placement again.
-- The site-level Popunder script is loaded only after explicit consent and same-origin reachability; it is Web-only and does not gate tool output actions.
+- The site-level Popunder script is loaded only after explicit consent and same-origin reachability; it is Web-only and does not gate tool output actions. Banner and Popunder script failures receive bounded retries instead of remaining permanently disabled after one failed request.

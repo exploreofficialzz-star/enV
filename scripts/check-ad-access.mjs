@@ -7,6 +7,7 @@ const read = (path) => readFileSync(resolve(root, path), "utf8");
 const rootRoute = read("src/routes/__root.tsx");
 const slot = read("src/components/tools/ad-slot.tsx");
 const adsterraWeb = read("src/components/ads/adsterra-ad.tsx");
+const toolShell = read("src/components/tools/tool-shell.tsx");
 const webAdPrivacy = read("src/components/layout/ad-privacy-controls.tsx");
 const adsBrowser = read("src/lib/ads/browser.ts");
 const shell = read("src/components/tools/tool-shell.tsx");
@@ -34,6 +35,11 @@ assert.match(rootRoute, /ca-pub-2492078126313994/, "The AdSense site verificatio
 assert.match(rootRoute, /name: "google-adsense-account", content: ADSENSE_SITE_CLIENT_ID/, "The shared document head must expose Google AdSense site verification.");
 assert.doesNotMatch(rootRoute, /ADSENSE_BOOTSTRAP_SCRIPT|pagead\.googlesyndication\.com/, "The root document must not load AdSense before hydration.");
 assert.match(shell, /<AdSlot tool=\{tool\} \/>/, "Tool details must include the ad placement.");
+assert.match(toolShell, /import \{ AdsterraNativeBanner \} from "@\/components\/ads\/adsterra-ad"/, "Adsterra must provide a tool-page placement when its Web integration is enabled.");
+assert.match(toolShell, /VITE_ADSTERRA_ENABLED === "true"[\s\S]*?<AdsterraNativeBanner \/>/, "Tool pages must use the configured Adsterra native banner rather than a disabled AdSense slot.");
+assert.match(adsterraWeb, /retryAttempt < 3/, "Failed Adsterra banner requests must retry a bounded number of times.");
+assert.match(adsterraWeb, /retryHandle = window\.setInterval/, "A failed Popunder request must be retried while the page is visible.");
+
 assert.match(slot, /isApplicationOnline\(\)/, "Ads must not be requested unless the application origin is reachable.");
 assert.match(shell, /!isFullscreen \? <AdSlot tool=\{tool\} \/> : null/, "Web ads must stay outside the full-screen tool-only experience.");
 
