@@ -61,7 +61,7 @@ Honest behaviour notes:
 
 ## Providers and models
 
-Most registry rows were checked against provider documentation on **2026-09-30**; the MOSS-Music/Modal row was researched on **2026-10-25**, and Cloudflare Workers AI on **2026-11-11**. Prices and model lists change: re-verify before relying on them, and record what you checked in the row's `notes`.
+Most registry rows were checked against provider documentation on **2026-09-30**; the MOSS-Music/Modal row was researched on **2026-10-25**, and Gemini and Cloudflare Workers AI pricing/tier terms were rechecked on **2026-11-11**. Prices and model lists change: re-verify before relying on them, and record what you checked in the row's `notes`.
 
 | Provider | Model id | Used for | Cost class | List price | Sensitive tasks |
 | --- | --- | --- | --- | --- | --- |
@@ -72,7 +72,7 @@ Most registry rows were checked against provider documentation on **2026-09-30**
 | Groq | `whisper-large-v3` | speech-to-text | LOW | $0.111 per audio hour | yes |
 | OpenRouter | `openai/gpt-oss-20b:free` | text, structured | FREE | $0 (rate limited; providers may log) | **no** |
 | OpenRouter | `openai/gpt-oss-20b` | text, structured | LOW | about $0.02 / $0.10 (varies by upstream) | yes (`data_collection: deny` is sent) |
-| Gemini | `gemini-3.8-flash` | text, structured, vision | FREE when explicitly configured as Free tier for standard-privacy text tasks; STANDARD for paid tier | Free input/output with limited access; Paid $0.75 / $3.75 per 1M tokens through 2026-12-31, then $1.50 / $7.50 from 2027-01-01 | Free tier may use submitted content to improve Google products; sensitive tasks remain blocked unless explicitly acknowledged |
+| Gemini | `gemini-3.8-flash` | text, structured, vision | FREE when explicitly configured as Free tier for standard-privacy text tasks; STANDARD for paid tier | Free input/output for limited access; Paid $0.75 / $3.75 per 1M tokens through 2026-12-31, then $1.50 / $7.50 from 2027-01-01 | Free tier may use submitted content to improve Google products; enV enables only text routes under explicit Free-tier configuration |
 | Cloudflare Workers AI | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` | text, JSON Mode (best-effort) | STANDARD | $0.293 / $2.253 per 1M input/output tokens; 10,000 Neurons/day included, then paid overage | documented Zero Data Retention for this model |
 
 Cost classes come from list price: FREE = zero; LOW ≤ $1 per 1M tokens (input + output) or ≤ $0.25 per audio hour; GPU compute rates up to $1/hour are LOW and up to $10/hour are STANDARD; above that PREMIUM. GPU cost estimates use the model service's measured inference time and exclude cold-start/idle time and non-GPU charges. Gemini's date-based price change is encoded (`pricingUntil`).

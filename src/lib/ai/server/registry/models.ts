@@ -12,6 +12,7 @@ import { CAPABILITIES, COST_CLASSES, PROVIDER_IDS } from "../../types.ts";
 
 const CHECKED = "Checked against provider docs on 2026-09-30.";
 const MOSS_CHECKED = "Checked against the OpenMOSS MOSS-Music README and SGLang serving guide on 2026-10-25.";
+const GEMINI_CHECKED = "Pricing and tier terms rechecked against the Google Gemini API pricing page on 2026-11-11.";
 const CLOUDFLARE_CHECKED = "Checked against Cloudflare Workers AI model, JSON Mode and pricing docs on 2026-11-11.";
 
 export const MODEL_REGISTRY: readonly ModelRecord[] = [
@@ -185,7 +186,7 @@ export const MODEL_REGISTRY: readonly ModelRecord[] = [
     reasoning: true,
     outputHeadroomTokens: 2500,
     sensitiveOk: false,
-    notes: `${CHECKED} Model id and the two-stage pricing ($0.75/$3.75 per 1M tokens through 2026-12-31, $1.50/$7.50 from 2027-01-01) are from ai.google.dev/gemini-api/docs/latest-model. The 1M context window comes from third-party listings and was not confirmed on the official page; the 16384 output cap is enV's own. Gemini Interactions API supports audio input and structured JSON output; see ai.google.dev/gemini-api/docs/audio and ai.google.dev/api/interactions-api. A free tier exists and Google may use free-tier content to improve its products, so sensitive tasks only use this model when AI_GEMINI_TIER=paid.`,
+    notes: `${GEMINI_CHECKED} Model id and the two-stage paid pricing ($0.75/$3.75 per 1M tokens through 2026-12-31, $1.50/$7.50 from 2027-01-01), Free-tier zero input/output pricing, and the Free-versus-Paid data-use distinction are from ai.google.dev/gemini-api/docs/pricing. The 1M context window comes from third-party listings and was not confirmed on the official page; the 16384 output cap is enV's own. Gemini Interactions API supports audio input and structured JSON output; see ai.google.dev/gemini-api/docs/audio and ai.google.dev/api/interactions-api. A free tier exists and Google may use free-tier content to improve its products, so sensitive tasks only use this model when AI_GEMINI_TIER=paid.`,
   },
   {
     provider: "moss_music",

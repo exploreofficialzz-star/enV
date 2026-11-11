@@ -445,7 +445,7 @@ export function validateAiConfig(config: AiConfig): ConfigValidation {
   if (config.keys.moss_music && config.keys.moss_music.reveal().length < 32) warnings.push("MOSS_MUSIC_TOKEN must be at least 32 characters; MOSS-Music remains unavailable until a longer random token is configured.");
   if (config.keys.cloudflare && !config.connections.some((connection) => connection.provider === "cloudflare")) warnings.push("Cloudflare is not configured: check CLOUDFLARE_ACCOUNT_ID and the connection settings.");
   if (config.keys.gemini && config.geminiTier === "unknown") {
-    warnings.push("AI_GEMINI_TIER is not set: Gemini is treated as a free tier that may use content to improve Google products, so privacy-sensitive tasks (images, audio, JSON) will not use it. Set AI_GEMINI_TIER=paid if billing is enabled.");
+    warnings.push("AI_GEMINI_TIER is not set: Gemini is treated conservatively for privacy (Free-tier content may be used to improve Google products), but no Free-tier pricing route is enabled. Sensitive tasks remain unavailable unless the project is explicitly configured as paid or the deployer separately acknowledges Free-tier data use. Set AI_GEMINI_TIER=free or paid only after verifying the Google AI project tier.");
   }
   if (config.adminToken && config.adminToken.reveal().length < 24) {
     errors.push("AI_ADMIN_TOKEN is shorter than 24 characters.");
