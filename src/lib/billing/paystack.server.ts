@@ -26,7 +26,7 @@ const PAYSTACK_MARKET_CURRENCIES: Record<string, string> = {
   ZA: "ZAR",
 };
 
-function paystackCurrencyConfiguration(currency: string, country: string, international: boolean) {
+function paystackCurrencyConfiguration(currency: string, international: boolean) {
   const secret = process.env["PAYSTACK_SECRET_KEY_" + currency]?.trim() ??
     (currency === "NGN" ? process.env.PAYSTACK_SECRET_KEY?.trim() : undefined) ?? "";
   const configuredPrice = process.env["PAYSTACK_TOKEN_PRICE_" + currency + "_MINOR"] ??
@@ -65,7 +65,7 @@ function resolvePaystackConfiguration(countryCode: string | null | undefined) {
     defaultInternationalCurrency;
 
   let selected = localCurrency
-    ? paystackCurrencyConfiguration(localCurrency, country, false)
+    ? paystackCurrencyConfiguration(localCurrency, false)
     : null;
 
   // A visitor outside a configured local merchant market may use Paystack only
@@ -76,9 +76,9 @@ function resolvePaystackConfiguration(countryCode: string | null | undefined) {
   const internationalCurrencyAllowed =
     merchantCurrencies.includes(internationalCurrency);
   if ((!selected || !selected.secret || selected.pricePerTokenMinor === null || !selected.approved) &&
-      internationalEnabled && country !== "NG" &&
+      internationalEnabled && country !== merchantCountry &&
       merchantCountry && internationalCurrencyAllowed) {
-    selected = paystackCurrencyConfiguration(internationalCurrency, country, true);
+    selected = paystackCurrencyConfiguration(internationalCurrency, true);
   }
   if (!selected && internationalEnabled && merchantCountry && internationalCurrencyAllowed) {
     selected = paystackCurrencyConfiguration(internationalCurrency, country, true);
