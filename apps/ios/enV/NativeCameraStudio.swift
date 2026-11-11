@@ -1907,13 +1907,17 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
 
         let canvas = CGRect(x: 0, y: 0, width: outputWidth, height: outputHeight)
         let background = aspectFill(CIImage(cvPixelBuffer: back), into: canvas)
-        // Core Image uses a bottom-left origin. Move the inset upward so the saved
-        // PiP placement matches the top-right live preview layers.
+        // Core Image uses a bottom-left origin. Scale the inset and margins with
+        // the active output profile so low-power 480p keeps the same composition.
+        let pipWidth = CGFloat(outputWidth) * 0.32
+        let pipHeight = pipWidth * 330.0 / 232.0
+        let horizontalMargin = CGFloat(outputWidth) * 24.0 / 720.0
+        let verticalMargin = CGFloat(outputHeight) * 24.0 / 1280.0
         let pipRect = CGRect(
-            x: outputWidth - 232 - 24,
-            y: outputHeight - 330 - 24,
-            width: 232,
-            height: 330
+            x: CGFloat(outputWidth) - pipWidth - horizontalMargin,
+            y: CGFloat(outputHeight) - pipHeight - verticalMargin,
+            width: pipWidth,
+            height: pipHeight
         )
         let inset = aspectFill(CIImage(cvPixelBuffer: front), into: CGRect(origin: .zero, size: pipRect.size))
             .transformed(by: CGAffineTransform(translationX: pipRect.minX, y: pipRect.minY))
