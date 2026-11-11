@@ -646,7 +646,18 @@ fun NativeCameraStudioScreen() {
                     manualIsoRange = camera2Info.getCameraCharacteristic(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE)
                     manualExposureTimeRange = camera2Info.getCameraCharacteristic(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE)
                     manualFocusMinimum = camera2Info.getCameraCharacteristic(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE) ?: 0f
-                    whiteBalanceModes = camera2Info.getCameraCharacteristic(CameraCharacteristics.CONTROL_AWB_AVAILABLE_MODES)?.toSet().orEmpty()
+                    val discoveredWhiteBalanceModes = camera2Info.getCameraCharacteristic(
+                        CameraCharacteristics.CONTROL_AWB_AVAILABLE_MODES
+                    )?.toSet().orEmpty()
+                    whiteBalanceModes = discoveredWhiteBalanceModes
+                    if (selectedWhiteBalance !in discoveredWhiteBalanceModes) {
+                        selectedWhiteBalance = when {
+                            discoveredWhiteBalanceModes.contains(CaptureRequest.CONTROL_AWB_MODE_AUTO) ->
+                                CaptureRequest.CONTROL_AWB_MODE_AUTO
+                            else -> discoveredWhiteBalanceModes.firstOrNull()
+                                ?: CaptureRequest.CONTROL_AWB_MODE_AUTO
+                        }
+                    }
                     videoStabilizationModes = camera2Info.getCameraCharacteristic(CameraCharacteristics.CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES)?.toSet().orEmpty()
                     manualIsoRange?.let { range -> manualIso = manualIso.coerceIn(range.lower.toFloat(), range.upper.toFloat()) }
                     manualExposureTimeRange?.let { range ->
@@ -668,7 +679,16 @@ fun NativeCameraStudioScreen() {
         val cameraControl = controller.cameraControl ?: return
         runCatching {
             val options = CaptureRequestOptions.Builder()
-                .setCaptureRequestOption(CaptureRequest.CONTROL_AWB_MODE, selectedWhiteBalance)
+                .apply {
+                    if (whiteBalanceModes.contains(selectedWhiteBalance)) {
+                        setCaptureRequestOption(CaptureRequest.CONTROL_AWB_MODE, selectedWhiteBalance)
+                    } else {
+                        // Some auxiliary lenses expose fewer AWB presets. Clearing this
+                        // option restores the camera's default instead of rejecting the
+                        // complete advanced-control request.
+                        clearCaptureRequestOption(CaptureRequest.CONTROL_AWB_MODE)
+                    }
+                }
                 .setCaptureRequestOption(
                     CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
                     if (mode == NativeCameraMode.VIDEO && videoStabilizationEnabled && videoStabilizationModes.contains(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_ON)) CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_ON else CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_OFF
