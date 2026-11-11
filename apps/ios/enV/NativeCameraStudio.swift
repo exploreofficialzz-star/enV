@@ -1961,7 +1961,8 @@ private struct NativeMultiCamPreview: UIViewRepresentable {
         guard let back = context.coordinator.backLayer, let front = context.coordinator.frontLayer else { return }
         back.frame = uiView.bounds
         let width = uiView.bounds.width * 0.32
-        let height = width * 4.0 / 3.0
+        // Match the 232×330 PiP rectangle used by the AVAssetWriter compositor.
+        let height = width * 330.0 / 232.0
         front.frame = CGRect(x: uiView.bounds.width - width - 12, y: 12, width: width, height: height)
     }
 
