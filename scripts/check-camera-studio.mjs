@@ -210,9 +210,18 @@ assert.match(androidCamera, /CameraEffect\.PREVIEW or CameraEffect\.VIDEO_CAPTUR
 assert.match(androidCamera, /cameraEffect\.setEffects\(nativeCameraEffects\(selectedLook\)\)/);
 assert.match(androidCamera, /addEffect\(cameraEffect\)/);
 assert.match(androidCamera, /CameraCharacteristics\.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR/);
+assert.match(androidCamera, /CameraCharacteristics\.SENSOR_INFO_SENSITIVITY_RANGE/);
+assert.match(androidCamera, /CameraCharacteristics\.SENSOR_INFO_EXPOSURE_TIME_RANGE/);
 assert.match(androidCamera, /CaptureRequest\.SENSOR_SENSITIVITY/);
 assert.match(androidCamera, /CaptureRequest\.SENSOR_EXPOSURE_TIME/);
+assert.match(androidCamera, /manualExposureEnabled && manualSensorSupported && manualIsoRange != null && manualExposureTimeRange != null/, "Manual ISO/shutter only enable when the active camera reports manual sensor capability and ranges.");
+assert.match(androidCamera, /setCaptureRequestOption\(CaptureRequest\.CONTROL_AE_MODE, CaptureRequest\.CONTROL_AE_MODE_OFF\)/);
+assert.match(androidCamera, /setCaptureRequestOption\(CaptureRequest\.CONTROL_AE_MODE, CaptureRequest\.CONTROL_AE_MODE_ON\)/);
 assert.match(androidCamera, /CaptureRequest\.LENS_FOCUS_DISTANCE/);
+assert.match(androidCamera, /CaptureRequest\.CONTROL_AF_MODE_OFF/);
+assert.match(androidCamera, /CaptureRequest\.CONTROL_AF_MODE_CONTINUOUS_PICTURE/);
+assert.match(androidCamera, /controller\.setTapToFocusEnabled\(!manualFocusLocked\)/, "Focus lock disables tap-to-focus until Auto is restored.");
+assert.match(androidCamera, /whiteBalanceModes\.contains\(it\.second\)/, "White-balance choices are limited to modes advertised by the active camera.");
 assert.match(androidCamera, /CaptureRequest\.CONTROL_AWB_MODE/);
 assert.match(androidCamera, /CameraCharacteristics.CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES/);
 assert.match(androidCamera, /CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_ON/);
