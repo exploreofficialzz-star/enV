@@ -46,7 +46,7 @@ assert.match(toolShell, /AdsterraBanner format="300x250"/, "Qualified tool pages
 assert.match(toolShell, /AdsterraToolPopunder/, "Qualified tool pages must be the only Popunder mount.");
 assert.match(toolShell, /isAdsterraQualifiedTool\(tool\)/, "Each placement must be limited to the approved tool cohort.");
 assert.match(toolShell, /openAdsterraSmartlinkFromOutput/, "Output actions must trigger the publisher Smartlink from a direct click.");
-assert.ok(toolShell.includes("copy|download|export"), "Output triggers must include copy, download and export actions.");
+assert.ok(toolShell.includes("copy|download|export|save|output|result|calculate|convert|generate"), "Output triggers must include copy, download, export and common output-producing actions.");
 assert.doesNotMatch(downloadUtils, /openAdsterraSmartlinkFromOutput/, "The download helper must not open a popup after an asynchronous download begins.");
 assert.match(toolShell, /data-env-ad-eligible=\{adsterraQualified \? "true" : undefined\}/, "The output trigger must be restricted to the same qualified tool interface.");
 assert.doesNotMatch(rootRoute, /AdsterraPopunder/, "The Popunder must not be loaded site-wide.");
