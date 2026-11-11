@@ -1,4 +1,7 @@
 import { useEffect, useState } from "react";
+import { useRouterState } from "@tanstack/react-router";
+import { getToolByPath } from "@/lib/registry";
+import { isAdsterraQualifiedTool } from "@/lib/ads/policy";
 import { chooseAnalyticsConsent, getAnalyticsConsent } from "@/lib/analytics/client";
 import {
   getAdsterraConsent,
@@ -19,8 +22,17 @@ function markNoticeSeen(): boolean {
 }
 
 export function CookieConsent() {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
   const analyticsEnabled = import.meta.env.VITE_ANALYTICS_ENABLED === "true";
   const advertisingEnabled = isAdsterraEnabled();
+  const toolPathMatch = /^\\/tools\\/([^/]+)\\/([^/]+)$/.exec(pathname);
+  const qualifiedTool = toolPathMatch
+    ? getToolByPath(toolPathMatch[1], toolPathMatch[2])
+    : undefined;
+  const showPreferencesOnThisPage =
+    pathname === "/" ||
+    pathname === "/privacy" ||
+    Boolean(advertisingEnabled && qualifiedTool && isAdsterraQualifiedTool(qualifiedTool));
   const [visible, setVisible] = useState(false);
   const [analyticsAllowed, setAnalyticsAllowed] = useState(false);
   const [advertisingAllowed, setAdvertisingAllowed] = useState(false);
@@ -30,6 +42,11 @@ export function CookieConsent() {
   useEffect(() => {
     setAnalyticsAllowed(getAnalyticsConsent() === "granted");
     setAdvertisingAllowed(getAdsterraConsent() === "granted");
+
+    if (!showPreferencesOnThisPage) {
+      setVisible(false);
+      return;
+    }
 
     try {
       setVisible(window.localStorage.getItem(NOTICE_KEY) !== "1");
@@ -43,7 +60,7 @@ export function CookieConsent() {
     };
     window.addEventListener(OPEN_EVENT, reopen);
     return () => window.removeEventListener(OPEN_EVENT, reopen);
-  }, []);
+  }, [showPreferencesOnThisPage]);
 
   async function savePreferences(
     nextAnalyticsAllowed: boolean,
