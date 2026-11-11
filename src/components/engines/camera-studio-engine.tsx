@@ -407,31 +407,44 @@ export function CameraStudioEngine() {
         Number(isDesiredFacingLabel(right.label)) - Number(isDesiredFacingLabel(left.label))
       );
       let stream: MediaStream | null = null;
+      let selectedSecondaryProfile = "";
       let lastCameraError: unknown = null;
+      // Some phones can run both sensors only at a reduced second-stream size/FPS.
+      // Retry progressively cheaper profiles instead of giving up after one 720p ask.
+      const secondaryProfiles = [
+        { width: 1280, height: 720, frameRate: 30, label: "720p / 30 fps" },
+        { width: 640, height: 480, frameRate: 24, label: "480p / 24 fps" },
+        { width: 320, height: 240, frameRate: 15, label: "low-power 240p / 15 fps" },
+      ];
       for (const device of orderedCameras) {
-        try {
-          const candidateStream = await navigator.mediaDevices.getUserMedia({
-            audio: false,
-            video: {
-              deviceId: { exact: device.deviceId },
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
-              frameRate: { ideal: 30 },
-            },
-          });
-          const candidateTrack = candidateStream.getVideoTracks()[0];
-          const actualFacing = candidateTrack?.getSettings().facingMode;
-          if (!candidateTrack || candidateTrack.readyState !== "live" ||
-              (actualFacing && actualFacing !== desiredFacing) ||
-              (!actualFacing && !isDesiredFacingLabel(device.label))) {
-            candidateStream.getTracks().forEach((track) => track.stop());
-            continue;
+        for (const profile of secondaryProfiles) {
+          try {
+            const candidateStream = await navigator.mediaDevices.getUserMedia({
+              audio: false,
+              video: {
+                deviceId: { exact: device.deviceId },
+                facingMode: { ideal: desiredFacing },
+                width: { ideal: profile.width, max: profile.width },
+                height: { ideal: profile.height, max: profile.height },
+                frameRate: { ideal: profile.frameRate, max: profile.frameRate },
+              },
+            });
+            const candidateTrack = candidateStream.getVideoTracks()[0];
+            const actualFacing = candidateTrack?.getSettings().facingMode;
+            if (!candidateTrack || candidateTrack.readyState !== "live" ||
+                (actualFacing && actualFacing !== desiredFacing) ||
+                (!actualFacing && !isDesiredFacingLabel(device.label))) {
+              candidateStream.getTracks().forEach((track) => track.stop());
+              continue;
+            }
+            stream = candidateStream;
+            selectedSecondaryProfile = profile.label;
+            break;
+          } catch (error) {
+            lastCameraError = error;
           }
-          stream = candidateStream;
-          break;
-        } catch (error) {
-          lastCameraError = error;
         }
+        if (stream) break;
       }
       if (!stream) {
         setDualUnavailable(true);
@@ -449,7 +462,7 @@ export function CameraStudioEngine() {
       dualStreamRef.current = stream;
       setDualStream(stream);
       setDualUnavailable(false);
-      setNotice("Both cameras are active. Photos and recordings will include both views.");
+      setNotice(`Both cameras are active. The second feed is using ${selectedSecondaryProfile}; photos and recordings include both views.`);
       secondTrack.addEventListener("ended", () => {
         if (dualStreamRef.current === stream && mountedRef.current) {
           stopDualCamera();
