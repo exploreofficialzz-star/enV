@@ -73,11 +73,14 @@ export function getAdsterraConsent(): AdsterraConsent {
   }
 }
 
-export function setAdsterraConsent(choice: Exclude<AdsterraConsent, "unset">): void {
+export function setAdsterraConsent(choice: Exclude<AdsterraConsent, "unset">): boolean {
   try {
     window.localStorage.setItem(ADSTERRA_CONSENT_STORAGE_KEY, choice);
+    if (window.localStorage.getItem(ADSTERRA_CONSENT_STORAGE_KEY) !== choice) return false;
   } catch {
     // If consent cannot be stored, this browser session must not request ads.
+    return false;
   }
   window.dispatchEvent(new CustomEvent("env:adsterra-consent-changed", { detail: { choice } }));
+  return true;
 }
