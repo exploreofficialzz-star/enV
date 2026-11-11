@@ -15,7 +15,7 @@ Do not send passwords, cookies, auth tokens, payment data, IP addresses, full us
 - Analytics is off unless the user actively chooses **Allow analytics** from the dedicated Privacy page controls.
 - Consent is installation-scoped and tied to a policy version.
 - **Decline / withdraw consent** stops local queuing, clears the local queue and requests deletion of that installation's event history.
-- The Web shows a small, centered **Cookie preferences** popup on first visit. It contains a short essential-storage notice, a Privacy policy link and a **Continue** action. It does not present a Product Analytics checkbox or an analytics allow/decline choice. People can reopen the popup from the Privacy page.
+- The Web does not show a global cookie or advertising-preference popup. Optional analytics remains controlled separately in the Privacy page. Advertising-provider choices, where required, remain within their provider-specific Privacy controls and are never inferred from ordinary tool use.
 - Optional analytics can be allowed or declined separately in **Cookie and analytics preferences** on the Privacy page.
 - A changed policy version requires renewed consent.
 - The server rejects event batches without a current granted consent record.
