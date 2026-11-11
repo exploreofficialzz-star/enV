@@ -311,6 +311,23 @@ function safeEqual(left: string, right: string): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+async function updateFlutterwaveIntentStatus(
+  reference: string,
+  status: "failed" | "cancelled",
+) {
+  if (!/^[a-f0-9-]{36}$/i.test(reference)) {
+    throw Object.assign(new Error("The Flutterwave payment reference is invalid."), {
+      code: "INVALID_PAYMENT_REFERENCE", status: 400,
+    });
+  }
+  const sql = await getSql();
+  await sql.query(
+    "update billing_purchase_intents set status = $2, updated_at = now() " +
+    "where id = $1 and provider = 'flutterwave' and status in ('created', 'pending', 'verified')",
+    [reference, status],
+  );
+}
+
 export async function handleFlutterwaveWebhook(request: Request) {
   const expectedHash = process.env.FLW_SECRET_HASH?.trim() ?? "";
   const receivedHash = request.headers.get("verif-hash") ?? "";
@@ -350,7 +367,21 @@ export async function handleFlutterwaveWebhook(request: Request) {
   }
   if (eventName !== "charge.completed") return { ignored: true };
   const data = body.data && typeof body.data === "object" ? body.data as Record<string, unknown> : null;
-  if (!data || data.status !== "successful" || data.id === undefined || data.id === null ||
-      typeof data.tx_ref !== "string") return { ignored: true };
+  if (!data || typeof data.tx_ref !== "string") {
+    throw Object.assign(new Error("The Flutterwave charge event is missing its transaction reference."), {
+      code: "INVALID_WEBHOOK", status: 400,
+    });
+  }
+  if (data.status === "failed") {
+    await updateFlutterwaveIntentStatus(data.tx_ref, "failed");
+    return { status: "failed" as const };
+  }
+  if (data.status === "cancelled" || data.status === "canceled") {
+    await updateFlutterwaveIntentStatus(data.tx_ref, "cancelled");
+    return { status: "cancelled" as const };
+  }
+  if (data.status !== "successful" || data.id === undefined || data.id === null) {
+    return { status: "pending" as const };
+  }
   return verifyAndCreditFlutterwaveReference(data.tx_ref, String(data.id));
 }
