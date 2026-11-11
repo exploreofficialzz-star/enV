@@ -40,27 +40,47 @@ function paystackCurrencyConfiguration(currency: string, country: string, intern
   return { currency, international, secret, pricePerTokenMinor, approved };
 }
 
+const PAYSTACK_INTERNATIONAL_CURRENCIES: Record<string, readonly string[]> = {
+  NG: ["NGN", "USD"],
+  GH: ["GHS"],
+  KE: ["KES", "USD"],
+  ZA: ["ZAR"],
+};
+
 function resolvePaystackConfiguration(countryCode: string | null | undefined) {
   const country = normalizeCountryCode(countryCode);
   if (!country) return null;
 
   const localCurrency = PAYSTACK_MARKET_CURRENCIES[country];
   const internationalEnabled = process.env.PAYSTACK_INTERNATIONAL_ENABLED === "true";
-  const internationalCurrency = process.env.PAYSTACK_INTERNATIONAL_CURRENCY?.trim().toUpperCase() || "NGN";
-  if (!["NGN", "GHS", "KES", "ZAR", "USD"].includes(internationalCurrency)) return null;
+  const merchantCountry = normalizeCountryCode(process.env.PAYSTACK_MERCHANT_COUNTRY);
+  const merchantCurrencies = merchantCountry
+    ? PAYSTACK_INTERNATIONAL_CURRENCIES[merchantCountry] ?? []
+    : [];
+  const defaultInternationalCurrency = merchantCountry
+    ? PAYSTACK_MARKET_CURRENCIES[merchantCountry] ?? ""
+    : "";
+  const internationalCurrency =
+    process.env.PAYSTACK_INTERNATIONAL_CURRENCY?.trim().toUpperCase() ||
+    defaultInternationalCurrency;
 
   let selected = localCurrency
     ? paystackCurrencyConfiguration(localCurrency, country, false)
     : null;
 
-  // Local settlement accounts take precedence. If the visitor is in another
-  // Paystack market but this deployment has no configured local merchant
-  // account, an explicitly approved international-card route may be used.
+  // A visitor outside a configured local merchant market may use Paystack only
+  // through a separately enabled international-card flow. International
+  // settlement currencies are restricted to those Paystack publishes for the
+  // merchant's registration country; a customer's country cannot enable a new
+  // Paystack merchant market or a local payment rail on its own.
+  const internationalCurrencyAllowed =
+    merchantCurrencies.includes(internationalCurrency);
   if ((!selected || !selected.secret || selected.pricePerTokenMinor === null || !selected.approved) &&
-      internationalEnabled && country !== "NG") {
+      internationalEnabled && country !== "NG" &&
+      merchantCountry && internationalCurrencyAllowed) {
     selected = paystackCurrencyConfiguration(internationalCurrency, country, true);
   }
-  if (!selected && internationalEnabled) {
+  if (!selected && internationalEnabled && merchantCountry && internationalCurrencyAllowed) {
     selected = paystackCurrencyConfiguration(internationalCurrency, country, true);
   }
   if (!selected) return null;
@@ -75,6 +95,7 @@ function resolvePaystackConfiguration(countryCode: string | null | undefined) {
     Boolean(selected.secret) && selected.pricePerTokenMinor !== null;
   return {
     country,
+    merchantCountry,
     ...selected,
     enabled,
     origin: publicOrigin(),
