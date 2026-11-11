@@ -1,7 +1,7 @@
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { getSql } from "../db";
 import { readWallet, creditVerifiedPurchase } from "./ledger.server";
-import { readSafePackPrice } from "./provider-config";
+import { isFlutterwavePaymentOptionsConfigured, readSafePackPrice } from "./provider-config";
 import { readBoundedBytes } from "./bounded-json.server";
 import {
   getCountryPaymentProfile,
@@ -48,6 +48,7 @@ function resolveConfiguration(countryCode: string | null | undefined) {
   const secret = process.env.FLW_SECRET_KEY?.trim() ?? "";
   const secretHash = process.env.FLW_SECRET_HASH?.trim() ?? "";
   const approved = process.env.FLUTTERWAVE_PROVIDER_APPROVED === "true";
+  const paymentOptionsConfigured = isFlutterwavePaymentOptionsConfigured(process.env);
   const exponent = getCurrencyMinorUnitExponent(currency);
   const packPricingSupported = pricePerTokenMinor !== null && TOKEN_PACKS.every((tokens) => {
     const amountMinor = tokens * pricePerTokenMinor;
@@ -55,14 +56,14 @@ function resolveConfiguration(countryCode: string | null | undefined) {
   });
   const ready = launchChecksPassed() && approved && enabled &&
     Boolean(secret) && Boolean(secretHash) && pricePerTokenMinor !== null &&
-    exponent !== null && packPricingSupported;
-  return { profile, currency, pricePerTokenMinor, secret, secretHash, ready, packPricingSupported };
+    exponent !== null && packPricingSupported && paymentOptionsConfigured;
+  return { profile, currency, pricePerTokenMinor, secret, secretHash, ready, packPricingSupported, paymentOptionsConfigured };
 }
 
 export function getFlutterwaveFundingOption(countryCode: string | null | undefined) {
   const configuration = resolveConfiguration(countryCode);
   if (!configuration) return null;
-  const { profile, currency, pricePerTokenMinor, ready, packPricingSupported } = configuration;
+  const { profile, currency, pricePerTokenMinor, ready, packPricingSupported, paymentOptionsConfigured } = configuration;
   const reason = !process.env.FLUTTERWAVE_PROVIDER_APPROVED || process.env.FLUTTERWAVE_PROVIDER_APPROVED !== "true"
     ? "Flutterwave checkout is awaiting merchant approval."
     : !enabledCurrencies().has(currency)
@@ -71,7 +72,9 @@ export function getFlutterwaveFundingOption(countryCode: string | null | undefin
         ? "Pricing for this local currency has not been configured."
         : !packPricingSupported
           ? "Each token pack must convert to an exact whole-unit Flutterwave amount within its integer amount limit."
-          : !launchChecksPassed()
+          : !paymentOptionsConfigured
+            ? "Disable \\u201cEnable Dashboard Payment Options\\u201d in Flutterwave account settings before enabling country-specific payment methods."
+            : !launchChecksPassed()
           ? "Checkout is disabled until billing, refund and dispute recovery checks are approved."
           : "Flutterwave credentials are not fully configured.";
   return {
