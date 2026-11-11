@@ -55,7 +55,12 @@ export function canRequestAdsterraAds(
 
 /** Open the publisher's Smartlink in a separate tab from an explicit output action. */
 export function openAdsterraSmartlinkFromOutput(): void {
+  if (typeof window === "undefined" || typeof document === "undefined") return;
   if (!canRequestAdsterraAds(isAdsterraEnabled(), getAdsterraConsent(), navigator.onLine)) return;
+  const eligibleToolSurface = document.querySelector<HTMLElement>(
+    '[data-env-tool-id][data-env-ad-eligible="true"]:not(.env-tool-fullscreen)',
+  );
+  if (!eligibleToolSurface || document.fullscreenElement === eligibleToolSurface) return;
   window.open(ADSTERRA_SMARTLINK_URL, "_blank", "noopener,noreferrer");
 }
 
