@@ -12,11 +12,12 @@ Do not send passwords, cookies, auth tokens, payment data, IP addresses, full us
 
 ## Consent controls
 
-- Analytics is off unless the user actively chooses **Allow analytics** from the dedicated Privacy page controls.
-- Consent is installation-scoped and tied to a policy version.
-- **Decline / withdraw consent** stops local queuing, clears the local queue and requests deletion of that installation's event history.
-- The Web does not show a global cookie or advertising-preference popup. Optional analytics remains controlled separately in the Privacy page. Advertising-provider choices, where required, remain within their provider-specific Privacy controls and are never inferred from ordinary tool use.
-- Optional analytics can be allowed or declined separately in **Product analytics** controls on the Privacy page.
+- The Web uses one global **Cookie preferences** dialog for essential storage, optional analytics and Adsterra advertising. Essential storage is always active; optional categories are off until the visitor actively chooses them.
+- Analytics is off unless the visitor selects **Allow optional analytics** in that dialog.
+- Adsterra scripts and placements are off unless the visitor selects **Allow Adsterra advertising** in the same dialog. A separate Adsterra preference screen on the Privacy page is not used.
+- Consent is installation-scoped and tied to the analytics policy version where analytics is enabled.
+- **Reject optional** or withdrawing analytics consent stops local queuing, clears the local queue and requests deletion of that installation's event history. Withdrawing advertising consent prevents further Adsterra requests and reloads the page to clear provider-installed scripts and listeners.
+- Visitors can reopen the same dialog from the Cookie preferences control on the Privacy page. Ordinary tool use and account creation are not consent.
 - A changed policy version requires renewed consent.
 - The server rejects event batches without a current granted consent record.
 - Account creation or ordinary tool use is not analytics consent.
