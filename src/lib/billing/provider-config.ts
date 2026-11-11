@@ -78,8 +78,8 @@ export function resolvePaystackCountryConfiguration(
     : merchantLocalCurrency;
   if (!acceptedCurrencies.includes(currency)) return null;
 
-  const secret = env["PAYSTACK_SECRET_KEY_" + currency]?.trim() ??
-    (currency === "NGN" ? env.PAYSTACK_SECRET_KEY?.trim() : undefined) ?? "";
+  // One Paystack integration key authenticates every transaction currency on the merchant account.
+  const secret = env.PAYSTACK_SECRET_KEY?.trim() ?? "";
   const configuredPrice = env["PAYSTACK_TOKEN_PRICE_" + currency + "_MINOR"] ??
     (currency === "NGN" ? env.PAYSTACK_TOKEN_PRICE_NGN_KOBO : undefined);
   const pricePerTokenMinor = readSafePackPrice(configuredPrice, packSizes);
