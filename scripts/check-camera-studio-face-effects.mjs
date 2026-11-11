@@ -10,6 +10,11 @@ const acceptance = read("docs/camera-studio-device-acceptance.md");
 
 assert.match(androidBuild, /androidx\.camera:camera-effects:1\.5\.3/);
 assert.match(androidBuild, /com\.google\.mlkit:face-mesh-detection:16\.0\.0-beta1/);
+assert.match(android, /import androidx\.camera\.core\.CompositionSettings/);
+assert.match(android, /CompositionSettings\.Builder\(\)[\s\S]*?\.setScale\(1f, 1f\)/);
+assert.match(android, /CompositionSettings\.Builder\(\)[\s\S]*?\.setOffset\(0\.62f, 0\.58f\)[\s\S]*?\.setScale\(0\.34f, 0\.34f\)/);
+assert.match(android, /SingleCameraConfig\(backSelector, group, rearComposition, lifecycleOwner\)/);
+assert.match(android, /SingleCameraConfig\(frontSelector, group, frontComposition, lifecycleOwner\)/);
 assert.match(android, /FaceMeshDetection\.getClient/);
 assert.match(android, /FaceMeshDetectorOptions\.DEFAULT_OPTIONS/);
 assert.match(android, /contourCenter\(FaceMesh\.LEFT_EYE\)/);
