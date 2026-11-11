@@ -36,6 +36,8 @@ export const ADSTERRA_POPUNDER_SCRIPT = {
   src: "https://abscloud.org/1/b39264253fbfc622884c9a3b81882853",
 } as const;
 
+export const ADSTERRA_SMARTLINK_URL = "https://araplhn.org/4/ae13eae40d577a3e29863b4ca80a9f2e";
+
 export type AdsterraBannerFormat = keyof typeof ADSTERRA_BANNER_UNITS;
 
 /**
@@ -49,6 +51,12 @@ export function canRequestAdsterraAds(
   online: boolean,
 ): boolean {
   return enabled && consent === "granted" && online;
+}
+
+/** Open the publisher's Smartlink in a separate tab from an explicit output action. */
+export function openAdsterraSmartlinkFromOutput(): void {
+  if (!canRequestAdsterraAds(isAdsterraEnabled(), getAdsterraConsent(), navigator.onLine)) return;
+  window.open(ADSTERRA_SMARTLINK_URL, "_blank", "noopener,noreferrer");
 }
 
 export function isAdsterraEnabled(): boolean {
