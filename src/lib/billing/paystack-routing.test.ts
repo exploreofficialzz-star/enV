@@ -1,120 +1,69 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getPaystackFundingOption } from "./paystack.server.ts";
+import { resolvePaystackCountryConfiguration } from "./provider-config.ts";
 
-const KEYS = [
-  "BETTER_AUTH_URL",
-  "BILLING_LAUNCH_ENABLED",
-  "BILLING_ENFORCEMENT_ENABLED",
-  "BILLING_REFUND_DISPUTE_HANDLING_APPROVED",
-  "PAYSTACK_MERCHANT_COUNTRY",
-  "PAYSTACK_SECRET_KEY",
-  "PAYSTACK_SECRET_KEY_NGN",
-  "PAYSTACK_SECRET_KEY_GHS",
-  "PAYSTACK_SECRET_KEY_KES",
-  "PAYSTACK_SECRET_KEY_ZAR",
-  "PAYSTACK_SECRET_KEY_USD",
-  "PAYSTACK_PROVIDER_APPROVED",
-  "PAYSTACK_PROVIDER_APPROVED_GHS",
-  "PAYSTACK_PROVIDER_APPROVED_KES",
-  "PAYSTACK_PROVIDER_APPROVED_ZAR",
-  "PAYSTACK_PROVIDER_APPROVED_USD",
-  "PAYSTACK_TOKEN_PRICE_NGN_KOBO",
-  "PAYSTACK_TOKEN_PRICE_GHS_MINOR",
-  "PAYSTACK_TOKEN_PRICE_KES_MINOR",
-  "PAYSTACK_TOKEN_PRICE_ZAR_MINOR",
-  "PAYSTACK_TOKEN_PRICE_USD_MINOR",
-  "PAYSTACK_INTERNATIONAL_ENABLED",
-  "PAYSTACK_INTERNATIONAL_CURRENCY",
-];
-
-function withEnvironment(values: Record<string, string>, run: () => void) {
-  const previous = new Map(KEYS.map((key) => [key, process.env[key]]));
-  for (const key of KEYS) delete process.env[key];
-  Object.assign(process.env, values);
-  try {
-    run();
-  } finally {
-    for (const key of KEYS) {
-      const value = previous.get(key);
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
-  }
-}
+const PACKS = [100, 250, 500, 1_000] as const;
 
 const approvedNigeria = {
-  BETTER_AUTH_URL: "https://envtools.store",
-  BILLING_LAUNCH_ENABLED: "true",
-  BILLING_ENFORCEMENT_ENABLED: "true",
-  BILLING_REFUND_DISPUTE_HANDLING_APPROVED: "true",
   PAYSTACK_MERCHANT_COUNTRY: "NG",
   PAYSTACK_SECRET_KEY: "sk_test_nigeria",
   PAYSTACK_PROVIDER_APPROVED: "true",
   PAYSTACK_TOKEN_PRICE_NGN_KOBO: "1",
 };
 
-test("Paystack local checkout is shown only in the merchant's registration country", () => {
-  withEnvironment(approvedNigeria, () => {
-    const local = getPaystackFundingOption("NG");
-    assert.equal(local?.enabled, true);
-    assert.equal(local?.currency, "NGN");
-    assert.match(local?.label ?? "", /Paystack · NGN/);
+test("Paystack local checkout is available only in the configured merchant registration country", () => {
+  const local = resolvePaystackCountryConfiguration("NG", approvedNigeria, PACKS);
+  assert.equal(local?.enabled, true);
+  assert.equal(local?.currency, "NGN");
+  assert.equal(local?.international, false);
 
-    // A Ghanaian customer is not offered Ghana local money rails by a
-    // Nigerian merchant account merely because the visitor is in Ghana.
-    assert.equal(getPaystackFundingOption("GH"), null);
-  });
+  // A Ghanaian visitor is not given Ghana local rails by a Nigerian account.
+  assert.equal(resolvePaystackCountryConfiguration("GH", approvedNigeria, PACKS), null);
 });
 
-test("Paystack international visitors receive a card-only route in an approved merchant currency", () => {
-  withEnvironment({
+test("Paystack international visitors use card-only merchant settlement currency", () => {
+  const foreign = resolvePaystackCountryConfiguration("GH", {
     ...approvedNigeria,
     PAYSTACK_INTERNATIONAL_ENABLED: "true",
-  }, () => {
-    const foreignCustomer = getPaystackFundingOption("GH");
-    assert.equal(foreignCustomer?.enabled, true);
-    assert.equal(foreignCustomer?.currency, "NGN");
-    assert.match(foreignCustomer?.label ?? "", /international cards/);
-  });
+  }, PACKS);
+  assert.equal(foreign?.enabled, true);
+  assert.equal(foreign?.currency, "NGN");
+  assert.equal(foreign?.international, true);
 });
 
-test("Paystack USD international settlement requires its own currency approval as well as global merchant approval", () => {
-  const configuration = {
-    BETTER_AUTH_URL: "https://envtools.store",
-    BILLING_LAUNCH_ENABLED: "true",
-    BILLING_ENFORCEMENT_ENABLED: "true",
-    BILLING_REFUND_DISPUTE_HANDLING_APPROVED: "true",
-    PAYSTACK_MERCHANT_COUNTRY: "NG",
+test("Paystack USD international settlement is restricted to merchant countries that support USD", () => {
+  const ghanaUsd = resolvePaystackCountryConfiguration("US", {
+    PAYSTACK_MERCHANT_COUNTRY: "GH",
     PAYSTACK_SECRET_KEY_USD: "sk_test_usd",
     PAYSTACK_PROVIDER_APPROVED: "true",
+    PAYSTACK_PROVIDER_APPROVED_USD: "true",
+    PAYSTACK_TOKEN_PRICE_USD_MINOR: "1",
+    PAYSTACK_INTERNATIONAL_ENABLED: "true",
+    PAYSTACK_INTERNATIONAL_CURRENCY: "USD",
+  }, PACKS);
+  assert.equal(ghanaUsd, null);
+});
+
+test("Paystack USD international settlement requires currency approval as well as global merchant approval", () => {
+  const usdConfig = {
+    ...approvedNigeria,
+    PAYSTACK_SECRET_KEY_USD: "sk_test_usd",
     PAYSTACK_PROVIDER_APPROVED_USD: "false",
     PAYSTACK_TOKEN_PRICE_USD_MINOR: "1",
     PAYSTACK_INTERNATIONAL_ENABLED: "true",
     PAYSTACK_INTERNATIONAL_CURRENCY: "USD",
   };
-  withEnvironment(configuration, () => {
-    assert.equal(getPaystackFundingOption("US")?.enabled, false);
-  });
-  withEnvironment({ ...configuration, PAYSTACK_PROVIDER_APPROVED_USD: "true" }, () => {
-    assert.equal(getPaystackFundingOption("US")?.enabled, true);
-    assert.equal(getPaystackFundingOption("US")?.currency, "USD");
-  });
+  assert.equal(resolvePaystackCountryConfiguration("US", usdConfig, PACKS)?.enabled, false);
+  assert.equal(resolvePaystackCountryConfiguration("US", {
+    ...usdConfig,
+    PAYSTACK_PROVIDER_APPROVED_USD: "true",
+  }, PACKS)?.enabled, true);
 });
 
-test("Paystack USD international settlement is restricted to merchant countries that support USD", () => {
-  withEnvironment({
-    BETTER_AUTH_URL: "https://envtools.store",
-    BILLING_LAUNCH_ENABLED: "true",
-    BILLING_ENFORCEMENT_ENABLED: "true",
-    BILLING_REFUND_DISPUTE_HANDLING_APPROVED: "true",
-    PAYSTACK_MERCHANT_COUNTRY: "GH",
-    PAYSTACK_SECRET_KEY_USD: "sk_test_usd",
-    PAYSTACK_PROVIDER_APPROVED: "true",
-    PAYSTACK_TOKEN_PRICE_USD_MINOR: "1",
+test("unknown customers and unsupported merchant countries fail closed", () => {
+  assert.equal(resolvePaystackCountryConfiguration(null, approvedNigeria, PACKS), null);
+  assert.equal(resolvePaystackCountryConfiguration("US", {
+    PAYSTACK_MERCHANT_COUNTRY: "JP",
     PAYSTACK_INTERNATIONAL_ENABLED: "true",
-    PAYSTACK_INTERNATIONAL_CURRENCY: "USD",
-  }, () => {
-    assert.equal(getPaystackFundingOption("US"), null);
-  });
+  }, PACKS), null);
 });
