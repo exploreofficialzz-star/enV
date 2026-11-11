@@ -2119,7 +2119,7 @@ struct NativeCameraStudioView: View {
                     }
                 }
             }
-            .aspectRatio(4.0 / 3.0, contentMode: .fit)
+            .aspectRatio(dualCameraMode ? 9.0 / 16.0 : 4.0 / 3.0, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: 12))
 
             if dualCameraMode {
