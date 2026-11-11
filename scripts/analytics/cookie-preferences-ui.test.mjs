@@ -2,7 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 
-const component = readFileSync(new URL("../../src/components/layout/cookie-consent.tsx", import.meta.url), "utf8");
 const appShell = readFileSync(new URL("../../src/components/layout/app-shell.tsx", import.meta.url), "utf8");
 const privacyControls = readFileSync(new URL("../../src/components/layout/privacy-controls.tsx", import.meta.url), "utf8");
 const accountPage = readFileSync(new URL("../../src/routes/account.tsx", import.meta.url), "utf8");
@@ -18,44 +17,21 @@ const viewMode = readFileSync(new URL("../../src/lib/view-mode.ts", import.meta.
 const settingsPage = readFileSync(new URL("../../src/routes/settings.tsx", import.meta.url), "utf8");
 const header = readFileSync(new URL("../../src/components/layout/header.tsx", import.meta.url), "utf8");
 
-test("cookie preferences are a compact popup rather than a full explanatory page", () => {
-  assert.match(component, /Cookie preferences/);
-  assert.match(component, /useLocation/);
-  assert.match(component, /pathname\.startsWith\("\/tools\/"\)/);
-  assert.match(component, /pathname === "\/3d-game-studio"/);
-  assert.match(component, /pointer-events-none fixed bottom-4 left-4 right-4/);
-  assert.match(component, /pointer-events-auto w-full rounded-2xl/);
-  assert.match(component, /sm:w-\[24rem\]/);
-  assert.match(component, /bg-white[\s\S]*dark:bg-black[\s\S]*dark:text-white/);
-  assert.doesNotMatch(component, /fixed inset-0|bg-transparent|backdrop-blur|min-h-dvh|bg-card/);
-  assert.match(component, /role="dialog"/);
-  assert.match(component, /aria-modal="false"/);
-  assert.match(component, /if \(event\.key === "Escape"\)/);
-  assert.match(component, /focusOnOpenRef\.current = true/);
-  assert.match(component, /returnFocusRef\.current\.focus\(\)/);
-  assert.match(component, /essential browser storage/);
-  assert.match(component, /Continue/);
-  assert.doesNotMatch(component, /min-h-dvh w-screen|max-w-3xl|Product analytics|analyticsAllowed|type="checkbox"|Decline analytics|chooseAnalyticsConsent/);
+test("enV does not mount a global cookie or advertising-preference popup", () => {
+  const popupPath = new URL("../../src/components/layout/cookie-consent.tsx", import.meta.url);
+  assert.equal(existsSync(popupPath), false, "The old global popup component must be removed.");
+  assert.doesNotMatch(appShell, /CookieConsent|cookie-consent/);
+  assert.doesNotMatch(privacyControls, /Open cookie preferences|env:open-cookie-preferences/);
+  assert.match(privacyControls, /Product analytics/);
 });
 
-test("cookie popup does not offer analytics as a checkbox or yes/no choice", () => {
-  assert.doesNotMatch(component, /Product analytics|Allow product analytics|Decline analytics|Save preferences|env-analytics-toggle/);
+test("analytics choices remain separate from inline advertising controls", () => {
   assert.match(privacyControls, /Allow analytics/);
   assert.match(privacyControls, /Decline \/ withdraw consent/);
-});
-
-test("cookie acknowledgement is versioned and remembered locally", () => {
-  assert.match(component, /env\.cookie-preferences\.seen\.v2/);
-  assert.match(component, /window\.localStorage\.getItem\(NOTICE_KEY\) !== "1"/);
-  assert.match(component, /window\.localStorage\.setItem\(NOTICE_KEY, "1"\)/);
-});
-
-test("popup is mounted globally and can be reopened from Privacy", () => {
-  assert.match(appShell, /import \{ CookieConsent \} from "@\/components\/layout\/cookie-consent"/);
-  assert.match(appShell, /<CookieConsent \/>/);
-  assert.match(privacyControls, /env:open-cookie-preferences/);
-  assert.match(privacyControls, /Open cookie preferences/);
-  assert.match(component, /addEventListener\(OPEN_EVENT, reopen\)/);
+  const privacyPage = readFileSync(new URL("../../src/routes/privacy.tsx", import.meta.url), "utf8");
+  assert.match(privacyPage, /<AdsterraPrivacyControls \/>/);
+  assert.match(privacyPage, /<AdPrivacyControls \/>/);
+  assert.doesNotMatch(appShell, /CookieConsent/);
 });
 
 test("account resolves sign-in state reactively and preserves the old server-function ID for cached clients", () => {
