@@ -4,10 +4,10 @@ import { readWallet, creditVerifiedPurchase } from "./ledger.server";
 import { readSafePackPrice } from "./provider-config";
 import { readBoundedBytes } from "./bounded-json.server";
 import {
-  formatMinorUnits,
   getCountryPaymentProfile,
   getCurrencyMinorUnitExponent,
   parseMajorUnitsToMinor,
+  toFlutterwaveMajorAmount,
 } from "./country-routing";
 
 const TOKEN_PACKS = [100, 250, 500, 1_000] as const;
@@ -49,22 +49,29 @@ function resolveConfiguration(countryCode: string | null | undefined) {
   const secretHash = process.env.FLW_SECRET_HASH?.trim() ?? "";
   const approved = process.env.FLUTTERWAVE_PROVIDER_APPROVED === "true";
   const exponent = getCurrencyMinorUnitExponent(currency);
+  const packPricingSupported = pricePerTokenMinor !== null && TOKEN_PACKS.every((tokens) => {
+    const amountMinor = tokens * pricePerTokenMinor;
+    return Number.isSafeInteger(amountMinor) && toFlutterwaveMajorAmount(amountMinor, currency) !== null;
+  });
   const ready = launchChecksPassed() && approved && enabled &&
-    Boolean(secret) && Boolean(secretHash) && pricePerTokenMinor !== null && exponent !== null;
-  return { profile, currency, pricePerTokenMinor, secret, secretHash, ready };
+    Boolean(secret) && Boolean(secretHash) && pricePerTokenMinor !== null &&
+    exponent !== null && packPricingSupported;
+  return { profile, currency, pricePerTokenMinor, secret, secretHash, ready, packPricingSupported };
 }
 
 export function getFlutterwaveFundingOption(countryCode: string | null | undefined) {
   const configuration = resolveConfiguration(countryCode);
   if (!configuration) return null;
-  const { profile, currency, pricePerTokenMinor, ready } = configuration;
+  const { profile, currency, pricePerTokenMinor, ready, packPricingSupported } = configuration;
   const reason = !process.env.FLUTTERWAVE_PROVIDER_APPROVED || process.env.FLUTTERWAVE_PROVIDER_APPROVED !== "true"
     ? "Flutterwave checkout is awaiting merchant approval."
     : !enabledCurrencies().has(currency)
       ? "This currency has not been enabled for the enV Flutterwave merchant account."
       : !pricePerTokenMinor
         ? "Pricing for this local currency has not been configured."
-        : !launchChecksPassed()
+        : !packPricingSupported
+          ? "Each token pack must convert to an exact whole-unit Flutterwave amount within its integer amount limit."
+          : !launchChecksPassed()
           ? "Checkout is disabled until billing, refund and dispute recovery checks are approved."
           : "Flutterwave credentials are not fully configured.";
   return {
@@ -110,8 +117,10 @@ export async function initializeFlutterwaveCheckout(input: {
 
   const { currency, pricePerTokenMinor, secret, profile } = configuration;
   const amountMinor = input.tokenPack * pricePerTokenMinor;
+  const amountMajor = toFlutterwaveMajorAmount(amountMinor, currency);
   const creditsSubunits = input.tokenPack * 1_000;
-  if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0 || !Number.isSafeInteger(creditsSubunits)) {
+  if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0 || amountMajor === null ||
+      !Number.isSafeInteger(creditsSubunits)) {
     throw Object.assign(new Error("The configured token price is outside the supported range."), {
       code: "INVALID_PRICE_CONFIGURATION", status: 503,
     });
@@ -177,7 +186,7 @@ export async function initializeFlutterwaveCheckout(input: {
       },
       body: JSON.stringify({
         tx_ref: intentId,
-        amount: formatMinorUnits(amountMinor, currency),
+        amount: amountMajor,
         currency,
         redirect_url: origin + "/api/billing/flutterwave/verify",
         payment_options: profile.paymentOptions.join(", "),
@@ -326,7 +335,12 @@ export async function handleFlutterwaveWebhook(request: Request) {
   }
 
   const eventName = typeof body.event === "string" ? body.event.toLowerCase() : "";
-  if (eventName.includes("refund") || eventName.includes("chargeback") || eventName.includes("dispute")) {
+  // V3 refund notifications can arrive as a top-level object with AmountRefunded
+  // and FlwRef, rather than the normal { event, data } charge envelope.
+  const isRefundPayload = body.AmountRefunded !== undefined ||
+    body.refund_id !== undefined || body.refundId !== undefined;
+  if (isRefundPayload || eventName.includes("refund") ||
+      eventName.includes("chargeback") || eventName.includes("dispute")) {
     throw Object.assign(new Error("This Flutterwave refund or dispute event requires wallet reconciliation; no wallet balance was changed."), {
       code: "FLUTTERWAVE_REFUND_DISPUTE_RECONCILIATION_REQUIRED", status: 503,
     });
