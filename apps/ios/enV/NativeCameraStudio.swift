@@ -948,6 +948,82 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
                 overlayContext.setStrokeColor(UIColor(red: 1, green: 0.93, blue: 0.62, alpha: 1).cgColor)
                 overlayContext.setLineWidth(max(2, CGFloat(width) * 0.003))
                 overlayContext.strokePath()
+            } else if activeFaceEffect == "Bunny ears" {
+                let leftPoints = face.landmarks?.leftEye?.normalizedPoints ?? []
+                let rightPoints = face.landmarks?.rightEye?.normalizedPoints ?? []
+                if !leftPoints.isEmpty && !rightPoints.isEmpty {
+                    func eyeCenter(_ points: [CGPoint]) -> CGPoint {
+                        let total = points.reduce(CGPoint.zero) { partial, point in
+                            CGPoint(x: partial.x + point.x, y: partial.y + point.y)
+                        }
+                        return CGPoint(x: total.x / CGFloat(points.count), y: total.y / CGFloat(points.count))
+                    }
+                    let leftEye = faceImagePoint(eyeCenter(leftPoints), in: face, extent: source.extent)
+                    let rightEye = faceImagePoint(eyeCenter(rightPoints), in: face, extent: source.extent)
+                    let angle = atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x)
+                    let pivot = CGPoint(x: faceRect.midX, y: faceRect.maxY + faceRect.height * 0.04)
+                    let earWidth = faceRect.width * 0.18
+                    let earHeight = faceRect.height * 0.38
+                    overlayContext.saveGState()
+                    overlayContext.translateBy(x: pivot.x, y: pivot.y)
+                    overlayContext.rotate(by: angle)
+                    for side in [-1.0, 1.0] {
+                        let ear = CGRect(
+                            x: CGFloat(side) * faceRect.width * 0.15 - earWidth / 2,
+                            y: 0,
+                            width: earWidth,
+                            height: earHeight
+                        )
+                        overlayContext.setFillColor(UIColor(red: 0.97, green: 0.93, blue: 0.89, alpha: 0.98).cgColor)
+                        overlayContext.fillEllipse(in: ear)
+                        let inner = ear.insetBy(dx: earWidth * 0.28, dy: earHeight * 0.14)
+                        overlayContext.setFillColor(UIColor(red: 0.96, green: 0.54, blue: 0.66, alpha: 0.9).cgColor)
+                        overlayContext.fillEllipse(in: inner)
+                    }
+                    overlayContext.restoreGState()
+                }
+            } else if activeFaceEffect == "Moustache" {
+                let lipPoints = face.landmarks?.outerLips?.normalizedPoints ?? []
+                if !lipPoints.isEmpty {
+                    let total = lipPoints.reduce(CGPoint.zero) { partial, point in
+                        CGPoint(x: partial.x + point.x, y: partial.y + point.y)
+                    }
+                    let lipCenter = CGPoint(
+                        x: total.x / CGFloat(lipPoints.count),
+                        y: total.y / CGFloat(lipPoints.count)
+                    )
+                    let mouth = faceImagePoint(lipCenter, in: face, extent: source.extent)
+                    let center = CGPoint(x: mouth.x, y: mouth.y + faceRect.height * 0.055)
+                    let halfWidth = faceRect.width * 0.23
+                    let height = faceRect.height * 0.095
+                    let path = CGMutablePath()
+                    path.move(to: center)
+                    path.addCurve(
+                        to: CGPoint(x: center.x - halfWidth, y: center.y + height * 0.08),
+                        control1: CGPoint(x: center.x - halfWidth * 0.20, y: center.y - height * 0.12),
+                        control2: CGPoint(x: center.x - halfWidth * 0.72, y: center.y - height * 0.78)
+                    )
+                    path.addCurve(
+                        to: center,
+                        control1: CGPoint(x: center.x - halfWidth * 0.82, y: center.y + height * 0.82),
+                        control2: CGPoint(x: center.x - halfWidth * 0.24, y: center.y + height * 0.42)
+                    )
+                    path.move(to: center)
+                    path.addCurve(
+                        to: CGPoint(x: center.x + halfWidth, y: center.y + height * 0.08),
+                        control1: CGPoint(x: center.x + halfWidth * 0.20, y: center.y - height * 0.12),
+                        control2: CGPoint(x: center.x + halfWidth * 0.72, y: center.y - height * 0.78)
+                    )
+                    path.addCurve(
+                        to: center,
+                        control1: CGPoint(x: center.x + halfWidth * 0.82, y: center.y + height * 0.82),
+                        control2: CGPoint(x: center.x + halfWidth * 0.24, y: center.y + height * 0.42)
+                    )
+                    path.closeSubpath()
+                    overlayContext.addPath(path)
+                    overlayContext.setFillColor(UIColor(red: 0.16, green: 0.11, blue: 0.09, alpha: 0.96).cgColor)
+                    overlayContext.fillPath()
+                }
             }
         }
 
@@ -1182,8 +1258,8 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
     private var stopRequested = false
     private var resumeAfterFinalization = false
 
-    private let outputWidth = 720
-    private let outputHeight = 1280
+    private var outputWidth = 720
+    private var outputHeight = 1280
 
     var backCameraInput: AVCaptureDeviceInput? { backInput }
     var frontCameraInput: AVCaptureDeviceInput? { frontInput }
@@ -1206,19 +1282,13 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
             self.stopRequested = false
             self.resumeAfterFinalization = false
             do {
-                try self.configureSession()
-                guard self.session.hardwareCost <= 1.0 else {
-                    throw NativeCameraError.message("This device cannot safely run both cameras at the selected quality.")
-                }
-                guard self.session.systemPressureCost <= 1.0 else {
-                    throw NativeCameraError.message("The camera system is under too much pressure for dual-camera recording.")
-                }
+                let selectedProfile = try self.configureBestAvailableSession()
                 if !self.session.isRunning { self.session.startRunning() }
                 Task { @MainActor in
                     self.ready = self.session.isRunning
                     self.error = nil
                     self.message = self.ready
-                        ? "Both cameras are ready. Start recording when you are set."
+                        ? "Both cameras are ready in \(selectedProfile) mode. Start recording when you are set."
                         : "The cameras could not start. Return to the normal camera."
                 }
             } catch {
@@ -1309,23 +1379,18 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
     private func restartSessionLocked() {
         guard !stopRequested, !recordingRequested, writer == nil else { return }
         do {
-            try configureSession()
-            guard session.hardwareCost <= 1.0 else {
-                throw NativeCameraError.message("This device cannot safely restart both cameras after the interruption.")
-            }
-            guard session.systemPressureCost <= 1.0 else {
-                throw NativeCameraError.message("The camera system is still under too much pressure to restart dual-camera mode.")
-            }
+            let selectedProfile = try configureBestAvailableSession()
             if !session.isRunning { session.startRunning() }
             let isRunning = session.isRunning
             Task { @MainActor in
                 self.ready = isRunning
                 self.error = isRunning ? nil : "The dual-camera session could not restart. Use the normal camera instead."
                 self.message = isRunning
-                    ? "Both cameras are ready again."
+                    ? "Both cameras are ready again in \(selectedProfile) mode."
                     : "Your normal single-camera mode remains available."
             }
         } catch {
+            resetSessionAfterFailure()
             Task { @MainActor in
                 self.ready = false
                 self.error = error.localizedDescription
@@ -1338,7 +1403,44 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
         sessionObservers.forEach(NotificationCenter.default.removeObserver)
     }
 
-    private func configureSession() throws {
+    // Try a balanced dual-camera profile first, then reduce both sensor streams and
+    // the encoded output together. This cannot add hardware concurrency to an
+    // unsupported iPhone, but it avoids rejecting devices that only sustain a
+    // lower-bandwidth MultiCam configuration.
+    private func configureBestAvailableSession() throws -> String {
+        do {
+            try configureSession(maxWidth: 1280, maxHeight: 720, frameRate: 30)
+            guard session.hardwareCost <= 1.0, session.systemPressureCost <= 1.0 else {
+                throw NativeCameraError.message("The 720p dual-camera profile exceeds this iPhone's camera resource budget.")
+            }
+            outputWidth = 720
+            outputHeight = 1280
+            return "720p"
+        } catch {
+            resetSessionAfterFailure()
+        }
+
+        do {
+            try configureSession(maxWidth: 640, maxHeight: 480, frameRate: 24)
+            guard session.hardwareCost <= 1.0, session.systemPressureCost <= 1.0 else {
+                throw NativeCameraError.message("The 480p dual-camera profile still exceeds this iPhone's camera resource budget.")
+            }
+            outputWidth = 480
+            outputHeight = 854
+            return "low-power 480p"
+        } catch {
+            resetSessionAfterFailure()
+            throw NativeCameraError.message(
+                "This iPhone could not sustain both cameras, even with the low-power profile. Use the normal camera instead. \(error.localizedDescription)"
+            )
+        }
+    }
+
+    private func configureSession(
+        maxWidth: Int = 1280,
+        maxHeight: Int = 720,
+        frameRate: Double = 30
+    ) throws {
         guard backInput == nil, frontInput == nil else { return }
         session.beginConfiguration()
         do {
@@ -1347,8 +1449,18 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
                 throw NativeCameraError.message("Both a front and rear camera are required for this mode.")
             }
 
-            try configureModerateFormat(backDevice)
-            try configureModerateFormat(frontDevice)
+            try configureModerateFormat(
+                backDevice,
+                maxWidth: maxWidth,
+                maxHeight: maxHeight,
+                frameRate: frameRate
+            )
+            try configureModerateFormat(
+                frontDevice,
+                maxWidth: maxWidth,
+                maxHeight: maxHeight,
+                frameRate: frameRate
+            )
 
             let back = try AVCaptureDeviceInput(device: backDevice)
             let front = try AVCaptureDeviceInput(device: frontDevice)
@@ -1385,13 +1497,19 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
         previewConnections.removeAll()
     }
 
-    private func configureModerateFormat(_ device: AVCaptureDevice) throws {
+    private func configureModerateFormat(
+        _ device: AVCaptureDevice,
+        maxWidth: Int,
+        maxHeight: Int,
+        frameRate: Double
+    ) throws {
         let formats = device.formats.filter { format in
             let dimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
-            return format.isMultiCamSupported && dimensions.width <= 1920 &&
-                dimensions.height <= 1080 &&
+            return format.isMultiCamSupported &&
+                Int(dimensions.width) <= maxWidth &&
+                Int(dimensions.height) <= maxHeight &&
                 format.videoSupportedFrameRateRanges.contains {
-                    $0.minFrameRate <= 30 && $0.maxFrameRate >= 30
+                    $0.minFrameRate <= frameRate && $0.maxFrameRate >= frameRate
                 }
         }
         guard let selected = formats.max(by: { lhs, rhs in
@@ -1399,13 +1517,16 @@ private final class NativeDualCameraCapture: NSObject, ObservableObject, AVCaptu
             let right = CMVideoFormatDescriptionGetDimensions(rhs.formatDescription)
             return Int(left.width) * Int(left.height) < Int(right.width) * Int(right.height)
         }) else {
-            throw NativeCameraError.message("A stable 1080p-or-lower, 30 fps camera format is not available.")
+            throw NativeCameraError.message(
+                "A MultiCam-compatible camera format at or below \(maxWidth)x\(maxHeight) and \(Int(frameRate)) fps is not available."
+            )
         }
 
+        let frameScale = CMTimeScale(frameRate)
         try device.lockForConfiguration()
         device.activeFormat = selected
-        device.activeVideoMinFrameDuration = CMTime(value: 1, timescale: 30)
-        device.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: 30)
+        device.activeVideoMinFrameDuration = CMTime(value: 1, timescale: frameScale)
+        device.activeVideoMaxFrameDuration = CMTime(value: 1, timescale: frameScale)
         device.unlockForConfiguration()
     }
 
@@ -2177,9 +2298,15 @@ struct NativeCameraStudioView: View {
                         Text("Beauty").tag("Beauty")
                         Text("Glasses").tag("Glasses")
                         Text("Crown").tag("Crown")
+                        Text("Bunny ears").tag("Bunny ears")
+                        Text("Moustache").tag("Moustache")
                     }.pickerStyle(.menu).disabled(capture.recording)
                 }
-                Text(faceEffect == "Off" ? "Face effects are off." : faceEffect == "Beauty" ? "Adds subtle face-only softening. Original face effects are processed on this device and included in recorded video." : "Face tracking anchors this original effect to your face. Processing stays on this device and is included in recorded video.")
+                Text(
+                    faceEffect == "Off" ? "Face effects are off." :
+                    faceEffect == "Beauty" ? "Adds subtle face-only softening. Original face effects are processed on this device and included in recorded video." :
+                    "Tracks your face and keeps the selected original effect aligned in preview and recorded video. Processing stays on this device."
+                )
                     .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
             }
             if let message = (dualCameraMode ? dualCapture.message : capture.message) {
