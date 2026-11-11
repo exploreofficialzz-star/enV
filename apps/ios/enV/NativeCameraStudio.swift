@@ -948,6 +948,82 @@ private final class NativeCameraCapture: NSObject, ObservableObject, AVCapturePh
                 overlayContext.setStrokeColor(UIColor(red: 1, green: 0.93, blue: 0.62, alpha: 1).cgColor)
                 overlayContext.setLineWidth(max(2, CGFloat(width) * 0.003))
                 overlayContext.strokePath()
+            } else if activeFaceEffect == "Bunny ears" {
+                let leftPoints = face.landmarks?.leftEye?.normalizedPoints ?? []
+                let rightPoints = face.landmarks?.rightEye?.normalizedPoints ?? []
+                if !leftPoints.isEmpty && !rightPoints.isEmpty {
+                    func eyeCenter(_ points: [CGPoint]) -> CGPoint {
+                        let total = points.reduce(CGPoint.zero) { partial, point in
+                            CGPoint(x: partial.x + point.x, y: partial.y + point.y)
+                        }
+                        return CGPoint(x: total.x / CGFloat(points.count), y: total.y / CGFloat(points.count))
+                    }
+                    let leftEye = faceImagePoint(eyeCenter(leftPoints), in: face, extent: source.extent)
+                    let rightEye = faceImagePoint(eyeCenter(rightPoints), in: face, extent: source.extent)
+                    let angle = atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x)
+                    let pivot = CGPoint(x: faceRect.midX, y: faceRect.maxY + faceRect.height * 0.04)
+                    let earWidth = faceRect.width * 0.18
+                    let earHeight = faceRect.height * 0.38
+                    overlayContext.saveGState()
+                    overlayContext.translateBy(x: pivot.x, y: pivot.y)
+                    overlayContext.rotate(by: angle)
+                    for side in [-1.0, 1.0] {
+                        let ear = CGRect(
+                            x: CGFloat(side) * faceRect.width * 0.15 - earWidth / 2,
+                            y: 0,
+                            width: earWidth,
+                            height: earHeight
+                        )
+                        overlayContext.setFillColor(UIColor(red: 0.97, green: 0.93, blue: 0.89, alpha: 0.98).cgColor)
+                        overlayContext.fillEllipse(in: ear)
+                        let inner = ear.insetBy(dx: earWidth * 0.28, dy: earHeight * 0.14)
+                        overlayContext.setFillColor(UIColor(red: 0.96, green: 0.54, blue: 0.66, alpha: 0.9).cgColor)
+                        overlayContext.fillEllipse(in: inner)
+                    }
+                    overlayContext.restoreGState()
+                }
+            } else if activeFaceEffect == "Moustache" {
+                let lipPoints = face.landmarks?.outerLips?.normalizedPoints ?? []
+                if !lipPoints.isEmpty {
+                    let total = lipPoints.reduce(CGPoint.zero) { partial, point in
+                        CGPoint(x: partial.x + point.x, y: partial.y + point.y)
+                    }
+                    let lipCenter = CGPoint(
+                        x: total.x / CGFloat(lipPoints.count),
+                        y: total.y / CGFloat(lipPoints.count)
+                    )
+                    let mouth = faceImagePoint(lipCenter, in: face, extent: source.extent)
+                    let center = CGPoint(x: mouth.x, y: mouth.y + faceRect.height * 0.055)
+                    let halfWidth = faceRect.width * 0.23
+                    let height = faceRect.height * 0.095
+                    let path = CGMutablePath()
+                    path.move(to: center)
+                    path.addCurve(
+                        to: CGPoint(x: center.x - halfWidth, y: center.y + height * 0.08),
+                        control1: CGPoint(x: center.x - halfWidth * 0.20, y: center.y - height * 0.12),
+                        control2: CGPoint(x: center.x - halfWidth * 0.72, y: center.y - height * 0.78)
+                    )
+                    path.addCurve(
+                        to: center,
+                        control1: CGPoint(x: center.x - halfWidth * 0.82, y: center.y + height * 0.82),
+                        control2: CGPoint(x: center.x - halfWidth * 0.24, y: center.y + height * 0.42)
+                    )
+                    path.move(to: center)
+                    path.addCurve(
+                        to: CGPoint(x: center.x + halfWidth, y: center.y + height * 0.08),
+                        control1: CGPoint(x: center.x + halfWidth * 0.20, y: center.y - height * 0.12),
+                        control2: CGPoint(x: center.x + halfWidth * 0.72, y: center.y - height * 0.78)
+                    )
+                    path.addCurve(
+                        to: center,
+                        control1: CGPoint(x: center.x + halfWidth * 0.82, y: center.y + height * 0.82),
+                        control2: CGPoint(x: center.x + halfWidth * 0.24, y: center.y + height * 0.42)
+                    )
+                    path.closeSubpath()
+                    overlayContext.addPath(path)
+                    overlayContext.setFillColor(UIColor(red: 0.16, green: 0.11, blue: 0.09, alpha: 0.96).cgColor)
+                    overlayContext.fillPath()
+                }
             }
         }
 
@@ -2222,9 +2298,15 @@ struct NativeCameraStudioView: View {
                         Text("Beauty").tag("Beauty")
                         Text("Glasses").tag("Glasses")
                         Text("Crown").tag("Crown")
+                        Text("Bunny ears").tag("Bunny ears")
+                        Text("Moustache").tag("Moustache")
                     }.pickerStyle(.menu).disabled(capture.recording)
                 }
-                Text(faceEffect == "Off" ? "Face effects are off." : faceEffect == "Beauty" ? "Adds subtle face-only softening. Original face effects are processed on this device and included in recorded video." : "Face tracking anchors this original effect to your face. Processing stays on this device and is included in recorded video.")
+                Text(
+                    faceEffect == "Off" ? "Face effects are off." :
+                    faceEffect == "Beauty" ? "Adds subtle face-only softening. Original face effects are processed on this device and included in recorded video." :
+                    "Tracks your face and keeps the selected original effect aligned in preview and recorded video. Processing stays on this device."
+                )
                     .font(.envScaled(size: 10, weight: .regular)).foregroundStyle(Color.envMuted)
             }
             if let message = (dualCameraMode ? dualCapture.message : capture.message) {
