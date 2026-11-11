@@ -35,6 +35,7 @@ import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.Camera2CameraControl
 import androidx.camera.camera2.interop.CaptureRequestOptions
 import androidx.camera.core.CameraEffect
+import androidx.camera.core.CompositionSettings
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.effects.OverlayEffect
 import androidx.camera.media3.effect.Media3Effect
@@ -1552,11 +1553,26 @@ private fun NativeDualCameraStudioScreen(
                     .addEffect(cameraEffect)
                     .build()
 
+                // CameraX composition is shared by the preview and the VideoCapture output.
+                // Keep the rear camera as the full-frame primary and put the front camera
+                // in a compact top-right picture-in-picture window. Binding order defines
+                // layer order on the CameraX 1.5 API used by this project.
+                val rearComposition = CompositionSettings.Builder()
+                    .setAlpha(1f)
+                    .setOffset(0f, 0f)
+                    .setScale(1f, 1f)
+                    .build()
+                val frontComposition = CompositionSettings.Builder()
+                    .setAlpha(1f)
+                    .setOffset(0.62f, 0.58f)
+                    .setScale(0.34f, 0.34f)
+                    .build()
+
                 try {
                     val concurrent = cameraProvider.bindToLifecycle(
                         listOf(
-                            ConcurrentCamera.SingleCameraConfig(backSelector, group, lifecycleOwner),
-                            ConcurrentCamera.SingleCameraConfig(frontSelector, group, lifecycleOwner)
+                            ConcurrentCamera.SingleCameraConfig(backSelector, group, rearComposition, lifecycleOwner),
+                            ConcurrentCamera.SingleCameraConfig(frontSelector, group, frontComposition, lifecycleOwner)
                         )
                     )
                     bound = Triple(preview, video, concurrent)
