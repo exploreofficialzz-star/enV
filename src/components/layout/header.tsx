@@ -103,6 +103,7 @@ function AccountAvatar({ user }: { user: AppUser }) {
 
       const refreshed = await refreshCachedAccountProfileMedia(user.id, "avatar");
       if (!active) return;
+      // An unchanged 304 or temporary error keeps the current image source intact.
       if (refreshed.status === "fresh") {
         const freshPreview = readCachedAccountProfileMediaPreview(user.id, "avatar");
         if (freshPreview) setCachedMedia({ userId: user.id, url: freshPreview });
