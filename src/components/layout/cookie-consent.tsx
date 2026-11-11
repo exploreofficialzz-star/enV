@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "@tanstack/react-router";
+import { getAdsterraConsent, isAdsterraEnabled, setAdsterraConsent, type AdsterraConsent } from "@/lib/ads/adsterra";
 
 const NOTICE_KEY = "env.cookie-preferences.seen.v2";
 const OPEN_EVENT = "env:open-cookie-preferences";
@@ -19,18 +20,23 @@ export function CookieConsent() {
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const focusOnOpenRef = useRef(false);
   const [visible, setVisible] = useState(false);
+  const [adConsent, setAdConsent] = useState<AdsterraConsent>("unset");
+  const adsterraEnabled = isAdsterraEnabled();
 
   useEffect(() => {
+    const consent = getAdsterraConsent();
+    setAdConsent(consent);
     if (isToolSurface) {
       setVisible(false);
       return;
     }
     try {
-      setVisible(window.localStorage.getItem(NOTICE_KEY) !== "1");
+      const adChoiceRequired = adsterraEnabled && consent === "unset";
+      setVisible(adChoiceRequired || window.localStorage.getItem(NOTICE_KEY) !== "1");
     } catch {
       setVisible(true);
     }
-  }, [isToolSurface]);
+  }, [isToolSurface, adsterraEnabled]);
 
   useEffect(() => {
     const reopen = () => {
@@ -60,6 +66,14 @@ export function CookieConsent() {
     setVisible(false);
   }
 
+  function chooseAdvertising(allowed: boolean) {
+    const choice = allowed ? "granted" : "denied";
+    setAdsterraConsent(choice);
+    setAdConsent(choice);
+    markNoticeSeen();
+    setVisible(false);
+  }
+
   if (!visible) return null;
 
   return (
@@ -81,10 +95,12 @@ export function CookieConsent() {
       >
         <header>
           <h2 id="env-cookie-title" className="text-lg font-semibold tracking-tight text-neutral-950 dark:text-white">
-            Cookie preferences
+            {adsterraEnabled ? "Advertising preferences" : "Cookie preferences"}
           </h2>
           <p id="env-cookie-description" className="mt-1.5 text-sm leading-5 text-neutral-600 dark:text-neutral-300">
-            enV uses essential browser storage for your account session and saved settings.
+            {adsterraEnabled
+              ? "Advertising is optional. If you allow it, Adsterra and its partners may process your IP address, browser and device details, page URL and referrer, and use cookies or similar storage for ad delivery, frequency capping, fraud prevention and measurement. Declining does not limit enV tools."
+              : "enV uses essential browser storage for your account session and saved settings."}
           </p>
         </header>
         <footer className="mt-3 flex items-center justify-between gap-3 border-t border-neutral-200 pt-3 dark:border-neutral-800">
@@ -94,13 +110,32 @@ export function CookieConsent() {
           >
             Privacy policy
           </a>
-          <button
-            type="button"
-            onClick={dismiss}
-            className="inline-flex min-h-10 items-center justify-center rounded-xl bg-accent px-5 py-2 text-sm font-semibold text-accent-foreground transition hover:opacity-90"
-          >
-            Continue
-          </button>
+          {adsterraEnabled ? (
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => chooseAdvertising(false)}
+                className="inline-flex min-h-10 items-center justify-center rounded-xl border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-800 transition hover:bg-neutral-100 dark:border-neutral-700 dark:text-white dark:hover:bg-neutral-900"
+              >
+                Not now
+              </button>
+              <button
+                type="button"
+                onClick={() => chooseAdvertising(true)}
+                className="inline-flex min-h-10 items-center justify-center rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition hover:opacity-90"
+              >
+                Allow ads
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={dismiss}
+              className="inline-flex min-h-10 items-center justify-center rounded-xl bg-accent px-5 py-2 text-sm font-semibold text-accent-foreground transition hover:opacity-90"
+            >
+              Continue
+            </button>
+          )}
         </footer>
       </section>
     </div>
