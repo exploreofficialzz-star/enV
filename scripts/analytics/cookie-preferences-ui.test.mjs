@@ -2,7 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 
-const appShell = readFileSync(new URL("../../src/components/layout/app-shell.tsx", import.meta.url), "utf8");
 const cookieConsent = readFileSync(new URL("../../src/components/layout/cookie-consent.tsx", import.meta.url), "utf8");
 const rootDocument = readFileSync(new URL("../../src/routes/__root.tsx", import.meta.url), "utf8");
 const accountPage = readFileSync(new URL("../../src/routes/account.tsx", import.meta.url), "utf8");
