@@ -13,17 +13,17 @@ const androidClient = source("apps/android/app/src/main/java/com/chastech/env/Na
 const ios = source("apps/ios/enV/ContentViews.swift");
 
 test("public Trending contains only ranked, consented tool starts", () => {
-  assert.match(analyticsServer, /export async function getPublicTrendingTools\\(\\)/);
+  assert.ok(analyticsServer.includes("export async function getPublicTrendingTools()"));
   assert.match(analyticsServer, /ANALYTICS_ENABLED !== "true"/);
-  assert.match(analyticsServer, /count\\(\\*\\) filter \\(where event_name='tool_started'\\) as starts/);
-  assert.match(analyticsServer, /count\\(distinct anonymous_subject_digest\\) filter \\(where event_name='tool_started'\\) as starting_installations/);
+  assert.ok(analyticsServer.includes("count(*) filter (where event_name='tool_started') as starts"));
+  assert.ok(analyticsServer.includes("count(distinct anonymous_subject_digest) filter (where event_name='tool_started') as starting_installations"));
   assert.match(analyticsServer, /where starts > 0 and starting_installations >= 3/);
   assert.match(analyticsServer, /order by starts desc, completed desc, views desc, tool_id asc/);
   assert.ok(analyticsServer.includes("limit \${PUBLIC_TRENDING_TOOL_LIMIT * 3}"));
   assert.ok(analyticsServer.includes("activeToolIds.has(id)"));
   const publicResult = analyticsServer.slice(analyticsServer.indexOf("export async function getPublicTrendingTools"), analyticsServer.indexOf("export async function runAnalyticsRetention"));
   assert.match(publicResult, /toolIds/);
-  assert.match(publicResult, /return empty\\(\\)/);
+  assert.ok(publicResult.includes("return empty();"));
   assert.doesNotMatch(publicResult, /dailyDiscovery|discovery|shuffle|popularity/);
   assert.doesNotMatch(publicResult, /select user_id|return .*anonymous_subject_digest|return .*session_digest/);
 });
