@@ -1,9 +1,10 @@
 /**
  * Server-side customer-country routing for payment providers.
  *
- * Vercel supplies x-vercel-ip-country from the request edge. Cloudflare's
- * cf-ipcountry is accepted for deployments routed through that proxy. Never
- * infer Nigeria (or any other country) when the edge cannot identify a visitor.
+ * Vercel's x-vercel-ip-country is the default trusted edge signal. Cloudflare's
+ * cf-ipcountry is accepted only when the deployment explicitly states that
+ * traffic is forced through Cloudflare and the origin is locked down.
+ * Client request bodies and arbitrary headers never choose a payment currency.
  */
 export type CountryPaymentProfile = {
   countryCode: string;
@@ -20,17 +21,24 @@ const COUNTRY_PROFILES: Record<string, CountryPaymentProfile> = {
   UG: { countryCode: "UG", currency: "UGX", paymentOptions: ["card", "mobilemoneyuganda"] },
   RW: { countryCode: "RW", currency: "RWF", paymentOptions: ["card", "mobilemoneyrwanda"] },
   TZ: { countryCode: "TZ", currency: "TZS", paymentOptions: ["card", "mobilemoneytanzania"] },
+  BF: { countryCode: "BF", currency: "XOF", paymentOptions: ["card", "mobilemoneyxof"] },
   CI: { countryCode: "CI", currency: "XOF", paymentOptions: ["card", "mobilemoneyxof"] },
   SN: { countryCode: "SN", currency: "XOF", paymentOptions: ["card", "mobilemoneyxof"] },
   CM: { countryCode: "CM", currency: "XAF", paymentOptions: ["card", "mobilemoneyxaf"] },
+  CF: { countryCode: "CF", currency: "XAF", paymentOptions: ["card", "mobilemoneyxaf"] },
+  CG: { countryCode: "CG", currency: "XAF", paymentOptions: ["card", "mobilemoneyxaf"] },
+  GQ: { countryCode: "GQ", currency: "XAF", paymentOptions: ["card", "mobilemoneyxaf"] },
+  GA: { countryCode: "GA", currency: "XAF", paymentOptions: ["card", "mobilemoneyxaf"] },
+  ZM: { countryCode: "ZM", currency: "ZMW", paymentOptions: ["card", "mobilemoneyzambia"] },
   EG: { countryCode: "EG", currency: "EGP", paymentOptions: ["card", "fawrypay"] },
   GB: { countryCode: "GB", currency: "GBP", paymentOptions: ["card", "account"] },
   US: { countryCode: "US", currency: "USD", paymentOptions: ["card", "account"] },
 };
 
+/** Euro-area membership as of 2026-11-11, including Bulgaria's 2026 adoption. */
 const EURO_ACCOUNT_COUNTRIES = new Set([
-  "AT", "BE", "DK", "DE", "EE", "ES", "FI", "FR", "IE", "IT", "LV", "LT",
-  "NL", "NO", "PL", "PT", "SE",
+  "AT", "BE", "BG", "CY", "DE", "EE", "ES", "FI", "FR", "GR", "HR",
+  "IE", "IT", "LT", "LU", "LV", "MT", "NL", "PT", "SI", "SK",
 ]);
 
 export function normalizeCountryCode(value: string | null | undefined): string | null {
@@ -38,12 +46,21 @@ export function normalizeCountryCode(value: string | null | undefined): string |
   return /^[A-Z]{2}$/.test(country) && country !== "XX" && country !== "ZZ" ? country : null;
 }
 
-/** Read only edge-provided country headers; request-body country values are never trusted. */
+/**
+ * Read edge-provided country only. The Cloudflare header is trusted solely
+ * when an operator has configured Cloudflare as the proxy and locked down the
+ * Vercel origin so visitors cannot bypass that proxy.
+ */
 export function getCustomerCountry(request: Request): string | null {
-  return normalizeCountryCode(
-    request.headers.get("x-vercel-ip-country") ??
-    request.headers.get("cf-ipcountry"),
-  );
+  const vercelCountry = normalizeCountryCode(request.headers.get("x-vercel-ip-country"));
+  if (vercelCountry) return vercelCountry;
+
+  const cloudflareIsTrusted =
+    process.env.COUNTRY_GEO_PROVIDER === "cloudflare" &&
+    process.env.CLOUDFLARE_ORIGIN_LOCKDOWN_APPROVED === "true";
+  return cloudflareIsTrusted
+    ? normalizeCountryCode(request.headers.get("cf-ipcountry"))
+    : null;
 }
 
 export function getCountryPaymentProfile(countryCode: string | null | undefined): CountryPaymentProfile | null {
@@ -60,7 +77,7 @@ export function getCountryPaymentProfile(countryCode: string | null | undefined)
 export function getCurrencyMinorUnitExponent(currency: string): number | null {
   const zeroDecimal = new Set(["UGX", "RWF", "XAF", "XOF"]);
   const twoDecimal = new Set([
-    "NGN", "GHS", "KES", "ZAR", "MWK", "TZS", "EGP", "GBP", "USD", "EUR",
+    "NGN", "GHS", "KES", "ZAR", "MWK", "TZS", "ZMW", "EGP", "GBP", "USD", "EUR",
   ]);
   const code = currency.toUpperCase();
   if (zeroDecimal.has(code)) return 0;
@@ -68,19 +85,21 @@ export function getCurrencyMinorUnitExponent(currency: string): number | null {
   return null;
 }
 
-export function formatMinorUnits(amountMinor: number, currency: string): string {
+/**
+ * Flutterwave Standard documents amount as int32 in major currency units.
+ * Convert only when the complete token pack is an exact whole major unit;
+ * never send a fractional/rounded value or overflow the provider's field.
+ */
+export function toFlutterwaveMajorAmount(amountMinor: number, currency: string): number | null {
   const exponent = getCurrencyMinorUnitExponent(currency);
-  if (exponent === null || !Number.isSafeInteger(amountMinor) || amountMinor <= 0) {
-    throw new Error("Unsupported payment currency or amount.");
-  }
-  if (exponent === 0) return String(amountMinor);
+  if (exponent === null || !Number.isSafeInteger(amountMinor) || amountMinor <= 0) return null;
   const factor = 10 ** exponent;
-  const whole = Math.floor(amountMinor / factor);
-  const fraction = String(amountMinor % factor).padStart(exponent, "0");
-  return String(whole) + "." + fraction;
+  if (amountMinor % factor !== 0) return null;
+  const amount = amountMinor / factor;
+  return Number.isInteger(amount) && amount > 0 && amount <= 2_147_483_647 ? amount : null;
 }
 
-/** Convert a provider's major-unit amount into exact integer minor units without float rounding. */
+/** Convert a provider major-unit amount into exact integer minor units without floating-point rounding. */
 export function parseMajorUnitsToMinor(amount: unknown, currency: string): number | null {
   const exponent = getCurrencyMinorUnitExponent(currency);
   if (exponent === null || (typeof amount !== "string" && typeof amount !== "number")) return null;
