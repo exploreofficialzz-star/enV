@@ -144,9 +144,9 @@ function BlogArticlePage({ article }: { article: BlogArticle }) {
                 <Fragment key={section.heading + "-p-" + paragraphIndex}>
                   <p className="text-base leading-7 text-muted">{paragraph}</p>
                   {sectionIndex === firstEligibleAdSection && paragraphIndex === 1
-                    ? import.meta.env.VITE_ADSTERRA_ENABLED === "true"
+                    ? (import.meta.env.VITE_ADSTERRA_ENABLED === "true"
                       ? <AdsterraNativeBanner />
-                      : <AdSensePageUnit format="in-article" />
+                      : <AdSensePageUnit format="in-article" />)
                     : null}
                 </Fragment>
               ))}
