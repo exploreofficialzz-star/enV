@@ -837,6 +837,7 @@ export function CameraStudioEngine() {
 
   const activeTrack = cameraStream?.getVideoTracks()[0];
   const cameraSettings = activeTrack?.getSettings();
+  const secondaryFacingMode = dualStream?.getVideoTracks()[0]?.getSettings().facingMode;
   const previewFilter = look.css;
 
   return (
@@ -902,6 +903,10 @@ export function CameraStudioEngine() {
                       className={dualLayout === "split"
                         ? "absolute inset-y-0 right-0 h-full w-1/2 object-cover"
                         : "absolute bottom-3 right-3 aspect-[4/3] w-[32%] rounded-lg border-2 border-white object-cover shadow-lg"}
+                      style={{
+                        filter: previewFilter,
+                        transform: secondaryFacingMode === "user" ? "scaleX(-1)" : undefined,
+                      }}
                     />
                   )}
                   {gridVisible && (
