@@ -281,6 +281,8 @@ assert.match(engine, /const secondaryProfiles = \[/);
 assert.match(engine, /low-power 240p \/ 15 fps/);
 assert.match(engine, /max: profile\.width/);
 assert.match(engine, /max: profile\.frameRate/);
+assert.match(engine, /const secondaryFacingMode = dualStream\?\.getVideoTracks\(\)\[0\]\?\.getSettings\(\)\.facingMode/);
+assert.match(engine, /aria-label="Second camera preview"[\s\S]*?filter: previewFilter[\s\S]*?scaleX\(-1\)/, "The secondary browser preview mirrors and filters the same feed as its saved composition.");
 assert.match(iosDualCamera, /mediaServicesWereReset/, "iOS dual-camera mode handles media-services resets.");
 assert.match(iosDualCamera, /resumeAfterFinalization/, "iOS dual-camera mode resumes only after an interrupted clip has finalized.");
 assert.match(iosDualCamera, /restartSessionLocked/, "iOS dual-camera mode has a guarded session recovery path.");
