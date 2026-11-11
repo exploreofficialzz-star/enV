@@ -148,3 +148,22 @@ test("schema utils: strict-mode checker, validator and example generator agree",
   assert.ok(problems.some((p) => p.includes("required")));
   assert.ok(strictSchemaProblems({ $ref: "#/x" }).some((p) => p.includes("$ref")));
 });
+
+
+test("usage counts are shared across connection keys and roll daily and monthly quotas independently", () => {
+  let now = Date.parse("2026-11-30T23:30:00.000Z");
+  const usage = createUsageLedger(() => now);
+  usage.recordAttempt("groq:model-a", "groq:org-shared");
+  usage.recordAttempt("groq:model-a", "groq:org-shared");
+  usage.recordAttempt("groq:model-b", "groq:org-shared");
+  assert.equal(usage.quotaScopeRequestsToday("groq:org-shared"), 3);
+  assert.equal(usage.quotaScopeRequestsThisMonth("groq:org-shared"), 3);
+  assert.equal(usage.modelRequestsThisMonth("groq:model-a"), 2);
+
+  now = Date.parse("2026-12-01T00:05:00.000Z");
+  assert.equal(usage.quotaScopeRequestsToday("groq:org-shared"), 0);
+  assert.equal(usage.quotaScopeRequestsThisMonth("groq:org-shared"), 0);
+  usage.recordAttempt("groq:model-a", "groq:org-shared");
+  assert.equal(usage.quotaScopeRequestsToday("groq:org-shared"), 1);
+  assert.equal(usage.quotaScopeRequestsThisMonth("groq:org-shared"), 1);
+});

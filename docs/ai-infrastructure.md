@@ -32,7 +32,7 @@ Folder map (`src/lib/ai/`):
 | `server/tasks/` | Task definitions: input schema, prompt, output schema, post-processing | server |
 | `server/routing/router.ts` | Capability- and cost-based candidate selection | server |
 | `server/core/` | Execution, health/circuit breaker, usage ledger, rate limiter, cache | server |
-| `server/providers/` | OpenRouter, Groq (chat + Whisper), Gemini, mock | server |
+| `server/providers/` | OpenRouter, Groq (chat + Whisper), Gemini, Cloudflare Workers AI, MOSS-Music, mock | server |
 | `server/handler.ts`, `runtime.ts` | HTTP handlers and lazy singleton; mounted by `server/routes/api/ai/*` | server |
 | `components/ai/` | `AiAssistPanel` (mounted in `ToolShell`) and result views | browser |
 
@@ -73,6 +73,7 @@ Most registry rows were checked against provider documentation on **2026-09-30**
 | OpenRouter | `openai/gpt-oss-20b:free` | text, structured | FREE | $0 (rate limited; providers may log) | **no** |
 | OpenRouter | `openai/gpt-oss-20b` | text, structured | LOW | about $0.02 / $0.10 (varies by upstream) | yes (`data_collection: deny` is sent) |
 | Gemini | `gemini-3.8-flash` | vision, structured | STANDARD | $0.75 / $3.75 through 2026-12-31, then $1.50 / $7.50 | only with `AI_GEMINI_TIER=paid` |
+| Cloudflare Workers AI | `@cf/meta/llama-3.3-70b-instruct-fp8-fast` | text, JSON Mode (best-effort) | STANDARD | $0.293 / $2.253 per 1M input/output tokens; 10,000 Neurons/day included, then paid overage | documented Zero Data Retention for this model |
 
 Cost classes come from list price: FREE = zero; LOW ≤ $1 per 1M tokens (input + output) or ≤ $0.25 per audio hour; GPU compute rates up to $1/hour are LOW and up to $10/hour are STANDARD; above that PREMIUM. GPU cost estimates use the model service's measured inference time and exclude cold-start/idle time and non-GPU charges. Gemini's date-based price change is encoded (`pricingUntil`).
 
@@ -90,9 +91,10 @@ All optional. See `.env.example`. Never prefix a secret with `VITE_`.
 | --- | --- | --- |
 | `OPENROUTER_API_KEY`, `GROQ_API_KEY`, `GEMINI_API_KEY` | unset | Provider keys (server only). `GOOGLE_AI_API_KEY` is accepted as an alias for `GEMINI_API_KEY`. |
 | `MOSS_MUSIC_ENDPOINT`, `MOSS_MUSIC_TOKEN` | unset | Optional HTTPS `/analyze` URL and shared bearer token for the private Modal-hosted MOSS-Music service. Both are required. Keep the token server-only. See [Modal deployment guide](modal-moss-music.md). |
+| `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | unset | Workers AI token and 32-character account id. The selected model is STANDARD-cost; Free includes 10,000 Neurons/day, with paid overage on Workers Paid. |
 | `GOOGLE_AI_API_KEY` | unset | Alias for `GEMINI_API_KEY`. |
 | `AI_ENABLED` | `true` | Master switch. |
-| `AI_PROVIDER_ORDER` | `moss_music,groq,openrouter,gemini` | Providers allowed to be used and the tie-break order. `mock` is accepted outside production for local development. |
+| `AI_PROVIDER_ORDER` | `moss_music,groq,openrouter,gemini,cloudflare` | Providers allowed to be used and the tie-break order. `mock` is accepted outside production for local development. |
 | `AI_MAX_COST_CLASS` | `LOW` | Highest cost class allowed (`FREE`, `LOW`, `STANDARD`, `PREMIUM`). Set `STANDARD` to allow Modal MOSS-Music and the registered vision model. |
 | `AI_GEMINI_TIER` | unknown | `paid` if billing is on for the Gemini project; `free` otherwise. Unknown is treated as free for privacy routing. |
 | `AI_SENSITIVE_ALLOW_FREE_TIER` | `false` | Accept routing sensitive tasks to free-tier / may-train models. |
@@ -111,6 +113,16 @@ All optional. See `.env.example`. Never prefix a secret with `VITE_`.
 | `AI_SESSION_SECRET` | random per instance | Signs anonymous session cookies. Set it in production. |
 
 Invalid values never crash the app: they fall back to the default and are reported by `npm run check:ai` and the diagnostics endpoint.
+
+## Multiple provider connections and shared quotas
+
+`AI_PROVIDER_CONNECTIONS_JSON` may register up to 32 server-side connections. Each entry contains a stable `id`, `provider`, `apiKeyEnv` (the name of an environment variable holding a key), and a `quotaScope`; Cloudflare entries also set `accountIdEnv`. The JSON must never contain raw API keys or tokens. Extra credentials can use suffixed environment names such as `GROQ_API_KEY_SECONDARY` or `CLOUDFLARE_API_TOKEN_TEAM_B`.
+
+When an explicit connection registry is set, it is authoritative: declare every key that should be available, including legacy/default keys. Every connection belonging to the same real upstream provider account or organization must use the same `quotaScope`, even when the account has multiple API keys. Cloudflare account IDs are checked so keys for one account cannot be split across scopes. Reusing the same credential under different scopes is rejected. Optional `requestQuota.dailyRequests` and `requestQuota.monthlyRequests` are deployment guardrails shared across every connection in that scope; the values must match across connections in the same scope. These are operator-configured limits, not claimed provider quotas.
+
+When one connection in a shared scope returns an authentication or rate-limit failure, its provider/model circuit is shared by the other keys in that scope. The router will not rotate to another key in that same account to evade the upstream limit. Separate scopes are appropriate only for genuinely independent upstream accounts with separate provider quota ownership. Scope counters are in-memory per warm application instance, like the existing usage ledger; configure provider-side hard quota and billing limits as the authoritative control.
+
+Cloudflare Workers AI is metered even though its plans include a daily allowance. The selected 70B model supports JSON Mode, but Cloudflare explicitly says JSON Schema adherence is not guaranteed; enV validates the returned object against the task schema and keeps its repair/fallback path. The model remains STANDARD-cost so the default LOW ceiling excludes it until the operator intentionally enables STANDARD routes.
 
 ## Hosting MOSS-Music on Modal
 
