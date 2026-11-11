@@ -202,7 +202,7 @@ export function CookieConsent() {
           type="button"
           disabled={saving}
           onClick={() => void savePreferences(analyticsEnabled, advertisingEnabled)}
-          className="inline-flex min-h-9 items-center justify-center rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-accent-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-9 items-center justify-center rounded-lg bg-fg px-3 py-2 text-xs font-semibold text-bg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {saving ? "Saving…" : "Accept all"}
         </button>
