@@ -170,7 +170,7 @@ assert.match(purchasesRoute, /initializePaystackCheckout/);
 assert.match(purchasesRoute, /initializeCryptomusCheckout/);
 assert.match(purchasesRoute, /provider !== "paystack" && provider !== "flutterwave" && provider !== "cryptomus"/);
 assert.match(purchasesRoute, /No payment was taken/);
-assert.match(paystackService, /PAYSTACK_PROVIDER_APPROVED === "true"/, "Paystack checkout must require explicit merchant approval");
+assert.match(paystackProviderConfig, /PAYSTACK_PROVIDER_APPROVED === "true"/, "Paystack checkout must require explicit merchant approval");
 assert.match(paystackService, /CRYPTOMUS_PROVIDER_APPROVED === "true"/, "crypto checkout must require explicit merchant approval");
 assert.match(paystackService, /CRYPTOMUS_TOKEN_PRICE_USD_CENTS/);
 assert.match(cryptomusService, /CRYPTOMUS_PAYMENT_API_KEY/);
@@ -242,8 +242,8 @@ assert.match(countryRouting, /getCountryPaymentProfile/);
 assert.match(countryRouting, /parseMajorUnitsToMinor/);
 assert.match(countryRouting, /toFlutterwaveMajorAmount/);
 assert.match(countryRouting, /CLOUDFLARE_ORIGIN_LOCKDOWN_APPROVED/);
-assert.match(paystackService, /PAYSTACK_MERCHANT_COUNTRY/);
-assert.match(paystackService, /PAYSTACK_MERCHANT_CURRENCIES/);
+assert.match(paystackProviderConfig, /PAYSTACK_MERCHANT_COUNTRY/);
+assert.match(paystackProviderConfig, /PAYSTACK_MERCHANT_ACCEPTED_CURRENCIES/);
 assert.match(paystackService, /PAYSTACK_INTERNATIONAL_ENABLED === "true"/);
 for (const country of ["NG", "GH", "KE", "ZA", "MW", "UG", "RW", "TZ", "BF", "CI", "SN", "CM", "CF", "CG", "GQ", "GA", "ZM", "EG", "GB", "US", "BG"]) {
   assert.ok(countryRouting.includes(country + ":"), "country routing must include " + country);
@@ -269,11 +269,11 @@ assert.match(envExample, /FLUTTERWAVE_TOKEN_PRICE_ZMW_MINOR=/);
 
 assert.match(paystackProviderConfig, /requirePaystackVerificationSecret/);
 assert.match(paystackProviderConfig, /readSafePackPrice/);
-assert.match(paystackService, /readSafePackPrice\(configuredPrice, TOKEN_PACKS\)/,
+assert.match(paystackProviderConfig, /readSafePackPrice\(configuredPrice, packSizes\)/,
   "Paystack market prices must stay within safe integer bounds for every token pack");
 assert.match(paystackService, /readSafePackPrice\(process\.env\.CRYPTOMUS_TOKEN_PRICE_USD_CENTS, TOKEN_PACKS\)/,
   "Cryptomus prices must stay within safe integer bounds for every token pack");
-assert.match(paystackService, /PAYSTACK_SECRET_KEY\?\.trim\(\)/,
+assert.match(paystackProviderConfig, /PAYSTACK_SECRET_KEY\?\.trim\(\)/,
   "whitespace-only Paystack credentials must not enable checkout");
 assert.match(cryptomusService, /CRYPTOMUS_PAYMENT_API_KEY\?\.trim\(\)/,
   "whitespace-only Cryptomus credentials must not enable checkout");
