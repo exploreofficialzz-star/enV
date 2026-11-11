@@ -516,7 +516,6 @@ struct HomeView: View {
     let onAssistant: () -> Void
     @State private var searchText = ""
     @State private var trendingToolIDs: [String] = []
-    @State private var trendingMode = "discovery"
     @State private var homePath = NavigationPath()
     @FocusState private var isHomeSearchFocused: Bool
     private var hasSearchText: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -643,12 +642,6 @@ struct HomeView: View {
                         enVCharacterSpacedText("Trending tools")
                             .font(.envScaled(size: 20, weight: .semibold))
                             .foregroundStyle(Color.envAccent)
-                        enVCharacterSpacedText(trendingMode == "analytics"
-                            ? "Ranked by actual tool starts over the last 30 days."
-                            : "A daily rotating selection of tools to explore.")
-                            .font(.envScaled(size: 12, weight: .regular))
-                            .foregroundStyle(Color.envMuted)
-                            .frame(maxWidth: .infinity, alignment: .leading)
                         if homeTools.isEmpty {
                             enVCharacterSpacedText("The tool selection is temporarily unavailable. Please try again.")
                                 .font(.envScaled(size: 12, weight: .regular))
@@ -686,7 +679,6 @@ struct HomeView: View {
             .task {
                 let feed = await NativeTrendingToolsClient.fetchFeed()
                 trendingToolIDs = feed.toolIDs
-                trendingMode = feed.mode
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
