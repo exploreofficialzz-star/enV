@@ -20,12 +20,10 @@ export function CookieConsent() {
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const focusOnOpenRef = useRef(false);
   const [visible, setVisible] = useState(false);
-  const [adConsent, setAdConsent] = useState<AdsterraConsent>("unset");
   const adsterraEnabled = isAdsterraEnabled();
 
   useEffect(() => {
     const consent = getAdsterraConsent();
-    setAdConsent(consent);
     if (isToolSurface) {
       setVisible(false);
       return;
@@ -69,7 +67,6 @@ export function CookieConsent() {
   function chooseAdvertising(allowed: boolean) {
     const choice = allowed ? "granted" : "denied";
     setAdsterraConsent(choice);
-    setAdConsent(choice);
     markNoticeSeen();
     setVisible(false);
   }
