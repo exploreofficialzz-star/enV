@@ -24,7 +24,7 @@ test("Paystack local checkout is available only in the configured merchant regis
 test("Paystack local merchant account requires both global and currency-specific approval", () => {
   const ghana = {
     PAYSTACK_MERCHANT_COUNTRY: "GH",
-    PAYSTACK_SECRET_KEY_GHS: "sk_test_ghana",
+    PAYSTACK_SECRET_KEY: "sk_test_ghana",
     PAYSTACK_PROVIDER_APPROVED: "false",
     PAYSTACK_PROVIDER_APPROVED_GHS: "true",
     PAYSTACK_TOKEN_PRICE_GHS_MINOR: "1",
