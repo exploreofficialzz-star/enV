@@ -122,6 +122,8 @@ export function AdsterraBanner({ format }: { format: AdsterraBannerFormat }) {
     slot.dataset.envAdsterraRequested = "true";
     void appendBannerScript(slot, unit).catch(() => {
       if (!active) return;
+      slot.replaceChildren();
+      delete slot.dataset.envAdsterraRequested;
       setFailed(true);
       if (retryAttempt < 3) {
         const delay = Math.min(30_000, 5_000 * (2 ** retryAttempt));
@@ -253,7 +255,7 @@ export function AdsterraNativeBanner() {
  * Load it only after explicit advertising consent and same-origin reachability.
  * Consent revocation reloads the document to clear provider-installed listeners.
  */
-export function AdsterraPopunder() {
+export function AdsterraToolPopunder() {
   useEffect(() => {
     let active = true;
     let loading = false;
