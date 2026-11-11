@@ -34,6 +34,19 @@ export const ADSTERRA_NATIVE_BANNER = {
 
 export type AdsterraBannerFormat = keyof typeof ADSTERRA_BANNER_UNITS;
 
+/**
+ * Ad delivery is enabled for this deployment, the visitor has granted the
+ * required advertising choice, and the browser is online. This deliberately
+ * does not change guest access or the availability of enV tools.
+ */
+export function canRequestAdsterraAds(
+  enabled: boolean,
+  consent: AdsterraConsent,
+  online: boolean,
+): boolean {
+  return enabled && consent === "granted" && online;
+}
+
 export function isAdsterraEnabled(): boolean {
   return import.meta.env.VITE_ADSTERRA_ENABLED === "true";
 }
