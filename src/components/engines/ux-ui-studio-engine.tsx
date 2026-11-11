@@ -2683,14 +2683,26 @@ export function UxUiStudioEngine() {
               {["device","platform"].includes(toolkit.id) && <div className="mt-3 flex flex-wrap gap-2">{(["mobile","tablet","desktop"] as DeviceTarget[]).map((device)=><button key={device} type="button" onClick={()=>changeTarget(device)} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold capitalize text-fg">{device}</button>)}</div>}
               {toolkit.id === "responsive" && <div className="mt-3 space-y-2"><button type="button" onClick={()=>{ setCustomArtboard(true); selectCanvas(); }} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">Set custom viewport</button><button type="button" onClick={()=>setShowGrid((value)=>!value)} className="ml-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-fg">{showGrid ? "Hide grid" : "Show grid"}</button></div>}
               {toolkit.id === "responsive" && <div className="uxui-inline-fields"><Field label="Canvas width"><input type="number" min="160" max="4096" value={board.width} className={fieldClass()} onChange={(event) => { setCustomArtboard(true); setCustomWidth(Math.max(160, Math.min(4096, Number(event.target.value) || 160))); setCustomHeight(board.height); }} /></Field><Field label="Canvas height"><input type="number" min="240" max="4096" value={board.height} className={fieldClass()} onChange={(event) => { setCustomArtboard(true); setCustomHeight(Math.max(240, Math.min(4096, Number(event.target.value) || 240))); setCustomWidth(board.width); }} /></Field></div>}
-              {toolkit.id === "device" && <div className="mt-3 space-y-2">
-                <p className="text-xs leading-5 text-muted">Switch the preview frame without compressing or changing the artboard's proportions.</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {([
-                    { target: "mobile", label: "Mobile", icon: <Smartphone size={16} /> },
-                    { target: "tablet", label: "Tablet", icon: <Tablet size={16} /> },
-                    { target: "desktop", label: "Desktop", icon: <Monitor size={16} /> },
-                  ] as Array<{ target: DeviceTarget; label: string; icon: ReactNode }>).map((option) => <button key={option.target} type="button" aria-pressed={target === option.target} onClick={() => changeTarget(option.target)} className={"flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg border px-2 py-2 text-xs font-semibold " + (target === option.target ? "border-accent bg-accent-soft text-fg" : "border-border text-fg")}>{option.icon}<span>{option.label}</span></button>)}
+              {toolkit.id === "device" && <div className="mt-3 space-y-3">
+                <div className="space-y-2">
+                  <p className="text-xs leading-5 text-muted">Switch the preview frame without compressing or changing the artboard's proportions.</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {([
+                      { target: "mobile", label: "Mobile", icon: <Smartphone size={16} /> },
+                      { target: "tablet", label: "Tablet", icon: <Tablet size={16} /> },
+                      { target: "desktop", label: "Desktop", icon: <Monitor size={16} /> },
+                    ] as Array<{ target: DeviceTarget; label: string; icon: ReactNode }>).map((option) => <button key={option.target} type="button" aria-pressed={target === option.target} onClick={() => changeTarget(option.target)} className={"flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg border px-2 py-2 text-xs font-semibold " + (target === option.target ? "border-accent bg-accent-soft text-fg" : "border-border text-fg")}>{option.icon}<span>{option.label}</span></button>)}
+                  </div>
+                </div>
+                <div className="space-y-2 rounded-lg border border-border p-3">
+                  <div>
+                    <p className="text-xs font-semibold text-fg">Editing scope</p>
+                    <p className="mt-1 text-xs leading-5 text-muted">New edits affect all previews by default. Choose this device only to create a responsive override.</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2" role="group" aria-label="Responsive editing scope">
+                    <button type="button" aria-pressed={responsiveEditMode === "shared"} onClick={() => setResponsiveEditMode("shared")} className={"min-h-10 rounded-lg border px-2 py-2 text-xs font-semibold " + (responsiveEditMode === "shared" ? "border-accent bg-accent-soft text-fg" : "border-border text-muted")}>All devices</button>
+                    <button type="button" aria-pressed={responsiveEditMode === "device"} onClick={() => setResponsiveEditMode("device")} className={"min-h-10 rounded-lg border px-2 py-2 text-xs font-semibold " + (responsiveEditMode === "device" ? "border-accent bg-accent-soft text-fg" : "border-border text-muted")}>This device</button>
+                  </div>
                 </div>
               </div>}
               {toolkit.id === "platform" && <div className="mt-3 space-y-2">
