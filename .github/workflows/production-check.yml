@@ -39,6 +39,11 @@ jobs:
             npx playwright install --with-deps chromium
           fi
 
+      - name: Run isolated AI provider tests
+        run: |
+          npm run check:ai
+          node --experimental-strip-types --test 'src/lib/ai/**/*.test.ts'
+
       - name: Start browser-audit server
         run: |
           npm run dev > /tmp/enV-game-dev.log 2>&1 &
