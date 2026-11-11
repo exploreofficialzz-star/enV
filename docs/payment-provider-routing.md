@@ -19,7 +19,7 @@ The current country profile catalogue is deliberately explicit. Flutterwave's St
 | Customer country | Checkout currency | Methods requested from Flutterwave |
 |---|---:|---|
 | Nigeria | NGN | Card, USSD, bank transfer, bank account, internet banking, NQR, eNaira, OPay |
-| Ghana | GHS | Card, Ghana mobile money |
+| Ghana | GHS | Card, Ghana mobile money (`ghanamobilemoney`) |
 | Kenya | KES | Card, M-Pesa |
 | South Africa | ZAR | Card, bank account, 1Voucher |
 | Malawi | MWK | Card, Malawi mobile money |
@@ -40,7 +40,7 @@ The country-to-method table is a request allowlist, not a guarantee that the mer
 
 ## Paystack coverage and account boundaries
 
-Paystack's supported merchant registration countries are Nigeria, Ghana, South Africa and Kenya. Paystack also describes Côte d'Ivoire and Egypt as private-beta markets; they are not enabled as ordinary enV merchant-country profiles by this implementation. Merchant registration country is not the same as customer location.
+Paystack's supported merchant registration countries are Nigeria, Ghana, South Africa and Kenya. Paystack's merchant-country documentation currently lists Nigeria, Ghana, South Africa and Kenya; Côte d'Ivoire and Egypt are not enabled as merchant-registration countries by this implementation. Merchant registration country is not the same as customer location.
 
 - Set `PAYSTACK_MERCHANT_COUNTRY` to the country where the actual Paystack merchant account is registered. Local Paystack checkout is offered only to a customer detected in that same country, and uses that merchant country's local currency.
 - Nigeria uses `PAYSTACK_SECRET_KEY`, `PAYSTACK_PROVIDER_APPROVED` and `PAYSTACK_TOKEN_PRICE_NGN_KOBO`.
