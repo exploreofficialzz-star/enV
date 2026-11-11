@@ -289,6 +289,11 @@ assert.match(iosDualCamera, /resumeAfterFinalization/, "iOS dual-camera mode res
 assert.match(iosDualCamera, /restartSessionLocked/, "iOS dual-camera mode has a guarded session recovery path.");
 assert.match(iosCamera, /look = \.natural[\s\S]*?capture\.setLook\(\.natural\)[\s\S]*?dualCameraMode = true/, "iOS dual preview and export start with the same Natural look.");
 assert.match(iosCamera, /if !dualCameraMode \{\s*HStack \{\s*Text\("Photo look"/, "The look selector stays hidden while dual preview cannot process it.");
+assert.match(iosCamera, /if !dualCameraMode && capture\.zoomMaximum > 1/, "iOS dual mode hides the inactive single-camera zoom control.");
+assert.match(iosCamera, /if !dualCameraMode, let exposureRange = capture\.exposureBiasRange/, "iOS dual mode hides inactive single-camera exposure compensation.");
+assert.match(iosCamera, /if !dualCameraMode \{\s*DisclosureGroup\("Advanced controls"/, "iOS dual mode hides inactive lens, focus, white-balance and manual exposure controls.");
+assert.match(iosCamera, /if !dualCameraMode && mode == "Photo" \{\s*HStack \{\s*Text\("Photo timer"/, "iOS dual-video mode hides the photo-only timer.");
+
 assert.match(iosCamera, /mediaServicesWereReset/);
 assert.match(iosCamera, /PHPhotoLibrary\.shared\(\)\.performChanges/);
 assert.match(iosCamera, /requestAccess\(for: \.audio\)/);
