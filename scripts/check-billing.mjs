@@ -241,6 +241,7 @@ assert.match(countryRouting, /cf-ipcountry/);
 assert.match(countryRouting, /getCountryPaymentProfile/);
 assert.match(countryRouting, /parseMajorUnitsToMinor/);
 assert.match(countryRouting, /toFlutterwaveMajorAmount/);
+assert.match(countryRouting, /ghanamobilemoney/);
 assert.match(countryRouting, /CLOUDFLARE_ORIGIN_LOCKDOWN_APPROVED/);
 assert.match(paystackProviderConfig, /PAYSTACK_MERCHANT_COUNTRY/);
 assert.match(paystackProviderConfig, /PAYSTACK_MERCHANT_ACCEPTED_CURRENCIES/);
