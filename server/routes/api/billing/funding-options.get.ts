@@ -5,5 +5,5 @@ import { getCustomerCountry } from "../../../../src/lib/billing/country-routing"
 
 export default defineHandler((event) => {
   const countryCode = getCustomerCountry(event.req);
-  return jsonResponse({ ok: true, data: getFundingOptions(countryCode) });
+  return jsonResponse({ ok: true, data: await getFundingOptions(countryCode) });
 });
