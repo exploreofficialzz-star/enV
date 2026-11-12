@@ -315,10 +315,15 @@ assert.match(fxPricingTests, /rounds half up with integer arithmetic/);
 assert.match(paystackService, /quoteTokenPacks/);
 assert.match(flutterwaveService, /quoteTokenPacks/);
 assert.match(purchasesRoute, /pricingQuote/);
-assert.match(fundingOptionsRoute, /amountMinor: Number\.isSafeInteger\(pack\.amountMinor\)/,
-  "funding options must expose the server-calculated local amount for display");
-assert.match(fundingOptionsRoute, /currency: "currency" in pack/,
-  "each displayed local amount must carry its ISO currency code");
+assert.match(fundingOptionsRoute, /methods: \{/,
+  "funding options must expose only customer-facing method availability");
+assert.match(fundingOptionsRoute, /card: providers\.some/);
+assert.match(fundingOptionsRoute, /local: providers\.some/);
+assert.match(fundingOptionsRoute, /more: providers\.some/);
+assert.doesNotMatch(fundingOptionsRoute, /label: provider\.label|providers: provider\.packs/,
+  "the wallet options API must not return gateway labels or provider pack cards");
+assert.doesNotMatch(walletDashboard, /label: "Paystack"|label: "Flutterwave"|Pay with crypto/,
+  "gateway names must not appear as wallet payment choices");
 assert.match(walletDashboard, /id="wallet-custom-amount"/, "wallet must use a custom USD amount input");
 assert.match(walletDashboard, /customAmountCents/, "wallet must validate the entered custom amount");
 assert.match(walletDashboard, /Amount \(USD\)/, "wallet must label the entered amount as USD");
