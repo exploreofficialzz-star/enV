@@ -120,7 +120,7 @@ enum NativeAdsPolicy {
             .replacingOccurrences(of: "_", with: " ")
             .lowercased()
         let excludedConcept = identity.range(
-            of: #"\\b(studio|studios|lab|labs|laboratory|laboratories|sandbox|ai|artificial intelligence)\\b"#,
+            of: #"\b(studio|studios|lab|labs|laboratory|laboratories|sandbox|ai|artificial intelligence)\b"#,
             options: .regularExpression
         ) != nil
         let localExecution = localEngineTypes.contains(engineType) ||
