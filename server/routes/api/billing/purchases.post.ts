@@ -109,7 +109,13 @@ export default defineHandler(async (event) => {
       : provider === "flutterwave"
         ? await initializeFlutterwaveCheckout({ ...input, countryCode, pricingQuote: pricingQuote!, paymentMethod: providerMethod })
         : await initializePaystackCheckout({ ...input, pricingQuote: pricingQuote!, paymentMethod: providerMethod }, countryCode);
-    return jsonResponse({ ok: true, data: { ...checkout, provider, paymentMethod: paymentMethod ?? null } }, 201);
+    // New customer-method clients do not receive a gateway identifier.
+    // Legacy provider clients keep the previous response contract until mobile clients migrate.
+    const checkoutData = { ...checkout, paymentMethod: paymentMethod ?? null };
+    return jsonResponse({
+      ok: true,
+      data: paymentMethod ? checkoutData : { ...checkoutData, provider },
+    }, 201);
   } catch (error) {
     const candidate = error as { code?: unknown };
     const candidateCode = typeof candidate.code === "string" ? candidate.code : "";
