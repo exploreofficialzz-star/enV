@@ -69,41 +69,22 @@ export function StudioRail({ open, active, onSelect }: RailProps) {
   const selectRef = useRef(onSelect);
   selectRef.current = onSelect;
 
-  useLayoutEffect(() => {
-    const activateFromWindow = (event: Event) => {
-      const root = rail.current?.closest<HTMLElement>(".wl-studio");
-      root?.setAttribute("data-rail-last-event", `capture:${event.type}`);
-      const target = event.target;
-      if (!(target instanceof Element)) {
-        root?.setAttribute("data-rail-last-target", "non-element");
-        return;
-      }
-      root?.setAttribute("data-rail-last-target", target.tagName.toLowerCase());
-      const button = target.closest<HTMLButtonElement>(".wl-rail button[data-group]");
-      root?.setAttribute("data-rail-last-button", button?.getAttribute("aria-label") ?? "no-match");
-      if (!button || !rail.current?.contains(button)) {
-        root?.setAttribute("data-rail-last-group", "outside-rail");
-        return;
-      }
+  const bindRailButton = (button: HTMLButtonElement | null) => {
+    if (!button || button.dataset.wlRailBound === "true") return;
+    button.dataset.wlRailBound = "true";
+    const activate = () => {
       const group = button.dataset.group;
-      root?.setAttribute("data-rail-last-group", group ?? "missing-group");
-      if (!GROUPS.some((item) => item.id === group)) return;
-      selectRef.current(group as StudioGroupId);
+      if (GROUPS.some((item) => item.id === group)) {
+        selectRef.current(group as StudioGroupId);
+      }
     };
-
-    const root = rail.current?.closest<HTMLElement>(".wl-studio");
-    root?.setAttribute("data-rail-listener", "true");
-    // Open from pointer-down so a world-canvas/document click interceptor
-    // cannot swallow the rail activation. The click path also preserves
-    // keyboard activation for Enter and Space.
-    window.addEventListener("pointerdown", activateFromWindow, true);
-    window.addEventListener("click", activateFromWindow, true);
-    return () => {
-      window.removeEventListener("pointerdown", activateFromWindow, true);
-      window.removeEventListener("click", activateFromWindow, true);
-      root?.removeAttribute("data-rail-listener");
-    };
-  }, []);
+    // Bind at the actual control, not a delegated document event. The 3D
+    // viewport installs its own global input handlers; rail controls must
+    // remain independently activatable on mouse, touch and keyboard focus.
+    button.addEventListener("pointerdown", activate);
+    button.addEventListener("click", activate);
+    button.addEventListener("focus", activate);
+  };
 
   return (
     <nav ref={rail} className="wl-rail" aria-label="World Lab tools">
@@ -114,6 +95,8 @@ export function StudioRail({ open, active, onSelect }: RailProps) {
           className="wl-icon-btn"
           data-active={open && active === id ? "true" : "false"}
           data-group={id}
+          ref={bindRailButton}
+          onFocus={() => onSelect(id)}
           aria-label={`Open ${label} tools`}
           aria-expanded={open && active === id}
           title={label[0].toUpperCase() + label.slice(1)}
