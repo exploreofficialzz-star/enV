@@ -370,7 +370,19 @@ try{
   await page.getByRole("button",{name:"Save on device"}).click();
   await page.getByText(/\d+ numerical runs and \d+ additional scientific records saved together atomically/).waitFor();
   await page.reload({waitUntil:"domcontentloaded"});
-  await page.getByText(/Opened the most recently saved local World Lab project/).waitFor({timeout:90000});
+  await page.waitForLoadState("load",{timeout:90000});
+  // The workspace restores persisted projects, but the right-hand Project
+  // panel intentionally starts closed after a reload. Reopen it before
+  // asserting the restored status and run-history controls.
+  await page.waitForFunction(() => {
+    const root = document.querySelector(".wl-studio");
+    const button = document.querySelector('.wl-rail button[data-group="project"]');
+    return root?.getAttribute("data-rail-document-listener") === "true" &&
+      button !== null &&
+      Object.keys(button).some((key) => key.startsWith("__reactProps$"));
+  }, undefined, { timeout: 30000 });
+  await page.getByRole("button",{name:"Open project tools"}).click();
+  await page.getByText(/Opened the most recently saved local World Lab project/).waitFor({state:"visible",timeout:90000});
   await page.getByRole("combobox",{name:"Open recorded run (local device)"}).waitFor({state:"visible"});
   assert.ok(await page.getByRole("combobox",{name:"Open recorded run (local device)"}).locator("option").count()>=3,
     "Saved project must restore its scientific run history after reload");
