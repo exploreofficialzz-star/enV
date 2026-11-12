@@ -286,6 +286,7 @@ assert.match(flutterwaveService, /readBoundedBytes\(request, 256_000\)/);
 assert.match(flutterwaveService, /FLUTTERWAVE_REFUND_DISPUTE_HANDLING_APPROVED/);
 assert.match(flutterwaveService, /handleFlutterwaveRefundWebhook/);
 assert.match(flutterwaveService, /handleFlutterwaveChargebackWebhook/);
+assert.match(flutterwaveService, /eventName\.startsWith\("chargeback\."\)/, "Flutterwave must filter chargebacks by event status when the payload omits data.status");
 assert.match(flutterwaveService, /reconcileVerifiedRefund/);
 assert.match(flutterwaveService, /reconcileVerifiedDispute/);
 assert.match(flutterwaveWebhook, /handleFlutterwaveWebhook/);
