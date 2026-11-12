@@ -509,7 +509,7 @@ function Account() {
       window.location.assign(checkout.href);
     } catch (error) {
       const detail = error instanceof Error ? error.message : "";
-      const requiresSetup = /PAYMENTS_NOT_CONFIGURED|CRYPTOMUS_NOT_CONFIGURED|FLUTTERWAVE_NOT_CONFIGURED|BILLING_AUTH_NOT_CONFIGURED|AUTH_REQUIRED|provider approval|checkout is not configured|approved NGN token price|persistent database|billing launch checks|sign in is required/i.test(detail);
+      const requiresSetup = /PAYMENTS_NOT_CONFIGURED|CRYPTOMUS_NOT_CONFIGURED|FLUTTERWAVE_NOT_CONFIGURED|BILLING_AUTH_NOT_CONFIGURED|AUTH_REQUIRED|provider approval|checkout is not configured|approved NGN token price|persistent database|billing launch checks|sign in is required|paystack|flutterwave|cryptomus/i.test(detail);
       setFundingFeedback({
         kind: "error",
         message: requiresSetup
@@ -692,7 +692,7 @@ function Account() {
     icon: React.ReactNode;
   }> = [
     { id: "card", title: "Pay with card", description: "Debit or credit cards supported in your country", icon: <CreditCard size={19} aria-hidden="true" /> },
-    { id: "local", title: "Local payments", description: "Bank transfer, USSD, mobile money and other local options where supported", icon: <Wallet size={19} aria-hidden="true" /> },
+    { id: "local", title: "Local payments", description: "Local payment methods supported in your country", icon: <Wallet size={19} aria-hidden="true" /> },
     { id: "more", title: "More", description: "Other payment options available for your country", icon: <Coins size={19} aria-hidden="true" /> },
   ];
 
