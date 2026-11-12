@@ -277,8 +277,8 @@ assert.doesNotMatch(envExample, /PAYSTACK_TOKEN_PRICE_|FLUTTERWAVE_TOKEN_PRICE_|
 assert.match(envExample, /FLUTTERWAVE_PAYMENT_OPTIONS_DASHBOARD_DISABLED=false/);
 
 assert.match(paystackProviderConfig, /requirePaystackVerificationSecret/);
-assert.match(fxPricing, /100 enV tokens = USD \\$1\\.00/);
-assert.match(fxPricing, /open\\.er-api\\.com\\/v6\\/latest\\/USD/);
+assert.ok(fxPricing.includes("100 enV tokens = USD $1.00"));
+assert.ok(fxPricing.includes("https://open.er-api.com/v6/latest/USD"));
 assert.match(fxPricing, /time_last_update_unix/);
 assert.match(fxPricing, /usdCentsToMinorAmount/);
 assert.match(fxPricing, /fxUpdatedAt/);
@@ -286,7 +286,7 @@ assert.match(fxPricingTests, /rounds half up with integer arithmetic/);
 assert.match(paystackService, /quoteTokenPacks/);
 assert.match(flutterwaveService, /quoteTokenPacks/);
 assert.match(purchasesRoute, /pricingQuote/);
-assert.match(walletDashboard, /tokenValueAmount\\(tokens\\) \\+ " USD reference"/);
+assert.ok(walletDashboard.includes('tokenValueAmount(tokens) + " USD reference"'));
 assert.match(walletDashboard, /exchangerate-api\\.com/);
 assert.match(cryptomusService, /const pricePerTokenMinor = 1/);
 assert.match(paystackProviderConfig, /PAYSTACK_SECRET_KEY\?\.trim\(\)/,
