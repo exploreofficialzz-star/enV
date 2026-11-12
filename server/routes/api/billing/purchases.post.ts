@@ -1,18 +1,18 @@
 import { defineHandler } from "nitro/h3";
 import { randomUUID } from "node:crypto";
 import { isSameOriginRequest, jsonResponse, readJsonObject, requireBillingUser } from "../../../../src/lib/billing/http.server";
-import { initializePaystackCheckout } from "../../../../src/lib/billing/paystack.server";
+import { initializePaystackCheckout, minimumPaystackAmountMinor } from "../../../../src/lib/billing/paystack.server";
 import { initializeCryptomusCheckout } from "../../../../src/lib/billing/cryptomus.server";
 import { initializeFlutterwaveCheckout } from "../../../../src/lib/billing/flutterwave.server";
-import { getCustomerCountry } from "../../../../src/lib/billing/country-routing";
+import { getCustomerCountry, toFlutterwaveMajorAmount } from "../../../../src/lib/billing/country-routing";
 import { getFundingOptions } from "../../../../src/lib/billing/paystack.server";
 import { quoteTokenPacks, type CurrencyPackQuote } from "../../../../src/lib/billing/fx.server";
-import { selectFundingProvider, type CustomerPaymentMethod } from "../../../../src/lib/billing/payment-methods";
+import type { CustomerPaymentMethod } from "../../../../src/lib/billing/payment-methods";
 
 const SAFE_CHECKOUT_FAILURES: Record<string, { status: number; message: string }> = {
   PAYMENTS_NOT_CONFIGURED: { status: 503, message: "Token purchases are not enabled for this deployment yet." },
   INVALID_PURCHASE: { status: 400, message: "Enter an amount of at least US$1 and choose a payment method." },
-  INVALID_PRICE_CONFIGURATION: { status: 503, message: "Token pricing is temporarily unavailable. No payment was taken." },
+  INVALID_PRICE_CONFIGURATION: { status: 503, message: "This amount cannot be quoted for the selected payment method right now. No payment was taken." },
   IDEMPOTENCY_CONFLICT: { status: 409, message: "This checkout key was already used for another purchase. Start a new checkout." },
   CHECKOUT_ALREADY_USED: { status: 409, message: "This checkout attempt has already been used. Start a new checkout." },
   ACCOUNT_EMAIL_REQUIRED: { status: 400, message: "Add a valid email address to your enV account before funding the wallet." },
@@ -57,30 +57,51 @@ export default defineHandler(async (event) => {
   const tokens = amountUsdCents;
   const countryCode = getCustomerCountry(request);
   const funding = await getFundingOptions(countryCode);
-  const providerOption = paymentMethod
-    ? selectFundingProvider(funding.providers, paymentMethod)
-    : funding.providers.find((item) => item.id === (legacyProvider ?? "paystack")) ?? null;
+  const isLocalProvider = (item: (typeof funding.providers)[number]) =>
+    (item.id === "paystack" && item.localPayments === true) ||
+    (item.id === "flutterwave" && item.paymentOptions?.some((option) => option !== "card") === true);
+  let candidates = paymentMethod === "more"
+    ? funding.providers.filter((item) => item.id === "cryptomus" && item.enabled)
+    : paymentMethod === "local"
+      ? funding.providers.filter((item) => item.enabled && isLocalProvider(item))
+          .sort((a, b) => (a.id === "flutterwave" ? -1 : 0) - (b.id === "flutterwave" ? -1 : 0))
+      : paymentMethod === "card"
+        ? funding.providers.filter((item) => item.enabled && (item.id === "paystack" || item.id === "flutterwave"))
+        : funding.providers.filter((item) => item.id === (legacyProvider ?? "paystack") && item.enabled);
+
+  let providerOption: (typeof funding.providers)[number] | undefined;
+  let pricingQuote: CurrencyPackQuote | undefined;
+  for (const candidate of candidates) {
+    if (candidate.id === "cryptomus") {
+      providerOption = candidate;
+      break;
+    }
+    try {
+      const quote = (await quoteTokenPacks(candidate.currency, [tokens]))[0];
+      if (!quote) continue;
+      if (candidate.id === "paystack" && quote.amountMinor < minimumPaystackAmountMinor(candidate.currency)) continue;
+      if (candidate.id === "flutterwave" && toFlutterwaveMajorAmount(quote.amountMinor, candidate.currency) === null) continue;
+      providerOption = candidate;
+      pricingQuote = quote;
+      break;
+    } catch {
+      // Try the next already-approved gateway; never fabricate a fallback amount.
+    }
+  }
+
   const provider = providerOption?.id;
-  if (!provider || !providerOption?.enabled) {
+  if (!provider || !providerOption.enabled) {
     return jsonResponse({
       ok: false,
       error: "PAYMENT_METHOD_NOT_AVAILABLE_FOR_COUNTRY",
       message: paymentMethod
-        ? "This payment method is not available for your country yet. No payment was taken."
+        ? "This payment method or amount is not supported for your country. Try a higher amount or another available method. No payment was taken."
         : providerOption?.message ?? funding.message,
     }, 422);
   }
 
   try {
     const input = { userId: auth.userId, tokenPack: tokens, idempotencyKey: body.idempotencyKey };
-    let pricingQuote: CurrencyPackQuote | undefined;
-    if (provider !== "cryptomus") {
-      const quotes = await quoteTokenPacks(providerOption.currency, [tokens]);
-      pricingQuote = quotes[0];
-      if (!pricingQuote) throw Object.assign(new Error("A current payment quote is unavailable."), {
-        code: "INVALID_PRICE_CONFIGURATION", status: 503,
-      });
-    }
     const providerMethod = paymentMethod === "card" || paymentMethod === "local" ? paymentMethod : undefined;
     const checkout = provider === "cryptomus"
       ? await initializeCryptomusCheckout(input)
