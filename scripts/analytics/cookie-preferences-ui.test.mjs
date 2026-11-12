@@ -18,8 +18,10 @@ const viewMode = readFileSync(new URL("../../src/lib/view-mode.ts", import.meta.
 const settingsPage = readFileSync(new URL("../../src/routes/settings.tsx", import.meta.url), "utf8");
 const header = readFileSync(new URL("../../src/components/layout/header.tsx", import.meta.url), "utf8");
 
-test("one global non-blocking cookie banner controls essential storage, optional analytics and Adsterra advertising", () => {
-  assert.match(rootDocument, /<CookieConsent \/>/, "The unified cookie dialog must be mounted once for all Web routes.");
+test("Privacy page hosts non-modal combined preferences without a global ad popup", () => {
+  assert.match(rootDocument, /<CookieConsent \/>/, "The preference controller is mounted once, but only renders on Privacy.");
+  assert.match(cookieConsent, /const showPreferencesOnThisPage = pathname === "\/privacy"/, "Home and tool pages must not auto-show an advertising prompt.");
+  assert.doesNotMatch(cookieConsent, /pathname === "\/" \|\||qualifiedTool/, "The consent panel must not be activated by Home or tool routes.");
   assert.match(cookieConsent, /Cookie preferences/);
   assert.match(cookieConsent, /Essential storage/);
   assert.match(cookieConsent, /role="region"/);
