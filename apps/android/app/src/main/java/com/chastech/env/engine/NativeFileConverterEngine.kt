@@ -15,10 +15,11 @@ object NativeFileConverterEngine {
     data class Result(val text: String? = null, val bytes: ByteArray? = null, val mime: String = "text/plain", val extension: String = "txt")
     private val imageOps = setOf("jpg-to-png","png-to-jpg","png-to-webp","webp-to-png","jpg-to-webp","webp-to-jpg","png-to-svg")
     private val documentOps = setOf("pdf-metadata-viewer","pdf-metadata-tool","pdf-page-extractor","pdf-splitter","pdf-rotator","pdf-merger","pdf-text-extractor","docx-text-extractor")
-    fun supports(tool: ToolRecord): Boolean = (tool.engine.type == "file-converter" && op(tool) in setOf("csv-to-json","json-to-csv","csv-to-tsv","tsv-to-csv","xml-to-json","json-to-xml","yaml-to-json","json-to-yaml","txt-to-csv","csv-to-txt","markdown-to-html","html-to-markdown") + imageOps) || (tool.engine.type == "document-backend" && op(tool) in documentOps)
+    fun supports(tool: ToolRecord): Boolean = (tool.engine.type == "file-converter" && op(tool) in setOf("file-to-txt","csv-to-json","json-to-csv","csv-to-tsv","tsv-to-csv","xml-to-json","json-to-xml","yaml-to-json","json-to-yaml","txt-to-csv","csv-to-txt","markdown-to-html","html-to-markdown") + imageOps) || (tool.engine.type == "document-backend" && op(tool) in documentOps)
     private fun op(t: ToolRecord) = t.engine.extras["op"] ?: t.engine.id ?: t.id
     fun run(tool: ToolRecord, fileName: String, bytes: ByteArray): Result {
         val operation = op(tool)
+        if (operation == "file-to-txt") return fileToText(fileName, bytes)
         if (operation in documentOps) return document(operation, fileName, bytes)
         if (operation in imageOps) return image(operation, fileName, bytes)
         val input = bytes.toString(Charsets.UTF_8)
@@ -37,6 +38,34 @@ object NativeFileConverterEngine {
             "html-to-markdown" -> Result(htmlToMarkdown(input) + "\n", extension="md", mime="text/markdown")
             else -> error("Unsupported file conversion: $operation")
         }
+    }
+    private fun fileToText(name:String,data:ByteArray):Result {
+        require(data.isNotEmpty()) { "The selected file is empty." }
+        val ext = name.substringAfterLast('.', "").lowercase()
+        val text = when (ext) {
+            "docx" -> docxText(data)
+            "pdf" -> PDDocument.load(ByteArrayInputStream(data)).use { pdf ->
+                require(pdf.numberOfPages <= 250) { "This PDF exceeds the 250-page local extraction limit." }
+                require(data.size <= 200 * 1024 * 1024) { "This PDF exceeds the 200 MB local extraction limit." }
+                com.tom_roush.pdfbox.text.PDFTextStripper().getText(pdf).also {
+                    require(it.isNotBlank()) { "No selectable text was found. Scanned image-only PDFs need OCR and cannot be converted by this tool." }
+                }
+            }
+            "html", "htm", "xhtml" -> data.toString(Charsets.UTF_8)
+                .replace(Regex("(?is)<(script|style|noscript)[^>]*>.*?</\\\\1>"), " ")
+                .replace(Regex("(?s)<[^>]+>"), " ")
+                .replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+                .replace(Regex("\\\\s+"), " ").trim()
+            else -> {
+                require(ext in setOf("txt","md","markdown","csv","tsv","json","xml","yaml","yml","css","js","mjs","cjs","ts","tsx","jsx","sql","log","ini","toml","sh","properties","conf","cfg","srt","vtt","ics")) {
+                    "Choose a supported text, Markdown, CSV, JSON, XML, YAML, HTML, DOCX or selectable-text PDF file."
+                }
+                data.toString(Charsets.UTF_8).removePrefix("\\uFEFF").also {
+                    require(it.isNotBlank()) { "The selected file contains no readable text." }
+                }
+            }
+        }
+        return Result(text.trimEnd() + "\\n", extension="txt", mime="text/plain")
     }
     private fun document(op:String,name:String,data:ByteArray):Result {
         if (op == "docx-text-extractor") return Result(docxText(data), extension="txt", mime="text/plain")
