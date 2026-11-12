@@ -52,7 +52,7 @@ function Privacy() {
 
       <section className="space-y-2">
         <h2 className="text-lg font-semibold text-fg">Cookies, sessions, and account requests</h2>
-        <p>Browser-local preferences use local storage. If an optional sign-in or AI feature is used, the service may set essential session cookies—for example, to maintain sign-in or apply abuse-prevention limits. The Cookie preferences dialog also lets you opt in to optional product analytics and Adsterra advertising technologies. Both remain off unless you actively allow them; declining either does not limit access to enV tools.</p>
+        <p>Browser-local preferences use local storage. If an optional sign-in or AI feature is used, the service may set essential session cookies—for example, to maintain sign-in or apply abuse-prevention limits. The Cookie preferences section on this Privacy page lets you opt in to optional product analytics and Adsterra advertising technologies. These controls are not shown as a global popup. Both remain off unless you actively allow them; declining either does not limit access to enV tools.</p>
         <button
           type="button"
           onClick={() => window.dispatchEvent(new Event("env:open-cookie-preferences"))}
