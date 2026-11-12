@@ -8,6 +8,8 @@ const migration = await read("migrations/0002_billing.sql");
 const rewardsMigration = await read("migrations/0007_wallet_rewards.sql");
 const rewardsService = await read("src/lib/billing/rewards.server.ts");
 const paystackService = await read("src/lib/billing/paystack.server.ts");
+const fxPricing = await read("src/lib/billing/fx.server.ts");
+const fxPricingTests = await read("src/lib/billing/fx.server.test.ts");
 const countryRouting = await read("src/lib/billing/country-routing.ts");
 const flutterwaveService = await read("src/lib/billing/flutterwave.server.ts");
 const flutterwaveWebhook = await read("server/routes/api/billing/flutterwave/webhook.post.ts");
@@ -172,7 +174,7 @@ assert.match(purchasesRoute, /provider !== "paystack" && provider !== "flutterwa
 assert.match(purchasesRoute, /No payment was taken/);
 assert.match(paystackProviderConfig, /PAYSTACK_PROVIDER_APPROVED === "true"/, "Paystack checkout must require explicit merchant approval");
 assert.match(paystackService, /CRYPTOMUS_PROVIDER_APPROVED === "true"/, "crypto checkout must require explicit merchant approval");
-assert.match(paystackService, /CRYPTOMUS_TOKEN_PRICE_USD_CENTS/);
+assert.match(paystackService, /const cryptoPricePerTokenMinor = 1/);
 assert.match(cryptomusService, /CRYPTOMUS_PAYMENT_API_KEY/);
 assert.match(cryptomusService, /createHash\("md5"\)/);
 assert.match(cryptomusService, /timingSafeEqual/);
@@ -271,15 +273,22 @@ assert.match(envExample, /FLUTTERWAVE_REFUND_DISPUTE_HANDLING_APPROVED=false/);
 assert.match(envExample, /PAYSTACK_INTERNATIONAL_ENABLED=false/);
 assert.match(envExample, /PAYSTACK_MERCHANT_COUNTRY=NG/);
 assert.match(envExample, /CLOUDFLARE_ORIGIN_LOCKDOWN_APPROVED=false/);
-assert.match(envExample, /FLUTTERWAVE_TOKEN_PRICE_ZMW_MINOR=/);
+assert.doesNotMatch(envExample, /PAYSTACK_TOKEN_PRICE_|FLUTTERWAVE_TOKEN_PRICE_|CRYPTOMUS_TOKEN_PRICE_USD_CENTS/);
 assert.match(envExample, /FLUTTERWAVE_PAYMENT_OPTIONS_DASHBOARD_DISABLED=false/);
 
 assert.match(paystackProviderConfig, /requirePaystackVerificationSecret/);
-assert.match(paystackProviderConfig, /readSafePackPrice/);
-assert.match(paystackProviderConfig, /readSafePackPrice\(configuredPrice, packSizes\)/,
-  "Paystack market prices must stay within safe integer bounds for every token pack");
-assert.match(paystackService, /CRYPTOMUS_TOKEN_PRICE_USD_CENTS/);
-assert.match(paystackService, /readSafePackPrice/);
+assert.match(fxPricing, /100 enV tokens = USD \\$1\\.00/);
+assert.match(fxPricing, /open\\.er-api\\.com\\/v6\\/latest\\/USD/);
+assert.match(fxPricing, /time_last_update_unix/);
+assert.match(fxPricing, /usdCentsToMinorAmount/);
+assert.match(fxPricing, /fxUpdatedAt/);
+assert.match(fxPricingTests, /rounds half up with integer arithmetic/);
+assert.match(paystackService, /quoteTokenPacks/);
+assert.match(flutterwaveService, /quoteTokenPacks/);
+assert.match(purchasesRoute, /pricingQuote/);
+assert.match(walletDashboard, /tokenValueAmount\\(tokens\\) \\+ " USD reference"/);
+assert.match(walletDashboard, /exchangerate-api\\.com/);
+assert.match(cryptomusService, /const pricePerTokenMinor = 1/);
 assert.match(paystackProviderConfig, /PAYSTACK_SECRET_KEY\?\.trim\(\)/,
   "whitespace-only Paystack credentials must not enable checkout");
 assert.match(cryptomusService, /CRYPTOMUS_PAYMENT_API_KEY\?\.trim\(\)/,
@@ -288,7 +297,7 @@ assert.match(paystackService, /process\.env\.VERCEL === "1"/,
   "Vercel deployments must require HTTPS payment callback origins");
 assert.match(cryptomusService, /process\.env\.VERCEL === "1"/,
   "Vercel deployments must require HTTPS crypto callback origins");
-const paystackVerificationConfig = paystackProviderConfig.slice(0, paystackProviderConfig.indexOf("export function readSafePackPrice"));
+const paystackVerificationConfig = paystackProviderConfig.slice(0, paystackProviderConfig.indexOf("const PAYSTACK_MERCHANT_LOCAL_CURRENCIES"));
 assert.doesNotMatch(paystackVerificationConfig, /BILLING_LAUNCH_ENABLED|BILLING_ENFORCEMENT_ENABLED|PAYSTACK_PROVIDER_APPROVED/,
   "settlement credentials must not inherit the new-checkout kill switch");
 const paystackSettlement = paystackService.slice(
