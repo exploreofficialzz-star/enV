@@ -319,9 +319,9 @@ assert.match(flutterwaveService, /quoteTokenPacks/);
 assert.match(purchasesRoute, /pricingQuote/);
 assert.match(fundingOptionsRoute, /methods: \{/,
   "funding options must expose only customer-facing method availability");
-assert.match(fundingOptionsRoute, /card: providers\.some/);
-assert.match(fundingOptionsRoute, /local: providers\.some/);
-assert.match(fundingOptionsRoute, /more: providers\.some/);
+assert.match(fundingOptionsRoute, /card: isCustomerPaymentMethodAvailable/);
+assert.match(fundingOptionsRoute, /local: isCustomerPaymentMethodAvailable/);
+assert.match(fundingOptionsRoute, /more: isCustomerPaymentMethodAvailable/);
 assert.doesNotMatch(fundingOptionsRoute, /label: provider\.label|providers: provider\.packs/,
   "the wallet options API must not return gateway labels or provider pack cards");
 assert.doesNotMatch(walletDashboard, /label: "Paystack"|label: "Flutterwave"|Pay with crypto/,
