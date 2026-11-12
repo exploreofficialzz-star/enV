@@ -548,7 +548,11 @@ async function handleFlutterwaveChargebackWebhook(body: Record<string, unknown>)
       code: "INVALID_CHARGEBACK_WEBHOOK", status: 400,
     });
   }
-  const providerStatus = typeof nested.status === "string" ? nested.status.toLowerCase() : "";
+  const eventName = typeof body.type === "string" ? body.type.toLowerCase()
+    : typeof body.event === "string" ? body.event.toLowerCase() : "";
+  const eventStatus = eventName.startsWith("chargeback.")
+    ? eventName.slice("chargeback.".length) : "";
+  const providerStatus = typeof nested.status === "string" ? nested.status.toLowerCase() : eventStatus;
   const statusFilter = ["lost", "won", "initiated", "accepted", "declined"].includes(providerStatus)
     ? providerStatus : null;
   // The v3 chargeback list is filtered by the original transaction reference
