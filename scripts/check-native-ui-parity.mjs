@@ -305,6 +305,9 @@ assert.ok(androidHome.indexOf('HomePreviewBar("Total token = 100"') < androidHom
 assert.ok(iosHome.indexOf('HomePreviewBar(title: "Total token = 100")') < iosHome.indexOf("HomeMostUsedToolsTray(tools: mostUsedTools)") && iosHome.indexOf("HomeMostUsedToolsTray(tools: mostUsedTools)") < iosHome.indexOf('Text("A focused toolkit'), "iOS home order should be AI/token, personal tray, then the hero headline");
 assert.match(webHome, /h-\[112px\].*min-h-\[112px\].*w-full.*max-w-3xl.*shrink-0.*rounded-\[28px\]/, "Web personal shortcuts tray must retain its full fixed size when shortcuts are sparse");
 assert.match(androidHome, /MostUsedToolsTray[\s\S]*?height\(112\.dp\)/);
+assert.match(webHome, /tools\.map\(\(tool, index\) => <ToolCard key=\{tool\.id\} tool=\{tool\} className=\{index >= 6 \? "hidden sm:flex" : ""\} \/>\)/, "Web Home should show six Trending cards on mobile and twelve at tablet/desktop widths");
+assert.match(androidHome, /trending\.take\(if \(screenWidth >= 640\) 12 else 6\)\.chunked\(homeColumns\)/, "Android Home should show six Trending cards on phones and twelve on tablets/desktops");
+assert.match(iosHome, /\.prefix\(horizontalSizeClass == \.regular \? 12 : 6\)/, "iOS Home should show six Trending cards in compact layouts and twelve in regular layouts");
 assert.match(webHome, /personal-tools-scroll snap-x snap-mandatory/);
 assert.match(webStyles, /grid-auto-columns: calc\(20% - 9\.6px\)/);
 assert.match(webStyles, /grid-auto-columns: calc\(10% - 10\.8px\)/);
