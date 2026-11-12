@@ -22,7 +22,9 @@ import {
   AdsterraToolPopunder,
 } from "@/components/ads/adsterra-ad";
 import { isAdsterraQualifiedTool } from "@/lib/ads/policy";
-import { openAdsterraSmartlinkFromOutput } from "@/lib/ads/adsterra";
+import { AdsterraGuestAccessGate } from "@/components/ads/adsterra-guest-access-gate";
+import { ADSTERRA_CONSENT_STORAGE_KEY, getAdsterraConsent, openAdsterraSmartlinkFromOutput } from "@/lib/ads/adsterra";
+import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import type { PublicCommunityFeed } from "@/lib/community/public-feed.functions";
 import { ToolExecutionTelemetryContext, type ToolExecutionTelemetry, type ToolExecutionOutcome } from "@/components/tools/tool-execution-context";
 import { UnderProductionDialog } from "@/components/tools/under-production";
@@ -44,6 +46,22 @@ export function ToolShell({
   const note = disclaimerText(tool);
   const adsterraQualified =
     import.meta.env.VITE_ADSTERRA_ENABLED === "true" && isAdsterraQualifiedTool(tool);
+  const { user: adsterraUser, isPending: adsterraAuthPending, error: adsterraAuthError } = useCurrentUserState();
+  const [adsterraConsent, setAdsterraConsentState] = useState(getAdsterraConsent);
+  useEffect(() => {
+    const syncAdsterraConsent = () => setAdsterraConsentState(getAdsterraConsent());
+    const syncFromStorage = (event: StorageEvent) => {
+      if (event.key === null || event.key === ADSTERRA_CONSENT_STORAGE_KEY) syncAdsterraConsent();
+    };
+    window.addEventListener("env:adsterra-consent-changed", syncAdsterraConsent);
+    window.addEventListener("storage", syncFromStorage);
+    return () => {
+      window.removeEventListener("env:adsterra-consent-changed", syncAdsterraConsent);
+      window.removeEventListener("storage", syncFromStorage);
+    };
+  }, []);
+  const adsterraAdsEnabled =
+    adsterraQualified && !adsterraAuthPending && !adsterraAuthError && !adsterraUser && adsterraConsent === "granted";
   const toggleFavorite = usePrefs((s) => s.toggleFavorite);
   const favorites = usePrefs((s) => s.favorites);
   const prefsHydrated = usePrefs((s) => s.hydrated);
@@ -200,6 +218,29 @@ export function ToolShell({
   }
 
   const cat = CATEGORY_MAP[tool.category];
+  const toolContent = isMusicSandbox ? (
+    <>
+      {isFullscreen ? <div className="env-tool-fullscreen__toolbar">
+        <button type="button" onClick={() => void toggleFullscreen()} className="env-tool-fullscreen__exit rounded-md border border-border bg-surface text-fg shadow-sm hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent" aria-label={`Exit full screen for ${tool.name}`} title="Exit full screen"><Minimize2 className="size-4" aria-hidden="true" /></button>
+      </div> : null}
+      <div className={isFullscreen ? "env-tool-fullscreen__content" : undefined}>{children}</div>
+    </>
+  ) : isFullscreen ? (
+    <>
+      <div className="env-tool-fullscreen__toolbar">
+        <button
+          type="button"
+          onClick={() => void toggleFullscreen()}
+          className="env-tool-fullscreen__exit rounded-md border border-border bg-surface text-fg shadow-sm hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          aria-label={`Exit full screen for ${tool.name}`}
+          title="Exit full screen"
+        >
+          <Minimize2 className="size-4" aria-hidden="true" />
+        </button>
+      </div>
+      <div className="env-tool-fullscreen__content">{children}</div>
+    </>
+  ) : children;
 
   return (
     <article className={tool.category === "creators" ? "env-device-tool-page" : "mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10" + (isMusicSandbox ? " env-music-sandbox-shell" : "")}>
@@ -262,7 +303,7 @@ export function ToolShell({
         {tool.category !== "creators" ? <p className="col-start-2 col-span-2 row-start-2 text-sm leading-6 text-muted sm:hidden">{offlineAwareToolDescription(tool)}</p> : null}
       </header>
 
-      {!isFullscreen && adsterraQualified ? <AdsterraResponsiveBanner /> : null}
+      {!isFullscreen && adsterraAdsEnabled ? <AdsterraResponsiveBanner /> : null}
 
       {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
 
@@ -270,7 +311,7 @@ export function ToolShell({
       <section
         ref={toolInterfaceRef}
         data-env-tool-id={tool.id}
-        data-env-ad-eligible={adsterraQualified ? "true" : undefined}
+        data-env-ad-eligible={adsterraAdsEnabled ? "true" : undefined}
         className={isFullscreen
           ? "env-tool-interface env-tool-fullscreen"
           : tool.category === "creators" ? "env-device-tool-interface"
@@ -288,7 +329,7 @@ export function ToolShell({
           const isOutputAction =
             isFileDownload ||
             /\b(copy|download|export|save|output|result|calculate|convert|generate|analy[sz]e|process|format|validate|inspect|scan|encode|decode|resize|compress|extract|transcribe|create|execute|compare|merge|split|apply|build|render)\b/i.test(label);
-          if (adsterraQualified && isOutputAction) {
+          if (adsterraAdsEnabled && isOutputAction) {
             // Open the supplied Smartlink synchronously within the visitor's
             // explicit output-button gesture, before async generation can
             // cause mobile browsers to block the new tab.
@@ -303,42 +344,23 @@ export function ToolShell({
         }}
       >
         <ToolExecutionTelemetryContext.Provider value={executionTelemetry}>
-        {isMusicSandbox ? (
-          <>
-            {isFullscreen ? <div className="env-tool-fullscreen__toolbar">
-              <button type="button" onClick={() => void toggleFullscreen()} className="env-tool-fullscreen__exit rounded-md border border-border bg-surface text-fg shadow-sm hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent" aria-label={`Exit full screen for ${tool.name}`} title="Exit full screen"><Minimize2 className="size-4" aria-hidden="true" /></button>
-            </div> : null}
-            <div className={isFullscreen ? "env-tool-fullscreen__content" : undefined}>{children}</div>
-          </>
-        ) : isFullscreen ? (
-          <>
-            <div className="env-tool-fullscreen__toolbar">
-              <button
-                type="button"
-                onClick={() => void toggleFullscreen()}
-                className="env-tool-fullscreen__exit rounded-md border border-border bg-surface text-fg shadow-sm hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                aria-label={`Exit full screen for ${tool.name}`}
-                title="Exit full screen"
-              >
-                <Minimize2 className="size-4" aria-hidden="true" />
-              </button>
-            </div>
-            <div className="env-tool-fullscreen__content">{children}</div>
-          </>
-        ) : children}
+          {adsterraQualified ? (
+            <AdsterraGuestAccessGate toolName={tool.name}>{toolContent}</AdsterraGuestAccessGate>
+          ) : toolContent}
         </ToolExecutionTelemetryContext.Provider>
         {!isFullscreen && tool.category !== "creators" ? <ToolCommunityPanel toolId={tool.id} discussionHref={"/community" + toolPath(tool)} initialFeed={initialCommunityFeed} /> : null}
       </section>
 
-      {tool.category !== "creators" ? (
-        <>
-      {!isFullscreen && adsterraQualified ? (
+      {!isFullscreen && adsterraAdsEnabled ? (
         <>
           <AdsterraBanner format="300x250" />
           <AdsterraNativeBanner />
           <AdsterraToolPopunder />
         </>
       ) : null}
+
+      {tool.category !== "creators" ? (
+        <>
       {!isFullscreen && import.meta.env.VITE_ADSTERRA_ENABLED !== "true" ? <AdSlot tool={tool} /> : null}
       <AiAssistPanel toolId={tool.id} />
 

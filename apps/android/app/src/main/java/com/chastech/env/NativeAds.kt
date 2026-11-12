@@ -101,6 +101,91 @@ internal object NativeAdsPolicy {
             (tool.disclaimer?.let { it !in restrictedDisclaimers } ?: true)
     }
 
+    /**
+     * Native advertising eligibility is separate from the offline-wallet cohort.
+     * Only active, public, device-local tools qualify; Studio, AI and Lab/Sandbox
+     * experiences remain excluded. This policy never grants offline execution.
+     */
+    fun isAdEligibleTool(tool: ToolRecord): Boolean {
+        val restrictedDisclaimers = setOf("health", "finance", "earnings")
+        val restrictedCategories = setOf(
+            "health", "finance", "earnings", "fitness", "personal",
+            "ai", "developer", "accessibility", "lab", "labs",
+        )
+        val localEngineTypes = setOf(
+            "calculator", "converter", "datetime", "text", "codec", "color", "qr",
+            "barcode", "generator", "image", "cssgen", "mockup", "post", "device",
+            "seo", "file-converter", "developer", "pdf", "mime", "security",
+            "creator", "business", "audio", "network", "video", "document",
+        )
+        val localCustomCategories = setOf(
+            "career", "celebrations", "communication", "ecommerce", "events", "food",
+            "gaming", "interactive", "marketing", "mockups", "photography",
+            "productivity", "relationships", "screenshots", "social", "streaming",
+            "travel", "webdesign",
+        )
+        val localDocumentIds = setOf(
+            "pdf-merger", "pdf-metadata-viewer", "pdf-metadata-tool", "pdf-page-extractor",
+            "pdf-splitter", "pdf-rotator", "docx-text-extractor", "text-to-docx",
+            "txt-to-docx", "markdown-to-docx",
+        )
+        val remoteAudioOperations = setOf(
+            "server-mp3", "server-wav", "server-ogg", "server-flac", "server-volume",
+            "server-bitrate", "server-sample-rate", "server-channels", "server-merge",
+        )
+        val remoteVideoOperations = setOf(
+            "video-merge", "video-replace-audio", "video-to-mp4", "video-to-mp3",
+            "video-to-gif", "video-to-webm", "video-to-mov", "video-to-avi",
+            "video-resize", "video-crop", "video-rotate", "video-mute", "video-fps",
+            "video-bitrate", "video-resolution-presets", "video-audio-volume",
+        )
+        val remoteToolIds = setOf(
+            "audio-to-mp3-server", "audio-to-wav-server", "audio-to-ogg-server",
+            "audio-to-flac-server", "audio-bitrate-converter", "audio-merger",
+            "audio-to-text", "audio-to-subtitles", "video-merger", "video-audio-replacer",
+            "video-to-mp4", "video-to-mp3", "video-to-gif", "video-to-webm", "video-to-mov",
+            "video-to-avi", "video-resize", "video-crop", "video-rotate", "video-mute",
+            "video-fps", "video-bitrate", "video-resolution-presets", "video-audio-volume",
+            "video-cropper", "video-to-text", "video-to-subtitles", "youtube-audio-extractor",
+            "url-media-inspector", "video-url-downloader", "youtube-video-downloader",
+            "tiktok-video-downloader", "facebook-video-downloader", "instagram-video-downloader",
+            "x-video-downloader", "whois-lookup", "dns-lookup", "website-screenshot",
+            "media-backend-checker",
+        )
+
+        val engineType = tool.engine.type.lowercase()
+        val operation = tool.engine.extras["op"]?.lowercase().orEmpty()
+        val identity = (
+            listOf(tool.id, tool.name, tool.subcategory.orEmpty(), engineType, tool.engine.id) +
+                tool.tags + tool.keywords
+            ).joinToString(" ")
+            .lowercase()
+            .replace('-', ' ')
+            .replace('_', ' ')
+        val excludedConcept = Regex(
+            """\b(studio|studios|lab|labs|laboratory|laboratories|sandbox|ai|artificial intelligence)\b"""
+        ).containsMatchIn(identity)
+        val localExecution = engineType in localEngineTypes ||
+            (engineType == "custom" && tool.category in localCustomCategories) ||
+            (engineType == "document-backend" && tool.id in localDocumentIds)
+        val remoteExecution = engineType in setOf("url-media", "url-media-info") ||
+            operation in remoteAudioOperations ||
+            operation in remoteVideoOperations ||
+            tool.id in remoteToolIds
+
+        return tool.status == "active" &&
+            tool.clientSide &&
+            !tool.requiresBackend &&
+            !tool.requiresAuth &&
+            tool.category.lowercase() !in restrictedCategories &&
+            !tool.id.startsWith("finance-") &&
+            (tool.disclaimer?.lowercase()?.let { it !in restrictedDisclaimers } ?: true) &&
+            engineType != "ai" &&
+            localExecution &&
+            !remoteExecution &&
+            !excludedConcept
+    }
+
     suspend fun isApplicationOnline(context: Context): Boolean = withContext(Dispatchers.IO) {
         if (!hasValidatedInternet(context)) return@withContext false
         val connection = (URL("https://envtools.store/").openConnection() as? HttpURLConnection)
@@ -220,8 +305,7 @@ internal fun NativeToolAdSlot(tool: ToolRecord) {
     val context = LocalContext.current
     val preview = LocalInspectionMode.current
     val supported = remember(toolId) {
-        NativeAdsPolicy.isHybridTool(context, tool) &&
-            runCatching { com.chastech.env.billing.OfflineWalletJournal(context).isEligibleTool(context, toolId) }.getOrDefault(false)
+        NativeAdsPolicy.isAdEligibleTool(tool)
     }
     val network = rememberValidatedAdNetwork(context)
     var applicationOnline by remember(toolId) { mutableStateOf(false) }

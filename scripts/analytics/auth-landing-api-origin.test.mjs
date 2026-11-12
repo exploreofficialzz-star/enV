@@ -15,13 +15,17 @@ test("Web API calls default to relative same-origin routes", () => {
   assert.doesNotMatch(envExample, /VITE_API_BASE_URL=https:\/\/env-q3mq\.onrender\.com/);
 });
 
-test("successful email and social sign-in return to the enV home page, not the optional AI Agent", () => {
-  assert.match(authPage, /callbackURL: "\/"/);
-  assert.match(authPage, /window\.location\.assign\("\/"\)/);
+test("successful email and social sign-in return to a validated tool destination or the enV home page", () => {
+  assert.match(authPage, /function getSafeReturnTo\(\)/);
+  assert.match(authPage, /const candidate = new URLSearchParams\(window\.location\.search\)\.get\("returnTo"\) \?\? "\/"/);
+  assert.match(authPage, /candidate\.startsWith\("\/tools\/"\)/);
+  assert.match(authPage, /candidate\.startsWith\("\/\/"\)/);
+  assert.match(authPage, /url\.origin === window\.location\.origin/);
+  assert.match(authPage, /callbackURL: returnTo/);
+  assert.match(authPage, /window\.location\.assign\(returnTo\)/);
+  assert.match(authPage, /: returnTo;/);
   assert.doesNotMatch(authPage, /callbackURL: "\/agent"|window\.location\.assign\("\/agent"\)/);
-  assert.match(authPage, /: "\/",/);
 });
-
 test("native API gateway remains separate from the Web same-origin API", () => {
   assert.match(backendDocs, /Web client calls the same-origin Vercel routes/);
   assert.match(backendDocs, /Android and iOS remain independent native clients/);
