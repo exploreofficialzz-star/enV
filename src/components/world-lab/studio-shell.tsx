@@ -71,15 +71,23 @@ export function StudioRail({ open, active, onSelect }: RailProps) {
 
   useLayoutEffect(() => {
     const activateFromWindow = (event: Event) => {
+      const root = rail.current?.closest<HTMLElement>(".wl-studio");
+      root?.setAttribute("data-rail-last-event", `capture:${event.type}`);
       const target = event.target;
-      if (!(target instanceof Element)) return;
+      if (!(target instanceof Element)) {
+        root?.setAttribute("data-rail-last-target", "non-element");
+        return;
+      }
+      root?.setAttribute("data-rail-last-target", target.tagName.toLowerCase());
       const button = target.closest<HTMLButtonElement>(".wl-rail button[data-group]");
-      if (!button || !rail.current?.contains(button)) return;
+      root?.setAttribute("data-rail-last-button", button?.getAttribute("aria-label") ?? "no-match");
+      if (!button || !rail.current?.contains(button)) {
+        root?.setAttribute("data-rail-last-group", "outside-rail");
+        return;
+      }
       const group = button.dataset.group;
+      root?.setAttribute("data-rail-last-group", group ?? "missing-group");
       if (!GROUPS.some((item) => item.id === group)) return;
-      const root = button.closest<HTMLElement>(".wl-studio");
-      root?.setAttribute("data-rail-last-event", event.type);
-      root?.setAttribute("data-rail-last-group", group ?? "missing");
       selectRef.current(group as StudioGroupId);
     };
 
