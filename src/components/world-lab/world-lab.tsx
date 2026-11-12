@@ -311,19 +311,27 @@ export default function WorldLab() {
     root.dataset.railListener = "true";
     const groups = new Set<StudioGroupId>(["project", "build", "experiments", "results"]);
     const activateRail = (event: Event) => {
+      root.dataset.railLastEvent = event.type;
+      const path = event.composedPath();
+      const button = path.find((item): item is HTMLButtonElement =>
+        item instanceof HTMLButtonElement && item.matches(".wl-rail button[data-group]") && root.contains(item)
+      );
       const target = event.target;
-      if (!(target instanceof Element)) return;
-      const button = target.closest<HTMLButtonElement>(".wl-rail button[data-group]");
-      if (!button || !root.contains(button)) return;
+      if (!button && target instanceof Element) {
+        const candidate = target.closest<HTMLButtonElement>(".wl-rail button[data-group]");
+        if (candidate && root.contains(candidate)) {
+          root.dataset.railLastButton = candidate.outerHTML.slice(0, 300);
+        }
+      }
+      if (!button) return;
       const group = button.dataset.group as StudioGroupId | undefined;
+      root.dataset.railLastGroup = group ?? "missing";
       if (group && groups.has(group)) setStudioPanel(group);
     };
-    // Capture before scene/canvas listeners; the rail is always a first-class control.
-    document.addEventListener("pointerdown", activateRail, true);
-    document.addEventListener("click", activateRail, true);
+    // Window capture runs before document/canvas handlers so scene input cannot swallow rail activation.
+    window.addEventListener("click", activateRail, true);
     return () => {
-      document.removeEventListener("pointerdown", activateRail, true);
-      document.removeEventListener("click", activateRail, true);
+      window.removeEventListener("click", activateRail, true);
       delete root.dataset.railListener;
     };
   }, []);
