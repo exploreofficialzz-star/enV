@@ -157,8 +157,12 @@ test("public discussion index and per-tool pages expose public comments for sear
   assert.doesNotMatch(publicDetail, /<main/);
   assert.match(publicDetail, /CollectionPage/);
   assert.match(publicDetail, /"@type": "Comment"/);
-  assert.match(toolRoute, /loadPublicCommunityToolFeed/);
+  // Tool navigation deliberately keeps community requests out of the blocking route loader.
+  // The separate indexable discussion URL renders the server-loaded public comments for discovery.
+  assert.match(toolRoute, /return \{ communityFeed: null \}/);
+  assert.doesNotMatch(toolRoute, /loadPublicCommunityToolFeed/);
   assert.match(toolRoute, /initialCommunityFeed=\{communityFeed\}/);
+  assert.match(web, /fetch\("\\/api\\/community\\?toolId=/);
   assert.match(web, /discussionHref/);
   assert.match(footer, /to: "\/community", label: "Public discussions"/);
   assert.match(seoGenerator, /"\/community"/);
@@ -210,7 +214,8 @@ test("tool comments show account photos only for explicitly public identities", 
 });
 
 test("account page uses a shimmer loading skeleton and reduced-motion-aware photo shimmer", () => {
-  assert.match(accountRoute, /pendingComponent:\s*AccountProfileSkeleton/);
+  // Auth status is reactive rather than a blocking route loader; the screen owns its pending state.
+  assert.match(accountRoute, /if \(sessionPending && !sessionTimedOut\) return <AccountProfileSkeleton \/>/);
   assert.match(accountRoute, /function AccountProfileSkeleton/);
   assert.match(accountRoute, /function ShimmerProfileImage/);
   assert.match(accountRoute, /<ShimmerProfileImage/);
