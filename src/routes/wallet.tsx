@@ -19,6 +19,7 @@ type WalletData = {
   reservedTokens: number;
   lifetimePurchasedSubunits: number;
   lifetimeConsumedSubunits: number;
+  recoveryDebtTokens: number;
 };
 
 type WalletActivity = {
@@ -121,7 +122,10 @@ function tokenPackReferenceValue(tokens: number): string {
 }
 
 function tokenReferenceValue(tokens: number): string {
-  return "Estimated token value " + (tokens * 0.01).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+  const amount = new Intl.NumberFormat(undefined, {
+    style: "currency", currency: "USD", minimumFractionDigits: 3, maximumFractionDigits: 3,
+  }).format(tokens * 0.01);
+  return "Estimated USD reference value " + amount;
 }
 
 function tokenUnitDisplay(label: string): React.ReactNode {
@@ -697,6 +701,13 @@ function Account() {
   }
 
   const visibleWallet = state.status === "ready" ? state.wallet : undefined;
+  const selectedProviderOption = fundingOptionsState.providers.find((item) => item.id === selectedFundingProvider);
+  const selectedFundingPack = selectedProviderOption?.packs.find((item) => item.tokens === selectedTokenPack);
+  const selectedFundingAmount = formatPaymentAmount(
+    selectedFundingPack?.amountMinor,
+    selectedFundingPack?.currency ?? selectedProviderOption?.currency,
+  );
+  const selectedFundingPackAvailable = Boolean(selectedFundingPack && selectedFundingPack.enabled !== false && selectedFundingAmount);
   return (
     <AppShell>
       <div className="mx-auto w-full max-w-6xl px-3 py-5 sm:px-6 sm:py-8">
@@ -734,6 +745,15 @@ function Account() {
             <MetricCard title="Total used" value={visibleWallet ? `${tokenAmount(visibleWallet.lifetimeConsumedSubunits)} enV` : "0.000 enV"} description={tokenReferenceValue((visibleWallet?.lifetimeConsumedSubunits ?? 0) / 1_000)} icon={<TrendingUp size={15} aria-hidden="true"/>} />
           </div>
         </section>
+
+        {visibleWallet && visibleWallet.recoveryDebtTokens > 0 ? (
+          <section className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3" role="status">
+            <p className="text-sm font-semibold text-fg">Wallet recovery balance</p>
+            <p className="mt-1 text-sm leading-5 text-muted">
+              {tokenAmount(visibleWallet.recoveryDebtTokens * 1_000)} enV is being recovered after a verified refund or lost payment dispute. New token usage stays paused until this balance is cleared by future credits.
+            </p>
+          </section>
+        ) : null}
 
         {showFundingOptions ? (
           <div
@@ -810,31 +830,39 @@ function Account() {
                 ))}
               </div>
 
-              <div className="mt-5 space-y-2">
-                <h3 className="text-sm font-semibold">Choose your token pack</h3>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="mt-5 space-y-3">
+                <label htmlFor="wallet-token-amount" className="block text-sm font-semibold">Amount to add</label>
+                <select
+                  id="wallet-token-amount"
+                  value={selectedTokenPack}
+                  onChange={(event) => setSelectedTokenPack(Number(event.target.value))}
+                  className="min-h-12 w-full rounded-xl border border-border bg-surface px-3 text-sm text-fg"
+                >
                   {[100, 250, 500, 1000].map((tokens) => {
-                    const selectedProviderOption = fundingOptionsState.providers.find((item) => item.id === selectedFundingProvider);
                     const pack = selectedProviderOption?.packs.find((item) => item.tokens === tokens);
-                    const formattedAmount = formatPaymentAmount(pack?.amountMinor, pack?.currency ?? selectedProviderOption?.currency);
-                    const packUnavailable = !pack || pack.enabled === false || !formattedAmount;
+                    const amount = formatPaymentAmount(pack?.amountMinor, pack?.currency ?? selectedProviderOption?.currency);
+                    const disabled = !pack || pack.enabled === false || !amount;
                     return (
-                      <button
-                        key={tokens}
-                        type="button"
-                        aria-pressed={selectedTokenPack === tokens}
-                        disabled={packUnavailable}
-                        onClick={() => setSelectedTokenPack(tokens)}
-                        className={"flex min-h-[88px] flex-col items-start justify-center rounded-xl border px-3 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-50 " +
-                          (selectedTokenPack === tokens ? "border-accent bg-accent/5" : "border-border bg-surface hover:bg-surface-2")}
-                      >
-                        <span className="text-sm font-semibold">{tokens.toLocaleString()} enV</span>
-                        <span className="mt-1 text-sm font-semibold tabular-nums">{formattedAmount ?? "Price unavailable"}</span>
-                        <span className="mt-0.5 text-[10px] leading-4 text-muted">enV value {tokenPackReferenceValue(tokens)}</span>
-                        {packUnavailable ? <span className="mt-1 text-[10px] leading-4 text-muted">{pack?.message ?? "A verified local price is not available"}</span> : null}
-                      </button>
+                      <option key={tokens} value={tokens} disabled={disabled}>
+                        {tokens.toLocaleString()} enV{amount ? " — " + amount : " — Unavailable"}
+                      </option>
                     );
                   })}
+                </select>
+                <div className="rounded-xl border border-border bg-surface-2 px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs text-muted">Amount to pay</span>
+                    <span className="text-lg font-semibold tabular-nums text-fg">{selectedFundingAmount ?? "Price unavailable"}</span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-3 border-t border-border pt-2">
+                    <span className="text-xs text-muted">{selectedTokenPack.toLocaleString()} enV reference value</span>
+                    <span className="text-sm font-medium tabular-nums text-fg">{tokenPackReferenceValue(selectedTokenPack)} USD</span>
+                  </div>
+                  <p className="mt-2 text-[11px] leading-4 text-muted">
+                    The local-currency figure is the checkout price. The USD figure is enV's fixed reference value, not a cash redemption promise.
+                    {selectedFundingPack?.message ? " " + selectedFundingPack.message : ""}
+                    {selectedFundingPack?.currency ? " Currency: " + selectedFundingPack.currency + "." : ""}
+                  </p>
                 </div>
               </div>
 
@@ -847,15 +875,15 @@ function Account() {
                 type="button"
                 onClick={() => selectedFundingProvider && void startFundingCheckout(selectedFundingProvider)}
                 disabled={fundingBusy || fundingOptionsState.status !== "ready" ||
-                  !selectedFundingProvider ||
-                  !fundingOptionsState.providers.some((item) => item.id === selectedFundingProvider && item.enabled)}
+                  !selectedFundingProvider || !selectedFundingPackAvailable ||
+                  !selectedProviderOption?.enabled}
                 className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#3df1c2] px-4 py-3 text-sm font-semibold text-[#052a2a] transition hover:bg-[#74f9d7] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <CreditCard size={17} aria-hidden="true"/>
                 {fundingBusy ? "Opening secure checkout…" : "Continue to secure checkout"}
                 {!fundingBusy ? <ArrowUpRight size={15} aria-hidden="true"/> : null}
               </button>
-              <p className="mt-3 text-center text-[11px] leading-4 text-muted">The amount on each pack is the verified local-currency price for your detected country. enV reference value is 100 enV = US$1.00. Checkout is re-quoted by the server using a current daily FX snapshot; <a href="https://www.exchangerate-api.com" target="_blank" rel="noreferrer" className="underline underline-offset-2">rates by Exchange Rate API</a>.</p>
+              <p className="mt-3 text-center text-[11px] leading-4 text-muted">The amount above is the server-quoted local-currency price for your detected country. enV reference value is 100 enV = US$1.00. Checkout is re-quoted by the server using a current daily FX snapshot; <a href="https://www.exchangerate-api.com" target="_blank" rel="noreferrer" className="underline underline-offset-2">rates by Exchange Rate API</a>.</p>
               <p className="mt-2 text-center text-[11px] leading-4 text-muted">enV adds tokens only after the server verifies the provider’s payment confirmation. Do not close a payment until the provider shows its final status.</p>
             </section>
           </div>
