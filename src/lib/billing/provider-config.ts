@@ -69,9 +69,6 @@ export function resolvePaystackCountryConfiguration(
 
   // One Paystack integration key authenticates every transaction currency on the merchant account.
   const secret = env.PAYSTACK_SECRET_KEY?.trim() ?? "";
-  // Pricing is always derived from the single USD reference price and a fresh
-  // server-side FX snapshot; no country-specific per-token price is configured.
-  const pricePerTokenMinor = null;
   const currencyApproved = currency === "NGN"
     ? env.PAYSTACK_PROVIDER_APPROVED === "true"
     : env["PAYSTACK_PROVIDER_APPROVED_" + currency] === "true";
@@ -86,7 +83,6 @@ export function resolvePaystackCountryConfiguration(
     currency,
     international,
     secret,
-    pricePerTokenMinor,
     approved,
     // FX availability and pack-size eligibility are checked in the server quote step.
     enabled: approved && Boolean(secret),
