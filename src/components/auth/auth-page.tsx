@@ -9,6 +9,18 @@ import { authClient, authEnabled, emailPasswordEnabled, googleAuthEnabled, apple
 type AuthPageProps = { mode: "sign-in" | "sign-up" };
 type SocialProvider = "google" | "apple";
 
+function getSafeReturnTo(): string {
+  if (typeof window === "undefined") return "/";
+  const candidate = new URLSearchParams(window.location.search).get("returnTo") ?? "/";
+  if (!candidate.startsWith("/tools/") || candidate.startsWith("//") || candidate.includes("\\\\")) return "/";
+  try {
+    const url = new URL(candidate, window.location.origin);
+    return url.origin === window.location.origin ? `${url.pathname}${url.search}${url.hash}` : "/";
+  } catch {
+    return "/";
+  }
+}
+
 const greetingSets = {
   morning: ["Welcome back to enV", "You're back on enV this morning", "Good morning. Let's make today count."],
   afternoon: ["Welcome back to enV", "Good to have you back", "Ready for your next great idea?"],
@@ -68,12 +80,13 @@ export function AuthPage({ mode }: AuthPageProps) {
 
     setBusy(true);
     try {
+      const returnTo = getSafeReturnTo();
       const pendingReferral = isSignUp ? window.localStorage.getItem("env.pendingReferralCode") : null;
       const pendingSource = window.localStorage.getItem("env.pendingReferralSource") === "video" ? "video" : "referral";
       const pendingSignature = window.localStorage.getItem("env.pendingReferralSignature");
       const referralCallback = pendingReferral
         ? `/wallet?claimReferral=1&ref=${encodeURIComponent(pendingReferral)}&source=${pendingSource}${pendingSource === "video" && pendingSignature ? `&sig=${encodeURIComponent(pendingSignature)}` : ""}`
-        : "/";
+        : returnTo;
       if (isSignUp) {
         const result = await authClient.signUp.email({
           name: name.trim(),
@@ -89,10 +102,10 @@ export function AuthPage({ mode }: AuthPageProps) {
         const result = await authClient.signIn.email({
           email: email.trim(),
           password,
-          callbackURL: "/",
+          callbackURL: returnTo,
         });
         if (result.error) throw new Error(result.error.message || "Sign-in failed. Check your details.");
-        window.location.assign("/");
+        window.location.assign(returnTo);
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Authentication failed. Please try again.");
@@ -113,7 +126,7 @@ export function AuthPage({ mode }: AuthPageProps) {
         provider,
         callbackURL: isSignUp && window.localStorage.getItem("env.pendingReferralCode")
           ? `/wallet?claimReferral=1&ref=${encodeURIComponent(window.localStorage.getItem("env.pendingReferralCode")!)}&source=${window.localStorage.getItem("env.pendingReferralSource") === "video" ? "video" : "referral"}${window.localStorage.getItem("env.pendingReferralSource") === "video" && window.localStorage.getItem("env.pendingReferralSignature") ? `&sig=${encodeURIComponent(window.localStorage.getItem("env.pendingReferralSignature")!)}` : ""}`
-          : "/",
+          : getSafeReturnTo(),
         errorCallbackURL: isSignUp ? "/signup" : "/account",
         disableRedirect: true,
       });
