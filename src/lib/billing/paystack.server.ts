@@ -464,7 +464,19 @@ async function handlePaystackRefundWebhook(eventName: string, data: PaystackApiR
       code: "PURCHASE_MISMATCH", status: 409,
     });
   }
-  const search = new URLSearchParams({ reference: refundReference });
+  if (!/^\d{1,24}$/.test(refundReference)) {
+    throw Object.assign(new Error("The Paystack refund webhook did not include a valid provider refund ID."), {
+      code: "INVALID_REFUND_WEBHOOK", status: 503,
+    });
+  }
+  // Paystack's documented list endpoint filters by the original transaction ID.
+  // The refund webhook's refund_reference identifies the refund resource ID.
+  const search = new URLSearchParams({
+    transaction: intent.provider_transaction_id,
+    currency: intent.currency.toUpperCase(),
+    perPage: "100",
+    page: "1",
+  });
   const response = await fetch("https://api.paystack.co/refund?" + search.toString(), {
     headers: {
       Authorization: "Bearer " + requirePaystackVerificationSecret(process.env),
@@ -476,12 +488,12 @@ async function handlePaystackRefundWebhook(eventName: string, data: PaystackApiR
     status?: unknown; data?: unknown;
   } | null;
   if (!response.ok || payload?.status !== true || !Array.isArray(payload.data)) {
-    throw Object.assign(new Error("Paystack could not verify this refund by its provider reference."), {
+    throw Object.assign(new Error("Paystack could not verify this refund against the original transaction."), {
       code: "PAYSTACK_RECONCILIATION_UNAVAILABLE", status: 503,
     });
   }
   const refund = payload.data.find((item) => item && typeof item === "object" &&
-    !Array.isArray(item) && String((item as Record<string, unknown>).reference) === refundReference) as
+    !Array.isArray(item) && String((item as Record<string, unknown>).id) === refundReference) as
     PaystackApiRecord | undefined;
   if (!refund || String(refund.transaction) !== intent.provider_transaction_id ||
       String(refund.currency).toUpperCase() !== intent.currency.toUpperCase()) {
