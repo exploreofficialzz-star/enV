@@ -61,6 +61,26 @@ function createServiceWorkerHarness(fetchImpl) {
   return { listeners, caches };
 }
 
+test("activation removes previous-version homepage caches so stale content cannot persist after release", async () => {
+  const harness = createServiceWorkerHarness(async () => new Response("<!doctype html><title>fresh home</title>", {
+    status: 200,
+    headers: { "content-type": "text/html; charset=utf-8" },
+  }));
+  await harness.caches.open("env-web-shell-v2");
+  await harness.caches.open("env-web-navigation-v2");
+  await harness.caches.open("env-web-shell-v1");
+  let activationPromise;
+  harness.listeners.get("activate")({
+    waitUntil(value) { activationPromise = value; },
+  });
+  await activationPromise;
+  const cacheNames = await harness.caches.keys();
+  assert.ok(cacheNames.includes("env-web-navigation-v3"));
+  assert.ok(!cacheNames.includes("env-web-shell-v2"));
+  assert.ok(!cacheNames.includes("env-web-navigation-v2"));
+  assert.ok(!cacheNames.includes("env-web-shell-v1"));
+});
+
 test("hard refresh returns the cached public page before the background revalidation completes", async () => {
   let finishNetwork;
   let networkStarted = false;
@@ -76,7 +96,7 @@ test("hard refresh returns the cached public page before the background revalida
     mode: "navigate",
     url: "https://env-cache.test/tools/design/example",
   };
-  const navigationCache = await harness.caches.open("env-web-navigation-v2");
+  const navigationCache = await harness.caches.open("env-web-navigation-v3");
   await navigationCache.put(request, new Response("cached page", {
     status: 200,
     headers: { "content-type": "text/html; charset=utf-8" },
@@ -136,7 +156,7 @@ test("private and query-bearing navigations do not enter the shared page cache",
     await Promise.all(waits);
   }
 
-  const cache = await harness.caches.open("env-web-navigation-v2");
+  const cache = await harness.caches.open("env-web-navigation-v3");
   assert.equal((await cache.keys()).length, 0);
   assert.equal(networkCalls.length, 2);
 });
