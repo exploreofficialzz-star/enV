@@ -91,7 +91,7 @@ export default defineHandler(async (event) => {
   }
 
   const provider = providerOption?.id;
-  if (!provider || !providerOption.enabled) {
+  if (!providerOption || !providerOption.enabled || !provider) {
     return jsonResponse({
       ok: false,
       error: "PAYMENT_METHOD_NOT_AVAILABLE_FOR_COUNTRY",
