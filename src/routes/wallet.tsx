@@ -467,8 +467,7 @@ function Account() {
       setFundingFeedback({ kind: "error", message: "Enter at least US$1.00. Amounts can have up to two decimal places." });
       return;
     }
-    if (fundingOptionsState.status !== "ready" ||
-        fundingOptionsState.status !== "ready" || !fundingOptionsState.methods[method]) {
+    if (fundingOptionsState.status !== "ready" || !fundingOptionsState.methods[method]) {
       setFundingFeedback({ kind: "error", message: "This payment method is not available for your detected country yet. No payment was taken." });
       return;
     }
@@ -487,22 +486,17 @@ function Account() {
       });
       const payload = await response.json().catch(() => null) as {
         ok?: boolean;
-        data?: { authorizationUrl?: string; provider?: string; paymentMethod?: string };
+        data?: { authorizationUrl?: string; paymentMethod?: string };
         message?: string;
       } | null;
-      const provider = payload?.data?.provider;
-      const correctProvider = method === "more"
-        ? provider === "cryptomus"
-        : provider === "paystack" || provider === "flutterwave";
-      const expectedHost = provider === "paystack"
-        ? "checkout.paystack.com"
-        : provider === "flutterwave"
-          ? "checkout.flutterwave.com"
-          : provider === "cryptomus" ? "pay.cryptomus.com" : "";
       let checkout: URL | null = null;
       try { if (payload?.data?.authorizationUrl) checkout = new URL(payload.data.authorizationUrl); } catch { checkout = null; }
-      if (!response.ok || !payload?.ok || !correctProvider || payload.data?.paymentMethod !== method ||
-          !checkout || checkout.protocol !== "https:" || checkout.hostname !== expectedHost) {
+      const allowedCheckoutHost = checkout?.protocol === "https:" && (
+        method === "more"
+          ? checkout.hostname === "pay.cryptomus.com"
+          : checkout.hostname === "checkout.paystack.com" || checkout.hostname === "checkout.flutterwave.com"
+      );
+      if (!response.ok || !payload?.ok || payload.data?.paymentMethod !== method || !allowedCheckoutHost) {
         throw new Error(payload?.message ?? "Secure checkout could not be opened. No tokens were added.");
       }
       window.location.assign(checkout.href);
