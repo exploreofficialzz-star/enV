@@ -1,6 +1,8 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { getSql } from "../db";
-import { readWallet, creditVerifiedPurchase } from "./ledger.server";
+import {
+  readWallet, creditVerifiedPurchase, reconcileVerifiedRefund, reconcileVerifiedDispute,
+} from "./ledger.server";
 import { requirePaystackVerificationSecret, resolvePaystackCountryConfiguration } from "./provider-config";
 import { readBoundedBytes } from "./bounded-json.server";
 import { getCountryPaymentProfile, normalizeCountryCode } from "./country-routing";
@@ -368,6 +370,230 @@ export async function verifyAndCreditPaystackReference(reference: string) {
   });
 }
 
+type PaystackApiRecord = Record<string, unknown>;
+
+async function fetchPaystackApiRecord(path: string): Promise<PaystackApiRecord> {
+  const verificationSecret = requirePaystackVerificationSecret(process.env);
+  const response = await fetch("https://api.paystack.co" + path, {
+    headers: { Authorization: "Bearer " + verificationSecret, Accept: "application/json" },
+    signal: AbortSignal.timeout(12_000),
+  });
+  const payload = await response.json().catch(() => null) as {
+    status?: unknown; message?: unknown; data?: unknown;
+  } | null;
+  if (!response.ok || payload?.status !== true) {
+    throw Object.assign(new Error("Paystack could not verify the refund or dispute record."), {
+      code: "PAYSTACK_RECONCILIATION_UNAVAILABLE", status: 503,
+    });
+  }
+  const data = payload.data;
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw Object.assign(new Error("Paystack returned an invalid refund or dispute record."), {
+      code: "PAYSTACK_RECONCILIATION_UNAVAILABLE", status: 503,
+    });
+  }
+  return data as PaystackApiRecord;
+}
+
+function asPaystackId(value: unknown): string | null {
+  if (typeof value === "string" && /^[A-Za-z0-9_-]{1,160}$/.test(value)) return value;
+  if (typeof value === "number" && Number.isSafeInteger(value) && value > 0) return String(value);
+  return null;
+}
+
+function paystackRefundStatus(value: unknown): "pending" | "processing" | "needs_attention" | "failed" | "completed" {
+  const status = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (status === "processed") return "completed";
+  if (status === "failed") return "failed";
+  if (status === "needs-attention" || status === "needs_attention") return "needs_attention";
+  if (status === "processing") return "processing";
+  return "pending";
+}
+
+function paystackDisputeStatus(
+  value: unknown,
+  resolutionValue: unknown,
+): "open" | "accepted" | "declined" | "review_required" | "won" | "lost" {
+  const status = typeof value === "string" ? value.trim().toLowerCase() : "";
+  const resolution = typeof resolutionValue === "string" ? resolutionValue.trim().toLowerCase() : "";
+  if (status === "resolved") {
+    if (resolution === "merchant-accepted") return "lost";
+    if (resolution === "declined") return "won";
+    return "review_required";
+  }
+  if (status === "awaiting-merchant-feedback") return "open";
+  if (status === "awaiting-bank-feedback" || status === "pending") {
+    if (resolution === "merchant-accepted") return "accepted";
+    if (resolution === "declined") return "declined";
+    return "review_required";
+  }
+  return "review_required";
+}
+
+async function handlePaystackRefundWebhook(eventName: string, data: PaystackApiRecord) {
+  const transactionReference = typeof data.transaction_reference === "string"
+    ? data.transaction_reference : "";
+  if (!/^[a-f0-9-]{36}$/i.test(transactionReference)) {
+    throw Object.assign(new Error("The Paystack refund event is missing its enV purchase reference."), {
+      code: "INVALID_REFUND_WEBHOOK", status: 400,
+    });
+  }
+  const refundReference = asPaystackId(data.refund_reference ?? data.reference);
+  // Paystack intentionally sends a null refund_reference for the first pending event.
+  // There is no stable refund identity yet, so acknowledge the pending notification
+  // without recording a synthetic ID or touching the wallet.
+  if (!refundReference && eventName === "refund.pending") {
+    return { status: "pending" as const, waitingForProviderReference: true };
+  }
+  if (!refundReference) {
+    throw Object.assign(new Error("The Paystack refund event does not include its final refund reference."), {
+      code: "INVALID_REFUND_WEBHOOK", status: 503,
+    });
+  }
+  const sql = await getSql();
+  const intents = await sql.query<{
+    id: string; provider_transaction_id: string | null; amount_minor: number | string; currency: string; status: string;
+  }>(
+    `select id, provider_transaction_id, amount_minor, currency, status
+       from billing_purchase_intents where id = $1 and provider = 'paystack' limit 1`,
+    [transactionReference],
+  );
+  const intent = intents[0];
+  if (!intent || !intent.provider_transaction_id) {
+    throw Object.assign(new Error("The Paystack refund does not match a verified enV purchase."), {
+      code: "PURCHASE_MISMATCH", status: 409,
+    });
+  }
+  const search = new URLSearchParams({ reference: refundReference });
+  const response = await fetch("https://api.paystack.co/refund?" + search.toString(), {
+    headers: {
+      Authorization: "Bearer " + requirePaystackVerificationSecret(process.env),
+      Accept: "application/json",
+    },
+    signal: AbortSignal.timeout(12_000),
+  });
+  const payload = await response.json().catch(() => null) as {
+    status?: unknown; data?: unknown;
+  } | null;
+  if (!response.ok || payload?.status !== true || !Array.isArray(payload.data)) {
+    throw Object.assign(new Error("Paystack could not verify this refund by its provider reference."), {
+      code: "PAYSTACK_RECONCILIATION_UNAVAILABLE", status: 503,
+    });
+  }
+  const refund = payload.data.find((item) => item && typeof item === "object" &&
+    !Array.isArray(item) && String((item as Record<string, unknown>).reference) === refundReference) as
+    PaystackApiRecord | undefined;
+  if (!refund || String(refund.transaction) !== intent.provider_transaction_id ||
+      String(refund.currency).toUpperCase() !== intent.currency.toUpperCase()) {
+    throw Object.assign(new Error("The Paystack refund does not match the stored payment transaction or currency."), {
+      code: "REFUND_PROVIDER_MISMATCH", status: 409,
+    });
+  }
+  const amountMinor = typeof refund.amount === "number" ? refund.amount
+    : typeof refund.amount === "string" && /^\d+$/.test(refund.amount) ? Number(refund.amount) : NaN;
+  const webhookAmount = typeof data.amount === "number" ? data.amount
+    : typeof data.amount === "string" && /^\d+$/.test(data.amount) ? Number(data.amount) : NaN;
+  if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0 ||
+      amountMinor > Number(intent.amount_minor) ||
+      (Number.isSafeInteger(webhookAmount) && webhookAmount !== amountMinor)) {
+    throw Object.assign(new Error("The verified Paystack refund amount is invalid or mismatched."), {
+      code: "REFUND_PROVIDER_MISMATCH", status: 409,
+    });
+  }
+  const status = paystackRefundStatus(refund.status);
+  const canonical = JSON.stringify({
+    provider: "paystack", eventName, refundReference, transactionReference,
+    transactionId: intent.provider_transaction_id, amountMinor,
+    currency: intent.currency.toUpperCase(), status: refund.status,
+  });
+  const result = await reconcileVerifiedRefund({
+    provider: "paystack",
+    providerRefundId: refundReference,
+    purchaseIntentId: intent.id,
+    amountMinor,
+    currency: intent.currency,
+    status,
+    payloadDigest: createHash("sha256").update(canonical).digest("hex"),
+    providerMetadata: {
+      providerStatus: refund.status,
+      transactionId: intent.provider_transaction_id,
+      transactionReference,
+      processor: refund.processor ?? data.processor ?? null,
+      refundedAt: refund.refunded_at ?? null,
+    },
+  });
+  return { event: eventName, refundReference, ...result };
+}
+
+async function handlePaystackDisputeWebhook(eventName: string, data: PaystackApiRecord) {
+  const disputeId = asPaystackId(data.id);
+  if (!disputeId) {
+    throw Object.assign(new Error("The Paystack dispute event does not include a valid dispute ID."), {
+      code: "INVALID_DISPUTE_WEBHOOK", status: 400,
+    });
+  }
+  const dispute = await fetchPaystackApiRecord("/dispute/" + encodeURIComponent(disputeId));
+  const returnedId = asPaystackId(dispute.id);
+  const transaction = dispute.transaction && typeof dispute.transaction === "object" &&
+    !Array.isArray(dispute.transaction) ? dispute.transaction as PaystackApiRecord : null;
+  const transactionId = transaction ? asPaystackId(transaction.id) : null;
+  const transactionReference = transaction && typeof transaction.reference === "string"
+    ? transaction.reference : "";
+  if (returnedId !== disputeId || !transaction || !transactionId ||
+      !/^[a-f0-9-]{36}$/i.test(transactionReference)) {
+    throw Object.assign(new Error("The Paystack dispute could not be matched to its original transaction."), {
+      code: "DISPUTE_PROVIDER_MISMATCH", status: 409,
+    });
+  }
+  const sql = await getSql();
+  const intents = await sql.query<{
+    id: string; provider_transaction_id: string | null; amount_minor: number | string; currency: string;
+  }>(
+    `select id, provider_transaction_id, amount_minor, currency
+       from billing_purchase_intents where id = $1 and provider = 'paystack' limit 1`,
+    [transactionReference],
+  );
+  const intent = intents[0];
+  if (!intent || intent.provider_transaction_id !== transactionId ||
+      String(transaction.currency).toUpperCase() !== intent.currency.toUpperCase() ||
+      Number(transaction.amount) !== Number(intent.amount_minor)) {
+    throw Object.assign(new Error("The Paystack dispute does not match the recorded transaction amount or currency."), {
+      code: "DISPUTE_PROVIDER_MISMATCH", status: 409,
+    });
+  }
+  const refundAmount = typeof dispute.refund_amount === "number" && Number.isSafeInteger(dispute.refund_amount) &&
+    dispute.refund_amount > 0 ? dispute.refund_amount : Number(transaction.amount);
+  if (!Number.isSafeInteger(refundAmount) || refundAmount <= 0 || refundAmount > Number(intent.amount_minor)) {
+    throw Object.assign(new Error("The Paystack dispute refund amount is invalid."), {
+      code: "DISPUTE_PROVIDER_MISMATCH", status: 409,
+    });
+  }
+  const status = paystackDisputeStatus(dispute.status, dispute.resolution);
+  const canonical = JSON.stringify({
+    provider: "paystack", eventName, disputeId, transactionReference, transactionId,
+    amountMinor: refundAmount, currency: intent.currency.toUpperCase(),
+    status: dispute.status, resolution: dispute.resolution ?? null,
+  });
+  const result = await reconcileVerifiedDispute({
+    provider: "paystack",
+    providerDisputeId: disputeId,
+    purchaseIntentId: intent.id,
+    amountMinor: refundAmount,
+    currency: intent.currency,
+    status,
+    payloadDigest: createHash("sha256").update(canonical).digest("hex"),
+    providerMetadata: {
+      providerStatus: dispute.status,
+      providerResolution: dispute.resolution ?? null,
+      transactionId,
+      transactionReference,
+      eventName,
+      resolvedAt: dispute.resolvedAt ?? null,
+    },
+  });
+  return { event: eventName, disputeId, ...result };
+}
+
 export async function handlePaystackWebhook(request: Request) {
   // Webhooks must remain verifiable during a checkout kill switch so settled
   // payments can be reconciled and no customer payment is silently stranded.
@@ -383,30 +609,17 @@ export async function handlePaystackWebhook(request: Request) {
       !timingSafeEqual(Buffer.from(signature, "hex"), Buffer.from(expected, "hex"))) {
     throw Object.assign(new Error("The payment-provider signature is invalid."), { code: "INVALID_WEBHOOK_SIGNATURE", status: 401 });
   }
-  let body: { event?: unknown; data?: { reference?: unknown } };
-  try { body = JSON.parse(raw) as { event?: unknown; data?: { reference?: unknown } }; }
+  let body: { event?: unknown; data?: unknown };
+  try { body = JSON.parse(raw) as { event?: unknown; data?: unknown }; }
   catch { throw Object.assign(new Error("The webhook payload is invalid."), { code: "INVALID_WEBHOOK", status: 400 }); }
-  // Do not acknowledge refund/dispute events as handled while wallet reversals are
-  // still unsupported. A non-2xx response keeps delivery visible for provider retry.
-  const reconciliationEvents = [
-    "charge.dispute.create",
-    "charge.dispute.remind",
-    "charge.dispute.resolve",
-    "refund.pending",
-    "refund.processing",
-    "refund.needs-attention",
-    "refund.failed",
-    "refund.processed",
-  ];
-  if (typeof body.event === "string" && reconciliationEvents.includes(body.event)) {
-    throw Object.assign(new Error("A refund or dispute callback requires manual wallet reconciliation; no wallet balance was changed."), {
-      code: "REFUND_DISPUTE_RECONCILIATION_REQUIRED",
-      status: 503,
-    });
-  }
-  if (body.event !== "charge.success") return { ignored: true };
-  if (typeof body.data?.reference !== "string") {
+  const eventName = typeof body.event === "string" ? body.event : "";
+  const data = body.data && typeof body.data === "object" && !Array.isArray(body.data)
+    ? body.data as PaystackApiRecord : {};
+  if (eventName.startsWith("refund.")) return handlePaystackRefundWebhook(eventName, data);
+  if (eventName.startsWith("charge.dispute.")) return handlePaystackDisputeWebhook(eventName, data);
+  if (eventName !== "charge.success") return { ignored: true };
+  if (typeof data.reference !== "string") {
     throw Object.assign(new Error("The payment event did not include a reference."), { code: "INVALID_WEBHOOK", status: 400 });
   }
-  return verifyAndCreditPaystackReference(body.data.reference);
+  return verifyAndCreditPaystackReference(data.reference);
 }
