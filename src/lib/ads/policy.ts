@@ -34,7 +34,7 @@ export type AdEligibleTool = {
 const TOOL_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,119}$/;
 const RESTRICTED_DISCLAIMERS = new Set(["health", "finance", "earnings"]);
 const RESTRICTED_CATEGORIES = new Set(["health", "finance", "earnings", "fitness", "personal"]);
-const ADSTERRA_EXCLUDED_CATEGORIES = new Set(["ai", "developer", "accessibility", "lab", "labs"]);
+const ADSTERRA_EXCLUDED_CATEGORIES = new Set(["ai", "lab", "labs", "studio", "studios"]);
 const ADSTERRA_EXCLUDED_CONCEPTS = /\b(?:studio|studios|lab|labs|laboratory|laboratories|sandbox|ai|artificial intelligence)\b/i;
 const OFFLINE_PROFILE_IDS = new Set(
   offlineEligibleTools.profiles
@@ -84,14 +84,14 @@ function isEligibleHybridToolRecord(toolId: string, tool: AdEligibleTool): boole
 }
 
 /**
- * Adsterra qualification is deliberately separate from the hybrid offline-wallet
- * allowlist. It covers suitable active local tools across categories, but never
- * enrolls them in offline billing. Studio, AI and Lab/Sandbox experiences are
- * excluded using canonical category plus tool identity/metadata.
+ * Adsterra qualification applies to active ordinary Web tool pages across categories.
+ * It is independent of account state, backend/local execution and offline-wallet
+ * metering. Studio, AI, Lab/Sandbox and sensitive-topic experiences remain excluded.
  */
 export function isAdsterraQualifiedTool(tool: AdEligibleTool): boolean {
   const category = tool.category.toLowerCase();
   const descriptiveIdentity = [
+    category,
     tool.id,
     tool.name ?? "",
     tool.subcategory ?? "",
@@ -100,16 +100,12 @@ export function isAdsterraQualifiedTool(tool: AdEligibleTool): boolean {
     ...(tool.keywords ?? []),
   ].join(" ").replace(/[-_]+/g, " ");
   return tool.status === "active" &&
-    tool.clientSide === true &&
-    !tool.requiresBackend &&
-    !tool.requiresAuth &&
     !ADSTERRA_EXCLUDED_CATEGORIES.has(category) &&
     !RESTRICTED_CATEGORIES.has(category) &&
     !tool.id.startsWith("finance-") &&
     !(tool.disclaimer && RESTRICTED_DISCLAIMERS.has(tool.disclaimer.toLowerCase())) &&
     tool.engine.type.toLowerCase() !== "ai" &&
-    !ADSTERRA_EXCLUDED_CONCEPTS.test(descriptiveIdentity) &&
-    classifyOfflineToolRecord(tool).execution === "device-local";
+    !ADSTERRA_EXCLUDED_CONCEPTS.test(descriptiveIdentity);
 }
 
 /** A selected hybrid tool must remain metered offline even while ad serving is disabled. */

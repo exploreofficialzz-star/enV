@@ -8,8 +8,6 @@ const rootRoute = read("src/routes/__root.tsx");
 const slot = read("src/components/tools/ad-slot.tsx");
 const adsterraWeb = read("src/components/ads/adsterra-ad.tsx");
 const adsterraConfig = read("src/lib/ads/adsterra.ts");
-const adsterraGuestGate = read("src/components/ads/adsterra-guest-access-gate.tsx");
-const authPage = read("src/components/auth/auth-page.tsx");
 const toolShell = read("src/components/tools/tool-shell.tsx");
 const webAdPrivacy = read("src/components/layout/ad-privacy-controls.tsx");
 const adsBrowser = read("src/lib/ads/browser.ts");
@@ -48,8 +46,9 @@ assert.match(toolShell, /!isFullscreen && adsterraAdsEnabled \? <AdsterraRespons
 assert.match(toolShell, /AdsterraBanner format="300x250"/, "Qualified tool pages must include the medium-rectangle banner.");
 assert.match(toolShell, /AdsterraToolPopunder/, "Qualified tool pages must be the only Popunder mount.");
 assert.match(toolShell, /isAdsterraQualifiedTool\(tool\)/, "Each placement must be limited to the shared Adsterra eligibility policy.");
-assert.match(toolShell, /!adsterraAuthPending && !adsterraAuthError && !adsterraUser && adsterraConsent === "granted"/, "Adsterra impressions and output Smartlinks must be limited to consenting guests, never signed-in users.");
-assert.match(toolShell, /<AdsterraGuestAccessGate toolName=\{tool\.name\}>/, "Qualified tools must gate guests on an explicit ad choice or account session.");
+assert.match(toolShell, /const adsterraAdsEnabled =\s*adsterraQualified && adsterraConsent === "granted"/, "Adsterra placements must depend on the saved advertising choice, not account state.");
+assert.doesNotMatch(toolShell, /useCurrentUserState|adsterraAuthPending|adsterraAuthError|adsterraUser|AdsterraGuestAccessGate/, "Tool access and ad rendering must not depend on an account check or guest access gate.");
+assert.match(toolShell, /<ToolExecutionTelemetryContext\.Provider value=\{executionTelemetry\}>\s*\{toolContent\}\s*<\/ToolExecutionTelemetryContext\.Provider>/, "Eligible tool content must render directly without an advertising access gate.");
 assert.match(toolShell, /<\/section>\s*\{!isFullscreen && adsterraAdsEnabled[\s\S]*?<AdsterraBanner format="300x250" \/>[\s\S]*?<AdsterraNativeBanner \/>[\s\S]*?\}\s*\{tool\.category !== "creators"/, "Lower Adsterra placements must work for every eligible category, including Creator tools.");
 assert.match(toolShell, /openAdsterraSmartlinkFromOutput/, "Output actions must trigger the publisher Smartlink from a direct click.");
 assert.ok(toolShell.includes("copy|download|export|save|output|result|calculate|convert|generate"), "Output triggers must include copy, download, export and common output-producing actions.");
@@ -69,14 +68,12 @@ assert.match(adsterraWeb, /attempts >= 4/, "Popunder retries must be bounded to 
 
 assert.match(slot, /isApplicationOnline\(\)/, "Ads must not be requested unless the application origin is reachable.");
 assert.match(shell, /!isFullscreen && adsterraAdsEnabled[\s\S]*?<AdsterraBanner format="300x250" \/>[\s\S]*?<AdsterraNativeBanner \/>[\s\S]*?<AdsterraToolPopunder \/>/, "Every Adsterra placement must remain outside fullscreen and inside qualified tool pages.");
-assert.match(adsterraGuestGate, /getAdsterraConsent\(\)[\s\S]*?setAdsterraConsent\("granted"\)[\s\S]*?Create free account[\s\S]*?Sign in/, "Guests must be able to explicitly allow ads or use account sign-up/sign-in.");
-assert.match(adsterraGuestGate, /if \(user \|\| consent === "granted"\)/, "Signed-in users and consenting guests can reach the eligible tool.");
-assert.match(authPage, /function getSafeReturnTo\(\)/, "The account flow must safely preserve the originating tool route.");
-assert.match(authPage, /callbackURL: returnTo/, "Email sign-in must return to the originating tool.");
-assert.match(adPolicy, /export function isAdsterraQualifiedTool[\s\S]*?classifyOfflineToolRecord\(tool\)\.execution === "device-local"/, "Adsterra eligibility must use active local tool capability without an offline-wallet allowlist requirement.");
+
+assert.match(adPolicy, /export function isAdsterraQualifiedTool[\s\S]*?ADSTERRA_EXCLUDED_CONCEPTS\.test\(descriptiveIdentity\)/, "Adsterra eligibility must cover active ordinary tool pages and exclude Studio, AI, Labs and Sandbox metadata.");
+assert.match(adPolicy, /new Set\(\["ai", "lab", "labs", "studio", "studios"\]\)/, "Developer and Accessibility categories must remain eligible; only explicit Studio, AI and Labs categories are excluded.");
 assert.match(adPolicy, /ADSTERRA_EXCLUDED_CATEGORIES[\s\S]*?ADSTERRA_EXCLUDED_CONCEPTS/, "Adsterra policy must exclude Studio, AI, Labs and Sandbox experiences.");
-assert.match(privacy, /guest who declines advertising must sign in or create an account/i, "Privacy copy must explain the signed-in path for guests who decline ads.");
-assert.match(cookieConsent, /Guests can use eligible ad-supported tools by allowing ads/, "Cookie preferences must describe guest consent and signed-in ad-free access.");
+assert.match(privacy, /Declining advertising prevents ad requests only; it never blocks access to an otherwise available tool or forces account creation/i, "Privacy copy must make clear that advertising consent never gates tool access.");
+assert.match(cookieConsent, /Your advertising choice only controls ad requests; it never affects whether you can use a tool/, "Cookie preferences must describe advertising consent as separate from tool access.");
 assert.match(shell, /!isFullscreen && import\.meta\.env\.VITE_ADSTERRA_ENABLED !== "true" \? <AdSlot tool=\{tool\} \/>/, "The Google fallback must remain tool-only when Adsterra is disabled.");
 
 assert.match(slot, /whenGooglePrivacyConsentDataReady/, "Web ad requests must wait for the CMP consent-data-ready callback.");
@@ -179,4 +176,4 @@ assert.match(iosPrivacy, /Advertising privacy options/, "iOS must surface advert
 assert.match(iosCalculator, /NativeToolAdSlot\(tool: tool\)/, "The native iOS tool surface must include its ad slot.");
 assert.match(iosCalculator, /NativeHybridAccessError\.offlineAllowanceRequired/, "iOS hybrid tools must block offline execution without a prepared allowance.");
 
-console.log("Ad-access checks PASS: cross-platform metered allowlist, guest online access, offline allowance gate, privacy controls and unchanged production billing lock.");
+console.log("Ad-access checks PASS: non-blocking tool access, category-wide Adsterra eligibility, explicit advertising preference, native privacy controls and unchanged offline billing.");

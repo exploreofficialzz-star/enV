@@ -80,7 +80,7 @@ test("only explicitly selected, active, public device-local tools can show an ad
 });
 
 
-test("Adsterra includes suitable local tools across categories without enrolling them in offline billing", () => {
+test("Adsterra includes active ordinary tools across categories without changing offline billing", () => {
   const communicationTool = {
     id: "meeting-agenda-builder",
     name: "Meeting Agenda Builder",
@@ -100,18 +100,41 @@ test("Adsterra includes suitable local tools across categories without enrolling
     category: "business",
     engine: { type: "business", op: "invoice-number" },
   });
+  const developerTool = eligibleTool({
+    id: "json-schema-validator",
+    name: "JSON Schema Validator",
+    category: "developer",
+    engine: { type: "custom", id: "json-schema-validator" },
+  });
+  const accessibilityTool = eligibleTool({
+    id: "contrast-checker",
+    name: "Color Contrast Checker",
+    category: "accessibility",
+    engine: { type: "custom", id: "contrast-checker" },
+  });
+  const backendTool = eligibleTool({
+    id: "video-metadata-inspector",
+    name: "Video Metadata Inspector",
+    category: "video",
+    clientSide: false,
+    requiresBackend: true,
+    requiresAuth: true,
+    engine: { type: "url-media", op: "inspect" },
+  });
   assert.equal(isAdsterraQualifiedTool(eligibleTool()), true);
   assert.equal(isAdsterraQualifiedTool(communicationTool), true);
   assert.equal(isAdsterraQualifiedTool(businessTool), true);
+  assert.equal(isAdsterraQualifiedTool(developerTool), true);
+  assert.equal(isAdsterraQualifiedTool(accessibilityTool), true);
+  assert.equal(isAdsterraQualifiedTool(backendTool), true, "Ads are page placements and must not depend on device-local execution or account state.");
   assert.equal(isHybridAccessToolId(communicationTool.id, goodEnvironment, communicationTool), false,
     "Ad eligibility must not silently enroll a tool in offline-wallet billing.");
 });
 
-test("Adsterra excludes Studio, AI, Lab/Sandbox and sensitive or non-local tools", () => {
+test("Adsterra excludes inactive, Studio, AI, Lab/Sandbox and sensitive tools", () => {
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ status: "beta" })), false);
-  assert.equal(isAdsterraQualifiedTool(eligibleTool({ requiresBackend: true })), false);
-  assert.equal(isAdsterraQualifiedTool(eligibleTool({ requiresAuth: true })), false);
-  assert.equal(isAdsterraQualifiedTool(eligibleTool({ clientSide: false })), false);
+  assert.equal(isAdsterraQualifiedTool(eligibleTool({ category: "studio" })), false);
+  assert.equal(isAdsterraQualifiedTool(eligibleTool({ category: "labs" })), false);
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ disclaimer: "health" })), false);
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ disclaimer: "finance" })), false);
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ category: "fitness" })), false);
@@ -120,10 +143,11 @@ test("Adsterra excludes Studio, AI, Lab/Sandbox and sensitive or non-local tools
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ category: "earnings" })), false);
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ category: "personal" })), false);
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ id: "finance-apr-calculator" })), false);
-  assert.equal(isAdsterraQualifiedTool(eligibleTool({ category: "developer" })), false);
-  assert.equal(isAdsterraQualifiedTool(eligibleTool({ category: "accessibility" })), false);
+  assert.equal(isAdsterraQualifiedTool(eligibleTool({ category: "developer" })), true);
+  assert.equal(isAdsterraQualifiedTool(eligibleTool({ category: "accessibility" })), true);
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ category: "ai" })), false);
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ engine: { type: "ai", op: "generate" } })), false);
+  assert.equal(isAdsterraQualifiedTool(eligibleTool({ tags: ["ai-assisted"] })), false);
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ name: "Invoice Studio" })), false);
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ tags: ["lab"] })), false);
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ keywords: ["sandbox", "training"] })), false);
