@@ -65,8 +65,32 @@ type RailProps = {
 
 /** Icon-only rail: left column on tablet and desktop, bottom bar on phones. */
 export function StudioRail({ open, active, onSelect }: RailProps) {
+  const rail = useRef<HTMLElement>(null);
+  const selectRef = useRef(onSelect);
+  selectRef.current = onSelect;
+
+  useEffect(() => {
+    const activateFromWindow = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const button = target.closest<HTMLButtonElement>(".wl-rail button[data-group]");
+      if (!button || !rail.current?.contains(button)) return;
+      const group = button.dataset.group;
+      if (!GROUPS.some((item) => item.id === group)) return;
+      const root = button.closest<HTMLElement>(".wl-studio");
+      root?.setAttribute("data-rail-last-event", "window-capture-click");
+      root?.setAttribute("data-rail-last-group", group ?? "missing");
+      selectRef.current(group as StudioGroupId);
+    };
+
+    // The canvas runtime can stop click propagation at document capture.
+    // Listen one phase earlier so the visible project rail remains usable.
+    window.addEventListener("click", activateFromWindow, true);
+    return () => window.removeEventListener("click", activateFromWindow, true);
+  }, []);
+
   return (
-    <nav className="wl-rail" aria-label="World Lab tools">
+    <nav ref={rail} className="wl-rail" aria-label="World Lab tools">
       {GROUPS.map(({ id, label, Icon }) => (
         <button
           key={id}
