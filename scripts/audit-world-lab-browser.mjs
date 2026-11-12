@@ -70,8 +70,15 @@ try{
         railLastEvent:root.getAttribute("data-rail-last-event"),
         railLastTarget:root.getAttribute("data-rail-last-target"),
         railLastButton:root.getAttribute("data-rail-last-button"),
-        railLastGroup:root.getAttribute("data-rail-last-group"),rail:describe(rail),
-        projectButton:[...root.querySelectorAll("button")].filter(node=>node.getAttribute("aria-label")==="Open project tools").map(describe),
+        railLastGroup:root.getAttribute("data-rail-last-group"),
+        railNativeEvent:root.getAttribute("data-rail-native-event"),
+        railNativeButton:root.getAttribute("data-rail-native-button"),
+        railNativeGroup:root.getAttribute("data-rail-native-group"),
+        rail:describe(rail),
+        projectButton:[...root.querySelectorAll("button")].filter(node=>node.getAttribute("aria-label")==="Open project tools").map(node=>({
+          ...describe(node),nativeBound:node.dataset.wlRailBound ?? null,
+          reactProps:Object.keys(node).filter(key=>key.startsWith("__reactProps$")||key.startsWith("__reactFiber$")).length
+        })),
         drawer:describe(drawer),
         drawerOpen:drawer?.getAttribute("data-open"),drawerBody:describe(drawer?.querySelector(".wl-drawer__body")),
         save:describe(save),groups:[...root.querySelectorAll(".wl-group")].map(node=>({
