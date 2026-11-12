@@ -5,9 +5,9 @@ import { getCustomerCountry } from "../../../../src/lib/billing/country-routing"
 import { isCustomerPaymentMethodAvailable } from "../../../../src/lib/billing/payment-methods";
 
 /**
- * Public funding options include server-calculated local pack amounts so the
- * wallet can show the real country price. Raw exchange-rate observations and
- * purchase quote metadata remain server-side; checkout independently re-quotes.
+ * Return only customer-visible payment methods and the detected country/currency.
+ * Provider identities, credentials and provider-specific messages never leave the server.
+ * Checkout independently re-resolves and re-quotes before initializing a payment.
  */
 function publicFundingOptions(funding: Awaited<ReturnType<typeof getFundingOptions>>) {
   // The browser receives customer-facing methods only. Gateway identity and
@@ -16,8 +16,6 @@ function publicFundingOptions(funding: Awaited<ReturnType<typeof getFundingOptio
   return {
     countryCode: funding.countryCode,
     currency: funding.currency,
-    enabled: funding.enabled,
-    message: funding.message,
     methods: {
       card: isCustomerPaymentMethodAvailable(providers, "card"),
       local: isCustomerPaymentMethodAvailable(providers, "local"),
