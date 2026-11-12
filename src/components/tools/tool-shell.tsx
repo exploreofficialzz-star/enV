@@ -23,7 +23,7 @@ import {
 } from "@/components/ads/adsterra-ad";
 import { isAdsterraQualifiedTool } from "@/lib/ads/policy";
 import { AdsterraGuestAccessGate } from "@/components/ads/adsterra-guest-access-gate";
-import { getAdsterraConsent, openAdsterraSmartlinkFromOutput } from "@/lib/ads/adsterra";
+import { ADSTERRA_CONSENT_STORAGE_KEY, getAdsterraConsent, openAdsterraSmartlinkFromOutput } from "@/lib/ads/adsterra";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import type { PublicCommunityFeed } from "@/lib/community/public-feed.functions";
 import { ToolExecutionTelemetryContext, type ToolExecutionTelemetry, type ToolExecutionOutcome } from "@/components/tools/tool-execution-context";
@@ -50,8 +50,15 @@ export function ToolShell({
   const [adsterraConsent, setAdsterraConsentState] = useState(getAdsterraConsent);
   useEffect(() => {
     const syncAdsterraConsent = () => setAdsterraConsentState(getAdsterraConsent());
+    const syncFromStorage = (event: StorageEvent) => {
+      if (event.key === null || event.key === ADSTERRA_CONSENT_STORAGE_KEY) syncAdsterraConsent();
+    };
     window.addEventListener("env:adsterra-consent-changed", syncAdsterraConsent);
-    return () => window.removeEventListener("env:adsterra-consent-changed", syncAdsterraConsent);
+    window.addEventListener("storage", syncFromStorage);
+    return () => {
+      window.removeEventListener("env:adsterra-consent-changed", syncAdsterraConsent);
+      window.removeEventListener("storage", syncFromStorage);
+    };
   }, []);
   const adsterraAdsEnabled =
     adsterraQualified && !adsterraAuthPending && !adsterraAuthError && !adsterraUser && adsterraConsent === "granted";
