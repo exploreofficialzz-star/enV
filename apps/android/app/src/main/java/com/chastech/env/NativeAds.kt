@@ -179,7 +179,7 @@ internal object NativeAdsPolicy {
             !tool.requiresAuth &&
             tool.category.lowercase() !in restrictedCategories &&
             !tool.id.startsWith("finance-") &&
-            tool.disclaimer?.lowercase() !in restrictedDisclaimers &&
+            (tool.disclaimer?.lowercase()?.let { it !in restrictedDisclaimers } ?: true) &&
             engineType != "ai" &&
             localExecution &&
             !remoteExecution &&
