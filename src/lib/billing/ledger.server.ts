@@ -756,6 +756,7 @@ export async function creditVerifiedPurchase(input: {
   paidAmountMinor: number;
   paidCurrency: string;
   payloadDigest: string;
+  providerMetadata?: Record<string, unknown>;
 }) {
   if (!Number.isSafeInteger(input.paidAmountMinor) || input.paidAmountMinor <= 0 ||
       !input.provider || input.provider.length > 80 || !input.providerEventId || input.providerEventId.length > 200 ||
@@ -819,9 +820,19 @@ export async function creditVerifiedPurchase(input: {
         JSON.stringify({ provider: input.provider, transactionId: input.providerTransactionId,
           purchasedSubunits: creditSubunits, recoveryDebtRepaidSubunits: creditAllocation.recoveredDebtSubunits })],
     );
+    const providerMetadata = JSON.stringify(input.providerMetadata ?? {});
+    if (providerMetadata.length > 4_096) {
+      throw new BillingError("PURCHASE_MISMATCH", "The verified provider metadata exceeds the allowed size.");
+    }
     await tx.query(
-      `update billing_purchase_intents set status = 'credited', provider_transaction_id = $2, credited_at = now(), updated_at = now() where id = $1`,
-      [intent.id, input.providerTransactionId],
+      `update billing_purchase_intents
+          set status = 'credited',
+              provider_transaction_id = $2,
+              provider_metadata = provider_metadata || $3::jsonb,
+              credited_at = now(),
+              updated_at = now()
+        where id = $1`,
+      [intent.id, input.providerTransactionId, providerMetadata],
     );
 
     // Referral rewards are granted only after the first verified paid conversion.
