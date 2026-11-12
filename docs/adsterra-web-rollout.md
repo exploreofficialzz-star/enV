@@ -12,7 +12,7 @@ Adsterra is restricted to qualified Web tool pages. Home, the All tools director
 | Qualified tool page | Popunder | Publisher script | Loads only after consent and same-origin reachability; may open a separate tab after an interaction |
 | Qualified tool output action | Smartlink | Publisher URL | Opens from the user's direct copy/download/export action, without delaying or gating the tool output |
 
-Each placement is labelled as an advertisement and is requested only when the production flag is enabled, the visitor has explicitly allowed advertising in the global Cookie preferences dialog, and the same-origin page is reachable. The same dialog holds the optional analytics and Adsterra advertising choices alongside always-active essential storage; there is no separate Adsterra preference screen. Visitors can reopen the dialog from the Privacy page. Declining advertising does not block tools. No advertising script is requested while offline.
+Each placement is labelled as an advertisement and is requested only when the production flag is enabled, the visitor has explicitly allowed advertising in the non-modal Cookie preferences section on the Privacy page, and the same-origin page is reachable. That section holds optional analytics and Adsterra advertising choices alongside always-active essential storage; there is no site-wide advertising popup or separate Adsterra preference screen. Visitors can return to Privacy to change their choice. Declining advertising does not block tools. No advertising script is requested while offline.
 
 ## Production boundaries
 
