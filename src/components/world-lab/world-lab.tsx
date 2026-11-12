@@ -312,21 +312,19 @@ export default function WorldLab() {
     const groups = new Set<StudioGroupId>(["project", "build", "experiments", "results"]);
     const activateRail = (event: Event) => {
       root.dataset.railLastEvent = event.type;
-      const path = event.composedPath();
-      const button = path.find((item): item is HTMLButtonElement =>
-        item instanceof HTMLButtonElement && item.matches(".wl-rail button[data-group]") && root.contains(item)
-      );
       const target = event.target;
-      if (!button && target instanceof Element) {
-        const candidate = target.closest<HTMLButtonElement>(".wl-rail button[data-group]");
-        if (candidate && root.contains(candidate)) {
-          root.dataset.railLastButton = candidate.outerHTML.slice(0, 300);
-        }
+      root.dataset.railLastTarget = target instanceof Element ? target.tagName : typeof target;
+      const button = target instanceof Element
+        ? target.closest<HTMLButtonElement>(".wl-rail button[data-group]")
+        : null;
+      if (!button) {
+        root.dataset.railLastButton = "not-matched";
+        return;
       }
-      if (!button) return;
+      root.dataset.railLastButton = button.getAttribute("aria-label") ?? button.outerHTML.slice(0, 120);
       const group = button.dataset.group as StudioGroupId | undefined;
       root.dataset.railLastGroup = group ?? "missing";
-      if (group && groups.has(group)) setStudioPanel(group);
+      if (root.contains(button) && group && groups.has(group)) setStudioPanel(group);
     };
     // Window capture runs before document/canvas handlers so scene input cannot swallow rail activation.
     window.addEventListener("click", activateRail, true);
