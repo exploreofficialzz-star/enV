@@ -70,24 +70,32 @@ export function StudioRail({ open, active, onSelect }: RailProps) {
   selectRef.current = onSelect;
 
   useLayoutEffect(() => {
+    const root = rail.current?.closest<HTMLElement>(".wl-studio");
+    root?.setAttribute("data-rail-document-listener", "true");
     const activateFromDocument = (event: Event) => {
+      root?.setAttribute("data-rail-document-event", event.type);
       const target = event.target;
-      if (!(target instanceof Element)) return;
+      if (!(target instanceof Element)) {
+        root?.setAttribute("data-rail-document-target", "non-element");
+        return;
+      }
+      root?.setAttribute("data-rail-document-target", target.tagName.toLowerCase());
       const button = target.closest<HTMLButtonElement>(".wl-rail button[data-group]");
+      root?.setAttribute("data-rail-document-button", button?.getAttribute("aria-label") ?? "no-match");
       if (!button || !rail.current?.contains(button)) return;
       const group = button.dataset.group;
+      root?.setAttribute("data-rail-document-group", group ?? "missing");
       if (GROUPS.some((item) => item.id === group)) {
         selectRef.current(group as StudioGroupId);
       }
     };
 
-    // Handle the rail before descendant/document bubbling handlers. The
-    // 3D viewport owns separate canvas input, but must never swallow navigation.
     document.addEventListener("pointerdown", activateFromDocument, true);
     document.addEventListener("click", activateFromDocument, true);
     return () => {
       document.removeEventListener("pointerdown", activateFromDocument, true);
       document.removeEventListener("click", activateFromDocument, true);
+      root?.removeAttribute("data-rail-document-listener");
     };
   }, []);
 
