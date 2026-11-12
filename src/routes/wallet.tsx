@@ -101,6 +101,14 @@ function tokenValueAmount(tokens: number): string {
   return "$" + (tokens * 0.01).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 }
 
+function countryDisplayName(countryCode: string): string {
+  try {
+    return new Intl.DisplayNames(undefined, { type: "region" }).of(countryCode) ?? countryCode;
+  } catch {
+    return countryCode;
+  }
+}
+
 function tokenReferenceValue(tokens: number): string {
   const amount = new Intl.NumberFormat(undefined, {
     style: "currency", currency: "USD", minimumFractionDigits: 3, maximumFractionDigits: 3,
@@ -761,7 +769,7 @@ function Account() {
                   <p className="mt-1 text-sm leading-5 text-muted">Choose a payment method and enter an amount.</p>
                   {fundingOptionsState.status === "ready" && fundingOptionsState.countryCode && fundingOptionsState.currency ? (
                     <p className="mt-1 text-[11px] text-muted">
-                      Options for {new Intl.DisplayNames(undefined, { type: "region" }).of(fundingOptionsState.countryCode) ?? fundingOptionsState.countryCode}
+                      Options for {countryDisplayName(fundingOptionsState.countryCode)}
                       {" · "}{fundingOptionsState.currency}
                     </p>
                   ) : null}
