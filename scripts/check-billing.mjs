@@ -209,7 +209,7 @@ assert.match(walletDashboard, /fundingOptionsState\.methods\[method\]/);
 assert.match(walletDashboard, /Options for/);
 assert.match(fundingOptionsRoute, /isCustomerPaymentMethodAvailable/);
 assert.match(paymentMethods, /parseUsdAmountToCents/);
-assert.match(paymentMethods, /selectFundingProvider/);
+assert.match(paymentMethods, /getFundingCandidates/);
 assert.match(walletDashboard, /checkout\.hostname !== expectedHost/);
 assert.match(pairNativePage, /api\/billing\/offline\/pairing/);
 assert.match(pairNativePage, /Generate pairing code/);
