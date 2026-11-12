@@ -476,7 +476,6 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
     }
 }
 
-@Composable
 private fun randomCrossCategoryTrendingTools(
     tools: List<com.chastech.env.data.ToolRecord>,
     limit: Int = 12,
@@ -503,6 +502,7 @@ private fun randomCrossCategoryTrendingTools(
     return selection
 }
 
+@Composable
 private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: List<String>, homeQuery: String, onQuery: (String) -> Unit, onSearch: (String) -> Unit, onTools: () -> Unit, onInformation: (String) -> Unit, darkMode: Boolean, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit, onAssistant: () -> Unit) {
     val screenWidth = LocalConfiguration.current.screenWidthDp
     val homeColumns = when { screenWidth >= 768 -> 3; screenWidth >= 640 -> 2; else -> 1 }
