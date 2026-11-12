@@ -305,6 +305,28 @@ export default function WorldLab() {
   const cadImportInput=useRef<HTMLInputElement>(null);
   const studioRef=useRef<HTMLDivElement>(null);
   const [studioPanel,setStudioPanel]=useState<StudioGroupId|null>(null);
+  useEffect(() => {
+    const root = studioRef.current;
+    if (!root) return;
+    root.dataset.railListener = "true";
+    const groups = new Set<StudioGroupId>(["project", "build", "experiments", "results"]);
+    const activateRail = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const button = target.closest<HTMLButtonElement>(".wl-rail button[data-group]");
+      if (!button || !root.contains(button)) return;
+      const group = button.dataset.group as StudioGroupId | undefined;
+      if (group && groups.has(group)) setStudioPanel(group);
+    };
+    // Capture before scene/canvas listeners; the rail is always a first-class control.
+    root.addEventListener("pointerdown", activateRail, true);
+    root.addEventListener("click", activateRail, true);
+    return () => {
+      root.removeEventListener("pointerdown", activateRail, true);
+      root.removeEventListener("click", activateRail, true);
+      delete root.dataset.railListener;
+    };
+  }, []);
   const [lookState,setLookState]=useState({heading:0,pitch:0});
   useEffect(()=>{if(studioPanel)scrollToStudioGroup(studioRef.current,studioPanel);},[studioPanel]);
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
