@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, FlaskConical, FolderOpen, Hammer, Info, LineChart, X } from "lucide-react";
 
@@ -69,8 +69,8 @@ export function StudioRail({ open, active, onSelect }: RailProps) {
   const selectRef = useRef(onSelect);
   selectRef.current = onSelect;
 
-  useEffect(() => {
-    const activateFromWindow = (event: MouseEvent) => {
+  useLayoutEffect(() => {
+    const activateFromWindow = (event: Event) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
       const button = target.closest<HTMLButtonElement>(".wl-rail button[data-group]");
@@ -78,15 +78,23 @@ export function StudioRail({ open, active, onSelect }: RailProps) {
       const group = button.dataset.group;
       if (!GROUPS.some((item) => item.id === group)) return;
       const root = button.closest<HTMLElement>(".wl-studio");
-      root?.setAttribute("data-rail-last-event", "window-capture-click");
+      root?.setAttribute("data-rail-last-event", event.type);
       root?.setAttribute("data-rail-last-group", group ?? "missing");
       selectRef.current(group as StudioGroupId);
     };
 
-    // The canvas runtime can stop click propagation at document capture.
-    // Listen one phase earlier so the visible project rail remains usable.
+    const root = rail.current?.closest<HTMLElement>(".wl-studio");
+    root?.setAttribute("data-rail-listener", "true");
+    // Open from pointer-down so a world-canvas/document click interceptor
+    // cannot swallow the rail activation. The click path also preserves
+    // keyboard activation for Enter and Space.
+    window.addEventListener("pointerdown", activateFromWindow, true);
     window.addEventListener("click", activateFromWindow, true);
-    return () => window.removeEventListener("click", activateFromWindow, true);
+    return () => {
+      window.removeEventListener("pointerdown", activateFromWindow, true);
+      window.removeEventListener("click", activateFromWindow, true);
+      root?.removeAttribute("data-rail-listener");
+    };
   }, []);
 
   return (
