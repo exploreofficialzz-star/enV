@@ -162,7 +162,7 @@ test("public discussion index and per-tool pages expose public comments for sear
   assert.match(toolRoute, /return \{ communityFeed: null \}/);
   assert.doesNotMatch(toolRoute, /loadPublicCommunityToolFeed/);
   assert.match(toolRoute, /initialCommunityFeed=\{communityFeed\}/);
-  assert.match(web, /fetch\("\\/api\\/community\\?toolId=/);
+  assert.match(web, /fetch\("\/api\/community\?toolId=/);
   assert.match(web, /discussionHref/);
   assert.match(footer, /to: "\/community", label: "Public discussions"/);
   assert.match(seoGenerator, /"\/community"/);
