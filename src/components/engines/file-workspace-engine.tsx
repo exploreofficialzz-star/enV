@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type ChangeEvent } from "react";
 import { BlobWriter, ZipWriter } from "@zip.js/zip.js";
 import { Archive, Check, Copy, FileSearch, FolderOpen, Search, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,6 @@ type FileSystemPickerWindow = Window & {
   showDirectoryPicker?: (options?: { mode?: "read" | "readwrite" }) => Promise<DirectoryLike>;
 };
 type CompareRow = { path: string; status: "added" | "removed" | "changed" | "same" | "unverified" };
-type DuplicateGroup = { digest: string; files: File[] };
 
 const MAX_BROWSER_HASH_BYTES = 64 * 1024 * 1024;
 const MAX_TEXT_SEARCH_BYTES = 8 * 1024 * 1024;
@@ -37,9 +36,11 @@ function fileGroup(file: File): string {
 }
 
 function safeSegment(value: string): string {
-  return value.replace(/[\\u0000-\\u001f<>:"/\\\\|?*]/g, "_").replace(/[. ]+$/g, "").trim() || "file";
+  return Array.from(value, (character) => {
+    const code = character.charCodeAt(0);
+    return code < 32 || code === 92 || '<>:"/|?*'.includes(character) ? "_" : character;
+  }).join("").replace(/[. ]+$/g, "").trim() || "file";
 }
-
 function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -121,7 +122,9 @@ export function FileWorkspaceEngine({ toolId }: { toolId: string }) {
   const [report, setReport] = useState<string[]>([]);
   const [compareRows, setCompareRows] = useState<CompareRow[]>([]);
   const folderInput = useRef<HTMLInputElement>(null);
+  const rightFolderInput = useRef<HTMLInputElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const rightFileInput = useRef<HTMLInputElement>(null);
 
   const totalBytes = useMemo(() => files.reduce((sum, file) => sum + file.size, 0), [files]);
   const title = ({
@@ -154,7 +157,7 @@ export function FileWorkspaceEngine({ toolId }: { toolId: string }) {
     fileInput.current?.click();
   }
 
-  async function chooseFolder() {
+  async function chooseFolder(side: "left" | "right" = "left") {
     resetResult();
     const picker = (window as FileSystemPickerWindow).showDirectoryPicker;
     if (picker) {
@@ -162,7 +165,7 @@ export function FileWorkspaceEngine({ toolId }: { toolId: string }) {
         setBusy(true);
         const directory = await picker({ mode: "read" });
         const found = await walkDirectory(directory);
-        setFiles(found);
+        if (side === "right") setRightFiles(found); else setFiles(found);
         setStatus(found.length + " files indexed locally.");
       } catch (cause) {
         if (!(cause instanceof DOMException && cause.name === "AbortError")) {
@@ -173,14 +176,14 @@ export function FileWorkspaceEngine({ toolId }: { toolId: string }) {
       }
       return;
     }
-    const input = folderInput.current;
+    const input = side === "right" ? rightFolderInput.current : folderInput.current;
     if (input) {
       input.setAttribute("webkitdirectory", "");
       input.click();
     }
   }
 
-  function receiveFiles(event: React.ChangeEvent<HTMLInputElement>, side: "left" | "right" = "left") {
+  function receiveFiles(event: ChangeEvent<HTMLInputElement>, side: "left" | "right" = "left") {
     const selected = inputFiles(event);
     if (side === "right") setRightFiles(selected);
     else setFiles(selected);
@@ -305,9 +308,9 @@ export function FileWorkspaceEngine({ toolId }: { toolId: string }) {
         const file = files[index];
         const path = relativePath(file);
         if (path.toLocaleLowerCase().includes(needle)) rows.push(path + " · filename match");
-        const textLike = /\\.(txt|md|csv|tsv|json|xml|ya?ml|html?|css|js|ts|sql|log|ini|toml|sh)$/i.test(file.name) || file.type.startsWith("text/");
+        const textLike = /\.(txt|md|csv|tsv|json|xml|ya?ml|html?|css|js|ts|sql|log|ini|toml|sh)$/i.test(file.name) || file.type.startsWith("text/");
         if (textLike && file.size <= MAX_TEXT_SEARCH_BYTES) {
-          const text = (await file.text()).split(/\\r?\\n/);
+          const text = (await file.text()).split(/\r?\n/);
           text.forEach((line, lineIndex) => {
             if (line.toLocaleLowerCase().includes(needle)) rows.push(path + ":" + (lineIndex + 1) + " · " + line.trim().slice(0, 240));
           });
@@ -380,18 +383,20 @@ export function FileWorkspaceEngine({ toolId }: { toolId: string }) {
         </div>
       </header>
 
-      <input ref={fileInput} type="file" multiple className="hidden" onChange={(event) => receiveFiles(event)} />
-      <input ref={folderInput} type="file" multiple className="hidden" onChange={(event) => receiveFiles(event)} />
-      {isCompare ? (
-        <div className="grid gap-3 sm:grid-cols-2">
+      <input ref={fileInput} type="file" multiple className="hidden" onChange={(event) => receiveFiles(event, "left")} />
+      <input ref={rightFileInput} type="file" multiple className="hidden" onChange={(event) => receiveFiles(event, "right")} />
+      <input ref={folderInput} type="file" multiple className="hidden" onChange={(event) => receiveFiles(event, "left")} />
+      <input ref={rightFolderInput} type="file" multiple className="hidden" onChange={(event) => receiveFiles(event, "right")} />
           <div className="rounded-xl border border-border p-3">
             <p className="text-sm font-medium">First folder or file set</p>
-            <Button className="mt-3 w-full" variant="outline" onClick={chooseFiles}>Choose first set</Button>
+            <Button className="mt-3 w-full" variant="outline" onClick={() => void chooseFolder("left")}>Choose first folder</Button>
+            <Button className="mt-2 w-full" size="sm" variant="ghost" onClick={chooseFiles}>Or choose files</Button>
             <p className="mt-2 text-xs text-subtle">{files.length} selected</p>
           </div>
           <div className="rounded-xl border border-border p-3">
             <p className="text-sm font-medium">Second folder or file set</p>
-            <Button className="mt-3 w-full" variant="outline" onClick={() => { resetResult(); fileInput.current?.click(); }}>Choose second set</Button>
+            <Button className="mt-3 w-full" variant="outline" onClick={() => void chooseFolder("right")}>Choose second folder</Button>
+            <Button className="mt-2 w-full" size="sm" variant="ghost" onClick={() => { resetResult(); rightFileInput.current?.click(); }}>Or choose files</Button>
             <p className="mt-2 text-xs text-subtle">{rightFiles.length} selected</p>
           </div>
         </div>
