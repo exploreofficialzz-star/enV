@@ -39,6 +39,8 @@ type FundingMethods = Record<CustomerPaymentMethod, boolean>;
 type FundingOptionsState = {
   status: "loading" | "ready" | "unavailable";
   methods: FundingMethods;
+  countryCode?: string | null;
+  currency?: string | null;
   message?: string;
 };
 type RewardsData = {
@@ -200,7 +202,7 @@ function Account() {
       .then(async (response) => {
         const payload = await response.json().catch(() => null) as {
           ok?: boolean;
-          data?: { methods?: Partial<FundingMethods> };
+          data?: { methods?: Partial<FundingMethods>; countryCode?: string | null; currency?: string | null };
           message?: string;
         } | null;
         const methods = payload?.data?.methods;
@@ -211,7 +213,7 @@ function Account() {
         }
         setFundingOptionsState({ status: "ready", methods: {
           card: methods.card, local: methods.local, more: methods.more,
-        } });
+        }, countryCode: payload.data?.countryCode ?? null, currency: payload.data?.currency ?? null });
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
@@ -752,6 +754,12 @@ function Account() {
                 <div className="min-w-0 flex-1">
                   <h2 id="funding-dialog-title" className="text-lg font-semibold sm:text-xl">Add funds</h2>
                   <p className="mt-1 text-sm leading-5 text-muted">Choose a payment method and enter an amount.</p>
+                  {fundingOptionsState.status === "ready" && fundingOptionsState.countryCode && fundingOptionsState.currency ? (
+                    <p className="mt-1 text-[11px] text-muted">
+                      Options for {new Intl.DisplayNames(undefined, { type: "region" }).of(fundingOptionsState.countryCode) ?? fundingOptionsState.countryCode}
+                      {" · "}{fundingOptionsState.currency}
+                    </p>
+                  ) : null}
                 </div>
                 <button
                   type="button"
