@@ -6,6 +6,7 @@ import { initializeCryptomusCheckout } from "../../../../src/lib/billing/cryptom
 import { initializeFlutterwaveCheckout } from "../../../../src/lib/billing/flutterwave.server";
 import { getCustomerCountry } from "../../../../src/lib/billing/country-routing";
 import { getFundingOptions } from "../../../../src/lib/billing/paystack.server";
+import type { CurrencyPackQuote } from "../../../../src/lib/billing/fx.server";
 
 const SAFE_CHECKOUT_FAILURES: Record<string, { status: number; message: string }> = {
   PAYMENTS_NOT_CONFIGURED: { status: 503, message: "Token purchases are not enabled for this deployment yet." },
@@ -38,7 +39,7 @@ export default defineHandler(async (event) => {
     return jsonResponse({ ok: false, error: "INVALID_PURCHASE", message: "Choose a supported payment method and token pack, then retry checkout." }, 400);
   }
   const countryCode = getCustomerCountry(request);
-  const funding = getFundingOptions(countryCode);
+  const funding = await getFundingOptions(countryCode);
   const providerOption = funding.providers.find((item) => item.id === provider);
   if (!providerOption?.enabled) {
     return jsonResponse({
@@ -47,13 +48,27 @@ export default defineHandler(async (event) => {
       message: providerOption?.message ?? funding.message,
     }, 422);
   }
+  const pack = providerOption.packs.find((item) => item.tokens === body.tokenPack);
+  if (!pack) {
+    return jsonResponse({ ok: false, error: "INVALID_PURCHASE", message: "Choose a supported token pack and retry checkout." }, 400);
+  }
+  if (provider !== "cryptomus" && (!("enabled" in pack) || pack.enabled !== true)) {
+    return jsonResponse({
+      ok: false,
+      error: "TOKEN_PACK_UNAVAILABLE",
+      message: ("message" in pack && typeof pack.message === "string" ? pack.message : null) ??
+        "This token pack is not available for the selected payment method.",
+    }, 422);
+  }
+
   try {
     const input = { userId: auth.userId, tokenPack: body.tokenPack, idempotencyKey: body.idempotencyKey };
+    const pricingQuote = pack as CurrencyPackQuote;
     const checkout = provider === "cryptomus"
       ? await initializeCryptomusCheckout(input)
       : provider === "flutterwave"
-        ? await initializeFlutterwaveCheckout({ ...input, countryCode })
-        : await initializePaystackCheckout(input, countryCode);
+        ? await initializeFlutterwaveCheckout({ ...input, countryCode, pricingQuote })
+        : await initializePaystackCheckout({ ...input, pricingQuote }, countryCode);
     return jsonResponse({ ok: true, data: { ...checkout, provider } }, 201);
   } catch (error) {
     const candidate = error as { code?: unknown };
