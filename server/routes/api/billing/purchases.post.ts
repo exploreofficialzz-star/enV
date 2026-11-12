@@ -58,8 +58,9 @@ export default defineHandler(async (event) => {
   const countryCode = getCustomerCountry(request);
   const funding = await getFundingOptions(countryCode);
   const isLocalProvider = (item: (typeof funding.providers)[number]) =>
-    (item.id === "paystack" && item.localPayments === true) ||
-    (item.id === "flutterwave" && item.paymentOptions?.some((option) => option !== "card") === true);
+    (item.id === "paystack" && "localPayments" in item && item.localPayments === true) ||
+    (item.id === "flutterwave" && "paymentOptions" in item &&
+      item.paymentOptions?.some((option) => option !== "card") === true);
   let candidates = paymentMethod === "more"
     ? funding.providers.filter((item) => item.id === "cryptomus" && item.enabled)
     : paymentMethod === "local"
