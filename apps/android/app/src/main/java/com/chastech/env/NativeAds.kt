@@ -112,17 +112,67 @@ internal object NativeAdsPolicy {
             "health", "finance", "earnings", "fitness", "personal",
             "ai", "developer", "accessibility", "lab", "labs",
         )
-        val identity = (listOf(
-            tool.id, tool.name, tool.subcategory.orEmpty(),
-            tool.engine.type, tool.engine.id,
-        ) + tool.tags + tool.keywords)
-            .joinToString(" ")
+        val localEngineTypes = setOf(
+            "calculator", "converter", "datetime", "text", "codec", "color", "qr",
+            "barcode", "generator", "image", "cssgen", "mockup", "post", "device",
+            "seo", "file-converter", "developer", "pdf", "mime", "security",
+            "creator", "business", "audio", "network", "video", "document",
+        )
+        val localCustomCategories = setOf(
+            "career", "celebrations", "communication", "ecommerce", "events", "food",
+            "gaming", "interactive", "marketing", "mockups", "photography",
+            "productivity", "relationships", "screenshots", "social", "streaming",
+            "travel", "webdesign",
+        )
+        val localDocumentIds = setOf(
+            "pdf-merger", "pdf-metadata-viewer", "pdf-metadata-tool", "pdf-page-extractor",
+            "pdf-splitter", "pdf-rotator", "docx-text-extractor", "text-to-docx",
+            "txt-to-docx", "markdown-to-docx",
+        )
+        val remoteAudioOperations = setOf(
+            "server-mp3", "server-wav", "server-ogg", "server-flac", "server-volume",
+            "server-bitrate", "server-sample-rate", "server-channels", "server-merge",
+        )
+        val remoteVideoOperations = setOf(
+            "video-merge", "video-replace-audio", "video-to-mp4", "video-to-mp3",
+            "video-to-gif", "video-to-webm", "video-to-mov", "video-to-avi",
+            "video-resize", "video-crop", "video-rotate", "video-mute", "video-fps",
+            "video-bitrate", "video-resolution-presets", "video-audio-volume",
+        )
+        val remoteToolIds = setOf(
+            "audio-to-mp3-server", "audio-to-wav-server", "audio-to-ogg-server",
+            "audio-to-flac-server", "audio-bitrate-converter", "audio-merger",
+            "audio-to-text", "audio-to-subtitles", "video-merger", "video-audio-replacer",
+            "video-to-mp4", "video-to-mp3", "video-to-gif", "video-to-webm", "video-to-mov",
+            "video-to-avi", "video-resize", "video-crop", "video-rotate", "video-mute",
+            "video-fps", "video-bitrate", "video-resolution-presets", "video-audio-volume",
+            "video-cropper", "video-to-text", "video-to-subtitles", "youtube-audio-extractor",
+            "url-media-inspector", "video-url-downloader", "youtube-video-downloader",
+            "tiktok-video-downloader", "facebook-video-downloader", "instagram-video-downloader",
+            "x-video-downloader", "whois-lookup", "dns-lookup", "website-screenshot",
+            "media-backend-checker",
+        )
+
+        val engineType = tool.engine.type.lowercase()
+        val operation = tool.engine.extras["op"]?.lowercase().orEmpty()
+        val identity = (
+            listOf(tool.id, tool.name, tool.subcategory.orEmpty(), engineType, tool.engine.id) +
+                tool.tags + tool.keywords
+            ).joinToString(" ")
             .lowercase()
             .replace('-', ' ')
             .replace('_', ' ')
         val excludedConcept = Regex(
-            """\\b(studio|studios|lab|labs|laboratory|laboratories|sandbox|ai|artificial intelligence)\\b"""
+            """\b(studio|studios|lab|labs|laboratory|laboratories|sandbox|ai|artificial intelligence)\b"""
         ).containsMatchIn(identity)
+        val localExecution = engineType in localEngineTypes ||
+            (engineType == "custom" && tool.category in localCustomCategories) ||
+            (engineType == "document-backend" && tool.id in localDocumentIds)
+        val remoteExecution = engineType in setOf("url-media", "url-media-info") ||
+            operation in remoteAudioOperations ||
+            operation in remoteVideoOperations ||
+            tool.id in remoteToolIds
+
         return tool.status == "active" &&
             tool.clientSide &&
             !tool.requiresBackend &&
@@ -130,7 +180,9 @@ internal object NativeAdsPolicy {
             tool.category.lowercase() !in restrictedCategories &&
             !tool.id.startsWith("finance-") &&
             tool.disclaimer?.lowercase() !in restrictedDisclaimers &&
-            tool.engine.type.lowercase() != "ai" &&
+            engineType != "ai" &&
+            localExecution &&
+            !remoteExecution &&
             !excludedConcept
     }
 
