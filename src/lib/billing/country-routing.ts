@@ -93,8 +93,8 @@ export function getCurrencyMinorUnitExponent(currency: string): number | null {
 
 /**
  * Flutterwave Standard documents amount as int32 in major currency units.
- * Convert only when the complete token pack is an exact whole major unit;
- * never send a fractional/rounded value or overflow the provider's field.
+ * A pack is purchasable only when the USD FX result is an exact whole major
+ * unit; this avoids sending fractional values that the provider schema rejects.
  */
 export function toFlutterwaveMajorAmount(amountMinor: number, currency: string): number | null {
   const exponent = getCurrencyMinorUnitExponent(currency);

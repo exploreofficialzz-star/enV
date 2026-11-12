@@ -25,23 +25,6 @@ export function isFlutterwavePaymentOptionsConfigured(
   return env.FLUTTERWAVE_PAYMENT_OPTIONS_DASHBOARD_DISABLED === "true";
 }
 
-/** Parse a positive minor-unit price only when every offered token pack fits safely in integer arithmetic. */
-export function readSafePackPrice(
-  value: string | undefined,
-  packSizes: readonly number[],
-): number | null {
-  if (!value || !/^\d+$/.test(value.trim()) || packSizes.length === 0) return null;
-  const parsed = Number(value.trim());
-  if (!Number.isSafeInteger(parsed) || parsed <= 0) return null;
-  for (const packSize of packSizes) {
-    if (!Number.isSafeInteger(packSize) || packSize <= 0) return null;
-    const total = packSize * parsed;
-    if (!Number.isSafeInteger(total) || total <= 0) return null;
-  }
-  return parsed;
-}
-
-
 const PAYSTACK_MERCHANT_LOCAL_CURRENCIES: Record<string, string> = {
   NG: "NGN",
   GH: "GHS",
@@ -64,7 +47,6 @@ const PAYSTACK_MERCHANT_ACCEPTED_CURRENCIES: Record<string, readonly string[]> =
 export function resolvePaystackCountryConfiguration(
   customerCountryCode: string | null | undefined,
   env: Record<string, string | undefined>,
-  packSizes: readonly number[],
 ) {
   const country = customerCountryCode?.trim().toUpperCase() ?? "";
   const merchantCountry = env.PAYSTACK_MERCHANT_COUNTRY?.trim().toUpperCase() ?? "";
@@ -87,9 +69,6 @@ export function resolvePaystackCountryConfiguration(
 
   // One Paystack integration key authenticates every transaction currency on the merchant account.
   const secret = env.PAYSTACK_SECRET_KEY?.trim() ?? "";
-  const configuredPrice = env["PAYSTACK_TOKEN_PRICE_" + currency + "_MINOR"] ??
-    (currency === "NGN" ? env.PAYSTACK_TOKEN_PRICE_NGN_KOBO : undefined);
-  const pricePerTokenMinor = readSafePackPrice(configuredPrice, packSizes);
   const currencyApproved = currency === "NGN"
     ? env.PAYSTACK_PROVIDER_APPROVED === "true"
     : env["PAYSTACK_PROVIDER_APPROVED_" + currency] === "true";
@@ -104,8 +83,8 @@ export function resolvePaystackCountryConfiguration(
     currency,
     international,
     secret,
-    pricePerTokenMinor,
     approved,
-    enabled: approved && Boolean(secret) && pricePerTokenMinor !== null,
+    // FX availability and pack-size eligibility are checked in the server quote step.
+    enabled: approved && Boolean(secret),
   };
 }

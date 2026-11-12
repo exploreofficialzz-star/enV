@@ -132,30 +132,37 @@ jobs:
           const data = response?.data;
           const failures = [];
           const providers = Array.isArray(data?.providers) ? data.providers : [];
-          const required = new Map([['paystack', 'NGN'], ['cryptomus', 'USD']]);
-          if (response?.ok !== true || !data || providers.length !== required.size) {
-            failures.push('Funding-options response is missing one or more configured provider contracts.');
+          const allowed = new Set(['paystack', 'flutterwave', 'cryptomus']);
+          const ids = providers.map((provider) => provider?.id);
+          if (response?.ok !== true || !data || providers.length === 0) {
+            failures.push('Funding-options response is missing provider routing data.');
           }
-          for (const [id, currency] of required) {
-            const provider = providers.find((item) => item?.id === id);
-            if (!provider) {
-              failures.push(`Missing payment provider contract: ${id}.`);
-              continue;
-            }
-            if (typeof provider.enabled !== 'boolean' || provider.currency !== currency ||
+          if (new Set(ids).size !== ids.length || ids.some((id) => !allowed.has(id))) {
+            failures.push('Funding-options response contains duplicate or unsupported providers.');
+          }
+          for (const provider of providers) {
+            const id = provider?.id ?? 'unknown';
+            if (typeof provider.enabled !== 'boolean' || !/^[A-Z]{3}$/.test(provider.currency ?? '') ||
                 !Array.isArray(provider.packs) ||
-                provider.packs.map((pack) => pack?.tokens).join(',') !== '100,250,500,1000') {
+                (provider.packs.length > 0 && provider.packs.map((pack) => pack?.tokens).join(',') !== '100,250,500,1000')) {
               failures.push(`The ${id} funding-options contract is malformed.`);
               continue;
             }
+            if (Object.hasOwn(provider, 'fxRate') || Object.hasOwn(provider, 'fxSource') ||
+                Object.hasOwn(provider, 'fxUpdatedAt')) {
+              failures.push(`The public ${id} contract exposes the upstream FX snapshot.`);
+            }
             for (const pack of provider.packs) {
-              if (pack.amountMinor !== null && (!Number.isSafeInteger(pack.amountMinor) || pack.amountMinor <= 0)) {
-                failures.push(`The ${id} provider returned an invalid token-pack amount.`);
+              if (typeof pack.enabled !== 'boolean') {
+                failures.push(`The ${id} provider omitted pack-level availability.`);
               }
-              if (provider.enabled && (!Number.isSafeInteger(provider.pricePerTokenMinor) ||
-                  provider.pricePerTokenMinor <= 0 || !Number.isSafeInteger(pack.amountMinor) || pack.amountMinor <= 0)) {
-                failures.push(`The enabled ${id} provider is missing a valid configured price.`);
+              if (Object.hasOwn(pack, 'amountMinor') || Object.hasOwn(pack, 'fxRate') ||
+                  Object.hasOwn(pack, 'fxSource') || Object.hasOwn(pack, 'fxUpdatedAt')) {
+                failures.push(`The public ${id} pack exposes a local amount or raw FX quote.`);
               }
+            }
+            if (provider.enabled && !provider.packs.some((pack) => pack.enabled === true)) {
+              failures.push(`The enabled ${id} provider has no purchasable pack.`);
             }
           }
           if (data && data.anyEnabled !== providers.some((provider) => provider.enabled === true)) {

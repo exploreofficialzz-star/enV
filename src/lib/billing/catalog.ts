@@ -2,10 +2,11 @@
  * Shared, client-safe enV metering catalog.
  *
  * The user-facing unit is an enV Token; integer milli-tokens are stored internally (1,000 = 1 displayed token).
- * One displayed token has a proposed reference value of USD $0.01. Therefore, one
- * milli-token represents $0.00001 at the USD reference rate. Rates in this initial
- * catalog are hypotheses, not live prices; production charging stays gated until the
- * tool-by-tool cost audit, provider products and billing enforcement are configured.
+ * One displayed token has a fixed non-cash reference value of USD $0.01. Therefore,
+ * one milli-token represents $0.00001 at the USD reference rate. Metered operation
+ * rates in this initial catalog remain hypotheses, not live charges; production
+ * charging stays gated until the tool-by-tool cost audit, provider products and
+ * billing enforcement are configured.
  */
 export const TOKEN_SUBUNITS_PER_TOKEN = 1_000;
 export const USD_MICROS_PER_TOKEN = 10_000;

@@ -3,7 +3,7 @@ import { getSql } from "../db";
 import { creditVerifiedPurchase, readWallet } from "./ledger.server";
 import { readBoundedBytes } from "./bounded-json.server";
 import { TOKEN_PACKS, getFundingOptions } from "./paystack.server";
-import { readSafePackPrice } from "./provider-config";
+
 
 type CryptomusCredentials = { merchantId: string; apiKey: string };
 type CryptomusInvoice = {
@@ -45,12 +45,12 @@ function readCredentials(): CryptomusCredentials {
   return { merchantId, apiKey };
 }
 
-function requireNewCheckoutConfiguration() {
-  const funding = getFundingOptions();
+async function requireNewCheckoutConfiguration() {
+  const funding = await getFundingOptions();
   const provider = funding.providers.find((entry) => entry.id === "cryptomus");
-  const pricePerTokenMinor = readSafePackPrice(process.env.CRYPTOMUS_TOKEN_PRICE_USD_CENTS, TOKEN_PACKS);
+  const pricePerTokenMinor = 1; // Fixed USD reference: 100 enV tokens = $1.00.
   const origin = publicOrigin();
-  if (!provider?.enabled || pricePerTokenMinor === null || !origin) {
+  if (!provider?.enabled || !origin) {
     throw Object.assign(new Error(provider?.message ?? "Crypto checkout is not enabled for this deployment."), {
       code: "CRYPTOMUS_NOT_CONFIGURED", status: 503,
     });
@@ -106,7 +106,7 @@ export async function initializeCryptomusCheckout(input: {
   tokenPack: number;
   idempotencyKey: unknown;
 }) {
-  const configuration = requireNewCheckoutConfiguration();
+  const configuration = await requireNewCheckoutConfiguration();
   if (!(TOKEN_PACKS as readonly number[]).includes(input.tokenPack) || !validIdempotencyKey(input.idempotencyKey)) {
     throw Object.assign(new Error("Choose a supported token pack and retry the checkout."), {
       code: "INVALID_PURCHASE", status: 400,
