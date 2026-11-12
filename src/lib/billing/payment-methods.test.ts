@@ -7,9 +7,9 @@ import {
 } from "./payment-methods.ts";
 
 const providers = [
-  { id: "paystack" as const, enabled: true, localPayments: true },
-  { id: "flutterwave" as const, enabled: true, paymentOptions: ["card", "ussd", "banktransfer"] },
-  { id: "cryptomus" as const, enabled: false },
+  { id: "paystack" as const, enabled: true, currency: "NGN", localPayments: true },
+  { id: "flutterwave" as const, enabled: true, currency: "NGN", paymentOptions: ["card", "ussd", "banktransfer"] },
+  { id: "cryptomus" as const, enabled: false, currency: "USD" },
 ];
 
 test("customer payment methods resolve to eligible providers without exposing provider names", () => {
@@ -22,7 +22,7 @@ test("customer payment methods resolve to eligible providers without exposing pr
 });
 
 test("local payments stay unavailable for international-card-only Paystack accounts", () => {
-  const international = [{ id: "paystack" as const, enabled: true, localPayments: false }];
+  const international = [{ id: "paystack" as const, enabled: true, currency: "USD", localPayments: false }];
   assert.equal(isCustomerPaymentMethodAvailable(international, "local"), false);
   assert.deepEqual(getFundingCandidates(international, "local"), []);
 });
