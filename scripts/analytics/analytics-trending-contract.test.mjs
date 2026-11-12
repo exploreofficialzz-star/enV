@@ -83,7 +83,7 @@ test("iOS consumes the shared real-usage order without adding Trending helper co
   const homeSource = ios.split("struct HomeView: View")[1]?.split("private struct ResponsiveToolGrid")[0] ?? "";
   assert.ok(homeSource.length > 0);
   assert.match(homeSource, /NativeTrendingToolsClient\.fetchFeed\(\)/);
-  assert.match(homeSource, /trendingToolIDs\.isEmpty\(\) \? fallbackTrendingToolIDs : trendingToolIDs/);
+  assert.match(homeSource, /trendingToolIDs\.isEmpty\s*\?\s*fallbackTrendingToolIDs\s*:/);
   assert.match(homeSource, /fallbackTrendingToolIDs = Array\(eligible\.shuffled\(\)/);
   assert.match(homeSource, /let liveIDs = feed\.toolIDs\.filter/);
   assert.match(homeSource, /Task\.sleep\(nanoseconds: 300_000_000_000\)/);
