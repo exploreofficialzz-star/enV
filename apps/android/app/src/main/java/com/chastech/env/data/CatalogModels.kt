@@ -261,6 +261,63 @@ fun Catalog.withZipArchive(): Catalog {
     )
 }
 
+/** Registers the native local File workspace tools without changing the generated base catalogue. */
+fun Catalog.withFileWorkspaceTools(): Catalog {
+    val definitions = listOf(
+        Triple("file-organizer", "File Organizer", "Sort selected files into type-based folders and copy them into a destination you choose. Original files are never deleted."),
+        Triple("batch-file-renamer", "Batch File Renamer", "Preview consistent filename prefixes, suffixes, numbering and replacements before exporting renamed copies."),
+        Triple("duplicate-file-finder", "Duplicate File Finder", "Find identical files using size filtering and streaming SHA-256 verification."),
+        Triple("folder-size-analyzer", "Folder Size Analyzer", "Review folder size, file-type breakdowns and the largest files on this device."),
+        Triple("file-search", "File Search", "Search filenames and supported text file contents without a terminal."),
+        Triple("file-compare", "File & Folder Compare", "Compare two folders and verify identical files using SHA-256 checksums."),
+    )
+    val existing = tools.mapTo(mutableSetOf()) { it.id }
+    val additions = definitions.filterNot { it.first in existing }.mapIndexed { index, item ->
+        val (id, name, description) = item
+        ToolRecord(
+            id = id,
+            name = name,
+            slug = id,
+            description = description,
+            category = "files",
+            keywords = listOf("files", "folder", "local", "mobile", "offline", "storage", "organize", "search", "compare", "rename", "checksum"),
+            tags = listOf("files", "local", "mobile", "offline", "file-workspace"),
+            icon = when (id) {
+                "file-organizer" -> "FolderTree"
+                "batch-file-renamer" -> "FilePenLine"
+                "duplicate-file-finder" -> "Files"
+                "folder-size-analyzer" -> "HardDrive"
+                "file-search" -> "FileSearch"
+                else -> "GitCompareArrows"
+            },
+            popularity = 1120 - index * 10,
+            featured = true,
+            clientSide = true,
+            requiresBackend = false,
+            requiresAuth = false,
+            status = "active",
+            related = emptyList(),
+            engine = EngineInfo("custom", id),
+            subcategory = when (id) {
+                "file-organizer", "batch-file-renamer" -> "Organization"
+                "duplicate-file-finder", "file-compare" -> "Verification"
+                "folder-size-analyzer" -> "Analysis"
+                else -> "Search"
+            },
+        )
+    }
+    if (additions.isEmpty()) return this
+    val updated = (tools + additions).sortedWith(
+        compareBy<ToolRecord> { it.category }
+            .thenBy { it.name.lowercase(Locale.ROOT) }
+            .thenBy { it.id }
+    )
+    return copy(
+        counts = counts.copy(total = updated.size, active = updated.count { it.status == "active" || it.status == "beta" }),
+        tools = updated,
+    )
+}
+
 /** Registers Camera Studio in the native tool catalogue without changing the generated shared catalogue. */
 fun Catalog.withCameraStudio(): Catalog {
     if (tools.any { it.id == "camera-studio" }) return this
