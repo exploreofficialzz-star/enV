@@ -164,6 +164,7 @@ const androidToolDetail = android.split("private fun ToolDetail(")[1]?.split("@C
 const androidRelatedCard = android.split("private fun RelatedToolCard(")[1]?.split("@Composable\nprivate fun NativeToolForm")[0] ?? "";
 const iosToolDetail = iosTools.split("struct ToolDetailView: View")[1]?.split("private func toolHeading")[0] ?? "";
 const webFullscreenTarget = webToolShell.split("ref={toolInterfaceRef}")[1]?.split("</section>")[0] ?? "";
+const webToolContent = webToolShell.split("const toolContent =")[1]?.split("\n\n  return (")[0] ?? "";
 const androidFullscreenBranch = androidToolDetail.split("if (isFullscreen) {")[1]?.split("} else {")[0] ?? "";
 const iosFullscreenContainer = iosTools.split("private struct ToolFullscreenContainer")[1]?.split("struct ToolDestinationView")[0] ?? "";
 const iosRelatedCard = iosTools.split("private struct RelatedToolDetailCard: View")[1]?.split("/// The native surface")[0] ?? "";
