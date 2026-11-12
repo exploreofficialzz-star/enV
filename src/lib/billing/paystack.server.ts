@@ -124,11 +124,11 @@ export async function getFundingOptions(countryCode: string | null = null) {
     Boolean(cryptomusApiKey) &&
     cryptoPricePerTokenMinor !== null;
 
-  const packsFor = (price: number | null, currency: string) => TOKEN_PACKS.map((tokens) => ({
+  const packsFor = (price: number, currency: string) => TOKEN_PACKS.map((tokens) => ({
     tokens,
-    amountMinor: price !== null ? tokens * price : null,
+    amountMinor: tokens * price,
     currency,
-    enabled: true,
+    enabled: cryptomusEnabled,
   }));
 
   const cryptomusMessage = cryptomusEnabled
