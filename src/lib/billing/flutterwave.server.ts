@@ -567,17 +567,34 @@ async function handleFlutterwaveChargebackWebhook(body: Record<string, unknown>)
   // V3 chargeback records carry flw_ref, not the merchant tx_ref or transaction
   // ID. Match that verified processor reference to the value captured when the
   // original paid transaction was verified.
+  const providerTransactionId = asProviderId(dispute.transaction_id);
   const sql = await getSql();
-  const intents = await sql.query<{
-    id: string; provider_transaction_id: string | null; amount_minor: number | string; currency: string;
-  }>(
-    `select id, provider_transaction_id, amount_minor, currency
-       from billing_purchase_intents
-      where provider = 'flutterwave' and provider_metadata->>'flwRef' = $1 limit 1`,
-    [webhookFlwRef],
-  );
+  const intents = providerTransactionId
+    ? await sql.query<{
+        id: string; provider_transaction_id: string | null; amount_minor: number | string; currency: string;
+        provider_metadata: Record<string, unknown> | string;
+      }>(
+        `select id, provider_transaction_id, amount_minor, currency, provider_metadata
+           from billing_purchase_intents
+          where provider = 'flutterwave' and provider_transaction_id = $1 limit 1`,
+        [providerTransactionId],
+      )
+    : await sql.query<{
+        id: string; provider_transaction_id: string | null; amount_minor: number | string; currency: string;
+        provider_metadata: Record<string, unknown> | string;
+      }>(
+        `select id, provider_transaction_id, amount_minor, currency, provider_metadata
+           from billing_purchase_intents
+          where provider = 'flutterwave' and provider_metadata->>'flwRef' = $1 limit 1`,
+        [webhookFlwRef],
+      );
   const intent = intents[0];
-  if (!intent || !intent.provider_transaction_id) {
+  const storedMetadata = typeof intent?.provider_metadata === "string"
+    ? JSON.parse(intent.provider_metadata) as Record<string, unknown>
+    : intent?.provider_metadata ?? {};
+  if (!intent || !intent.provider_transaction_id ||
+      (providerTransactionId && intent.provider_transaction_id !== providerTransactionId) ||
+      (typeof storedMetadata.flwRef === "string" && storedMetadata.flwRef !== webhookFlwRef)) {
     throw Object.assign(new Error("The Flutterwave chargeback does not match a verified enV payment reference."), {
       code: "CHARGEBACK_PROVIDER_MISMATCH", status: 409,
     });
