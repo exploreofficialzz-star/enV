@@ -73,8 +73,8 @@ export const CATEGORIES: CategoryMeta[] = [
   {
     id: "files",
     name: "Files",
-    description: "MIME lookup, size conversion, and structured data converters.",
-    blurb: "JSON, CSV, YAML, XML, and file metadata.",
+    description: "Local file conversion, text extraction, archives, organization, search, comparison, and storage analysis.",
+    blurb: "Convert, organize, inspect, compare, and archive files on your device.",
     icon: "Folder",
   },
   {
