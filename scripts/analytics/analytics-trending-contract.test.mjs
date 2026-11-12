@@ -41,7 +41,7 @@ test("Web Home shows Trending without helper copy or advertising placements", ()
   assert.match(home, /getToolById\(id\)/);
   assert.match(home, /loadHomeTrendingTools/);
   assert.match(home, /title="Trending tools"/);
-  assert.doesNotMatch(home, /index >= 6 \? "hidden md:flex"/);
+  assert.match(home, /tools\.map\(\(tool, index\) => <ToolCard key=\{tool\.id\} tool=\{tool\} className=\{index >= 6 \? "hidden sm:flex" : ""\} \/>\)/, "Web mobile Trending shows six cards while tablet and desktop retain the full set");
   assert.doesNotMatch(home, /prefsHydrated|aria-busy=\{!prefsHydrated\}/, "Personal shortcuts must not be hidden while preferences hydrate");
   assert.match(home, /h-\[112px\] min-h-\[112px\] w-full max-w-3xl shrink-0/);
   assert.doesNotMatch(home, /daily rotating|Ranked by actual tool starts/);
@@ -76,7 +76,7 @@ test("Android consumes the shared real-usage order without adding Trending helpe
   assert.match(homeSource, /randomCrossCategoryTrendingTools\(availableTrendingTools\)/);
   assert.match(android, /groupBy \{ it\.category \}/);
   assert.match(android, /!it\.isUnderProduction\(\)/);
-  assert.doesNotMatch(homeSource, /take\(if \(screenWidth >= 768\) 12 else 6\)/);
+  assert.match(homeSource, /trending\.take\(if \(screenWidth >= 640\) 12 else 6\)\.chunked\(homeColumns\)/, "Android phone Trending shows six cards while tablet and desktop retain twelve");
   assert.match(homeSource, /feed\.toolIds\.filter/);
   assert.match(homeSource, /kotlinx\.coroutines\.delay\(5 \* 60 \* 1000L\)/);
   assert.match(homeSource, /SectionTitle\("Trending tools"/);
@@ -98,6 +98,7 @@ test("iOS consumes the shared real-usage order without adding Trending helper co
   assert.match(homeSource, /let liveIDs = feed\.toolIDs\.filter/);
   assert.match(homeSource, /Task\.sleep\(nanoseconds: 300_000_000_000\)/);
   assert.match(homeSource, /selectedIDs\.compactMap/);
+  assert.match(homeSource, /\.prefix\(horizontalSizeClass == \.regular \? 12 : 6\)/, "iOS compact phones show six Trending cards while regular-width iPad layouts retain twelve");
   assert.match(ios, /private var visibleLimit: Int \{ Int\.max \}/);
   assert.match(homeSource, /Trending tools/);
   assert.doesNotMatch(homeSource, /A daily rotating selection|Ranked by actual tool starts|trendingMode/);
