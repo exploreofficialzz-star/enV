@@ -170,7 +170,7 @@ function MostUsedToolsTray({ tools, prefsHydrated }: { tools: ToolMeta[]; prefsH
   const [productionTool, setProductionTool] = useState<ToolMeta | null>(null);
   return (
     <>
-      <div aria-busy={!prefsHydrated}>
+      <div className={prefsHydrated ? "visible" : "invisible"} aria-busy={!prefsHydrated}>
       <section
         aria-label="Your most-used tools"
         className="mx-auto mt-4 h-[112px] w-full max-w-3xl overflow-hidden rounded-[28px] border border-border bg-surface shadow-[var(--shadow-border)]"
