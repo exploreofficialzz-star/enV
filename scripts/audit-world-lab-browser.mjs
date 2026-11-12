@@ -74,6 +74,11 @@ try{
         railNativeEvent:root.getAttribute("data-rail-native-event"),
         railNativeButton:root.getAttribute("data-rail-native-button"),
         railNativeGroup:root.getAttribute("data-rail-native-group"),
+        railDocumentListener:root.getAttribute("data-rail-document-listener"),
+        railDocumentEvent:root.getAttribute("data-rail-document-event"),
+        railDocumentTarget:root.getAttribute("data-rail-document-target"),
+        railDocumentButton:root.getAttribute("data-rail-document-button"),
+        railDocumentGroup:root.getAttribute("data-rail-document-group"),
         rail:describe(rail),
         projectButton:[...root.querySelectorAll("button")].filter(node=>node.getAttribute("aria-label")==="Open project tools").map(node=>({
           ...describe(node),nativeBound:node.dataset.wlRailBound ?? null,
