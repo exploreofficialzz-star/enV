@@ -1,7 +1,7 @@
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { getSql } from "../db";
 import { readWallet, creditVerifiedPurchase } from "./ledger.server";
-import { isFlutterwavePaymentOptionsConfigured, readSafePackPrice } from "./provider-config";
+import { isFlutterwavePaymentOptionsConfigured } from "./provider-config";
 import { readBoundedBytes } from "./bounded-json.server";
 import {
   getCountryPaymentProfile,
@@ -9,6 +9,7 @@ import {
   parseMajorUnitsToMinor,
   toFlutterwaveMajorAmount,
 } from "./country-routing";
+import { quoteTokenPacks, type CurrencyPackQuote } from "./fx.server";
 
 const TOKEN_PACKS = [100, 250, 500, 1_000] as const;
 
@@ -40,57 +41,77 @@ function resolveConfiguration(countryCode: string | null | undefined) {
   const profile = getCountryPaymentProfile(countryCode);
   if (!profile) return null;
   const currency = profile.currency;
-  const enabled = enabledCurrencies().has(currency);
-  const pricePerTokenMinor = readSafePackPrice(
-    process.env["FLUTTERWAVE_TOKEN_PRICE_" + currency + "_MINOR"],
-    TOKEN_PACKS,
-  );
+  const currencyEnabled = enabledCurrencies().has(currency);
   const secret = process.env.FLW_SECRET_KEY?.trim() ?? "";
   const secretHash = process.env.FLW_SECRET_HASH?.trim() ?? "";
   const approved = process.env.FLUTTERWAVE_PROVIDER_APPROVED === "true";
   const paymentOptionsConfigured = isFlutterwavePaymentOptionsConfigured(process.env);
   const exponent = getCurrencyMinorUnitExponent(currency);
-  const packPricingSupported = pricePerTokenMinor !== null && TOKEN_PACKS.every((tokens) => {
-    const amountMinor = tokens * pricePerTokenMinor;
-    return Number.isSafeInteger(amountMinor) && toFlutterwaveMajorAmount(amountMinor, currency) !== null;
-  });
-  const ready = launchChecksPassed() && approved && enabled &&
-    Boolean(secret) && Boolean(secretHash) && pricePerTokenMinor !== null &&
-    exponent !== null && packPricingSupported && paymentOptionsConfigured;
-  return { profile, currency, pricePerTokenMinor, secret, secretHash, ready, packPricingSupported, paymentOptionsConfigured };
+  const ready = launchChecksPassed() && approved && currencyEnabled &&
+    Boolean(secret) && Boolean(secretHash) && exponent !== null && paymentOptionsConfigured;
+  return { profile, currency, secret, secretHash, ready, currencyEnabled, paymentOptionsConfigured, approved };
 }
 
-export function getFlutterwaveFundingOption(countryCode: string | null | undefined) {
+/** Build Flutterwave packs from enV's USD reference price and the current local FX snapshot. */
+export async function getFlutterwaveFundingOption(countryCode: string | null | undefined) {
   const configuration = resolveConfiguration(countryCode);
   if (!configuration) return null;
-  const { profile, currency, pricePerTokenMinor, ready, packPricingSupported, paymentOptionsConfigured } = configuration;
-  const reason = !process.env.FLUTTERWAVE_PROVIDER_APPROVED || process.env.FLUTTERWAVE_PROVIDER_APPROVED !== "true"
+  const { profile, currency, ready, currencyEnabled, paymentOptionsConfigured, approved } = configuration;
+  let quotes: CurrencyPackQuote[];
+  try {
+    quotes = await quoteTokenPacks(currency, TOKEN_PACKS);
+  } catch {
+    return {
+      id: "flutterwave" as const,
+      label: "Flutterwave · " + currency,
+      enabled: false,
+      currency,
+      pricePerTokenMinor: null,
+      packs: [],
+      paymentOptions: [...profile.paymentOptions],
+      message: "A current USD exchange-rate quote is unavailable for " + currency + ". No local amount was estimated.",
+    };
+  }
+  const packs = quotes.map((quote) => {
+    const amountMajor = toFlutterwaveMajorAmount(quote.amountMinor, currency);
+    return {
+      ...quote,
+      enabled: ready && amountMajor !== null,
+      message: amountMajor === null
+        ? "This pack is outside Flutterwave's supported transaction amount range."
+        : undefined,
+    };
+  });
+  const anyPackAvailable = packs.some((pack) => pack.enabled);
+  const enabled = ready && anyPackAvailable;
+  const reason = !approved
     ? "Flutterwave checkout is awaiting merchant approval."
-    : !enabledCurrencies().has(currency)
+    : !currencyEnabled
       ? "This currency has not been enabled for the enV Flutterwave merchant account."
-      : !pricePerTokenMinor
-        ? "Pricing for this local currency has not been configured."
-        : !packPricingSupported
-          ? "Each token pack must convert to an exact whole-unit Flutterwave amount within its integer amount limit."
-          : !paymentOptionsConfigured
-            ? "Disable “Enable Dashboard Payment Options” in Flutterwave account settings before enabling country-specific payment methods."
-            : !launchChecksPassed()
+      : !paymentOptionsConfigured
+        ? "Disable “Enable Dashboard Payment Options” in Flutterwave account settings before enabling country-specific payment methods."
+        : !launchChecksPassed()
           ? "Checkout is disabled until billing, refund and dispute recovery checks are approved."
-          : "Flutterwave credentials are not fully configured.";
+          : !configuration.secret || !configuration.secretHash
+            ? "Flutterwave credentials are not fully configured."
+            : !anyPackAvailable
+              ? "The token pack amounts exceed Flutterwave's supported transaction range."
+              : "Flutterwave is unavailable for this currency.";
   return {
     id: "flutterwave" as const,
     label: "Flutterwave · " + currency,
-    enabled: ready,
+    enabled,
     currency,
-    pricePerTokenMinor,
-    packs: TOKEN_PACKS.map((tokens) => ({
-      tokens,
-      amountMinor: pricePerTokenMinor === null ? null : tokens * pricePerTokenMinor,
-      currency,
-    })),
+    pricePerTokenMinor: null,
+    fxRate: quotes[0]?.fxRate ?? null,
+    fxSource: quotes[0]?.fxSource ?? null,
+    fxUpdatedAt: quotes[0]?.fxUpdatedAt ?? null,
+    fxNextUpdateAt: quotes[0]?.fxNextUpdateAt ?? null,
+    fxFetchedAt: quotes[0]?.fxFetchedAt ?? null,
+    packs,
     paymentOptions: [...profile.paymentOptions],
-    message: ready
-      ? "Choose a token pack. Available local methods are shown by Flutterwave for your country."
+    message: enabled
+      ? "Choose a pack. Flutterwave shows only methods supported by your country and currency; payment is verified before tokens are credited."
       : reason,
   };
 }
@@ -105,23 +126,31 @@ export async function initializeFlutterwaveCheckout(input: {
   tokenPack: number;
   idempotencyKey: unknown;
   countryCode: string | null;
+  pricingQuote: CurrencyPackQuote;
 }) {
-  const configuration = resolveConfiguration(input.countryCode);
-  if (!configuration?.ready || !configuration.pricePerTokenMinor) {
-    throw Object.assign(new Error("Flutterwave is not enabled for the detected country and currency."), {
-      code: "FLUTTERWAVE_NOT_CONFIGURED", status: 503,
-    });
-  }
   if (!(TOKEN_PACKS as readonly number[]).includes(input.tokenPack) || !validIdempotencyKey(input.idempotencyKey)) {
     throw Object.assign(new Error("Choose a supported token pack and retry checkout."), {
       code: "INVALID_PURCHASE", status: 400,
     });
   }
+  const configuration = resolveConfiguration(input.countryCode);
+  if (!configuration?.ready) {
+    throw Object.assign(new Error("Flutterwave is not enabled for the detected country and currency."), {
+      code: "FLUTTERWAVE_NOT_CONFIGURED", status: 503,
+    });
+  }
 
-  const { currency, pricePerTokenMinor, secret, profile } = configuration;
-  const amountMinor = input.tokenPack * pricePerTokenMinor;
+  const { currency, secret, profile } = configuration;
+  const amountMinor = input.pricingQuote.amountMinor;
   const amountMajor = toFlutterwaveMajorAmount(amountMinor, currency);
   const creditsSubunits = input.tokenPack * 1_000;
+  if (input.pricingQuote.tokens !== input.tokenPack || input.pricingQuote.currency !== currency ||
+      input.pricingQuote.usdAmountCents !== input.tokenPack || !Number.isFinite(input.pricingQuote.fxRate) ||
+      !input.pricingQuote.fxUpdatedAt || !input.pricingQuote.quotedAt) {
+    throw Object.assign(new Error("The server-side token pack FX quote is invalid for this Flutterwave checkout."), {
+      code: "INVALID_PRICE_CONFIGURATION", status: 503,
+    });
+  }
   if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0 || amountMajor === null ||
       !Number.isSafeInteger(creditsSubunits)) {
     throw Object.assign(new Error("The configured token price is outside the supported range."), {
@@ -176,7 +205,19 @@ export async function initializeFlutterwaveCheckout(input: {
     "(id, user_id, provider, platform, product_id, amount_minor, currency, credits_subunits, status, idempotency_key, provider_metadata) " +
     "values ($1, $2, 'flutterwave', 'web', $3, $4, $5, $6, 'created', $7, $8::jsonb)",
     [intentId, input.userId, "tokens-" + input.tokenPack, amountMinor, currency, creditsSubunits,
-      input.idempotencyKey, JSON.stringify({ txRef: intentId, tokenPack: input.tokenPack, countryCode: profile.countryCode })],
+      input.idempotencyKey, JSON.stringify({
+        txRef: intentId,
+        tokenPack: input.tokenPack,
+        countryCode: profile.countryCode,
+        baseCurrency: "USD",
+        usdAmountCents: input.pricingQuote.usdAmountCents,
+        fxRate: input.pricingQuote.fxRate,
+        fxSource: input.pricingQuote.fxSource,
+        fxUpdatedAt: input.pricingQuote.fxUpdatedAt,
+        fxNextUpdateAt: input.pricingQuote.fxNextUpdateAt,
+        fxFetchedAt: input.pricingQuote.fxFetchedAt,
+        quotedAt: input.pricingQuote.quotedAt,
+      })],
   );
 
   try {
@@ -198,7 +239,17 @@ export async function initializeFlutterwaveCheckout(input: {
           title: "enV wallet",
           description: "Add " + input.tokenPack + " enV tokens",
         },
-        meta: { purchaseIntentId: intentId, tokenPack: input.tokenPack, countryCode: profile.countryCode },
+        meta: {
+          purchaseIntentId: intentId,
+          tokenPack: input.tokenPack,
+          countryCode: profile.countryCode,
+          baseCurrency: "USD",
+          usdAmountCents: input.pricingQuote.usdAmountCents,
+          fxRate: input.pricingQuote.fxRate,
+          fxSource: input.pricingQuote.fxSource,
+          fxUpdatedAt: input.pricingQuote.fxUpdatedAt,
+          quotedAt: input.pricingQuote.quotedAt,
+        },
       }),
       signal: AbortSignal.timeout(12_000),
     });
@@ -215,7 +266,18 @@ export async function initializeFlutterwaveCheckout(input: {
       "update billing_purchase_intents set status = 'pending', checkout_url = $2, " +
       "provider_metadata = $3::jsonb, updated_at = now() where id = $1 and status = 'created'",
       [intentId, checkout.href, JSON.stringify({
-        txRef: intentId, tokenPack: input.tokenPack, countryCode: profile.countryCode, currency,
+        txRef: intentId,
+        tokenPack: input.tokenPack,
+        countryCode: profile.countryCode,
+        currency,
+        baseCurrency: "USD",
+        usdAmountCents: input.pricingQuote.usdAmountCents,
+        fxRate: input.pricingQuote.fxRate,
+        fxSource: input.pricingQuote.fxSource,
+        fxUpdatedAt: input.pricingQuote.fxUpdatedAt,
+        fxNextUpdateAt: input.pricingQuote.fxNextUpdateAt,
+        fxFetchedAt: input.pricingQuote.fxFetchedAt,
+        quotedAt: input.pricingQuote.quotedAt,
       })],
     );
     return { authorizationUrl: checkout.href, reference: intentId, tokens: input.tokenPack };
