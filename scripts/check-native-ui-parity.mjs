@@ -308,6 +308,7 @@ assert.match(androidHome, /MostUsedToolsTray[\s\S]*?height\(112\.dp\)/);
 assert.match(webHome, /personal-tools-scroll snap-x snap-mandatory/);
 assert.match(webStyles, /grid-auto-columns: calc\(20% - 9\.6px\)/);
 assert.match(webStyles, /grid-auto-columns: calc\(10% - 10\.8px\)/);
+assert.match(webStyles, /\.personal-tools-track \{[\s\S]*?width: 100%;[\s\S]*?min-width: 100%;[\s\S]*?height: 100%;/);
 assert.match(webStyles, /overflow-x: auto/);
 assert.match(webStyles, /scrollbar-width: none/);
 assert.match(webStyles, /::-webkit-scrollbar/);
