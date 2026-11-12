@@ -51,6 +51,16 @@ function minimumPaystackAmountMinor(currency: string): number {
   return minimums[currency] ?? 1;
 }
 
+function paystackLocalChannels(countryCode: string | null | undefined): string[] {
+  const channels: Record<string, string[]> = {
+    NG: ["bank", "ussd", "qr", "bank_transfer", "payattitude"],
+    GH: ["bank", "mobile_money"],
+    KE: ["bank", "mobile_money"],
+    ZA: ["bank", "eft", "capitec_pay"],
+  };
+  return channels[countryCode?.trim().toUpperCase() ?? ""] ?? [];
+}
+
 /** Build a Paystack option from the detected customer country and actual merchant settlement currency. */
 export async function getPaystackFundingOption(countryCode: string | null | undefined) {
   const configuration = resolvePaystackConfiguration(countryCode);
@@ -67,6 +77,7 @@ export async function getPaystackFundingOption(countryCode: string | null | unde
       currency,
       pricePerTokenMinor: null,
       packs: [],
+      localPayments: !international && paystackLocalChannels(countryCode).length > 0,
       message: "A current USD exchange-rate quote is unavailable for " + currency + ". No local amount was estimated.",
     };
   }
@@ -79,7 +90,9 @@ export async function getPaystackFundingOption(countryCode: string | null | unde
       : undefined,
   }));
   const anyPackAvailable = packs.some((pack) => pack.enabled);
-  const ready = enabled && anyPackAvailable;
+  // Custom amounts are quoted on demand. A preset pack failing the minimum
+  // must not disable a larger custom amount that meets the same provider rules.
+  const ready = enabled;
   const message = !configuration.secret
     ? "Paystack credentials for " + currency + " are not configured on this deployment."
     : !enabled
@@ -98,8 +111,11 @@ export async function getPaystackFundingOption(countryCode: string | null | unde
     fxUpdatedAt: quotes[0]?.fxUpdatedAt ?? null,
     fxNextUpdateAt: quotes[0]?.fxNextUpdateAt ?? null,
     fxFetchedAt: quotes[0]?.fxFetchedAt ?? null,
+    localPayments: !international && paystackLocalChannels(countryCode).length > 0,
     packs,
-    message,
+    message: !anyPackAvailable && enabled
+      ? "Enter a custom amount that meets the payment minimum for " + currency + "."
+      : message,
   };
 }
 
@@ -198,11 +214,19 @@ export async function initializePaystackCheckout(input: {
   tokenPack: number;
   idempotencyKey: unknown;
   pricingQuote: CurrencyPackQuote;
+  paymentMethod?: "card" | "local";
 }, countryCode: string | null) {
-  if (!(TOKEN_PACKS as readonly number[]).includes(input.tokenPack) || !validIdempotencyKey(input.idempotencyKey)) {
+  if (!Number.isSafeInteger(input.tokenPack) || input.tokenPack < 100 ||
+      input.tokenPack > 9_000_000_000 || !validIdempotencyKey(input.idempotencyKey)) {
     throw Object.assign(new Error("Choose a supported token pack and retry the checkout."), { code: "INVALID_PURCHASE", status: 400 });
   }
   const configuration = requireLiveFunding(countryCode, input.pricingQuote, input.tokenPack);
+  if (input.paymentMethod === "local" &&
+      (configuration.international || paystackLocalChannels(countryCode).length === 0)) {
+    throw Object.assign(new Error("Local payment methods are not available for this country and merchant account."), {
+      code: "PAYMENT_METHOD_NOT_AVAILABLE_FOR_COUNTRY", status: 422,
+    });
+  }
   const amountMinor = input.pricingQuote.amountMinor;
   const creditsSubunits = input.tokenPack * 1_000;
   if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0 || !Number.isSafeInteger(creditsSubunits)) {
@@ -268,6 +292,7 @@ export async function initializePaystackCheckout(input: {
         metadata: {
           purchaseIntentId: intentId,
           tokenPack: input.tokenPack,
+          paymentMethod: input.paymentMethod ?? null,
           currency: configuration.currency,
           baseCurrency: "USD",
           usdAmountCents: input.pricingQuote.usdAmountCents,
@@ -276,7 +301,11 @@ export async function initializePaystackCheckout(input: {
           fxUpdatedAt: input.pricingQuote.fxUpdatedAt,
           quotedAt: input.pricingQuote.quotedAt,
         },
-        ...(configuration.international ? { channels: ["card"] } : {}),
+        ...(input.paymentMethod === "card"
+          ? { channels: ["card"] }
+          : input.paymentMethod === "local"
+            ? { channels: paystackLocalChannels(countryCode) }
+            : configuration.international ? { channels: ["card"] } : {}),
       }),
       signal: AbortSignal.timeout(12_000),
     });
