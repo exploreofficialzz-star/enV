@@ -385,7 +385,9 @@ assert.doesNotMatch(tokenDashboardComponent, /> Home|enV token activity</, "the 
 assert.match(tokenDashboardComponent, /flex items-start justify-between gap-3 sm:gap-5[\s\S]*Welcome to your token dashboard[\s\S]*<Link to="\/wallet"[\s\S]*Open wallet/, "Open wallet must share the welcome heading row");
 assert.match(tokenDashboardComponent, /wallet \? tokenLabel\(wallet\.reservedTokens\) : "—"/, "reserved tokens must remain unavailable when the wallet is missing");
 assert.match(tokenDashboardComponent, /wallet \? tokenLabel\(wallet\.lifetimeConsumedSubunits \/ 1_000\) : "—"/, "total used ever must remain unavailable when the wallet is missing");
-assert.match(tokenDashboardComponent, /Array\.from\(\{ length: 7 \}/, "the empty-wallet preview must keep seven zero-use chart days visible");
+assert.match(tokenDashboardComponent, /Confirmed token deductions over the last seven local calendar days/, "the dashboard must label its seven-day usage window");
+assert.match(tokenDashboardComponent, /daily\.map\(\(item\)/, "the dashboard must render each returned daily usage record");
+assert.match(tokenDashboardComponent, /No recent token usage\./, "an empty usage history must be described honestly rather than fabricate zero-use records");
 const androidTokenDashboard = androidPricing.split("private fun NativeTokenDashboard(onOpenWallet: () -> Unit)")[1]?.split("private fun NativeWalletDashboard()")[0] ?? "";
 assert.match(androidTokenDashboard, /Text\("Open wallet"\)/, "Android token dashboard must place Open wallet beside the welcome heading");
 assert.match(androidTokenDashboard, /Row\(Modifier\.fillMaxWidth\(\), verticalAlignment = Alignment\.Top[\s\S]*"Welcome to your token dashboard"[\s\S]*Text\("Open wallet"\)/, "Android Open wallet action must share the welcome row");
