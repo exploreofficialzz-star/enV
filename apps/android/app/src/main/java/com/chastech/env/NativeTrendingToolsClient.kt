@@ -7,8 +7,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Shared Home feed. The server selects one daily discovery order until enough
- * consented activity exists, then returns the same analytics ranking to all apps.
+ * Fetches only consented real-usage rankings. Each native Home screen supplies
+ * its own temporary random catalogue selection until this endpoint has IDs.
  */
 data class NativeTrendingFeed(val toolIds: List<String>, val mode: String)
 
