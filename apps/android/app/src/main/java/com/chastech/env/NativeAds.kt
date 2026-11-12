@@ -101,6 +101,39 @@ internal object NativeAdsPolicy {
             (tool.disclaimer?.let { it !in restrictedDisclaimers } ?: true)
     }
 
+    /**
+     * Native advertising eligibility is separate from the offline-wallet cohort.
+     * Only active, public, device-local tools qualify; Studio, AI and Lab/Sandbox
+     * experiences remain excluded. This policy never grants offline execution.
+     */
+    fun isAdEligibleTool(tool: ToolRecord): Boolean {
+        val restrictedDisclaimers = setOf("health", "finance", "earnings")
+        val restrictedCategories = setOf(
+            "health", "finance", "earnings", "fitness", "personal",
+            "ai", "developer", "accessibility", "lab", "labs",
+        )
+        val identity = (listOf(
+            tool.id, tool.name, tool.subcategory.orEmpty(),
+            tool.engine.type, tool.engine.id,
+        ) + tool.tags + tool.keywords)
+            .joinToString(" ")
+            .lowercase()
+            .replace('-', ' ')
+            .replace('_', ' ')
+        val excludedConcept = Regex(
+            """\\b(studio|studios|lab|labs|laboratory|laboratories|sandbox|ai|artificial intelligence)\\b"""
+        ).containsMatchIn(identity)
+        return tool.status == "active" &&
+            tool.clientSide &&
+            !tool.requiresBackend &&
+            !tool.requiresAuth &&
+            tool.category.lowercase() !in restrictedCategories &&
+            !tool.id.startsWith("finance-") &&
+            tool.disclaimer?.lowercase() !in restrictedDisclaimers &&
+            tool.engine.type.lowercase() != "ai" &&
+            !excludedConcept
+    }
+
     suspend fun isApplicationOnline(context: Context): Boolean = withContext(Dispatchers.IO) {
         if (!hasValidatedInternet(context)) return@withContext false
         val connection = (URL("https://envtools.store/").openConnection() as? HttpURLConnection)
@@ -220,8 +253,7 @@ internal fun NativeToolAdSlot(tool: ToolRecord) {
     val context = LocalContext.current
     val preview = LocalInspectionMode.current
     val supported = remember(toolId) {
-        NativeAdsPolicy.isHybridTool(context, tool) &&
-            runCatching { com.chastech.env.billing.OfflineWalletJournal(context).isEligibleTool(context, toolId) }.getOrDefault(false)
+        NativeAdsPolicy.isAdEligibleTool(tool)
     }
     val network = rememberValidatedAdNetwork(context)
     var applicationOnline by remember(toolId) { mutableStateOf(false) }
