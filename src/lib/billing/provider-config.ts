@@ -25,6 +25,20 @@ export function isFlutterwavePaymentOptionsConfigured(
   return env.FLUTTERWAVE_PAYMENT_OPTIONS_DASHBOARD_DISABLED === "true";
 }
 
+const PAYSTACK_LOCAL_CHANNELS: Record<string, readonly string[]> = {
+  NG: ["bank", "ussd", "bank_transfer"],
+  GH: ["mobile_money", "bank_transfer"],
+  KE: ["mobile_money"],
+  CI: ["mobile_money"],
+  ZA: ["qr", "eft", "capitec_pay"],
+};
+
+/** Paystack channels supported for local customers in each market. */
+export function getPaystackLocalChannels(countryCode: string | null | undefined): string[] {
+  const country = countryCode?.trim().toUpperCase() ?? "";
+  return [...(PAYSTACK_LOCAL_CHANNELS[country] ?? [])];
+}
+
 const PAYSTACK_MERCHANT_LOCAL_CURRENCIES: Record<string, string> = {
   NG: "NGN",
   GH: "GHS",
