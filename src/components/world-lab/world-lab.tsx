@@ -319,11 +319,11 @@ export default function WorldLab() {
       if (group && groups.has(group)) setStudioPanel(group);
     };
     // Capture before scene/canvas listeners; the rail is always a first-class control.
-    root.addEventListener("pointerdown", activateRail, true);
-    root.addEventListener("click", activateRail, true);
+    document.addEventListener("pointerdown", activateRail, true);
+    document.addEventListener("click", activateRail, true);
     return () => {
-      root.removeEventListener("pointerdown", activateRail, true);
-      root.removeEventListener("click", activateRail, true);
+      document.removeEventListener("pointerdown", activateRail, true);
+      document.removeEventListener("click", activateRail, true);
       delete root.dataset.railListener;
     };
   }, []);
