@@ -247,6 +247,7 @@ export function AdsterraNativeBanner() {
     const loadTimeout = window.setTimeout(fail, 15_000);
     script.addEventListener("load", () => {
       window.clearTimeout(loadTimeout);
+      if (failureHandled) return;
       failureHandled = true;
       if (active) setFailed(false);
     }, { once: true });
@@ -322,16 +323,18 @@ export function AdsterraToolPopunder() {
       nextScript.dataset.envAdsterraPopunder = "true";
       nextScript.src = ADSTERRA_POPUNDER_SCRIPT.src;
       nextScript.addEventListener("load", () => {
+        if (!active || script !== nextScript) return;
         if (loadTimeout !== null) window.clearTimeout(loadTimeout);
         loadTimeout = null;
         loaded = true;
         loading = false;
       }, { once: true });
       nextScript.addEventListener("error", () => {
+        if (!active || script !== nextScript) return;
         if (loadTimeout !== null) window.clearTimeout(loadTimeout);
         loadTimeout = null;
         loading = false;
-        if (script === nextScript) script = null;
+        script = null;
         nextScript.remove();
       }, { once: true });
       script = nextScript;
