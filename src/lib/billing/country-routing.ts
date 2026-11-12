@@ -92,17 +92,16 @@ export function getCurrencyMinorUnitExponent(currency: string): number | null {
 }
 
 /**
- * Flutterwave Standard documents amount as int32 in major currency units.
- * Convert only when the complete token pack is an exact whole major unit;
- * never send a fractional/rounded value or overflow the provider's field.
+ * Convert integer currency minor units to Flutterwave Standard's major-unit amount.
+ * Preserve the currency's supported decimal precision and reject int32 overflows.
  */
 export function toFlutterwaveMajorAmount(amountMinor: number, currency: string): number | null {
   const exponent = getCurrencyMinorUnitExponent(currency);
   if (exponent === null || !Number.isSafeInteger(amountMinor) || amountMinor <= 0) return null;
   const factor = 10 ** exponent;
-  if (amountMinor % factor !== 0) return null;
   const amount = amountMinor / factor;
-  return Number.isInteger(amount) && amount > 0 && amount <= 2_147_483_647 ? amount : null;
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 2_147_483_647) return null;
+  return Number(amount.toFixed(exponent));
 }
 
 /** Convert a provider major-unit amount into exact integer minor units without floating-point rounding. */
