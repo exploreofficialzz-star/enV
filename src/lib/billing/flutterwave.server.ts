@@ -1,6 +1,8 @@
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { getSql } from "../db";
-import { readWallet, creditVerifiedPurchase } from "./ledger.server";
+import {
+  readWallet, creditVerifiedPurchase, reconcileVerifiedRefund, reconcileVerifiedDispute,
+} from "./ledger.server";
 import { isFlutterwavePaymentOptionsConfigured } from "./provider-config";
 import { readBoundedBytes } from "./bounded-json.server";
 import {
@@ -336,7 +338,7 @@ export async function verifyAndCreditFlutterwaveReference(reference: string, tra
   );
   const payload = await response.json() as {
     status?: string;
-    data?: { id?: string | number; tx_ref?: string; status?: string; amount?: number | string; currency?: string };
+    data?: { id?: string | number; tx_ref?: string; status?: string; amount?: number | string; currency?: string; flw_ref?: string };
   };
   const transaction = payload.data;
   const paidAmountMinor = transaction
@@ -356,7 +358,7 @@ export async function verifyAndCreditFlutterwaveReference(reference: string, tra
     provider: "flutterwave", reference, transactionId,
     amountMinor: paidAmountMinor, currency: intent.currency.toUpperCase(), status: "successful",
   });
-  return creditVerifiedPurchase({
+  const credited = await creditVerifiedPurchase({
     purchaseIntentId: intent.id,
     provider: "flutterwave",
     providerEventId: "charge-completed-" + transactionId,
@@ -365,6 +367,15 @@ export async function verifyAndCreditFlutterwaveReference(reference: string, tra
     paidCurrency: intent.currency,
     payloadDigest: createHash("sha256").update(canonical).digest("hex"),
   });
+  if (typeof transaction.flw_ref === "string" && transaction.flw_ref.length <= 160) {
+    await sql.query(
+      `update billing_purchase_intents
+          set provider_metadata = provider_metadata || $2::jsonb, updated_at = now()
+        where id = $1 and provider = 'flutterwave'`,
+      [intent.id, JSON.stringify({ flwRef: transaction.flw_ref })],
+    );
+  }
+  return credited;
 }
 
 function safeEqual(left: string, right: string): boolean {
@@ -388,6 +399,200 @@ async function updateFlutterwaveIntentStatus(
     "where id = $1 and provider = 'flutterwave' and status in ('created', 'pending', 'verified')",
     [reference, status],
   );
+}
+
+type FlutterwaveApiRecord = Record<string, unknown>;
+
+async function getFlutterwaveApiRecords(
+  resource: "refunds" | "chargebacks",
+  parameters: Record<string, string>,
+): Promise<FlutterwaveApiRecord[]> {
+  const secret = process.env.FLW_SECRET_KEY?.trim() ?? "";
+  if (!secret) throw Object.assign(new Error("Flutterwave verification is not configured."), {
+    code: "FLUTTERWAVE_NOT_CONFIGURED", status: 503,
+  });
+  const url = new URL("https://api.flutterwave.com/v3/" + resource);
+  for (const [key, value] of Object.entries(parameters)) url.searchParams.set(key, value);
+  const response = await fetch(url, {
+    headers: { Authorization: "Bearer " + secret, Accept: "application/json" },
+    signal: AbortSignal.timeout(12_000),
+  });
+  const payload = await response.json().catch(() => null) as {
+    status?: unknown; data?: unknown;
+  } | null;
+  if (!response.ok || payload?.status !== "success") {
+    throw Object.assign(new Error("Flutterwave could not verify the refund or chargeback record."), {
+      code: "FLUTTERWAVE_RECONCILIATION_UNAVAILABLE", status: 503,
+    });
+  }
+  if (Array.isArray(payload.data)) {
+    return payload.data.filter((item): item is FlutterwaveApiRecord =>
+      Boolean(item) && typeof item === "object" && !Array.isArray(item));
+  }
+  if (payload.data && typeof payload.data === "object") return [payload.data as FlutterwaveApiRecord];
+  return [];
+}
+
+function flutterwaveRefundStatus(value: unknown): "pending" | "processing" | "needs_attention" | "failed" | "completed" {
+  const status = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (status === "failed" || status.startsWith("failed-")) return "failed";
+  if (status.startsWith("completed-") || status === "successful") return "completed";
+  if (status === "completed" || status === "processing" || status === "new") return "processing";
+  if (status.startsWith("pending")) return "pending";
+  if (status.includes("attention")) return "needs_attention";
+  return "needs_attention";
+}
+
+function flutterwaveDisputeStatus(value: unknown): "open" | "accepted" | "declined" | "review_required" | "won" | "lost" {
+  const status = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (status === "initiated" || status === "pending" || status === "open") return "open";
+  if (status === "accepted") return "accepted";
+  if (status === "declined") return "declined";
+  if (status === "won" || status === "reversed") return "won";
+  if (status === "lost") return "lost";
+  return "review_required";
+}
+
+function asProviderId(value: unknown): string | null {
+  if (typeof value === "string" && /^[A-Za-z0-9_-]{1,160}$/.test(value)) return value;
+  if (typeof value === "number" && Number.isSafeInteger(value) && value > 0) return String(value);
+  return null;
+}
+
+async function handleFlutterwaveRefundWebhook(body: Record<string, unknown>) {
+  const nested = body.data && typeof body.data === "object" && !Array.isArray(body.data)
+    ? body.data as Record<string, unknown> : {};
+  const refundId = asProviderId(body.id ?? body.refund_id ?? body.refundId ?? nested.id);
+  const transactionId = asProviderId(
+    body.TransactionId ?? body.transaction_id ?? nested.TransactionId ?? nested.transaction_id,
+  );
+  const webhookRefundRef = typeof (body.FlwRef ?? nested.FlwRef ?? body.flw_ref ?? nested.flw_ref) === "string"
+    ? String(body.FlwRef ?? nested.FlwRef ?? body.flw_ref ?? nested.flw_ref) : null;
+  if (!refundId || !transactionId) {
+    throw Object.assign(new Error("The Flutterwave refund event is missing its refund or original transaction ID."), {
+      code: "INVALID_REFUND_WEBHOOK", status: 400,
+    });
+  }
+  const sql = await getSql();
+  const intents = await sql.query<{
+    id: string; provider_transaction_id: string; amount_minor: number | string; currency: string;
+    credits_subunits: number | string; status: string;
+  }>(
+    `select id, provider_transaction_id, amount_minor, currency, credits_subunits, status
+       from billing_purchase_intents
+      where provider = 'flutterwave' and provider_transaction_id = $1 limit 1`,
+    [transactionId],
+  );
+  const intent = intents[0];
+  if (!intent || intent.provider_transaction_id !== transactionId) {
+    throw Object.assign(new Error("The Flutterwave refund does not match a recorded enV purchase."), {
+      code: "PURCHASE_MISMATCH", status: 409,
+    });
+  }
+  const records = await getFlutterwaveApiRecords("refunds", {
+    id: refundId,
+    currency: intent.currency.toUpperCase(),
+  });
+  const refund = records.find((record) => String(record.id) === refundId);
+  if (!refund || String(refund.transaction_id) !== transactionId ||
+      (webhookRefundRef && typeof refund.flw_ref === "string" && refund.flw_ref !== webhookRefundRef)) {
+    throw Object.assign(new Error("The Flutterwave refund record does not match the original enV payment."), {
+      code: "REFUND_PROVIDER_MISMATCH", status: 409,
+    });
+  }
+  const amountMinor = parseMajorUnitsToMinor(refund.amount_refunded as string | number | undefined, intent.currency);
+  if (!amountMinor || amountMinor > Number(intent.amount_minor) ||
+      (refund.currency !== undefined && String(refund.currency).toUpperCase() !== intent.currency.toUpperCase())) {
+    throw Object.assign(new Error("The verified Flutterwave refund amount or currency is invalid."), {
+      code: "REFUND_PROVIDER_MISMATCH", status: 409,
+    });
+  }
+  const status = flutterwaveRefundStatus(refund.status);
+  const canonical = JSON.stringify({
+    provider: "flutterwave", refundId, transactionId, amountMinor,
+    currency: intent.currency.toUpperCase(), status: refund.status, flwRef: refund.flw_ref ?? null,
+  });
+  const result = await reconcileVerifiedRefund({
+    provider: "flutterwave",
+    providerRefundId: refundId,
+    purchaseIntentId: intent.id,
+    amountMinor,
+    currency: intent.currency,
+    status,
+    payloadDigest: createHash("sha256").update(canonical).digest("hex"),
+    providerMetadata: {
+      providerStatus: refund.status,
+      flutterwaveRefundReference: refund.flw_ref ?? null,
+      originalTransactionId: transactionId,
+      webhookReference: webhookRefundRef,
+    },
+  });
+  return { event: "refund", refundId, ...result };
+}
+
+async function handleFlutterwaveChargebackWebhook(body: Record<string, unknown>) {
+  const nested = body.data && typeof body.data === "object" && !Array.isArray(body.data)
+    ? body.data as Record<string, unknown> : {};
+  const disputeId = asProviderId(nested.id ?? body.id);
+  const webhookFlwRef = typeof nested.flw_ref === "string" ? nested.flw_ref
+    : typeof body.flw_ref === "string" ? body.flw_ref : null;
+  if (!disputeId || !webhookFlwRef) {
+    throw Object.assign(new Error("The Flutterwave chargeback event is missing its dispute ID or transaction reference."), {
+      code: "INVALID_CHARGEBACK_WEBHOOK", status: 400,
+    });
+  }
+  const records = await getFlutterwaveApiRecords("chargebacks", { id: disputeId, flw_ref: webhookFlwRef });
+  const dispute = records.find((record) => String(record.id) === disputeId && record.flw_ref === webhookFlwRef);
+  const transactionId = dispute ? asProviderId(dispute.transaction_id) : null;
+  const purchaseReference = dispute && typeof dispute.tx_ref === "string" ? dispute.tx_ref : null;
+  if (!dispute || !transactionId || !purchaseReference) {
+    throw Object.assign(new Error("The Flutterwave chargeback record could not be matched to its original transaction."), {
+      code: "CHARGEBACK_PROVIDER_MISMATCH", status: 409,
+    });
+  }
+  const sql = await getSql();
+  const intents = await sql.query<{
+    id: string; provider_transaction_id: string | null; amount_minor: number | string; currency: string;
+  }>(
+    `select id, provider_transaction_id, amount_minor, currency
+       from billing_purchase_intents
+      where id = $1 and provider = 'flutterwave' limit 1`,
+    [purchaseReference],
+  );
+  const intent = intents[0];
+  if (!intent || intent.provider_transaction_id !== transactionId) {
+    throw Object.assign(new Error("The Flutterwave chargeback transaction does not match the enV purchase ledger."), {
+      code: "CHARGEBACK_PROVIDER_MISMATCH", status: 409,
+    });
+  }
+  const amountMinor = parseMajorUnitsToMinor(dispute.amount as string | number | undefined, intent.currency);
+  if (!amountMinor || amountMinor > Number(intent.amount_minor)) {
+    throw Object.assign(new Error("The verified Flutterwave chargeback amount is invalid."), {
+      code: "CHARGEBACK_PROVIDER_MISMATCH", status: 409,
+    });
+  }
+  const status = flutterwaveDisputeStatus(dispute.status);
+  const canonical = JSON.stringify({
+    provider: "flutterwave", disputeId, transactionId, purchaseReference,
+    amountMinor, currency: intent.currency.toUpperCase(), status: dispute.status,
+    flwRef: webhookFlwRef, stage: dispute.stage ?? null,
+  });
+  const result = await reconcileVerifiedDispute({
+    provider: "flutterwave",
+    providerDisputeId: disputeId,
+    purchaseIntentId: intent.id,
+    amountMinor,
+    currency: intent.currency,
+    status,
+    payloadDigest: createHash("sha256").update(canonical).digest("hex"),
+    providerMetadata: {
+      providerStatus: dispute.status,
+      stage: dispute.stage ?? null,
+      flutterwaveTransactionReference: webhookFlwRef,
+      originalTransactionId: transactionId,
+    },
+  });
+  return { event: "chargeback", disputeId, ...result };
 }
 
 export async function handleFlutterwaveWebhook(request: Request) {
@@ -417,33 +622,31 @@ export async function handleFlutterwaveWebhook(request: Request) {
   }
 
   const eventName = typeof body.event === "string" ? body.event.toLowerCase() : "";
-  // V3 refund notifications can arrive as a top-level object with AmountRefunded
-  // and FlwRef, rather than the normal { event, data } charge envelope.
+  const nested = body.data && typeof body.data === "object" && !Array.isArray(body.data)
+    ? body.data as Record<string, unknown> : {};
   const isRefundPayload = body.AmountRefunded !== undefined ||
-    body.refund_id !== undefined || body.refundId !== undefined;
-  if (isRefundPayload || eventName.includes("refund") ||
-      eventName.includes("chargeback") || eventName.includes("dispute")) {
-    throw Object.assign(new Error("This Flutterwave refund or dispute event requires wallet reconciliation; no wallet balance was changed."), {
-      code: "FLUTTERWAVE_REFUND_DISPUTE_RECONCILIATION_REQUIRED", status: 503,
-    });
+    body.refund_id !== undefined || body.refundId !== undefined ||
+    eventName.includes("refund");
+  if (isRefundPayload) return handleFlutterwaveRefundWebhook(body);
+  if (eventName.includes("chargeback") || eventName.includes("dispute")) {
+    return handleFlutterwaveChargebackWebhook(body);
   }
   if (eventName !== "charge.completed") return { ignored: true };
-  const data = body.data && typeof body.data === "object" ? body.data as Record<string, unknown> : null;
-  if (!data || typeof data.tx_ref !== "string") {
+  if (typeof nested.tx_ref !== "string") {
     throw Object.assign(new Error("The Flutterwave charge event is missing its transaction reference."), {
       code: "INVALID_WEBHOOK", status: 400,
     });
   }
-  if (data.status === "failed") {
-    await updateFlutterwaveIntentStatus(data.tx_ref, "failed");
+  if (nested.status === "failed") {
+    await updateFlutterwaveIntentStatus(nested.tx_ref, "failed");
     return { status: "failed" as const };
   }
-  if (data.status === "cancelled" || data.status === "canceled") {
-    await updateFlutterwaveIntentStatus(data.tx_ref, "cancelled");
+  if (nested.status === "cancelled" || nested.status === "canceled") {
+    await updateFlutterwaveIntentStatus(nested.tx_ref, "cancelled");
     return { status: "cancelled" as const };
   }
-  if (data.status !== "successful" || data.id === undefined || data.id === null) {
+  if (nested.status !== "successful" || nested.id === undefined || nested.id === null) {
     return { status: "pending" as const };
   }
-  return verifyAndCreditFlutterwaveReference(data.tx_ref, String(data.id));
+  return verifyAndCreditFlutterwaveReference(nested.tx_ref, String(nested.id));
 }
