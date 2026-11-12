@@ -411,8 +411,19 @@ async function getFlutterwaveApiRecords(
   if (!secret) throw Object.assign(new Error("Flutterwave verification is not configured."), {
     code: "FLUTTERWAVE_NOT_CONFIGURED", status: 503,
   });
-  const url = new URL("https://api.flutterwave.com/v3/" + resource);
-  for (const [key, value] of Object.entries(parameters)) url.searchParams.set(key, value);
+  const refundId = resource === "refunds" ? parameters.id : undefined;
+  if (resource === "refunds" && !refundId) {
+    throw Object.assign(new Error("A Flutterwave refund ID is required for verification."), {
+      code: "INVALID_REFUND_WEBHOOK", status: 400,
+    });
+  }
+  const url = new URL(resource === "refunds"
+    ? "https://api.flutterwave.com/v3/refunds/" + encodeURIComponent(refundId!)
+    : "https://api.flutterwave.com/v3/chargebacks");
+  for (const [key, value] of Object.entries(parameters)) {
+    if (resource === "refunds" && key === "id") continue;
+    url.searchParams.set(key, value);
+  }
   const response = await fetch(url, {
     headers: { Authorization: "Bearer " + secret, Accept: "application/json" },
     signal: AbortSignal.timeout(12_000),
