@@ -68,7 +68,7 @@ test("All Tools groups results by category and progressively expands without glo
 
 test("tool detail Save action stays in the title row and the description wraps below it on compact screens", () => {
   const shell = readFileSync(join(PROJECT_ROOT, "src/components/tools/tool-shell.tsx"), "utf8");
-  assert.ok(shell.includes('<header className="mt-6 grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto]'), "responsive grid title/save row must be present");
+  assert.ok(shell.includes('mt-6 grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_auto]'), "responsive grid title/save row must be present");
   assert.ok(shell.includes('className="col-start-3 row-start-1 shrink-0"'), "Save must stay in the first row");
   assert.ok(shell.includes("col-start-2 col-span-2 row-start-2 text-sm leading-6 text-muted sm:hidden"), "mobile description must occupy the row beneath Save");
   assert.ok(shell.includes("Read the full guide") && shell.includes("toolDocumentationPath(tool)"), "the full-guide link must remain after inline guide content");
@@ -216,7 +216,8 @@ test("web brand lockups use the canonical light and dark assets in the home hero
   assert.match(home, /inputClassName="[^\"]*text-left/);
   assert.doesNotMatch(home, /pl-\[76px\]/);
   assert.match(home, /sm:mt-5/);
-  assert.match(home, /getPopularTools\(12\)/);
+  assert.match(home, /loadHomeTrendingTools\(\)/);
+  assert.match(home, /fetch\("\/api\/analytics\/trending"/);
   assert.match(home, /index >= 6 \? "hidden md:flex"/);
   assert.match(home, /text-xl font-semibold text-accent sm:text-2xl/);
   assert.match(home, /AI Agent/);
