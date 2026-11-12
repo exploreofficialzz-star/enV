@@ -503,7 +503,7 @@ function Account() {
           ? checkout.hostname === "pay.cryptomus.com"
           : checkout.hostname === "checkout.paystack.com" || checkout.hostname === "checkout.flutterwave.com"
       );
-      if (!response.ok || !payload?.ok || payload.data?.paymentMethod !== method || !allowedCheckoutHost) {
+      if (!response.ok || !payload?.ok || payload.data?.paymentMethod !== method || !checkout || !allowedCheckoutHost) {
         throw new Error(payload?.message ?? "Secure checkout could not be opened. No tokens were added.");
       }
       window.location.assign(checkout.href);
