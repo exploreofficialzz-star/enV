@@ -164,7 +164,7 @@ test("public discussion index and per-tool pages expose public comments for sear
   assert.match(toolRoute, /initialCommunityFeed=\{communityFeed\}/);
   assert.match(web, /fetch\("\/api\/community\?toolId=/);
   assert.match(web, /discussionHref/);
-  assert.match(footer, /to: "\/community", label: "Public discussions"/);
+  assert.doesNotMatch(footer, /to: "\/community", label: "Public discussions"/, "The Explore footer remains limited to legal links; community discovery is provided by the indexed discussion routes and sitemap.");
   assert.match(seoGenerator, /"\/community"/);
   assert.match(seoGenerator, /Public tool discussions/);
 });
