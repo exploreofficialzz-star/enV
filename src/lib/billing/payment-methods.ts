@@ -16,10 +16,10 @@ export function isCustomerPaymentMethodAvailable(
 }
 
 /** Return approved gateway candidates in preferred order for server-side amount-specific routing. */
-export function getFundingCandidates(
-  providers: readonly FundingProvider[],
+export function getFundingCandidates<T extends FundingProvider>(
+  providers: readonly T[],
   method: CustomerPaymentMethod,
-): FundingProvider[] {
+): T[] {
   if (method === "card") {
     return providers.filter((provider) =>
       provider.enabled && (provider.id === "paystack" || provider.id === "flutterwave"),
