@@ -232,7 +232,7 @@ function ToolSection({ title, tools }: { title: string; tools: ToolMeta[] }) {
       </div>
       {tools.length ? (
         <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-          {tools.map((tool) => <ToolCard key={tool.id} tool={tool} />)}
+          {tools.map((tool, index) => <ToolCard key={tool.id} tool={tool} className={index >= 6 ? "hidden sm:flex" : ""} />)}
         </div>
       ) : null}
       <div className="mt-5"><SeeMoreLink to="/tools">See more tools</SeeMoreLink></div>
