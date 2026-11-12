@@ -12,7 +12,7 @@ type SocialProvider = "google" | "apple";
 function getSafeReturnTo(): string {
   if (typeof window === "undefined") return "/";
   const candidate = new URLSearchParams(window.location.search).get("returnTo") ?? "/";
-  if (!candidate.startsWith("/tools/") || candidate.startsWith("//") || candidate.includes("\\\\")) return "/";
+  if (!candidate.startsWith("/tools/") || candidate.startsWith("//") || candidate.includes("\\")) return "/";
   try {
     const url = new URL(candidate, window.location.origin);
     return url.origin === window.location.origin ? `${url.pathname}${url.search}${url.hash}` : "/";
