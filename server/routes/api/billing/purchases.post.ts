@@ -6,11 +6,12 @@ import { initializeCryptomusCheckout } from "../../../../src/lib/billing/cryptom
 import { initializeFlutterwaveCheckout } from "../../../../src/lib/billing/flutterwave.server";
 import { getCustomerCountry } from "../../../../src/lib/billing/country-routing";
 import { getFundingOptions } from "../../../../src/lib/billing/paystack.server";
-import type { CurrencyPackQuote } from "../../../../src/lib/billing/fx.server";
+import { quoteTokenPacks, type CurrencyPackQuote } from "../../../../src/lib/billing/fx.server";
+import { selectFundingProvider, type CustomerPaymentMethod } from "../../../../src/lib/billing/payment-methods";
 
 const SAFE_CHECKOUT_FAILURES: Record<string, { status: number; message: string }> = {
   PAYMENTS_NOT_CONFIGURED: { status: 503, message: "Token purchases are not enabled for this deployment yet." },
-  INVALID_PURCHASE: { status: 400, message: "Choose a valid token pack and try again." },
+  INVALID_PURCHASE: { status: 400, message: "Enter an amount of at least US$1 and choose a payment method." },
   INVALID_PRICE_CONFIGURATION: { status: 503, message: "Token pricing is temporarily unavailable. No payment was taken." },
   IDEMPOTENCY_CONFLICT: { status: 409, message: "This checkout key was already used for another purchase. Start a new checkout." },
   CHECKOUT_ALREADY_USED: { status: 409, message: "This checkout attempt has already been used. Start a new checkout." },
@@ -32,44 +33,61 @@ export default defineHandler(async (event) => {
   const auth = await requireBillingUser(request);
   if (auth.response || !auth.userId) return auth.response ?? jsonResponse({ ok: false, error: "AUTH_REQUIRED" }, 401);
   const body = await readJsonObject(request, 2_048);
-  const provider = body?.provider === undefined ? "paystack" : body.provider;
-  if (!body || typeof body.tokenPack !== "number" || !Number.isInteger(body.tokenPack) ||
+  const methodValue = body?.paymentMethod;
+  const paymentMethod = methodValue === "card" || methodValue === "local" || methodValue === "more"
+    ? methodValue as CustomerPaymentMethod
+    : undefined;
+  // Backwards compatibility: old clients send tokenPack; new clients send USD cents.
+  // One cent of USD reference value equals one enV token.
+  const amountUsdCents = body?.amountUsdCents ?? body?.tokenPack;
+  const legacyProvider = body?.provider;
+  if (!body || typeof amountUsdCents !== "number" || !Number.isSafeInteger(amountUsdCents) ||
+      amountUsdCents < 100 || amountUsdCents > 9_000_000_000 ||
       typeof body.idempotencyKey !== "string" ||
-      (provider !== "paystack" && provider !== "flutterwave" && provider !== "cryptomus")) {
-    return jsonResponse({ ok: false, error: "INVALID_PURCHASE", message: "Choose a supported payment method and token pack, then retry checkout." }, 400);
+      (methodValue !== undefined && !paymentMethod) ||
+      (!paymentMethod && legacyProvider !== undefined &&
+        legacyProvider !== "paystack" && legacyProvider !== "flutterwave" && legacyProvider !== "cryptomus")) {
+    return jsonResponse({
+      ok: false,
+      error: "INVALID_PURCHASE",
+      message: "Enter an amount of at least US$1 and choose a payment method.",
+    }, 400);
   }
+
+  const tokens = amountUsdCents;
   const countryCode = getCustomerCountry(request);
   const funding = await getFundingOptions(countryCode);
-  const providerOption = funding.providers.find((item) => item.id === provider);
-  if (!providerOption?.enabled) {
+  const providerOption = paymentMethod
+    ? selectFundingProvider(funding.providers, paymentMethod)
+    : funding.providers.find((item) => item.id === (legacyProvider ?? "paystack")) ?? null;
+  const provider = providerOption?.id;
+  if (!provider || !providerOption?.enabled) {
     return jsonResponse({
       ok: false,
       error: "PAYMENT_METHOD_NOT_AVAILABLE_FOR_COUNTRY",
-      message: providerOption?.message ?? funding.message,
-    }, 422);
-  }
-  const pack = providerOption.packs.find((item) => item.tokens === body.tokenPack);
-  if (!pack) {
-    return jsonResponse({ ok: false, error: "INVALID_PURCHASE", message: "Choose a supported token pack and retry checkout." }, 400);
-  }
-  if (provider !== "cryptomus" && (!("enabled" in pack) || pack.enabled !== true)) {
-    return jsonResponse({
-      ok: false,
-      error: "TOKEN_PACK_UNAVAILABLE",
-      message: ("message" in pack && typeof pack.message === "string" ? pack.message : null) ??
-        "This token pack is not available for the selected payment method.",
+      message: paymentMethod
+        ? "This payment method is not available for your country yet. No payment was taken."
+        : providerOption?.message ?? funding.message,
     }, 422);
   }
 
   try {
-    const input = { userId: auth.userId, tokenPack: body.tokenPack, idempotencyKey: body.idempotencyKey };
-    const pricingQuote = pack as CurrencyPackQuote;
+    const input = { userId: auth.userId, tokenPack: tokens, idempotencyKey: body.idempotencyKey };
+    let pricingQuote: CurrencyPackQuote | undefined;
+    if (provider !== "cryptomus") {
+      const quotes = await quoteTokenPacks(providerOption.currency, [tokens]);
+      pricingQuote = quotes[0];
+      if (!pricingQuote) throw Object.assign(new Error("A current payment quote is unavailable."), {
+        code: "INVALID_PRICE_CONFIGURATION", status: 503,
+      });
+    }
+    const providerMethod = paymentMethod === "card" || paymentMethod === "local" ? paymentMethod : undefined;
     const checkout = provider === "cryptomus"
       ? await initializeCryptomusCheckout(input)
       : provider === "flutterwave"
-        ? await initializeFlutterwaveCheckout({ ...input, countryCode, pricingQuote })
-        : await initializePaystackCheckout({ ...input, pricingQuote }, countryCode);
-    return jsonResponse({ ok: true, data: { ...checkout, provider } }, 201);
+        ? await initializeFlutterwaveCheckout({ ...input, countryCode, pricingQuote: pricingQuote!, paymentMethod: providerMethod })
+        : await initializePaystackCheckout({ ...input, pricingQuote: pricingQuote!, paymentMethod: providerMethod }, countryCode);
+    return jsonResponse({ ok: true, data: { ...checkout, provider, paymentMethod: paymentMethod ?? null } }, 201);
   } catch (error) {
     const candidate = error as { code?: unknown };
     const candidateCode = typeof candidate.code === "string" ? candidate.code : "";
