@@ -177,7 +177,9 @@ for (const [platform, ids] of [["Android", nativeInventory.androidToolIds], ["iO
 }
 assert.match(purchasesRoute, /initializePaystackCheckout/);
 assert.match(purchasesRoute, /initializeCryptomusCheckout/);
-assert.match(purchasesRoute, /provider !== "paystack" && provider !== "flutterwave" && provider !== "cryptomus"/);
+assert.match(purchasesRoute, /legacyProvider !== "paystack" && legacyProvider !== "flutterwave" && legacyProvider !== "cryptomus"/);
+assert.match(purchasesRoute, /amountUsdCents/);
+assert.match(purchasesRoute, /paymentMethod === "local"/);
 assert.match(purchasesRoute, /No payment was taken/);
 assert.match(paystackProviderConfig, /PAYSTACK_PROVIDER_APPROVED === "true"/, "Paystack checkout must require explicit merchant approval");
 assert.match(paystackService, /CRYPTOMUS_PROVIDER_APPROVED === "true"/, "crypto checkout must require explicit merchant approval");
