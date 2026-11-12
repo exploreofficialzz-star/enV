@@ -2,14 +2,40 @@ import { createServerFn } from "@tanstack/react-start";
 import { getActiveTools } from "@/lib/registry";
 import { isToolUnderProduction } from "@/lib/production-notice";
 import { getPublicTrendingTools } from "./analytics.server";
+import type { ToolMeta } from "@/types/tool";
 
-function shuffledToolIds(toolIds: string[]): string[] {
-  const shuffled = [...toolIds];
-  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+function shuffled<T>(items: T[]): T[] {
+  const result = [...items];
+  for (let index = result.length - 1; index > 0; index -= 1) {
     const target = Math.floor(Math.random() * (index + 1));
-    [shuffled[index], shuffled[target]] = [shuffled[target], shuffled[index]];
+    [result[index], result[target]] = [result[target], result[index]];
   }
-  return shuffled;
+  return result;
+}
+
+function randomCrossCategoryTools(tools: ToolMeta[], limit: number): ToolMeta[] {
+  const byCategory = new Map<string, ToolMeta[]>();
+  for (const tool of tools) {
+    if (isToolUnderProduction(tool)) continue;
+    const categoryTools = byCategory.get(tool.category) ?? [];
+    categoryTools.push(tool);
+    byCategory.set(tool.category, categoryTools);
+  }
+
+  const groups = shuffled([...byCategory.values()].map((group) => shuffled(group)));
+  const selection: ToolMeta[] = [];
+  while (selection.length < limit) {
+    let addedInRound = false;
+    for (const group of groups) {
+      const next = group.shift();
+      if (!next) continue;
+      selection.push(next);
+      addedInRound = true;
+      if (selection.length === limit) break;
+    }
+    if (!addedInRound) break;
+  }
+  return selection;
 }
 
 /**
@@ -21,12 +47,10 @@ export const loadHomeTrendingTools = createServerFn({ method: "GET" }).handler(a
   const feed = await getPublicTrendingTools();
   if (feed.toolIds.length > 0) return feed;
 
-  const discoveryIds = getActiveTools()
-    .filter((tool) => !isToolUnderProduction(tool))
-    .map((tool) => tool.id);
+  const discoveryIds = randomCrossCategoryTools(getActiveTools(), 12).map((tool) => tool.id);
   return {
     ...feed,
     mode: "discovery" as const,
-    toolIds: shuffledToolIds(discoveryIds).slice(0, 12),
+    toolIds: discoveryIds,
   };
 });
