@@ -1,6 +1,6 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { getSql } from "../db";
-import { creditVerifiedPurchase, readWallet } from "./ledger.server";
+import { creditVerifiedPurchase, readWallet, reconcileVerifiedRefund } from "./ledger.server";
 import { readBoundedBytes } from "./bounded-json.server";
 import { TOKEN_PACKS, getFundingOptions } from "./paystack.server";
 
@@ -297,6 +297,77 @@ function validCryptomusWebhookSignature(body: Record<string, unknown>, credentia
   return timingSafeEqual(Buffer.from(supplied, "hex"), Buffer.from(expected, "hex"));
 }
 
+async function reconcileCryptomusRefund(
+  body: Record<string, unknown>,
+  credentials: CryptomusCredentials,
+  reference: string,
+  invoiceUuid: string,
+  webhookStatus: "refund_process" | "refund_fail" | "refund_paid",
+) {
+  const sql = await getSql();
+  const intents = await sql.query<{
+    id: string; provider: string; amount_minor: number | string; currency: string;
+    credits_subunits: number | string; status: string; provider_transaction_id: string | null;
+  }>(
+    `select id, provider, amount_minor, currency, credits_subunits, status, provider_transaction_id
+       from billing_purchase_intents where id = $1 limit 1`,
+    [reference],
+  );
+  const intent = intents[0];
+  if (!intent || intent.provider !== "cryptomus" ||
+      intent.provider_transaction_id !== invoiceUuid ||
+      intent.currency.toUpperCase() !== "USD") {
+    throw Object.assign(new Error("The Cryptomus refund does not match a verified enV purchase."), {
+      code: "PURCHASE_MISMATCH", status: 409,
+    });
+  }
+  const invoice = await cryptomusPost("/v1/payment/info", { order_id: reference }, credentials);
+  const invoiceUuidFromProvider = invoice.uuid ?? "";
+  const invoiceStatus = typeof invoice.status === "string" ? invoice.status : invoice.payment_status;
+  const invoiceAmountMinor = amountToCents(invoice.amount);
+  if (invoice.order_id !== reference || invoiceUuidFromProvider !== invoiceUuid ||
+      invoiceAmountMinor !== Number(intent.amount_minor) ||
+      invoice.currency?.toUpperCase() !== intent.currency.toUpperCase() ||
+      invoiceStatus !== webhookStatus) {
+    throw Object.assign(new Error("Cryptomus has not confirmed the refund status or original invoice details yet."), {
+      code: "CRYPTOMUS_RECONCILIATION_UNAVAILABLE", status: 503,
+    });
+  }
+  const status = webhookStatus === "refund_paid" ? "completed"
+    : webhookStatus === "refund_fail" ? "failed" : "processing";
+  // Cryptomus' refund endpoint identifies the invoice and refund destination but
+  // does not accept a partial-refund amount. The final refund status therefore
+  // reverses the complete enV purchase, not an estimated crypto payout.
+  const amountMinor = Number(intent.amount_minor);
+  const providerRefundId = "refund-" + invoiceUuid;
+  const canonical = JSON.stringify({
+    provider: "cryptomus", reference, invoiceUuid, amountMinor,
+    currency: intent.currency.toUpperCase(), webhookStatus,
+    invoiceStatus, payerCurrency: body.payer_currency ?? null,
+    network: body.network ?? null, paymentAmount: body.payment_amount ?? null,
+  });
+  const result = await reconcileVerifiedRefund({
+    provider: "cryptomus",
+    providerRefundId,
+    purchaseIntentId: intent.id,
+    amountMinor,
+    currency: intent.currency,
+    status,
+    payloadDigest: createHash("sha256").update(canonical).digest("hex"),
+    providerMetadata: {
+      providerStatus: webhookStatus,
+      invoiceStatus,
+      invoiceUuid,
+      orderId: reference,
+      refundScope: "full_purchase",
+      payerCurrency: body.payer_currency ?? null,
+      network: body.network ?? null,
+      paymentAmount: body.payment_amount ?? null,
+    },
+  });
+  return { status, refundId: providerRefundId, ...result };
+}
+
 export async function handleCryptomusWebhook(request: Request) {
   const rawBytes = await readBoundedBytes(request, 256_000);
   if (!rawBytes) {
@@ -337,13 +408,8 @@ export async function handleCryptomusWebhook(request: Request) {
     });
   }
   const status = typeof body.status === "string" ? body.status : "";
-  // Refund callbacks must not be accepted as successfully processed until refund
-  // reconciliation and wallet-credit reversal policy are implemented.
-  if (["refund_process", "refund_fail", "refund_paid"].includes(status)) {
-    throw Object.assign(new Error("This Cryptomus refund callback requires manual wallet reconciliation; no wallet balance was changed."), {
-      code: "CRYPTOMUS_REFUND_RECONCILIATION_REQUIRED",
-      status: 503,
-    });
+  if (status === "refund_process" || status === "refund_fail" || status === "refund_paid") {
+    return reconcileCryptomusRefund(body, credentials, reference, invoiceUuid, status);
   }
   if (["paid", "paid_over", "locked", "wrong_amount", "cancel", "fail", "system_fail"].includes(status)) {
     // Even signed non-success/fraud-review callbacks must match the stored order,
