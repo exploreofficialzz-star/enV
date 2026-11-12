@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { ArrowDownToLine, Coins, RefreshCw, Wallet, Clock3, Copy, Gift, Users, Video, CreditCard, TrendingUp, Share2, ArrowUpRight, Link2, Eye, EyeOff, X } from "lucide-react";
-import { isCustomerPaymentMethodAvailable, parseUsdAmountToCents, type CustomerPaymentMethod } from "@/lib/billing/payment-methods";
+import { parseUsdAmountToCents, type CustomerPaymentMethod } from "@/lib/billing/payment-methods";
 import { AppShell } from "@/components/layout/app-shell";
 import {
   clearWebOfflineIssueKey,
@@ -35,19 +35,12 @@ type WalletActivity = {
 };
 
 type WalletState = { status: "loading" | "ready" | "unavailable"; message?: string; wallet?: WalletData; activity?: WalletActivity[] };
-type FundingProviderId = "paystack" | "flutterwave" | "cryptomus";
-type FundingProviderOption = {
-  id: FundingProviderId;
-  label: string;
-  enabled: boolean;
-  currency: string;
-  pricePerTokenMinor: number | null;
-  localPayments?: boolean;
-  paymentOptions?: string[];
-  packs: Array<{ tokens: number; amountMinor?: number | null; currency?: string; enabled?: boolean; message?: string }>;
-  message: string;
+type FundingMethods = Record<CustomerPaymentMethod, boolean>;
+type FundingOptionsState = {
+  status: "loading" | "ready" | "unavailable";
+  methods: FundingMethods;
+  message?: string;
 };
-type FundingOptionsState = { status: "loading" | "ready" | "unavailable"; providers: FundingProviderOption[]; message?: string };
 type RewardsData = {
   referralCode: string; videoSignature: string; referralCount: number; pendingReferrals: number; qualifiedReferrals: number;
   videoSignups: number; videoConversions: number; referralTokens: number; affiliateTokens: number;
@@ -192,7 +185,7 @@ function Account() {
   const [fundingBusy, setFundingBusy] = useState(false);
   const [showFundingOptions, setShowFundingOptions] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<CustomerPaymentMethod>("card");
-  const [fundingOptionsState, setFundingOptionsState] = useState<FundingOptionsState>({ status: "loading", providers: [] });
+  const [fundingOptionsState, setFundingOptionsState] = useState<FundingOptionsState>({ status: "loading", methods: { card: false, local: false, more: false } });
   const [fundingFeedback, setFundingFeedback] = useState<{ kind: "success" | "error" | "info"; message: string } | null>(null);
   const [showAllTransactions, setShowAllTransactions] = useState(false);
   const [showBalance, setShowBalance] = useState(true);
@@ -202,32 +195,29 @@ function Account() {
   useEffect(() => {
     if (!showFundingOptions) return;
     const controller = new AbortController();
-    setFundingOptionsState({ status: "loading", providers: [] });
+    setFundingOptionsState({ status: "loading", methods: { card: false, local: false, more: false } });
     void fetch("/api/billing/funding-options", { credentials: "same-origin", signal: controller.signal })
       .then(async (response) => {
         const payload = await response.json().catch(() => null) as {
           ok?: boolean;
-          data?: { providers?: FundingProviderOption[] };
+          data?: { methods?: Partial<FundingMethods> };
           message?: string;
         } | null;
-        if (!response.ok || !payload?.ok || !Array.isArray(payload.data?.providers)) {
+        const methods = payload?.data?.methods;
+        if (!response.ok || !payload?.ok || !methods ||
+            typeof methods.card !== "boolean" || typeof methods.local !== "boolean" ||
+            typeof methods.more !== "boolean") {
           throw new Error(payload?.message ?? "Payment options could not be loaded.");
         }
-        const providers = payload.data.providers.filter((item) =>
-          item && (item.id === "paystack" || item.id === "flutterwave" || item.id === "cryptomus")
-        );
-        if (!providers.length) throw new Error("Payment options are not available.");
-        setFundingOptionsState({ status: "ready", providers });
+        setFundingOptionsState({ status: "ready", methods: {
+          card: methods.card, local: methods.local, more: methods.more,
+        } });
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
         setFundingOptionsState({
           status: "unavailable",
-          providers: [
-            { id: "paystack", label: "Card payment", enabled: false, currency: "NGN", pricePerTokenMinor: null, packs: [], message: "Card payment options could not be loaded. Refresh and try again." },
-            { id: "flutterwave", label: "Local payment", enabled: false, currency: "NGN", pricePerTokenMinor: null, packs: [], message: "Local payment options could not be loaded. Refresh and try again." },
-            { id: "cryptomus", label: "More payment options", enabled: false, currency: "USD", pricePerTokenMinor: null, packs: [], message: "More payment options could not be loaded. Refresh and try again." },
-          ],
+          methods: { card: false, local: false, more: false },
           message: error instanceof Error ? error.message : "Secure payment options could not be loaded.",
         });
       });
@@ -478,7 +468,7 @@ function Account() {
       return;
     }
     if (fundingOptionsState.status !== "ready" ||
-        !isCustomerPaymentMethodAvailable(fundingOptionsState.providers, method)) {
+        fundingOptionsState.status !== "ready" || !fundingOptionsState.methods[method]) {
       setFundingFeedback({ kind: "error", message: "This payment method is not available for your detected country yet. No payment was taken." });
       return;
     }
@@ -693,8 +683,7 @@ function Account() {
   const customAmountCents = parseUsdAmountToCents(customAmountUsd);
   const customTokenAmount = customAmountCents ?? 0;
   const methodAvailable = (method: CustomerPaymentMethod) =>
-    fundingOptionsState.status === "ready" &&
-    isCustomerPaymentMethodAvailable(fundingOptionsState.providers, method);
+    fundingOptionsState.status === "ready" && fundingOptionsState.methods[method];
   const fundingMethodOptions: Array<{
     id: CustomerPaymentMethod;
     title: string;
