@@ -34,8 +34,8 @@ export type AdEligibleTool = {
 const TOOL_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,119}$/;
 const RESTRICTED_DISCLAIMERS = new Set(["health", "finance", "earnings"]);
 const RESTRICTED_CATEGORIES = new Set(["health", "finance", "earnings", "fitness", "personal"]);
-const ADSTERra_EXCLUDED_CATEGORIES = new Set(["ai", "developer", "accessibility", "lab", "labs"]);
-const ADSTERra_EXCLUDED_CONCEPTS = /\\b(?:studio|studios|lab|labs|laboratory|laboratories|sandbox|ai|artificial intelligence)\\b/i;
+const ADSTERRA_EXCLUDED_CATEGORIES = new Set(["ai", "developer", "accessibility", "lab", "labs"]);
+const ADSTERRA_EXCLUDED_CONCEPTS = /\\b(?:studio|studios|lab|labs|laboratory|laboratories|sandbox|ai|artificial intelligence)\\b/i;
 const OFFLINE_PROFILE_IDS = new Set(
   offlineEligibleTools.profiles
     .filter((profile) => profile.billingKey.startsWith("local.") && ["web", "android", "ios"].every((platform) => profile.platforms.includes(platform)))
@@ -103,12 +103,12 @@ export function isAdsterraQualifiedTool(tool: AdEligibleTool): boolean {
     tool.clientSide === true &&
     !tool.requiresBackend &&
     !tool.requiresAuth &&
-    !ADSTERra_EXCLUDED_CATEGORIES.has(category) &&
+    !ADSTERRA_EXCLUDED_CATEGORIES.has(category) &&
     !RESTRICTED_CATEGORIES.has(category) &&
     !tool.id.startsWith("finance-") &&
     !(tool.disclaimer && RESTRICTED_DISCLAIMERS.has(tool.disclaimer.toLowerCase())) &&
     tool.engine.type.toLowerCase() !== "ai" &&
-    !ADSTERra_EXCLUDED_CONCEPTS.test(descriptiveIdentity) &&
+    !ADSTERRA_EXCLUDED_CONCEPTS.test(descriptiveIdentity) &&
     classifyOfflineToolRecord(tool).execution === "device-local";
 }
 
@@ -129,13 +129,16 @@ export async function isApplicationOnline(): Promise<boolean> {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 3000);
   try {
-    const response = await fetch(window.location.origin + "/", { method: "HEAD", cache: "no-store", credentials: "same-origin", signal: controller.signal });
-    if (response.ok && new URL(response.url).origin === window.location.origin) return true;
+    try {
+      const response = await fetch(window.location.origin + "/", { method: "HEAD", cache: "no-store", credentials: "same-origin", signal: controller.signal });
+      if (response.ok && new URL(response.url).origin === window.location.origin) return true;
+    } catch {
+      // Fall through to a small same-origin asset request when HEAD is unsupported.
+    }
     // Some edge/cache configurations do not answer HEAD consistently. Verify
-    // the same origin with a one-byte ranged GET before concluding the app is offline.
-    const fallback = await fetch(window.location.origin + "/", {
+    // the same origin with a tiny static asset before concluding the app is offline.
+    const fallback = await fetch(window.location.origin + "/ads.txt", {
       method: "GET",
-      headers: { Range: "bytes=0-0" },
       cache: "no-store",
       credentials: "same-origin",
       signal: controller.signal,
