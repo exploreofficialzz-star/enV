@@ -363,16 +363,10 @@ export async function verifyAndCreditFlutterwaveReference(reference: string, exp
     paidAmountMinor,
     paidCurrency: intent.currency,
     payloadDigest: createHash("sha256").update(canonical).digest("hex"),
+    providerMetadata: typeof transaction.flw_ref === "string" && transaction.flw_ref.length <= 160
+      ? { flwRef: transaction.flw_ref }
+      : {},
   });
-  if (typeof transaction.flw_ref === "string" && transaction.flw_ref.length <= 160) {
-    await sql.query(
-      `update billing_purchase_intents
-          set provider_metadata = provider_metadata || $2::jsonb, updated_at = now()
-        where id = $1 and provider = 'flutterwave'`,
-      [intent.id, JSON.stringify({ flwRef: transaction.flw_ref })],
-    );
-  }
-  return credited;
 }
 
 function safeEqual(left: string, right: string): boolean {
