@@ -21,6 +21,10 @@ function publicFundingOptions(funding: Awaited<ReturnType<typeof getFundingOptio
       label: provider.label,
       enabled: provider.enabled,
       currency: provider.currency,
+      localPayments: "localPayments" in provider && provider.localPayments === true,
+      paymentOptions: "paymentOptions" in provider && Array.isArray(provider.paymentOptions)
+        ? [...provider.paymentOptions]
+        : [],
       // Preserve a stable, client-safe field during the API contract migration.
       pricePerTokenMinor: null,
       packs: provider.packs.map((pack) => ({
