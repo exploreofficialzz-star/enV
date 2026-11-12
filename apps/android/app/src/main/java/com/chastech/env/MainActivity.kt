@@ -606,7 +606,7 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
         item {
             Column(Modifier.widthIn(max = 1152.dp).fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 SectionTitle("Trending tools", accent = true)
-                trending.chunked(homeColumns).forEach { rowTools ->
+                trending.take(if (screenWidth >= 640) 12 else 6).chunked(homeColumns).forEach { rowTools ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         rowTools.forEach { tool -> WebHomeToolCard(tool, onTool, Modifier.weight(1f)) }
                         repeat(homeColumns - rowTools.size) { Spacer(Modifier.weight(1f)) }
