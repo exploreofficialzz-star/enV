@@ -225,7 +225,7 @@ function Account() {
         setFundingOptionsState({
           status: "unavailable",
           methods: { card: false, local: false, more: false },
-          message: error instanceof Error ? error.message : "Secure payment options could not be loaded.",
+          message: "Payment options are temporarily unavailable. Please try again.",
         });
       });
     return () => controller.abort();
