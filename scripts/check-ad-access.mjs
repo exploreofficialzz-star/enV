@@ -7,6 +7,7 @@ const read = (path) => readFileSync(resolve(root, path), "utf8");
 const rootRoute = read("src/routes/__root.tsx");
 const slot = read("src/components/tools/ad-slot.tsx");
 const adsterraWeb = read("src/components/ads/adsterra-ad.tsx");
+const adsterraConfig = read("src/lib/ads/adsterra.ts");
 const toolShell = read("src/components/tools/tool-shell.tsx");
 const webAdPrivacy = read("src/components/layout/ad-privacy-controls.tsx");
 const adsBrowser = read("src/lib/ads/browser.ts");
@@ -51,6 +52,13 @@ assert.doesNotMatch(downloadUtils, /openAdsterraSmartlinkFromOutput/, "The downl
 assert.match(toolShell, /data-env-ad-eligible=\{adsterraQualified \? "true" : undefined\}/, "The output trigger must be restricted to the same qualified tool interface.");
 assert.doesNotMatch(rootRoute, /AdsterraPopunder/, "The Popunder must not be loaded site-wide.");
 assert.match(adsterraWeb, /retryAttempt < 3/, "Failed Adsterra banner requests must retry a bounded number of times.");
+assert.match(adsterraWeb, /Adsterra banner request timed out/, "A stalled banner request must be released so it cannot block later placements.");
+assert.match(adsterraWeb, /window\.setTimeout\(fail, 15_000\)/, "The native banner must time out when the publisher script stalls.");
+assert.match(adsterraWeb, /document\.addEventListener\("visibilitychange", retryOnAvailability\)/, "A retry deferred while hidden must resume when the visitor returns.");
+assert.match(adsterraWeb, /nextScript\.remove\(\)[\s\S]*?15_000\)/, "A stalled Popunder request must be removed before another bounded attempt.");
+assert.match(adsterraConfig, /ADSTERRA_SMARTLINK_URL = "https:\/\/araplhn\.org\/4\/ae13eae40d577a3e29863b4ca80a9f2e"/, "The exact owner-supplied Smartlink must be used.");
+assert.match(adsterraConfig, /ADSTERRA_POPUNDER_SCRIPT = \{\s*src: "https:\/\/abscloud\.org\/1\/b39264253fbfc622884c9a3b81882853"/, "The exact owner-supplied Popunder script must be used.");
+assert.match(adsterraConfig, /src: "https:\/\/bauval\.org\/21\/78a40bc1026f57ead96fcab42af6c0b0"/, "The exact owner-supplied Native Banner must be used.");
 assert.match(adsterraWeb, /retryHandle = window\.setInterval/, "A failed Popunder request must be retried while the page is visible.");
 assert.match(adsterraWeb, /attempts >= 4/, "Popunder retries must be bounded to avoid repeated provider requests.");
 
