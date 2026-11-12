@@ -466,6 +466,23 @@ private struct NativeTrendingFeed {
     let mode: String
 }
 
+private func randomCrossCategoryTrendingTools(from tools: [Tool], limit: Int = 12) -> [Tool] {
+    var groups = Dictionary(grouping: tools.filter {
+        ($0.status == "active" || $0.status == "beta") && !$0.isUnderProduction
+    }, by: \.category).values.map { $0.shuffled() }.shuffled()
+    var selection: [Tool] = []
+    while selection.count < limit {
+        var addedInRound = false
+        for index in groups.indices where selection.count < limit {
+            guard !groups[index].isEmpty else { continue }
+            selection.append(groups[index].removeFirst())
+            addedInRound = true
+        }
+        if !addedInRound { break }
+    }
+    return selection
+}
+
 private enum NativeTrendingToolsClient {
     static func fetchFeed() async -> NativeTrendingFeed {
         guard let raw = Bundle.main.object(forInfoDictionaryKey: "ENV_API_BASE_URL") as? String,
@@ -674,10 +691,9 @@ struct HomeView: View {
             .modifier(Screen())
             .onAppear {
                 if fallbackTrendingToolIDs.isEmpty {
-                    let eligible = store.catalog.accessibilityDiscoveryTools()
-                        .filter { ($0.status == "active" || $0.status == "beta") && !$0.isUnderProduction }
-                    var seen = Set<String>()
-                    fallbackTrendingToolIDs = Array(eligible.shuffled().filter { seen.insert($0.id).inserted }.prefix(12)).map(\.id)
+                    fallbackTrendingToolIDs = randomCrossCategoryTrendingTools(
+                        from: store.catalog.accessibilityDiscoveryTools()
+                    ).map(\.id)
                 }
             }
             .task {
@@ -733,7 +749,7 @@ private struct ResponsiveToolGrid<Content: View>: View {
         return viewportWidth < 640 ? 1 : (viewportWidth < 1024 ? 2 : 3)
     }
 
-    private var visibleLimit: Int { home && columnCount < 3 ? 6 : Int.max }
+    private var visibleLimit: Int { Int.max }
 
     var body: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: columnCount), spacing: 12) {
