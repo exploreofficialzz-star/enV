@@ -23,7 +23,8 @@ import {
 } from "@/components/ads/adsterra-ad";
 import { isAdsterraQualifiedTool } from "@/lib/ads/policy";
 import { AdsterraGuestAccessGate } from "@/components/ads/adsterra-guest-access-gate";
-import { openAdsterraSmartlinkFromOutput } from "@/lib/ads/adsterra";
+import { getAdsterraConsent, openAdsterraSmartlinkFromOutput } from "@/lib/ads/adsterra";
+import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import type { PublicCommunityFeed } from "@/lib/community/public-feed.functions";
 import { ToolExecutionTelemetryContext, type ToolExecutionTelemetry, type ToolExecutionOutcome } from "@/components/tools/tool-execution-context";
 import { UnderProductionDialog } from "@/components/tools/under-production";
@@ -45,6 +46,15 @@ export function ToolShell({
   const note = disclaimerText(tool);
   const adsterraQualified =
     import.meta.env.VITE_ADSTERRA_ENABLED === "true" && isAdsterraQualifiedTool(tool);
+  const { user: adsterraUser, isPending: adsterraAuthPending, error: adsterraAuthError } = useCurrentUserState();
+  const [adsterraConsent, setAdsterraConsentState] = useState(getAdsterraConsent);
+  useEffect(() => {
+    const syncAdsterraConsent = () => setAdsterraConsentState(getAdsterraConsent());
+    window.addEventListener("env:adsterra-consent-changed", syncAdsterraConsent);
+    return () => window.removeEventListener("env:adsterra-consent-changed", syncAdsterraConsent);
+  }, []);
+  const adsterraAdsEnabled =
+    adsterraQualified && !adsterraAuthPending && !adsterraAuthError && !adsterraUser && adsterraConsent === "granted";
   const toggleFavorite = usePrefs((s) => s.toggleFavorite);
   const favorites = usePrefs((s) => s.favorites);
   const prefsHydrated = usePrefs((s) => s.hydrated);
@@ -286,7 +296,7 @@ export function ToolShell({
         {tool.category !== "creators" ? <p className="col-start-2 col-span-2 row-start-2 text-sm leading-6 text-muted sm:hidden">{offlineAwareToolDescription(tool)}</p> : null}
       </header>
 
-      {!isFullscreen && adsterraQualified ? <AdsterraResponsiveBanner /> : null}
+      {!isFullscreen && adsterraAdsEnabled ? <AdsterraResponsiveBanner /> : null}
 
       {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
 
@@ -294,7 +304,7 @@ export function ToolShell({
       <section
         ref={toolInterfaceRef}
         data-env-tool-id={tool.id}
-        data-env-ad-eligible={adsterraQualified ? "true" : undefined}
+        data-env-ad-eligible={adsterraAdsEnabled ? "true" : undefined}
         className={isFullscreen
           ? "env-tool-interface env-tool-fullscreen"
           : tool.category === "creators" ? "env-device-tool-interface"
@@ -312,7 +322,7 @@ export function ToolShell({
           const isOutputAction =
             isFileDownload ||
             /\b(copy|download|export|save|output|result|calculate|convert|generate|analy[sz]e|process|format|validate|inspect|scan|encode|decode|resize|compress|extract|transcribe|create|execute|compare|merge|split|apply|build|render)\b/i.test(label);
-          if (adsterraQualified && isOutputAction) {
+          if (adsterraAdsEnabled && isOutputAction) {
             // Open the supplied Smartlink synchronously within the visitor's
             // explicit output-button gesture, before async generation can
             // cause mobile browsers to block the new tab.
@@ -334,7 +344,7 @@ export function ToolShell({
         {!isFullscreen && tool.category !== "creators" ? <ToolCommunityPanel toolId={tool.id} discussionHref={"/community" + toolPath(tool)} initialFeed={initialCommunityFeed} /> : null}
       </section>
 
-      {!isFullscreen && adsterraQualified ? (
+      {!isFullscreen && adsterraAdsEnabled ? (
         <>
           <AdsterraBanner format="300x250" />
           <AdsterraNativeBanner />
