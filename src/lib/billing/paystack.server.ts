@@ -38,7 +38,7 @@ function resolvePaystackConfiguration(countryCode: string | null | undefined) {
     origin: publicOrigin(),
   };
 }
-function minimumPaystackAmountMinor(currency: string): number {
+export function minimumPaystackAmountMinor(currency: string): number {
   // Paystack's documented transaction minimums, expressed in the ISO currency
   // minor units used by this merchant's accepted settlement currency.
   const minimums: Record<string, number> = {
