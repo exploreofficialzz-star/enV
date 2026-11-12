@@ -108,6 +108,7 @@ export function resolvePaystackCountryConfiguration(
     secret,
     pricePerTokenMinor,
     approved,
-    enabled: approved && Boolean(secret) && pricePerTokenMinor !== null,
+    // FX availability and pack-size eligibility are checked in the server quote step.
+    enabled: approved && Boolean(secret),
   };
 }
