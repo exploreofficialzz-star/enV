@@ -305,34 +305,6 @@ export default function WorldLab() {
   const cadImportInput=useRef<HTMLInputElement>(null);
   const studioRef=useRef<HTMLDivElement>(null);
   const [studioPanel,setStudioPanel]=useState<StudioGroupId|null>(null);
-  useEffect(() => {
-    const root = studioRef.current;
-    if (!root) return;
-    root.dataset.railListener = "true";
-    const groups = new Set<StudioGroupId>(["project", "build", "experiments", "results"]);
-    const activateRail = (event: Event) => {
-      root.dataset.railLastEvent = event.type;
-      const target = event.target;
-      root.dataset.railLastTarget = target instanceof Element ? target.tagName : typeof target;
-      const button = target instanceof Element
-        ? target.closest<HTMLButtonElement>(".wl-rail button[data-group]")
-        : null;
-      if (!button) {
-        root.dataset.railLastButton = "not-matched";
-        return;
-      }
-      root.dataset.railLastButton = button.getAttribute("aria-label") ?? button.outerHTML.slice(0, 120);
-      const group = button.dataset.group as StudioGroupId | undefined;
-      root.dataset.railLastGroup = group ?? "missing";
-      if (root.contains(button) && group && groups.has(group)) setStudioPanel(group);
-    };
-    // Window capture runs before document/canvas handlers so scene input cannot swallow rail activation.
-    window.addEventListener("click", activateRail, true);
-    return () => {
-      window.removeEventListener("click", activateRail, true);
-      delete root.dataset.railListener;
-    };
-  }, []);
   const [lookState,setLookState]=useState({heading:0,pitch:0});
   useEffect(()=>{if(studioPanel)scrollToStudioGroup(studioRef.current,studioPanel);},[studioPanel]);
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
