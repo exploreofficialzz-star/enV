@@ -202,6 +202,23 @@ export function TokenDashboard() {
           </p>
         </header>
 
+        {loadState === "signed-out" || loadState === "unavailable" ? (
+          <section
+            role="status"
+            aria-live="polite"
+            className="mt-4 rounded-xl border border-border bg-surface px-4 py-3"
+          >
+            <h2 className="text-sm font-semibold text-fg">
+              {loadState === "signed-out" ? "Sign in to view your account tokens" : "Your token account data is temporarily unavailable"}
+            </h2>
+            <p className="mt-1 text-xs leading-5 text-muted">
+              {loadState === "signed-out"
+                ? "Your local tools remain available. Sign in when you need to review your personal wallet and usage history."
+                : "The account ledger could not be reached. Your tools remain available; try again when the service is available."}
+            </p>
+          </section>
+        ) : null}
+
         <>
             <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Token summary">
               <article className="relative overflow-hidden rounded-2xl border border-emerald-300/25 bg-gradient-to-br from-[#063e37] via-[#06304a] to-[#0b1e36] p-5 text-white shadow-sm sm:col-span-2">
