@@ -3,7 +3,7 @@ import { getSql } from "../db";
 import {
   readWallet, creditVerifiedPurchase, reconcileVerifiedRefund, reconcileVerifiedDispute,
 } from "./ledger.server";
-import { requirePaystackVerificationSecret, resolvePaystackCountryConfiguration } from "./provider-config";
+import { getPaystackLocalChannels, requirePaystackVerificationSecret, resolvePaystackCountryConfiguration } from "./provider-config";
 import { readBoundedBytes } from "./bounded-json.server";
 import { getCountryPaymentProfile, normalizeCountryCode } from "./country-routing";
 import { getFlutterwaveFundingOption } from "./flutterwave.server";
@@ -51,16 +51,6 @@ export function minimumPaystackAmountMinor(currency: string): number {
   return minimums[currency] ?? 1;
 }
 
-function paystackLocalChannels(countryCode: string | null | undefined): string[] {
-  const channels: Record<string, string[]> = {
-    NG: ["bank", "ussd", "qr", "bank_transfer", "payattitude"],
-    GH: ["bank", "mobile_money"],
-    KE: ["bank", "mobile_money"],
-    ZA: ["bank", "eft", "capitec_pay"],
-  };
-  return channels[countryCode?.trim().toUpperCase() ?? ""] ?? [];
-}
-
 /** Build a Paystack option from the detected customer country and actual merchant settlement currency. */
 export async function getPaystackFundingOption(countryCode: string | null | undefined) {
   const configuration = resolvePaystackConfiguration(countryCode);
@@ -77,7 +67,7 @@ export async function getPaystackFundingOption(countryCode: string | null | unde
       currency,
       pricePerTokenMinor: null,
       packs: [],
-      localPayments: !international && paystackLocalChannels(countryCode).length > 0,
+      localPayments: !international && getPaystackLocalChannels(countryCode).length > 0,
       message: "A current USD exchange-rate quote is unavailable for " + currency + ". No local amount was estimated.",
     };
   }
@@ -111,7 +101,7 @@ export async function getPaystackFundingOption(countryCode: string | null | unde
     fxUpdatedAt: quotes[0]?.fxUpdatedAt ?? null,
     fxNextUpdateAt: quotes[0]?.fxNextUpdateAt ?? null,
     fxFetchedAt: quotes[0]?.fxFetchedAt ?? null,
-    localPayments: !international && paystackLocalChannels(countryCode).length > 0,
+    localPayments: !international && getPaystackLocalChannels(countryCode).length > 0,
     packs,
     message: !anyPackAvailable && enabled
       ? "Enter a custom amount that meets the payment minimum for " + currency + "."
@@ -222,7 +212,7 @@ export async function initializePaystackCheckout(input: {
   }
   const configuration = requireLiveFunding(countryCode, input.pricingQuote, input.tokenPack);
   if (input.paymentMethod === "local" &&
-      (configuration.international || paystackLocalChannels(countryCode).length === 0)) {
+      (configuration.international || getPaystackLocalChannels(countryCode).length === 0)) {
     throw Object.assign(new Error("Local payment methods are not available for this country and merchant account."), {
       code: "PAYMENT_METHOD_NOT_AVAILABLE_FOR_COUNTRY", status: 422,
     });
@@ -304,7 +294,7 @@ export async function initializePaystackCheckout(input: {
         ...(input.paymentMethod === "card"
           ? { channels: ["card"] }
           : input.paymentMethod === "local"
-            ? { channels: paystackLocalChannels(countryCode) }
+            ? { channels: getPaystackLocalChannels(countryCode) }
             : configuration.international ? { channels: ["card"] } : {}),
       }),
       signal: AbortSignal.timeout(12_000),
