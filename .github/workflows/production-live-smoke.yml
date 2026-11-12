@@ -148,25 +148,21 @@ jobs:
               failures.push(`The ${id} funding-options contract is malformed.`);
               continue;
             }
+            if (Object.hasOwn(provider, 'fxRate') || Object.hasOwn(provider, 'fxSource') ||
+                Object.hasOwn(provider, 'fxUpdatedAt')) {
+              failures.push(`The public ${id} contract exposes the upstream FX snapshot.`);
+            }
             for (const pack of provider.packs) {
               if (typeof pack.enabled !== 'boolean') {
                 failures.push(`The ${id} provider omitted pack-level availability.`);
               }
-              if (pack.amountMinor !== null && (!Number.isSafeInteger(pack.amountMinor) || pack.amountMinor <= 0)) {
-                failures.push(`The ${id} provider returned an invalid token-pack amount.`);
-              }
-              if (provider.enabled && pack.enabled && (!Number.isSafeInteger(pack.amountMinor) || pack.amountMinor <= 0)) {
-                failures.push(`The enabled ${id} provider is missing a valid token-pack amount.`);
+              if (Object.hasOwn(pack, 'amountMinor') || Object.hasOwn(pack, 'fxRate') ||
+                  Object.hasOwn(pack, 'fxSource') || Object.hasOwn(pack, 'fxUpdatedAt')) {
+                failures.push(`The public ${id} pack exposes a local amount or raw FX quote.`);
               }
             }
             if (provider.enabled && !provider.packs.some((pack) => pack.enabled === true)) {
               failures.push(`The enabled ${id} provider has no purchasable pack.`);
-            }
-            if ((id === 'paystack' || id === 'flutterwave') && provider.packs.length > 0 &&
-                (typeof provider.fxRate !== 'number' || !Number.isFinite(provider.fxRate) || provider.fxRate <= 0 ||
-                 typeof provider.fxSource !== 'string' || !provider.fxUpdatedAt ||
-                 Number.isNaN(Date.parse(provider.fxUpdatedAt)))) {
-              failures.push(`The ${id} provider omitted its server-generated FX snapshot.`);
             }
           }
           if (data && data.anyEnabled !== providers.some((provider) => provider.enabled === true)) {
