@@ -286,7 +286,14 @@ assert.match(fxPricingTests, /rounds half up with integer arithmetic/);
 assert.match(paystackService, /quoteTokenPacks/);
 assert.match(flutterwaveService, /quoteTokenPacks/);
 assert.match(purchasesRoute, /pricingQuote/);
-assert.ok(walletDashboard.includes('tokenValueAmount(tokens) + " USD reference"'));
+assert.match(fundingOptionsRoute, /amountMinor: Number\.isSafeInteger\(pack\.amountMinor\)/,
+  "funding options must expose the server-calculated local amount for display");
+assert.match(fundingOptionsRoute, /currency: "currency" in pack/,
+  "each displayed local amount must carry its ISO currency code");
+assert.match(walletDashboard, /formatPaymentAmount\(pack\?\.amountMinor, pack\?\.currency \?\? selectedProviderOption\?\.currency\)/,
+  "wallet pack cards must display the verified local-currency amount");
+assert.match(walletDashboard, /tokenPackReferenceValue\(tokens\)/,
+  "wallet pack cards must show the enV USD reference value under the local amount");
 assert.ok(walletDashboard.includes("exchangerate-api.com"));
 assert.match(cryptomusService, /const pricePerTokenMinor = 1/);
 assert.match(paystackProviderConfig, /PAYSTACK_SECRET_KEY\?\.trim\(\)/,
