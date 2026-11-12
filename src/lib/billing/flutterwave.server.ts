@@ -551,8 +551,10 @@ async function handleFlutterwaveChargebackWebhook(body: Record<string, unknown>)
   const providerStatus = typeof nested.status === "string" ? nested.status.toLowerCase() : "";
   const statusFilter = ["lost", "won", "initiated", "accepted", "declined"].includes(providerStatus)
     ? providerStatus : null;
+  // The v3 chargeback list is filtered by the original transaction reference
+  // and status. "id" on the returned record is the chargeback ID, not the
+  // transaction ID used by that query parameter.
   const records = await getFlutterwaveApiRecords("chargebacks", {
-    id: disputeId,
     flw_ref: webhookFlwRef,
     ...(statusFilter ? { status: statusFilter } : {}),
   });
