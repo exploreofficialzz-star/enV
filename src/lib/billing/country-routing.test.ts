@@ -64,10 +64,11 @@ test("country profiles expose the documented Flutterwave local currencies and me
   assert.equal(getCountryPaymentProfile("JP"), null);
 });
 
-test("Flutterwave checkout amount conversion only emits exact int32 whole major currency units", () => {
+test("Flutterwave checkout conversion preserves supported currency precision and int32 limits", () => {
   assert.equal(toFlutterwaveMajorAmount(10_000, "NGN"), 100);
   assert.equal(toFlutterwaveMajorAmount(12_300, "NGN"), 123);
-  assert.equal(toFlutterwaveMajorAmount(12_350, "NGN"), null);
+  assert.equal(toFlutterwaveMajorAmount(12_350, "NGN"), 123.5);
+  assert.equal(toFlutterwaveMajorAmount(12_345, "NGN"), 123.45);
   assert.equal(toFlutterwaveMajorAmount(123, "XOF"), 123);
   assert.equal(toFlutterwaveMajorAmount(214_748_364_800, "NGN"), null);
   assert.equal(toFlutterwaveMajorAmount(0, "NGN"), null);
