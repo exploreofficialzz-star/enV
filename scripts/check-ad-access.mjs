@@ -107,6 +107,7 @@ assert.match(privacy, /frequency capping and aggregated reporting/, "Privacy dis
 assert.match(cookieConsent, /chooseAnalyticsConsent/, "The combined cookie dialog must preserve the analytics consent and withdrawal API.");
 assert.match(cookieConsent, /setAdsterraConsent/, "The combined cookie dialog must save Adsterra advertising consent.");
 assert.match(cookieConsent, /Reject optional/, "Visitors must be able to reject all optional storage and advertising.");
+assert.match(cookieConsent, /const showPreferencesOnThisPage = pathname === "\/privacy"/, "The combined non-modal consent controls must remain on Privacy and never prompt globally.");
 assert.match(rootRoute, /<CookieConsent \/>/, "The combined cookie dialog must be mounted globally.");
 assert.doesNotMatch(privacy, /AdsterraPrivacyControls/, "Adsterra consent must not require a separate Privacy-page choice.");
 assert.match(privacy, /env:open-cookie-preferences/, "Visitors must be able to reopen the same cookie dialog from Privacy.");
