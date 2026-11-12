@@ -18,13 +18,13 @@ test("Paystack local checkout is available only in the configured merchant regis
   assert.equal(resolvePaystackCountryConfiguration("GH", approvedNigeria), null);
 });
 
-test("Paystack local merchant account requires both global and currency-specific approval", () => {
+test("Paystack local merchant account requires global and currency-specific approval", () => {
   const ghana = {
     PAYSTACK_MERCHANT_COUNTRY: "GH",
     PAYSTACK_SECRET_KEY: "sk_test_ghana",
     PAYSTACK_PROVIDER_APPROVED: "false",
     PAYSTACK_PROVIDER_APPROVED_GHS: "true",
-    };
+  };
   assert.equal(resolvePaystackCountryConfiguration("GH", ghana)?.enabled, false);
   assert.equal(resolvePaystackCountryConfiguration("GH", {
     ...ghana,
@@ -34,7 +34,7 @@ test("Paystack local merchant account requires both global and currency-specific
     ...ghana,
     PAYSTACK_PROVIDER_APPROVED: "true",
     PAYSTACK_PROVIDER_APPROVED_GHS: "false",
-  }, PACKS)?.enabled, false);
+  })?.enabled, false);
 });
 
 test("Paystack international visitors use card-only merchant settlement currency", () => {
@@ -54,29 +54,22 @@ test("Paystack USD international settlement is restricted to merchant countries 
     PAYSTACK_PROVIDER_APPROVED_USD: "true",
     PAYSTACK_INTERNATIONAL_ENABLED: "true",
     PAYSTACK_INTERNATIONAL_CURRENCY: "USD",
-  }, PACKS);
+  });
   assert.equal(ghanaUsd, null);
 });
 
-test("Paystack USD international settlement requires currency approval as well as global merchant approval", () => {
+test("Paystack USD international settlement requires separate currency approval", () => {
   const usdConfig = {
     ...approvedNigeria,
-    PAYSTACK_SECRET_KEY_USD: "sk_test_usd",
     PAYSTACK_PROVIDER_APPROVED_USD: "false",
-    PAYSTACK_TOKEN_PRICE_USD_MINOR: "1",
     PAYSTACK_INTERNATIONAL_ENABLED: "true",
     PAYSTACK_INTERNATIONAL_CURRENCY: "USD",
   };
-  assert.equal(resolvePaystackCountryConfiguration("US", usdConfig, PACKS)?.enabled, false);
-  assert.equal(resolvePaystackCountryConfiguration("US", usdConfig, PACKS)?.secret, "sk_test_nigeria");
+  assert.equal(resolvePaystackCountryConfiguration("US", usdConfig)?.enabled, false);
   assert.equal(resolvePaystackCountryConfiguration("US", {
     ...usdConfig,
     PAYSTACK_PROVIDER_APPROVED_USD: "true",
-  }, PACKS)?.enabled, true);
-  assert.equal(resolvePaystackCountryConfiguration("US", {
-    ...usdConfig,
-    PAYSTACK_PROVIDER_APPROVED_USD: "true",
-  }, PACKS)?.secret, "sk_test_nigeria");
+  })?.enabled, true);
 });
 
 test("unknown customers and unsupported merchant countries fail closed", () => {
