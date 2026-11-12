@@ -2,6 +2,7 @@ export type CustomerPaymentMethod = "card" | "local" | "more";
 export type FundingProvider = {
   id: "paystack" | "flutterwave" | "cryptomus";
   enabled: boolean;
+  currency: string;
   localPayments?: boolean;
   paymentOptions?: readonly string[];
 };
