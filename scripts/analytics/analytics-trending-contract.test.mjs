@@ -42,7 +42,8 @@ test("Web Home shows Trending without helper copy or advertising placements", ()
   assert.match(home, /loadHomeTrendingTools/);
   assert.match(home, /title="Trending tools"/);
   assert.doesNotMatch(home, /index >= 6 \? "hidden md:flex"/);
-  assert.doesNotMatch(home, /className=\{prefsHydrated \? "visible" : "invisible"\}/);
+  assert.match(home, /className=\{prefsHydrated \? "visible" : "invisible"\}/);
+  assert.match(home, /h-\[112px\] w-full max-w-3xl/);
   assert.doesNotMatch(home, /daily rotating|Ranked by actual tool starts/);
   assert.doesNotMatch(home, /Adsterra|AdSlot|AdSensePageUnit|getPopularTools/);
   assert.match(homeTrendingLoader, /getPublicTrendingTools\(\)/);
