@@ -89,5 +89,9 @@ test("Adsterra qualification is based on active public device-local tools in the
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ disclaimer: "health" })), false);
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ disclaimer: "finance" })), false);
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ category: "fitness" })), false);
+  assert.equal(isAdsterraQualifiedTool(eligibleTool({ category: "health" })), false);
+  assert.equal(isAdsterraQualifiedTool(eligibleTool({ category: "finance" })), false);
+  assert.equal(isAdsterraQualifiedTool(eligibleTool({ category: "earnings" })), false);
+  assert.equal(isAdsterraQualifiedTool(eligibleTool({ category: "personal" })), false);
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ id: "finance-apr-calculator" })), false);
 });
