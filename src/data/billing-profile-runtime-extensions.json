@@ -1,6 +1,6 @@
 {
   "pricingVersion": "env-metering-preview-2026-10-18-v1",
-  "toolCount": 2,
+  "toolCount": 3,
   "profiles": [
     {
       "toolId": "a-book",
@@ -49,6 +49,31 @@
       "priceStatus": "provisional",
       "manualAuditRequired": true,
       "classificationReason": "Native camera capture and video encoding run locally; device workload and actual user value require individual review before pricing.",
+      "pricingVersion": "env-metering-preview-2026-10-18-v1"
+    },
+    {
+      "toolId": "zip-any-file",
+      "toolName": "Zip any file",
+      "category": "productivity",
+      "toolStatus": "active",
+      "engineType": "custom",
+      "clientSide": true,
+      "requiresBackend": false,
+      "executionMode": "local-device",
+      "billingKey": "local.general",
+      "pricingMode": "per-unit-hypothesis",
+      "provisionalSubunitsPerUnit": 200,
+      "unitLabel": "operation",
+      "meteringDimensions": [
+        "operation-count",
+        "input-size-if-relevant"
+      ],
+      "optionalAiAssistProfile": null,
+      "premiumRequired": false,
+      "adsEligible": false,
+      "priceStatus": "provisional",
+      "manualAuditRequired": true,
+      "classificationReason": "Local ZIP/ZIP64 compression and extraction run on the device. Operation volume and archive size require manual cost/value review before any price is finalised.",
       "pricingVersion": "env-metering-preview-2026-10-18-v1"
     }
   ]
