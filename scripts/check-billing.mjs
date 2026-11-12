@@ -287,7 +287,7 @@ assert.match(paystackService, /quoteTokenPacks/);
 assert.match(flutterwaveService, /quoteTokenPacks/);
 assert.match(purchasesRoute, /pricingQuote/);
 assert.ok(walletDashboard.includes('tokenValueAmount(tokens) + " USD reference"'));
-assert.match(walletDashboard, /exchangerate-api\\.com/);
+assert.ok(walletDashboard.includes("exchangerate-api.com"));
 assert.match(cryptomusService, /const pricePerTokenMinor = 1/);
 assert.match(paystackProviderConfig, /PAYSTACK_SECRET_KEY\?\.trim\(\)/,
   "whitespace-only Paystack credentials must not enable checkout");
