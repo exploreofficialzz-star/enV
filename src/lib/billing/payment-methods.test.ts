@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  getFundingCandidates,
   isCustomerPaymentMethodAvailable,
   parseUsdAmountToCents,
-  selectFundingProvider,
 } from "./payment-methods.ts";
 
 const providers = [
@@ -16,15 +16,15 @@ test("customer payment methods resolve to eligible providers without exposing pr
   assert.equal(isCustomerPaymentMethodAvailable(providers, "card"), true);
   assert.equal(isCustomerPaymentMethodAvailable(providers, "local"), true);
   assert.equal(isCustomerPaymentMethodAvailable(providers, "more"), false);
-  assert.equal(selectFundingProvider(providers, "card")?.id, "paystack");
-  assert.equal(selectFundingProvider(providers, "local")?.id, "flutterwave");
-  assert.equal(selectFundingProvider(providers, "more"), null);
+  assert.deepEqual(getFundingCandidates(providers, "card").map((provider) => provider.id), ["paystack", "flutterwave"]);
+  assert.deepEqual(getFundingCandidates(providers, "local").map((provider) => provider.id), ["flutterwave", "paystack"]);
+  assert.deepEqual(getFundingCandidates(providers, "more"), []);
 });
 
 test("local payments stay unavailable for international-card-only Paystack accounts", () => {
   const international = [{ id: "paystack" as const, enabled: true, localPayments: false }];
   assert.equal(isCustomerPaymentMethodAvailable(international, "local"), false);
-  assert.equal(selectFundingProvider(international, "local"), null);
+  assert.deepEqual(getFundingCandidates(international, "local"), []);
 });
 
 test("custom USD input converts cents to matching enV token units and enforces the $1 minimum", () => {
