@@ -22,9 +22,7 @@ import {
   AdsterraToolPopunder,
 } from "@/components/ads/adsterra-ad";
 import { isAdsterraQualifiedTool } from "@/lib/ads/policy";
-import { AdsterraGuestAccessGate } from "@/components/ads/adsterra-guest-access-gate";
 import { ADSTERRA_CONSENT_STORAGE_KEY, getAdsterraConsent, openAdsterraSmartlinkFromOutput } from "@/lib/ads/adsterra";
-import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import type { PublicCommunityFeed } from "@/lib/community/public-feed.functions";
 import { ToolExecutionTelemetryContext, type ToolExecutionTelemetry, type ToolExecutionOutcome } from "@/components/tools/tool-execution-context";
 import { UnderProductionDialog } from "@/components/tools/under-production";
@@ -46,7 +44,6 @@ export function ToolShell({
   const note = disclaimerText(tool);
   const adsterraQualified =
     import.meta.env.VITE_ADSTERRA_ENABLED === "true" && isAdsterraQualifiedTool(tool);
-  const { user: adsterraUser, isPending: adsterraAuthPending, error: adsterraAuthError } = useCurrentUserState();
   const [adsterraConsent, setAdsterraConsentState] = useState(getAdsterraConsent);
   useEffect(() => {
     const syncAdsterraConsent = () => setAdsterraConsentState(getAdsterraConsent());
@@ -60,8 +57,7 @@ export function ToolShell({
       window.removeEventListener("storage", syncFromStorage);
     };
   }, []);
-  const adsterraAdsEnabled =
-    adsterraQualified && !adsterraAuthPending && !adsterraAuthError && !adsterraUser && adsterraConsent === "granted";
+  const adsterraAdsEnabled = adsterraQualified && adsterraConsent === "granted";
   const toggleFavorite = usePrefs((s) => s.toggleFavorite);
   const favorites = usePrefs((s) => s.favorites);
   const prefsHydrated = usePrefs((s) => s.hydrated);
@@ -344,9 +340,7 @@ export function ToolShell({
         }}
       >
         <ToolExecutionTelemetryContext.Provider value={executionTelemetry}>
-          {adsterraQualified ? (
-            <AdsterraGuestAccessGate toolName={tool.name}>{toolContent}</AdsterraGuestAccessGate>
-          ) : toolContent}
+          {toolContent}
         </ToolExecutionTelemetryContext.Provider>
         {!isFullscreen && tool.category !== "creators" ? <ToolCommunityPanel toolId={tool.id} discussionHref={"/community" + toolPath(tool)} initialFeed={initialCommunityFeed} /> : null}
       </section>
