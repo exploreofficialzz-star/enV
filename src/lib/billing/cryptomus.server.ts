@@ -45,8 +45,8 @@ function readCredentials(): CryptomusCredentials {
   return { merchantId, apiKey };
 }
 
-function requireNewCheckoutConfiguration() {
-  const funding = getFundingOptions();
+async function requireNewCheckoutConfiguration() {
+  const funding = await getFundingOptions();
   const provider = funding.providers.find((entry) => entry.id === "cryptomus");
   const pricePerTokenMinor = readSafePackPrice(process.env.CRYPTOMUS_TOKEN_PRICE_USD_CENTS, TOKEN_PACKS);
   const origin = publicOrigin();
@@ -106,7 +106,7 @@ export async function initializeCryptomusCheckout(input: {
   tokenPack: number;
   idempotencyKey: unknown;
 }) {
-  const configuration = requireNewCheckoutConfiguration();
+  const configuration = await requireNewCheckoutConfiguration();
   if (!(TOKEN_PACKS as readonly number[]).includes(input.tokenPack) || !validIdempotencyKey(input.idempotencyKey)) {
     throw Object.assign(new Error("Choose a supported token pack and retry the checkout."), {
       code: "INVALID_PURCHASE", status: 400,
