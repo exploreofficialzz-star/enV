@@ -703,6 +703,7 @@ function Account() {
     { id: "local", title: "Local payments", description: "Local payment methods supported in your country", icon: <Wallet size={19} aria-hidden="true" /> },
     { id: "more", title: "More", description: "Other payment options available for your country", icon: <Coins size={19} aria-hidden="true" /> },
   ];
+  const availableFundingMethodOptions = fundingMethodOptions.filter((option) => methodAvailable(option.id));
 
   return (
     <AppShell>
@@ -794,33 +795,33 @@ function Account() {
 
               <div className="mt-4 space-y-2">
                 <h3 className="text-sm font-semibold">How would you like to pay?</h3>
-                <div className="grid gap-2">
-                  {fundingMethodOptions.map((option) => {
-                    const available = methodAvailable(option.id);
-                    const selected = selectedPaymentMethod === option.id;
-                    return (
-                      <button
-                        key={option.id}
-                        type="button"
-                        aria-pressed={selected}
-                        onClick={() => setSelectedPaymentMethod(option.id)}
-                        className={"flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition " +
-                          (selected ? "border-accent bg-accent/5" : "border-border bg-surface hover:bg-surface-2")}
-                      >
-                        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-fg">{option.icon}</span>
-                        <span className="min-w-0 flex-1">
-                          <span className="flex items-center justify-between gap-2">
-                            <span className="text-sm font-semibold">{option.title}</span>
-                            <span className={"shrink-0 text-[10px] font-medium " + (available ? "text-emerald-600" : "text-muted")}>
-                              {available ? "Available" : fundingOptionsState.status === "loading" ? "Checking…" : "Unavailable"}
-                            </span>
+                {availableFundingMethodOptions.length > 0 ? (
+                  <div className="grid gap-2">
+                    {availableFundingMethodOptions.map((option) => {
+                      const selected = selectedPaymentMethod === option.id;
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          aria-pressed={selected}
+                          onClick={() => setSelectedPaymentMethod(option.id)}
+                          className={"flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition " +
+                            (selected ? "border-accent bg-accent/5" : "border-border bg-surface hover:bg-surface-2")}
+                        >
+                          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-fg">{option.icon}</span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-semibold">{option.title}</span>
+                            <span className="mt-1 block text-xs leading-5 text-muted">{option.description}</span>
                           </span>
-                          <span className="mt-1 block text-xs leading-5 text-muted">{option.description}</span>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : fundingOptionsState.status === "ready" ? (
+                  <p className="rounded-xl border border-border bg-surface-2 p-3 text-sm leading-5 text-muted" role="status">
+                    Payment methods are not available for this country right now. No payment has been taken.
+                  </p>
+                ) : null}
               </div>
 
               <div className="mt-5 space-y-3">
