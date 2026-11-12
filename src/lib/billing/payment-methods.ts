@@ -11,43 +11,28 @@ export function isCustomerPaymentMethodAvailable(
   providers: readonly FundingProvider[],
   method: CustomerPaymentMethod,
 ): boolean {
+  return getFundingCandidates(providers, method).length > 0;
+}
+
+/** Return approved gateway candidates in preferred order for server-side amount-specific routing. */
+export function getFundingCandidates(
+  providers: readonly FundingProvider[],
+  method: CustomerPaymentMethod,
+): FundingProvider[] {
   if (method === "card") {
-    return providers.some((provider) =>
+    return providers.filter((provider) =>
       provider.enabled && (provider.id === "paystack" || provider.id === "flutterwave"),
     );
   }
   if (method === "local") {
-    return providers.some((provider) =>
+    return providers.filter((provider) =>
       provider.enabled && (
         (provider.id === "paystack" && provider.localPayments === true) ||
         (provider.id === "flutterwave" && provider.paymentOptions?.some((option) => option !== "card") === true)
       ),
-    );
+    ).sort((a, b) => Number(b.id === "flutterwave") - Number(a.id === "flutterwave"));
   }
-  return providers.some((provider) => provider.id === "cryptomus" && provider.enabled);
-}
-
-/** Resolve a customer choice to an approved provider without exposing that choice in the UI. */
-export function selectFundingProvider(
-  providers: readonly FundingProvider[],
-  method: CustomerPaymentMethod,
-): FundingProvider | null {
-  if (method === "card") {
-    return providers.find((provider) =>
-      provider.enabled && provider.id === "paystack",
-    ) ?? providers.find((provider) =>
-      provider.enabled && provider.id === "flutterwave",
-    ) ?? null;
-  }
-  if (method === "local") {
-    return providers.find((provider) =>
-      provider.enabled && provider.id === "flutterwave" &&
-      provider.paymentOptions?.some((option) => option !== "card") === true,
-    ) ?? providers.find((provider) =>
-      provider.enabled && provider.id === "paystack" && provider.localPayments === true,
-    ) ?? null;
-  }
-  return providers.find((provider) => provider.id === "cryptomus" && provider.enabled) ?? null;
+  return providers.filter((provider) => provider.id === "cryptomus" && provider.enabled);
 }
 
 /** USD amount entered in dollars becomes integer cents; each cent is one enV token. */
