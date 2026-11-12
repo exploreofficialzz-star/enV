@@ -2,6 +2,7 @@ import { defineHandler } from "nitro/h3";
 import { jsonResponse } from "../../../../src/lib/billing/http.server";
 import { getFundingOptions } from "../../../../src/lib/billing/paystack.server";
 import { getCustomerCountry } from "../../../../src/lib/billing/country-routing";
+import { isCustomerPaymentMethodAvailable } from "../../../../src/lib/billing/payment-methods";
 
 /**
  * Public funding options include server-calculated local pack amounts so the
@@ -18,17 +19,9 @@ function publicFundingOptions(funding: Awaited<ReturnType<typeof getFundingOptio
     enabled: funding.enabled,
     message: funding.message,
     methods: {
-      card: providers.some((provider) =>
-        provider.enabled && (provider.id === "paystack" || provider.id === "flutterwave"),
-      ),
-      local: providers.some((provider) =>
-        provider.enabled && (
-          (provider.id === "paystack" && "localPayments" in provider && provider.localPayments === true) ||
-          (provider.id === "flutterwave" && "paymentOptions" in provider &&
-            provider.paymentOptions?.some((option) => option !== "card") === true)
-        ),
-      ),
-      more: providers.some((provider) => provider.id === "cryptomus" && provider.enabled),
+      card: isCustomerPaymentMethodAvailable(providers, "card"),
+      local: isCustomerPaymentMethodAvailable(providers, "local"),
+      more: isCustomerPaymentMethodAvailable(providers, "more"),
     },
   };
 }
