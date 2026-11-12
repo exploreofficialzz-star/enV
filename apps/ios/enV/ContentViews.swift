@@ -516,6 +516,7 @@ struct HomeView: View {
     let onAssistant: () -> Void
     @State private var searchText = ""
     @State private var trendingToolIDs: [String] = []
+    @State private var fallbackTrendingToolIDs: [String] = []
     @State private var homePath = NavigationPath()
     @FocusState private var isHomeSearchFocused: Bool
     private var hasSearchText: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -525,7 +526,8 @@ struct HomeView: View {
         else { onSearch(searchText.trimmingCharacters(in: .whitespacesAndNewlines)) }
     }
     private var homeTools: [Tool] {
-        trendingToolIDs.compactMap { store.catalog.displayTool(for: $0) }
+        let selectedIDs = trendingToolIDs.isEmpty ? fallbackTrendingToolIDs : trendingToolIDs
+        return selectedIDs.compactMap { store.catalog.displayTool(for: $0) }
             .filter { ($0.status == "active" || $0.status == "beta") && !$0.isUnderProduction }
             .prefix(12)
             .map { $0 }
@@ -641,12 +643,7 @@ struct HomeView: View {
                         enVCharacterSpacedText("Trending tools")
                             .font(.envScaled(size: 20, weight: .semibold))
                             .foregroundStyle(Color.envAccent)
-                        if homeTools.isEmpty {
-                            enVCharacterSpacedText("The tool selection is temporarily unavailable. Please try again.")
-                                .font(.envScaled(size: 12, weight: .regular))
-                                .foregroundStyle(Color.envMuted)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        } else {
+                        if !homeTools.isEmpty {
                             ResponsiveToolGrid(home: true) { visibleLimit in
                                 ForEach(homeTools.prefix(visibleLimit)) { tool in
                                     DiscoveryToolCard(tool: tool)
@@ -675,9 +672,31 @@ struct HomeView: View {
                 .frame(maxWidth: .infinity)
             }
             .modifier(Screen())
+            .onAppear {
+                if fallbackTrendingToolIDs.isEmpty {
+                    let eligible = store.catalog.accessibilityDiscoveryTools()
+                        .filter { ($0.status == "active" || $0.status == "beta") && !$0.isUnderProduction }
+                    var seen = Set<String>()
+                    fallbackTrendingToolIDs = Array(eligible.shuffled().filter { seen.insert($0.id).inserted }.prefix(12)).map(\.id)
+                }
+            }
             .task {
-                let feed = await NativeTrendingToolsClient.fetchFeed()
-                trendingToolIDs = feed.toolIDs
+                while !Task.isCancelled {
+                    let feed = await NativeTrendingToolsClient.fetchFeed()
+                    let eligibleIDs = Set(store.catalog.accessibilityDiscoveryTools()
+                        .filter { ($0.status == "active" || $0.status == "beta") && !$0.isUnderProduction }
+                        .map(\.id))
+                    let liveIDs = feed.toolIDs.filter { eligibleIDs.contains($0) }
+                    if !liveIDs.isEmpty {
+                        trendingToolIDs = liveIDs
+                        break
+                    }
+                    do {
+                        try await Task.sleep(nanoseconds: 300_000_000_000)
+                    } catch {
+                        break
+                    }
+                }
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
