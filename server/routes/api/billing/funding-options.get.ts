@@ -9,33 +9,27 @@ import { getCustomerCountry } from "../../../../src/lib/billing/country-routing"
  * purchase quote metadata remain server-side; checkout independently re-quotes.
  */
 function publicFundingOptions(funding: Awaited<ReturnType<typeof getFundingOptions>>) {
+  // The browser receives customer-facing methods only. Gateway identity and
+  // provider fallback order stay entirely on the server.
+  const providers = funding.providers;
   return {
     countryCode: funding.countryCode,
     currency: funding.currency,
     enabled: funding.enabled,
-    provider: funding.provider,
-    anyEnabled: funding.anyEnabled,
     message: funding.message,
-    providers: funding.providers.map((provider) => ({
-      id: provider.id,
-      label: provider.label,
-      enabled: provider.enabled,
-      currency: provider.currency,
-      localPayments: "localPayments" in provider && provider.localPayments === true,
-      paymentOptions: "paymentOptions" in provider && Array.isArray(provider.paymentOptions)
-        ? [...provider.paymentOptions]
-        : [],
-      // Preserve a stable, client-safe field during the API contract migration.
-      pricePerTokenMinor: null,
-      packs: provider.packs.map((pack) => ({
-        tokens: pack.tokens,
-        amountMinor: Number.isSafeInteger(pack.amountMinor) && pack.amountMinor > 0 ? pack.amountMinor : null,
-        currency: "currency" in pack && typeof pack.currency === "string" ? pack.currency : provider.currency,
-        enabled: "enabled" in pack ? pack.enabled === true : provider.enabled,
-        ...("message" in pack && typeof pack.message === "string" ? { message: pack.message } : {}),
-      })),
-      message: provider.message,
-    })),
+    methods: {
+      card: providers.some((provider) =>
+        provider.enabled && (provider.id === "paystack" || provider.id === "flutterwave"),
+      ),
+      local: providers.some((provider) =>
+        provider.enabled && (
+          (provider.id === "paystack" && "localPayments" in provider && provider.localPayments === true) ||
+          (provider.id === "flutterwave" && "paymentOptions" in provider &&
+            provider.paymentOptions?.some((option) => option !== "card") === true)
+        ),
+      ),
+      more: providers.some((provider) => provider.id === "cryptomus" && provider.enabled),
+    },
   };
 }
 
