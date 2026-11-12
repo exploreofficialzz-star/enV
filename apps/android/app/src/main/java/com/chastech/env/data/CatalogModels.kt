@@ -240,8 +240,8 @@ fun Catalog.withZipArchive(): Catalog {
         name = "Zip any file",
         slug = "zip-any-file",
         description = "Compress one file or many files into a ZIP/ZIP64 archive, or safely extract archives locally on this device.",
-        category = "productivity",
-        keywords = listOf("zip", "zipper", "compress", "compression", "archive", "extract", "unzip", "decompress", "zip64", "large files", "folder", "multiple files"),
+        category = "files",
+        keywords = listOf("zip", "zipper", "compress", "compression", "archive", "extract", "unzip", "decompress", "zip64", "large files", "folder", "multiple files", "tar"),
         tags = listOf("zip", "archive", "compression", "extract", "offline", "local", "files"),
         icon = "Archive",
         popularity = 1450,
@@ -252,7 +252,7 @@ fun Catalog.withZipArchive(): Catalog {
         status = "active",
         related = listOf("file-converter", "pdf-merger", "document-editor"),
         engine = EngineInfo("custom", "zip-any-file"),
-        subcategory = "Files & storage",
+        subcategory = "Archives & extraction",
     )
     val updated = tools + tool
     return copy(
