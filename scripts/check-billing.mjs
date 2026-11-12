@@ -5,6 +5,7 @@ import { parseFinalCatalog } from "./catalog-reader.mjs";
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 const migration = await read("migrations/0002_billing.sql");
+const refundMigration = await read("migrations/0009_billing_refund_dispute_reconciliation.sql");
 const rewardsMigration = await read("migrations/0007_wallet_rewards.sql");
 const rewardsService = await read("src/lib/billing/rewards.server.ts");
 const paystackService = await read("src/lib/billing/paystack.server.ts");
@@ -80,6 +81,11 @@ for (const tool of DATETIME_TOOL_EXTENSIONS) expectedRuntimeToolIds.add(tool.id)
 for (const table of ["billing_accounts", "billing_credit_ledger", "billing_reservations", "billing_purchase_intents", "billing_entitlements", "billing_entitlement_events", "billing_webhook_events", "billing_usage_events"]) {
   assert.match(migration, new RegExp(`create table if not exists ${table}\\b`, "i"), `missing table ${table}`);
 }
+assert.match(refundMigration, /recovery_debt_subunits bigint not null default 0/i, "refund reversals must persist recoverable wallet debt");
+assert.match(refundMigration, /create table if not exists public\.billing_purchase_refunds/i, "refund records must be stored durably");
+assert.match(refundMigration, /create table if not exists public\.billing_purchase_disputes/i, "dispute records must be stored durably");
+assert.match(refundMigration, /unique \(provider, provider_refund_id\)/i, "provider refund IDs must be unique");
+assert.match(refundMigration, /unique \(provider, provider_dispute_id\)/i, "provider dispute IDs must be unique");
 assert.match(migration, /unique \(provider, provider_event_id\)/i, "webhook events must be idempotent");
 assert.match(migration, /idempotency_key text not null unique/i, "billing mutations must have idempotency keys");
 assert.match(migration, /usage_digest text not null/i, "usage events need stable idempotency digests");
@@ -221,16 +227,24 @@ assert.match(paystackService, /readBoundedBytes\(request, 256_000\)/,
 assert.doesNotMatch(paystackService.slice(paystackService.indexOf("export async function handlePaystackWebhook")), /request\.text\(\)/,
   "Paystack webhook must not buffer an unbounded body before enforcing its byte limit");
 assert.match(paystackService, /verifyAndCreditPaystackReference/);
-assert.match(paystackService, /REFUND_DISPUTE_RECONCILIATION_REQUIRED/);
-for (const event of ["charge.dispute.create", "charge.dispute.remind", "charge.dispute.resolve", "refund.pending", "refund.processing", "refund.needs-attention", "refund.failed", "refund.processed"]) {
-  assert.ok(paystackService.includes('"' + event + '"'), `Paystack ${event} must not be acknowledged before reconciliation is implemented`);
-}
-assert.match(cryptomusService, /CRYPTOMUS_REFUND_RECONCILIATION_REQUIRED/);
+assert.doesNotMatch(paystackService, /REFUND_DISPUTE_RECONCILIATION_REQUIRED/, "Paystack callbacks must not remain behind the old manual-reconciliation guard");
+assert.match(paystackService, /handlePaystackRefundWebhook/);
+assert.match(paystackService, /handlePaystackDisputeWebhook/);
+assert.match(paystackService, /reconcileVerifiedRefund/);
+assert.match(paystackService, /reconcileVerifiedDispute/);
+assert.match(paystackService, /transaction: intent\.provider_transaction_id/);
+assert.match(paystackService, /\/refund\?/);
+assert.match(cryptomusService, /reconcileCryptomusRefund/);
+assert.doesNotMatch(cryptomusService, /CRYPTOMUS_REFUND_RECONCILIATION_REQUIRED/, "Cryptomus refund callbacks must enter reconciliation");
 for (const status of ["refund_process", "refund_fail", "refund_paid"]) {
-  assert.ok(cryptomusService.includes('"' + status + '"'), `Cryptomus ${status} must not be acknowledged before reconciliation is implemented`);
+  assert.ok(cryptomusService.includes('"' + status + '"'), `Cryptomus ${status} must be reconciled`);
 }
+assert.match(ledger, /reconcileVerifiedRefund/);
+assert.match(ledger, /reconcileVerifiedDispute/);
+assert.match(ledger, /recovery_debt_subunits/);
+assert.match(ledger, /ACCOUNT_RECOVERY_REQUIRED/);
 assert.match(paystackWebhookRoute, /billing-paystack-webhook/);
-assert.match(cryptomusWebhook, /CRYPTOMUS_REFUND_RECONCILIATION_REQUIRED/);
+assert.match(cryptomusWebhook, /handleCryptomusWebhook/);
 assert.match(fundingOptionsRoute, /getCustomerCountry/);
 assert.match(purchasesRoute, /getCustomerCountry/);
 assert.match(purchasesRoute, /getFundingOptions\(countryCode\)/);
@@ -243,7 +257,9 @@ assert.match(countryRouting, /cf-ipcountry/);
 assert.match(countryRouting, /getCountryPaymentProfile/);
 assert.match(countryRouting, /parseMajorUnitsToMinor/);
 assert.match(countryRouting, /toFlutterwaveMajorAmount/);
-assert.match(countryRouting, /ghanamobilemoney/);
+assert.match(countryRouting, /mobilemoneyghana/);
+assert.match(countryRouting, /mobilemoneyxaf/);
+assert.match(countryRouting, /mobilemoneyxof/);
 assert.match(countryRouting, /CLOUDFLARE_ORIGIN_LOCKDOWN_APPROVED/);
 assert.match(paystackProviderConfig, /PAYSTACK_MERCHANT_COUNTRY/);
 assert.match(paystackProviderConfig, /PAYSTACK_MERCHANT_ACCEPTED_CURRENCIES/);
@@ -259,13 +275,18 @@ assert.match(flutterwaveService, /FLW_SECRET_HASH/);
 assert.match(flutterwaveService, /FLUTTERWAVE_ENABLED_CURRENCIES/);
 assert.match(flutterwaveService, /payment_options: profile\.paymentOptions\.join/);
 assert.match(flutterwaveService, /verifyAndCreditFlutterwaveReference/);
+assert.match(flutterwaveService, /verify_by_reference/);
 assert.match(flutterwaveService, /updateFlutterwaveIntentStatus/);
-assert.match(flutterwaveService, /data.status === "failed"/);
+assert.match(flutterwaveService, /nested\.status !== "successful" && nested\.status !== "succeeded"/);
 assert.match(flutterwaveService, /timingSafeEqual/);
+assert.match(flutterwaveService, /flutterwave-signature/);
+assert.match(flutterwaveService, /createHmac\("sha256"/);
 assert.match(flutterwaveService, /readBoundedBytes\(request, 256_000\)/);
 assert.match(flutterwaveService, /FLUTTERWAVE_REFUND_DISPUTE_HANDLING_APPROVED/);
-assert.match(flutterwaveService, /AmountRefunded/);
-assert.match(flutterwaveService, /amount: amountMajor/);
+assert.match(flutterwaveService, /handleFlutterwaveRefundWebhook/);
+assert.match(flutterwaveService, /handleFlutterwaveChargebackWebhook/);
+assert.match(flutterwaveService, /reconcileVerifiedRefund/);
+assert.match(flutterwaveService, /reconcileVerifiedDispute/);
 assert.match(flutterwaveWebhook, /handleFlutterwaveWebhook/);
 assert.match(flutterwaveVerify, /verifyAndCreditFlutterwaveReference/);
 assert.match(envExample, /FLUTTERWAVE_ENABLED_CURRENCIES=/);
@@ -290,10 +311,13 @@ assert.match(fundingOptionsRoute, /amountMinor: Number\.isSafeInteger\(pack\.amo
   "funding options must expose the server-calculated local amount for display");
 assert.match(fundingOptionsRoute, /currency: "currency" in pack/,
   "each displayed local amount must carry its ISO currency code");
-assert.match(walletDashboard, /formatPaymentAmount\(pack\?\.amountMinor, pack\?\.currency \?\? selectedProviderOption\?\.currency\)/,
-  "wallet pack cards must display the verified local-currency amount");
-assert.match(walletDashboard, /tokenPackReferenceValue\(tokens\)/,
-  "wallet pack cards must show the enV USD reference value under the local amount");
+assert.match(walletDashboard, /id="wallet-token-amount"/, "wallet must use a single amount selector instead of token-pack cards");
+assert.match(walletDashboard, /selectedFundingAmount/, "wallet must display the server-quoted local-currency amount");
+assert.match(walletDashboard, /Amount to pay/, "wallet must identify the actual payment amount");
+assert.match(walletDashboard, /tokenPackReferenceValue\(selectedTokenPack\)/, "wallet must display the enV USD reference value beneath the local charge");
+assert.doesNotMatch(walletDashboard, /Choose your token pack/, "wallet must not retain the old token-pack card heading");
+assert.match(walletDashboard, /visibleWallet\.recoveryDebtTokens/, "wallet must explain a recovery balance after reversals");
+assert.match(tokenDashboardComponent, /referenceValue\(wallet\.availableTokens\)/, "web token dashboard must calculate reference value from the live balance");
 assert.ok(walletDashboard.includes("exchangerate-api.com"));
 assert.match(cryptomusService, /const pricePerTokenMinor = 1/);
 assert.match(paystackProviderConfig, /PAYSTACK_SECRET_KEY\?\.trim\(\)/,
@@ -380,7 +404,7 @@ assert.match(iosTokenDashboard, /Label\("Open wallet", systemImage: "wallet\.bif
 assert.doesNotMatch(iosTokenDashboard, /connectAccountCard|Connect your enV account/, "iOS token dashboard must not be blocked by a connect-account fallback");
 assert.match(iosTokenDashboard, /minimumFractionDigits = 3/, "iOS token amounts must display three decimal places");
 assert.match(iosTokenDashboard, /displayDailyUsage/, "iOS empty-wallet preview must show seven zero-use chart days");
-assert.match(tokenDashboardComponent, /enV estimated reference value ≈ \$0\.010/, "web token card must show the enV unit reference value as one cent");
+assert.match(tokenDashboardComponent, /referenceValue\(wallet\.availableTokens\)/, "web token dashboard must show the calculated reference value for the current balance");
 assert.doesNotMatch(tokenDashboardComponent, /Available balance · Token name: enV/, "web token card must use the concise enV reference label");
 assert.match(androidTokenDashboard, /enV estimated reference value ≈ \$0\.010/, "Android token card must show the enV unit reference value as one cent");
 assert.doesNotMatch(androidTokenDashboard, /Available balance · Token name: enV/, "Android token card must use the concise enV reference label");
@@ -408,4 +432,4 @@ assert.match(iosPricing, /native StoreKit purchase flow is not configured/);
 assert.match(iosPricing, /informationRouter\.open\("wallet"\)/);
 assert.match(androidPricing, /Create pairing code/);
 assert.match(iosPricing, /pair-native\?platform=ios/);
-console.log(`[billing] schema, ledger idempotency, gated Paystack and Cryptomus checkout, verified payment callbacks, referral/affiliate reward accounting, native-store safety, ${profiles.toolCount} provisional profiles, ${nativeInventory.androidToolIds.length} Android IDs, ${nativeInventory.iosToolIds.length} iOS IDs and pricing-policy checks passed.`);
+console.log(`[billing] schema, idempotent Paystack/Flutterwave refund and dispute reconciliation, country-aware local pricing, wallet USD reference display, referral accounting and native-store safety passed. ${profiles.toolCount} provisional profiles, ${nativeInventory.androidToolIds.length} Android IDs and ${nativeInventory.iosToolIds.length} iOS IDs remain inventoried.`);
