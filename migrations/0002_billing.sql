@@ -1,6 +1,6 @@
 -- enV monetization foundation. No payment processor is activated by this schema alone.
 -- Balances are held in integer milli-tokens (1,000 milli-tokens = 1 visible token).
--- One visible token has a proposed reference value of USD $0.01; rates remain configurable.
+-- One visible token has a fixed non-cash reference value of USD $0.01 (100 tokens = USD $1.00).
 
 create table if not exists billing_accounts (
   user_id text primary key references "user" ("id") on delete cascade,
