@@ -1,6 +1,5 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { openAdsterraSmartlinkFromOutput } from "@/lib/ads/adsterra";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -40,8 +39,6 @@ export function slugify(value: string): string {
 }
 
 export function downloadBlob(blob: Blob, filename: string) {
-  // A Smartlink is a separate ad tab; it never replaces or delays the real file.
-  try { openAdsterraSmartlinkFromOutput(); } catch { /* The browser may block a new tab. Preserve the download. */ }
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

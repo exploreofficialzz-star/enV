@@ -55,7 +55,12 @@ export function canRequestAdsterraAds(
 
 /** Open the publisher's Smartlink in a separate tab from an explicit output action. */
 export function openAdsterraSmartlinkFromOutput(): void {
+  if (typeof window === "undefined" || typeof document === "undefined") return;
   if (!canRequestAdsterraAds(isAdsterraEnabled(), getAdsterraConsent(), navigator.onLine)) return;
+  const eligibleToolSurface = document.querySelector<HTMLElement>(
+    '[data-env-tool-id][data-env-ad-eligible="true"]:not(.env-tool-fullscreen)',
+  );
+  if (!eligibleToolSurface || document.fullscreenElement === eligibleToolSurface) return;
   window.open(ADSTERRA_SMARTLINK_URL, "_blank", "noopener,noreferrer");
 }
 
@@ -73,11 +78,14 @@ export function getAdsterraConsent(): AdsterraConsent {
   }
 }
 
-export function setAdsterraConsent(choice: Exclude<AdsterraConsent, "unset">): void {
+export function setAdsterraConsent(choice: Exclude<AdsterraConsent, "unset">): boolean {
   try {
     window.localStorage.setItem(ADSTERRA_CONSENT_STORAGE_KEY, choice);
+    if (window.localStorage.getItem(ADSTERRA_CONSENT_STORAGE_KEY) !== choice) return false;
   } catch {
     // If consent cannot be stored, this browser session must not request ads.
+    return false;
   }
   window.dispatchEvent(new CustomEvent("env:adsterra-consent-changed", { detail: { choice } }));
+  return true;
 }

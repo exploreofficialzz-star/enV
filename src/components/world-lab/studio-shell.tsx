@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, FlaskConical, FolderOpen, Hammer, Info, LineChart, X } from "lucide-react";
 
@@ -65,8 +65,37 @@ type RailProps = {
 
 /** Icon-only rail: left column on tablet and desktop, bottom bar on phones. */
 export function StudioRail({ open, active, onSelect }: RailProps) {
+  const rail = useRef<HTMLElement>(null);
+  const selectRef = useRef(onSelect);
+  selectRef.current = onSelect;
+
+  useLayoutEffect(() => {
+    const root = rail.current?.closest<HTMLElement>(".wl-studio");
+    root?.setAttribute("data-wl-rail-ready", "true");
+    const activateFromDocument = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+      const button = target.closest<HTMLButtonElement>(".wl-rail button[data-group]");
+      if (!button || !rail.current?.contains(button)) return;
+      const group = button.dataset.group;
+      if (GROUPS.some((item) => item.id === group)) {
+        selectRef.current(group as StudioGroupId);
+      }
+    };
+
+    document.addEventListener("pointerdown", activateFromDocument, true);
+    document.addEventListener("click", activateFromDocument, true);
+    return () => {
+      document.removeEventListener("pointerdown", activateFromDocument, true);
+      document.removeEventListener("click", activateFromDocument, true);
+      root?.removeAttribute("data-rail-document-listener");
+    };
+  }, []);
+
   return (
-    <nav className="wl-rail" aria-label="World Lab tools">
+    <nav ref={rail} className="wl-rail" aria-label="World Lab tools">
       {GROUPS.map(({ id, label, Icon }) => (
         <button
           key={id}

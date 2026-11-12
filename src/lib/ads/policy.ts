@@ -29,6 +29,7 @@ export type AdEligibleTool = {
 
 const TOOL_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,119}$/;
 const RESTRICTED_DISCLAIMERS = new Set(["health", "finance", "earnings"]);
+const RESTRICTED_CATEGORIES = new Set(["health", "finance", "earnings", "fitness", "personal"]);
 const OFFLINE_PROFILE_IDS = new Set(
   offlineEligibleTools.profiles
     .filter((profile) => profile.billingKey.startsWith("local.") && ["web", "android", "ios"].every((platform) => profile.platforms.includes(platform)))
@@ -70,11 +71,15 @@ function isEligibleHybridToolRecord(toolId: string, tool: AdEligibleTool): boole
     tool.clientSide === true &&
     !tool.requiresBackend &&
     !tool.requiresAuth &&
-    tool.category !== "fitness" &&
-    tool.category !== "personal" &&
+    !RESTRICTED_CATEGORIES.has(tool.category.toLowerCase()) &&
     !tool.id.startsWith("finance-") &&
     !(tool.disclaimer && RESTRICTED_DISCLAIMERS.has(tool.disclaimer)) &&
     classifyOfflineToolRecord(tool).execution === "device-local";
+}
+
+/** Adsterra may appear only on active, public, device-local tools in the approved offline-capable cohort. */
+export function isAdsterraQualifiedTool(tool: AdEligibleTool): boolean {
+  return isEligibleHybridToolRecord(tool.id, tool);
 }
 
 /** A selected hybrid tool must remain metered offline even while ad serving is disabled. */

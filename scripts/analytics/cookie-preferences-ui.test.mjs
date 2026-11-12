@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 
 const appShell = readFileSync(new URL("../../src/components/layout/app-shell.tsx", import.meta.url), "utf8");
-const privacyControls = readFileSync(new URL("../../src/components/layout/privacy-controls.tsx", import.meta.url), "utf8");
+const cookieConsent = readFileSync(new URL("../../src/components/layout/cookie-consent.tsx", import.meta.url), "utf8");
+const rootDocument = readFileSync(new URL("../../src/routes/__root.tsx", import.meta.url), "utf8");
 const accountPage = readFileSync(new URL("../../src/routes/account.tsx", import.meta.url), "utf8");
 const currentUserState = readFileSync(new URL("../../src/lib/auth/use-current-user.ts", import.meta.url), "utf8");
 const profileMediaRoute = readFileSync(new URL("../../server/routes/api/account/profile-media.ts", import.meta.url), "utf8");
@@ -17,21 +18,33 @@ const viewMode = readFileSync(new URL("../../src/lib/view-mode.ts", import.meta.
 const settingsPage = readFileSync(new URL("../../src/routes/settings.tsx", import.meta.url), "utf8");
 const header = readFileSync(new URL("../../src/components/layout/header.tsx", import.meta.url), "utf8");
 
-test("enV does not mount a global cookie or advertising-preference popup", () => {
-  const popupPath = new URL("../../src/components/layout/cookie-consent.tsx", import.meta.url);
-  assert.equal(existsSync(popupPath), false, "The old global popup component must be removed.");
-  assert.doesNotMatch(appShell, /CookieConsent|cookie-consent/);
-  assert.doesNotMatch(privacyControls, /Open cookie preferences|env:open-cookie-preferences/);
-  assert.match(privacyControls, /Product analytics/);
+test("Privacy page hosts non-modal combined preferences without a global ad popup", () => {
+  assert.match(rootDocument, /<CookieConsent \/>/, "The preference controller is mounted once, but only renders on Privacy.");
+  assert.match(cookieConsent, /const showPreferencesOnThisPage = pathname === "\/privacy"/, "Home and tool pages must not auto-show an advertising prompt.");
+  assert.doesNotMatch(cookieConsent, /pathname === "\/" \|\||qualifiedTool/, "The consent panel must not be activated by Home or tool routes.");
+  assert.match(cookieConsent, /Cookie preferences/);
+  assert.match(cookieConsent, /Essential storage/);
+  assert.match(cookieConsent, /role="region"/);
+  assert.doesNotMatch(cookieConsent, /<dialog|showModal|backdrop:/);
+  assert.match(cookieConsent, /Always active/);
+  assert.match(cookieConsent, /Optional analytics/);
+  assert.match(cookieConsent, /Adsterra advertising/);
+  assert.match(cookieConsent, /Allow Adsterra advertising/);
+  assert.match(cookieConsent, /Accept all/);
+  assert.match(cookieConsent, /Reject optional/);
+  assert.match(cookieConsent, /Save choices/);
+  assert.match(cookieConsent, /chooseAnalyticsConsent/);
+  assert.match(cookieConsent, /setAdsterraConsent/);
+  assert.match(cookieConsent, /env:open-cookie-preferences/);
 });
 
-test("analytics choices remain separate from inline advertising controls", () => {
-  assert.match(privacyControls, /Allow analytics/);
-  assert.match(privacyControls, /Decline \/ withdraw consent/);
+test("Privacy opens the same cookie dialog instead of showing a second Adsterra consent control", () => {
   const privacyPage = readFileSync(new URL("../../src/routes/privacy.tsx", import.meta.url), "utf8");
-  assert.match(privacyPage, /<AdsterraPrivacyControls \/>/);
-  assert.match(privacyPage, /<AdPrivacyControls \/>/);
-  assert.doesNotMatch(appShell, /CookieConsent/);
+  const adsterraControlPath = new URL("../../src/components/layout/adsterra-privacy-controls.tsx", import.meta.url);
+  assert.match(privacyPage, /env:open-cookie-preferences/);
+  assert.doesNotMatch(privacyPage, /AdsterraPrivacyControls/);
+  assert.doesNotMatch(privacyPage, /<PrivacyControls \/>/);
+  assert.equal(existsSync(adsterraControlPath), false, "A separate Adsterra consent screen must not remain.");
 });
 
 test("account resolves sign-in state reactively and preserves the old server-function ID for cached clients", () => {

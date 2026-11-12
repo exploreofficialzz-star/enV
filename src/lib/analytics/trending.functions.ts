@@ -1,11 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getPublicTrendingDiscoveryTools } from "./analytics.server";
+import { getPublicTrendingTools } from "./analytics.server";
 
 /**
- * Include the same shared daily discovery order in the initial Home response.
- * The Home client refreshes it from the cached public endpoint after hydration,
- * allowing qualifying analytics rankings to replace discovery mode automatically.
+ * Provide the same real-usage ranking for the initial Home response and the public endpoint.
  */
-export const loadHomeTrendingDiscovery = createServerFn({ method: "GET" }).handler(async () => {
-  return getPublicTrendingDiscoveryTools();
+export const loadHomeTrendingTools = createServerFn({ method: "GET" }).handler(async () => {
+  return getPublicTrendingTools();
 });

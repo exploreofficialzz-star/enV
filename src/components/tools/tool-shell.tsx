@@ -15,7 +15,14 @@ import { ToolAppIcon } from "@/components/tools/tool-app-icon";
 import { AiAssistPanel } from "@/components/ai/ai-assist-panel";
 import { ToolCommunityPanel } from "@/components/tools/tool-community-panel";
 import { AdSlot } from "@/components/tools/ad-slot";
-import { AdsterraNativeBanner } from "@/components/ads/adsterra-ad";
+import {
+  AdsterraBanner,
+  AdsterraNativeBanner,
+  AdsterraResponsiveBanner,
+  AdsterraToolPopunder,
+} from "@/components/ads/adsterra-ad";
+import { isAdsterraQualifiedTool } from "@/lib/ads/policy";
+import { openAdsterraSmartlinkFromOutput } from "@/lib/ads/adsterra";
 import type { PublicCommunityFeed } from "@/lib/community/public-feed.functions";
 import { ToolExecutionTelemetryContext, type ToolExecutionTelemetry, type ToolExecutionOutcome } from "@/components/tools/tool-execution-context";
 import { UnderProductionDialog } from "@/components/tools/under-production";
@@ -35,6 +42,8 @@ export function ToolShell({
   const [visibleRelatedCount, setVisibleRelatedCount] = useState(6);
   const [productionTool, setProductionTool] = useState<ToolMeta | null>(null);
   const note = disclaimerText(tool);
+  const adsterraQualified =
+    import.meta.env.VITE_ADSTERRA_ENABLED === "true" && isAdsterraQualifiedTool(tool);
   const toggleFavorite = usePrefs((s) => s.toggleFavorite);
   const favorites = usePrefs((s) => s.favorites);
   const prefsHydrated = usePrefs((s) => s.hydrated);
@@ -253,12 +262,15 @@ export function ToolShell({
         {tool.category !== "creators" ? <p className="col-start-2 col-span-2 row-start-2 text-sm leading-6 text-muted sm:hidden">{offlineAwareToolDescription(tool)}</p> : null}
       </header>
 
+      {!isFullscreen && adsterraQualified ? <AdsterraResponsiveBanner /> : null}
+
       {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
 
       {note && tool.category !== "creators" ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
       <section
         ref={toolInterfaceRef}
         data-env-tool-id={tool.id}
+        data-env-ad-eligible={adsterraQualified ? "true" : undefined}
         className={isFullscreen
           ? "env-tool-interface env-tool-fullscreen"
           : tool.category === "creators" ? "env-device-tool-interface"
@@ -269,9 +281,19 @@ export function ToolShell({
         onClickCapture={(event) => {
           const target = event.target;
           if (!(target instanceof Element) || target.closest(".env-tool-fullscreen__toolbar")) return;
-          const action = target.closest("button,[role=button]");
+          const action = target.closest("button,a,[role=button]");
           if (!action || (action instanceof HTMLButtonElement && action.disabled)) return;
           const label = [action.getAttribute("aria-label"), action.getAttribute("title"), action.textContent].filter(Boolean).join(" ");
+          const isFileDownload = action instanceof HTMLAnchorElement && action.hasAttribute("download");
+          const isOutputAction =
+            isFileDownload ||
+            /\b(copy|download|export|save|output|result|calculate|convert|generate|analy[sz]e|process|format|validate|inspect|scan|encode|decode|resize|compress|extract|transcribe|create|execute|compare|merge|split|apply|build|render)\b/i.test(label);
+          if (adsterraQualified && isOutputAction) {
+            // Open the supplied Smartlink synchronously within the visitor's
+            // explicit output-button gesture, before async generation can
+            // cause mobile browsers to block the new tab.
+            openAdsterraSmartlinkFromOutput();
+          }
           if (/\b(run|calculate|convert|generate|analy[sz]e|process|format|validate|inspect|scan|encode|decode|resize|compress|extract|transcribe|create|execute|search|lookup|compare|merge|split|apply|build|render|submit|start)\b/i.test(label)) {
             startToolExecution("action_button");
           }
@@ -310,11 +332,14 @@ export function ToolShell({
 
       {tool.category !== "creators" ? (
         <>
-      {!isFullscreen ? (
-        import.meta.env.VITE_ADSTERRA_ENABLED === "true"
-          ? <AdsterraNativeBanner />
-          : <AdSlot tool={tool} />
+      {!isFullscreen && adsterraQualified ? (
+        <>
+          <AdsterraBanner format="300x250" />
+          <AdsterraNativeBanner />
+          <AdsterraToolPopunder />
+        </>
       ) : null}
+      {!isFullscreen && import.meta.env.VITE_ADSTERRA_ENABLED !== "true" ? <AdSlot tool={tool} /> : null}
       <AiAssistPanel toolId={tool.id} />
 
       <section className="mt-10" aria-labelledby="tool-guide-heading">

@@ -41,14 +41,17 @@ try{
     assert.equal(layout.visibleParagraphs,0,`No long explanatory paragraphs may be visible on the opening screen at ${size.width}px`);
   }
   await page.setViewportSize({width:1280,height:900});
+  // Wait for the client-side rail handlers to attach; the visible server-rendered
+  // shell is not yet an interactive control until React has hydrated it.
+  await page.waitForFunction(() => {
+    const root = document.querySelector(".wl-studio");
+    const button = document.querySelector('.wl-rail button[data-group="project"]');
+    return root?.getAttribute("data-wl-rail-ready") === "true" &&
+      button !== null &&
+      Object.keys(button).some((key) => key.startsWith("__reactProps$"));
+  }, undefined, { timeout: 30000 });
   // Every tool lives in one scrolling panel opened from the rail.
   const worldLabRoot=page.locator(".wl-studio").first();
-  await page.evaluate(()=>{
-    document.addEventListener("click",event=>{
-      const button=(event.target instanceof Element)?event.target.closest('button[aria-label="Open project tools"]'):null;
-      if(button)button.setAttribute("data-audit-click-seen","true");
-    },true);
-  });
   await worldLabRoot.getByRole("button",{name:"Open project tools"}).click();
   try {
     await page.getByRole("button",{name:"Save on device"}).waitFor({state:"visible",timeout:15000});
@@ -66,8 +69,9 @@ try{
       };
       return {rootCount:document.querySelectorAll(".wl-studio").length,
         allRootStates:[...document.querySelectorAll(".wl-studio")].map(node=>({open:node.getAttribute("data-open"),railClicks:node.querySelectorAll('[data-audit-click-seen="true"]').length})),
-        rootOpen:root.getAttribute("data-open"),railListener:root.getAttribute("data-rail-listener"),
-        railLastGroup:root.getAttribute("data-rail-last-group"),rail:describe(rail),
+        rootOpen:root.getAttribute("data-open"),
+        railReady:root.getAttribute("data-wl-rail-ready"),
+        rail:describe(rail),
         projectButton:[...root.querySelectorAll("button")].filter(node=>node.getAttribute("aria-label")==="Open project tools").map(describe),
         drawer:describe(drawer),
         drawerOpen:drawer?.getAttribute("data-open"),drawerBody:describe(drawer?.querySelector(".wl-drawer__body")),
@@ -346,7 +350,19 @@ try{
   await page.getByRole("button",{name:"Save on device"}).click();
   await page.getByText(/\d+ numerical runs and \d+ additional scientific records saved together atomically/).waitFor();
   await page.reload({waitUntil:"domcontentloaded"});
-  await page.getByText(/Opened the most recently saved local World Lab project/).waitFor({timeout:90000});
+  await page.waitForLoadState("load",{timeout:90000});
+  // The workspace restores persisted projects, but the right-hand Project
+  // panel intentionally starts closed after a reload. Reopen it before
+  // asserting the restored status and run-history controls.
+  await page.waitForFunction(() => {
+    const root = document.querySelector(".wl-studio");
+    const button = document.querySelector('.wl-rail button[data-group="project"]');
+    return root?.getAttribute("data-wl-rail-ready") === "true" &&
+      button !== null &&
+      Object.keys(button).some((key) => key.startsWith("__reactProps$"));
+  }, undefined, { timeout: 30000 });
+  await page.getByRole("button",{name:"Open project tools"}).click();
+  await page.getByText(/Opened the most recently saved local World Lab project/).waitFor({state:"visible",timeout:90000});
   await page.getByRole("combobox",{name:"Open recorded run (local device)"}).waitFor({state:"visible"});
   assert.ok(await page.getByRole("combobox",{name:"Open recorded run (local device)"}).locator("option").count()>=3,
     "Saved project must restore its scientific run history after reload");

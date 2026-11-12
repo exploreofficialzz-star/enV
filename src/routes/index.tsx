@@ -2,7 +2,6 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
-import { AdsterraResponsiveBanner } from "@/components/ads/adsterra-ad";
 import { Logo } from "@/components/brand/logo";
 import { ProductUpdatesBanner } from "@/components/layout/product-updates-banner";
 import { SearchBox } from "@/components/tools/search-box";
@@ -11,14 +10,14 @@ import { ToolAppIcon } from "@/components/tools/tool-app-icon";
 import { SeeMoreLink } from "@/components/tools/see-more-link";
 import { UnderProductionDialog } from "@/components/tools/under-production";
 import { isToolUnderProduction } from "@/lib/production-notice";
-import { loadHomeTrendingDiscovery } from "@/lib/analytics/trending.functions";
+import { loadHomeTrendingTools } from "@/lib/analytics/trending.functions";
 import { seoPageHead, pageSchema } from "@/lib/seo-metadata";
 import { getToolById, toolPath } from "@/lib/registry";
 import { rankMostUsedToolIds, usePrefs } from "@/lib/storage";
 import type { ToolMeta } from "@/types/tool";
 
 export const Route = createFileRoute("/")({
-  loader: () => loadHomeTrendingDiscovery(),
+  loader: () => loadHomeTrendingTools(),
   head: () => seoPageHead({
     title: "enV Digital Toolkit by chAs Technologies | Online Tools",
     description: "enV Digital Toolkit by chAs Technologies LLC brings calculators, converters, developer utilities, media and productivity tools to Web, Android and iOS.",
@@ -48,7 +47,6 @@ function Home() {
     [initialTrendingFeed.toolIds],
   );
   const [trendingTools, setTrendingTools] = useState<ToolMeta[]>(initialTrendingTools);
-  const [trendingMode, setTrendingMode] = useState<"discovery" | "analytics">(initialTrendingFeed.mode);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -64,7 +62,6 @@ function Home() {
           data?: { mode?: unknown; toolIds?: unknown };
         };
         if (payload.ok !== true) throw new Error("Trending usage is unavailable.");
-        setTrendingMode(payload.data?.mode === "analytics" ? "analytics" : "discovery");
         const ids = Array.isArray(payload.data?.toolIds)
           ? payload.data.toolIds.filter((id): id is string => typeof id === "string")
           : [];
@@ -81,13 +78,13 @@ function Home() {
         if (!controller.signal.aborted) {
           // Keep the server-rendered shared discovery feed visible if refresh fails.
           setTrendingTools(initialTrendingTools);
-          setTrendingMode("discovery");
         }
       });
     return () => controller.abort();
   }, [initialTrendingTools]);
   const recent = usePrefs((state) => state.recent);
   const usageCounts = usePrefs((state) => state.usageCounts);
+  const prefsHydrated = usePrefs((state) => state.hydrated);
   const mostUsedTools = useMemo(
     () => rankMostUsedToolIds(recent, usageCounts, 10).flatMap((id) => {
       const tool = getToolById(id);
@@ -132,7 +129,7 @@ function Home() {
           <Link to="/agent" aria-label="Open AI Agent" className="flex h-10 min-w-0 items-center justify-center rounded-[20px] border border-border-strong bg-surface-2 px-2 text-center text-[11.1px] font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:px-4 sm:text-sm">AI Agent</Link>
           <Link to="/tokens" aria-label="Open token dashboard" className="flex h-10 min-w-0 items-center justify-center rounded-[20px] border border-border-strong bg-surface-2 px-2 text-center text-[11.1px] font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:px-4 sm:text-sm">Total token = 100</Link>
         </div>
-        <MostUsedToolsTray tools={mostUsedTools} />
+        <MostUsedToolsTray tools={mostUsedTools} prefsHydrated={prefsHydrated} />
         <h1 className="mt-6 w-full max-w-3xl self-start text-left text-balance text-2xl font-semibold tracking-tight sm:mt-8 sm:text-4xl">
           A focused toolkit for
           <br className="sm:hidden" />
@@ -140,16 +137,16 @@ function Home() {
           <span className="hidden sm:inline"> everyday work.</span>
         </h1>
       </section>
-      <AdsterraResponsiveBanner />
-      <ToolSection title="Trending tools" tools={trendingTools} mode={trendingMode} />
+      <ToolSection title="Trending tools" tools={trendingTools} />
     </AppShell>
   );
 }
 
-function MostUsedToolsTray({ tools }: { tools: ToolMeta[] }) {
+function MostUsedToolsTray({ tools, prefsHydrated }: { tools: ToolMeta[]; prefsHydrated: boolean }) {
   const [productionTool, setProductionTool] = useState<ToolMeta | null>(null);
   return (
     <>
+      <div className={prefsHydrated ? "visible" : "invisible"} aria-busy={!prefsHydrated}>
       <section
         aria-label="Your most-used tools"
         className="mx-auto mt-4 h-[112px] w-full max-w-3xl overflow-hidden rounded-[28px] border border-border bg-surface shadow-[var(--shadow-border)]"
@@ -196,6 +193,7 @@ function MostUsedToolsTray({ tools }: { tools: ToolMeta[] }) {
           </div>
         )}
       </section>
+      </div>
       <UnderProductionDialog
         open={productionTool !== null}
         toolName={productionTool?.name ?? "This tool"}
@@ -205,13 +203,12 @@ function MostUsedToolsTray({ tools }: { tools: ToolMeta[] }) {
   );
 }
 
-function ToolSection({ title, tools, mode }: { title: string; tools: ToolMeta[]; mode: "discovery" | "analytics" }) {
+function ToolSection({ title, tools }: { title: string; tools: ToolMeta[] }) {
   return (
     <section className="mx-auto max-w-6xl px-4 pb-10 sm:px-6">
       <div className="flex items-end justify-between gap-4">
         <h2 className="text-xl font-semibold text-accent sm:text-2xl">{title}</h2>
       </div>
-      <p className="mt-1 text-xs text-muted">{mode === "analytics" ? "Ranked by actual tool starts over the last 30 days." : "A daily rotating selection of tools to explore."}</p>
       {tools.length ? (
         <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
           {tools.map((tool, index) => <ToolCard key={tool.id} tool={tool} className={index >= 6 ? "hidden md:flex" : ""} />)}

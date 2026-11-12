@@ -92,8 +92,18 @@ function appendBannerScript(
     script.setAttribute("data-cfasync", "false");
     script.dataset.envAdsterraPlacement = unit.placementId;
     script.src = unit.src;
-    script.addEventListener("load", () => resolve(), { once: true });
-    script.addEventListener("error", () => reject(new Error("Adsterra banner could not be loaded.")), { once: true });
+    const loadTimeout = window.setTimeout(() => {
+      script.remove();
+      reject(new Error("Adsterra banner request timed out."));
+    }, 15_000);
+    script.addEventListener("load", () => {
+      window.clearTimeout(loadTimeout);
+      resolve();
+    }, { once: true });
+    script.addEventListener("error", () => {
+      window.clearTimeout(loadTimeout);
+      reject(new Error("Adsterra banner could not be loaded."));
+    }, { once: true });
     slot.appendChild(script);
   });
 
@@ -119,23 +129,34 @@ export function AdsterraBanner({ format }: { format: AdsterraBannerFormat }) {
     const slot = slotRef.current;
     if (!slot || slot.dataset.envAdsterraRequested === "true") return;
     let active = true;
+    let retryTriggered = false;
+    const retryOnAvailability = () => {
+      if (!active || retryTriggered || !navigator.onLine || document.visibilityState !== "visible") return;
+      retryTriggered = true;
+      if (retryTimerRef.current !== null) {
+        window.clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+      setFailed(false);
+      setRetryAttempt(retryAttempt + 1);
+    };
     slot.dataset.envAdsterraRequested = "true";
     void appendBannerScript(slot, unit).catch(() => {
       if (!active) return;
+      slot.replaceChildren();
+      delete slot.dataset.envAdsterraRequested;
       setFailed(true);
       if (retryAttempt < 3) {
         const delay = Math.min(30_000, 5_000 * (2 ** retryAttempt));
-        retryTimerRef.current = window.setTimeout(() => {
-          retryTimerRef.current = null;
-          if (active && navigator.onLine && document.visibilityState === "visible") {
-            setFailed(false);
-            setRetryAttempt(retryAttempt + 1);
-          }
-        }, delay);
+        window.addEventListener("online", retryOnAvailability);
+        document.addEventListener("visibilitychange", retryOnAvailability);
+        retryTimerRef.current = window.setTimeout(retryOnAvailability, delay);
       }
     });
     return () => {
       active = false;
+      window.removeEventListener("online", retryOnAvailability);
+      document.removeEventListener("visibilitychange", retryOnAvailability);
       if (retryTimerRef.current !== null) {
         window.clearTimeout(retryTimerRef.current);
         retryTimerRef.current = null;
@@ -192,16 +213,25 @@ export function AdsterraNativeBanner() {
     const container = document.getElementById(ADSTERRA_NATIVE_BANNER.containerId);
     if (!container || container.dataset.envAdsterraRequested === "true") return;
     let active = true;
-    container.dataset.envAdsterraRequested = "true";
+    let retryTriggered = false;
+    const retryOnAvailability = () => {
+      if (!active || retryTriggered || !navigator.onLine || document.visibilityState !== "visible") return;
+      retryTriggered = true;
+      if (retryTimerRef.current !== null) {
+        window.clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+      setFailed(false);
+      setRetryAttempt(retryAttempt + 1);
+    };
+    let failureHandled = false;
     const script = document.createElement("script");
     script.async = true;
     script.setAttribute("data-cfasync", "false");
     script.src = ADSTERRA_NATIVE_BANNER.src;
-    script.addEventListener("load", () => {
-      if (active) setFailed(false);
-    }, { once: true });
-    script.addEventListener("error", () => {
-      if (!active) return;
+    const fail = () => {
+      if (!active || failureHandled) return;
+      failureHandled = true;
       script.remove();
       if (scriptRef.current === script) scriptRef.current = null;
       container.replaceChildren();
@@ -209,19 +239,28 @@ export function AdsterraNativeBanner() {
       setFailed(true);
       if (retryAttempt < 3) {
         const delay = Math.min(30_000, 5_000 * (2 ** retryAttempt));
-        retryTimerRef.current = window.setTimeout(() => {
-          retryTimerRef.current = null;
-          if (active && navigator.onLine && document.visibilityState === "visible") {
-            setFailed(false);
-            setRetryAttempt(retryAttempt + 1);
-          }
-        }, delay);
+        window.addEventListener("online", retryOnAvailability);
+        document.addEventListener("visibilitychange", retryOnAvailability);
+        retryTimerRef.current = window.setTimeout(retryOnAvailability, delay);
       }
+    };
+    const loadTimeout = window.setTimeout(fail, 15_000);
+    script.addEventListener("load", () => {
+      window.clearTimeout(loadTimeout);
+      if (failureHandled) return;
+      failureHandled = true;
+      if (active) setFailed(false);
+    }, { once: true });
+    script.addEventListener("error", () => {
+      window.clearTimeout(loadTimeout);
+      fail();
     }, { once: true });
     container.insertAdjacentElement("beforebegin", script);
     scriptRef.current = script;
     return () => {
       active = false;
+      window.removeEventListener("online", retryOnAvailability);
+      document.removeEventListener("visibilitychange", retryOnAvailability);
       if (retryTimerRef.current !== null) {
         window.clearTimeout(retryTimerRef.current);
         retryTimerRef.current = null;
@@ -253,13 +292,14 @@ export function AdsterraNativeBanner() {
  * Load it only after explicit advertising consent and same-origin reachability.
  * Consent revocation reloads the document to clear provider-installed listeners.
  */
-export function AdsterraPopunder() {
+export function AdsterraToolPopunder() {
   useEffect(() => {
     let active = true;
     let loading = false;
     let loaded = false;
     let attempts = 0;
     let script: HTMLScriptElement | null = null;
+    let loadTimeout: number | null = null;
 
     const refresh = async () => {
       if (!active || loaded || loading || attempts >= 4) return;
@@ -283,16 +323,29 @@ export function AdsterraPopunder() {
       nextScript.dataset.envAdsterraPopunder = "true";
       nextScript.src = ADSTERRA_POPUNDER_SCRIPT.src;
       nextScript.addEventListener("load", () => {
+        if (!active || script !== nextScript) return;
+        if (loadTimeout !== null) window.clearTimeout(loadTimeout);
+        loadTimeout = null;
         loaded = true;
         loading = false;
       }, { once: true });
       nextScript.addEventListener("error", () => {
+        if (!active || script !== nextScript) return;
+        if (loadTimeout !== null) window.clearTimeout(loadTimeout);
+        loadTimeout = null;
         loading = false;
-        if (script === nextScript) script = null;
+        script = null;
         nextScript.remove();
       }, { once: true });
       script = nextScript;
       document.head.appendChild(nextScript);
+      loadTimeout = window.setTimeout(() => {
+        if (!active || script !== nextScript) return;
+        loading = false;
+        script = null;
+        nextScript.remove();
+        loadTimeout = null;
+      }, 15_000);
     };
 
     const onChange = () => { void refresh(); };
@@ -306,6 +359,7 @@ export function AdsterraPopunder() {
 
     return () => {
       active = false;
+      if (loadTimeout !== null) window.clearTimeout(loadTimeout);
       window.clearInterval(retryHandle);
       window.removeEventListener("online", onChange);
       window.removeEventListener("focus", onChange);

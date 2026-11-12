@@ -4,6 +4,8 @@ import {
   Activity,
   CalendarDays,
   Clock3,
+  Copy,
+  Download,
   FileText,
   Hash,
   Image as ImageIcon,
@@ -21,7 +23,6 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ErrorBanner } from "@/components/tools/error-banner";
-import { CodeResult } from "@/components/engines/result-panel";
 import { initialValues } from "@/components/engines/initial-values";
 import {
   CREATOR_PLATFORMS,
@@ -181,16 +182,52 @@ function ToolActions({ state, primary = "Run tool" }: { state: ToolState; primar
   );
 }
 
+function CreatorResult({ value, filename, title = "Result" }: { value: string; filename: string; title?: string }) {
+  const [copyMessage, setCopyMessage] = useState("");
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopyMessage("Copied to clipboard.");
+    } catch {
+      setCopyMessage("Copy is unavailable in this browser. Select the result text to copy it.");
+    }
+  };
+  const download = () => {
+    const blob = new Blob([value], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.hidden = true;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
+  return (
+    <section className="env-creator-workspace__result" aria-live="polite" aria-label={title}>
+      <div className="env-creator-workspace__result-head">
+        <span className="env-creator-workspace__result-title">{title}</span>
+        <div className="flex items-center gap-2">
+          <button type="button" className="env-creator-workspace__icon-button" aria-label="Copy result" title="Copy result" onClick={() => void copy()} disabled={!value}>
+            <Copy aria-hidden="true" />
+          </button>
+          <button type="button" className="env-creator-workspace__icon-button" aria-label="Download result" title="Download result" onClick={download} disabled={!value}>
+            <Download aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+      {copyMessage ? <p role="status" className="text-xs text-muted">{copyMessage}</p> : null}
+      <pre className="env-creator-workspace__output">{value}</pre>
+    </section>
+  );
+}
+
 function ToolOutput({ state, op, title = "Your result" }: { state: ToolState; op: string; title?: string }) {
   return (
     <>
       <ErrorBanner message={state.error} />
-      {state.out ? (
-        <section className="rounded-xl border border-border bg-surface-2 p-4 sm:p-5" aria-live="polite">
-          <div className="mb-2 flex items-center gap-2"><Sparkles className="size-4 text-accent" /><h3 className="text-sm font-semibold">{title}</h3></div>
-          <CodeResult code={state.out} filename={`env-${op}.txt`} />
-        </section>
-      ) : null}
+      {state.out ? <CreatorResult value={state.out} filename={`env-${op}.txt`} title={title} /> : null}
     </>
   );
 }
@@ -554,7 +591,7 @@ function TapTempo() {
         </WorkPanel>
       </div>
       <ErrorBanner message={error} />
-      {bpm !== null ? <div className="rounded-xl border border-border bg-surface-2 p-4" aria-live="polite"><div className="grid gap-3 sm:grid-cols-3"><div><p className="text-xs text-muted">Tempo</p><p className="mt-1 text-lg font-semibold tabular-nums">{bpm.toFixed(2)} BPM</p></div><div><p className="text-xs text-muted">Beat duration</p><p className="mt-1 text-lg font-semibold tabular-nums">{(60 / bpm).toFixed(4)} sec</p></div><div><p className="text-xs text-muted">Tap count</p><p className="mt-1 text-lg font-semibold tabular-nums">{tapCount}</p></div></div><CodeResult code={`Tempo: ${bpm.toFixed(2)} BPM\nBeat duration: ${(60 / bpm).toFixed(4)} seconds\nTap count: ${tapCount}`} filename="env-bpm-tempo.txt" /></div> : null}
+      {bpm !== null ? <div className="rounded-xl border border-border bg-surface-2 p-4" aria-live="polite"><div className="grid gap-3 sm:grid-cols-3"><div><p className="text-xs text-muted">Tempo</p><p className="mt-1 text-lg font-semibold tabular-nums">{bpm.toFixed(2)} BPM</p></div><div><p className="text-xs text-muted">Beat duration</p><p className="mt-1 text-lg font-semibold tabular-nums">{(60 / bpm).toFixed(4)} sec</p></div><div><p className="text-xs text-muted">Tap count</p><p className="mt-1 text-lg font-semibold tabular-nums">{tapCount}</p></div></div><CreatorResult value={`Tempo: ${bpm.toFixed(2)} BPM\nBeat duration: ${(60 / bpm).toFixed(4)} seconds\nTap count: ${tapCount}`} filename="env-bpm-tempo.txt" title="Tempo result" /></div> : null}
     </div>
   );
 }

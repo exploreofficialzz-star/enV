@@ -134,9 +134,30 @@ for (const [browserName, browserType] of browserEntries) {
   await page.waitForLoadState("networkidle", { timeout: 30000 });
   const swatchExport = page.locator('[aria-labelledby="palette-swatch-export-heading"]');
   await swatchExport.waitFor({ state: "visible" });
-  // Confirm React has hydrated by changing the palette count and waiting for the sixth editable swatch.
+  // Wait for React to attach its event props before testing the controlled select.
+  await page.waitForFunction(() => {
+    const control = document.querySelector("#palette-count");
+    return control instanceof HTMLSelectElement &&
+      Object.keys(control).some((key) => key.startsWith("__reactProps$"));
+  }, undefined, { timeout: 30000 });
   await page.locator("#palette-count").selectOption("6");
-  await page.getByLabel("Edit palette color 6").waitFor({ state: "visible" });
+  try {
+    await page.getByLabel("Edit palette color 6").waitFor({ state: "visible" });
+  } catch (error) {
+    const paletteDiagnostic = await page.evaluate(() => {
+      const count = document.querySelector("#palette-count");
+      const editors = [...document.querySelectorAll('input[aria-label^="Edit palette color"]')];
+      return {
+        selectValue: count instanceof HTMLSelectElement ? count.value : null,
+        editorCount: editors.length,
+        editorLabels: editors.map((node) => node.getAttribute("aria-label")),
+        exportPanelVisible: Boolean(document.querySelector('[aria-labelledby="palette-swatch-export-heading"]')?.getBoundingClientRect().height),
+        appRoot: document.querySelector("#root")?.getAttribute("data-hydrated") ?? null,
+      };
+    });
+    console.error("DESIGN_PALETTE_BROWSER_DIAGNOSTIC:", JSON.stringify(paletteDiagnostic));
+    throw error;
+  }
   const [pngDownload] = await Promise.all([
     page.waitForEvent("download", { timeout: 15000 }),
     page.getByTestId("palette-download-png").click(),

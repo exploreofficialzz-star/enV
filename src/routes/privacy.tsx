@@ -1,9 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { InfoPage } from "@/components/layout/info-page";
 import { seoPageHead, pageSchema } from "@/lib/seo-metadata";
-import { PrivacyControls } from "@/components/layout/privacy-controls";
 import { AdPrivacyControls } from "@/components/layout/ad-privacy-controls";
-import { AdsterraPrivacyControls } from "@/components/layout/adsterra-privacy-controls";
+import { resolveAdConfig } from "@/lib/ads/policy";
 
 export const Route = createFileRoute("/privacy")({
   head: () => seoPageHead({
@@ -16,7 +15,13 @@ export const Route = createFileRoute("/privacy")({
 });
 
 function Privacy() {
-  const advertisingEnabled = import.meta.env.VITE_ADS_ENABLED === "true";
+  const advertisingEnabled = resolveAdConfig({
+    enabled: import.meta.env.VITE_ADS_ENABLED,
+    privacyConfigured: import.meta.env.VITE_ADSENSE_PRIVACY_CONFIGURED,
+    clientId: import.meta.env.VITE_ADSENSE_CLIENT_ID,
+    toolSlotId: import.meta.env.VITE_ADSENSE_TOOL_SLOT_ID,
+    toolIds: import.meta.env.VITE_AD_SUPPORTED_TOOL_IDS,
+  }) !== null;
   const adsterraAdvertisingEnabled = import.meta.env.VITE_ADSTERRA_ENABLED === "true";
   return (
     <InfoPage title="Privacy">
@@ -46,7 +51,7 @@ function Privacy() {
           <li><strong className="font-semibold text-fg">AI features:</strong> when enabled, the task input needed to produce a response is sent through the enV server to the AI provider configured for that deployment. The code supports Groq, OpenRouter, and Google Gemini; the provider used can vary by task and server configuration. AI results may be cached briefly when caching is enabled. Provider handling and retention are governed in part by the provider’s terms and privacy practices.</li>
           <li><strong className="font-semibold text-fg">Sign-in:</strong> an account is not required for ordinary toolkit use. If sign-in is enabled for a deployment and you choose to use it, the identity provider and configured database process account and session information such as your email and profile details. Authentication uses session cookies.</li>
           {advertisingEnabled ? <li><strong className="font-semibold text-fg">Advertising on selected Web tools:</strong> Google AdSense may load on explicitly allowlisted, online, device-local tool pages. The ad provider may process request context and technical identifiers for ad delivery, fraud prevention, frequency capping and aggregated reporting. enV requests non-personalized ads, which are not based on your past behavior, but that setting does not mean no cookies or identifiers are used.</li> : null}
-          {adsterraAdvertisingEnabled ? <li><strong className="font-semibold text-fg">Adsterra advertising:</strong> selected Adsterra banner and native placements may load on the Home page, All tools directory, Web tool pages and eligible Blog articles after you allow advertising. The Web site-level Popunder may open a separate browser tab after a page interaction. The Smartlink may open a separate tab when you choose a supported file download; the requested enV download continues separately. Adsterra and its advertising partners may process your IP address, browser and device information, page URL and referrer, and may use cookies or similar storage for delivery, frequency capping, fraud prevention and measurement. Declining advertising does not limit access to enV tools.</li> : null}
+          {adsterraAdvertisingEnabled ? <li><strong className="font-semibold text-fg">Adsterra advertising:</strong> Adsterra responsive, 300x250 and native placements load only on qualified active, device-local Web tool pages after you allow advertising. Home, the All tools directory and Blog pages do not display ads. A tool-page Popunder may open a separate browser tab after an interaction. The Smartlink may open a separate tab when you choose a supported output action such as copying, downloading or exporting; the requested enV output continues separately. Adsterra and its advertising partners may process your IP address, browser and device information, page URL and referrer, and may use cookies or similar storage for delivery, frequency capping, fraud prevention and measurement. Declining advertising does not limit access to enV tools.</li> : null}
           <li><strong className="font-semibold text-fg">Operational infrastructure:</strong> hosting, network, and service providers may process connection and diagnostic data needed to deliver, secure, and troubleshoot the service.</li>
         </ul>
         <p>Provider availability, settings, and retention can change by deployment. enV does not promise that an external provider will retain or delete submitted content on a particular schedule. Review the provider information shown for the feature before sending information you consider sensitive.</p>
@@ -54,12 +59,17 @@ function Privacy() {
 
       <section className="space-y-2">
         <h2 className="text-lg font-semibold text-fg">Cookies, sessions, and account requests</h2>
-        <p>Browser-local preferences use local storage. If an optional sign-in or AI feature is used, the service may set essential session cookies—for example, to maintain sign-in or apply abuse-prevention limits. These are not the same as a marketing-cookie profile.</p>
+        <p>Browser-local preferences use local storage. If an optional sign-in or AI feature is used, the service may set essential session cookies—for example, to maintain sign-in or apply abuse-prevention limits. The Cookie preferences section on this Privacy page lets you opt in to optional product analytics and Adsterra advertising technologies. These controls are not shown as a global popup. Both remain off unless you actively allow them; declining either does not limit access to enV tools.</p>
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new Event("env:open-cookie-preferences"))}
+          className="inline-flex min-h-10 items-center rounded-lg border border-border px-3 py-2 text-sm font-semibold text-fg hover:bg-surface"
+        >
+          Cookie preferences
+        </button>
         <p>If you have used a sign-in-enabled deployment and want to ask about, correct, or delete account information, email <a className="text-accent underline underline-offset-4" href="mailto:envtoolkit@gmail.com">envtoolkit@gmail.com</a>. Information stored only on your device can generally be removed by clearing that browser’s site data or the app’s local data.</p>
       </section>
 
-      <PrivacyControls />
-      <AdsterraPrivacyControls />
       <AdPrivacyControls />
 
       <section className="space-y-2">
@@ -70,7 +80,7 @@ function Privacy() {
         <p><strong className="font-semibold text-fg">Retention:</strong> raw analytics events are currently retained for a 90-day window from receipt; the scheduled daily job removes events beyond that window. Daily aggregate snapshots and privacy-safe reports may be retained for up to 730 days. Those aggregates contain counts and totals by day, platform, tool and event type, not account, installation, session or event identifiers. A granted consent record is retained while consent remains active and is removed when you withdraw consent. Short-lived rate-limit records are deleted separately.</p>
         <p><strong className="font-semibold text-fg">Storage and service providers:</strong> analytics records are stored in the enV Supabase PostgreSQL project configured in region <code>eu-central-1</code>. Vercel provides application hosting and API execution. These infrastructure providers may process service, security and operational information under their own privacy and data-processing terms; the stated database region does not mean that every provider operation or support process occurs only in that region.</p>
         <p><strong className="font-semibold text-fg">Your choice and withdrawal:</strong> the Web client keeps a bounded pending-event queue in browser storage; Android and iOS keep separate bounded native queues. Choosing Decline or withdrawing consent immediately stops new local collection and clears the pending queue. When online, the client asks the server to remove that installation's raw events, rate-limit records and consent record. When offline, it keeps a revocation request and sends it after connectivity returns. Aggregate snapshots and reports already created may remain until their 730-day retention period expires because they no longer contain an installation or session identifier that can be used to isolate your events.</p>
-        <p>You can change your choice in the privacy controls above. For an access, correction or deletion request, contact <a className="text-accent underline underline-offset-4" href="mailto:envtoolkit@gmail.com?subject=enV%20analytics%20privacy%20request">envtoolkit@gmail.com</a>. Requests involving a signed-in account may require enough information to verify that account; do not send passwords or authentication tokens.</p>
+        <p>You can change your analytics and advertising choices using the Cookie preferences button above. For an access, correction or deletion request, contact <a className="text-accent underline underline-offset-4" href="mailto:envtoolkit@gmail.com?subject=enV%20analytics%20privacy%20request">envtoolkit@gmail.com</a>. Requests involving a signed-in account may require enough information to verify that account; do not send passwords or authentication tokens.</p>
       </section>
 
       <section className="space-y-2">

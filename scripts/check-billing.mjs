@@ -340,12 +340,12 @@ assert.doesNotMatch(tokenDashboardComponent, /loadState === "ready" && wallet &&
 assert.match(tokenDashboardComponent, /loadState === "auth-disabled"/, "the dashboard must distinguish disabled production auth from a transient API failure");
 assert.match(tokenDashboardComponent, /aria-label="Loading token balance"/, "the web wallet balance must show shimmer while the initial account request is pending");
 assert.match(tokenDashboardComponent, /loading=\{loadState === "loading"\}/, "web summary metrics must share the same initial loading state");
-assert.match(tokenDashboardComponent, /wallet \\? tokenLabel\\(wallet\\.availableTokens\\) : "—"/, "a missing wallet must not be presented as a fabricated zero balance");
+assert.match(tokenDashboardComponent, /wallet \? tokenLabel\(wallet\.availableTokens\) : "—"/, "a missing wallet must not be presented as a fabricated zero balance");
 assert.match(tokenDashboardComponent, /formatTimestamp\(item\.createdAt\)/, "usage history must show recorded timestamps");
 assert.doesNotMatch(tokenDashboardComponent, /> Home|enV token activity</, "the token dashboard header must not show the Home button or token activity pill");
 assert.match(tokenDashboardComponent, /flex items-start justify-between gap-3 sm:gap-5[\s\S]*Welcome to your token dashboard[\s\S]*<Link to="\/wallet"[\s\S]*Open wallet/, "Open wallet must share the welcome heading row");
-assert.match(tokenDashboardComponent, /wallet \? tokenLabel\(wallet\.reservedTokens\) : tokenLabel\(0\)/, "reserved tokens must use the same 0.000 enV empty-wallet format");
-assert.match(tokenDashboardComponent, /wallet \? tokenLabel\(wallet\.lifetimeConsumedSubunits \/ 1_000\) : tokenLabel\(0\)/, "total used ever must use the same 0.000 enV empty-wallet format");
+assert.match(tokenDashboardComponent, /wallet \? tokenLabel\(wallet\.reservedTokens\) : "—"/, "reserved tokens must remain unavailable when the wallet is missing");
+assert.match(tokenDashboardComponent, /wallet \? tokenLabel\(wallet\.lifetimeConsumedSubunits \/ 1_000\) : "—"/, "total used ever must remain unavailable when the wallet is missing");
 assert.match(tokenDashboardComponent, /Array\.from\(\{ length: 7 \}/, "the empty-wallet preview must keep seven zero-use chart days visible");
 const androidTokenDashboard = androidPricing.split("private fun NativeTokenDashboard(onOpenWallet: () -> Unit)")[1]?.split("private fun NativeWalletDashboard()")[0] ?? "";
 assert.match(androidTokenDashboard, /Text\("Open wallet"\)/, "Android token dashboard must place Open wallet beside the welcome heading");

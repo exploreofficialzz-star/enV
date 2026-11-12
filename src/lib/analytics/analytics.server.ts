@@ -1,4 +1,4 @@
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { dashboardSessionDigest, issueDashboardSession, readDashboardSession } from "./dashboard-session.mjs";
 import { createSessionLookup } from "../ai/server/session";
 import { getSql } from "../db";
@@ -286,44 +286,19 @@ export async function getAnalyticsSummary(request: Request) {
 const PUBLIC_TRENDING_TOOL_LIMIT = 500;
 
 /**
- * Before the analytics threshold is met, all platforms receive the same
- * date-seeded shuffle of the active shared Web catalogue. The ordering changes
- * daily, is independent of the legacy popularity field, and gives native apps
- * a long enough ordered pool to select the tools present in their catalogues.
+ * Rank public Trending strictly by real, consented tool starts in the last
+ * 30 days. A tool is included only after three distinct opted-in installations
+ * have started it, preventing a low-volume usage signal from identifying a
+ * single visitor. There is no synthetic or daily-shuffle fallback.
  */
-function getDailyDiscoveryToolIds(now = new Date()) {
-  const day = now.toISOString().slice(0, 10);
-  return getActiveTools()
-    .filter(tool => tool.status === "active" || tool.status === "beta")
-    .map(tool => ({
-      id: tool.id,
-      order: createHash("sha256")
-        .update(`env-public-trending-discovery-v1:${day}:${tool.id}`)
-        .digest("hex"),
-    }))
-    .filter(item => /^[a-z0-9][a-z0-9._:-]{0,127}$/i.test(item.id))
-    .sort((a, b) => a.order.localeCompare(b.order) || a.id.localeCompare(b.id))
-    .slice(0, PUBLIC_TRENDING_TOOL_LIMIT)
-    .map(item => item.id);
-}
-
-function publicTrendingDiscoveryResponse(now = new Date()) {
-  return {
-    generatedAt: now.toISOString(),
-    windowDays: 30,
-    mode: "discovery" as const,
-    toolIds: getDailyDiscoveryToolIds(now),
-  };
-}
-
-export function getPublicTrendingDiscoveryTools(now = new Date()) {
-  return publicTrendingDiscoveryResponse(now);
-}
-
 export async function getPublicTrendingTools() {
-  // The public endpoint always has a useful, non-ranked discovery feed while
-  // opt-in usage data is unavailable or below the privacy threshold.
-  if (process.env.ANALYTICS_ENABLED !== "true") return publicTrendingDiscoveryResponse();
+  const empty = () => ({
+    generatedAt: new Date().toISOString(),
+    windowDays: 30,
+    mode: "analytics" as const,
+    toolIds: [] as string[],
+  });
+  if (process.env.ANALYTICS_ENABLED !== "true") return empty();
 
   try {
     const sql = await getSql();
@@ -347,7 +322,6 @@ export async function getPublicTrendingTools() {
       .map(row => String(row.tool_id ?? ""))
       .filter(id => /^[a-z0-9][a-z0-9._:-]{0,127}$/i.test(id) && activeToolIds.has(id))
       .slice(0, PUBLIC_TRENDING_TOOL_LIMIT);
-    if (!toolIds.length) return publicTrendingDiscoveryResponse();
     return {
       generatedAt: new Date().toISOString(),
       windowDays: 30,
@@ -355,9 +329,9 @@ export async function getPublicTrendingTools() {
       toolIds,
     };
   } catch {
-    // Analytics outages must not turn the Home discovery section into an empty
-    // state. The ranked feed resumes automatically when the query succeeds.
-    return publicTrendingDiscoveryResponse();
+    // Do not label a shuffled or catalogue-curated list as "Trending" when
+    // actual usage cannot be read. A successful query restores the ranking.
+    return empty();
   }
 }
 
