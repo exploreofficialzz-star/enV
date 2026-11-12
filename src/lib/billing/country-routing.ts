@@ -14,7 +14,7 @@ export type CountryPaymentProfile = {
 
 const COUNTRY_PROFILES: Record<string, CountryPaymentProfile> = {
   NG: { countryCode: "NG", currency: "NGN", paymentOptions: ["card", "ussd", "banktransfer", "account", "internetbanking", "nqr", "enaira", "opay"] },
-  GH: { countryCode: "GH", currency: "GHS", paymentOptions: ["card", "ghanamobilemoney"] },
+  GH: { countryCode: "GH", currency: "GHS", paymentOptions: ["card", "mobilemoneyghana"] },
   KE: { countryCode: "KE", currency: "KES", paymentOptions: ["card", "mpesa"] },
   ZA: { countryCode: "ZA", currency: "ZAR", paymentOptions: ["card", "account", "1voucher"] },
   MW: { countryCode: "MW", currency: "MWK", paymentOptions: ["card", "mobilemoneymalawi"] },

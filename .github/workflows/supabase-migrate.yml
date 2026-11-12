@@ -74,6 +74,7 @@ jobs:
             'user', 'session', 'account', 'verification',
             'billing_accounts', 'billing_credit_ledger',
             'billing_reservations', 'billing_purchase_intents',
+            'billing_purchase_refunds', 'billing_purchase_disputes',
             'billing_entitlements', 'billing_entitlement_events',
             'billing_webhook_events', 'billing_usage_events',
             'billing_offline_allowances', 'billing_offline_transactions',
@@ -114,13 +115,31 @@ jobs:
                     AND contype = 'c' AND convalidated
                 ) AS digest_check_validated,
                 (SELECT COUNT(*)::int FROM public.billing_offline_finalization_proofs
-                  WHERE batch_digest IS NULL) AS unbound_proofs
+                  WHERE batch_digest IS NULL) AS unbound_proofs,
+                EXISTS (
+                  SELECT 1 FROM information_schema.columns
+                  WHERE table_schema = 'public' AND table_name = 'billing_accounts'
+                    AND column_name = 'recovery_debt_subunits' AND is_nullable = 'NO'
+                ) AS recovery_debt_ready,
+                EXISTS (
+                  SELECT 1 FROM information_schema.columns
+                  WHERE table_schema = 'public' AND table_name = 'billing_purchase_intents'
+                    AND column_name = 'refunded_amount_minor' AND is_nullable = 'NO'
+                ) AS refund_amount_ready,
+                EXISTS (
+                  SELECT 1 FROM information_schema.columns
+                  WHERE table_schema = 'public' AND table_name = 'billing_purchase_intents'
+                    AND column_name = 'refunded_subunits' AND is_nullable = 'NO'
+                ) AS refund_subunits_ready
             `);
             const p = proof.rows[0];
             if (!p.digest_not_null || !p.digest_check_validated || p.unbound_proofs !== 0) {
               throw new Error('Part 3G preflight did not pass. No migrations were run; inspect batch_digest and proof records first.');
             }
-            console.log('Preflight passed: database connection works, all 23 expected tables exist, and Part 3G is constrained with zero unbound proofs.');
+            if (!p.recovery_debt_ready || !p.refund_amount_ready || !p.refund_subunits_ready) {
+              throw new Error('Refund/recovery columns are incomplete. No migrations were run; inspect the billing reconciliation schema.');
+            }
+            console.log('Preflight passed: database connection works, all 25 expected tables exist, and refund/recovery columns are present.');
           } catch (error) {
             console.error('[preflight] ' + (error?.message || 'Database preflight failed.'));
             process.exitCode = 1;
@@ -154,11 +173,13 @@ jobs:
             '0006_offline_native_pairing.sql',
             '0007_wallet_rewards.sql',
             '0008_supabase_rls.sql',
+            '0009_billing_refund_dispute_reconciliation.sql',
           ];
           const expectedTables = [
             'user', 'session', 'account', 'verification',
             'billing_accounts', 'billing_credit_ledger',
             'billing_reservations', 'billing_purchase_intents',
+            'billing_purchase_refunds', 'billing_purchase_disputes',
             'billing_entitlements', 'billing_entitlement_events',
             'billing_webhook_events', 'billing_usage_events',
             'billing_offline_allowances', 'billing_offline_transactions',
@@ -195,7 +216,7 @@ jobs:
             if (clientPolicies.rows.length) {
               throw new Error('Unexpected direct client-role policies found on: ' + clientPolicies.rows.map((r) => r.tablename).join(', ') + '. Review these policies before enabling client access.');
             }
-            console.log('Verified: all 8 canonical migration filenames are tracked; RLS is enabled on all 23 tables; no direct anon/authenticated/public policies were found.');
+            console.log('Verified: all 9 canonical migration filenames are tracked; RLS is enabled on all 25 tables; no direct anon/authenticated/public policies were found.');
           } catch (error) {
             console.error('[verification] ' + (error?.message || 'Post-migration verification failed.'));
             process.exitCode = 1;

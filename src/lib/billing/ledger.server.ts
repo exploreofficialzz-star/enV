@@ -12,12 +12,14 @@ export type WalletSnapshot = {
   reservedTokens: number;
   lifetimePurchasedSubunits: number;
   lifetimeConsumedSubunits: number;
+  recoveryDebtSubunits: number;
+  recoveryDebtTokens: number;
   updatedAt: string;
 };
 
 export class BillingError extends Error {
   constructor(
-    readonly code: "INSUFFICIENT_CREDITS" | "INVALID_AMOUNT" | "RESERVATION_NOT_FOUND" | "RESERVATION_NOT_ACTIVE" | "WORKFLOW_BUDGET_EXCEEDED" | "IDEMPOTENCY_CONFLICT" | "PURCHASE_NOT_VERIFIED" | "PURCHASE_MISMATCH",
+    readonly code: "INSUFFICIENT_CREDITS" | "INVALID_AMOUNT" | "RESERVATION_NOT_FOUND" | "RESERVATION_NOT_ACTIVE" | "WORKFLOW_BUDGET_EXCEEDED" | "IDEMPOTENCY_CONFLICT" | "PURCHASE_NOT_VERIFIED" | "PURCHASE_MISMATCH" | "ACCOUNT_RECOVERY_REQUIRED",
     message: string,
   ) {
     super(message);
@@ -84,6 +86,326 @@ async function ensureBillingAccount(sql: Awaited<ReturnType<typeof getSql>>, use
   );
 }
 
+type BillingExecutor = {
+  query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<T[]>;
+};
+
+async function applyIncomingCredit(
+  tx: BillingExecutor,
+  userId: string,
+  subunits: number,
+  countAsPurchase = false,
+): Promise<{ availableSubunits: number; recoveredDebtSubunits: number }> {
+  const credit = requireAmount(subunits);
+  const accounts = await tx.query<{ recovery_debt_subunits: number | string }>(
+    `select recovery_debt_subunits from billing_accounts where user_id = $1 for update`,
+    [userId],
+  );
+  const account = accounts[0];
+  if (!account) throw new Error("The billing account could not be locked for incoming credits.");
+  const debt = amount(account.recovery_debt_subunits ?? 0);
+  const recoveredDebtSubunits = Math.min(debt, credit);
+  const availableSubunits = credit - recoveredDebtSubunits;
+  const updated = await tx.query<{ user_id: string }>(
+    `update billing_accounts
+        set recovery_debt_subunits = recovery_debt_subunits - $2,
+            available_subunits = available_subunits + $3,
+            lifetime_purchased_subunits = lifetime_purchased_subunits + $4,
+            updated_at = now()
+      where user_id = $1
+      returning user_id`,
+    [userId, recoveredDebtSubunits, availableSubunits, countAsPurchase ? credit : 0],
+  );
+  if (!updated[0]) throw new Error("Incoming wallet credits could not be reconciled.");
+  return { availableSubunits, recoveredDebtSubunits };
+}
+
+async function releaseReservedFunds(
+  tx: BillingExecutor,
+  input: { userId: string; releasedSubunits: number; reservedSubunits: number },
+): Promise<{ availableSubunits: number; recoveredDebtSubunits: number }> {
+  const releasedSubunits = requireAmount(input.releasedSubunits, true);
+  const reservedSubunits = requireAmount(input.reservedSubunits);
+  if (releasedSubunits > reservedSubunits) throw new BillingError("INVALID_AMOUNT", "Released funds exceed the reservation.");
+  const accounts = await tx.query<{ recovery_debt_subunits: number | string }>(
+    `select recovery_debt_subunits from billing_accounts where user_id = $1 for update`,
+    [input.userId],
+  );
+  const account = accounts[0];
+  if (!account) throw new Error("The billing account could not be locked while releasing reserved funds.");
+  const debt = amount(account.recovery_debt_subunits ?? 0);
+  const recoveredDebtSubunits = Math.min(debt, releasedSubunits);
+  const availableSubunits = releasedSubunits - recoveredDebtSubunits;
+  const updated = await tx.query<{ user_id: string }>(
+    `update billing_accounts
+        set available_subunits = available_subunits + $2,
+            reserved_subunits = reserved_subunits - $3,
+            recovery_debt_subunits = recovery_debt_subunits - $4,
+            updated_at = now()
+      where user_id = $1 and reserved_subunits >= $3
+      returning user_id`,
+    [input.userId, availableSubunits, reservedSubunits, recoveredDebtSubunits],
+  );
+  if (!updated[0]) throw new Error("The reserved wallet balance could not be reconciled.");
+  return { availableSubunits, recoveredDebtSubunits };
+}
+
+function calculateReversedSubunits(creditsSubunits: number, purchaseAmountMinor: number, reversedAmountMinor: number): number {
+  const credits = BigInt(requireAmount(creditsSubunits));
+  if (!Number.isSafeInteger(purchaseAmountMinor) || purchaseAmountMinor <= 0 ||
+      !Number.isSafeInteger(reversedAmountMinor) || reversedAmountMinor < 0) {
+    throw new BillingError("PURCHASE_MISMATCH", "The verified reversal amount is invalid.");
+  }
+  const cappedMinor = Math.min(purchaseAmountMinor, reversedAmountMinor);
+  return Number((credits * BigInt(cappedMinor)) / BigInt(purchaseAmountMinor));
+}
+
+type PurchaseRecoveryIntent = {
+  id: string;
+  user_id: string;
+  provider: string;
+  amount_minor: number | string;
+  currency: string;
+  credits_subunits: number | string;
+  status: string;
+  refunded_amount_minor?: number | string;
+  refunded_subunits?: number | string;
+};
+
+async function syncPurchaseRecovery(
+  tx: BillingExecutor,
+  intent: PurchaseRecoveryIntent,
+  provider: string,
+  eventReference: string,
+): Promise<{ status: string; reversedSubunits: number; recoveryDebtSubunits: number; recoveredDebtSubunits: number }> {
+  const purchaseAmountMinor = amount(intent.amount_minor);
+  const creditsSubunits = amount(intent.credits_subunits);
+  const refundRows = await tx.query<{ total_minor: number | string }>(
+    `select coalesce(sum(amount_minor), 0) as total_minor
+       from billing_purchase_refunds
+      where purchase_intent_id = $1 and status = 'completed'`,
+    [intent.id],
+  );
+  const disputeRows = await tx.query<{ total_minor: number | string }>(
+    `select coalesce(sum(amount_minor), 0) as total_minor
+       from billing_purchase_disputes
+      where purchase_intent_id = $1 and status = 'lost' and amount_minor is not null`,
+    [intent.id],
+  );
+  const refundMinor = amount(refundRows[0]?.total_minor ?? 0);
+  const disputeMinor = amount(disputeRows[0]?.total_minor ?? 0);
+  const cumulativeMinor = Math.min(purchaseAmountMinor, refundMinor + disputeMinor);
+  const targetReversedSubunits = calculateReversedSubunits(creditsSubunits, purchaseAmountMinor, cumulativeMinor);
+  const previousReversedSubunits = amount(intent.refunded_subunits ?? 0);
+  const deltaSubunits = targetReversedSubunits - previousReversedSubunits;
+  let availableDelta = 0;
+  let debtDelta = 0;
+  let recoveredDebtSubunits = 0;
+  if (deltaSubunits < 0) {
+    const reversal = -deltaSubunits;
+    const accounts = await tx.query<{ available_subunits: number | string }>(
+      `select available_subunits from billing_accounts where user_id = $1 for update`,
+      [intent.user_id],
+    );
+    const account = accounts[0];
+    if (!account) throw new Error("The purchase wallet could not be locked for a reversal.");
+    const available = amount(account.available_subunits);
+    availableDelta = -Math.min(available, reversal);
+    debtDelta = reversal + availableDelta;
+    const updated = await tx.query<{ user_id: string }>(
+      `update billing_accounts
+          set available_subunits = available_subunits + $2,
+              recovery_debt_subunits = recovery_debt_subunits + $3,
+              updated_at = now()
+        where user_id = $1
+        returning user_id`,
+      [intent.user_id, availableDelta, debtDelta],
+    );
+    if (!updated[0]) throw new Error("The purchase wallet reversal could not be applied.");
+  } else if (deltaSubunits > 0) {
+    const restored = await applyIncomingCredit(tx, intent.user_id, deltaSubunits);
+    availableDelta = restored.availableSubunits;
+    recoveredDebtSubunits = restored.recoveredDebtSubunits;
+  }
+  if (deltaSubunits !== 0) {
+    const ledgerKey = `purchase-recovery:${intent.id}:${targetReversedSubunits}`;
+    await tx.query(
+      `insert into billing_credit_ledger
+        (id, user_id, entry_type, delta_available_subunits, idempotency_key, reference_id, description, metadata)
+       values ($1, $2, 'refund', $3, $4, $5, $6, $7::jsonb)
+       on conflict (idempotency_key) do nothing`,
+      [randomUUID(), intent.user_id, availableDelta, ledgerKey, intent.id,
+        deltaSubunits < 0 ? "Reconciled provider refund or lost chargeback" : "Restored credits after provider dispute reversal",
+        JSON.stringify({
+          provider, eventReference, cumulativeRefundAmountMinor: cumulativeMinor,
+          previousReversedSubunits, targetReversedSubunits, deltaSubunits,
+          recoveryDebtAddedSubunits: debtDelta, recoveryDebtRepaidSubunits: recoveredDebtSubunits,
+        })],
+    );
+  }
+  const activeDisputes = await tx.query<{ active: boolean }>(
+    `select exists (
+       select 1 from billing_purchase_disputes
+        where purchase_intent_id = $1 and status in ('open', 'accepted', 'declined', 'review_required')
+     ) as active`,
+    [intent.id],
+  );
+  const nextStatus = activeDisputes[0]?.active
+    ? "disputed"
+    : targetReversedSubunits >= creditsSubunits ? "refunded" : "credited";
+  await tx.query(
+    `update billing_purchase_intents
+        set refunded_amount_minor = $2,
+            refunded_subunits = $3,
+            status = $4,
+            updated_at = now()
+      where id = $1`,
+    [intent.id, cumulativeMinor, targetReversedSubunits, nextStatus],
+  );
+  const accountRows = await tx.query<{ recovery_debt_subunits: number | string }>(
+    `select recovery_debt_subunits from billing_accounts where user_id = $1`,
+    [intent.user_id],
+  );
+  return {
+    status: nextStatus,
+    reversedSubunits: targetReversedSubunits,
+    recoveryDebtSubunits: amount(accountRows[0]?.recovery_debt_subunits ?? 0),
+    recoveredDebtSubunits,
+  };
+}
+
+export async function reconcileVerifiedRefund(input: {
+  provider: string;
+  providerRefundId: string;
+  purchaseIntentId: string;
+  amountMinor: number;
+  currency: string;
+  status: "pending" | "processing" | "needs_attention" | "failed" | "completed";
+  payloadDigest: string;
+  providerMetadata?: Record<string, unknown>;
+}) {
+  if (!input.provider || input.provider.length > 80 ||
+      !/^[A-Za-z0-9_-]{1,160}$/.test(input.providerRefundId) ||
+      !/^[a-f0-9-]{36}$/i.test(input.purchaseIntentId) ||
+      !Number.isSafeInteger(input.amountMinor) || input.amountMinor <= 0 ||
+      !/^[A-Z]{3}$/i.test(input.currency) ||
+      !/^[a-f0-9]{64}$/i.test(input.payloadDigest)) {
+    throw new BillingError("PURCHASE_MISMATCH", "The verified refund metadata is invalid.");
+  }
+  const sql = await getSql();
+  return sql.transaction(async (tx) => {
+    const intents = await tx.query<PurchaseRecoveryIntent>(
+      `select id, user_id, provider, amount_minor, currency, credits_subunits, status,
+              refunded_amount_minor, refunded_subunits
+         from billing_purchase_intents where id = $1 for update`,
+      [input.purchaseIntentId],
+    );
+    const intent = intents[0];
+    if (!intent || intent.provider !== input.provider ||
+        !["credited", "refunded", "disputed"].includes(intent.status) ||
+        intent.currency.toUpperCase() !== input.currency.toUpperCase() ||
+        input.amountMinor > amount(intent.amount_minor)) {
+      throw new BillingError("PURCHASE_MISMATCH", "The verified refund does not match a credited purchase.");
+    }
+    const existing = await tx.query<{
+      purchase_intent_id: string; amount_minor: number | string; currency: string; status: string;
+    }>(
+      `select purchase_intent_id, amount_minor, currency, status
+         from billing_purchase_refunds where provider = $1 and provider_refund_id = $2 for update`,
+      [input.provider, input.providerRefundId],
+    );
+    if (existing[0] && (existing[0].purchase_intent_id !== intent.id ||
+        amount(existing[0].amount_minor) !== input.amountMinor ||
+        existing[0].currency.toUpperCase() !== input.currency.toUpperCase())) {
+      throw new BillingError("PURCHASE_MISMATCH", "This provider refund ID is already bound to a different purchase.");
+    }
+    const nextRefundStatus = existing[0]?.status === "completed" ? "completed" : input.status;
+    await tx.query(
+      `insert into billing_purchase_refunds
+        (id, provider, provider_refund_id, purchase_intent_id, amount_minor, currency, status, payload_digest, provider_metadata, processed_at)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, case when $7 = 'completed' then now() else null end)
+       on conflict (provider, provider_refund_id) do update
+         set status = case when billing_purchase_refunds.status = 'completed' then 'completed' else excluded.status end,
+             payload_digest = excluded.payload_digest,
+             provider_metadata = excluded.provider_metadata,
+             processed_at = case
+               when billing_purchase_refunds.status = 'completed' then billing_purchase_refunds.processed_at
+               when excluded.status = 'completed' then now()
+               else null end,
+             updated_at = now()`,
+      [randomUUID(), input.provider, input.providerRefundId, intent.id, input.amountMinor,
+        input.currency.toUpperCase(), nextRefundStatus, input.payloadDigest, JSON.stringify(input.providerMetadata ?? {})],
+    );
+    if (nextRefundStatus !== "completed") return { status: nextRefundStatus, reversedSubunits: amount(intent.refunded_subunits ?? 0), idempotentReplay: false };
+    const reconciliation = await syncPurchaseRecovery(tx, intent, input.provider, input.providerRefundId);
+    return { ...reconciliation, idempotentReplay: false };
+  });
+}
+
+export async function reconcileVerifiedDispute(input: {
+  provider: string;
+  providerDisputeId: string;
+  purchaseIntentId: string;
+  amountMinor: number;
+  currency: string;
+  status: "open" | "accepted" | "declined" | "review_required" | "won" | "lost";
+  payloadDigest: string;
+  providerMetadata?: Record<string, unknown>;
+}) {
+  if (!input.provider || input.provider.length > 80 ||
+      !/^[A-Za-z0-9_-]{1,160}$/.test(input.providerDisputeId) ||
+      !/^[a-f0-9-]{36}$/i.test(input.purchaseIntentId) ||
+      !Number.isSafeInteger(input.amountMinor) || input.amountMinor <= 0 ||
+      !/^[A-Z]{3}$/i.test(input.currency) ||
+      !/^[a-f0-9]{64}$/i.test(input.payloadDigest)) {
+    throw new BillingError("PURCHASE_MISMATCH", "The verified dispute metadata is invalid.");
+  }
+  const sql = await getSql();
+  return sql.transaction(async (tx) => {
+    const intents = await tx.query<PurchaseRecoveryIntent>(
+      `select id, user_id, provider, amount_minor, currency, credits_subunits, status,
+              refunded_amount_minor, refunded_subunits
+         from billing_purchase_intents where id = $1 for update`,
+      [input.purchaseIntentId],
+    );
+    const intent = intents[0];
+    if (!intent || intent.provider !== input.provider ||
+        !["credited", "refunded", "disputed"].includes(intent.status) ||
+        intent.currency.toUpperCase() !== input.currency.toUpperCase() ||
+        input.amountMinor > amount(intent.amount_minor)) {
+      throw new BillingError("PURCHASE_MISMATCH", "The verified dispute does not match a credited purchase.");
+    }
+    const existing = await tx.query<{
+      purchase_intent_id: string; amount_minor: number | string | null; currency: string | null;
+    }>(
+      `select purchase_intent_id, amount_minor, currency
+         from billing_purchase_disputes where provider = $1 and provider_dispute_id = $2 for update`,
+      [input.provider, input.providerDisputeId],
+    );
+    if (existing[0] && (existing[0].purchase_intent_id !== intent.id ||
+        (existing[0].amount_minor != null && amount(existing[0].amount_minor) !== input.amountMinor) ||
+        (existing[0].currency && existing[0].currency.toUpperCase() !== input.currency.toUpperCase()))) {
+      throw new BillingError("PURCHASE_MISMATCH", "This provider dispute ID is already bound to a different purchase.");
+    }
+    await tx.query(
+      `insert into billing_purchase_disputes
+        (id, provider, provider_dispute_id, purchase_intent_id, amount_minor, currency, status, payload_digest, provider_metadata, resolved_at)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, case when $7 in ('won', 'lost') then now() else null end)
+       on conflict (provider, provider_dispute_id) do update
+         set status = excluded.status,
+             amount_minor = excluded.amount_minor,
+             currency = excluded.currency,
+             payload_digest = excluded.payload_digest,
+             provider_metadata = excluded.provider_metadata,
+             resolved_at = case when excluded.status in ('won', 'lost') then now() else null end,
+             updated_at = now()`,
+      [randomUUID(), input.provider, input.providerDisputeId, intent.id, input.amountMinor,
+        input.currency.toUpperCase(), input.status, input.payloadDigest, JSON.stringify(input.providerMetadata ?? {})],
+    );
+    const reconciliation = await syncPurchaseRecovery(tx, intent, input.provider, input.providerDisputeId);
+    return { ...reconciliation, disputeStatus: input.status };
+  });
+}
 
 /** Release stale reservations in bounded, idempotent batches when a user returns. */
 async function releaseExpiredReservationsForUser(userId: string): Promise<number> {
@@ -107,16 +429,9 @@ async function releaseExpiredReservationsForUser(userId: string): Promise<number
     );
     for (const reservation of expired) {
       const reservedSubunits = amount(reservation.reserved_subunits);
-      const accountUpdate = await tx.query<{ user_id: string }>(
-        `update billing_accounts
-            set available_subunits = available_subunits + $2,
-                reserved_subunits = reserved_subunits - $2,
-                updated_at = now()
-          where user_id = $1 and reserved_subunits >= $2
-          returning user_id`,
-        [userId, reservedSubunits],
-      );
-      if (!accountUpdate[0]) throw new Error("Expired reservation balance could not be reconciled.");
+      const released = await releaseReservedFunds(tx, {
+        userId, releasedSubunits: reservedSubunits, reservedSubunits,
+      });
       await tx.query(
         `update billing_reservations set status = 'released', completed_at = now()
           where id = $1 and status = 'reserved'`,
@@ -124,11 +439,12 @@ async function releaseExpiredReservationsForUser(userId: string): Promise<number
       );
       await tx.query(
         `insert into billing_credit_ledger
-          (id, user_id, entry_type, delta_available_subunits, delta_reserved_subunits, idempotency_key, reference_id, description)
-         values ($1, $2, 'release', $3, $4, $5, $6, $7)
+          (id, user_id, entry_type, delta_available_subunits, delta_reserved_subunits, idempotency_key, reference_id, description, metadata)
+         values ($1, $2, 'release', $3, $4, $5, $6, $7, $8::jsonb)
          on conflict (idempotency_key) do nothing`,
-        [randomUUID(), userId, reservedSubunits, -reservedSubunits, `expire:${reservation.id}`, reservation.id,
-          `Automatically released expired reservation for ${reservation.operation_id}`],
+        [randomUUID(), userId, released.availableSubunits, -reservedSubunits, `expire:${reservation.id}`, reservation.id,
+          `Automatically released expired reservation for ${reservation.operation_id}`,
+          JSON.stringify({ recoveryDebtRepaidSubunits: released.recoveredDebtSubunits })],
       );
     }
     return expired.length;
@@ -145,10 +461,11 @@ export async function readWallet(userId: string): Promise<WalletSnapshot> {
     reserved_subunits: number | string;
     lifetime_purchased_subunits: number | string;
     lifetime_consumed_subunits: number | string;
+    recovery_debt_subunits: number | string;
     updated_at: string | Date;
   }>(
     `select user_id, available_subunits, reserved_subunits, lifetime_purchased_subunits,
-            lifetime_consumed_subunits, updated_at
+            lifetime_consumed_subunits, recovery_debt_subunits, updated_at
        from billing_accounts where user_id = $1`,
     [userId],
   );
@@ -164,6 +481,8 @@ export async function readWallet(userId: string): Promise<WalletSnapshot> {
     reservedTokens: reservedSubunits / SUBUNITS_PER_TOKEN,
     lifetimePurchasedSubunits: amount(row.lifetime_purchased_subunits),
     lifetimeConsumedSubunits: amount(row.lifetime_consumed_subunits),
+    recoveryDebtSubunits: amount(row.recovery_debt_subunits),
+    recoveryDebtTokens: amount(row.recovery_debt_subunits) / SUBUNITS_PER_TOKEN,
     updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : String(row.updated_at),
   };
 }
@@ -206,12 +525,28 @@ export async function reserveCredits(input: ReserveCreditsInput) {
   const sql = await getSql();
   return sql.transaction(async (tx) => {
     await ensureBillingAccount(tx, input.userId);
-    const accounts = await tx.query<{ available_subunits: number | string; reserved_subunits: number | string }>(
-      `select available_subunits, reserved_subunits from billing_accounts where user_id = $1 for update`,
+    const accounts = await tx.query<{
+      available_subunits: number | string; reserved_subunits: number | string; recovery_debt_subunits: number | string;
+    }>(
+      `select available_subunits, reserved_subunits, recovery_debt_subunits from billing_accounts where user_id = $1 for update`,
       [input.userId],
     );
     const account = accounts[0];
     if (!account) throw new Error("Billing account could not be locked.");
+    if (amount(account.recovery_debt_subunits ?? 0) > 0) {
+      throw new BillingError("ACCOUNT_RECOVERY_REQUIRED", "New token usage is paused while a refunded purchase balance is being recovered.");
+    }
+    const unresolvedDisputes = await tx.query<{ active: boolean }>(
+      `select exists (
+         select 1 from billing_purchase_disputes d
+         join billing_purchase_intents p on p.id = d.purchase_intent_id
+          where p.user_id = $1 and d.status in ('open', 'accepted', 'declined', 'review_required')
+       ) as active`,
+      [input.userId],
+    );
+    if (unresolvedDisputes[0]?.active) {
+      throw new BillingError("ACCOUNT_RECOVERY_REQUIRED", "Token usage is paused while a payment dispute is being reviewed.");
+    }
 
     const existing = await tx.query<{
       id: string; user_id: string; operation_id: string; reserved_subunits: number | string;
@@ -283,17 +618,16 @@ export async function settleReservation(input: { userId: string; reservationId: 
       throw new BillingError("WORKFLOW_BUDGET_EXCEEDED", "Actual cost exceeded the approved budget. Pause execution, obtain user approval, then release this reservation and create a larger one before continuing.");
     }
     const releaseSubunits = reservedSubunits - actualSubunits;
-    const accountUpdate = await tx.query<{ user_id: string }>(
+    const released = await releaseReservedFunds(tx, {
+      userId: input.userId, releasedSubunits: releaseSubunits, reservedSubunits,
+    });
+    await tx.query(
       `update billing_accounts
-          set available_subunits = available_subunits + $2,
-              reserved_subunits = reserved_subunits - $3,
-              lifetime_consumed_subunits = lifetime_consumed_subunits + $4,
+          set lifetime_consumed_subunits = lifetime_consumed_subunits + $2,
               updated_at = now()
-        where user_id = $1 and reserved_subunits >= $3
-        returning user_id`,
-      [input.userId, releaseSubunits, reservedSubunits, actualSubunits],
+        where user_id = $1`,
+      [input.userId, actualSubunits],
     );
-    if (!accountUpdate[0]) throw new Error("The account reservation balance could not be reconciled.");
     await tx.query(
       `update billing_reservations set actual_subunits = $2, status = 'settled', completed_at = now() where id = $1`,
       [reservation.id, actualSubunits],
@@ -302,7 +636,7 @@ export async function settleReservation(input: { userId: string; reservationId: 
       `insert into billing_credit_ledger
         (id, user_id, entry_type, delta_available_subunits, delta_reserved_subunits, consumed_subunits, idempotency_key, reference_id, description)
        values ($1, $2, 'settlement', $3, $4, $5, $6, $7, $8)`,
-      [randomUUID(), input.userId, releaseSubunits, -reservedSubunits, actualSubunits, `settlement:${reservation.id}`, reservation.id, `Settled ${reservation.operation_id}`],
+      [randomUUID(), input.userId, released.availableSubunits, -reservedSubunits, actualSubunits, `settlement:${reservation.id}`, reservation.id, `Settled ${reservation.operation_id}`],
     );
     return { id: reservation.id, status: "settled" as const, reservedSubunits, actualSubunits, releasedSubunits: releaseSubunits, idempotentReplay: false };
   });
@@ -319,18 +653,15 @@ export async function releaseReservation(input: { userId: string; reservationId:
     if (reservation.status === "released") return { id: reservation.id, status: reservation.status, idempotentReplay: true };
     if (reservation.status !== "reserved") throw new BillingError("RESERVATION_NOT_ACTIVE", "Only active reservations can be released.");
     const reservedSubunits = amount(reservation.reserved_subunits);
-    const accountUpdate = await tx.query<{ user_id: string }>(
-      `update billing_accounts set available_subunits = available_subunits + $2,
-          reserved_subunits = reserved_subunits - $2, updated_at = now()
-        where user_id = $1 and reserved_subunits >= $2 returning user_id`, [input.userId, reservedSubunits],
-    );
-    if (!accountUpdate[0]) throw new Error("The account reservation balance could not be reconciled.");
+    const released = await releaseReservedFunds(tx, {
+      userId: input.userId, releasedSubunits: reservedSubunits, reservedSubunits,
+    });
     await tx.query(`update billing_reservations set status = 'released', completed_at = now() where id = $1`, [reservation.id]);
     await tx.query(
       `insert into billing_credit_ledger
         (id, user_id, entry_type, delta_available_subunits, delta_reserved_subunits, idempotency_key, reference_id, description)
        values ($1, $2, 'release', $3, $4, $5, $6, $7)`,
-      [randomUUID(), input.userId, reservedSubunits, -reservedSubunits, `release:${reservation.id}`, reservation.id,
+      [randomUUID(), input.userId, released.availableSubunits, -reservedSubunits, `release:${reservation.id}`, reservation.id,
         input.reason?.slice(0, 240) || `Released reservation for ${reservation.operation_id}`],
     );
     return { id: reservation.id, status: "released" as const, releasedSubunits: reservedSubunits, idempotentReplay: false };
@@ -425,6 +756,7 @@ export async function creditVerifiedPurchase(input: {
   paidAmountMinor: number;
   paidCurrency: string;
   payloadDigest: string;
+  providerMetadata?: Record<string, unknown>;
 }) {
   if (!Number.isSafeInteger(input.paidAmountMinor) || input.paidAmountMinor <= 0 ||
       !input.provider || input.provider.length > 80 || !input.providerEventId || input.providerEventId.length > 200 ||
@@ -479,23 +811,28 @@ export async function creditVerifiedPurchase(input: {
     }
     const creditSubunits = requireAmount(amount(intent.credits_subunits));
     await ensureBillingAccount(tx, intent.user_id);
-    const accountUpdate = await tx.query<{ user_id: string }>(
-      `update billing_accounts set available_subunits = available_subunits + $2,
-        lifetime_purchased_subunits = lifetime_purchased_subunits + $2, updated_at = now()
-        where user_id = $1 returning user_id`,
-      [intent.user_id, creditSubunits],
-    );
-    if (!accountUpdate[0]) throw new Error("The billing account could not be credited.");
+    const creditAllocation = await applyIncomingCredit(tx, intent.user_id, creditSubunits, true);
     await tx.query(
       `insert into billing_credit_ledger
        (id, user_id, entry_type, delta_available_subunits, idempotency_key, reference_id, description, currency, payment_amount_minor, metadata)
        values ($1, $2, 'purchase', $3, $4, $5, $6, $7, $8, $9::jsonb)`,
-      [randomUUID(), intent.user_id, creditSubunits, `purchase:${intent.id}`, intent.id, "Verified credit purchase", intent.currency.toUpperCase(), input.paidAmountMinor,
-        JSON.stringify({ provider: input.provider, transactionId: input.providerTransactionId })],
+      [randomUUID(), intent.user_id, creditAllocation.availableSubunits, `purchase:${intent.id}`, intent.id, "Verified credit purchase", intent.currency.toUpperCase(), input.paidAmountMinor,
+        JSON.stringify({ provider: input.provider, transactionId: input.providerTransactionId,
+          purchasedSubunits: creditSubunits, recoveryDebtRepaidSubunits: creditAllocation.recoveredDebtSubunits })],
     );
+    const providerMetadata = JSON.stringify(input.providerMetadata ?? {});
+    if (providerMetadata.length > 4_096) {
+      throw new BillingError("PURCHASE_MISMATCH", "The verified provider metadata exceeds the allowed size.");
+    }
     await tx.query(
-      `update billing_purchase_intents set status = 'credited', provider_transaction_id = $2, credited_at = now(), updated_at = now() where id = $1`,
-      [intent.id, input.providerTransactionId],
+      `update billing_purchase_intents
+          set status = 'credited',
+              provider_transaction_id = $2,
+              provider_metadata = provider_metadata || $3::jsonb,
+              credited_at = now(),
+              updated_at = now()
+        where id = $1`,
+      [intent.id, input.providerTransactionId, providerMetadata],
     );
 
     // Referral rewards are granted only after the first verified paid conversion.
@@ -541,18 +878,14 @@ export async function creditVerifiedPurchase(input: {
             JSON.stringify({ purchaseIntentId: intent.id, provider: input.provider })],
         );
         if (!created[0]) continue;
-        const credited = await tx.query<{ user_id: string }>(
-          `update billing_accounts set available_subunits = available_subunits + $2, updated_at = now()
-            where user_id = $1 returning user_id`,
-          [reward.userId, reward.subunits],
-        );
-        if (!credited[0]) throw new Error("A referral reward could not be credited.");
+        const credited = await applyIncomingCredit(tx, reward.userId, reward.subunits);
         await tx.query(
           `insert into billing_credit_ledger
             (id, user_id, entry_type, delta_available_subunits, idempotency_key, reference_id, description, metadata)
            values ($1, $2, 'promotion', $3, $4, $5, $6, $7::jsonb)`,
-          [randomUUID(), reward.userId, reward.subunits, `reward:${reward.key}`, referral.id, reward.description,
-            JSON.stringify({ rewardType: reward.type, purchaseIntentId: intent.id })],
+          [randomUUID(), reward.userId, credited.availableSubunits, `reward:${reward.key}`, referral.id, reward.description,
+            JSON.stringify({ rewardType: reward.type, purchaseIntentId: intent.id,
+              rewardSubunits: reward.subunits, recoveryDebtRepaidSubunits: credited.recoveredDebtSubunits })],
         );
       }
       await tx.query(

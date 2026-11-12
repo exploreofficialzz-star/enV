@@ -9,6 +9,7 @@ type WalletSummary = {
   reservedTokens: number;
   lifetimePurchasedSubunits: number;
   lifetimeConsumedSubunits: number;
+  recoveryDebtTokens: number;
   updatedAt: string;
 };
 type ChargeRecord = {
@@ -230,7 +231,12 @@ export function TokenDashboard() {
                     ) : (
                       <p className="mt-2 break-words text-3xl font-semibold tracking-tight tabular-nums sm:text-4xl">{tokenUnitDisplay(wallet ? tokenLabel(wallet.availableTokens) : "—")}</p>
                     )}
-                    <p className="mt-2 text-xs text-white/75">enV estimated reference value ≈ $0.010</p>
+                    <p className="mt-2 text-xs text-white/75">{wallet ? referenceValue(wallet.availableTokens) : "Estimated reference value unavailable"}</p>
+                    {wallet && wallet.recoveryDebtTokens > 0 ? (
+                      <p className="mt-2 text-xs font-medium text-amber-200">
+                        Recovery balance: {tokenLabel(wallet.recoveryDebtTokens)}. New token usage is paused until it clears.
+                      </p>
+                    ) : null}
                   </div>
                   <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-white/10"><Coins size={23} aria-hidden="true" /></span>
                 </div>
