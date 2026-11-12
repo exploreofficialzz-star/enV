@@ -65,37 +65,8 @@ type RailProps = {
 
 /** Icon-only rail: left column on tablet and desktop, bottom bar on phones. */
 export function StudioRail({ open, active, onSelect }: RailProps) {
-  const rail = useRef<HTMLElement>(null);
-  const selectRef = useRef(onSelect);
-  selectRef.current = onSelect;
-
-  // Bind directly to each rail button. This keeps tool selection independent
-  // from the world canvas and any event delegation outside the rail itself.
-  useEffect(() => {
-    const node = rail.current;
-    if (!node) return;
-    const root = node.closest<HTMLElement>(".wl-studio");
-    const buttons = Array.from(node.querySelectorAll<HTMLButtonElement>("button[data-group]"));
-    root?.setAttribute("data-rail-listener", "true");
-    const removers = buttons.map((button) => {
-      const activate = () => {
-        const group = button.dataset.group;
-        root?.setAttribute("data-rail-last-event", "button-click");
-        root?.setAttribute("data-rail-last-button", button.getAttribute("aria-label") ?? "unknown");
-        root?.setAttribute("data-rail-last-group", group ?? "missing");
-        if (GROUPS.some((item) => item.id === group)) selectRef.current(group as StudioGroupId);
-      };
-      button.addEventListener("click", activate, true);
-      return () => button.removeEventListener("click", activate, true);
-    });
-    return () => {
-      removers.forEach((remove) => remove());
-      root?.removeAttribute("data-rail-listener");
-    };
-  }, []);
-
   return (
-    <nav ref={rail} className="wl-rail" aria-label="World Lab tools">
+    <nav className="wl-rail" aria-label="World Lab tools">
       {GROUPS.map(({ id, label, Icon }) => (
         <button
           key={id}
@@ -106,6 +77,7 @@ export function StudioRail({ open, active, onSelect }: RailProps) {
           aria-label={`Open ${label} tools`}
           aria-expanded={open && active === id}
           title={label[0].toUpperCase() + label.slice(1)}
+          onClick={() => onSelect(id)}
         >
           <Icon aria-hidden="true" size={22} strokeWidth={1.9} />
         </button>
