@@ -280,7 +280,7 @@ assert.ok(countryRouting.includes('"BG"'), "Bulgaria must resolve through the Eu
 assert.match(flutterwaveService, /FLW_SECRET_KEY/);
 assert.match(flutterwaveService, /FLW_SECRET_HASH/);
 assert.match(flutterwaveService, /FLUTTERWAVE_ENABLED_CURRENCIES/);
-assert.match(flutterwaveService, /payment_options: profile\.paymentOptions\.join/);
+assert.match(flutterwaveService, /payment_options: selectedPaymentOptions\.join/);
 assert.match(flutterwaveService, /verifyAndCreditFlutterwaveReference/);
 assert.match(flutterwaveService, /verify_by_reference/);
 assert.match(flutterwaveService, /updateFlutterwaveIntentStatus/);
