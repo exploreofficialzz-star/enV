@@ -25,7 +25,7 @@ The current country profile catalogue is deliberately explicit. Flutterwave's St
 | Customer country | Checkout currency | Methods requested from Flutterwave |
 |---|---:|---|
 | Nigeria | NGN | Card, USSD, bank transfer, bank account, internet banking, NQR, eNaira, OPay |
-| Ghana | GHS | Card, Ghana mobile money (`ghanamobilemoney`) |
+| Ghana | GHS | Card, Ghana mobile money (`mobilemoneyghana`) |
 | Kenya | KES | Card, M-Pesa |
 | South Africa | ZAR | Card, bank account, 1Voucher |
 | Malawi | MWK | Card, Malawi mobile money |
@@ -38,11 +38,15 @@ The current country profile catalogue is deliberately explicit. Flutterwave's St
 | Egypt | EGP | Card, FawryPay |
 | United Kingdom | GBP | Card, bank account |
 | United States | USD | Card, bank account |
+| Canada | CAD | Card |
+| Colombia | COP | Card |
+| India | INR | Card |
+| Sierra Leone | SLL | Card |
 | Euro-area countries (including Bulgaria from 1 January 2026) | EUR | Card, bank account |
 
 Flutterwave's published card-currency list is GBP, CAD, XAF, COP, EGP, EUR, GHS, KES, INR, NGN, RWF, SLL, ZAR, TZS, UGX, USD, XOF and ZMW (its Help Center has a typo `IRN` for India's INR). enV also includes MWK for the documented Malawi local-payment profile. The card currency list does not itself imply a local payment rail in every country; those methods remain tied to their country profiles. Only currencies enabled on the actual merchant account and listed in `FLUTTERWAVE_ENABLED_CURRENCIES` can be purchasable. The token-pack value is converted from the single USD reference price using the FX snapshot; no `FLUTTERWAVE_TOKEN_PRICE_<CURRENCY>_MINOR` variables exist. Flutterwave Standard currently documents `amount` as an int32 in major currency units. enV therefore enables a pack only when the converted amount is an exact whole major unit within the provider's int32 limit; fractional major-unit results are disabled rather than rounded or sent in an unsupported format. Flutterwave's current documentation also requires the account-level **Enable Dashboard Payment Options** switch to be unchecked before per-payment `payment_options` are applied. Set `FLUTTERWAVE_PAYMENT_OPTIONS_DASHBOARD_DISABLED=true` only after verifying that dashboard setting. The deployment also requires `FLW_SECRET_KEY`, `FLW_SECRET_HASH`, `FLUTTERWAVE_PROVIDER_APPROVED=true`, the global billing gates, and `FLUTTERWAVE_REFUND_DISPUTE_HANDLING_APPROVED=true`. The last flag is intentionally false by default: the provider's refund/chargeback reconciliation and wallet reversal policy must be implemented and tested before activation.
 
-Flutterwave method identifiers are currency-region specific: Ghana uses `ghanamobilemoney`; West African XOF uses `mobilemoneyxof`; Central African XAF uses `mobilemoneyxaf`. Flutterwave's documentation lists these identifiers separately from its country/currency matrix, so enV does not interchange XOF and XAF method names.
+Flutterwave method identifiers are currency-region specific: Ghana uses `mobilemoneyghana`; West African XOF uses `mobilemoneyxof`; Central African XAF uses `mobilemoneyxaf`. enV follows the named-method list in Flutterwave's payment-method documentation and keeps XOF and XAF rails separate.
 
 The country-to-method table is a request allowlist, not a guarantee that the merchant's Flutterwave account has every method activated. The account's live eligibility, settlement currencies, dashboard settings and provider onboarding remain authoritative.
 
@@ -66,7 +70,7 @@ Paystack's local channels are controlled by the merchant account and dashboard. 
 - Redirects do not credit the wallet by themselves. Paystack and Flutterwave transaction details are re-fetched from the provider API and compared with the stored reference, transaction ID, exact amount and currency.
 - Flutterwave webhook requests require the exact configured `verif-hash` header to match `FLW_SECRET_HASH`; the handler reads a bounded body and verifies the transaction with Flutterwave before calling the shared idempotent wallet ledger.
 - Tokens are credited only through `creditVerifiedPurchase`, which enforces the stored purchase intent and provider transaction uniqueness.
-- Flutterwave refund/dispute callbacks fail closed until a separate reconciliation and wallet reversal procedure exists. Never enable the provider-specific refund approval flag as a way to bypass that work.
+- Flutterwave refund and chargeback callbacks are implemented with provider-record re-fetch and purchase-intent matching before wallet reversal. Keep the production refund/dispute approval gate false until the live webhook URL is registered, real provider callbacks are delivered and tested, and the operating/recovery procedure is signed off.
 
 ## Deployment configuration
 
