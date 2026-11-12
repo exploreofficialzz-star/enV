@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { ArrowDownToLine, Coins, RefreshCw, Wallet, Clock3, Copy, Gift, Users, Video, CreditCard, TrendingUp, Share2, ArrowUpRight, Link2, Eye, EyeOff, X } from "lucide-react";
+import { isCustomerPaymentMethodAvailable, parseUsdAmountToCents, type CustomerPaymentMethod } from "@/lib/billing/payment-methods";
 import { AppShell } from "@/components/layout/app-shell";
 import {
   clearWebOfflineIssueKey,
@@ -36,8 +37,15 @@ type WalletActivity = {
 type WalletState = { status: "loading" | "ready" | "unavailable"; message?: string; wallet?: WalletData; activity?: WalletActivity[] };
 type FundingProviderId = "paystack" | "flutterwave" | "cryptomus";
 type FundingProviderOption = {
-  id: FundingProviderId; label: string; enabled: boolean; currency: string; pricePerTokenMinor: number | null;
-  packs: Array<{ tokens: number; amountMinor?: number | null; currency?: string; enabled?: boolean; message?: string }>; message: string;
+  id: FundingProviderId;
+  label: string;
+  enabled: boolean;
+  currency: string;
+  pricePerTokenMinor: number | null;
+  localPayments?: boolean;
+  paymentOptions?: string[];
+  packs: Array<{ tokens: number; amountMinor?: number | null; currency?: string; enabled?: boolean; message?: string }>;
+  message: string;
 };
 type FundingOptionsState = { status: "loading" | "ready" | "unavailable"; providers: FundingProviderOption[]; message?: string };
 type RewardsData = {
@@ -96,29 +104,6 @@ function tokenAmount(subunits: number): string {
 
 function tokenValueAmount(tokens: number): string {
   return "$" + (tokens * 0.01).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
-}
-
-function formatPaymentAmount(amountMinor: number | null | undefined, currencyValue: string | null | undefined): string | null {
-  const currency = currencyValue?.trim().toUpperCase() ?? "";
-  if (amountMinor == null || !Number.isSafeInteger(amountMinor) || amountMinor <= 0 || !/^[A-Z]{3}$/.test(currency)) {
-    return null;
-  }
-  try {
-    const formatter = new Intl.NumberFormat(undefined, { style: "currency", currency });
-    const minorUnitExponent = formatter.resolvedOptions().maximumFractionDigits ?? 2;
-    return formatter.format(amountMinor / (10 ** minorUnitExponent));
-  } catch {
-    return null;
-  }
-}
-
-function tokenPackReferenceValue(tokens: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(tokens * 0.01);
 }
 
 function tokenReferenceValue(tokens: number): string {
@@ -203,10 +188,10 @@ function Account() {
   const [nativeSessionsMessage, setNativeSessionsMessage] = useState("");
   const [rewardsState, setRewardsState] = useState<RewardsState>({ status: "loading" });
   const [rewardsReloadKey, setRewardsReloadKey] = useState(0);
-  const [selectedTokenPack, setSelectedTokenPack] = useState(100);
+  const [customAmountUsd, setCustomAmountUsd] = useState("10");
   const [fundingBusy, setFundingBusy] = useState(false);
   const [showFundingOptions, setShowFundingOptions] = useState(false);
-  const [selectedFundingProvider, setSelectedFundingProvider] = useState<FundingProviderId | null>(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<CustomerPaymentMethod>("card");
   const [fundingOptionsState, setFundingOptionsState] = useState<FundingOptionsState>({ status: "loading", providers: [] });
   const [fundingFeedback, setFundingFeedback] = useState<{ kind: "success" | "error" | "info"; message: string } | null>(null);
   const [showAllTransactions, setShowAllTransactions] = useState(false);
@@ -233,11 +218,6 @@ function Account() {
         );
         if (!providers.length) throw new Error("Payment options are not available.");
         setFundingOptionsState({ status: "ready", providers });
-        setSelectedFundingProvider((current) =>
-          current && providers.some((item) => item.id === current)
-            ? current
-            : providers.find((item) => item.enabled)?.id ?? null
-        );
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
@@ -250,7 +230,6 @@ function Account() {
           ],
           message: error instanceof Error ? error.message : "Secure payment options could not be loaded.",
         });
-        setSelectedFundingProvider(null);
       });
     return () => controller.abort();
   }, [showFundingOptions]);
@@ -491,16 +470,19 @@ function Account() {
     await copyReferralLink(code, source, signature);
   }
 
-  async function startFundingCheckout(provider: FundingProviderId) {
+  async function startFundingCheckout(method: CustomerPaymentMethod) {
     if (fundingBusy) return;
-    const providerOption = fundingOptionsState.providers.find((item) => item.id === provider);
-    if (!providerOption?.enabled || fundingOptionsState.status !== "ready") {
-      setFundingFeedback({
-        kind: "error",
-        message: providerOption?.message ?? "This payment method is not available right now. No payment was taken.",
-      });
+    const amountUsdCents = parseUsdAmountToCents(customAmountUsd);
+    if (amountUsdCents === null) {
+      setFundingFeedback({ kind: "error", message: "Enter at least US$1.00. Amounts can have up to two decimal places." });
       return;
     }
+    if (fundingOptionsState.status !== "ready" ||
+        !isCustomerPaymentMethodAvailable(fundingOptionsState.providers, method)) {
+      setFundingFeedback({ kind: "error", message: "This payment method is not available for your detected country yet. No payment was taken." });
+      return;
+    }
+
     setFundingBusy(true);
     setFundingFeedback(null);
     try {
@@ -508,21 +490,28 @@ function Account() {
         method: "POST", credentials: "same-origin",
         headers: { "content-type": "application/json", accept: "application/json" },
         body: JSON.stringify({
-          provider,
-          tokenPack: selectedTokenPack,
-          idempotencyKey: provider + "-wallet-topup-" + crypto.randomUUID(),
+          paymentMethod: method,
+          amountUsdCents,
+          idempotencyKey: method + "-wallet-topup-" + crypto.randomUUID(),
         }),
       });
       const payload = await response.json().catch(() => null) as {
         ok?: boolean;
-        data?: { authorizationUrl?: string; provider?: string };
+        data?: { authorizationUrl?: string; provider?: string; paymentMethod?: string };
         message?: string;
       } | null;
-      const target = payload?.data?.authorizationUrl;
-      const expectedHost = provider === "paystack" ? "checkout.paystack.com" : provider === "flutterwave" ? "checkout.flutterwave.com" : "pay.cryptomus.com";
+      const provider = payload?.data?.provider;
+      const correctProvider = method === "more"
+        ? provider === "cryptomus"
+        : provider === "paystack" || provider === "flutterwave";
+      const expectedHost = provider === "paystack"
+        ? "checkout.paystack.com"
+        : provider === "flutterwave"
+          ? "checkout.flutterwave.com"
+          : provider === "cryptomus" ? "pay.cryptomus.com" : "";
       let checkout: URL | null = null;
-      try { if (target) checkout = new URL(target); } catch { checkout = null; }
-      if (!response.ok || !payload?.ok || payload.data?.provider !== provider ||
+      try { if (payload?.data?.authorizationUrl) checkout = new URL(payload.data.authorizationUrl); } catch { checkout = null; }
+      if (!response.ok || !payload?.ok || !correctProvider || payload.data?.paymentMethod !== method ||
           !checkout || checkout.protocol !== "https:" || checkout.hostname !== expectedHost) {
         throw new Error(payload?.message ?? "Secure checkout could not be opened. No tokens were added.");
       }
@@ -701,13 +690,22 @@ function Account() {
   }
 
   const visibleWallet = state.status === "ready" ? state.wallet : undefined;
-  const selectedProviderOption = fundingOptionsState.providers.find((item) => item.id === selectedFundingProvider);
-  const selectedFundingPack = selectedProviderOption?.packs.find((item) => item.tokens === selectedTokenPack);
-  const selectedFundingAmount = formatPaymentAmount(
-    selectedFundingPack?.amountMinor,
-    selectedFundingPack?.currency ?? selectedProviderOption?.currency,
-  );
-  const selectedFundingPackAvailable = Boolean(selectedFundingPack && selectedFundingPack.enabled !== false && selectedFundingAmount);
+  const customAmountCents = parseUsdAmountToCents(customAmountUsd);
+  const customTokenAmount = customAmountCents ?? 0;
+  const methodAvailable = (method: CustomerPaymentMethod) =>
+    fundingOptionsState.status === "ready" &&
+    isCustomerPaymentMethodAvailable(fundingOptionsState.providers, method);
+  const fundingMethodOptions: Array<{
+    id: CustomerPaymentMethod;
+    title: string;
+    description: string;
+    icon: React.ReactNode;
+  }> = [
+    { id: "card", title: "Pay with card", description: "Debit or credit cards supported in your country", icon: <CreditCard size={19} aria-hidden="true" /> },
+    { id: "local", title: "Local payments", description: "Bank transfer, USSD, mobile money and other local options where supported", icon: <Wallet size={19} aria-hidden="true" /> },
+    { id: "more", title: "More", description: "Other payment options available for your country", icon: <Coins size={19} aria-hidden="true" /> },
+  ];
+
   return (
     <AppShell>
       <div className="mx-auto w-full max-w-6xl px-3 py-5 sm:px-6 sm:py-8">
@@ -770,7 +768,7 @@ function Account() {
               <div className="flex items-start gap-3">
                 <div className="min-w-0 flex-1">
                   <h2 id="funding-dialog-title" className="text-lg font-semibold sm:text-xl">Add funds</h2>
-                  <p className="mt-1 text-sm leading-5 text-muted">Choose how you want to pay, then select the enV token amount.</p>
+                  <p className="mt-1 text-sm leading-5 text-muted">Choose a payment method and enter an amount.</p>
                 </div>
                 <button
                   type="button"
@@ -784,107 +782,107 @@ function Account() {
               </div>
 
               {fundingOptionsState.status === "loading" ? (
-                <p className="mt-5 rounded-xl border border-border bg-surface-2 p-3 text-sm text-muted" role="status">Checking available payment methods…</p>
+                <p className="mt-5 rounded-xl border border-border bg-surface-2 p-3 text-sm text-muted" role="status">Checking payment methods for your country…</p>
               ) : null}
               {fundingOptionsState.status === "unavailable" ? (
                 <p className="mt-4 rounded-xl border border-rose-500/30 bg-rose-500/5 p-3 text-sm leading-5 text-fg" role="status">{fundingOptionsState.message}</p>
               ) : null}
 
               <div className="mt-4 space-y-2">
-                <h3 className="text-sm font-semibold">Payment method</h3>
-                {fundingOptionsState.providers.map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    aria-pressed={selectedFundingProvider === option.id}
-                    onClick={() => setSelectedFundingProvider(option.id)}
-                    className={"flex w-full items-start gap-3 rounded-2xl border p-3 text-left transition " +
-                      (selectedFundingProvider === option.id
-                        ? "border-accent bg-accent/5"
-                        : "border-border bg-surface hover:bg-surface-2") +
-                      (!option.enabled ? " opacity-80" : "")}
-                  >
-                    <span className="mt-0.5 grid size-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-fg">
-                      {option.id === "cryptomus" ? <Coins size={19} aria-hidden="true"/> : <CreditCard size={19} aria-hidden="true"/>}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-sm font-semibold">{option.label}</span>
-                        <span className={"rounded-full px-2 py-1 text-[10px] font-semibold " +
-                          (option.enabled ? "bg-emerald-500/10 text-emerald-600" : "bg-surface-2 text-muted")}>
-                          {option.enabled ? "Available" : "Not available"}
-                        </span>
-                      </span>
-                      <span className="mt-1 block text-xs leading-5 text-muted">
-                        {option.id === "paystack"
-                          ? "Cards and eligible local channels for the detected country and configured Paystack merchant account."
-                          : option.id === "flutterwave"
-                            ? "Local cards, bank and mobile-money options where enabled for your country and currency."
-                            : "Pay through a hosted crypto invoice. The available coins and networks are shown by the provider."}
-                      </span>
-                      {selectedFundingProvider === option.id && !option.enabled ? (
-                        <span className="mt-2 block text-xs leading-5 text-muted">{option.message}</span>
-                      ) : null}
-                    </span>
-                  </button>
-                ))}
-              </div>
-
-              <div className="mt-5 space-y-3">
-                <label htmlFor="wallet-token-amount" className="block text-sm font-semibold">Amount to add</label>
-                <select
-                  id="wallet-token-amount"
-                  value={selectedTokenPack}
-                  onChange={(event) => setSelectedTokenPack(Number(event.target.value))}
-                  className="min-h-12 w-full rounded-xl border border-border bg-surface px-3 text-sm text-fg"
-                >
-                  {[100, 250, 500, 1000].map((tokens) => {
-                    const pack = selectedProviderOption?.packs.find((item) => item.tokens === tokens);
-                    const amount = formatPaymentAmount(pack?.amountMinor, pack?.currency ?? selectedProviderOption?.currency);
-                    const disabled = !pack || pack.enabled === false || !amount;
+                <h3 className="text-sm font-semibold">How would you like to pay?</h3>
+                <div className="grid gap-2">
+                  {fundingMethodOptions.map((option) => {
+                    const available = methodAvailable(option.id);
+                    const selected = selectedPaymentMethod === option.id;
                     return (
-                      <option key={tokens} value={tokens} disabled={disabled}>
-                        {tokens.toLocaleString()} enV{amount ? " — " + amount : " — Unavailable"}
-                      </option>
+                      <button
+                        key={option.id}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => setSelectedPaymentMethod(option.id)}
+                        className={"flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition " +
+                          (selected ? "border-accent bg-accent/5" : "border-border bg-surface hover:bg-surface-2")}
+                      >
+                        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-fg">{option.icon}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-semibold">{option.title}</span>
+                            <span className={"shrink-0 text-[10px] font-medium " + (available ? "text-emerald-600" : "text-muted")}>
+                              {available ? "Available" : fundingOptionsState.status === "loading" ? "Checking…" : "Unavailable"}
+                            </span>
+                          </span>
+                          <span className="mt-1 block text-xs leading-5 text-muted">{option.description}</span>
+                        </span>
+                      </button>
                     );
                   })}
-                </select>
-                <div className="rounded-xl border border-border bg-surface-2 px-4 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs text-muted">Amount to pay</span>
-                    <span className="text-lg font-semibold tabular-nums text-fg">{selectedFundingAmount ?? "Price unavailable"}</span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-3 border-t border-border pt-2">
-                    <span className="text-xs text-muted">{selectedTokenPack.toLocaleString()} enV reference value</span>
-                    <span className="text-sm font-medium tabular-nums text-fg">{tokenPackReferenceValue(selectedTokenPack)} USD</span>
-                  </div>
-                  <p className="mt-2 text-[11px] leading-4 text-muted">
-                    The local-currency figure is the checkout price. The USD figure is enV's fixed reference value, not a cash redemption promise.
-                    {selectedFundingPack?.message ? " " + selectedFundingPack.message : ""}
-                    {selectedFundingPack?.currency ? " Currency: " + selectedFundingPack.currency + "." : ""}
-                  </p>
                 </div>
               </div>
 
-              {selectedFundingProvider ? (
-                <p className="mt-4 text-xs leading-5 text-muted">
-                  {fundingOptionsState.providers.find((item) => item.id === selectedFundingProvider)?.message}
-                </p>
-              ) : null}
+              <div className="mt-5 space-y-3">
+                <label htmlFor="wallet-custom-amount" className="block text-sm font-semibold">Amount (USD)</label>
+                <div className="flex min-h-12 items-center rounded-xl border border-border bg-surface px-3 focus-within:border-accent">
+                  <span className="mr-2 text-base font-semibold text-muted">$</span>
+                  <input
+                    id="wallet-custom-amount"
+                    type="number"
+                    inputMode="decimal"
+                    min="1"
+                    step="0.01"
+                    max="90000000"
+                    value={customAmountUsd}
+                    onChange={(event) => setCustomAmountUsd(event.target.value)}
+                    aria-describedby="wallet-amount-help"
+                    className="min-w-0 flex-1 bg-transparent py-3 text-base font-semibold text-fg outline-none"
+                    placeholder="10.00"
+                  />
+                </div>
+                <p id="wallet-amount-help" className="text-xs text-muted">Minimum $1.00. You can enter any amount with up to two decimal places.</p>
+                <div className="flex flex-wrap gap-2" aria-label="Suggested amounts">
+                  {[10, 50, 100].map((amount) => (
+                    <button
+                      key={amount}
+                      type="button"
+                      aria-pressed={customAmountUsd === String(amount)}
+                      onClick={() => setCustomAmountUsd(String(amount))}
+                      className={"min-h-9 rounded-full border px-4 text-sm font-semibold transition " +
+                        (customAmountUsd === String(amount)
+                          ? "border-accent bg-accent/10 text-fg"
+                          : "border-border bg-surface text-muted hover:bg-surface-2")}
+                    >
+                      ${amount}
+                    </button>
+                  ))}
+                </div>
+                <div className="rounded-xl border border-border bg-surface-2 px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs text-muted">Your amount</span>
+                    <span className="text-sm font-semibold tabular-nums text-fg">
+                      {customAmountCents === null
+                        ? "Enter at least $1.00"
+                        : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(customAmountCents / 100)}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-3 border-t border-border pt-2">
+                    <span className="text-xs text-muted">enV tokens</span>
+                    <span className="text-lg font-semibold tabular-nums text-fg">{customAmountCents === null ? "—" : customTokenAmount.toLocaleString() + " enV"}</span>
+                  </div>
+                  <p className="mt-2 text-[11px] leading-4 text-muted">100 enV = $1.00 reference value. Your final charge is quoted in your local currency after your country is detected. Token reference value is not a cash redemption promise.</p>
+                </div>
+              </div>
+
               <button
                 type="button"
-                onClick={() => selectedFundingProvider && void startFundingCheckout(selectedFundingProvider)}
+                onClick={() => void startFundingCheckout(selectedPaymentMethod)}
                 disabled={fundingBusy || fundingOptionsState.status !== "ready" ||
-                  !selectedFundingProvider || !selectedFundingPackAvailable ||
-                  !selectedProviderOption?.enabled}
+                  !methodAvailable(selectedPaymentMethod) || customAmountCents === null}
                 className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#3df1c2] px-4 py-3 text-sm font-semibold text-[#052a2a] transition hover:bg-[#74f9d7] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <CreditCard size={17} aria-hidden="true"/>
-                {fundingBusy ? "Opening secure checkout…" : "Continue to secure checkout"}
+                {fundingBusy ? "Opening secure checkout…" : "Continue"}
                 {!fundingBusy ? <ArrowUpRight size={15} aria-hidden="true"/> : null}
               </button>
-              <p className="mt-3 text-center text-[11px] leading-4 text-muted">The amount above is the server-quoted local-currency price for your detected country. enV reference value is 100 enV = US$1.00. Checkout is re-quoted by the server using a current daily FX snapshot; <a href="https://www.exchangerate-api.com" target="_blank" rel="noreferrer" className="underline underline-offset-2">rates by Exchange Rate API</a>.</p>
-              <p className="mt-2 text-center text-[11px] leading-4 text-muted">enV adds tokens only after the server verifies the provider’s payment confirmation. Do not close a payment until the provider shows its final status.</p>
+              <p className="mt-3 text-center text-[11px] leading-4 text-muted">Payments are processed securely. enV adds tokens only after server-side payment verification.</p>
             </section>
           </div>
         ) : null}
