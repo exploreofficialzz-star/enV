@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { getSql } from "../db";
 import { readWallet, creditVerifiedPurchase } from "./ledger.server";
-import { readSafePackPrice, requirePaystackVerificationSecret, resolvePaystackCountryConfiguration } from "./provider-config";
+import { requirePaystackVerificationSecret, resolvePaystackCountryConfiguration } from "./provider-config";
 import { readBoundedBytes } from "./bounded-json.server";
 import { getCountryPaymentProfile, normalizeCountryCode } from "./country-routing";
 import { getFlutterwaveFundingOption } from "./flutterwave.server";
@@ -21,7 +21,7 @@ function publicOrigin(): string | null {
 }
 
 function resolvePaystackConfiguration(countryCode: string | null | undefined) {
-  const selected = resolvePaystackCountryConfiguration(countryCode, process.env, TOKEN_PACKS);
+  const selected = resolvePaystackCountryConfiguration(countryCode, process.env);
   if (!selected) return null;
 
   const launchChecksPassed =
@@ -116,10 +116,8 @@ export async function getFundingOptions(countryCode: string | null = null) {
 
   const cryptomusMerchantId = process.env.CRYPTOMUS_MERCHANT_ID?.trim() ?? "";
   const cryptomusApiKey = process.env.CRYPTOMUS_PAYMENT_API_KEY?.trim() ?? "";
-  const cryptoPricePerTokenMinor = readSafePackPrice(
-    process.env.CRYPTOMUS_TOKEN_PRICE_USD_CENTS,
-    TOKEN_PACKS,
-  );
+  // Cryptomus charges the same USD reference price: one cent per enV token.
+  const cryptoPricePerTokenMinor = 1;
   const cryptomusEnabled = launchChecksPassed &&
     process.env.CRYPTOMUS_PROVIDER_APPROVED === "true" &&
     /^[a-f0-9-]{36}$/i.test(cryptomusMerchantId) &&
@@ -130,6 +128,7 @@ export async function getFundingOptions(countryCode: string | null = null) {
     tokens,
     amountMinor: price !== null ? tokens * price : null,
     currency,
+    enabled: true,
   }));
 
   const cryptomusMessage = cryptomusEnabled
