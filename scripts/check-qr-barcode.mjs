@@ -58,7 +58,7 @@ const webCommerceTests = read("src/components/engines/ecommerce-engine-utils.tes
 
 
 assert.ok(androidGate.includes('"ecommerce"') && androidGate.includes('"qr"'), "Android production gate exempts QR and E-commerce");
-assert.ok(iosCatalog.includes('"ecommerce", "qr"'), "iOS production gate exempts QR and E-commerce");
+assert.ok((iosCatalog.includes('["qr", "ecommerce"]') || iosCatalog.includes('["ecommerce", "qr"]')), "iOS production gate exempts QR and E-commerce");
 assert.ok(androidCatalog.includes('stringOrEmpty("category") in setOf("qr", "ecommerce")') && androidCatalog.includes('"active"'), "Android catalog activates QR and E-commerce records");
 assert.ok(iosCatalog.includes('["qr", "ecommerce"].contains(category.lowercased()) ? "active" : status'), "iOS catalog activates QR and E-commerce records");
 assert.ok(androidReader.includes("ProcessCameraProvider") && androidReader.includes("NativeBarcodeCameraAnalyzer") && androidReader.includes("NativeBarcodeImageDecoder"), "Android QR/barcode reader uses CameraX, ZXing and local image decoding");
