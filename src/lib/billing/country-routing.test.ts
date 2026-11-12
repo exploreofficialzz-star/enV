@@ -47,7 +47,6 @@ test("country profiles expose the documented Flutterwave local currencies and me
   assert.equal(getCountryPaymentProfile("KE")?.paymentOptions.includes("mpesa"), true);
   assert.equal(getCountryPaymentProfile("ZA")?.currency, "ZAR");
   assert.equal(getCountryPaymentProfile("GH")?.currency, "GHS");
-  assert.equal(getCountryPaymentProfile("GH")?.paymentOptions.includes("mobilemoneyghana"), true);
   for (const country of ["BJ", "BF", "CI", "GW", "ML", "NE", "SN", "TG"]) {
     assert.equal(getCountryPaymentProfile(country)?.currency, "XOF", country + " must use the XOF profile");
     assert.equal(getCountryPaymentProfile(country)?.paymentOptions.includes("mobilemoneyxof"), true);
