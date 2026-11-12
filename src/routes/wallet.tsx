@@ -36,7 +36,7 @@ type WalletState = { status: "loading" | "ready" | "unavailable"; message?: stri
 type FundingProviderId = "paystack" | "flutterwave" | "cryptomus";
 type FundingProviderOption = {
   id: FundingProviderId; label: string; enabled: boolean; currency: string; pricePerTokenMinor: number | null;
-  packs: Array<{ tokens: number; amountMinor: number | null; currency: string }>; message: string;
+  packs: Array<{ tokens: number; amountMinor: number | null; currency: string; enabled?: boolean; message?: string }>; message: string;
 };
 type FundingOptionsState = { status: "loading" | "ready" | "unavailable"; providers: FundingProviderOption[]; message?: string };
 type RewardsData = {
@@ -792,24 +792,21 @@ function Account() {
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {[100, 250, 500, 1000].map((tokens) => {
                     const pack = fundingOptionsState.providers.find((item) => item.id === selectedFundingProvider)?.packs.find((item) => item.tokens === tokens);
-                    const amount = pack?.amountMinor;
-                    const currency = pack?.currency ?? fundingOptionsState.providers.find((item) => item.id === selectedFundingProvider)?.currency ?? "NGN";
-                    const formattedAmount = amount !== null && amount !== undefined
-                      ? new Intl.NumberFormat(currency === "NGN" ? "en-NG" : "en-US", {
-                          style: "currency", currency, minimumFractionDigits: 2, maximumFractionDigits: 2,
-                        }).format(amount / 100)
-                      : "Price at checkout";
+                    const formattedAmount = tokenValueAmount(tokens) + " USD reference";
+                    const packUnavailable = pack?.enabled === false;
                     return (
                       <button
                         key={tokens}
                         type="button"
                         aria-pressed={selectedTokenPack === tokens}
+                        disabled={packUnavailable}
                         onClick={() => setSelectedTokenPack(tokens)}
-                        className={"flex min-h-[78px] flex-col items-start justify-center rounded-xl border px-3 py-2 text-left transition " +
+                        className={"flex min-h-[78px] flex-col items-start justify-center rounded-xl border px-3 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-50 " +
                           (selectedTokenPack === tokens ? "border-accent bg-accent/5" : "border-border bg-surface hover:bg-surface-2")}
                       >
                         <span className="text-sm font-semibold">{tokens.toLocaleString()} enV</span>
                         <span className="mt-1 text-xs text-muted">{formattedAmount}</span>
+                        {packUnavailable ? <span className="mt-1 text-[10px] leading-4 text-muted">{pack?.message ?? "Unavailable for this payment method"}</span> : null}
                       </button>
                     );
                   })}
@@ -833,7 +830,8 @@ function Account() {
                 {fundingBusy ? "Opening secure checkout…" : "Continue to secure checkout"}
                 {!fundingBusy ? <ArrowUpRight size={15} aria-hidden="true"/> : null}
               </button>
-              <p className="mt-3 text-center text-[11px] leading-4 text-muted">enV adds tokens only after the server verifies the provider’s payment confirmation. Do not close a payment until the provider shows its final status.</p>
+              <p className="mt-3 text-center text-[11px] leading-4 text-muted">The card shows enV’s USD reference value. Final payment currency and amount are calculated from the detected country and the server-side FX snapshot. Rates update daily; <a href="https://www.exchangerate-api.com" target="_blank" rel="noreferrer" className="underline underline-offset-2">rates by Exchange Rate API</a>.</p>
+              <p className="mt-2 text-center text-[11px] leading-4 text-muted">enV adds tokens only after the server verifies the provider’s payment confirmation. Do not close a payment until the provider shows its final status.</p>
             </section>
           </div>
         ) : null}
