@@ -21,7 +21,7 @@ Each placement is labelled as an advertisement and is requested only when the pr
 - Ads are only a funding mechanism for the service; a visitor's privacy choice does not turn off enV's monetization configuration for other visitors.
 - This rollout is Web-only. Android Kotlin and iOS Swift implementations are unchanged; they need a separately reviewed native ad integration rather than reusing browser script tags.
 - Google AdSense remains independently configured and unchanged.
-- The public build flag `VITE_ADSTERRA_ENABLED` defaults to false. Production deployment has it set to true.
+- The checked-in build flag `VITE_ADSTERRA_ENABLED` defaults to false. Vercel sets it to `true` for the `envtools.store` **Production** target only; Preview and Development targets are intentionally unset so test traffic does not create publisher impressions.
 
 ## Deliberately not enabled yet
 
