@@ -36,7 +36,7 @@ type WalletState = { status: "loading" | "ready" | "unavailable"; message?: stri
 type FundingProviderId = "paystack" | "flutterwave" | "cryptomus";
 type FundingProviderOption = {
   id: FundingProviderId; label: string; enabled: boolean; currency: string; pricePerTokenMinor: number | null;
-  packs: Array<{ tokens: number; amountMinor: number | null; currency: string; enabled?: boolean; message?: string }>; message: string;
+  packs: Array<{ tokens: number; amountMinor?: number | null; currency?: string; enabled?: boolean; message?: string }>; message: string;
 };
 type FundingOptionsState = { status: "loading" | "ready" | "unavailable"; providers: FundingProviderOption[]; message?: string };
 type RewardsData = {
