@@ -77,6 +77,9 @@ export function StudioRail({ open, active, onSelect }: RailProps) {
           aria-label={`Open ${label} tools`}
           aria-expanded={open && active === id}
           title={label[0].toUpperCase() + label.slice(1)}
+          onPointerDown={(event) => {
+            if (event.button === 0) onSelect(id);
+          }}
           onClick={() => onSelect(id)}
         >
           <Icon aria-hidden="true" size={22} strokeWidth={1.9} />
