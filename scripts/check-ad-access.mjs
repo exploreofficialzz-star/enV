@@ -102,7 +102,7 @@ assert.doesNotMatch(homePage, /Adsterra|AdSlot|AdSensePageUnit/, "Home must neve
 assert.doesNotMatch(toolDirectory, /Adsterra|AdSensePageUnit/, "The all-tools directory must never display advertising placements.");
 assert.doesNotMatch(blogArticle, /Adsterra|AdSensePageUnit/, "Blog articles must never display advertising placements.");
 assert.doesNotMatch(blogIndex, /Adsterra|AdSensePageUnit/, "The Blog index must never display advertising placements.");
-assert.match(privacy, /advertisingEnabled = import\.meta\.env\.VITE_ADS_ENABLED === "true"/, "Privacy disclosure must appear when ad serving is enabled.");
+assert.match(privacy, /advertisingEnabled = resolveAdConfig\([\s\S]*?VITE_ADSENSE_PRIVACY_CONFIGURED[\s\S]*?\) !== null/, "Privacy disclosure must appear only when the complete AdSense and CMP configuration is valid.");
 assert.match(privacy, /frequency capping and aggregated reporting/, "Privacy disclosure must explain NPA identifier use.");
 assert.match(cookieConsent, /chooseAnalyticsConsent/, "The combined cookie dialog must preserve the analytics consent and withdrawal API.");
 assert.match(cookieConsent, /setAdsterraConsent/, "The combined cookie dialog must save Adsterra advertising consent.");
