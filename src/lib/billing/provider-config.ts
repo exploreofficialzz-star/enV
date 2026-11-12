@@ -43,6 +43,7 @@ export function readSafePackPrice(
 
 
 const PAYSTACK_MERCHANT_LOCAL_CURRENCIES: Record<string, string> = {
+  CI: "XOF",
   NG: "NGN",
   GH: "GHS",
   KE: "KES",
@@ -50,6 +51,7 @@ const PAYSTACK_MERCHANT_LOCAL_CURRENCIES: Record<string, string> = {
 };
 
 const PAYSTACK_MERCHANT_ACCEPTED_CURRENCIES: Record<string, readonly string[]> = {
+  CI: ["XOF"],
   NG: ["NGN", "USD"],
   GH: ["GHS"],
   KE: ["KES", "USD"],
@@ -87,9 +89,9 @@ export function resolvePaystackCountryConfiguration(
 
   // One Paystack integration key authenticates every transaction currency on the merchant account.
   const secret = env.PAYSTACK_SECRET_KEY?.trim() ?? "";
-  const configuredPrice = env["PAYSTACK_TOKEN_PRICE_" + currency + "_MINOR"] ??
-    (currency === "NGN" ? env.PAYSTACK_TOKEN_PRICE_NGN_KOBO : undefined);
-  const pricePerTokenMinor = readSafePackPrice(configuredPrice, packSizes);
+  // Pricing is always derived from the single USD reference price and a fresh
+  // server-side FX snapshot; no country-specific per-token price is configured.
+  const pricePerTokenMinor = null;
   const currencyApproved = currency === "NGN"
     ? env.PAYSTACK_PROVIDER_APPROVED === "true"
     : env["PAYSTACK_PROVIDER_APPROVED_" + currency] === "true";
