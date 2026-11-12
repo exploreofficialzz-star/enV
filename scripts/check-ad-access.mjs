@@ -44,16 +44,17 @@ assert.match(rootRoute, /name: "google-adsense-account", content: ADSENSE_SITE_C
 assert.doesNotMatch(rootRoute, /ADSENSE_BOOTSTRAP_SCRIPT|pagead\.googlesyndication\.com/, "The root document must not load AdSense before hydration.");
 assert.match(shell, /<AdSlot tool=\{tool\} \/>/, "Tool details must include the ad placement.");
 assert.match(toolShell, /AdsterraNativeBanner/, "Qualified tool pages must include the publisher's native placement.");
-assert.match(toolShell, /!isFullscreen && adsterraQualified \? <AdsterraResponsiveBanner \/>/, "Qualified tool pages must actually mount the responsive banner above the interface.");
+assert.match(toolShell, /!isFullscreen && adsterraAdsEnabled \? <AdsterraResponsiveBanner \/>/, "Qualified tool pages must actually mount the responsive banner above the interface.");
 assert.match(toolShell, /AdsterraBanner format="300x250"/, "Qualified tool pages must include the medium-rectangle banner.");
 assert.match(toolShell, /AdsterraToolPopunder/, "Qualified tool pages must be the only Popunder mount.");
 assert.match(toolShell, /isAdsterraQualifiedTool\(tool\)/, "Each placement must be limited to the shared Adsterra eligibility policy.");
+assert.match(toolShell, /!adsterraAuthPending && !adsterraAuthError && !adsterraUser && adsterraConsent === "granted"/, "Adsterra impressions and output Smartlinks must be limited to consenting guests, never signed-in users.");
 assert.match(toolShell, /<AdsterraGuestAccessGate toolName=\{tool\.name\}>/, "Qualified tools must gate guests on an explicit ad choice or account session.");
-assert.match(toolShell, /<\/section>\s*\{!isFullscreen && adsterraQualified[\s\S]*?<AdsterraBanner format="300x250" \/>[\s\S]*?<AdsterraNativeBanner \/>[\s\S]*?\}\s*\{tool\.category !== "creators"/, "Lower Adsterra placements must work for every eligible category, including Creator tools.");
+assert.match(toolShell, /<\/section>\s*\{!isFullscreen && adsterraAdsEnabled[\s\S]*?<AdsterraBanner format="300x250" \/>[\s\S]*?<AdsterraNativeBanner \/>[\s\S]*?\}\s*\{tool\.category !== "creators"/, "Lower Adsterra placements must work for every eligible category, including Creator tools.");
 assert.match(toolShell, /openAdsterraSmartlinkFromOutput/, "Output actions must trigger the publisher Smartlink from a direct click.");
 assert.ok(toolShell.includes("copy|download|export|save|output|result|calculate|convert|generate"), "Output triggers must include copy, download, export and common output-producing actions.");
 assert.doesNotMatch(downloadUtils, /openAdsterraSmartlinkFromOutput/, "The download helper must not open a popup after an asynchronous download begins.");
-assert.match(toolShell, /data-env-ad-eligible=\{adsterraQualified \? "true" : undefined\}/, "The output trigger must be restricted to the same qualified tool interface.");
+assert.match(toolShell, /data-env-ad-eligible=\{adsterraAdsEnabled \? "true" : undefined\}/, "The output trigger must be restricted to the same qualified tool interface.");
 assert.doesNotMatch(rootRoute, /AdsterraPopunder/, "The Popunder must not be loaded site-wide.");
 assert.match(adsterraWeb, /retryAttempt < 3/, "Failed Adsterra banner requests must retry a bounded number of times.");
 assert.match(adsterraWeb, /Adsterra banner request timed out/, "A stalled banner request must be released so it cannot block later placements.");
@@ -67,7 +68,7 @@ assert.match(adsterraWeb, /retryHandle = window\.setInterval/, "A failed Popunde
 assert.match(adsterraWeb, /attempts >= 4/, "Popunder retries must be bounded to avoid repeated provider requests.");
 
 assert.match(slot, /isApplicationOnline\(\)/, "Ads must not be requested unless the application origin is reachable.");
-assert.match(shell, /!isFullscreen && adsterraQualified[\s\S]*?<AdsterraBanner format="300x250" \/>[\s\S]*?<AdsterraNativeBanner \/>[\s\S]*?<AdsterraToolPopunder \/>/, "Every Adsterra placement must remain outside fullscreen and inside qualified tool pages.");
+assert.match(shell, /!isFullscreen && adsterraAdsEnabled[\s\S]*?<AdsterraBanner format="300x250" \/>[\s\S]*?<AdsterraNativeBanner \/>[\s\S]*?<AdsterraToolPopunder \/>/, "Every Adsterra placement must remain outside fullscreen and inside qualified tool pages.");
 assert.match(adsterraGuestGate, /getAdsterraConsent\(\)[\s\S]*?setAdsterraConsent\("granted"\)[\s\S]*?Create free account[\s\S]*?Sign in/, "Guests must be able to explicitly allow ads or use account sign-up/sign-in.");
 assert.match(adsterraGuestGate, /if \(user \|\| consent === "granted"\)/, "Signed-in users and consenting guests can reach the eligible tool.");
 assert.match(authPage, /function getSafeReturnTo\(\)/, "The account flow must safely preserve the originating tool route.");
