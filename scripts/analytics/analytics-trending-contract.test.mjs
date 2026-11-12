@@ -73,8 +73,9 @@ test("Android consumes the shared real-usage order without adding Trending helpe
   assert.match(homeSource, /NativeTrendingToolsClient\.fetchFeed\(\)/);
   assert.match(homeSource, /trendingIds\.mapNotNull/);
   assert.match(homeSource, /randomCrossCategoryTrendingTools\(availableTrendingTools\)/);
-  assert.match(home, /groupBy \{ it\.category \}/);
-  assert.match(home, /!it\.isUnderProduction\(\)/);
+  assert.match(android, /groupBy \{ it\.category \}/);
+  assert.match(android, /!it\.isUnderProduction\(\)/);
+  assert.doesNotMatch(homeSource, /take\(if \(screenWidth >= 768\) 12 else 6\)/);
   assert.match(homeSource, /feed\.toolIds\.filter/);
   assert.match(homeSource, /kotlinx\.coroutines\.delay\(5 \* 60 \* 1000L\)/);
   assert.match(homeSource, /SectionTitle\("Trending tools"/);
