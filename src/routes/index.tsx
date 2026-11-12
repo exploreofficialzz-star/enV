@@ -173,7 +173,7 @@ function MostUsedToolsTray({ tools, prefsHydrated }: { tools: ToolMeta[]; prefsH
       <div className={prefsHydrated ? "visible" : "invisible"} aria-busy={!prefsHydrated}>
       <section
         aria-label="Your most-used tools"
-        className="mx-auto mt-4 h-[112px] w-full max-w-3xl overflow-hidden rounded-[28px] border border-border bg-surface shadow-[var(--shadow-border)]"
+        className="mx-auto mt-4 h-[112px] min-h-[112px] w-full max-w-3xl shrink-0 overflow-hidden rounded-[28px] border border-border bg-surface shadow-[var(--shadow-border)]"
       >
         {tools.length ? (
           <div className="personal-tools-scroll snap-x snap-mandatory">
