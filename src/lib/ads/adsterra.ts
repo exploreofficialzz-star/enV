@@ -41,9 +41,10 @@ export const ADSTERRA_SMARTLINK_URL = "https://araplhn.org/4/ae13eae40d577a3e298
 export type AdsterraBannerFormat = keyof typeof ADSTERRA_BANNER_UNITS;
 
 /**
- * Ad delivery is enabled for this deployment, the visitor has granted the
- * required advertising choice, and the browser is online. This deliberately
- * does not change guest access or the availability of enV tools.
+ * Ad requests require the production flag, an explicit advertising choice,
+ * and an online browser. Qualified guest-tool access is enforced separately by
+ * AdsterraGuestAccessGate: guests must allow ads, while signed-in users can
+ * use those tools without ads. Offline-wallet policy is independent.
  */
 export function canRequestAdsterraAds(
   enabled: boolean,
