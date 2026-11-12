@@ -5,6 +5,7 @@ import { readSafePackPrice, requirePaystackVerificationSecret, resolvePaystackCo
 import { readBoundedBytes } from "./bounded-json.server";
 import { getCountryPaymentProfile, normalizeCountryCode } from "./country-routing";
 import { getFlutterwaveFundingOption } from "./flutterwave.server";
+import { quoteTokenPacks, type CurrencyPackQuote } from "./fx.server";
 
 export const TOKEN_PACKS = [100, 250, 500, 1_000] as const;
 
@@ -35,36 +36,76 @@ function resolvePaystackConfiguration(countryCode: string | null | undefined) {
     origin: publicOrigin(),
   };
 }
-/** Build the Paystack option from the visitor's detected country and configured merchant currency. */
-export function getPaystackFundingOption(countryCode: string | null | undefined) {
+function minimumPaystackAmountMinor(currency: string): number {
+  // Paystack's documented transaction minimums, expressed in the ISO currency
+  // minor units used by this merchant's accepted settlement currency.
+  const minimums: Record<string, number> = {
+    NGN: 5_000,
+    USD: 200,
+    GHS: 10,
+    KES: 300,
+    ZAR: 100,
+  };
+  return minimums[currency] ?? 1;
+}
+
+/** Build a Paystack option from the detected customer country and actual merchant settlement currency. */
+export async function getPaystackFundingOption(countryCode: string | null | undefined) {
   const configuration = resolvePaystackConfiguration(countryCode);
   if (!configuration) return null;
-  const { currency, international, pricePerTokenMinor, enabled } = configuration;
-  const message = enabled
-    ? "Choose a token pack. enV verifies the payment with Paystack before adding tokens."
-    : !configuration.secret
-      ? "Paystack credentials for " + currency + " are not configured on this deployment."
-      : !pricePerTokenMinor
-        ? "Token pricing for " + currency + " has not been configured."
-        : "Paystack checkout is disabled until merchant, billing and refund/dispute recovery checks are approved.";
+  const { currency, international, enabled } = configuration;
+  let quotes: CurrencyPackQuote[];
+  try {
+    quotes = await quoteTokenPacks(currency, TOKEN_PACKS);
+  } catch {
+    return {
+      id: "paystack" as const,
+      label: international ? "Paystack · international cards (" + currency + ")" : "Paystack · " + currency,
+      enabled: false,
+      currency,
+      pricePerTokenMinor: null,
+      packs: [],
+      message: "A current USD exchange-rate quote is unavailable for " + currency + ". No local amount was estimated.",
+    };
+  }
+  const minimum = minimumPaystackAmountMinor(currency);
+  const packs = quotes.map((quote) => ({
+    ...quote,
+    enabled: enabled && quote.amountMinor >= minimum,
+    message: quote.amountMinor < minimum
+      ? "This pack is below Paystack's minimum transaction amount for " + currency + "."
+      : undefined,
+  }));
+  const anyPackAvailable = packs.some((pack) => pack.enabled);
+  const ready = enabled && anyPackAvailable;
+  const message = !configuration.secret
+    ? "Paystack credentials for " + currency + " are not configured on this deployment."
+    : !enabled
+      ? "Paystack checkout is disabled until merchant, billing and refund/dispute recovery checks are approved."
+      : !anyPackAvailable
+        ? "The available token packs do not meet Paystack's minimum transaction amount in " + currency + "."
+        : "Choose a token pack. The final amount uses the current USD-to-" + currency + " reference rate; enV verifies payment before crediting tokens.";
   return {
     id: "paystack" as const,
     label: international ? "Paystack · international cards (" + currency + ")" : "Paystack · " + currency,
-    enabled,
+    enabled: ready,
     currency,
-    pricePerTokenMinor,
-    packs: TOKEN_PACKS.map((tokens) => ({
-      tokens,
-      amountMinor: pricePerTokenMinor === null ? null : tokens * pricePerTokenMinor,
-      currency,
-    })),
+    pricePerTokenMinor: null,
+    fxRate: quotes[0]?.fxRate ?? null,
+    fxSource: quotes[0]?.fxSource ?? null,
+    fxUpdatedAt: quotes[0]?.fxUpdatedAt ?? null,
+    fxNextUpdateAt: quotes[0]?.fxNextUpdateAt ?? null,
+    fxFetchedAt: quotes[0]?.fxFetchedAt ?? null,
+    packs,
     message,
   };
 }
 
-export function getFundingOptions(countryCode: string | null = null) {
-  const paystack = getPaystackFundingOption(countryCode);
-  const flutterwave = getFlutterwaveFundingOption(countryCode);
+export async function getFundingOptions(countryCode: string | null = null) {
+  const [paystack, flutterwave] = await Promise.all([
+    getPaystackFundingOption(countryCode),
+    getFlutterwaveFundingOption(countryCode),
+  ]);
 
   const refundDisputeHandlingApproved =
     process.env.BILLING_REFUND_DISPUTE_HANDLING_APPROVED === "true";
@@ -128,16 +169,22 @@ export function getFundingOptions(countryCode: string | null = null) {
   };
 }
 
-function requireLiveFunding(countryCode: string | null) {
+function requireLiveFunding(countryCode: string | null, pricingQuote: CurrencyPackQuote, tokenPack: number) {
   const configuration = resolvePaystackConfiguration(countryCode);
-  const pricePerTokenMinor = configuration?.pricePerTokenMinor ?? null;
-  if (!configuration || !configuration.enabled || !configuration.secret ||
-      pricePerTokenMinor === null || !configuration.origin) {
+  if (!configuration || !configuration.enabled || !configuration.secret || !configuration.origin) {
     throw Object.assign(new Error("Paystack is not enabled for the detected country and currency."), {
       code: "PAYMENTS_NOT_CONFIGURED", status: 503,
     });
   }
-  return { ...configuration, pricePerTokenMinor };
+  if (pricingQuote.tokens !== tokenPack || pricingQuote.currency !== configuration.currency ||
+      !Number.isSafeInteger(pricingQuote.amountMinor) || pricingQuote.amountMinor < minimumPaystackAmountMinor(configuration.currency) ||
+      pricingQuote.usdAmountCents !== tokenPack || !Number.isFinite(pricingQuote.fxRate) ||
+      !pricingQuote.fxUpdatedAt || !pricingQuote.quotedAt) {
+    throw Object.assign(new Error("The server-side token pack FX quote is invalid or no longer eligible for this Paystack account."), {
+      code: "INVALID_PRICE_CONFIGURATION", status: 503,
+    });
+  }
+  return { ...configuration, pricingQuote };
 }
 
 function validIdempotencyKey(value: unknown): value is string {
@@ -149,12 +196,13 @@ export async function initializePaystackCheckout(input: {
   userId: string;
   tokenPack: number;
   idempotencyKey: unknown;
+  pricingQuote: CurrencyPackQuote;
 }, countryCode: string | null) {
-  const configuration = requireLiveFunding(countryCode);
   if (!(TOKEN_PACKS as readonly number[]).includes(input.tokenPack) || !validIdempotencyKey(input.idempotencyKey)) {
     throw Object.assign(new Error("Choose a supported token pack and retry the checkout."), { code: "INVALID_PURCHASE", status: 400 });
   }
-  const amountMinor = input.tokenPack * configuration.pricePerTokenMinor;
+  const configuration = requireLiveFunding(countryCode, input.pricingQuote, input.tokenPack);
+  const amountMinor = input.pricingQuote.amountMinor;
   const creditsSubunits = input.tokenPack * 1_000;
   if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0 || !Number.isSafeInteger(creditsSubunits)) {
     throw Object.assign(new Error("The configured token price is outside the supported range."), { code: "INVALID_PRICE_CONFIGURATION", status: 503 });
@@ -193,7 +241,19 @@ export async function initializePaystackCheckout(input: {
        status, idempotency_key, provider_metadata)
      values ($1, $2, 'paystack', 'web', $3, $4, $8, $5, 'created', $6, $7::jsonb)`,
     [intentId, input.userId, `tokens-${input.tokenPack}`, amountMinor, creditsSubunits, input.idempotencyKey,
-      JSON.stringify({ reference: intentId, tokenPack: input.tokenPack, currency: configuration.currency }),
+      JSON.stringify({
+        reference: intentId,
+        tokenPack: input.tokenPack,
+        currency: configuration.currency,
+        baseCurrency: "USD",
+        usdAmountCents: input.pricingQuote.usdAmountCents,
+        fxRate: input.pricingQuote.fxRate,
+        fxSource: input.pricingQuote.fxSource,
+        fxUpdatedAt: input.pricingQuote.fxUpdatedAt,
+        fxNextUpdateAt: input.pricingQuote.fxNextUpdateAt,
+        fxFetchedAt: input.pricingQuote.fxFetchedAt,
+        quotedAt: input.pricingQuote.quotedAt,
+      }),
       configuration.currency],
   );
 
@@ -204,7 +264,17 @@ export async function initializePaystackCheckout(input: {
       body: JSON.stringify({
         email, amount: String(amountMinor), currency: configuration.currency, reference: intentId,
         callback_url: `${configuration.origin}/api/billing/paystack/verify`,
-        metadata: { purchaseIntentId: intentId, tokenPack: input.tokenPack, currency: configuration.currency },
+        metadata: {
+          purchaseIntentId: intentId,
+          tokenPack: input.tokenPack,
+          currency: configuration.currency,
+          baseCurrency: "USD",
+          usdAmountCents: input.pricingQuote.usdAmountCents,
+          fxRate: input.pricingQuote.fxRate,
+          fxSource: input.pricingQuote.fxSource,
+          fxUpdatedAt: input.pricingQuote.fxUpdatedAt,
+          quotedAt: input.pricingQuote.quotedAt,
+        },
         ...(configuration.international ? { channels: ["card"] } : {}),
       }),
       signal: AbortSignal.timeout(12_000),
@@ -223,7 +293,18 @@ export async function initializePaystackCheckout(input: {
       `update billing_purchase_intents set status = 'pending', checkout_url = $2,
         provider_metadata = $3::jsonb, updated_at = now() where id = $1 and status = 'created'`,
       [intentId, authorizationUrl, JSON.stringify({
-        reference: intentId, tokenPack: input.tokenPack, accessCode: payload.data?.access_code ?? null,
+        reference: intentId,
+        tokenPack: input.tokenPack,
+        accessCode: payload.data?.access_code ?? null,
+        currency: configuration.currency,
+        baseCurrency: "USD",
+        usdAmountCents: input.pricingQuote.usdAmountCents,
+        fxRate: input.pricingQuote.fxRate,
+        fxSource: input.pricingQuote.fxSource,
+        fxUpdatedAt: input.pricingQuote.fxUpdatedAt,
+        fxNextUpdateAt: input.pricingQuote.fxNextUpdateAt,
+        fxFetchedAt: input.pricingQuote.fxFetchedAt,
+        quotedAt: input.pricingQuote.quotedAt,
       })],
     );
     return { authorizationUrl, reference: intentId, tokens: input.tokenPack };
