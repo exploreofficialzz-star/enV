@@ -71,6 +71,7 @@ export async function getFlutterwaveFundingOption(countryCode: string | null | u
       pricePerTokenMinor: null,
       packs: [],
       paymentOptions: [...profile.paymentOptions],
+      localPayments: profile.paymentOptions.some((option) => option !== "card"),
       message: "A current USD exchange-rate quote is unavailable for " + currency + ". No local amount was estimated.",
     };
   }
@@ -85,7 +86,9 @@ export async function getFlutterwaveFundingOption(countryCode: string | null | u
     };
   });
   const anyPackAvailable = packs.some((pack) => pack.enabled);
-  const enabled = ready && anyPackAvailable;
+  // Custom amounts are quoted on demand; preset rounding must not disable a
+  // different amount that can be represented in the provider's major units.
+  const enabled = ready;
   const reason = !approved
     ? "Flutterwave checkout is awaiting merchant approval."
     : !currencyEnabled
@@ -112,9 +115,12 @@ export async function getFlutterwaveFundingOption(countryCode: string | null | u
     fxFetchedAt: quotes[0]?.fxFetchedAt ?? null,
     packs,
     paymentOptions: [...profile.paymentOptions],
-    message: enabled
-      ? "Choose a pack. Flutterwave shows only methods supported by your country and currency; payment is verified before tokens are credited."
-      : reason,
+    localPayments: profile.paymentOptions.some((option) => option !== "card"),
+    message: enabled && !anyPackAvailable
+      ? "Enter a custom amount that can be charged in " + currency + "."
+      : enabled
+        ? "Payment methods are selected for your country and currency; enV verifies payment before crediting tokens."
+        : reason,
   };
 }
 
@@ -129,8 +135,10 @@ export async function initializeFlutterwaveCheckout(input: {
   idempotencyKey: unknown;
   countryCode: string | null;
   pricingQuote: CurrencyPackQuote;
+  paymentMethod?: "card" | "local";
 }) {
-  if (!(TOKEN_PACKS as readonly number[]).includes(input.tokenPack) || !validIdempotencyKey(input.idempotencyKey)) {
+  if (!Number.isSafeInteger(input.tokenPack) || input.tokenPack < 100 ||
+      input.tokenPack > 9_000_000_000 || !validIdempotencyKey(input.idempotencyKey)) {
     throw Object.assign(new Error("Choose a supported token pack and retry checkout."), {
       code: "INVALID_PURCHASE", status: 400,
     });
@@ -143,6 +151,16 @@ export async function initializeFlutterwaveCheckout(input: {
   }
 
   const { currency, secret, profile } = configuration;
+  const selectedPaymentOptions = input.paymentMethod === "card"
+    ? profile.paymentOptions.filter((option) => option === "card")
+    : input.paymentMethod === "local"
+      ? profile.paymentOptions.filter((option) => option !== "card")
+      : [...profile.paymentOptions];
+  if (input.paymentMethod && selectedPaymentOptions.length === 0) {
+    throw Object.assign(new Error("This payment method is not available for your country."), {
+      code: "PAYMENT_METHOD_NOT_AVAILABLE_FOR_COUNTRY", status: 422,
+    });
+  }
   const amountMinor = input.pricingQuote.amountMinor;
   const amountMajor = toFlutterwaveMajorAmount(amountMinor, currency);
   const creditsSubunits = input.tokenPack * 1_000;
@@ -235,7 +253,7 @@ export async function initializeFlutterwaveCheckout(input: {
         amount: amountMajor,
         currency,
         redirect_url: origin + "/api/billing/flutterwave/verify",
-        payment_options: profile.paymentOptions.join(", "),
+        payment_options: selectedPaymentOptions.join(", "),
         customer: { email },
         customizations: {
           title: "enV wallet",
@@ -244,6 +262,7 @@ export async function initializeFlutterwaveCheckout(input: {
         meta: {
           purchaseIntentId: intentId,
           tokenPack: input.tokenPack,
+          paymentMethod: input.paymentMethod ?? null,
           countryCode: profile.countryCode,
           baseCurrency: "USD",
           usdAmountCents: input.pricingQuote.usdAmountCents,
