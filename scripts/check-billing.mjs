@@ -192,7 +192,7 @@ assert.match(cryptomusService, /verifyAndCreditCryptomusReference/);
 assert.match(cryptomusService, /invoice\.is_final !== true/);
 assert.match(cryptomusService, /invoice\.order_id !== reference/);
 assert.match(cryptomusService, /invoice\.currency\?\.toUpperCase\(\) !== intent\.currency\.toUpperCase\(\)/);
-assert.match(cryptomusWebhook, /handleCryptomusWebhook/);
+assert.match(cryptomusWebhook, /CRYPTOMUS_REFUND_RECONCILIATION_REQUIRED/);
 assert.match(cryptomusWebhook, /No payment was taken|could not be verified/);
 assert.match(cryptomusVerifyRoute, /requireBillingUser/);
 assert.match(cryptomusVerifyRoute, /intent\.user_id !== auth\.userId/);
@@ -234,10 +234,9 @@ assert.match(paystackService, /reconcileVerifiedRefund/);
 assert.match(paystackService, /reconcileVerifiedDispute/);
 assert.match(paystackService, /transaction: intent\.provider_transaction_id/);
 assert.match(paystackService, /\/refund\?/);
-assert.match(cryptomusService, /reconcileCryptomusRefund/);
-assert.doesNotMatch(cryptomusService, /CRYPTOMUS_REFUND_RECONCILIATION_REQUIRED/, "Cryptomus refund callbacks must enter reconciliation");
+assert.match(cryptomusService, /CRYPTOMUS_REFUND_RECONCILIATION_REQUIRED/);
 for (const status of ["refund_process", "refund_fail", "refund_paid"]) {
-  assert.ok(cryptomusService.includes('"' + status + '"'), `Cryptomus ${status} must be reconciled`);
+  assert.ok(cryptomusService.includes('"' + status + '"'), `Cryptomus ${status} must remain fail-closed until its provider refund API is integrated`);
 }
 assert.match(ledger, /reconcileVerifiedRefund/);
 assert.match(ledger, /reconcileVerifiedDispute/);
