@@ -41,6 +41,15 @@ try{
     assert.equal(layout.visibleParagraphs,0,`No long explanatory paragraphs may be visible on the opening screen at ${size.width}px`);
   }
   await page.setViewportSize({width:1280,height:900});
+  // Wait for the client-side rail handlers to attach; the visible server-rendered
+  // shell is not yet an interactive control until React has hydrated it.
+  await page.waitForFunction(() => {
+    const root = document.querySelector(".wl-studio");
+    const button = document.querySelector('.wl-rail button[data-group="project"]');
+    return root?.getAttribute("data-rail-document-listener") === "true" &&
+      button !== null &&
+      Object.keys(button).some((key) => key.startsWith("__reactProps$"));
+  }, undefined, { timeout: 30000 });
   // Every tool lives in one scrolling panel opened from the rail.
   const worldLabRoot=page.locator(".wl-studio").first();
   await page.evaluate(()=>{
