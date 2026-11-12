@@ -65,8 +65,35 @@ type RailProps = {
 
 /** Icon-only rail: left column on tablet and desktop, bottom bar on phones. */
 export function StudioRail({ open, active, onSelect }: RailProps) {
+  const rail = useRef<HTMLElement>(null);
+  const selectRef = useRef(onSelect);
+  selectRef.current = onSelect;
+
+  // Native delegation keeps the rail responsive during canvas-heavy scene input,
+  // while preserving normal click activation for keyboard and assistive technology.
+  useEffect(() => {
+    const node = rail.current;
+    if (!node) return;
+    const activate = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const button = target.closest<HTMLButtonElement>("button[data-group]");
+      if (!button || !node.contains(button)) return;
+      const group = button.dataset.group;
+      if (GROUPS.some((item) => item.id === group)) {
+        selectRef.current(group as StudioGroupId);
+      }
+    };
+    node.addEventListener("pointerdown", activate, true);
+    node.addEventListener("click", activate, true);
+    return () => {
+      node.removeEventListener("pointerdown", activate, true);
+      node.removeEventListener("click", activate, true);
+    };
+  }, []);
+
   return (
-    <nav className="wl-rail" aria-label="World Lab tools">
+    <nav ref={rail} className="wl-rail" aria-label="World Lab tools">
       {GROUPS.map(({ id, label, Icon }) => (
         <button
           key={id}
@@ -77,10 +104,6 @@ export function StudioRail({ open, active, onSelect }: RailProps) {
           aria-label={`Open ${label} tools`}
           aria-expanded={open && active === id}
           title={label[0].toUpperCase() + label.slice(1)}
-          onPointerDown={(event) => {
-            if (event.button === 0) onSelect(id);
-          }}
-          onClick={() => onSelect(id)}
         >
           <Icon aria-hidden="true" size={22} strokeWidth={1.9} />
         </button>
