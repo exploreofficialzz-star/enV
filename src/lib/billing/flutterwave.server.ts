@@ -494,11 +494,19 @@ async function handleFlutterwaveRefundWebhook(body: Record<string, unknown>) {
       code: "PURCHASE_MISMATCH", status: 409,
     });
   }
+  const providerStatus = typeof (body.status ?? nested.status) === "string"
+    ? String(body.status ?? nested.status).toLowerCase() : "";
+  const refundStatusFilter = providerStatus.includes("fail") ? "failed"
+    : providerStatus.includes("success") ? "successful" : "completed";
+  // In Flutterwave v3 the refunds list "id" filter is the original charge ID,
+  // while each returned row's own id identifies the refund record.
   const records = await getFlutterwaveApiRecords("refunds", {
-    id: refundId,
+    id: transactionId,
     currency: intent.currency.toUpperCase(),
+    status: refundStatusFilter,
   });
-  const refund = records.find((record) => String(record.id) === refundId);
+  const refund = records.find((record) =>
+    String(record.id) === refundId || (webhookRefundRef !== null && record.flw_ref === webhookRefundRef));
   if (!refund || String(refund.transaction_id) !== transactionId ||
       (webhookRefundRef && typeof refund.flw_ref === "string" && refund.flw_ref !== webhookRefundRef)) {
     throw Object.assign(new Error("The Flutterwave refund record does not match the original enV payment."), {
@@ -546,7 +554,14 @@ async function handleFlutterwaveChargebackWebhook(body: Record<string, unknown>)
       code: "INVALID_CHARGEBACK_WEBHOOK", status: 400,
     });
   }
-  const records = await getFlutterwaveApiRecords("chargebacks", { id: disputeId, flw_ref: webhookFlwRef });
+  const providerStatus = typeof nested.status === "string" ? nested.status.toLowerCase() : "";
+  const statusFilter = ["lost", "won", "initiated", "accepted", "declined"].includes(providerStatus)
+    ? providerStatus : null;
+  const records = await getFlutterwaveApiRecords("chargebacks", {
+    id: disputeId,
+    flw_ref: webhookFlwRef,
+    ...(statusFilter ? { status: statusFilter } : {}),
+  });
   const dispute = records.find((record) => String(record.id) === disputeId && record.flw_ref === webhookFlwRef);
   if (!dispute) {
     throw Object.assign(new Error("Flutterwave could not verify the chargeback record."), {
