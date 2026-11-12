@@ -134,7 +134,12 @@ for (const [browserName, browserType] of browserEntries) {
   await page.waitForLoadState("networkidle", { timeout: 30000 });
   const swatchExport = page.locator('[aria-labelledby="palette-swatch-export-heading"]');
   await swatchExport.waitFor({ state: "visible" });
-  // Confirm React has hydrated by changing the palette count and waiting for the sixth editable swatch.
+  // Wait for React to attach its event props before testing the controlled select.
+  await page.waitForFunction(() => {
+    const control = document.querySelector("#palette-count");
+    return control instanceof HTMLSelectElement &&
+      Object.keys(control).some((key) => key.startsWith("__reactProps$"));
+  }, undefined, { timeout: 30000 });
   await page.locator("#palette-count").selectOption("6");
   try {
     await page.getByLabel("Edit palette color 6").waitFor({ state: "visible" });
