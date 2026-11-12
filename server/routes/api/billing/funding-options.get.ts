@@ -4,9 +4,9 @@ import { getFundingOptions } from "../../../../src/lib/billing/paystack.server";
 import { getCustomerCountry } from "../../../../src/lib/billing/country-routing";
 
 /**
- * Public funding options intentionally exclude converted payment amounts and
- * raw exchange-rate observations. The browser renders enV's USD reference
- * price; the purchase endpoint recalculates and consumes the FX quote server-side.
+ * Public funding options include server-calculated local pack amounts so the
+ * wallet can show the real country price. Raw exchange-rate observations and
+ * purchase quote metadata remain server-side; checkout independently re-quotes.
  */
 function publicFundingOptions(funding: Awaited<ReturnType<typeof getFundingOptions>>) {
   return {
@@ -25,6 +25,8 @@ function publicFundingOptions(funding: Awaited<ReturnType<typeof getFundingOptio
       pricePerTokenMinor: null,
       packs: provider.packs.map((pack) => ({
         tokens: pack.tokens,
+        amountMinor: Number.isSafeInteger(pack.amountMinor) && pack.amountMinor > 0 ? pack.amountMinor : null,
+        currency: "currency" in pack && typeof pack.currency === "string" ? pack.currency : provider.currency,
         enabled: "enabled" in pack ? pack.enabled === true : provider.enabled,
         ...("message" in pack && typeof pack.message === "string" ? { message: pack.message } : {}),
       })),
