@@ -87,7 +87,7 @@ test("iOS consumes the shared real-usage order without adding Trending helper co
   assert.match(homeSource, /fallbackTrendingToolIDs = Array\(eligible\.shuffled\(\)/);
   assert.match(homeSource, /let liveIDs = feed\.toolIDs\.filter/);
   assert.match(homeSource, /Task\.sleep\(nanoseconds: 300_000_000_000\)/);
-  assert.match(homeSource, /trendingToolIDs\.compactMap/);
+  assert.match(homeSource, /selectedIDs\.compactMap/);
   assert.match(homeSource, /Trending tools/);
   assert.doesNotMatch(homeSource, /A daily rotating selection|Ranked by actual tool starts|trendingMode/);
   assert.doesNotMatch(homeSource, /store\.catalog\.webSearch\("", limit: Int\.max/);
