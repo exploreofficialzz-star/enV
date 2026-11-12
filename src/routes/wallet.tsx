@@ -211,9 +211,14 @@ function Account() {
             typeof methods.more !== "boolean") {
           throw new Error(payload?.message ?? "Payment options could not be loaded.");
         }
-        setFundingOptionsState({ status: "ready", methods: {
+        const availableMethods: FundingMethods = {
           card: methods.card, local: methods.local, more: methods.more,
-        }, countryCode: payload.data?.countryCode ?? null, currency: payload.data?.currency ?? null });
+        };
+        setFundingOptionsState({ status: "ready", methods: availableMethods,
+          countryCode: payload.data?.countryCode ?? null, currency: payload.data?.currency ?? null });
+        setSelectedPaymentMethod((current) => availableMethods[current]
+          ? current
+          : availableMethods.card ? "card" : availableMethods.local ? "local" : "more");
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
