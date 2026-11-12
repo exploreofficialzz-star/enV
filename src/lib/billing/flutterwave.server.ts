@@ -1,4 +1,4 @@
-import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { getSql } from "../db";
 import {
   readWallet, creditVerifiedPurchase, reconcileVerifiedRefund, reconcileVerifiedDispute,
@@ -294,8 +294,9 @@ export async function initializeFlutterwaveCheckout(input: {
   }
 }
 
-export async function verifyAndCreditFlutterwaveReference(reference: string, transactionId: string) {
-  if (!/^[a-f0-9-]{36}$/i.test(reference) || !/^\d{1,24}$/.test(transactionId)) {
+export async function verifyAndCreditFlutterwaveReference(reference: string, expectedTransactionId?: string) {
+  if (!/^[a-f0-9-]{36}$/i.test(reference) ||
+      (expectedTransactionId !== undefined && !/^[A-Za-z0-9_-]{1,160}$/.test(expectedTransactionId))) {
     throw Object.assign(new Error("The Flutterwave payment reference is invalid."), {
       code: "INVALID_PAYMENT_REFERENCE", status: 400,
     });
@@ -320,17 +321,9 @@ export async function verifyAndCreditFlutterwaveReference(reference: string, tra
       code: "PAYMENT_NOT_FOUND", status: 404,
     });
   }
-  if (intent.status === "credited") {
-    if (intent.provider_transaction_id !== transactionId) {
-      throw Object.assign(new Error("This payment reference was credited by a different transaction."), {
-        code: "PAYMENT_MISMATCH", status: 409,
-      });
-    }
-    return { status: "credited" as const, creditedSubunits: 0 };
-  }
-
+  const query = new URLSearchParams({ tx_ref: reference });
   const response = await fetch(
-    "https://api.flutterwave.com/v3/transactions/" + encodeURIComponent(transactionId) + "/verify",
+    "https://api.flutterwave.com/v3/transactions/verify_by_reference?" + query.toString(),
     {
       headers: { Authorization: "Bearer " + secret, Accept: "application/json" },
       signal: AbortSignal.timeout(12_000),
@@ -341,11 +334,15 @@ export async function verifyAndCreditFlutterwaveReference(reference: string, tra
     data?: { id?: string | number; tx_ref?: string; status?: string; amount?: number | string; currency?: string; flw_ref?: string };
   };
   const transaction = payload.data;
+  const transactionId = transaction?.id === undefined || transaction?.id === null
+    ? "" : String(transaction.id);
   const paidAmountMinor = transaction
     ? parseMajorUnitsToMinor(transaction.amount, intent.currency)
     : null;
   if (!response.ok || payload.status !== "success" || !transaction ||
-      String(transaction.id) !== transactionId || transaction.tx_ref !== reference ||
+      !/^\d{1,24}$/.test(transactionId) ||
+      (expectedTransactionId && /^\d{1,24}$/.test(expectedTransactionId) && transactionId !== expectedTransactionId) ||
+      transaction.tx_ref !== reference ||
       transaction.status !== "successful" || !paidAmountMinor ||
       paidAmountMinor !== Number(intent.amount_minor) ||
       transaction.currency?.toUpperCase() !== intent.currency.toUpperCase()) {
@@ -411,19 +408,15 @@ async function getFlutterwaveApiRecords(
   if (!secret) throw Object.assign(new Error("Flutterwave verification is not configured."), {
     code: "FLUTTERWAVE_NOT_CONFIGURED", status: 503,
   });
-  const refundId = resource === "refunds" ? parameters.id : undefined;
-  if (resource === "refunds" && !refundId) {
+  if (resource === "refunds" && !parameters.id) {
     throw Object.assign(new Error("A Flutterwave refund ID is required for verification."), {
       code: "INVALID_REFUND_WEBHOOK", status: 400,
     });
   }
-  const url = new URL(resource === "refunds"
-    ? "https://api.flutterwave.com/v3/refunds/" + encodeURIComponent(refundId!)
-    : "https://api.flutterwave.com/v3/chargebacks");
-  for (const [key, value] of Object.entries(parameters)) {
-    if (resource === "refunds" && key === "id") continue;
-    url.searchParams.set(key, value);
-  }
+  // Flutterwave v3 exposes refunds and chargebacks through collection endpoints,
+  // not /refunds/:id. Filter by the provider-issued record ID and transaction ref.
+  const url = new URL("https://api.flutterwave.com/v3/" + resource);
+  for (const [key, value] of Object.entries(parameters)) url.searchParams.set(key, value);
   const response = await fetch(url, {
     headers: { Authorization: "Bearer " + secret, Accept: "application/json" },
     signal: AbortSignal.timeout(12_000),
@@ -447,8 +440,9 @@ async function getFlutterwaveApiRecords(
 function flutterwaveRefundStatus(value: unknown): "pending" | "processing" | "needs_attention" | "failed" | "completed" {
   const status = typeof value === "string" ? value.trim().toLowerCase() : "";
   if (status === "failed" || status.startsWith("failed-")) return "failed";
-  if (status.startsWith("completed-") || status === "successful") return "completed";
-  if (status === "completed" || status === "processing" || status === "new") return "processing";
+  if (status === "successful" || status === "succeeded" || status === "completed" ||
+      status.startsWith("completed-")) return "completed";
+  if (status === "processing" || status === "new") return "processing";
   if (status.startsWith("pending")) return "pending";
   if (status.includes("attention")) return "needs_attention";
   return "needs_attention";
@@ -548,31 +542,32 @@ async function handleFlutterwaveChargebackWebhook(body: Record<string, unknown>)
   const webhookFlwRef = typeof nested.flw_ref === "string" ? nested.flw_ref
     : typeof body.flw_ref === "string" ? body.flw_ref : null;
   if (!disputeId || !webhookFlwRef) {
-    throw Object.assign(new Error("The Flutterwave chargeback event is missing its dispute ID or transaction reference."), {
+    throw Object.assign(new Error("The Flutterwave chargeback event is missing its dispute ID or payment reference."), {
       code: "INVALID_CHARGEBACK_WEBHOOK", status: 400,
     });
   }
   const records = await getFlutterwaveApiRecords("chargebacks", { id: disputeId, flw_ref: webhookFlwRef });
   const dispute = records.find((record) => String(record.id) === disputeId && record.flw_ref === webhookFlwRef);
-  const transactionId = dispute ? asProviderId(dispute.transaction_id) : null;
-  const purchaseReference = dispute && typeof dispute.tx_ref === "string" ? dispute.tx_ref : null;
-  if (!dispute || !transactionId || !purchaseReference) {
-    throw Object.assign(new Error("The Flutterwave chargeback record could not be matched to its original transaction."), {
+  if (!dispute) {
+    throw Object.assign(new Error("Flutterwave could not verify the chargeback record."), {
       code: "CHARGEBACK_PROVIDER_MISMATCH", status: 409,
     });
   }
+  // V3 chargeback records carry flw_ref, not the merchant tx_ref or transaction
+  // ID. Match that verified processor reference to the value captured when the
+  // original paid transaction was verified.
   const sql = await getSql();
   const intents = await sql.query<{
     id: string; provider_transaction_id: string | null; amount_minor: number | string; currency: string;
   }>(
     `select id, provider_transaction_id, amount_minor, currency
        from billing_purchase_intents
-      where id = $1 and provider = 'flutterwave' limit 1`,
-    [purchaseReference],
+      where provider = 'flutterwave' and provider_metadata->>'flwRef' = $1 limit 1`,
+    [webhookFlwRef],
   );
   const intent = intents[0];
-  if (!intent || intent.provider_transaction_id !== transactionId) {
-    throw Object.assign(new Error("The Flutterwave chargeback transaction does not match the enV purchase ledger."), {
+  if (!intent || !intent.provider_transaction_id) {
+    throw Object.assign(new Error("The Flutterwave chargeback does not match a verified enV payment reference."), {
       code: "CHARGEBACK_PROVIDER_MISMATCH", status: 409,
     });
   }
@@ -584,9 +579,9 @@ async function handleFlutterwaveChargebackWebhook(body: Record<string, unknown>)
   }
   const status = flutterwaveDisputeStatus(dispute.status);
   const canonical = JSON.stringify({
-    provider: "flutterwave", disputeId, transactionId, purchaseReference,
-    amountMinor, currency: intent.currency.toUpperCase(), status: dispute.status,
-    flwRef: webhookFlwRef, stage: dispute.stage ?? null,
+    provider: "flutterwave", disputeId, transactionId: intent.provider_transaction_id,
+    purchaseIntentId: intent.id, amountMinor, currency: intent.currency.toUpperCase(),
+    status: dispute.status, flwRef: webhookFlwRef, stage: dispute.stage ?? null,
   });
   const result = await reconcileVerifiedDispute({
     provider: "flutterwave",
@@ -600,7 +595,7 @@ async function handleFlutterwaveChargebackWebhook(body: Record<string, unknown>)
       providerStatus: dispute.status,
       stage: dispute.stage ?? null,
       flutterwaveTransactionReference: webhookFlwRef,
-      originalTransactionId: transactionId,
+      originalTransactionId: intent.provider_transaction_id,
     },
   });
   return { event: "chargeback", disputeId, ...result };
@@ -608,16 +603,25 @@ async function handleFlutterwaveChargebackWebhook(body: Record<string, unknown>)
 
 export async function handleFlutterwaveWebhook(request: Request) {
   const expectedHash = process.env.FLW_SECRET_HASH?.trim() ?? "";
-  const receivedHash = request.headers.get("verif-hash") ?? "";
-  if (!expectedHash || !receivedHash || !safeEqual(receivedHash, expectedHash)) {
-    throw Object.assign(new Error("The Flutterwave webhook signature is invalid."), {
-      code: "INVALID_WEBHOOK_SIGNATURE", status: 401,
+  if (!expectedHash) {
+    throw Object.assign(new Error("The Flutterwave webhook secret hash is not configured."), {
+      code: "FLUTTERWAVE_NOT_CONFIGURED", status: 503,
     });
   }
   const rawBytes = await readBoundedBytes(request, 256_000);
   if (!rawBytes) {
     throw Object.assign(new Error("Webhook payload is too large or unreadable."), {
       code: "WEBHOOK_TOO_LARGE", status: 413,
+    });
+  }
+  const suppliedHash = request.headers.get("verif-hash") ?? "";
+  const suppliedSignature = request.headers.get("flutterwave-signature") ?? "";
+  const legacyValid = suppliedHash ? safeEqual(suppliedHash, expectedHash) : false;
+  const modernExpected = createHmac("sha256", expectedHash).update(rawBytes).digest("base64");
+  const modernValid = suppliedSignature ? safeEqual(suppliedSignature, modernExpected) : false;
+  if (!legacyValid && !modernValid) {
+    throw Object.assign(new Error("The Flutterwave webhook signature is invalid."), {
+      code: "INVALID_WEBHOOK_SIGNATURE", status: 401,
     });
   }
   let body: Record<string, unknown>;
@@ -632,7 +636,8 @@ export async function handleFlutterwaveWebhook(request: Request) {
     });
   }
 
-  const eventName = typeof body.event === "string" ? body.event.toLowerCase() : "";
+  const eventName = typeof body.type === "string" ? body.type.toLowerCase()
+    : typeof body.event === "string" ? body.event.toLowerCase() : "";
   const nested = body.data && typeof body.data === "object" && !Array.isArray(body.data)
     ? body.data as Record<string, unknown> : {};
   const isRefundPayload = body.AmountRefunded !== undefined ||
@@ -656,8 +661,11 @@ export async function handleFlutterwaveWebhook(request: Request) {
     await updateFlutterwaveIntentStatus(nested.tx_ref, "cancelled");
     return { status: "cancelled" as const };
   }
-  if (nested.status !== "successful" || nested.id === undefined || nested.id === null) {
+  if (nested.status !== "successful" && nested.status !== "succeeded") {
     return { status: "pending" as const };
   }
-  return verifyAndCreditFlutterwaveReference(nested.tx_ref, String(nested.id));
+  return verifyAndCreditFlutterwaveReference(
+    nested.tx_ref,
+    nested.id === undefined || nested.id === null ? undefined : String(nested.id),
+  );
 }
