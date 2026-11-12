@@ -108,7 +108,7 @@ assert.match(cookieConsent, /chooseAnalyticsConsent/, "The combined cookie dialo
 assert.match(cookieConsent, /setAdsterraConsent/, "The combined cookie dialog must save Adsterra advertising consent.");
 assert.match(cookieConsent, /Reject optional/, "Visitors must be able to reject all optional storage and advertising.");
 assert.match(cookieConsent, /const showPreferencesOnThisPage = pathname === "\/privacy"/, "The combined non-modal consent controls must remain on Privacy and never prompt globally.");
-assert.match(rootRoute, /<CookieConsent \/>/, "The combined cookie dialog must be mounted globally.");
+assert.match(rootRoute, /<CookieConsent \/>/, "The preference controller is mounted once in the app root and only renders on the Privacy route.");
 assert.doesNotMatch(privacy, /AdsterraPrivacyControls/, "Adsterra consent must not require a separate Privacy-page choice.");
 assert.match(privacy, /env:open-cookie-preferences/, "Visitors must be able to reopen the same cookie dialog from Privacy.");
 assert.match(webAdPrivacy, /whenGooglePrivacyMessagingReady/, "Web Privacy must wait for Google Privacy & Messaging readiness before showing revocation controls.");
