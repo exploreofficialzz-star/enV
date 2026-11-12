@@ -98,9 +98,9 @@ const zipAnyFileTool: ToolMeta = {
   name: "Zip any file",
   slug: "zip-any-file",
   description: "Compress one file or a whole selection into a ZIP/ZIP64 archive, or safely extract an archive. Files stay on this device.",
-  category: "productivity",
-  subcategory: "Files & storage",
-  keywords: ["zip", "zipper", "compress", "compression", "archive", "extract", "unzip", "decompress", "zip64", "large files", "folder", "multiple files", "store", "share"],
+  category: "files",
+  subcategory: "Archives & extraction",
+  keywords: ["zip", "zipper", "compress", "compression", "archive", "extract", "unzip", "decompress", "zip64", "large files", "folder", "multiple files", "store", "share", "tar"],
   tags: ["zip", "archive", "compression", "extract", "offline", "local", "files"],
   icon: "Archive",
   popularity: 1450,
@@ -193,6 +193,73 @@ const smartphonePrototypeLabTool: ToolMeta = {
   isNew: true,
 };
 
+
+const fileWorkspaceTools: ToolMeta[] = [
+  {
+    id: "file-to-txt", name: "File to TXT Converter", slug: "file-to-txt",
+    description: "Extract readable text locally from supported plain-text files, DOCX documents and selectable-text PDFs, then save a portable TXT file.",
+    category: "files", subcategory: "Text extraction",
+    keywords: ["file to txt", "convert to text", "extract text", "docx to txt", "pdf to txt", "plain text", "text extractor"],
+    tags: ["files", "text", "extract", "converter", "local"], icon: "FileText", popularity: 1080, featured: true,
+    clientSide: true, requiresBackend: false, requiresAuth: false, status: "active",
+    related: ["mime-type-lookup", "file-organizer", "pdf-text-extractor"], engine: { type: "file-converter", op: "file-to-txt" }, isNew: true,
+  },
+  {
+    id: "file-organizer", name: "File Organizer", slug: "file-organizer",
+    description: "Sort selected files into clear folders by type and export an organized copy without moving or deleting originals.",
+    category: "files", subcategory: "Organization",
+    keywords: ["organize files", "sort files", "file manager", "file organizer", "folders", "move files", "documents", "phone storage"],
+    tags: ["files", "organize", "folders", "local", "mobile"], icon: "FolderTree", popularity: 1120, featured: true,
+    clientSide: true, requiresBackend: false, requiresAuth: false, status: "active",
+    related: ["batch-file-renamer", "folder-size-analyzer", "zip-any-file"], engine: { type: "custom", id: "file-organizer" }, isNew: true,
+  },
+  {
+    id: "batch-file-renamer", name: "Batch File Renamer", slug: "batch-file-renamer",
+    description: "Preview and apply consistent prefixes, suffixes, numbering and literal replacements to many filenames in one operation.",
+    category: "files", subcategory: "Organization",
+    keywords: ["batch rename", "bulk rename", "rename files", "filename pattern", "number files", "prefix", "suffix"],
+    tags: ["files", "rename", "batch", "local", "mobile"], icon: "FilePenLine", popularity: 1050, featured: true,
+    clientSide: true, requiresBackend: false, requiresAuth: false, status: "active",
+    related: ["file-organizer", "file-search", "mime-type-lookup"], engine: { type: "custom", id: "batch-file-renamer" }, isNew: true,
+  },
+  {
+    id: "duplicate-file-finder", name: "Duplicate File Finder", slug: "duplicate-file-finder",
+    description: "Find identical files using SHA-256 content verification after size filtering; filenames alone are never treated as proof.",
+    category: "files", subcategory: "Verification",
+    keywords: ["duplicate finder", "find duplicates", "identical files", "same files", "free storage", "checksum"],
+    tags: ["files", "duplicates", "sha256", "verify", "local"], icon: "Files", popularity: 1100, featured: true,
+    clientSide: true, requiresBackend: false, requiresAuth: false, status: "active",
+    related: ["folder-size-analyzer", "file-compare", "file-organizer"], engine: { type: "custom", id: "duplicate-file-finder" }, isNew: true,
+  },
+  {
+    id: "folder-size-analyzer", name: "Folder Size Analyzer", slug: "folder-size-analyzer",
+    description: "Inspect folder contents, total storage, file-type breakdowns and the largest files without opening a terminal.",
+    category: "files", subcategory: "Analysis",
+    keywords: ["folder size", "storage analyzer", "disk usage", "du", "largest files", "folder inventory", "storage usage"],
+    tags: ["files", "storage", "folder", "analysis", "local", "mobile"], icon: "HardDrive", popularity: 1060, featured: true,
+    clientSide: true, requiresBackend: false, requiresAuth: false, status: "active",
+    related: ["file-organizer", "duplicate-file-finder", "file-search"], engine: { type: "custom", id: "folder-size-analyzer" }, isNew: true,
+  },
+  {
+    id: "file-search", name: "File Search", slug: "file-search",
+    description: "Find files by name and search inside supported text files with clear file and line references.",
+    category: "files", subcategory: "Search",
+    keywords: ["find files", "search files", "grep", "search in files", "file finder", "text search", "folder search"],
+    tags: ["files", "search", "find", "grep", "local", "mobile"], icon: "FileSearch", popularity: 1090, featured: true,
+    clientSide: true, requiresBackend: false, requiresAuth: false, status: "active",
+    related: ["folder-size-analyzer", "batch-file-renamer", "file-compare"], engine: { type: "custom", id: "file-search" }, isNew: true,
+  },
+  {
+    id: "file-compare", name: "File & Folder Compare", slug: "file-compare",
+    description: "Compare two selected file sets to identify added, missing, changed and SHA-256-verified identical files.",
+    category: "files", subcategory: "Verification",
+    keywords: ["compare folders", "compare files", "directory diff", "diff", "file comparison", "backup compare", "rsync dry run"],
+    tags: ["files", "compare", "diff", "backup", "sha256", "local"], icon: "GitCompareArrows", popularity: 1030, featured: true,
+    clientSide: true, requiresBackend: false, requiresAuth: false, status: "active",
+    related: ["duplicate-file-finder", "folder-size-analyzer", "file-search"], engine: { type: "custom", id: "file-compare" }, isNew: true,
+  },
+];
+
 const allTools: ToolMeta[] = [
   // The browser has real dispatchers for both families. The generated catalogue is
   // shared with native clients, so expose these web-ready records as active here
@@ -227,6 +294,7 @@ const allTools: ToolMeta[] = [
   ...(!catalogTools.some((tool) => tool.id === zipAnyFileTool.id) ? [zipAnyFileTool] : []),
   ...(!catalogTools.some((tool) => tool.id === cameraStudioTool.id) ? [cameraStudioTool] : []),
   ...(!catalogTools.some((tool) => tool.id === smartphonePrototypeLabTool.id) ? [smartphonePrototypeLabTool] : []),
+  ...fileWorkspaceTools.filter((tool) => !catalogTools.some((catalogTool) => catalogTool.id === tool.id)),
 ];
 
 const byId = new Map(allTools.map((t) => [t.id, t]));
