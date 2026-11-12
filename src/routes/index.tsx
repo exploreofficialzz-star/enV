@@ -49,19 +49,27 @@ function Home() {
   const [trendingTools, setTrendingTools] = useState<ToolMeta[]>(initialTrendingTools);
 
   useEffect(() => {
-    const controller = new AbortController();
-    void fetch("/api/analytics/trending", {
-      signal: controller.signal,
-      credentials: "same-origin",
-      headers: { accept: "application/json" },
-    })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Trending usage is unavailable.");
+    let active = true;
+    let requestInFlight = false;
+    let hasLiveTrendingData = initialTrendingFeed.mode === "analytics" && initialTrendingTools.length > 0;
+    let controller: AbortController | null = null;
+
+    const refreshLiveTrending = async () => {
+      if (!active || hasLiveTrendingData || requestInFlight || !navigator.onLine) return;
+      requestInFlight = true;
+      controller = new AbortController();
+      try {
+        const response = await fetch("/api/analytics/trending", {
+          signal: controller.signal,
+          credentials: "same-origin",
+          headers: { accept: "application/json" },
+        });
+        if (!response.ok) return;
         const payload = await response.json() as {
           ok?: boolean;
-          data?: { mode?: unknown; toolIds?: unknown };
+          data?: { toolIds?: unknown };
         };
-        if (payload.ok !== true) throw new Error("Trending usage is unavailable.");
+        if (payload.ok !== true) return;
         const ids = Array.isArray(payload.data?.toolIds)
           ? payload.data.toolIds.filter((id): id is string => typeof id === "string")
           : [];
@@ -72,16 +80,32 @@ function Home() {
           )
           .filter((tool, index, items) => items.findIndex((item) => item.id === tool.id) === index)
           .slice(0, 12);
-        setTrendingTools(ranked);
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) {
-          // Keep the server-rendered shared discovery feed visible if refresh fails.
-          setTrendingTools(initialTrendingTools);
+        if (ranked.length > 0) {
+          hasLiveTrendingData = true;
+          setTrendingTools(ranked);
         }
-      });
-    return () => controller.abort();
-  }, [initialTrendingTools]);
+      } catch {
+        // Keep the random discovery set visible and retry while live data is absent.
+      } finally {
+        requestInFlight = false;
+      }
+    };
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") void refreshLiveTrending();
+    };
+    void refreshLiveTrending();
+    const retryHandle = window.setInterval(refreshWhenVisible, 5 * 60 * 1000);
+    window.addEventListener("online", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      active = false;
+      controller?.abort();
+      window.clearInterval(retryHandle);
+      window.removeEventListener("online", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [initialTrendingFeed.mode, initialTrendingTools]);
   const recent = usePrefs((state) => state.recent);
   const usageCounts = usePrefs((state) => state.usageCounts);
   const prefsHydrated = usePrefs((state) => state.hydrated);
