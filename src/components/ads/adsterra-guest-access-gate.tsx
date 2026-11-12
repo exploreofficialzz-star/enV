@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { getAdsterraConsent, setAdsterraConsent, type AdsterraConsent } from "@/lib/ads/adsterra";
+import { ADSTERRA_CONSENT_STORAGE_KEY, getAdsterraConsent, setAdsterraConsent, type AdsterraConsent } from "@/lib/ads/adsterra";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 
 /**
@@ -22,8 +22,15 @@ export function AdsterraGuestAccessGate({
 
   useEffect(() => {
     const updateChoice = () => setConsent(getAdsterraConsent());
+    const updateFromStorage = (event: StorageEvent) => {
+      if (event.key === null || event.key === ADSTERRA_CONSENT_STORAGE_KEY) updateChoice();
+    };
     window.addEventListener("env:adsterra-consent-changed", updateChoice);
-    return () => window.removeEventListener("env:adsterra-consent-changed", updateChoice);
+    window.addEventListener("storage", updateFromStorage);
+    return () => {
+      window.removeEventListener("env:adsterra-consent-changed", updateChoice);
+      window.removeEventListener("storage", updateFromStorage);
+    };
   }, []);
 
   if (user || consent === "granted") return <>{children}</>;
