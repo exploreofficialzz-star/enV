@@ -224,9 +224,9 @@ function Account() {
         setFundingOptionsState({
           status: "unavailable",
           providers: [
-            { id: "paystack", label: "Paystack", enabled: false, currency: "NGN", pricePerTokenMinor: null, packs: [], message: "Paystack options could not be loaded. Refresh and try again." },
-            { id: "flutterwave", label: "Flutterwave", enabled: false, currency: "NGN", pricePerTokenMinor: null, packs: [], message: "Flutterwave options could not be loaded. Refresh and try again." },
-            { id: "cryptomus", label: "Pay with crypto", enabled: false, currency: "USD", pricePerTokenMinor: null, packs: [], message: "Secure crypto checkout could not be loaded. Refresh and try again." },
+            { id: "paystack", label: "Card payment", enabled: false, currency: "NGN", pricePerTokenMinor: null, packs: [], message: "Card payment options could not be loaded. Refresh and try again." },
+            { id: "flutterwave", label: "Local payment", enabled: false, currency: "NGN", pricePerTokenMinor: null, packs: [], message: "Local payment options could not be loaded. Refresh and try again." },
+            { id: "cryptomus", label: "More payment options", enabled: false, currency: "USD", pricePerTokenMinor: null, packs: [], message: "More payment options could not be loaded. Refresh and try again." },
           ],
           message: error instanceof Error ? error.message : "Secure payment options could not be loaded.",
         });
