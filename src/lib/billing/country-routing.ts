@@ -39,6 +39,13 @@ const COUNTRY_PROFILES: Record<string, CountryPaymentProfile> = {
   EG: { countryCode: "EG", currency: "EGP", paymentOptions: ["card", "fawrypay"] },
   GB: { countryCode: "GB", currency: "GBP", paymentOptions: ["card", "account"] },
   US: { countryCode: "US", currency: "USD", paymentOptions: ["card", "account"] },
+  // Flutterwave also documents these currencies for card acceptance. No local
+  // rail is advertised for these markets, so enV exposes card checkout only.
+  CA: { countryCode: "CA", currency: "CAD", paymentOptions: ["card"] },
+  CO: { countryCode: "CO", currency: "COP", paymentOptions: ["card"] },
+  // Flutterwave's Help Center spells this code "IRN"; INR is the ISO 4217 code.
+  IN: { countryCode: "IN", currency: "INR", paymentOptions: ["card"] },
+  SL: { countryCode: "SL", currency: "SLL", paymentOptions: ["card"] },
 };
 
 /** Euro-area membership as of 2026-11-11, including Bulgaria's 2026 adoption. */
@@ -84,6 +91,7 @@ export function getCurrencyMinorUnitExponent(currency: string): number | null {
   const zeroDecimal = new Set(["UGX", "RWF", "XAF", "XOF"]);
   const twoDecimal = new Set([
     "NGN", "GHS", "KES", "ZAR", "MWK", "TZS", "ZMW", "EGP", "GBP", "USD", "EUR",
+    "CAD", "COP", "INR", "SLL",
   ]);
   const code = currency.toUpperCase();
   if (zeroDecimal.has(code)) return 0;
