@@ -46,18 +46,12 @@ try{
   await page.waitForFunction(() => {
     const root = document.querySelector(".wl-studio");
     const button = document.querySelector('.wl-rail button[data-group="project"]');
-    return root?.getAttribute("data-rail-document-listener") === "true" &&
+    return root?.getAttribute("data-wl-rail-ready") === "true" &&
       button !== null &&
       Object.keys(button).some((key) => key.startsWith("__reactProps$"));
   }, undefined, { timeout: 30000 });
   // Every tool lives in one scrolling panel opened from the rail.
   const worldLabRoot=page.locator(".wl-studio").first();
-  await page.evaluate(()=>{
-    document.addEventListener("click",event=>{
-      const button=(event.target instanceof Element)?event.target.closest('button[aria-label="Open project tools"]'):null;
-      if(button)button.setAttribute("data-audit-click-seen","true");
-    },true);
-  });
   await worldLabRoot.getByRole("button",{name:"Open project tools"}).click();
   try {
     await page.getByRole("button",{name:"Save on device"}).waitFor({state:"visible",timeout:15000});
@@ -75,24 +69,10 @@ try{
       };
       return {rootCount:document.querySelectorAll(".wl-studio").length,
         allRootStates:[...document.querySelectorAll(".wl-studio")].map(node=>({open:node.getAttribute("data-open"),railClicks:node.querySelectorAll('[data-audit-click-seen="true"]').length})),
-        rootOpen:root.getAttribute("data-open"),railListener:root.getAttribute("data-rail-listener"),
-        railLastEvent:root.getAttribute("data-rail-last-event"),
-        railLastTarget:root.getAttribute("data-rail-last-target"),
-        railLastButton:root.getAttribute("data-rail-last-button"),
-        railLastGroup:root.getAttribute("data-rail-last-group"),
-        railNativeEvent:root.getAttribute("data-rail-native-event"),
-        railNativeButton:root.getAttribute("data-rail-native-button"),
-        railNativeGroup:root.getAttribute("data-rail-native-group"),
-        railDocumentListener:root.getAttribute("data-rail-document-listener"),
-        railDocumentEvent:root.getAttribute("data-rail-document-event"),
-        railDocumentTarget:root.getAttribute("data-rail-document-target"),
-        railDocumentButton:root.getAttribute("data-rail-document-button"),
-        railDocumentGroup:root.getAttribute("data-rail-document-group"),
+        rootOpen:root.getAttribute("data-open"),
+        railReady:root.getAttribute("data-wl-rail-ready"),
         rail:describe(rail),
-        projectButton:[...root.querySelectorAll("button")].filter(node=>node.getAttribute("aria-label")==="Open project tools").map(node=>({
-          ...describe(node),nativeBound:node.dataset.wlRailBound ?? null,
-          reactProps:Object.keys(node).filter(key=>key.startsWith("__reactProps$")||key.startsWith("__reactFiber$")).length
-        })),
+        projectButton:[...root.querySelectorAll("button")].filter(node=>node.getAttribute("aria-label")==="Open project tools").map(describe),
         drawer:describe(drawer),
         drawerOpen:drawer?.getAttribute("data-open"),drawerBody:describe(drawer?.querySelector(".wl-drawer__body")),
         save:describe(save),groups:[...root.querySelectorAll(".wl-group")].map(node=>({
@@ -377,7 +357,7 @@ try{
   await page.waitForFunction(() => {
     const root = document.querySelector(".wl-studio");
     const button = document.querySelector('.wl-rail button[data-group="project"]');
-    return root?.getAttribute("data-rail-document-listener") === "true" &&
+    return root?.getAttribute("data-wl-rail-ready") === "true" &&
       button !== null &&
       Object.keys(button).some((key) => key.startsWith("__reactProps$"));
   }, undefined, { timeout: 30000 });
