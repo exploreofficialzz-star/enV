@@ -42,10 +42,14 @@ test("remote music downloading remains online-only", () => {
 });
 
 test("local custom tool categories are eligible while unknown custom engines fail closed", () => {
-  for (const category of ["accessibility", "business", "communication", "ecommerce", "events", "marketing", "personal", "productivity", "social", "travel", "webdesign"]) {
+  for (const category of ["accessibility", "career", "celebrations", "communication", "ecommerce", "events", "food", "gaming", "interactive", "marketing", "mockups", "personal", "photography", "productivity", "relationships", "screenshots", "social", "streaming", "travel", "webdesign"]) {
     const result = classifyOfflineToolRecord(tool({ category, engine: { type: "custom", id: "local-workflow" } }));
     assert.equal(result.execution, "device-local", category);
   }
+  const businessCustom = classifyOfflineToolRecord(tool({ category: "business", engine: { type: "custom", id: "local-workflow" } }));
+  assert.equal(businessCustom.execution, "not-verified", "Unregistered custom business engines fail closed");
+  const businessEngine = classifyOfflineToolRecord(tool({ category: "business", engine: { type: "business", op: "local-operation" } }));
+  assert.equal(businessEngine.execution, "device-local", "Verified business engine operations remain local");
   const unknown = classifyOfflineToolRecord(tool({ category: "unknown", engine: { type: "custom", id: "unknown" } }));
   assert.equal(unknown.execution, "not-verified");
   assert.equal(unknown.mayRunWithoutNetwork, false);
