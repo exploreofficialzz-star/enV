@@ -648,24 +648,26 @@ export async function handleFlutterwaveWebhook(request: Request) {
     return handleFlutterwaveChargebackWebhook(body);
   }
   if (eventName !== "charge.completed") return { ignored: true };
-  if (typeof nested.tx_ref !== "string") {
+  const transactionReference = typeof nested.tx_ref === "string" ? nested.tx_ref
+    : typeof nested.reference === "string" ? nested.reference : "";
+  if (!transactionReference) {
     throw Object.assign(new Error("The Flutterwave charge event is missing its transaction reference."), {
       code: "INVALID_WEBHOOK", status: 400,
     });
   }
   if (nested.status === "failed") {
-    await updateFlutterwaveIntentStatus(nested.tx_ref, "failed");
+    await updateFlutterwaveIntentStatus(transactionReference, "failed");
     return { status: "failed" as const };
   }
   if (nested.status === "cancelled" || nested.status === "canceled") {
-    await updateFlutterwaveIntentStatus(nested.tx_ref, "cancelled");
+    await updateFlutterwaveIntentStatus(transactionReference, "cancelled");
     return { status: "cancelled" as const };
   }
   if (nested.status !== "successful" && nested.status !== "succeeded") {
     return { status: "pending" as const };
   }
   return verifyAndCreditFlutterwaveReference(
-    nested.tx_ref,
+    transactionReference,
     nested.id === undefined || nested.id === null ? undefined : String(nested.id),
   );
 }
