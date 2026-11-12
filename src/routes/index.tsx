@@ -108,7 +108,6 @@ function Home() {
   }, [initialTrendingFeed.mode, initialTrendingTools]);
   const recent = usePrefs((state) => state.recent);
   const usageCounts = usePrefs((state) => state.usageCounts);
-  const prefsHydrated = usePrefs((state) => state.hydrated);
   const mostUsedTools = useMemo(
     () => rankMostUsedToolIds(recent, usageCounts, 10).flatMap((id) => {
       const tool = getToolById(id);
@@ -153,7 +152,7 @@ function Home() {
           <Link to="/agent" aria-label="Open AI Agent" className="flex h-10 min-w-0 items-center justify-center rounded-[20px] border border-border-strong bg-surface-2 px-2 text-center text-[11.1px] font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:px-4 sm:text-sm">AI Agent</Link>
           <Link to="/tokens" aria-label="Open token dashboard" className="flex h-10 min-w-0 items-center justify-center rounded-[20px] border border-border-strong bg-surface-2 px-2 text-center text-[11.1px] font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:px-4 sm:text-sm">Total token = 100</Link>
         </div>
-        <MostUsedToolsTray tools={mostUsedTools} prefsHydrated={prefsHydrated} />
+<MostUsedToolsTray tools={mostUsedTools} />
         <h1 className="mt-6 w-full max-w-3xl self-start text-left text-balance text-2xl font-semibold tracking-tight sm:mt-8 sm:text-4xl">
           A focused toolkit for
           <br className="sm:hidden" />
@@ -166,11 +165,10 @@ function Home() {
   );
 }
 
-function MostUsedToolsTray({ tools, prefsHydrated }: { tools: ToolMeta[]; prefsHydrated: boolean }) {
+function MostUsedToolsTray({ tools }: { tools: ToolMeta[] }) {
   const [productionTool, setProductionTool] = useState<ToolMeta | null>(null);
   return (
     <>
-      <div className={prefsHydrated ? "visible" : "invisible"} aria-busy={!prefsHydrated}>
       <section
         aria-label="Your most-used tools"
         className="mx-auto mt-4 h-[112px] min-h-[112px] w-full max-w-3xl shrink-0 overflow-hidden rounded-[28px] border border-border bg-surface shadow-[var(--shadow-border)]"
@@ -217,7 +215,6 @@ function MostUsedToolsTray({ tools, prefsHydrated }: { tools: ToolMeta[]; prefsH
           </div>
         )}
       </section>
-      </div>
       <UnderProductionDialog
         open={productionTool !== null}
         toolName={productionTool?.name ?? "This tool"}
