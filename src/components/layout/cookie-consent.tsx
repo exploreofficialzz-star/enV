@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
-import { getToolByPath } from "@/lib/registry";
-import { isAdsterraQualifiedTool } from "@/lib/ads/policy";
 import { chooseAnalyticsConsent, getAnalyticsConsent } from "@/lib/analytics/client";
 import {
   getAdsterraConsent,
@@ -25,14 +23,9 @@ export function CookieConsent() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const analyticsEnabled = import.meta.env.VITE_ANALYTICS_ENABLED === "true";
   const advertisingEnabled = isAdsterraEnabled();
-  const toolPathMatch = /^\/tools\/([^/]+)\/([^/]+)$/.exec(pathname);
-  const qualifiedTool = toolPathMatch
-    ? getToolByPath(toolPathMatch[1], toolPathMatch[2])
-    : undefined;
-  const showPreferencesOnThisPage =
-    pathname === "/" ||
-    pathname === "/privacy" ||
-    Boolean(advertisingEnabled && qualifiedTool && isAdsterraQualifiedTool(qualifiedTool));
+  // Consent is managed from the normal Privacy page only. Do not show a
+  // site-wide advertising prompt on Home or interrupt qualified tool use.
+  const showPreferencesOnThisPage = pathname === "/privacy";
   const [visible, setVisible] = useState(false);
   const [analyticsAllowed, setAnalyticsAllowed] = useState(false);
   const [advertisingAllowed, setAdvertisingAllowed] = useState(false);
