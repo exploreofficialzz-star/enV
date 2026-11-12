@@ -22,6 +22,7 @@ import {
   AdsterraToolPopunder,
 } from "@/components/ads/adsterra-ad";
 import { isAdsterraQualifiedTool } from "@/lib/ads/policy";
+import { AdsterraGuestAccessGate } from "@/components/ads/adsterra-guest-access-gate";
 import { openAdsterraSmartlinkFromOutput } from "@/lib/ads/adsterra";
 import type { PublicCommunityFeed } from "@/lib/community/public-feed.functions";
 import { ToolExecutionTelemetryContext, type ToolExecutionTelemetry, type ToolExecutionOutcome } from "@/components/tools/tool-execution-context";
@@ -200,6 +201,29 @@ export function ToolShell({
   }
 
   const cat = CATEGORY_MAP[tool.category];
+  const toolContent = isMusicSandbox ? (
+    <>
+      {isFullscreen ? <div className="env-tool-fullscreen__toolbar">
+        <button type="button" onClick={() => void toggleFullscreen()} className="env-tool-fullscreen__exit rounded-md border border-border bg-surface text-fg shadow-sm hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent" aria-label={`Exit full screen for ${tool.name}`} title="Exit full screen"><Minimize2 className="size-4" aria-hidden="true" /></button>
+      </div> : null}
+      <div className={isFullscreen ? "env-tool-fullscreen__content" : undefined}>{children}</div>
+    </>
+  ) : isFullscreen ? (
+    <>
+      <div className="env-tool-fullscreen__toolbar">
+        <button
+          type="button"
+          onClick={() => void toggleFullscreen()}
+          className="env-tool-fullscreen__exit rounded-md border border-border bg-surface text-fg shadow-sm hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          aria-label={`Exit full screen for ${tool.name}`}
+          title="Exit full screen"
+        >
+          <Minimize2 className="size-4" aria-hidden="true" />
+        </button>
+      </div>
+      <div className="env-tool-fullscreen__content">{children}</div>
+    </>
+  ) : children;
 
   return (
     <article className={tool.category === "creators" ? "env-device-tool-page" : "mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10" + (isMusicSandbox ? " env-music-sandbox-shell" : "")}>
@@ -303,35 +327,13 @@ export function ToolShell({
         }}
       >
         <ToolExecutionTelemetryContext.Provider value={executionTelemetry}>
-        {isMusicSandbox ? (
-          <>
-            {isFullscreen ? <div className="env-tool-fullscreen__toolbar">
-              <button type="button" onClick={() => void toggleFullscreen()} className="env-tool-fullscreen__exit rounded-md border border-border bg-surface text-fg shadow-sm hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent" aria-label={`Exit full screen for ${tool.name}`} title="Exit full screen"><Minimize2 className="size-4" aria-hidden="true" /></button>
-            </div> : null}
-            <div className={isFullscreen ? "env-tool-fullscreen__content" : undefined}>{children}</div>
-          </>
-        ) : isFullscreen ? (
-          <>
-            <div className="env-tool-fullscreen__toolbar">
-              <button
-                type="button"
-                onClick={() => void toggleFullscreen()}
-                className="env-tool-fullscreen__exit rounded-md border border-border bg-surface text-fg shadow-sm hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                aria-label={`Exit full screen for ${tool.name}`}
-                title="Exit full screen"
-              >
-                <Minimize2 className="size-4" aria-hidden="true" />
-              </button>
-            </div>
-            <div className="env-tool-fullscreen__content">{children}</div>
-          </>
-        ) : children}
+          {adsterraQualified ? (
+            <AdsterraGuestAccessGate toolName={tool.name}>{toolContent}</AdsterraGuestAccessGate>
+          ) : toolContent}
         </ToolExecutionTelemetryContext.Provider>
         {!isFullscreen && tool.category !== "creators" ? <ToolCommunityPanel toolId={tool.id} discussionHref={"/community" + toolPath(tool)} initialFeed={initialCommunityFeed} /> : null}
       </section>
 
-      {tool.category !== "creators" ? (
-        <>
       {!isFullscreen && adsterraQualified ? (
         <>
           <AdsterraBanner format="300x250" />
@@ -339,6 +341,9 @@ export function ToolShell({
           <AdsterraToolPopunder />
         </>
       ) : null}
+
+      {tool.category !== "creators" ? (
+        <>
       {!isFullscreen && import.meta.env.VITE_ADSTERRA_ENABLED !== "true" ? <AdSlot tool={tool} /> : null}
       <AiAssistPanel toolId={tool.id} />
 
