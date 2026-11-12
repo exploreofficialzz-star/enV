@@ -69,26 +69,27 @@ export function StudioRail({ open, active, onSelect }: RailProps) {
   const selectRef = useRef(onSelect);
   selectRef.current = onSelect;
 
-  const bindRailButton = (button: HTMLButtonElement | null) => {
-    if (!button || button.dataset.wlRailBound === "true") return;
-    button.dataset.wlRailBound = "true";
-    const activate = (event: Event) => {
-      const root = button.closest<HTMLElement>(".wl-studio");
-      root?.setAttribute("data-rail-native-event", event.type);
-      root?.setAttribute("data-rail-native-button", button.getAttribute("aria-label") ?? "unknown");
+  useLayoutEffect(() => {
+    const activateFromDocument = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const button = target.closest<HTMLButtonElement>(".wl-rail button[data-group]");
+      if (!button || !rail.current?.contains(button)) return;
       const group = button.dataset.group;
-      root?.setAttribute("data-rail-native-group", group ?? "missing");
       if (GROUPS.some((item) => item.id === group)) {
         selectRef.current(group as StudioGroupId);
       }
     };
-    // Bind at the actual control, not a delegated document event. The 3D
-    // viewport installs its own global input handlers; rail controls must
-    // remain independently activatable on mouse, touch and keyboard focus.
-    button.addEventListener("pointerdown", activate);
-    button.addEventListener("click", activate);
-    button.addEventListener("focus", activate);
-  };
+
+    // Handle the rail before descendant/document bubbling handlers. The
+    // 3D viewport owns separate canvas input, but must never swallow navigation.
+    document.addEventListener("pointerdown", activateFromDocument, true);
+    document.addEventListener("click", activateFromDocument, true);
+    return () => {
+      document.removeEventListener("pointerdown", activateFromDocument, true);
+      document.removeEventListener("click", activateFromDocument, true);
+    };
+  }, []);
 
   return (
     <nav ref={rail} className="wl-rail" aria-label="World Lab tools">
@@ -99,8 +100,6 @@ export function StudioRail({ open, active, onSelect }: RailProps) {
           className="wl-icon-btn"
           data-active={open && active === id ? "true" : "false"}
           data-group={id}
-          ref={bindRailButton}
-          onFocus={() => onSelect(id)}
           aria-label={`Open ${label} tools`}
           aria-expanded={open && active === id}
           title={label[0].toUpperCase() + label.slice(1)}
