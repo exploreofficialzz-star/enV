@@ -303,7 +303,7 @@ assert.ok(!/HomeMostUsedToolsTray\(tools: mostUsedTools\)[\s\S]{0,120}\.padding\
 assert.ok(webHome.indexOf("Total token = 100") < webHome.indexOf("<MostUsedToolsTray") && webHome.indexOf("<MostUsedToolsTray") < webHome.indexOf('<h1 className="mt-6'), "Web home order should be AI/token, personal tray, then the hero headline");
 assert.ok(androidHome.indexOf('HomePreviewBar("Total token = 100"') < androidHome.indexOf("MostUsedToolsTray(mostUsed") && androidHome.indexOf("MostUsedToolsTray(mostUsed") < androidHome.indexOf('Text("A focused toolkit'), "Android home order should be AI/token, personal tray, then the hero headline");
 assert.ok(iosHome.indexOf('HomePreviewBar(title: "Total token = 100")') < iosHome.indexOf("HomeMostUsedToolsTray(tools: mostUsedTools)") && iosHome.indexOf("HomeMostUsedToolsTray(tools: mostUsedTools)") < iosHome.indexOf('Text("A focused toolkit'), "iOS home order should be AI/token, personal tray, then the hero headline");
-assert.match(webHome, /h-\[112px\].*rounded-\[28px\]/);
+assert.match(webHome, /h-\[112px\].*min-h-\[112px\].*w-full.*max-w-3xl.*shrink-0.*rounded-\[28px\]/, "Web personal shortcuts tray must retain its full fixed size when shortcuts are sparse");
 assert.match(androidHome, /MostUsedToolsTray[\s\S]*?height\(112\.dp\)/);
 assert.match(webHome, /personal-tools-scroll snap-x snap-mandatory/);
 assert.match(webStyles, /grid-auto-columns: calc\(20% - 9\.6px\)/);
