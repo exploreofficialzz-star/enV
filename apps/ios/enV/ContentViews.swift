@@ -546,7 +546,7 @@ struct HomeView: View {
         let selectedIDs = trendingToolIDs.isEmpty ? fallbackTrendingToolIDs : trendingToolIDs
         return selectedIDs.compactMap { store.catalog.displayTool(for: $0) }
             .filter { ($0.status == "active" || $0.status == "beta") && !$0.isUnderProduction }
-            .prefix(12)
+            .prefix(horizontalSizeClass == .regular ? 12 : 6)
             .map { $0 }
     }
     private var mostUsedTools: [Tool] {
