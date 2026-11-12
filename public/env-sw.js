@@ -1,7 +1,7 @@
 /* enV visit-triggered offline tool packages. Only assets requested during an eligible
    tool visit enter that tool's cache. The app shell and navigation are cached separately. */
-const CORE_CACHE = "env-web-shell-v2";
-const NAVIGATION_CACHE = "env-web-navigation-v2";
+const CORE_CACHE = "env-web-shell-v3";
+const NAVIGATION_CACHE = "env-web-navigation-v3";
 const NAVIGATION_CACHE_LIMIT = 120;
 // Never put identity-specific pages into the shared navigation cache.
 const PRIVATE_NAVIGATION_PATHS = [

@@ -104,7 +104,7 @@ function formatPaymentAmount(amountMinor: number | null | undefined, currencyVal
   }
   try {
     const formatter = new Intl.NumberFormat(undefined, { style: "currency", currency });
-    const minorUnitExponent = formatter.resolvedOptions().maximumFractionDigits;
+    const minorUnitExponent = formatter.resolvedOptions().maximumFractionDigits ?? 2;
     return formatter.format(amountMinor / (10 ** minorUnitExponent));
   } catch {
     return null;

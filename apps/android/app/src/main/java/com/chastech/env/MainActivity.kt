@@ -477,20 +477,57 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
 }
 
 @Composable
+private fun randomCrossCategoryTrendingTools(
+    tools: List<com.chastech.env.data.ToolRecord>,
+    limit: Int = 12,
+): List<com.chastech.env.data.ToolRecord> {
+    val groups = tools
+        .filter { (it.status == "active" || it.status == "beta") && !it.isUnderProduction() }
+        .distinctBy { it.id }
+        .groupBy { it.category }
+        .values
+        .map { it.shuffled().toMutableList() }
+        .shuffled()
+    val selection = mutableListOf<com.chastech.env.data.ToolRecord>()
+    while (selection.size < limit) {
+        var addedInRound = false
+        for (group in groups) {
+            if (selection.size >= limit) break
+            if (group.isNotEmpty()) {
+                selection += group.removeAt(0)
+                addedInRound = true
+            }
+        }
+        if (!addedInRound) break
+    }
+    return selection
+}
+
 private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: List<String>, homeQuery: String, onQuery: (String) -> Unit, onSearch: (String) -> Unit, onTools: () -> Unit, onInformation: (String) -> Unit, darkMode: Boolean, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit, onAssistant: () -> Unit) {
     val screenWidth = LocalConfiguration.current.screenWidthDp
     val homeColumns = when { screenWidth >= 768 -> 3; screenWidth >= 640 -> 2; else -> 1 }
-    var trendingIds by remember { mutableStateOf(emptyList<String>()) }
-    LaunchedEffect(catalog.catalogVersion) {
-        val feed = NativeTrendingToolsClient.fetchFeed()
-        trendingIds = feed.toolIds
-    }
-    val trending = remember(catalog, trendingIds, screenWidth) {
-        val available = catalog.accessibilityDiscoveryTools().associateBy { it.id }
-        trendingIds.mapNotNull { available[it] }
-            .filter { it.status == "active" || it.status == "beta" }
+    val availableTrendingTools = remember(catalog.catalogVersion) {
+        catalog.accessibilityDiscoveryTools()
+            .filter { (it.status == "active" || it.status == "beta") && !it.isUnderProduction() }
             .distinctBy { it.id }
-            .take(if (screenWidth >= 768) 12 else 6)
+    }
+    val availableTrendingById = remember(availableTrendingTools) { availableTrendingTools.associateBy { it.id } }
+    var trendingIds by remember(catalog.catalogVersion) {
+        mutableStateOf(randomCrossCategoryTrendingTools(availableTrendingTools).map { it.id })
+    }
+    LaunchedEffect(catalog.catalogVersion) {
+        while (true) {
+            val feed = NativeTrendingToolsClient.fetchFeed()
+            val liveIds = feed.toolIds.filter { it in availableTrendingById }
+            if (liveIds.isNotEmpty()) {
+                trendingIds = liveIds
+                break
+            }
+            kotlinx.coroutines.delay(5 * 60 * 1000L)
+        }
+    }
+    val trending = remember(availableTrendingById, trendingIds) {
+        trendingIds.mapNotNull { availableTrendingById[it] }
     }
     val mostUsed = remember(catalog, mostUsedIds) {
         mostUsedIds.mapNotNull { catalog.displayTool(it) }.distinctBy { it.id }.take(10)
@@ -569,13 +606,6 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
         item {
             Column(Modifier.widthIn(max = 1152.dp).fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 SectionTitle("Trending tools", accent = true)
-                if (trending.isEmpty()) {
-                    Text(
-                        "The tool selection is temporarily unavailable. Please try again.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
                 trending.chunked(homeColumns).forEach { rowTools ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         rowTools.forEach { tool -> WebHomeToolCard(tool, onTool, Modifier.weight(1f)) }

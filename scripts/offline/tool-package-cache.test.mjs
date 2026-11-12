@@ -37,7 +37,7 @@ test("public app assets use stale-while-revalidate and never cache private API r
   assert.match(serviceWorker, /cacheControl\.includes\("private"\)/);
   assert.match(serviceWorker, /CORE_CACHE_LIMIT = 800/);
   assert.match(serviceWorker, /precacheFirstVisitShell/);
-  assert.match(serviceWorker, /env-web-shell-v2/);
+  assert.match(serviceWorker, /env-web-shell-v3/);
   assert.ok(serviceWorker.includes("isCacheableNavigation(request, url)"));
   assert.ok(serviceWorker.includes("PRIVATE_NAVIGATION_PATHS"));
   assert.ok(serviceWorker.includes("NAVIGATION_CACHE_LIMIT = 120"));

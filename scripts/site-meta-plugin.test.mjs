@@ -95,7 +95,7 @@ test("Home search shows live matches and opens full results only on explicit act
   assert.match(home, /to: "\/search", search: \{ q: searchQuery\.trim\(\) \}/);
   assert.doesNotMatch(home, /navigate\(\{ to: "\/tools"/);
   assert.match(home, /<ToolCard key=\{tool\.id\} tool=\{tool\}/);
-  assert.match(home, /hidden md:flex/);
+  assert.doesNotMatch(home, /hidden md:flex/);
   assert.match(home, /leading=\{<Logo size="search"/);
   assert.match(brand, /search: "h-9 w-14"/);
   assert.match(searchBox, /onChange=\{\(e\) => \{\s*setQ\(e\.target\.value\);\s*setOpen\(true\);/);
@@ -218,7 +218,7 @@ test("web brand lockups use the canonical light and dark assets in the home hero
   assert.match(home, /sm:mt-5/);
   assert.match(home, /loadHomeTrendingTools\(\)/);
   assert.match(home, /fetch\("\/api\/analytics\/trending"/);
-  assert.match(home, /index >= 6 \? "hidden md:flex"/);
+  assert.doesNotMatch(home, /index >= 6 \? "hidden md:flex"/);
   assert.match(home, /text-xl font-semibold text-accent sm:text-2xl/);
   assert.match(home, /AI Agent/);
   assert.match(home, /Total token = 100/);
