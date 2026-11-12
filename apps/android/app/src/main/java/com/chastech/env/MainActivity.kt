@@ -477,17 +477,43 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
 }
 
 @Composable
+private fun randomCrossCategoryTrendingTools(
+    tools: List<com.chastech.env.data.ToolRecord>,
+    limit: Int = 12,
+): List<com.chastech.env.data.ToolRecord> {
+    val groups = tools
+        .filter { (it.status == "active" || it.status == "beta") && !it.isUnderProduction() }
+        .distinctBy { it.id }
+        .groupBy { it.category }
+        .values
+        .map { it.shuffled().toMutableList() }
+        .shuffled()
+    val selection = mutableListOf<com.chastech.env.data.ToolRecord>()
+    while (selection.size < limit) {
+        var addedInRound = false
+        for (group in groups) {
+            if (selection.size >= limit) break
+            if (group.isNotEmpty()) {
+                selection += group.removeAt(0)
+                addedInRound = true
+            }
+        }
+        if (!addedInRound) break
+    }
+    return selection
+}
+
 private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: List<String>, homeQuery: String, onQuery: (String) -> Unit, onSearch: (String) -> Unit, onTools: () -> Unit, onInformation: (String) -> Unit, darkMode: Boolean, onTool: (String) -> Unit, onToggleFavorite: (String) -> Unit, onAssistant: () -> Unit) {
     val screenWidth = LocalConfiguration.current.screenWidthDp
     val homeColumns = when { screenWidth >= 768 -> 3; screenWidth >= 640 -> 2; else -> 1 }
     val availableTrendingTools = remember(catalog.catalogVersion) {
         catalog.accessibilityDiscoveryTools()
-            .filter { it.status == "active" || it.status == "beta" }
+            .filter { (it.status == "active" || it.status == "beta") && !it.isUnderProduction() }
             .distinctBy { it.id }
     }
     val availableTrendingById = remember(availableTrendingTools) { availableTrendingTools.associateBy { it.id } }
     var trendingIds by remember(catalog.catalogVersion) {
-        mutableStateOf(availableTrendingTools.shuffled().take(12).map { it.id })
+        mutableStateOf(randomCrossCategoryTrendingTools(availableTrendingTools).map { it.id })
     }
     LaunchedEffect(catalog.catalogVersion) {
         while (true) {
@@ -500,9 +526,8 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
             kotlinx.coroutines.delay(5 * 60 * 1000L)
         }
     }
-    val trending = remember(availableTrendingById, trendingIds, screenWidth) {
+    val trending = remember(availableTrendingById, trendingIds) {
         trendingIds.mapNotNull { availableTrendingById[it] }
-            .take(if (screenWidth >= 768) 12 else 6)
     }
     val mostUsed = remember(catalog, mostUsedIds) {
         mostUsedIds.mapNotNull { catalog.displayTool(it) }.distinctBy { it.id }.take(10)
