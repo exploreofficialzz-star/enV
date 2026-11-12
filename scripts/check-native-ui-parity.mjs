@@ -86,7 +86,7 @@ assert.match(webToolEnginePreload, /export async function preloadToolEngine/, "E
 assert.match(webToolEnginePreload, /export async function preloadAllToolEngineModules/, "All shipped tool modules must warm in the background after platform paint");
 assert.match(webRootRoute, /preloadAllToolEngineModules[\s\S]*prepareEnVOfflineShell/, "The app shell must cache the complete warmed engine library for offline routes");
 assert.match(webToolEnginePreload, /tool\.engine\.type/, "Engine preload must cover the catalog engine type dispatch");
-assert.match(webOfflineWorker, /if \(url\.pathname === "\\/" \|\| url\.pathname\.startsWith\("\\/tools\\/"\)\) return await shellResponse\(\)/, "Offline Home and tool URLs must render through the regular enV app shell when no cached page is available");
+assert.match(webOfflineWorker, /if \(url\.pathname === "[/]" \|\| url\.pathname\.startsWith\("[/]tools[/]"\)\) return await shellResponse\(\)/, "Offline Home and tool URLs must render through the regular enV app shell when no cached page is available");
 assert.ok(webToolRoute.indexOf("await prepareOfflineToolPackage(") < webToolRoute.indexOf("await preloadToolEngine(matchedTool)"), "Offline route must open the target tool package before requesting its engine chunk");
 assert.doesNotMatch(webOfflinePackageClient, /offlineEligible/, "Tool UI caching must not depend on local-operation eligibility");
 assert.doesNotMatch(webToolEngine, /isOfflineLocalTool|offlineEligible/, "Every visited tool interface must be packaged regardless of its operation execution mode");
