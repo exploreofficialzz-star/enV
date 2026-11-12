@@ -69,26 +69,28 @@ export function StudioRail({ open, active, onSelect }: RailProps) {
   const selectRef = useRef(onSelect);
   selectRef.current = onSelect;
 
-  // Native delegation keeps the rail responsive during canvas-heavy scene input,
-  // while preserving normal click activation for keyboard and assistive technology.
+  // Bind directly to each rail button. This keeps tool selection independent
+  // from the world canvas and any event delegation outside the rail itself.
   useEffect(() => {
     const node = rail.current;
     if (!node) return;
-    const activate = (event: Event) => {
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      const button = target.closest<HTMLButtonElement>("button[data-group]");
-      if (!button || !node.contains(button)) return;
-      const group = button.dataset.group;
-      if (GROUPS.some((item) => item.id === group)) {
-        selectRef.current(group as StudioGroupId);
-      }
-    };
-    node.addEventListener("pointerdown", activate, true);
-    node.addEventListener("click", activate, true);
+    const root = node.closest<HTMLElement>(".wl-studio");
+    const buttons = Array.from(node.querySelectorAll<HTMLButtonElement>("button[data-group]"));
+    root?.setAttribute("data-rail-listener", "true");
+    const removers = buttons.map((button) => {
+      const activate = () => {
+        const group = button.dataset.group;
+        root?.setAttribute("data-rail-last-event", "button-click");
+        root?.setAttribute("data-rail-last-button", button.getAttribute("aria-label") ?? "unknown");
+        root?.setAttribute("data-rail-last-group", group ?? "missing");
+        if (GROUPS.some((item) => item.id === group)) selectRef.current(group as StudioGroupId);
+      };
+      button.addEventListener("click", activate, true);
+      return () => button.removeEventListener("click", activate, true);
+    });
     return () => {
-      node.removeEventListener("pointerdown", activate, true);
-      node.removeEventListener("click", activate, true);
+      removers.forEach((remove) => remove());
+      root?.removeAttribute("data-rail-listener");
     };
   }, []);
 
