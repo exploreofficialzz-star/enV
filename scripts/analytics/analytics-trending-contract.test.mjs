@@ -93,7 +93,7 @@ test("iOS consumes the shared real-usage order without adding Trending helper co
   assert.match(homeSource, /NativeTrendingToolsClient\.fetchFeed\(\)/);
   assert.match(homeSource, /trendingToolIDs\.isEmpty\s*\?\s*fallbackTrendingToolIDs\s*:/);
   assert.match(homeSource, /fallbackTrendingToolIDs = randomCrossCategoryTrendingTools/);
-  assert.match(ios, /by: \.category/);
+  assert.ok(ios.includes("by: \\.category"));
   assert.match(homeSource, /let liveIDs = feed\.toolIDs\.filter/);
   assert.match(homeSource, /Task\.sleep\(nanoseconds: 300_000_000_000\)/);
   assert.match(homeSource, /selectedIDs\.compactMap/);
