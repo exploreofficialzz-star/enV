@@ -1,0 +1,36 @@
+name: Regenerate shared native catalog (temporary)
+on:
+  push:
+    branches:
+      - fix/unified-cookie-advertising-consent-20261111
+permissions:
+  contents: write
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Regenerate shared native catalog
+        run: npm run export:native-catalog
+      - name: Commit generated catalog when changed
+        run: |
+          if git diff --quiet -- apps/shared/catalog.json apps/shared/native-engine-inventory.json; then
+            echo "Native catalog is already current."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/shared/catalog.json apps/shared/native-engine-inventory.json
+          git commit -m "chore(native): regenerate shared offline catalog"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
