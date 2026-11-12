@@ -242,6 +242,8 @@ assert.match(ledger, /reconcileVerifiedRefund/);
 assert.match(ledger, /reconcileVerifiedDispute/);
 assert.match(ledger, /recovery_debt_subunits/);
 assert.match(ledger, /ACCOUNT_RECOVERY_REQUIRED/);
+assert.match(ledger, /providerMetadata\?: Record<string, unknown>/, "verified provider references must be accepted by the shared purchase-credit ledger");
+assert.match(ledger, /provider_metadata = provider_metadata \|\| \$3::jsonb/, "provider references must persist atomically with purchase credit");
 assert.match(paystackWebhookRoute, /billing-paystack-webhook/);
 assert.match(cryptomusWebhook, /handleCryptomusWebhook/);
 assert.match(fundingOptionsRoute, /getCustomerCountry/);
