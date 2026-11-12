@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { InfoPage } from "@/components/layout/info-page";
 import { seoPageHead, pageSchema } from "@/lib/seo-metadata";
 import { AdPrivacyControls } from "@/components/layout/ad-privacy-controls";
+import { resolveAdConfig } from "@/lib/ads/policy";
 
 export const Route = createFileRoute("/privacy")({
   head: () => seoPageHead({
@@ -14,7 +15,13 @@ export const Route = createFileRoute("/privacy")({
 });
 
 function Privacy() {
-  const advertisingEnabled = import.meta.env.VITE_ADS_ENABLED === "true";
+  const advertisingEnabled = resolveAdConfig({
+    enabled: import.meta.env.VITE_ADS_ENABLED,
+    privacyConfigured: import.meta.env.VITE_ADSENSE_PRIVACY_CONFIGURED,
+    clientId: import.meta.env.VITE_ADSENSE_CLIENT_ID,
+    toolSlotId: import.meta.env.VITE_ADSENSE_TOOL_SLOT_ID,
+    toolIds: import.meta.env.VITE_AD_SUPPORTED_TOOL_IDS,
+  }) !== null;
   const adsterraAdvertisingEnabled = import.meta.env.VITE_ADSTERRA_ENABLED === "true";
   return (
     <InfoPage title="Privacy">
