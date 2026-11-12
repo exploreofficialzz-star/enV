@@ -19,6 +19,7 @@ const SeoEngine = lazy(() => import("@/components/engines/io-engines").then((m) 
 import { ComingSoonPanel } from "@/components/tools/coming-soon";
 const DocumentEngine = lazy(() => import("@/components/engines/document-engine").then((m) => ({ default: m.DocumentEngine })));
 const FileConverterEngine = lazy(() => import("@/components/engines/file-converter-engine").then((m) => ({ default: m.FileConverterEngine })));
+const FileWorkspaceEngine = lazy(() => import("@/components/engines/file-workspace-engine").then((m) => ({ default: m.FileWorkspaceEngine })));
 const DeveloperEngine = lazy(() => import("@/components/engines/developer-engine").then((m) => ({ default: m.DeveloperEngine })));
 const DeveloperStudioEngine = lazy(() => import("@/components/engines/developer-studio-engine").then((m) => ({ default: m.DeveloperStudioEngine })));
 const UxUiStudioEngine = lazy(() => import("@/components/engines/ux-ui-studio-engine").then((m) => ({ default: m.UxUiStudioEngine })));
@@ -84,6 +85,7 @@ function ToolEngineView({ tool, initialMode, initialAction, initialOp }: ToolEng
   if (tool.category === "events" && isEventTemplateTool(tool.id)) return <EventTemplateEngine toolId={tool.id} />;
   if (tool.id === "a-book") return <ABookEngine />;
   if (tool.id === "zip-any-file") return <ZipArchiveEngine />;
+  if (tool.category === "files" && tool.engine.type === "custom") return <FileWorkspaceEngine toolId={tool.id} />;
   if (tool.id === "music-downloader") return <MusicDownloaderEngine />;
   if (tool.id === "song-metadata-analyzer") return <AiMusicDataSandbox />;
   // The reader extends the existing payload inspector route with real QR and barcode decoding.
