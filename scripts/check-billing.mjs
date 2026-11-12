@@ -17,6 +17,7 @@ const flutterwaveWebhook = await read("server/routes/api/billing/flutterwave/web
 const flutterwaveVerify = await read("server/routes/api/billing/flutterwave/verify.get.ts");
 const paystackWebhookRoute = await read("server/routes/api/billing/paystack/webhook.post.ts");
 const paystackProviderConfig = await read("src/lib/billing/provider-config.ts");
+const paymentMethods = await read("src/lib/billing/payment-methods.ts");
 const cryptomusService = await read("src/lib/billing/cryptomus.server.ts");
 const cryptomusWebhook = await read("server/routes/api/billing/cryptomus/webhook.post.ts");
 const cryptomusVerifyRoute = await read("server/routes/api/billing/cryptomus/verify.post.ts");
@@ -176,7 +177,9 @@ for (const [platform, ids] of [["Android", nativeInventory.androidToolIds], ["iO
 }
 assert.match(purchasesRoute, /initializePaystackCheckout/);
 assert.match(purchasesRoute, /initializeCryptomusCheckout/);
-assert.match(purchasesRoute, /provider !== "paystack" && provider !== "flutterwave" && provider !== "cryptomus"/);
+assert.match(purchasesRoute, /legacyProvider !== "paystack" && legacyProvider !== "flutterwave" && legacyProvider !== "cryptomus"/);
+assert.match(purchasesRoute, /amountUsdCents/);
+assert.match(purchasesRoute, /paymentMethod === "local"/);
 assert.match(purchasesRoute, /No payment was taken/);
 assert.match(paystackProviderConfig, /PAYSTACK_PROVIDER_APPROVED === "true"/, "Paystack checkout must require explicit merchant approval");
 assert.match(paystackService, /CRYPTOMUS_PROVIDER_APPROVED === "true"/, "crypto checkout must require explicit merchant approval");
@@ -199,11 +202,18 @@ assert.match(cryptomusVerifyRoute, /intent\.user_id !== auth\.userId/);
 assert.match(cryptomusVerifyRoute, /verifyAndCreditCryptomusReference/);
 assert.match(walletDashboard, /api\/billing\/cryptomus\/verify/);
 assert.match(walletDashboard, /The crypto payment is still processing/);
-assert.match(walletDashboard, /Choose how you want to pay/);
-assert.match(walletDashboard, /Paystack/);
-assert.match(walletDashboard, /Pay with crypto/);
-assert.match(walletDashboard, /option\.enabled/);
-assert.match(walletDashboard, /checkout\.hostname !== expectedHost/);
+assert.match(walletDashboard, /How would you like to pay/);
+assert.match(walletDashboard, /title: "Pay with card"/);
+assert.match(walletDashboard, /title: "More"/);
+assert.match(walletDashboard, /fundingOptionsState\.methods\[method\]/);
+assert.match(walletDashboard, /Options for/);
+assert.match(fundingOptionsRoute, /isCustomerPaymentMethodAvailable/);
+assert.match(paymentMethods, /parseUsdAmountToCents/);
+assert.match(paymentMethods, /getFundingCandidates/);
+assert.match(walletDashboard, /const allowedCheckoutHost = checkout\?\.protocol === "https:"/);
+assert.match(walletDashboard, /checkout\.hostname === "checkout\.paystack\.com"/);
+assert.match(walletDashboard, /checkout\.hostname === "checkout\.flutterwave\.com"/);
+assert.match(walletDashboard, /checkout\.hostname === "pay\.cryptomus\.com"/);
 assert.match(pairNativePage, /api\/billing\/offline\/pairing/);
 assert.match(pairNativePage, /Generate pairing code/);
 assert.match(envExample, /PAYSTACK_PROVIDER_APPROVED=false/);
@@ -250,9 +260,13 @@ assert.match(fundingOptionsRoute, /getCustomerCountry/);
 assert.match(purchasesRoute, /getCustomerCountry/);
 assert.match(purchasesRoute, /getFundingOptions\(countryCode\)/);
 assert.match(purchasesRoute, /initializeFlutterwaveCheckout/);
-assert.match(walletDashboard, /checkout\.hostname !== expectedHost/);
+assert.match(walletDashboard, /const allowedCheckoutHost = checkout\?\.protocol === "https:"/);
+assert.match(walletDashboard, /checkout\.hostname === "checkout\.paystack\.com"/);
+assert.match(walletDashboard, /checkout\.hostname === "checkout\.flutterwave\.com"/);
+assert.match(walletDashboard, /checkout\.hostname === "pay\.cryptomus\.com"/);
 assert.match(walletDashboard, /checkout\.flutterwave\.com/);
-assert.match(walletDashboard, /option\.id === "flutterwave"/);
+assert.match(purchasesRoute, /toFlutterwaveMajorAmount/);
+assert.match(purchasesRoute, /minimumPaystackAmountMinor/);
 assert.match(countryRouting, /x-vercel-ip-country/);
 assert.match(countryRouting, /cf-ipcountry/);
 assert.match(countryRouting, /getCountryPaymentProfile/);
@@ -274,7 +288,7 @@ assert.ok(countryRouting.includes('"BG"'), "Bulgaria must resolve through the Eu
 assert.match(flutterwaveService, /FLW_SECRET_KEY/);
 assert.match(flutterwaveService, /FLW_SECRET_HASH/);
 assert.match(flutterwaveService, /FLUTTERWAVE_ENABLED_CURRENCIES/);
-assert.match(flutterwaveService, /payment_options: profile\.paymentOptions\.join/);
+assert.match(flutterwaveService, /payment_options: selectedPaymentOptions\.join/);
 assert.match(flutterwaveService, /verifyAndCreditFlutterwaveReference/);
 assert.match(flutterwaveService, /verify_by_reference/);
 assert.match(flutterwaveService, /updateFlutterwaveIntentStatus/);
@@ -309,18 +323,25 @@ assert.match(fxPricingTests, /rounds half up with integer arithmetic/);
 assert.match(paystackService, /quoteTokenPacks/);
 assert.match(flutterwaveService, /quoteTokenPacks/);
 assert.match(purchasesRoute, /pricingQuote/);
-assert.match(fundingOptionsRoute, /amountMinor: Number\.isSafeInteger\(pack\.amountMinor\)/,
-  "funding options must expose the server-calculated local amount for display");
-assert.match(fundingOptionsRoute, /currency: "currency" in pack/,
-  "each displayed local amount must carry its ISO currency code");
-assert.match(walletDashboard, /id="wallet-token-amount"/, "wallet must use a single amount selector instead of token-pack cards");
-assert.match(walletDashboard, /selectedFundingAmount/, "wallet must display the server-quoted local-currency amount");
-assert.match(walletDashboard, /Amount to pay/, "wallet must identify the actual payment amount");
-assert.match(walletDashboard, /tokenPackReferenceValue\(selectedTokenPack\)/, "wallet must display the enV USD reference value beneath the local charge");
+assert.match(fundingOptionsRoute, /methods: \{/,
+  "funding options must expose only customer-facing method availability");
+assert.match(fundingOptionsRoute, /card: isCustomerPaymentMethodAvailable/);
+assert.match(fundingOptionsRoute, /local: isCustomerPaymentMethodAvailable/);
+assert.match(fundingOptionsRoute, /more: isCustomerPaymentMethodAvailable/);
+assert.doesNotMatch(fundingOptionsRoute, /label: provider\.label|providers: provider\.packs/,
+  "the wallet options API must not return gateway labels or provider pack cards");
+assert.doesNotMatch(walletDashboard, /label: "Paystack"|label: "Flutterwave"|Pay with crypto/,
+  "gateway names must not appear as wallet payment choices");
+assert.match(walletDashboard, /id="wallet-custom-amount"/, "wallet must use a custom USD amount input");
+assert.match(walletDashboard, /customAmountCents/, "wallet must validate the entered custom amount");
+assert.match(walletDashboard, /Amount \(USD\)/, "wallet must label the entered amount as USD");
+assert.match(walletDashboard, /customTokenAmount/, "wallet must show the matching enV token amount");
+assert.match(walletDashboard, /\[10, 50, 100\]/, "wallet must offer the requested custom amount suggestions");
+assert.match(walletDashboard, /100 enV = \$1\.00 reference value/);
 assert.doesNotMatch(walletDashboard, /Choose your token pack/, "wallet must not retain the old token-pack card heading");
 assert.match(walletDashboard, /visibleWallet\.recoveryDebtTokens/, "wallet must explain a recovery balance after reversals");
 assert.match(tokenDashboardComponent, /referenceValue\(wallet\.availableTokens\)/, "web token dashboard must calculate reference value from the live balance");
-assert.ok(walletDashboard.includes("exchangerate-api.com"));
+assert.match(walletDashboard, /final charge is quoted in your local currency after your country is detected/);
 assert.match(cryptomusService, /const pricePerTokenMinor = 1/);
 assert.match(paystackProviderConfig, /PAYSTACK_SECRET_KEY\?\.trim\(\)/,
   "whitespace-only Paystack credentials must not enable checkout");

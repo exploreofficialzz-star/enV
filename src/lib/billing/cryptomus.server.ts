@@ -2,7 +2,7 @@ import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto
 import { getSql } from "../db";
 import { creditVerifiedPurchase, readWallet } from "./ledger.server";
 import { readBoundedBytes } from "./bounded-json.server";
-import { TOKEN_PACKS, getFundingOptions } from "./paystack.server";
+import { getFundingOptions } from "./paystack.server";
 
 
 type CryptomusCredentials = { merchantId: string; apiKey: string };
@@ -107,7 +107,8 @@ export async function initializeCryptomusCheckout(input: {
   idempotencyKey: unknown;
 }) {
   const configuration = await requireNewCheckoutConfiguration();
-  if (!(TOKEN_PACKS as readonly number[]).includes(input.tokenPack) || !validIdempotencyKey(input.idempotencyKey)) {
+  if (!Number.isSafeInteger(input.tokenPack) || input.tokenPack < 100 ||
+      input.tokenPack > 9_000_000_000 || !validIdempotencyKey(input.idempotencyKey)) {
     throw Object.assign(new Error("Choose a supported token pack and retry the checkout."), {
       code: "INVALID_PURCHASE", status: 400,
     });
