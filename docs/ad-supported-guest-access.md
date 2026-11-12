@@ -8,13 +8,13 @@ The hybrid economy applies only to tool IDs explicitly selected for the cohort.
 - **Offline:** the same selected tool requires an authenticated enV account and a valid, pre-issued offline allowance. The allowance must be active, unexpired, and use the current offline pricing version. A failed/missing allowance rejects the operation before the tool computes or reveals a result.
 - **Unselected tools:** retain their existing access and offline policy. The feature must not silently broaden to every local tool.
 
-The selected hybrid cohort is intersected with `src/data/offline-eligible-tools.json`. Each candidate must already have a `local.*` billing profile and explicit `web`, `android`, and `ios` platform coverage. The Web, Android, and iOS execution boundaries all enforce the offline rule independently in their native implementation.
+The selected hybrid cohort is intersected with `src/data/offline-eligible-tools.json`. Each candidate must already have a `local.*` billing profile and explicit `web`, `android`, and `ios` platform coverage. The Web, Android, and iOS execution boundaries all enforce the offline rule independently in their native implementation. This registry is exclusively an offline-wallet boundary; it must not be reused as the Adsterra ad allowlist.
 
 ## Safety defaults
 
-Advertising is **off by default** in Web, Android, and iOS builds. Blank provider IDs, blank allowlists, or an unconfigured privacy flag fail closed. Do not enable the feature until you have completed the relevant publisher account setup, privacy messaging, test-device setup, and release review.
+Native AdMob advertising is **off by default** in Android and iOS builds until production publisher IDs, banner units and UMP privacy messaging are configured. Web Adsterra is a separate rollout: its production flag is enabled only for `envtools.store`, while requests remain gated by explicit visitor consent and same-origin availability. Never treat an Adsterra Web flag as proof that native AdMob is configured.
 
-The selected-tool allowlist is also the offline-access boundary and is evaluated independently from ad rendering. When a reviewed cohort is configured but provider IDs or CMP readiness are absent, the tools remain guest-usable online, ads stay suppressed, and those same tools still require a valid offline allowance when the enV origin cannot be reached. Disabling ads must never disable offline token enforcement for an already selected cohort.
+The selected-tool allowlist is the offline-access boundary only and is evaluated independently from ad rendering. Web Adsterra uses a separate policy for active, public, device-local tools across categories, excluding Studio, AI, Labs/Sandbox and restricted sensitive experiences. It does not require membership in the offline-wallet registry. A qualified guest must explicitly allow ads to use that tool; a guest who declines or has not chosen must sign in/create an account, and signed-in users can use the tool without ads. These online access rules do not change offline allowance enforcement.
 
 The following are not supplied by this repository and must not be fabricated:
 
@@ -78,7 +78,7 @@ The checked-in iOS app ID is Google's iOS **test app ID** and the ad unit is bla
 
 ## Tool selection and privacy boundaries
 
-Start with a small, reviewed group of simple calculators. Do not select health, fitness, finance, earnings, personal-data, account, AI, upload, or backend-dependent tools. The runtime policy only admits active public tools classified as device-local and present in the canonical three-platform offline pricing registry. The IDs are deliberately not hard-coded into the repository; maintainers must review and explicitly set the allowlist consistently across the three platforms.
+For Web Adsterra, include suitable active, public, device-local tools across eligible categories; do not limit selection to calculators or intersect this policy with `offline-eligible-tools.json`. Exclude Studio workspaces, AI-related tools, Labs/Sandboxes, health, fitness, finance, earnings, personal-data, account, upload and backend-dependent tools. The tool must be auth-free for guest access and classified as device-local by the execution policy. Android/iOS AdMob eligibility uses its own native check and publisher configuration; it must not reuse the offline-wallet eligibility predicate.
 
 ## Offline wallet boundary
 
@@ -98,8 +98,8 @@ As of 2026-11-09, the verified GitHub `main` commit `b975bf1b774925e6b29325eadaf
 
 Before launch, verify:
 
-1. Web guest can open and run a selected tool without sign-in while online.
-2. Web ad script is not requested when disabled, unallowlisted, offline, or privacy is not ready.
+1. A Web guest can use an Adsterra-qualified tool only after explicitly allowing advertising; declining or leaving consent unset presents a tool-level sign-up/sign-in choice. Signed-in users can use that tool without ads.
+2. Web Adsterra scripts are not requested when disabled, unqualified, consent is missing/declined, or the application origin is unreachable. Verify eligibility is independent of offline-wallet enrollment.
 3. Android and iOS guest can run the same selected tool while online without sign-in.
 4. UMP consent/refusal and privacy-options paths work on both native platforms.
 5. All three apps reject that tool offline without a selected, current allowance.

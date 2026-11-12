@@ -80,8 +80,34 @@ test("only explicitly selected, active, public device-local tools can show an ad
 });
 
 
-test("Adsterra qualification is based on active public device-local tools in the shared cross-platform cohort", () => {
+test("Adsterra includes suitable local tools across categories without enrolling them in offline billing", () => {
+  const communicationTool = {
+    id: "meeting-agenda-builder",
+    name: "Meeting Agenda Builder",
+    category: "communication",
+    subcategory: "Meeting helpers",
+    keywords: ["agenda", "meeting", "planning"],
+    tags: ["communication", "meeting"],
+    status: "active",
+    clientSide: true,
+    requiresBackend: false,
+    requiresAuth: false,
+    engine: { type: "custom", id: "meeting-agenda-builder" },
+  };
+  const businessTool = eligibleTool({
+    id: "invoice-number-generator",
+    name: "Invoice Number Generator",
+    category: "business",
+    engine: { type: "business", op: "invoice-number" },
+  });
   assert.equal(isAdsterraQualifiedTool(eligibleTool()), true);
+  assert.equal(isAdsterraQualifiedTool(communicationTool), true);
+  assert.equal(isAdsterraQualifiedTool(businessTool), true);
+  assert.equal(isHybridAccessToolId(communicationTool.id, goodEnvironment, communicationTool), false,
+    "Ad eligibility must not silently enroll a tool in offline-wallet billing.");
+});
+
+test("Adsterra excludes Studio, AI, Lab/Sandbox and sensitive or non-local tools", () => {
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ status: "beta" })), false);
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ requiresBackend: true })), false);
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ requiresAuth: true })), false);
@@ -94,4 +120,12 @@ test("Adsterra qualification is based on active public device-local tools in the
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ category: "earnings" })), false);
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ category: "personal" })), false);
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ id: "finance-apr-calculator" })), false);
+  assert.equal(isAdsterraQualifiedTool(eligibleTool({ category: "developer" })), false);
+  assert.equal(isAdsterraQualifiedTool(eligibleTool({ category: "accessibility" })), false);
+  assert.equal(isAdsterraQualifiedTool(eligibleTool({ category: "ai" })), false);
+  assert.equal(isAdsterraQualifiedTool(eligibleTool({ engine: { type: "ai", op: "generate" } })), false);
+  assert.equal(isAdsterraQualifiedTool(eligibleTool({ name: "Invoice Studio" })), false);
+  assert.equal(isAdsterraQualifiedTool(eligibleTool({ tags: ["lab"] })), false);
+  assert.equal(isAdsterraQualifiedTool(eligibleTool({ keywords: ["sandbox", "training"] })), false);
+  assert.equal(isAdsterraQualifiedTool(eligibleTool({ id: "ai-caption-writer" })), false);
 });

@@ -8,6 +8,8 @@ const rootRoute = read("src/routes/__root.tsx");
 const slot = read("src/components/tools/ad-slot.tsx");
 const adsterraWeb = read("src/components/ads/adsterra-ad.tsx");
 const adsterraConfig = read("src/lib/ads/adsterra.ts");
+const adsterraGuestGate = read("src/components/ads/adsterra-guest-access-gate.tsx");
+const authPage = read("src/components/auth/auth-page.tsx");
 const toolShell = read("src/components/tools/tool-shell.tsx");
 const webAdPrivacy = read("src/components/layout/ad-privacy-controls.tsx");
 const adsBrowser = read("src/lib/ads/browser.ts");
@@ -42,14 +44,17 @@ assert.match(rootRoute, /name: "google-adsense-account", content: ADSENSE_SITE_C
 assert.doesNotMatch(rootRoute, /ADSENSE_BOOTSTRAP_SCRIPT|pagead\.googlesyndication\.com/, "The root document must not load AdSense before hydration.");
 assert.match(shell, /<AdSlot tool=\{tool\} \/>/, "Tool details must include the ad placement.");
 assert.match(toolShell, /AdsterraNativeBanner/, "Qualified tool pages must include the publisher's native placement.");
-assert.match(toolShell, /AdsterraResponsiveBanner/, "Qualified tool pages must include the responsive banner.");
+assert.match(toolShell, /!isFullscreen && adsterraAdsEnabled \? <AdsterraResponsiveBanner \/>/, "Qualified tool pages must actually mount the responsive banner above the interface.");
 assert.match(toolShell, /AdsterraBanner format="300x250"/, "Qualified tool pages must include the medium-rectangle banner.");
 assert.match(toolShell, /AdsterraToolPopunder/, "Qualified tool pages must be the only Popunder mount.");
-assert.match(toolShell, /isAdsterraQualifiedTool\(tool\)/, "Each placement must be limited to the approved tool cohort.");
+assert.match(toolShell, /isAdsterraQualifiedTool\(tool\)/, "Each placement must be limited to the shared Adsterra eligibility policy.");
+assert.match(toolShell, /!adsterraAuthPending && !adsterraAuthError && !adsterraUser && adsterraConsent === "granted"/, "Adsterra impressions and output Smartlinks must be limited to consenting guests, never signed-in users.");
+assert.match(toolShell, /<AdsterraGuestAccessGate toolName=\{tool\.name\}>/, "Qualified tools must gate guests on an explicit ad choice or account session.");
+assert.match(toolShell, /<\/section>\s*\{!isFullscreen && adsterraAdsEnabled[\s\S]*?<AdsterraBanner format="300x250" \/>[\s\S]*?<AdsterraNativeBanner \/>[\s\S]*?\}\s*\{tool\.category !== "creators"/, "Lower Adsterra placements must work for every eligible category, including Creator tools.");
 assert.match(toolShell, /openAdsterraSmartlinkFromOutput/, "Output actions must trigger the publisher Smartlink from a direct click.");
 assert.ok(toolShell.includes("copy|download|export|save|output|result|calculate|convert|generate"), "Output triggers must include copy, download, export and common output-producing actions.");
 assert.doesNotMatch(downloadUtils, /openAdsterraSmartlinkFromOutput/, "The download helper must not open a popup after an asynchronous download begins.");
-assert.match(toolShell, /data-env-ad-eligible=\{adsterraQualified \? "true" : undefined\}/, "The output trigger must be restricted to the same qualified tool interface.");
+assert.match(toolShell, /data-env-ad-eligible=\{adsterraAdsEnabled \? "true" : undefined\}/, "The output trigger must be restricted to the same qualified tool interface.");
 assert.doesNotMatch(rootRoute, /AdsterraPopunder/, "The Popunder must not be loaded site-wide.");
 assert.match(adsterraWeb, /retryAttempt < 3/, "Failed Adsterra banner requests must retry a bounded number of times.");
 assert.match(adsterraWeb, /Adsterra banner request timed out/, "A stalled banner request must be released so it cannot block later placements.");
@@ -63,7 +68,15 @@ assert.match(adsterraWeb, /retryHandle = window\.setInterval/, "A failed Popunde
 assert.match(adsterraWeb, /attempts >= 4/, "Popunder retries must be bounded to avoid repeated provider requests.");
 
 assert.match(slot, /isApplicationOnline\(\)/, "Ads must not be requested unless the application origin is reachable.");
-assert.match(shell, /!isFullscreen && adsterraQualified[\s\S]*?<AdsterraBanner format="300x250" \/>[\s\S]*?<AdsterraNativeBanner \/>[\s\S]*?<AdsterraToolPopunder \/>/, "Every Adsterra placement must remain outside fullscreen and inside qualified tool pages.");
+assert.match(shell, /!isFullscreen && adsterraAdsEnabled[\s\S]*?<AdsterraBanner format="300x250" \/>[\s\S]*?<AdsterraNativeBanner \/>[\s\S]*?<AdsterraToolPopunder \/>/, "Every Adsterra placement must remain outside fullscreen and inside qualified tool pages.");
+assert.match(adsterraGuestGate, /getAdsterraConsent\(\)[\s\S]*?setAdsterraConsent\("granted"\)[\s\S]*?Create free account[\s\S]*?Sign in/, "Guests must be able to explicitly allow ads or use account sign-up/sign-in.");
+assert.match(adsterraGuestGate, /if \(user \|\| consent === "granted"\)/, "Signed-in users and consenting guests can reach the eligible tool.");
+assert.match(authPage, /function getSafeReturnTo\(\)/, "The account flow must safely preserve the originating tool route.");
+assert.match(authPage, /callbackURL: returnTo/, "Email sign-in must return to the originating tool.");
+assert.match(adPolicy, /export function isAdsterraQualifiedTool[\s\S]*?classifyOfflineToolRecord\(tool\)\.execution === "device-local"/, "Adsterra eligibility must use active local tool capability without an offline-wallet allowlist requirement.");
+assert.match(adPolicy, /ADSTERRA_EXCLUDED_CATEGORIES[\s\S]*?ADSTERRA_EXCLUDED_CONCEPTS/, "Adsterra policy must exclude Studio, AI, Labs and Sandbox experiences.");
+assert.match(privacy, /guest who declines advertising must sign in or create an account/i, "Privacy copy must explain the signed-in path for guests who decline ads.");
+assert.match(cookieConsent, /Guests can use eligible ad-supported tools by allowing ads/, "Cookie preferences must describe guest consent and signed-in ad-free access.");
 assert.match(shell, /!isFullscreen && import\.meta\.env\.VITE_ADSTERRA_ENABLED !== "true" \? <AdSlot tool=\{tool\} \/>/, "The Google fallback must remain tool-only when Adsterra is disabled.");
 
 assert.match(slot, /whenGooglePrivacyConsentDataReady/, "Web ad requests must wait for the CMP consent-data-ready callback.");
@@ -88,7 +101,7 @@ assert.match(adPolicy, /export function isHybridAccessToolId/, "The offline acce
 assert.match(offlineClient, /isHybridAccessToolId/, "Web offline billing must use the ad-independent hybrid access policy.");
 assert.match(androidAds, /!tool\.id\.startsWith\("finance-"\)/, "Android must exclude finance-prefixed tools from the hybrid cohort.");
 assert.match(iosAds, /!tool\.id\.hasPrefix\("finance-"\)/, "iOS must exclude finance-prefixed tools from the hybrid cohort.");
-assert.match(iosAds, /NativeAdsPolicy\.adDisplayConfigured && NativeAdsPolicy\.isHybridTool/, "iOS ad rendering must remain disabled until provider configuration is ready.");
+assert.match(iosAds, /NativeAdsPolicy\.adDisplayConfigured && NativeAdsPolicy\.isAdEligibleTool/, "iOS native ad slots must use ad eligibility, not offline-wallet membership.");
 
 assert.ok(meteredProfiles.profiles.every((profile) => profile.platforms.includes("web") && profile.platforms.includes("android") && profile.platforms.includes("ios")), "Offline metering profiles must have platform parity.");
 assert.match(offlinePolicy, /tokenPolicy: "monetization-pending"/, "Offline execution classification must remain separate from billing rollout.");
@@ -130,7 +143,9 @@ assert.match(androidAds, /suspend fun isApplicationOnline/, "Android must verify
 assert.match(androidAds, /MobileAds\.setRequestConfiguration/, "Android ad requests must default to non-personalized treatment.");
 assert.match(iosAds, /publisherPrivacyPersonalizationState = \.disabled/, "iOS ad requests must default to non-personalized treatment.");
 assert.match(iosAds, /coarseLocationCollectionEnabled = false/, "iOS ads must not collect coarse device location by default.");
-assert.match(androidAds, /context\.assets\.open\("offline-eligible-tools\.json"\)/, "Android must read the canonical bundled offline pricing registry.");
+assert.match(androidAds, /context\.assets\.open\("offline-eligible-tools\.json"\)/, "Android offline-wallet policy must retain the canonical bundled pricing registry.");
+assert.match(androidAds, /NativeAdsPolicy\.isAdEligibleTool\(tool\)/, "Android native ad slots must use independent ad eligibility.");
+assert.doesNotMatch(androidAds, /OfflineWalletJournal\(context\)\.isEligibleTool\(context, toolId\)/, "Android ad display must not require offline-wallet eligibility.");
 assert.match(androidAds, /tool\.status == "active"/, "Android ads must exclude non-active tools.");
 assert.match(androidAds, /tool\.requiresBackend|!tool\.requiresBackend/, "Android ads must exclude backend-dependent tools.");
 assert.match(androidAds, /restrictedDisclaimers/, "Android ads must apply the same sensitive-topic exclusions as Web.");
@@ -150,7 +165,8 @@ assert.match(iosAds, /ConsentInformation\.shared\.requestConsentInfoUpdate/, "iO
 assert.match(iosAds, /MobileAds\.shared\.start/, "iOS must initialize Google Mobile Ads after consent.");
 assert.match(iosAds, /publisherPrivacyPersonalizationState = \.disabled/, "iOS ad requests must default to non-personalized treatment.");
 assert.match(iosAds, /coarseLocationCollectionEnabled = false/, "iOS ads must not collect coarse device location by default.");
-assert.match(iosAds, /static func isHybridTool\(_ tool: Tool\)/, "iOS must evaluate the full catalog record before selecting an ad-supported tool.");
+assert.match(iosAds, /static func isAdEligibleTool\(_ tool: Tool\)/, "iOS must evaluate the full catalog record using independent native ad eligibility.");
+assert.match(iosAds, /static func isHybridTool\(_ tool: Tool\)/, "The existing iOS offline-wallet hybrid policy must remain available and unchanged.");
 assert.match(iosAds, /restrictedCategories/, "iOS must exclude fitness and personal tools like Web and Android.");
 assert.match(iosAds, /restrictedDisclaimers/, "iOS must exclude health, finance and earnings disclaimer tools.");
 assert.match(iosCalculator, /NativeAdsPolicy\.isHybridTool\(tool\)/, "iOS ad slots and offline gating must use the same per-tool decision.");

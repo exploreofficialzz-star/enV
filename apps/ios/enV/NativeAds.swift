@@ -61,6 +61,89 @@ enum NativeAdsPolicy {
             (tool.disclaimer.map { !restrictedDisclaimers.contains($0) } ?? true)
     }
 
+    /// Native ad eligibility is separate from offline-wallet qualification.
+    /// This decides only whether an online banner may appear; it never grants
+    /// offline tool execution or token-allowance access.
+    static func isAdEligibleTool(_ tool: Tool) -> Bool {
+        let restrictedDisclaimers: Set<String> = ["health", "finance", "earnings"]
+        let restrictedCategories: Set<String> = [
+            "health", "finance", "earnings", "fitness", "personal",
+            "ai", "developer", "accessibility", "lab", "labs"
+        ]
+        let localEngineTypes: Set<String> = [
+            "calculator", "converter", "datetime", "text", "codec", "color", "qr",
+            "barcode", "generator", "image", "cssgen", "mockup", "post", "device",
+            "seo", "file-converter", "developer", "pdf", "mime", "security",
+            "creator", "business", "audio", "network", "video", "document"
+        ]
+        let localCustomCategories: Set<String> = [
+            "career", "celebrations", "communication", "ecommerce", "events", "food",
+            "gaming", "interactive", "marketing", "mockups", "photography",
+            "productivity", "relationships", "screenshots", "social", "streaming",
+            "travel", "webdesign"
+        ]
+        let localDocumentIDs: Set<String> = [
+            "pdf-merger", "pdf-metadata-viewer", "pdf-metadata-tool", "pdf-page-extractor",
+            "pdf-splitter", "pdf-rotator", "docx-text-extractor", "text-to-docx",
+            "txt-to-docx", "markdown-to-docx"
+        ]
+        let remoteAudioOperations: Set<String> = [
+            "server-mp3", "server-wav", "server-ogg", "server-flac", "server-volume",
+            "server-bitrate", "server-sample-rate", "server-channels", "server-merge"
+        ]
+        let remoteVideoOperations: Set<String> = [
+            "video-merge", "video-replace-audio", "video-to-mp4", "video-to-mp3",
+            "video-to-gif", "video-to-webm", "video-to-mov", "video-to-avi",
+            "video-resize", "video-crop", "video-rotate", "video-mute", "video-fps",
+            "video-bitrate", "video-resolution-presets", "video-audio-volume"
+        ]
+        let remoteToolIDs: Set<String> = [
+            "audio-to-mp3-server", "audio-to-wav-server", "audio-to-ogg-server",
+            "audio-to-flac-server", "audio-bitrate-converter", "audio-merger",
+            "audio-to-text", "audio-to-subtitles", "video-merger", "video-audio-replacer",
+            "video-to-mp4", "video-to-mp3", "video-to-gif", "video-to-webm", "video-to-mov",
+            "video-to-avi", "video-resize", "video-crop", "video-rotate", "video-mute",
+            "video-fps", "video-bitrate", "video-resolution-presets", "video-audio-volume",
+            "video-cropper", "video-to-text", "video-to-subtitles", "youtube-audio-extractor",
+            "url-media-inspector", "video-url-downloader", "youtube-video-downloader",
+            "tiktok-video-downloader", "facebook-video-downloader", "instagram-video-downloader",
+            "x-video-downloader", "whois-lookup", "dns-lookup", "website-screenshot",
+            "media-backend-checker"
+        ]
+
+        let engineType = (tool.engine.type ?? "").lowercased()
+        let operation = (tool.engine.op ?? "").lowercased()
+        let identity = ([tool.id, tool.name, tool.subcategory ?? "", engineType, tool.engine.id ?? ""] +
+                        tool.tags + tool.keywords)
+            .joined(separator: " ")
+            .replacingOccurrences(of: "-", with: " ")
+            .replacingOccurrences(of: "_", with: " ")
+            .lowercased()
+        let excludedConcept = identity.range(
+            of: #"\b(studio|studios|lab|labs|laboratory|laboratories|sandbox|ai|artificial intelligence)\b"#,
+            options: .regularExpression
+        ) != nil
+        let localExecution = localEngineTypes.contains(engineType) ||
+            (engineType == "custom" && localCustomCategories.contains(tool.category)) ||
+            (engineType == "document-backend" && localDocumentIDs.contains(tool.id))
+        let remoteExecution = ["url-media", "url-media-info"].contains(engineType) ||
+            remoteAudioOperations.contains(operation) ||
+            remoteVideoOperations.contains(operation) ||
+            remoteToolIDs.contains(tool.id)
+
+        return tool.status == "active" &&
+            tool.clientSide &&
+            !tool.requiresBackend &&
+            !tool.requiresAuth &&
+            !restrictedCategories.contains(tool.category.lowercased()) &&
+            !tool.id.hasPrefix("finance-") &&
+            !(tool.disclaimer.map { restrictedDisclaimers.contains($0.lowercased()) } ?? false) &&
+            engineType != "ai" &&
+            localExecution &&
+            !remoteExecution &&
+            !excludedConcept
+    }
+
     static func isApplicationOnline() async -> Bool {
         guard let url = URL(string: "https://envtools.store/") else { return false }
         var request = URLRequest(url: url)
@@ -160,7 +243,7 @@ struct NativeToolAdSlot: View {
 
     var body: some View {
         Group {
-            if NativeAdsPolicy.adDisplayConfigured && NativeAdsPolicy.isHybridTool(tool) && originReachable &&
+            if NativeAdsPolicy.adDisplayConfigured && NativeAdsPolicy.isAdEligibleTool(tool) && originReachable &&
                 consent.canRequestAds && consent.sdkReady {
                 VStack(alignment: .leading, spacing: 5) {
                     Text("Advertisement")

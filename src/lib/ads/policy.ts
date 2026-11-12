@@ -18,7 +18,11 @@ export type AdRuntimeConfig = {
 
 export type AdEligibleTool = {
   id: string;
+  name?: string;
   category: string;
+  subcategory?: string;
+  keywords?: string[];
+  tags?: string[];
   status: string;
   clientSide: boolean;
   requiresBackend: boolean;
@@ -30,6 +34,8 @@ export type AdEligibleTool = {
 const TOOL_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,119}$/;
 const RESTRICTED_DISCLAIMERS = new Set(["health", "finance", "earnings"]);
 const RESTRICTED_CATEGORIES = new Set(["health", "finance", "earnings", "fitness", "personal"]);
+const ADSTERRA_EXCLUDED_CATEGORIES = new Set(["ai", "developer", "accessibility", "lab", "labs"]);
+const ADSTERRA_EXCLUDED_CONCEPTS = /\b(?:studio|studios|lab|labs|laboratory|laboratories|sandbox|ai|artificial intelligence)\b/i;
 const OFFLINE_PROFILE_IDS = new Set(
   offlineEligibleTools.profiles
     .filter((profile) => profile.billingKey.startsWith("local.") && ["web", "android", "ios"].every((platform) => profile.platforms.includes(platform)))
@@ -77,9 +83,33 @@ function isEligibleHybridToolRecord(toolId: string, tool: AdEligibleTool): boole
     classifyOfflineToolRecord(tool).execution === "device-local";
 }
 
-/** Adsterra may appear only on active, public, device-local tools in the approved offline-capable cohort. */
+/**
+ * Adsterra qualification is deliberately separate from the hybrid offline-wallet
+ * allowlist. It covers suitable active local tools across categories, but never
+ * enrolls them in offline billing. Studio, AI and Lab/Sandbox experiences are
+ * excluded using canonical category plus tool identity/metadata.
+ */
 export function isAdsterraQualifiedTool(tool: AdEligibleTool): boolean {
-  return isEligibleHybridToolRecord(tool.id, tool);
+  const category = tool.category.toLowerCase();
+  const descriptiveIdentity = [
+    tool.id,
+    tool.name ?? "",
+    tool.subcategory ?? "",
+    tool.engine.id ?? "",
+    ...(tool.tags ?? []),
+    ...(tool.keywords ?? []),
+  ].join(" ").replace(/[-_]+/g, " ");
+  return tool.status === "active" &&
+    tool.clientSide === true &&
+    !tool.requiresBackend &&
+    !tool.requiresAuth &&
+    !ADSTERRA_EXCLUDED_CATEGORIES.has(category) &&
+    !RESTRICTED_CATEGORIES.has(category) &&
+    !tool.id.startsWith("finance-") &&
+    !(tool.disclaimer && RESTRICTED_DISCLAIMERS.has(tool.disclaimer.toLowerCase())) &&
+    tool.engine.type.toLowerCase() !== "ai" &&
+    !ADSTERRA_EXCLUDED_CONCEPTS.test(descriptiveIdentity) &&
+    classifyOfflineToolRecord(tool).execution === "device-local";
 }
 
 /** A selected hybrid tool must remain metered offline even while ad serving is disabled. */
@@ -99,8 +129,21 @@ export async function isApplicationOnline(): Promise<boolean> {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 3000);
   try {
-    const response = await fetch(window.location.origin + "/", { method: "HEAD", cache: "no-store", credentials: "same-origin", signal: controller.signal });
-    return response.ok && new URL(response.url).origin === window.location.origin;
+    try {
+      const response = await fetch(window.location.origin + "/", { method: "HEAD", cache: "no-store", credentials: "same-origin", signal: controller.signal });
+      if (response.ok && new URL(response.url).origin === window.location.origin) return true;
+    } catch {
+      // Fall through to a small same-origin asset request when HEAD is unsupported.
+    }
+    // Some edge/cache configurations do not answer HEAD consistently. Verify
+    // the same origin with a tiny static asset before concluding the app is offline.
+    const fallback = await fetch(window.location.origin + "/ads.txt", {
+      method: "GET",
+      cache: "no-store",
+      credentials: "same-origin",
+      signal: controller.signal,
+    });
+    return fallback.ok && new URL(fallback.url).origin === window.location.origin;
   } catch {
     return false;
   } finally {
