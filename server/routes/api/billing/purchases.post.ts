@@ -7,7 +7,7 @@ import { initializeFlutterwaveCheckout } from "../../../../src/lib/billing/flutt
 import { getCustomerCountry, toFlutterwaveMajorAmount } from "../../../../src/lib/billing/country-routing";
 import { getFundingOptions } from "../../../../src/lib/billing/paystack.server";
 import { quoteTokenPacks, type CurrencyPackQuote } from "../../../../src/lib/billing/fx.server";
-import type { CustomerPaymentMethod } from "../../../../src/lib/billing/payment-methods";
+import { getFundingCandidates, type CustomerPaymentMethod } from "../../../../src/lib/billing/payment-methods";
 
 const SAFE_CHECKOUT_FAILURES: Record<string, { status: number; message: string }> = {
   PAYMENTS_NOT_CONFIGURED: { status: 503, message: "Token purchases are not enabled for this deployment yet." },
@@ -57,18 +57,9 @@ export default defineHandler(async (event) => {
   const tokens = amountUsdCents;
   const countryCode = getCustomerCountry(request);
   const funding = await getFundingOptions(countryCode);
-  const isLocalProvider = (item: (typeof funding.providers)[number]) =>
-    (item.id === "paystack" && "localPayments" in item && item.localPayments === true) ||
-    (item.id === "flutterwave" && "paymentOptions" in item &&
-      item.paymentOptions?.some((option) => option !== "card") === true);
-  let candidates = paymentMethod === "more"
-    ? funding.providers.filter((item) => item.id === "cryptomus" && item.enabled)
-    : paymentMethod === "local"
-      ? funding.providers.filter((item) => item.enabled && isLocalProvider(item))
-          .sort((a, b) => (a.id === "flutterwave" ? -1 : 0) - (b.id === "flutterwave" ? -1 : 0))
-      : paymentMethod === "card"
-        ? funding.providers.filter((item) => item.enabled && (item.id === "paystack" || item.id === "flutterwave"))
-        : funding.providers.filter((item) => item.id === (legacyProvider ?? "paystack") && item.enabled);
+  const candidates = paymentMethod
+    ? getFundingCandidates(funding.providers, paymentMethod)
+    : funding.providers.filter((item) => item.id === (legacyProvider ?? "paystack") && item.enabled);
 
   let providerOption: (typeof funding.providers)[number] | undefined;
   let pricingQuote: CurrencyPackQuote | undefined;
