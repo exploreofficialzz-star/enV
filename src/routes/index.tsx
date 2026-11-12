@@ -40,7 +40,7 @@ function Home() {
     () => initialTrendingFeed.toolIds
       .map((id) => getToolById(id))
       .filter((tool): tool is ToolMeta =>
-        Boolean(tool && (tool.status === "active" || tool.status === "beta")),
+        Boolean(tool && (tool.status === "active" || tool.status === "beta") && !isToolUnderProduction(tool)),
       )
       .filter((tool, index, items) => items.findIndex((item) => item.id === tool.id) === index)
       .slice(0, 12),
@@ -76,7 +76,7 @@ function Home() {
         const ranked = ids
           .map((id) => getToolById(id))
           .filter((tool): tool is ToolMeta =>
-            Boolean(tool && (tool.status === "active" || tool.status === "beta")),
+            Boolean(tool && (tool.status === "active" || tool.status === "beta") && !isToolUnderProduction(tool)),
           )
           .filter((tool, index, items) => items.findIndex((item) => item.id === tool.id) === index)
           .slice(0, 12);
@@ -170,7 +170,7 @@ function MostUsedToolsTray({ tools, prefsHydrated }: { tools: ToolMeta[]; prefsH
   const [productionTool, setProductionTool] = useState<ToolMeta | null>(null);
   return (
     <>
-      <div className={prefsHydrated ? "visible" : "invisible"} aria-busy={!prefsHydrated}>
+      <div aria-busy={!prefsHydrated}>
       <section
         aria-label="Your most-used tools"
         className="mx-auto mt-4 h-[112px] w-full max-w-3xl overflow-hidden rounded-[28px] border border-border bg-surface shadow-[var(--shadow-border)]"
@@ -235,7 +235,7 @@ function ToolSection({ title, tools }: { title: string; tools: ToolMeta[] }) {
       </div>
       {tools.length ? (
         <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-          {tools.map((tool, index) => <ToolCard key={tool.id} tool={tool} className={index >= 6 ? "hidden md:flex" : ""} />)}
+          {tools.map((tool) => <ToolCard key={tool.id} tool={tool} />)}
         </div>
       ) : null}
       <div className="mt-5"><SeeMoreLink to="/tools">See more tools</SeeMoreLink></div>
