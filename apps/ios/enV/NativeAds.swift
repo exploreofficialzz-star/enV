@@ -131,7 +131,8 @@ enum NativeAdsPolicy {
             remoteVideoOperations.contains(operation) ||
             remoteToolIDs.contains(tool.id)
 
-        return tool.status == "active" &&
+        return tool.id != "a-book" &&
+            tool.status == "active" &&
             tool.clientSide &&
             !tool.requiresBackend &&
             !tool.requiresAuth &&
