@@ -11,7 +11,12 @@ import java.util.zip.ZipInputStream
 import org.json.JSONArray
 import org.json.JSONObject
 
-object NativeFileConverterEngine {\n    private const val MAX_FILE_TO_TEXT_BYTES = 200 * 1024 * 1024\n    private const val MAX_DOCX_XML_BYTES = 32 * 1024 * 1024\n    private const val MAX_DOCX_EXPANDED_BYTES = 128L * 1024L * 1024L\n    private const val MAX_DOCX_ENTRIES = 10_000\n    private const val MAX_TEXT_OUTPUT_BYTES = 32 * 1024 * 1024\n
+object NativeFileConverterEngine {
+    private const val MAX_FILE_TO_TEXT_BYTES = 200 * 1024 * 1024
+    private const val MAX_DOCX_XML_BYTES = 32 * 1024 * 1024
+    private const val MAX_DOCX_EXPANDED_BYTES = 128L * 1024L * 1024L
+    private const val MAX_DOCX_ENTRIES = 10_000
+    private const val MAX_TEXT_OUTPUT_BYTES = 32 * 1024 * 1024
     data class Result(val text: String? = null, val bytes: ByteArray? = null, val mime: String = "text/plain", val extension: String = "txt")
     private val imageOps = setOf("jpg-to-png","png-to-jpg","png-to-webp","webp-to-png","jpg-to-webp","webp-to-jpg","png-to-svg")
     private val documentOps = setOf("pdf-metadata-viewer","pdf-metadata-tool","pdf-page-extractor","pdf-splitter","pdf-rotator","pdf-merger","pdf-text-extractor","docx-text-extractor")
@@ -56,10 +61,12 @@ object NativeFileConverterEngine {\n    private const val MAX_FILE_TO_TEXT_BYTES
                 }
             }
             "html", "htm", "xhtml" -> decodeUtf8(data)
-                .replace(Regex("""(?is)<(script|style|noscript)[^>]*>.*?</\\1>"""), " ")
+                .replace(Regex("""(?is)<script\b[^>]*>.*?</script>"""), " ")
+                .replace(Regex("""(?is)<style\b[^>]*>.*?</style>"""), " ")
+                .replace(Regex("""(?is)<noscript\b[^>]*>.*?</noscript>"""), " ")
                 .replace(Regex("""(?s)<[^>]+>"""), " ")
                 .replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
-                .replace(Regex("""\\s+"""), " ").trim()
+                .replace(Regex("""\s+"""), " ").trim()
             else -> {
                 require(ext in setOf(
                     "txt", "md", "markdown", "csv", "tsv", "json", "xml", "yaml", "yml", "css",
@@ -123,14 +130,14 @@ object NativeFileConverterEngine {\n    private const val MAX_FILE_TO_TEXT_BYTES
                         "This DOCX archive expands beyond the 128 MB local safety limit."
                     }
                     if (isDocument) {
-                        require((captured!!.size() + count) <= MAX_DOCX_XML_BYTES) {
+                        require(captured!!.size() + count <= MAX_DOCX_XML_BYTES) {
                             "The DOCX document text exceeds the 32 MB local extraction limit."
                         }
                         captured.write(buffer, 0, count)
                     }
                 }
                 if (isDocument) {
-                    documentXml = captured!!.toString(Charsets.UTF_8.name())
+                    documentXml = String(captured!!.toByteArray(), Charsets.UTF_8)
                     break
                 }
                 archive.closeEntry()
@@ -140,9 +147,9 @@ object NativeFileConverterEngine {\n    private const val MAX_FILE_TO_TEXT_BYTES
         }
         require(xml.isNotEmpty()) { "This DOCX file does not contain word/document.xml." }
         val text = xml
-            .replace(Regex("""<w:tab\\s*/?>"""), "\\t")
-            .replace(Regex("""<w:br\\s*/?>"""), "\\n")
-            .replace("</w:p>", "\\n")
+            .replace(Regex("""<w:tab\s*/?>"""), "\t")
+            .replace(Regex("""<w:br\s*/?>"""), "\n")
+            .replace("</w:p>", "\n")
             .replace(Regex("""<w:t[^>]*>(.*?)</w:t>""")) { it.groupValues[1] }
             .replace(Regex("""<[^>]+>"""), "")
             .replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
@@ -151,7 +158,7 @@ object NativeFileConverterEngine {\n    private const val MAX_FILE_TO_TEXT_BYTES
         require(text.toByteArray(Charsets.UTF_8).size <= MAX_TEXT_OUTPUT_BYTES) {
             "The extracted text exceeds the 32 MB local output limit."
         }
-        return text + "\\n"
+        return text + "\n"
     }
 
     private fun image(op:String,name:String,data:ByteArray):Result { if(op=="png-to-svg"){val image=BitmapFactory.decodeByteArray(data,0,data.size) ?: error("Unsupported PNG"); val b64=Base64.encodeToString(data,Base64.NO_WRAP); return Result("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"${image.width}\" height=\"${image.height}\"><image href=\"data:image/png;base64,$b64\" width=\"100%\" height=\"100%\"/></svg>",extension="svg",mime="image/svg+xml")}; val bitmap=BitmapFactory.decodeByteArray(data,0,data.size) ?: error("Unsupported image"); val format=when{op.endsWith("png")->android.graphics.Bitmap.CompressFormat.PNG;op.endsWith("webp")->android.graphics.Bitmap.CompressFormat.WEBP;else->android.graphics.Bitmap.CompressFormat.JPEG}; val out=ByteArrayOutputStream(); bitmap.compress(format,92,out); return Result(bytes=out.toByteArray(),extension=if(format==android.graphics.Bitmap.CompressFormat.PNG)"png" else if(format==android.graphics.Bitmap.CompressFormat.WEBP)"webp" else "jpg",mime=if(format==android.graphics.Bitmap.CompressFormat.PNG)"image/png" else "image/jpeg") }
