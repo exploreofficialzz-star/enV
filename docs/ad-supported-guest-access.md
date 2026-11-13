@@ -4,7 +4,7 @@
 
 The hybrid economy applies only to tool IDs explicitly selected for the cohort.
 
-- **Online:** a selected ad-supported tool can run for a guest only when the ad provider delivers a visible creative. If no ad fills, guests must sign in/create an account; signed-in users must have sufficient enV and the server must confirm a per-run debit before the tool executes.
+- **Online:** a selected ad-supported tool can run for a guest only when the ad provider delivers a visible creative. If no ad fills, guests must sign in/create an account; signed-in users must have sufficient enV and the server must confirm a per-run debit at an approved fixed local price; backend/cloud and measured-cost tools remain blocked until an authoritative price exists.
 - **Offline:** the same selected tool requires an authenticated enV account and a valid, pre-issued offline allowance. The allowance must be active, unexpired, and use the current offline pricing version. A failed/missing allowance rejects the operation before the tool computes or reveals a result.
 - **Unselected tools:** retain their existing access and offline policy. The feature must not silently broaden to every local tool.
 
