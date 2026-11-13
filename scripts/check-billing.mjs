@@ -337,7 +337,7 @@ assert.match(walletDashboard, /customAmountCents/, "wallet must validate the ent
 assert.match(walletDashboard, /Amount \(USD\)/, "wallet must label the entered amount as USD");
 assert.match(walletDashboard, /customTokenAmount/, "wallet must show the matching enV token amount");
 assert.match(walletDashboard, /\[10, 50, 100\]/, "wallet must offer the requested custom amount suggestions");
-assert.match(walletDashboard, /100 enV = \$1\.00 reference value/);
+assert.doesNotMatch(walletDashboard, /100 enV = \$1\.00 reference value/, "reference-value explanation must stay off the checkout screen");
 assert.doesNotMatch(walletDashboard, /Choose your token pack/, "wallet must not retain the old token-pack card heading");
 assert.match(walletDashboard, /visibleWallet\.recoveryDebtTokens/, "wallet must explain a recovery balance after reversals");
 assert.match(tokenDashboardComponent, /referenceValue\(wallet\.availableTokens\)/, "web token dashboard must calculate reference value from the live balance");
