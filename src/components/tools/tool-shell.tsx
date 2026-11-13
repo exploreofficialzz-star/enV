@@ -70,11 +70,13 @@ export function ToolShell({
   } | null>(null);
   const [fallbackQuoteLoading, setFallbackQuoteLoading] = useState(false);
   const [fallbackChargeLoading, setFallbackChargeLoading] = useState(false);
+  const [fallbackPromptOpen, setFallbackPromptOpen] = useState(false);
   const [paidExecutionInFlight, setPaidExecutionInFlight] = useState(false);
   const authorizedExecutionRef = useRef(false);
   const pendingExecutionRef = useRef<HTMLElement | null>(null);
   const onAdDelivery = useCallback((state: AdsterraDeliveryState) => {
     setAdDelivery((current) => current === "filled" ? current : state);
+    if (state === "filled") setFallbackPromptOpen(false);
   }, []);
   const toggleFavorite = usePrefs((s) => s.toggleFavorite);
   const favorites = usePrefs((s) => s.favorites);
@@ -137,7 +139,7 @@ export function ToolShell({
   }, [tool.id, requiresTokenFallback, accessUserPending, authenticatedAccount]);
 
   async function chargeFallbackAndRun() {
-    if (!fallbackAccess || !fallbackAccess.billingEnabled || fallbackChargeLoading) return;
+    if (!fallbackAccess || !fallbackAccess.billingEnabled || fallbackChargeLoading || !pendingExecutionRef.current) return;
     setFallbackChargeLoading(true);
     try {
       const response = await fetch("/api/billing/ad-fallback/consume", {
@@ -159,6 +161,7 @@ export function ToolShell({
       }
       authorizedExecutionRef.current = true;
       setPaidExecutionInFlight(true);
+      setFallbackPromptOpen(false);
       setFallbackAccess((current) => current ? {
         ...current,
         availableSubunits: payload.data!.availableSubunits ?? null,
@@ -221,7 +224,7 @@ export function ToolShell({
   const [isCssFullscreen, setIsCssFullscreen] = useState(false);
   const requiresTokenFallback = adsterraQualified && (adDelivery !== "filled" || isFullscreen);
   const authenticatedAccount = Boolean(accessUser && !accessUser.isDevFallback && !accessUserPending);
-  const showAdFallbackGate = requiresTokenFallback && !paidExecutionInFlight;
+  const showAdFallbackGate = requiresTokenFallback && fallbackPromptOpen && !paidExecutionInFlight;
   const isMusicSandbox = ["song-metadata-analyzer", "audio-analyze-studio"].includes(tool.id);
 
 
@@ -258,7 +261,11 @@ export function ToolShell({
       if (detail?.toolId === tool.id && ["success", "failure", "cancelled"].includes(detail.outcome ?? "")) {
         toolFinishedRef.current = true;
         executionFinishedRef.current = true;
-        if (requiresTokenFallback) setPaidExecutionInFlight(false);
+        if (requiresTokenFallback) {
+          authorizedExecutionRef.current = false;
+          setPaidExecutionInFlight(false);
+          setFallbackPromptOpen(false);
+        }
       }
     };
     const reportAbandoned = () => {
@@ -450,6 +457,7 @@ export function ToolShell({
             }
             if (!authorizedExecutionRef.current) {
               pendingExecutionRef.current = action as HTMLElement;
+              setFallbackPromptOpen(true);
               event.preventDefault();
               event.stopPropagation();
               return;
@@ -481,7 +489,9 @@ export function ToolShell({
             }
             if (!authorizedExecutionRef.current) {
               const submitter = (event.nativeEvent as SubmitEvent).submitter;
-              pendingExecutionRef.current = submitter instanceof HTMLElement ? submitter : event.currentTarget;
+              const form = event.target instanceof HTMLFormElement ? event.target : null;
+              pendingExecutionRef.current = submitter instanceof HTMLElement ? submitter : form;
+              setFallbackPromptOpen(true);
               event.preventDefault();
               event.stopPropagation();
               return;
