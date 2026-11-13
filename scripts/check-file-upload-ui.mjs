@@ -91,6 +91,13 @@ for (const [path, pattern] of serverBackedCopy) {
   assert.match(read(path), pattern, path + " must disclose the destination for server-backed file processing.");
 }
 
+// File to TXT also supports direct, unrestricted plain-text entry inside its card wrapper.
+const fileToTxt = read("src/components/engines/file-converter-engine.tsx");
+assert.match(fileToTxt, /<Textarea[\s\S]*?value=\{plainText\}/, "File to TXT must offer a controlled plain-text editor.");
+assert.match(fileToTxt, /No built-in word or character limit\./, "Direct text entry must not advertise an artificial limit.");
+assert.match(fileToTxt, /new Blob\(\[plainText\]/, "Manually entered text must be downloadable as a TXT blob.");
+assert.doesNotMatch(fileToTxt, /maxLength=/, "The File to TXT input must not impose a maxLength.");
+
 // Remove explanatory filler from ZIP and business cards while preserving actual controls.
 const zipUi = read("src/components/engines/zip-archive-engine.tsx");
 assert.doesNotMatch(zipUi, /Private and on-device|This browser can extract a single small file directly|Files stay on this device/i);

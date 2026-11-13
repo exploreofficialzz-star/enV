@@ -3,6 +3,7 @@ import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/tools/error-banner";
 import { FileDropzone } from "@/components/tools/file-dropzone";
+import { Textarea } from "@/components/ui/textarea";
 import { recordToolExecutionResult } from "@/lib/analytics/client";
 import { docxToText } from "@/lib/documents/local-document";
 import { extractPdfTextLocally } from "@/lib/a-book/pdf-reader";
@@ -51,18 +52,28 @@ function markdownToHtml(text: string) { const esc = (s: string) => s.replaceAll(
 function htmlToMarkdown(text: string) { return text.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<h1[^>]*>(.*?)<\/h1>/gi, "# $1\n\n").replace(/<h2[^>]*>(.*?)<\/h2>/gi, "## $1\n\n").replace(/<h3[^>]*>(.*?)<\/h3>/gi, "### $1\n\n").replace(/<strong[^>]*>(.*?)<\/strong>/gi, "**$1**").replace(/<li[^>]*>(.*?)<\/li>/gi, "- $1\n").replace(/<p[^>]*>(.*?)<\/p>/gi, "$1\n\n").replace(/<br\s*\/?>(?:)/gi, "\n").replace(/<[^>]+>/g, "").replace(/\n{3,}/g, "\n\n").trim(); }
 
 export function FileConverterEngine({ op, toolId }: { op: string; toolId?: string }) {
-  const [file, setFile] = useState<File | null>(null); const [output, setOutput] = useState<{blob: Blob; name: string} | null>(null); const [error, setError] = useState<string | null>(null); const [preview, setPreview] = useState(""); const [busy, setBusy] = useState(false);
+  const [file, setFile] = useState<File | null>(null); const [plainText, setPlainText] = useState(""); const [output, setOutput] = useState<{blob: Blob; name: string} | null>(null); const [error, setError] = useState<string | null>(null); const [preview, setPreview] = useState(""); const [busy, setBusy] = useState(false);
   const image = IMAGE_OPS.has(op); const accept = ACCEPT[op] ?? "*/*";
   async function run() {
     const startedAt = Date.now();
     if (busy) return;
-    if (!file) { setError("Choose a file first."); return; }
-    if (op === "file-to-txt" && file.size > MAX_FILE_TO_TXT_BYTES) {
+    const manualText = op === "file-to-txt" && !file;
+    if (manualText && plainText.length === 0) { setError("Enter plain text or choose a file."); return; }
+    if (!file && !manualText) { setError("Choose a file first."); return; }
+    if (op === "file-to-txt" && file && file.size > MAX_FILE_TO_TXT_BYTES) {
       setError("The selected file exceeds the 200 MB local text-extraction limit.");
       return;
     }
     setError(null); setOutput(null); setBusy(true);
     try {
+      if (manualText) {
+        const blob = new Blob([plainText], { type: "text/plain;charset=utf-8" });
+        setOutput({ blob, name: "plain-text.txt" });
+        setPreview(plainText.slice(0, 4000));
+        if (toolId) recordToolExecutionResult(toolId, "success", Date.now() - startedAt, "file_conversion");
+        return;
+      }
+      if (!file) throw new Error("Choose a file first.");
       if (image) {
         if (op === "png-to-svg") { const data = await file.arrayBuffer(); const b64 = btoa(String.fromCharCode(...new Uint8Array(data))); const img = await createImageBitmap(file); const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${img.width}" height="${img.height}" viewBox="0 0 ${img.width} ${img.height}"><image href="data:image/png;base64,${b64}" width="100%" height="100%"/></svg>`; const blob = new Blob([svg], {type:"image/svg+xml"}); setOutput({blob,name:file.name.replace(/\.[^.]+$/, ".svg")}); setPreview(svg.slice(0,500)); if (toolId) recordToolExecutionResult(toolId, "success", Date.now() - startedAt, "file_conversion"); return; }
         const src = URL.createObjectURL(file); const img = new Image(); await new Promise((res, rej) => { img.onload=()=>res(null); img.onerror=rej; img.src=src; }); const canvas=document.createElement("canvas"); canvas.width=img.naturalWidth; canvas.height=img.naturalHeight; const ctx=canvas.getContext("2d"); if(!ctx) throw new Error("Your browser cannot create a canvas."); if(op.includes("jpg")) { ctx.fillStyle="#fff"; ctx.fillRect(0,0,canvas.width,canvas.height); } ctx.drawImage(img,0,0); const mime=op.endsWith("png")?"image/png":op.endsWith("webp")?"image/webp":"image/jpeg"; const blob=await new Promise<Blob|null>(r=>canvas.toBlob(r,mime,0.92)); URL.revokeObjectURL(src); if(!blob) throw new Error("Could not encode the converted image."); const ext=mime==="image/png"?"png":mime==="image/webp"?"webp":"jpg"; setOutput({blob,name:file.name.replace(/\.[^.]+$/, `.${ext}`)}); if (toolId) recordToolExecutionResult(toolId, "success", Date.now() - startedAt, "file_conversion"); return;
@@ -108,7 +119,32 @@ export function FileConverterEngine({ op, toolId }: { op: string; toolId?: strin
   }
   return (
     <div className="space-y-4">
-      <FileDropzone accept={accept} disabled={busy} label="Drop a file or browse" onFiles={(next) => { setFile(next[0] ?? null); setOutput(null); setPreview(""); setError(null); }} />
+      {op === "file-to-txt" ? (
+        <section className="space-y-3 rounded-xl border border-border bg-surface p-4 sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-fg">Enter plain text</h3>
+              <p className="mt-1 text-xs text-muted">Type or paste text of any length and save it as a TXT file.</p>
+            </div>
+            {plainText.length > 0 ? <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => { setPlainText(""); setOutput(null); setPreview(""); setError(null); }}>Clear</Button> : null}
+          </div>
+          <Textarea
+            aria-label="Plain text to convert to TXT"
+            value={plainText}
+            onChange={(event) => { setPlainText(event.target.value); setFile(null); setOutput(null); setPreview(""); setError(null); }}
+            placeholder="Type or paste your plain text here…"
+            rows={10}
+            spellCheck={false}
+            disabled={busy}
+            className="min-h-[240px] resize-y font-mono text-sm"
+          />
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+            <span>No built-in word or character limit.</span>
+            <span className="tabular-nums">{plainText.length.toLocaleString()} characters</span>
+          </div>
+        </section>
+      ) : null}
+      <FileDropzone accept={accept} disabled={busy} label="Drop a file or browse" onFiles={(next) => { setFile(next[0] ?? null); if (op === "file-to-txt") setPlainText(""); setOutput(null); setPreview(""); setError(null); }} />
       {file ? (
         <div className="flex items-center gap-3 rounded-xl border border-border bg-surface-2 px-3 py-3">
           <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-fg">{file.name}</p><p className="text-xs text-muted">{file.size.toLocaleString()} bytes</p></div>
@@ -117,7 +153,7 @@ export function FileConverterEngine({ op, toolId }: { op: string; toolId?: strin
       ) : null}
       <ErrorBanner message={error} />
       <div className="flex flex-wrap gap-2">
-        <Button onClick={run} disabled={!file || busy}>{busy ? "Converting…" : "Convert"}</Button>
+        <Button onClick={run} disabled={!(file || (op === "file-to-txt" && plainText.length > 0)) || busy}>{busy ? "Converting…" : "Convert"}</Button>
         {output ? <Button variant="outline" onClick={() => download(output.blob, output.name)}><Download className="mr-2 size-4" />Download {output.name}</Button> : null}
       </div>
       {preview ? <pre className="max-h-72 overflow-auto rounded-lg bg-surface-2 p-4 text-xs whitespace-pre-wrap">{preview}</pre> : null}

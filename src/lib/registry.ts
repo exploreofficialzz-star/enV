@@ -197,7 +197,7 @@ const smartphonePrototypeLabTool: ToolMeta = {
 const fileWorkspaceTools: ToolMeta[] = [
   {
     id: "file-to-txt", name: "File to TXT Converter", slug: "file-to-txt",
-    description: "Extract readable text locally from supported plain-text files, DOCX documents and selectable-text PDFs, then save a portable TXT file.",
+    description: "Type or paste plain text, or extract readable text from supported files and save it as a TXT file.",
     category: "files", subcategory: "Text extraction",
     keywords: ["file to txt", "convert to text", "extract text", "docx to txt", "pdf to txt", "plain text", "text extractor"],
     tags: ["files", "text", "extract", "converter", "local"], icon: "FileText", popularity: 1080, featured: true,
