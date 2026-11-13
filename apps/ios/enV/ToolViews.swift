@@ -6660,18 +6660,18 @@ private enum NativeSimpleError: Error, LocalizedError {
     var errorDescription: String? { if case let .message(text) = self { return text }; return nil }
 }
 
-private struct NativeToolExecutionTrackerKey: EnvironmentKey {
+struct NativeToolExecutionTrackerKey: EnvironmentKey {
     static let defaultValue: NativeToolExecutionTracker? = nil
 }
 
-private extension EnvironmentValues {
+extension EnvironmentValues {
     var nativeToolExecutionTracker: NativeToolExecutionTracker? {
         get { self[NativeToolExecutionTrackerKey.self] }
         set { self[NativeToolExecutionTrackerKey.self] = newValue }
     }
 }
 
-private enum NativeToolAuthorization: Equatable {
+enum NativeToolAuthorization: Equatable {
     case allowed
     case signInRequired
     case insufficientCredits
@@ -6679,7 +6679,7 @@ private enum NativeToolAuthorization: Equatable {
 }
 
 @MainActor
-private final class NativeToolExecutionTracker {
+final class NativeToolExecutionTracker {
     private let toolID: String
     private let adSupported: Bool
     private var startedAt: Date?
@@ -6747,6 +6747,63 @@ private final class NativeToolExecutionTracker {
             errorCode: "NATIVE_TOOL_LEFT_BEFORE_RESULT"
         )
         Task { try? await NativeAnalyticsClient.flush() }
+    }
+}
+
+struct NativeExecutionAccessButton<Label: View>: View {
+    @Environment(\.nativeToolExecutionTracker) private var executionTracker
+    @State private var authorization: NativeToolAuthorization?
+    @State private var isAuthorizing = false
+
+    let action: () -> Void
+    let label: Label
+
+    init(action: @escaping () -> Void, @ViewBuilder label: () -> Label) {
+        self.action = action
+        self.label = label()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                guard !isAuthorizing else { return }
+                isAuthorizing = true
+                Task { @MainActor in
+                    let decision = await executionTracker?.authorizeRun() ?? .allowed
+                    isAuthorizing = false
+                    guard decision == .allowed else {
+                        authorization = decision
+                        return
+                    }
+                    authorization = nil
+                    action()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    if isAuthorizing { ProgressView() }
+                    label
+                }
+            }
+            .disabled(isAuthorizing)
+
+            switch authorization {
+            case .signInRequired:
+                HStack(spacing: 8) {
+                    Link("Sign in", destination: URL(string: "https://envtools.store/login")!)
+                        .buttonStyle(.bordered)
+                    Link("Create account", destination: URL(string: "https://envtools.store/signup")!)
+                        .buttonStyle(.borderedProminent)
+                }
+            case .insufficientCredits:
+                Link("Buy enV", destination: URL(string: "https://envtools.store/wallet")!)
+                    .buttonStyle(.borderedProminent)
+            case .retry:
+                Button("Retry") { authorization = nil }
+                    .buttonStyle(.bordered)
+            case .allowed, .none:
+                EmptyView()
+            }
+        }
     }
 }
 
