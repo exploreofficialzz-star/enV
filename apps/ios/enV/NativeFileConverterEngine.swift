@@ -22,7 +22,7 @@ enum NativeFileConverterEngine {
     private static let documentOps:Set<String> = ["pdf-metadata-viewer","pdf-metadata-tool","pdf-page-extractor","pdf-splitter","pdf-rotator","pdf-merger","pdf-text-extractor","docx-text-extractor"]
     static func supports(_ tool:Tool)->Bool { (tool.engine.type == "file-converter" && (imageOps.contains(operation(tool)) || ["file-to-txt","csv-to-json","json-to-csv","csv-to-tsv","tsv-to-csv","xml-to-json","json-to-xml","yaml-to-json","json-to-yaml","txt-to-csv","csv-to-txt","markdown-to-html","html-to-markdown"].contains(operation(tool)))) || (tool.engine.type == "document-backend" && documentOps.contains(operation(tool))) }
     static func run(_ tool:Tool,file:NativeBackendFile)throws->Result {
-        let op=operation(tool); if op == "file-to-txt" { return try fileToText(file) }; if documentOps.contains(op) { return try document(op,file:file) }; if imageOps.contains(op) { return try image(op,file.data) }
+        let op=operation(tool); if op == "file-to-txt" { return try convertFileToText(name: file.name, data: file.data, mime: file.mime) }; if documentOps.contains(op) { return try document(op,file:file) }; if imageOps.contains(op) { return try image(op,file.data) }
         let input=String(decoding:file.data,as:UTF8.self)
         switch op {
         case "csv-to-json": return Result(try csvToJson(input),nil,"application/json","json")
@@ -42,40 +42,57 @@ enum NativeFileConverterEngine {
         default: throw NativeNativeError.message("Unsupported file conversion: \(op)")
         }
     }
-    private static func fileToText(_ file:NativeBackendFile)throws->Result {
-        guard !file.data.isEmpty else { throw NativeNativeError.message("The selected file is empty.") }
-        let ext = URL(fileURLWithPath:file.name).pathExtension.lowercased()
-        let text:String
+    static func convertFileToText(name: String, data: Data, mime: String) throws -> Result {
+        guard !data.isEmpty else { throw NativeNativeError.message("The selected file is empty.") }
+        let ext = URL(fileURLWithPath: name).pathExtension.lowercased()
+        let text: String
         if ext == "docx" {
-            guard let document = try? NSAttributedString(data:file.data,options:[.documentType:"org.openxmlformats-officedocument.wordprocessingml.document"],documentAttributes:nil) else {
+            guard let document = try? NSAttributedString(
+                data: data,
+                options: [.documentType: "org.openxmlformats-officedocument.wordprocessingml.document"],
+                documentAttributes: nil
+            ) else {
                 throw NativeNativeError.message("This DOCX file could not be read locally.")
             }
             text = document.string
         } else if ext == "pdf" {
-            guard file.data.count <= 200 * 1024 * 1024, let pdf = PDFDocument(data:file.data), pdf.pageCount <= 250 else {
-                throw NativeNativeError.message("This PDF is unreadable or exceeds the local 200 MB / 250-page extraction limit.")
+            guard data.count <= 200 * 1024 * 1024,
+                  let pdf = PDFDocument(data: data),
+                  pdf.pageCount <= 250 else {
+                throw NativeNativeError.message("This PDF is unreadable or exceeds the local 200 MB or 250-page extraction limit.")
             }
-            text = (0..<pdf.pageCount).compactMap { pdf.page(at:$0)?.string }.joined(separator:"\\n\\n")
-            guard !text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else {
+            text = (0..<pdf.pageCount).compactMap { pdf.page(at: $0)?.string }.joined(separator: "\n\n")
+            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 throw NativeNativeError.message("No selectable text was found. Scanned image-only PDFs need OCR and cannot be converted by this tool.")
             }
-        } else if ["html","htm","xhtml"].contains(ext) {
-            let markup = String(decoding:file.data,as:UTF8.self)
-            text = markup.replacingOccurrences(of:#"(?is)<(script|style|noscript)[^>]*>.*?</\\\\1>"#,with:" ",options:.regularExpression)
-                .replacingOccurrences(of:#"(?s)<[^>]+>"#,with:" ",options:.regularExpression)
-                .replacingOccurrences(of:"&nbsp;",with:" ").replacingOccurrences(of:"&amp;",with:"&")
-                .replacingOccurrences(of:"&lt;",with:"<").replacingOccurrences(of:"&gt;",with:">")
+        } else if ["html", "htm", "xhtml"].contains(ext) {
+            let markup = String(decoding: data, as: UTF8.self)
+            text = markup
+                .replacingOccurrences(of: #"(?is)<(script|style|noscript)[^>]*>.*?</\1>"#, with: " ", options: .regularExpression)
+                .replacingOccurrences(of: #"(?s)<[^>]+>"#, with: " ", options: .regularExpression)
+                .replacingOccurrences(of: "&nbsp;", with: " ")
+                .replacingOccurrences(of: "&amp;", with: "&")
+                .replacingOccurrences(of: "&lt;", with: "<")
+                .replacingOccurrences(of: "&gt;", with: ">")
+                .replacingOccurrences(of: "&quot;", with: "\"")
         } else {
-            let supported:Set<String> = ["txt","md","markdown","csv","tsv","json","xml","yaml","yml","css","js","mjs","cjs","ts","tsx","jsx","sql","log","ini","toml","sh","properties","conf","cfg","srt","vtt","ics"]
-            guard supported.contains(ext) || file.mime.lowercased().hasPrefix("text/") else {
+            let supported: Set<String> = [
+                "txt", "md", "markdown", "csv", "tsv", "json", "xml", "yaml", "yml",
+                "css", "js", "mjs", "cjs", "ts", "tsx", "jsx", "sql", "log", "ini",
+                "toml", "sh", "properties", "conf", "cfg", "srt", "vtt", "ics"
+            ]
+            guard supported.contains(ext) || mime.lowercased().hasPrefix("text/") else {
                 throw NativeNativeError.message("Choose a supported text, Markdown, CSV, JSON, XML, YAML, HTML, DOCX or selectable-text PDF file.")
             }
-            text = String(decoding:file.data,as:UTF8.self).replacingOccurrences(of:"\\u{FEFF}",with:"")
+            guard let decoded = String(data: data, encoding: .utf8) else {
+                throw NativeNativeError.message("This file is not valid UTF-8 text.")
+            }
+            text = decoded.replacingOccurrences(of: "\u{FEFF}", with: "")
         }
-        guard !text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty else {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw NativeNativeError.message("The selected file contains no readable text.")
         }
-        return Result(text.trimmingCharacters(in:.newlines) + "\\n",nil,"text/plain","txt")
+        return Result(text.trimmingCharacters(in: .newlines) + "\n", nil, "text/plain", "txt")
     }
     private static func document(_ op:String,file:NativeBackendFile)throws->Result {
         if op == "docx-text-extractor" {
