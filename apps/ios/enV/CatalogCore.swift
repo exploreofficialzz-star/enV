@@ -153,7 +153,7 @@ struct Tool: Decodable, Identifiable, Hashable {
     }
     var isUnderProduction: Bool {
         !["a-book", "zip-any-file", "camera-studio"].contains(id.lowercased()) &&
-        !["accessibility", "audio", "business", "calculators", "communication", "datetime", "developer", "design", "ecommerce", "ai", "qr", "video"].contains(category.lowercased())
+        !["accessibility", "audio", "business", "calculators", "communication", "datetime", "developer", "design", "ecommerce", "files", "ai", "qr", "video"].contains(category.lowercased())
     }
     var searchText: String {
         ([id, slug, name, description, category, subcategory ?? "", keywords.joined(separator: " "), tags.joined(separator: " ")].joined(separator: " ")).lowercased()
@@ -402,8 +402,8 @@ extension Catalog {
             name: "Zip any file",
             slug: "zip-any-file",
             description: "Compress one file or many files into a ZIP/ZIP64 archive, or safely extract archives locally on this device.",
-            category: "productivity",
-            subcategory: "Files & storage",
+            category: "files",
+            subcategory: "Archives & extraction",
             keywords: ["zip", "zipper", "compress", "compression", "archive", "extract", "unzip", "decompress", "zip64", "large files", "folder", "multiple files"],
             tags: ["zip", "archive", "compression", "extract", "offline", "local", "files"],
             icon: "Archive",
@@ -529,7 +529,7 @@ enum CatalogLoader {
         let data = try Data(contentsOf: url)
         let catalog = try JSONDecoder().decode(Catalog.self, from: data)
         guard !catalog.tools.isEmpty else { throw CocoaError(.fileReadCorruptFile) }
-        return catalog.nativeFacing().includingMusicDownloader().includingSongMetadataAnalyzer().includingABook().includingZipArchive().includingCameraStudio().includingDateTimeExtensions()
+        return catalog.nativeFacing().includingMusicDownloader().includingSongMetadataAnalyzer().includingABook().includingZipArchive().includingFileWorkspaceTools().includingCameraStudio().includingDateTimeExtensions()
     }
 }
 
