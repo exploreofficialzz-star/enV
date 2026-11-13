@@ -9,6 +9,7 @@ export const PRODUCTION_EXEMPT_CATEGORIES = new Set<CategoryId>([
   "calculators",
   "career",
   "communication",
+  "celebrations",
   "converters",
   "creators",
   "datetime",
