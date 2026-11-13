@@ -20,7 +20,6 @@ export const PRODUCTION_EXEMPT_CATEGORIES = new Set<CategoryId>([
   "files",
   "fitness",
   "gaming",
-  "generators",
   "image",
   "interactive",
   "marketing",
