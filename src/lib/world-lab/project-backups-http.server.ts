@@ -1,5 +1,5 @@
 import {randomUUID} from "node:crypto";
-import {auth,authConfigured,authConfigurationError} from "../auth/server";
+import {auth,authConfigured,authInfrastructureError} from "../auth/server";
 import {readBoundedJsonObject} from "../billing/bounded-json.server";
 export function backupResponse(body:unknown,status=200){
   return new Response(JSON.stringify(body),{status,headers:{
@@ -13,7 +13,7 @@ export async function authorizeBackupRequest(req:Request){
     requestId,userId:null,error:backupResponse({ok:false,requestId,code},status),
   });
   if(process.env.WORLD_LAB_PROJECT_SYNC_ENABLED!=="true"||
-     !process.env.DATABASE_URL?.trim()||!authConfigured||authConfigurationError)
+     !process.env.DATABASE_URL?.trim()||!authConfigured||authInfrastructureError)
     return fail(503,"SYNC_NOT_CONFIGURED");
   const explicit=process.env.BETTER_AUTH_URL?.trim();
   if(!explicit&&process.env.NODE_ENV==="production")return fail(503,"ORIGIN_NOT_CONFIGURED");

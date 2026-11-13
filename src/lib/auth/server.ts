@@ -57,27 +57,48 @@ export const authConfigured = authRequested;
  * at module import can make unrelated TanStack Start SSR routes fail because
  * the auth route and page bundle share this server module.
  */
-export const authConfigurationError = (() => {
-  if (authRequested && oauthPartiallyConfigured) return "OAuth is partially configured. Set AUTH_OAUTH_ISSUER, AUTH_OAUTH_CLIENT_ID, and AUTH_OAUTH_CLIENT_SECRET together, or remove all three to use social providers or email/password authentication.";
-  if (authRequested && googlePartiallyConfigured) return "Google sign-in requires both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.";
-  if (authRequested && emailPasswordUiRequested && !emailPasswordAuthEnabled) return "The email/password sign-in UI is enabled but AUTH_EMAIL_PASSWORD_ENABLED is not true on the server.";
-  if (authRequested && databaseUrl && isSupabaseDatabaseUrl(databaseUrl) && !env("SUPABASE_CA_CERT")) return "Supabase PostgreSQL TLS requires SUPABASE_CA_CERT so the server can verify the database certificate.";
-  if (authRequested && googleUiRequested && !googleConfigured) return "The Google sign-in UI is enabled but GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are not configured on the server.";
-  if (authRequested && appleUiRequested && !appleConfigured) return "The Apple sign-in UI is enabled but complete Apple credentials are not configured on the server.";
-  if (authRequested && appleClientSecret && appleGeneratedSecretConfigured) return "Configure either APPLE_CLIENT_SECRET or APPLE_TEAM_ID, APPLE_KEY_ID, and APPLE_PRIVATE_KEY, not both.";
-  if (authRequested && applePartiallyConfigured) return "Apple sign-in requires both APPLE_CLIENT_ID and APPLE_CLIENT_SECRET.";
-  if (authRequested && !oauthConfigured && !socialProviderConfigured && !emailPasswordAuthEnabled) return "Authentication is enabled but no provider is configured. Configure Google, Apple, a complete OIDC provider, or email/password with transactional email delivery.";
-  if (authRequested && emailPasswordAuthEnabled && (!resendApiKey || !authEmailFrom)) return "Email/password authentication requires RESEND_API_KEY and AUTH_EMAIL_FROM so verification and password-reset emails can be delivered.";
-  if (authRequested && (isVercel || env("NODE_ENV") === "production") && (!explicitBaseURL || !configuredSecret || !databaseUrl)) return "Production authentication requires BETTER_AUTH_URL, BETTER_AUTH_SECRET, and DATABASE_URL. Configure them in the deployment environment.";
-  if (authRequested && (isVercel || env("NODE_ENV") === "production") && !explicitBaseURL?.startsWith("https://")) return "BETTER_AUTH_URL must be the canonical HTTPS origin when authentication is enabled in production.";
-  if (authRequested && oauthConfigured && (isVercel || env("NODE_ENV") === "production") && !oauthIssuer?.startsWith("https://")) return "AUTH_OAUTH_ISSUER must use HTTPS when OAuth is enabled in production.";
+/**
+ * Infrastructure faults make session verification unsafe or impossible.
+ * Optional provider faults are diagnostic only and must never take down
+ * existing sessions or unrelated authenticated features.
+ */
+export const authInfrastructureError = (() => {
+  if (authRequested && databaseUrl && isSupabaseDatabaseUrl(databaseUrl) && !env("SUPABASE_CA_CERT")) {
+    return "Supabase PostgreSQL TLS requires SUPABASE_CA_CERT so the server can verify the database certificate.";
+  }
+  if (authRequested && (isVercel || env("NODE_ENV") === "production") && (!explicitBaseURL || !configuredSecret || !databaseUrl)) {
+    return "Production authentication requires BETTER_AUTH_URL, BETTER_AUTH_SECRET, and DATABASE_URL. Configure them in the deployment environment.";
+  }
+  if (authRequested && (isVercel || env("NODE_ENV") === "production") && !explicitBaseURL?.startsWith("https://")) {
+    return "BETTER_AUTH_URL must be the canonical HTTPS origin when authentication is enabled in production.";
+  }
   return null;
 })();
 
-if (authConfigurationError) {
-  // Log setting names/validation messages only, never credential values.
-  console.error("[enV auth] Authentication endpoints are disabled:", authConfigurationError);
+const authProviderConfigurationErrors = (() => {
+  const issues: string[] = [];
+  if (authRequested && oauthPartiallyConfigured) issues.push("OIDC sign-in requires AUTH_OAUTH_ISSUER, AUTH_OAUTH_CLIENT_ID, and AUTH_OAUTH_CLIENT_SECRET together.");
+  if (authRequested && oauthConfigured && (isVercel || env("NODE_ENV") === "production") && !oauthIssuer?.startsWith("https://")) issues.push("AUTH_OAUTH_ISSUER must use HTTPS before OIDC sign-in can be used in production.");
+  if (authRequested && googlePartiallyConfigured) issues.push("Google sign-in requires both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.");
+  if (authRequested && googleUiRequested && !googleConfigured) issues.push("The Google sign-in UI is enabled but Google credentials are not configured on the server.");
+  if (authRequested && emailPasswordUiRequested && !emailPasswordAuthEnabled) issues.push("The email/password UI is enabled but AUTH_EMAIL_PASSWORD_ENABLED is not true on the server.");
+  if (authRequested && emailPasswordAuthEnabled && (!resendApiKey || !authEmailFrom)) issues.push("Email/password authentication requires RESEND_API_KEY and AUTH_EMAIL_FROM.");
+  if (authRequested && appleUiRequested && !appleConfigured) issues.push("The Apple sign-in UI is enabled but complete Apple credentials are not configured on the server.");
+  if (authRequested && appleClientSecret && appleGeneratedSecretConfigured) issues.push("Configure either APPLE_CLIENT_SECRET or APPLE_TEAM_ID, APPLE_KEY_ID, and APPLE_PRIVATE_KEY, not both.");
+  if (authRequested && applePartiallyConfigured) issues.push("Apple sign-in requires APPLE_CLIENT_ID and either APPLE_CLIENT_SECRET or the complete generated-secret signing set.");
+  if (authRequested && !oauthConfigured && !socialProviderConfigured && !emailPasswordAuthEnabled) issues.push("No sign-in provider is fully configured. Configure a complete identity provider before offering new sign-ins.");
+  return [...new Set(issues)];
+})();
+
+/** Compatibility diagnostic; use authInfrastructureError—not this field—for request gating. */
+export const authConfigurationError = authInfrastructureError ?? authProviderConfigurationErrors[0] ?? null;
+
+if (authInfrastructureError) {
+  console.error("[enV auth] Authentication infrastructure unavailable:", authInfrastructureError);
+} else if (authProviderConfigurationErrors.length > 0) {
+  console.warn("[enV auth] Sign-in providers unavailable:", authProviderConfigurationErrors);
 }
+
 const secret = configuredSecret ?? randomBytes(32).toString("hex");
 const database = databaseUrl
   ? new Pool(getPostgresPoolOptions(5))
@@ -85,7 +106,7 @@ const database = databaseUrl
 
 // Auth is opt-in. Avoid starting an embedded database on every Vercel function
 // cold start when the app's browser utilities do not require a server account.
-if (authRequested && !databaseUrl && !authConfigurationError) void ensureDbReady();
+if (authRequested && !databaseUrl && !authInfrastructureError) void ensureDbReady();
 
 const localOrigins = [
   "http://localhost:8080",

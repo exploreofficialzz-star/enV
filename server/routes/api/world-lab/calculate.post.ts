@@ -1,6 +1,6 @@
 import {randomUUID} from "node:crypto";
 import {defineHandler} from "nitro/h3";
-import {auth,authConfigured,authConfigurationError} from "../../../../src/lib/auth/server";
+import {auth,authConfigured,authInfrastructureError} from "../../../../src/lib/auth/server";
 import {runBoundedWorldLabOperation} from "../../../../src/lib/world-lab/server-compute";
 
 const MAX_BODY_BYTES=64*1024;
@@ -42,7 +42,7 @@ export default defineHandler(async event=>{
   if(request.method!=="POST")
     return respond({ok:false,code:"METHOD_NOT_ALLOWED",requestId},405);
   if(process.env.WORLD_LAB_SERVER_COMPUTE_ENABLED!=="true"||
-      !authConfigured||authConfigurationError)
+      !authConfigured||authInfrastructureError)
     return respond({ok:false,code:"COMPUTE_NOT_CONFIGURED",
       error:"World Lab server calculation is not enabled for this deployment.",requestId},503);
   const expected=process.env.BETTER_AUTH_URL?.trim();
