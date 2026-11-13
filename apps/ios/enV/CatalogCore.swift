@@ -152,7 +152,7 @@ struct Tool: Decodable, Identifiable, Hashable {
         return description.lowercased().hasPrefix("works offline") ? description : "Works offline. \(description)"
     }
     var isUnderProduction: Bool {
-        !["a-book", "zip-any-file", "camera-studio", "pdf-merger", "pdf-metadata-viewer", "pdf-metadata-tool", "pdf-page-extractor", "pdf-splitter", "pdf-rotator", "pdf-text-extractor", "docx-text-extractor"].contains(id.lowercased()) &&
+        !["a-book", "zip-any-file", "camera-studio", "pdf-merger", "pdf-metadata-viewer", "pdf-page-extractor", "pdf-splitter", "pdf-rotator"].contains(id.lowercased()) &&
         !["accessibility", "audio", "business", "calculators", "communication", "datetime", "developer", "design", "ecommerce", "files", "ai", "qr", "video"].contains(category.lowercased())
     }
     var searchText: String {
