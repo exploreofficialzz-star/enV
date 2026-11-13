@@ -31,6 +31,32 @@ export type AdEligibleTool = {
   engine: { type: string; id?: string; op?: string };
 };
 
+export type AdsterraDeliveryState = "filled" | "unfilled" | "blocked";
+
+const adsterraDeliveryByTool = new Map<string, AdsterraDeliveryState>();
+const adFallbackExecutionGrants = new Map<string, number>();
+
+export function recordAdsterraToolDelivery(toolId: string, state: AdsterraDeliveryState): void {
+  if (!/^[a-z0-9][a-z0-9-]{0,119}$/.test(toolId)) return;
+  adsterraDeliveryByTool.set(toolId, state);
+}
+
+export function hasVerifiedAdsterraToolDelivery(toolId: string): boolean {
+  return adsterraDeliveryByTool.get(toolId) === "filled";
+}
+
+/** A server-confirmed one-run debit authorizes only the immediately replayed Web action. */
+export function grantAdFallbackExecution(toolId: string): void {
+  if (!/^[a-z0-9][a-z0-9-]{0,119}$/.test(toolId)) return;
+  adFallbackExecutionGrants.set(toolId, Date.now() + 60_000);
+}
+
+export function consumeAdFallbackExecutionGrant(toolId: string): boolean {
+  const expiresAt = adFallbackExecutionGrants.get(toolId);
+  adFallbackExecutionGrants.delete(toolId);
+  return typeof expiresAt === "number" && expiresAt >= Date.now();
+}
+
 const TOOL_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,119}$/;
 const RESTRICTED_DISCLAIMERS = new Set(["health", "finance", "earnings"]);
 const RESTRICTED_CATEGORIES = new Set(["health", "finance", "earnings", "fitness", "personal"]);
