@@ -54,7 +54,8 @@ try {
   await page.getByRole("heading", { name: "Zip any file" }).first().waitFor();
   await page.waitForFunction(() => document.documentElement.dataset.envToolHydrated === "zip-any-file");
   await page.getByRole("tab", { name: "Compress" }).waitFor();
-  await page.getByText("Private and on-device", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Drop files here or choose files" }).waitFor();
+  assert.equal(await page.getByText("Private and on-device", { exact: true }).count(), 0, "The tool interface does not repeat privacy explanations.");
   localWriteRequests.length = 0;
 
   const fileInput = page.locator('input[type="file"]');

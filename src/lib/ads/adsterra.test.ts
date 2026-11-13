@@ -3,7 +3,6 @@ import test from "node:test";
 import {
   ADSTERRA_BANNER_UNITS,
   ADSTERRA_NATIVE_BANNER,
-  ADSTERRA_POPUNDER_SCRIPT,
   ADSTERRA_SMARTLINK_URL,
   canRequestAdsterraAds,
 } from "./adsterra.ts";
@@ -29,13 +28,6 @@ test("Adsterra requests require deployment enablement, explicit advertising cons
   assert.equal(canRequestAdsterraAds(true, "granted", false), false);
 });
 
-
-test("Popunder uses the exact publisher-supplied Web script", () => {
-  assert.equal(
-    ADSTERRA_POPUNDER_SCRIPT.src,
-    "https://abscloud.org/1/b39264253fbfc622884c9a3b81882853",
-  );
-});
 
 test("Smartlink URL is kept exactly as supplied by the publisher", () => {
   assert.equal(ADSTERRA_SMARTLINK_URL, "https://araplhn.org/4/ae13eae40d577a3e29863b4ca80a9f2e");

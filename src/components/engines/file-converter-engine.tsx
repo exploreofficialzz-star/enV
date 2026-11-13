@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
-import { Download, FileUp } from "lucide-react";
+import { useState } from "react";
+import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/tools/error-banner";
+import { FileDropzone } from "@/components/tools/file-dropzone";
 import { recordToolExecutionResult } from "@/lib/analytics/client";
 import { docxToText } from "@/lib/documents/local-document";
 import { extractPdfTextLocally } from "@/lib/a-book/pdf-reader";
@@ -50,17 +51,17 @@ function markdownToHtml(text: string) { const esc = (s: string) => s.replaceAll(
 function htmlToMarkdown(text: string) { return text.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<h1[^>]*>(.*?)<\/h1>/gi, "# $1\n\n").replace(/<h2[^>]*>(.*?)<\/h2>/gi, "## $1\n\n").replace(/<h3[^>]*>(.*?)<\/h3>/gi, "### $1\n\n").replace(/<strong[^>]*>(.*?)<\/strong>/gi, "**$1**").replace(/<li[^>]*>(.*?)<\/li>/gi, "- $1\n").replace(/<p[^>]*>(.*?)<\/p>/gi, "$1\n\n").replace(/<br\s*\/?>(?:)/gi, "\n").replace(/<[^>]+>/g, "").replace(/\n{3,}/g, "\n\n").trim(); }
 
 export function FileConverterEngine({ op, toolId }: { op: string; toolId?: string }) {
-  const [file, setFile] = useState<File | null>(null); const [output, setOutput] = useState<{blob: Blob; name: string} | null>(null); const [error, setError] = useState<string | null>(null); const [preview, setPreview] = useState("");
+  const [file, setFile] = useState<File | null>(null); const [output, setOutput] = useState<{blob: Blob; name: string} | null>(null); const [error, setError] = useState<string | null>(null); const [preview, setPreview] = useState(""); const [busy, setBusy] = useState(false);
   const image = IMAGE_OPS.has(op); const accept = ACCEPT[op] ?? "*/*";
-  const label = useMemo(() => op.replaceAll("-", " ").replace(/\b\w/g, x => x.toUpperCase()), [op]);
   async function run() {
     const startedAt = Date.now();
+    if (busy) return;
     if (!file) { setError("Choose a file first."); return; }
     if (op === "file-to-txt" && file.size > MAX_FILE_TO_TXT_BYTES) {
       setError("The selected file exceeds the 200 MB local text-extraction limit.");
       return;
     }
-    setError(null); setOutput(null);
+    setError(null); setOutput(null); setBusy(true);
     try {
       if (image) {
         if (op === "png-to-svg") { const data = await file.arrayBuffer(); const b64 = btoa(String.fromCharCode(...new Uint8Array(data))); const img = await createImageBitmap(file); const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${img.width}" height="${img.height}" viewBox="0 0 ${img.width} ${img.height}"><image href="data:image/png;base64,${b64}" width="100%" height="100%"/></svg>`; const blob = new Blob([svg], {type:"image/svg+xml"}); setOutput({blob,name:file.name.replace(/\.[^.]+$/, ".svg")}); setPreview(svg.slice(0,500)); if (toolId) recordToolExecutionResult(toolId, "success", Date.now() - startedAt, "file_conversion"); return; }
@@ -101,12 +102,25 @@ export function FileConverterEngine({ op, toolId }: { op: string; toolId?: strin
     } catch(e) {
       setError(e instanceof Error?e.message:"Conversion failed.");
       if (toolId) recordToolExecutionResult(toolId, "failure", Date.now() - startedAt, "file_conversion", "FILE_CONVERSION_FAILED");
+    } finally {
+      setBusy(false);
     }
   }
-  return <div className="space-y-5">
-    <div className="rounded-xl border border-border bg-surface-2/50 p-4"><div className="flex items-center gap-2 font-medium"><FileUp className="size-4" /> {label}</div><p className="mt-1 text-sm text-subtle">Processed entirely in your browser. Your file is not uploaded to enV.</p><input className="mt-4 block w-full text-sm" type="file" accept={accept} onChange={e=>{setFile(e.target.files?.[0]??null);setOutput(null);setPreview("");setError(null);}} /></div>
-    <ErrorBanner message={error} />
-    <div className="flex gap-2"><Button onClick={run} disabled={!file}>Convert</Button>{output?<Button variant="outline" onClick={()=>download(output.blob,output.name)}><Download className="mr-2 size-4"/>Download {output.name}</Button>:null}</div>
-    {preview?<pre className="max-h-72 overflow-auto rounded-lg bg-surface-2 p-4 text-xs whitespace-pre-wrap">{preview}</pre>:null}
-  </div>;
+  return (
+    <div className="space-y-4">
+      <FileDropzone accept={accept} disabled={busy} label="Drop a file or browse" onFiles={(next) => { setFile(next[0] ?? null); setOutput(null); setPreview(""); setError(null); }} />
+      {file ? (
+        <div className="flex items-center gap-3 rounded-xl border border-border bg-surface-2 px-3 py-3">
+          <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-fg">{file.name}</p><p className="text-xs text-muted">{file.size.toLocaleString()} bytes</p></div>
+          <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => { setFile(null); setOutput(null); setPreview(""); setError(null); }}>Remove</Button>
+        </div>
+      ) : null}
+      <ErrorBanner message={error} />
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={run} disabled={!file || busy}>{busy ? "Converting…" : "Convert"}</Button>
+        {output ? <Button variant="outline" onClick={() => download(output.blob, output.name)}><Download className="mr-2 size-4" />Download {output.name}</Button> : null}
+      </div>
+      {preview ? <pre className="max-h-72 overflow-auto rounded-lg bg-surface-2 p-4 text-xs whitespace-pre-wrap">{preview}</pre> : null}
+    </div>
+  );
 }

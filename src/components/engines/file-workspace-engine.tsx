@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { BlobWriter, ZipWriter } from "@zip.js/zip.js";
-import { Archive, Check, Copy, FileSearch, FolderOpen, Search, ShieldCheck } from "lucide-react";
+import { Archive, Check, Copy, FileSearch, FolderOpen, Search, ShieldCheck, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/tools/error-banner";
+import { FileDropzone } from "@/components/tools/file-dropzone";
 
 type DirectoryLike = {
   entries(): AsyncIterableIterator<[string, FileSystemFileHandle | FileSystemDirectoryHandle]>;
@@ -130,38 +131,13 @@ export function FileWorkspaceEngine({ toolId }: { toolId: string }) {
   const [compareRows, setCompareRows] = useState<CompareRow[]>([]);
   const folderInput = useRef<HTMLInputElement>(null);
   const rightFolderInput = useRef<HTMLInputElement>(null);
-  const fileInput = useRef<HTMLInputElement>(null);
-  const rightFileInput = useRef<HTMLInputElement>(null);
 
   const totalBytes = useMemo(() => files.reduce((sum, file) => sum + file.size, 0), [files]);
-  const title = ({
-    "file-organizer": "File Organizer",
-    "batch-file-renamer": "Batch File Renamer",
-    "duplicate-file-finder": "Duplicate File Finder",
-    "folder-size-analyzer": "Folder Size Analyzer",
-    "file-search": "File Search",
-    "file-compare": "File & Folder Compare",
-  } as Record<string, string>)[toolId] ?? "File Workspace";
-
-  const description = ({
-    "file-organizer": "Sort selected files into clear folders by file type and download an organized copy. Your originals are never moved or deleted.",
-    "batch-file-renamer": "Preview a batch rename, resolve name collisions, and export renamed copies in one ZIP archive.",
-    "duplicate-file-finder": "Find identical files using SHA-256 content checks, not filenames or file size alone.",
-    "folder-size-analyzer": "Review selected folder contents by total size, file type, and largest files.",
-    "file-search": "Find files by name or search inside supported text files without a terminal.",
-    "file-compare": "Compare two file selections to identify added, missing, changed, and verified identical files.",
-  } as Record<string, string>)[toolId] ?? "Work with files locally on this device.";
-
   function resetResult() {
     setStatus("");
     setError("");
     setReport([]);
     setCompareRows([]);
-  }
-
-  function chooseFiles() {
-    resetResult();
-    fileInput.current?.click();
   }
 
   async function chooseFolder(side: "left" | "right" = "left") {
@@ -202,6 +178,26 @@ export function FileWorkspaceEngine({ toolId }: { toolId: string }) {
     else setFiles(selected);
     if (selected.length) setStatus(selected.length + " files selected.");
     event.target.value = "";
+  }
+
+  function addFiles(selected: File[], side: "left" | "right" = "left") {
+    if (!selected.length) return;
+    resetResult();
+    const current = side === "right" ? rightFiles : files;
+    if (current.length + selected.length > MAX_WORKSPACE_FILES) {
+      setError("This selection contains more than 100,000 files. Select a smaller set.");
+      return;
+    }
+    const known = new Set(current.map((file) => relativePath(file) + "|" + file.size + "|" + file.lastModified));
+    const merged = [...current, ...selected.filter((file) => {
+      const key = relativePath(file) + "|" + file.size + "|" + file.lastModified;
+      if (known.has(key)) return false;
+      known.add(key);
+      return true;
+    })];
+    if (side === "right") setRightFiles(merged);
+    else setFiles(merged);
+    setStatus(merged.length + " files selected.");
   }
 
   async function organizeFiles() {
@@ -384,57 +380,41 @@ export function FileWorkspaceEngine({ toolId }: { toolId: string }) {
 
   return (
     <section data-file-workspace-ready={hydrated ? "true" : "false"} className="mx-auto w-full max-w-3xl space-y-4">
-      <header className="flex items-start gap-3 rounded-xl border border-border bg-surface-2/50 p-4">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-surface">
-          {isOrganizer ? <FolderOpen className="size-5" /> : isDuplicates ? <ShieldCheck className="size-5" /> : isSearch ? <Search className="size-5" /> : isCompare ? <FileSearch className="size-5" /> : <Archive className="size-5" />}
-        </div>
-        <div className="min-w-0 flex-1">
-          <h2 className="font-semibold">{title}</h2>
-          <p className="mt-1 text-sm text-subtle">{description}</p>
-          <p className="mt-2 text-xs text-subtle">Local processing · No terminal commands · Your selected files are not uploaded</p>
-        </div>
-      </header>
-
-      <input ref={fileInput} type="file" multiple className="hidden" onChange={(event) => receiveFiles(event, "left")} />
-      <input ref={rightFileInput} type="file" multiple className="hidden" onChange={(event) => receiveFiles(event, "right")} />
-      <input ref={folderInput} type="file" multiple className="hidden" onChange={(event) => receiveFiles(event, "left")} />
-      <input ref={rightFolderInput} type="file" multiple className="hidden" onChange={(event) => receiveFiles(event, "right")} />
       {isCompare ? (
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-xl border border-border p-3">
-            <p className="text-sm font-medium">First folder or file set</p>
-            <Button className="mt-3 w-full" variant="outline" onClick={() => void chooseFolder("left")}>Choose first folder</Button>
-            <Button className="mt-2 w-full" size="sm" variant="ghost" onClick={chooseFiles}>Or choose files</Button>
-            <p className="mt-2 text-xs text-subtle">{files.length} selected</p>
+          <div className="space-y-3 rounded-xl border border-border p-3">
+            <div className="flex items-center justify-between gap-2"><p className="text-sm font-medium">First file set</p><span className="text-xs text-subtle">{files.length} selected</span></div>
+            <FileDropzone multiple disabled={busy} label="Drop files or browse" onFiles={(next) => addFiles(next, "left")} />
+            <Button className="w-full" variant="outline" onClick={() => void chooseFolder("left")} disabled={busy}><FolderOpen className="mr-1 size-4" /> Choose first folder</Button>
           </div>
-          <div className="rounded-xl border border-border p-3">
-            <p className="text-sm font-medium">Second folder or file set</p>
-            <Button className="mt-3 w-full" variant="outline" onClick={() => void chooseFolder("right")}>Choose second folder</Button>
-            <Button className="mt-2 w-full" size="sm" variant="ghost" onClick={() => { resetResult(); rightFileInput.current?.click(); }}>Or choose files</Button>
-            <p className="mt-2 text-xs text-subtle">{rightFiles.length} selected</p>
+          <div className="space-y-3 rounded-xl border border-border p-3">
+            <div className="flex items-center justify-between gap-2"><p className="text-sm font-medium">Second file set</p><span className="text-xs text-subtle">{rightFiles.length} selected</span></div>
+            <FileDropzone multiple disabled={busy} label="Drop files or browse" onFiles={(next) => addFiles(next, "right")} />
+            <Button className="w-full" variant="outline" onClick={() => void chooseFolder("right")} disabled={busy}><FolderOpen className="mr-1 size-4" /> Choose second folder</Button>
           </div>
         </div>
       ) : (
-        <div className="rounded-xl border border-border p-3">
+        <div className="space-y-3 rounded-xl border border-border p-3">
+          <FileDropzone multiple disabled={busy} label="Drop files here or browse" onFiles={(next) => addFiles(next)} />
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="text-sm font-medium">Select files</p>
-              <p className="text-xs text-subtle">{files.length} selected · {totalBytes.toLocaleString()} bytes</p>
-            </div>
-            <div className="flex gap-2">
-              {(isFolderSize || isOrganizer || isSearch) ? <Button variant="outline" size="sm" onClick={() => void chooseFolder()} disabled={busy}> <FolderOpen className="mr-1 size-4" /> Choose folder</Button> : null}
-              <Button variant="outline" size="sm" onClick={chooseFiles}>Choose files</Button>
-            </div>
+            <p className="text-xs text-subtle">{files.length} selected · {totalBytes.toLocaleString()} bytes</p>
+            {(isFolderSize || isOrganizer || isSearch) ? <Button variant="outline" size="sm" onClick={() => void chooseFolder()} disabled={busy}><FolderOpen className="mr-1 size-4" /> Choose folder</Button> : null}
           </div>
           {files.length ? (
-            <ul className="mt-3 max-h-36 divide-y divide-border overflow-y-auto text-sm">
-              {files.slice(0, 100).map((file, index) => <li key={index} className="flex justify-between gap-3 py-2"><span className="min-w-0 truncate">{relativePath(file)}</span><span className="shrink-0 text-xs text-subtle">{file.size.toLocaleString()} B</span></li>)}
+            <ul className="max-h-48 divide-y divide-border overflow-y-auto text-sm" aria-label="Selected files">
+              {files.slice(0, 100).map((file, index) => (
+                <li key={relativePath(file) + "|" + index} className="flex items-center gap-3 py-2">
+                  <span className="min-w-0 flex-1 truncate">{relativePath(file)}</span><span className="shrink-0 text-xs text-subtle">{file.size.toLocaleString()} B</span>
+                  <button type="button" aria-label={"Remove " + relativePath(file)} disabled={busy} onClick={() => { setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index)); resetResult(); }} className="rounded p-1 text-muted hover:text-fg disabled:opacity-50"><Trash2 className="size-3.5" aria-hidden="true" /></button>
+                </li>
+              ))}
               {files.length > 100 ? <li className="py-2 text-xs text-subtle">And {files.length - 100} more files</li> : null}
             </ul>
           ) : null}
         </div>
       )}
-
+      <input ref={folderInput} type="file" multiple className="hidden" onChange={(event) => receiveFiles(event, "left")} />
+      <input ref={rightFolderInput} type="file" multiple className="hidden" onChange={(event) => receiveFiles(event, "right")} />
       {isRenamer ? (
         <div className="grid gap-3 rounded-xl border border-border p-3 sm:grid-cols-2">
           <label className="space-y-1 text-sm">Prefix<input className="w-full rounded-lg border border-border bg-surface px-3 py-2" value={prefix} onChange={(e) => setPrefix(e.target.value)} /></label>

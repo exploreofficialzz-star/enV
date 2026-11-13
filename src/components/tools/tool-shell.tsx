@@ -19,7 +19,6 @@ import {
   AdsterraBanner,
   AdsterraNativeBanner,
   AdsterraResponsiveBanner,
-  AdsterraToolPopunder,
 } from "@/components/ads/adsterra-ad";
 import { isAdsterraQualifiedTool } from "@/lib/ads/policy";
 import { ADSTERRA_CONSENT_STORAGE_KEY, getAdsterraConsent, openAdsterraSmartlinkFromOutput } from "@/lib/ads/adsterra";
@@ -349,7 +348,6 @@ export function ToolShell({
         <>
           <AdsterraBanner format="300x250" />
           <AdsterraNativeBanner />
-          <AdsterraToolPopunder />
         </>
       ) : null}
 

@@ -44,7 +44,6 @@ assert.match(shell, /<AdSlot tool=\{tool\} \/>/, "Tool details must include the 
 assert.match(toolShell, /AdsterraNativeBanner/, "Qualified tool pages must include the publisher's native placement.");
 assert.match(toolShell, /!isFullscreen && adsterraAdsEnabled \? <AdsterraResponsiveBanner \/>/, "Qualified tool pages must actually mount the responsive banner above the interface.");
 assert.match(toolShell, /AdsterraBanner format="300x250"/, "Qualified tool pages must include the medium-rectangle banner.");
-assert.match(toolShell, /AdsterraToolPopunder/, "Qualified tool pages must be the only Popunder mount.");
 assert.match(toolShell, /isAdsterraQualifiedTool\(tool\)/, "Each placement must be limited to the shared Adsterra eligibility policy.");
 assert.match(toolShell, /const adsterraAdsEnabled =\s*adsterraQualified && adsterraConsent === "granted"/, "Adsterra placements must depend on the saved advertising choice, not account state.");
 assert.doesNotMatch(toolShell, /useCurrentUserState|adsterraAuthPending|adsterraAuthError|adsterraUser|AdsterraGuestAccessGate/, "Tool access and ad rendering must not depend on an account check or guest access gate.");
@@ -54,20 +53,19 @@ assert.match(toolShell, /openAdsterraSmartlinkFromOutput/, "Output actions must 
 assert.ok(toolShell.includes("copy|download|export|save|output|result|calculate|convert|generate"), "Output triggers must include copy, download, export and common output-producing actions.");
 assert.doesNotMatch(downloadUtils, /openAdsterraSmartlinkFromOutput/, "The download helper must not open a popup after an asynchronous download begins.");
 assert.match(toolShell, /data-env-ad-eligible=\{adsterraAdsEnabled \? "true" : undefined\}/, "The output trigger must be restricted to the same qualified tool interface.");
-assert.doesNotMatch(rootRoute, /AdsterraPopunder/, "The Popunder must not be loaded site-wide.");
+assert.doesNotMatch(rootRoute, /AdsterraPopunder/, "The root document must not mount any page-wide popunder.");
+assert.doesNotMatch(toolShell, /AdsterraToolPopunder|ADSTERRA_POPUNDER_SCRIPT/, "Tool pages must not install a page-wide click-triggered ad.");
+assert.doesNotMatch(adsterraWeb, /AdsterraToolPopunder|envAdsterraPopunder|ADSTERRA_POPUNDER_SCRIPT/, "The browser ad components must not load a popunder script.");
+assert.ok(!adsterraConfig.includes("ADSTERRA_POPUNDER_SCRIPT") && !adsterraConfig.includes("abscloud.org"), "The page-wide popunder placement must not be configured.");
+assert.ok(shell.includes('<AdsterraBanner format="300x250" />') && shell.includes("<AdsterraNativeBanner />"), "Qualified tool pages retain fixed banner slots.");
 assert.match(adsterraWeb, /retryAttempt < 3/, "Failed Adsterra banner requests must retry a bounded number of times.");
 assert.match(adsterraWeb, /Adsterra banner request timed out/, "A stalled banner request must be released so it cannot block later placements.");
 assert.match(adsterraWeb, /window\.setTimeout\(fail, 15_000\)/, "The native banner must time out when the publisher script stalls.");
 assert.match(adsterraWeb, /document\.addEventListener\("visibilitychange", retryOnAvailability\)/, "A retry deferred while hidden must resume when the visitor returns.");
-assert.match(adsterraWeb, /nextScript\.remove\(\)[\s\S]*?15_000\)/, "A stalled Popunder request must be removed before another bounded attempt.");
 assert.match(adsterraConfig, /ADSTERRA_SMARTLINK_URL = "https:\/\/araplhn\.org\/4\/ae13eae40d577a3e29863b4ca80a9f2e"/, "The exact owner-supplied Smartlink must be used.");
-assert.match(adsterraConfig, /ADSTERRA_POPUNDER_SCRIPT = \{\s*src: "https:\/\/abscloud\.org\/1\/b39264253fbfc622884c9a3b81882853"/, "The exact owner-supplied Popunder script must be used.");
 assert.match(adsterraConfig, /src: "https:\/\/bauval\.org\/21\/78a40bc1026f57ead96fcab42af6c0b0"/, "The exact owner-supplied Native Banner must be used.");
-assert.match(adsterraWeb, /retryHandle = window\.setInterval/, "A failed Popunder request must be retried while the page is visible.");
-assert.match(adsterraWeb, /attempts >= 4/, "Popunder retries must be bounded to avoid repeated provider requests.");
 
 assert.match(slot, /isApplicationOnline\(\)/, "Ads must not be requested unless the application origin is reachable.");
-assert.match(shell, /!isFullscreen && adsterraAdsEnabled[\s\S]*?<AdsterraBanner format="300x250" \/>[\s\S]*?<AdsterraNativeBanner \/>[\s\S]*?<AdsterraToolPopunder \/>/, "Every Adsterra placement must remain outside fullscreen and inside qualified tool pages.");
 
 assert.match(adPolicy, /export function isAdsterraQualifiedTool[\s\S]*?ADSTERRA_EXCLUDED_CONCEPTS\.test\(descriptiveIdentity\)/, "Adsterra eligibility must cover active ordinary tool pages and exclude Studio, AI, Labs and Sandbox metadata.");
 assert.match(adPolicy, /new Set\(\["ai", "lab", "labs", "studio", "studios"\]\)/, "Developer and Accessibility categories must remain eligible; only explicit Studio, AI and Labs categories are excluded.");

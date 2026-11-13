@@ -3,7 +3,6 @@ import { isApplicationOnline } from "@/lib/ads/policy";
 import {
   ADSTERRA_BANNER_UNITS,
   ADSTERRA_NATIVE_BANNER,
-  ADSTERRA_POPUNDER_SCRIPT,
   canRequestAdsterraAds,
   getAdsterraConsent,
   isAdsterraEnabled,
@@ -292,81 +291,3 @@ export function AdsterraNativeBanner() {
  * Load it only after explicit advertising consent and same-origin reachability.
  * Consent revocation reloads the document to clear provider-installed listeners.
  */
-export function AdsterraToolPopunder() {
-  useEffect(() => {
-    let active = true;
-    let loading = false;
-    let loaded = false;
-    let attempts = 0;
-    let script: HTMLScriptElement | null = null;
-    let loadTimeout: number | null = null;
-
-    const refresh = async () => {
-      if (!active || loaded || loading || attempts >= 4) return;
-      if (!canRequestAdsterraAds(isAdsterraEnabled(), getAdsterraConsent(), navigator.onLine)) return;
-
-      loading = true;
-      const online = await isApplicationOnline();
-      if (
-        !active ||
-        !online ||
-        !canRequestAdsterraAds(isAdsterraEnabled(), getAdsterraConsent(), navigator.onLine)
-      ) {
-        loading = false;
-        return;
-      }
-
-      attempts += 1;
-      const nextScript = document.createElement("script");
-      nextScript.async = true;
-      nextScript.setAttribute("data-cfasync", "false");
-      nextScript.dataset.envAdsterraPopunder = "true";
-      nextScript.src = ADSTERRA_POPUNDER_SCRIPT.src;
-      nextScript.addEventListener("load", () => {
-        if (!active || script !== nextScript) return;
-        if (loadTimeout !== null) window.clearTimeout(loadTimeout);
-        loadTimeout = null;
-        loaded = true;
-        loading = false;
-      }, { once: true });
-      nextScript.addEventListener("error", () => {
-        if (!active || script !== nextScript) return;
-        if (loadTimeout !== null) window.clearTimeout(loadTimeout);
-        loadTimeout = null;
-        loading = false;
-        script = null;
-        nextScript.remove();
-      }, { once: true });
-      script = nextScript;
-      document.head.appendChild(nextScript);
-      loadTimeout = window.setTimeout(() => {
-        if (!active || script !== nextScript) return;
-        loading = false;
-        script = null;
-        nextScript.remove();
-        loadTimeout = null;
-      }, 15_000);
-    };
-
-    const onChange = () => { void refresh(); };
-    void refresh();
-    const retryHandle = window.setInterval(() => {
-      if (document.visibilityState === "visible") void refresh();
-    }, 15_000);
-    window.addEventListener("online", onChange);
-    window.addEventListener("focus", onChange);
-    window.addEventListener("env:adsterra-consent-changed", onChange);
-
-    return () => {
-      active = false;
-      if (loadTimeout !== null) window.clearTimeout(loadTimeout);
-      window.clearInterval(retryHandle);
-      window.removeEventListener("online", onChange);
-      window.removeEventListener("focus", onChange);
-      window.removeEventListener("env:adsterra-consent-changed", onChange);
-      script?.remove();
-    };
-  }, []);
-
-  return null;
-}

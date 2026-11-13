@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Archive, Check, FileArchive, FilePlus2, FolderOpen, LoaderCircle, ShieldCheck, Trash2 } from "lucide-react";
+import { Archive, Check, FileArchive, FilePlus2, FolderOpen, LoaderCircle, Trash2 } from "lucide-react";
 import { BlobReader, ZipReader, ZipWriter, type FileEntry } from "@zip.js/zip.js";
 import { FileDropzone } from "@/components/tools/file-dropzone";
 import { formatArchiveBytes, MAX_ARCHIVE_ENTRIES, MAX_BROWSER_BUFFER_BYTES, MAX_EXTRACT_BYTES, sanitizeArchivePath, shouldStoreWithoutCompression } from "@/lib/zip/archive-utils";
@@ -249,19 +249,6 @@ export function ZipArchiveEngine() {
 
   return (
     <section className="mx-auto w-full max-w-3xl space-y-5">
-      <div className="flex items-center gap-3">
-        <div className="flex size-11 items-center justify-center rounded-xl border border-border bg-surface-2">
-          <Archive className="size-5" aria-hidden="true" />
-        </div>
-        <div className="min-w-0">
-          <h2 className="text-lg font-semibold text-fg">Zip any file</h2>
-          <p className="text-sm text-muted">Compress and extract files on this device.</p>
-        </div>
-        <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-xs text-muted">
-          <ShieldCheck className="size-3.5" aria-hidden="true" /> Local
-        </span>
-      </div>
-
       <div className="grid grid-cols-2 gap-2 rounded-xl border border-border bg-surface-2 p-1" role="tablist" aria-label="Archive action">
         <button type="button" role="tab" aria-selected={mode === "compress"} onClick={() => setTab("compress")} className={`rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${mode === "compress" ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg"}`}>
           <span className="inline-flex items-center justify-center gap-2"><FileArchive className="size-4" /> Compress</span>
@@ -273,7 +260,7 @@ export function ZipArchiveEngine() {
 
       {mode === "compress" ? (
         <div className="space-y-4">
-          <FileDropzone multiple label="Drop files here or choose files" hint="Choose one file or select as many as you need. They stay on this device." onFiles={(next) => { setFiles((current) => [...current, ...next]); setError(""); setStatus(""); }} />
+          <FileDropzone multiple disabled={busy} label="Drop files here or choose files" onFiles={(next) => { setFiles((current) => [...current, ...next]); setError(""); setStatus(""); }} />
           {files.length > 0 ? (
             <div className="overflow-hidden rounded-xl border border-border">
               <div className="flex items-center justify-between border-b border-border px-4 py-3">
@@ -301,10 +288,10 @@ export function ZipArchiveEngine() {
             <span className="block text-sm font-medium text-fg">Compression</span>
             <div className="grid grid-cols-2 gap-2">
               <button type="button" disabled={busy} onClick={() => setCompression("balanced")} className={`rounded-xl border px-3 py-3 text-left ${compression === "balanced" ? "border-fg bg-surface-2 text-fg" : "border-border bg-surface text-muted"}`}>
-                <span className="block text-sm font-medium">Balanced</span><span className="mt-1 block text-xs">Good size and speed</span>
+                <span className="block text-sm font-medium">Balanced</span>
               </button>
               <button type="button" disabled={busy} onClick={() => setCompression("maximum")} className={`rounded-xl border px-3 py-3 text-left ${compression === "maximum" ? "border-fg bg-surface-2 text-fg" : "border-border bg-surface text-muted"}`}>
-                <span className="block text-sm font-medium">Maximum</span><span className="mt-1 block text-xs">More CPU time, smaller when possible</span>
+                <span className="block text-sm font-medium">Maximum</span>
               </button>
             </div>
           </div>
@@ -315,7 +302,7 @@ export function ZipArchiveEngine() {
         </div>
       ) : (
         <div className="space-y-4">
-          <FileDropzone accept=".zip,application/zip,application/x-zip-compressed" label={archive ? archive.name : "Choose a ZIP archive"} hint="Select an archive saved on your device." onFiles={(next) => { setArchive(next[0] ?? null); setError(""); setStatus(""); }} />
+          <FileDropzone accept=".zip,application/zip,application/x-zip-compressed" disabled={busy} label="Drop a ZIP archive or browse" onFiles={(next) => { setArchive(next[0] ?? null); setError(""); setStatus(""); }} />
           {archive ? <div className="flex items-center justify-between rounded-xl border border-border bg-surface px-4 py-3 text-sm"><span className="min-w-0 truncate text-fg">{archive.name}</span><span className="ml-3 shrink-0 text-xs text-muted">{formatArchiveBytes(archive.size)}</span><button type="button" aria-label="Remove archive" onClick={() => setArchive(null)} className="ml-2 rounded p-1 text-muted hover:text-fg"><Trash2 className="size-3.5" /></button></div> : null}
           <button type="button" onClick={() => void extractArchive()} disabled={!archive || busy} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-fg px-4 py-3 text-sm font-semibold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40">
             {busy ? <LoaderCircle className="size-4 animate-spin" /> : <FolderOpen className="size-4" />}
@@ -332,11 +319,7 @@ export function ZipArchiveEngine() {
       {status && !busy ? <p className="flex items-center gap-2 rounded-xl border border-border bg-surface-2 px-3 py-3 text-sm text-fg" role="status"><Check className="size-4 shrink-0" /> {status}</p> : null}
       {error ? <p className="rounded-xl border border-border px-3 py-3 text-sm text-fg" role="alert">{error}</p> : null}
 
-      <div className="rounded-xl border border-border bg-surface-2 p-4">
-        <div className="flex items-center gap-2 text-sm font-medium text-fg"><ShieldCheck className="size-4" /> Private and on-device</div>
-        <p className="mt-1.5 text-xs leading-5 text-muted">Files are read and processed locally. enV does not upload them. ZIP64 supports very large archives; available storage, browser support and device speed still set practical limits.</p>
-        <p className="mt-2 text-xs leading-5 text-muted">Already-compressed photos, music and videos are stored without wasting time recompressing them. Text and many documents can shrink much more. A 20 GB file can sometimes become 2 GB, but no compressor can guarantee that result for every file.</p>
-      </div>
+
     </section>
   );
 }
