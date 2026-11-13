@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isAdFallbackBillingEnabled, resolveAdFallbackUnitSubunits } from "./fallback";
+import { isAdFallbackBillingEnabled, resolveAdFallbackUnitSubunits } from "./fallback.ts";
 
 const tool = { id: "example-tool", status: "active", clientSide: true, requiresBackend: false, requiresAuth: false };
 const profile = {
