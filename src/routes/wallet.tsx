@@ -880,7 +880,7 @@ function Account() {
                   </div>
                 ) : (
                   <p className="rounded-xl border border-border px-3 py-3 text-sm text-muted" role="status">
-                    {fundingOptionsState.message ?? "No approved payment methods are available for your detected country and currency. No payment was taken."}
+                    {fundingOptionsState.message ?? "No approved payment methods are available for your detected country and currency."}
                   </p>
                 )}
               </div>
