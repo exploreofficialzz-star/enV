@@ -19,12 +19,19 @@ struct NativeArchiveToolDestinationView: View {
 
     var body: some View {
         Group {
-            if tool.id == "zip-any-file" {
-                NativeZipArchiveScreen()
-            } else if tool.id == "file-to-txt" {
-                NativeFileToTextScreen()
-            } else if tool.category == "files" && tool.engine.type == "custom" {
-                NativeFileWorkspaceScreen(toolID: tool.id)
+            if tool.id == "zip-any-file" ||
+                tool.id == "file-to-txt" ||
+                (tool.category == "files" && tool.engine.type == "custom") {
+                VStack(alignment: .leading, spacing: 12) {
+                    NativeToolAdSlot(tool: tool)
+                    if tool.id == "zip-any-file" {
+                        NativeZipArchiveScreen()
+                    } else if tool.id == "file-to-txt" {
+                        NativeFileToTextScreen()
+                    } else {
+                        NativeFileWorkspaceScreen(toolID: tool.id)
+                    }
+                }
             } else {
                 ToolDestinationView(tool: tool)
             }
