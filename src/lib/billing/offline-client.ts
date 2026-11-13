@@ -133,6 +133,39 @@ export async function listLocalWebOfflineAllowances() {
   }).sort((a, b) => Date.parse(b.expiresAt) - Date.parse(a.expiresAt));
 }
 
+/**
+ * Check whether a tool can use an already-selected local allowance while the
+ * enV origin is unreachable. This is only a preflight hint for the shared UI;
+ * runOfflineMeteredOperationIfSelected remains the authoritative journal gate.
+ */
+export async function hasSelectedWebOfflineAllowanceForTool(toolId: string): Promise<boolean> {
+  const profile = offlineEligibleById.get(toolId);
+  if (!profile || !profile.billingKey.startsWith("local.") || !profile.platforms.includes("web")) return false;
+  if (await isApplicationOnline()) return false;
+
+  const selectedAllowanceId = getSelectedWebOfflineAllowanceId();
+  if (!selectedAllowanceId) return false;
+
+  const db = await openDb();
+  let allowance: StoredAllowance | undefined;
+  try {
+    allowance = await getRow<StoredAllowance>(db, "allowances", selectedAllowanceId);
+  } finally {
+    db.close();
+  }
+
+  if (!allowance ||
+      !["issued", "syncing"].includes(allowance.status) ||
+      allowance.pricingVersion !== offlineEligibleTools.pricingVersion ||
+      Date.parse(allowance.expiresAt) <= Date.now() ||
+      allowance.pendingBatch) return false;
+
+  const remainingSubunits = allowance.allowanceSubunits - allowance.spentSubunits - allowance.pendingSubunits;
+  return Number.isSafeInteger(profile.subunitsPerUnit) &&
+    profile.subunitsPerUnit > 0 &&
+    remainingSubunits >= profile.subunitsPerUnit;
+}
+
 /** Meter an explicitly selected allowance for the small, explicit set of instrumented
  * local calculator actions. Do not use navigator.onLine as an accounting decision: it may be
  * true during a captive portal or failed network path. A selected allowance is an explicit
