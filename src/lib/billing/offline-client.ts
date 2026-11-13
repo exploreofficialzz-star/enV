@@ -8,7 +8,13 @@ import {
 import eligibleTools from "../../data/offline-eligible-tools.json";
 import { recordAnalyticsEvent } from "../analytics/client";
 import { getToolById } from "../registry";
-import { isApplicationOnline, isHybridAccessToolId } from "../ads/policy";
+import {
+  consumeAdFallbackExecutionGrant,
+  hasVerifiedAdsterraToolDelivery,
+  isAdsterraQualifiedTool,
+  isApplicationOnline,
+  isHybridAccessToolId,
+} from "../ads/policy";
 
 type EligibleToolsIndex = { pricingVersion: string; toolCount: number; profiles: { toolId: string; billingKey: string; subunitsPerUnit: number; platforms: ("web" | "android" | "ios")[] }[] };
 const offlineEligibleTools = eligibleTools as EligibleToolsIndex;
@@ -173,6 +179,10 @@ export async function hasSelectedWebOfflineAllowanceForTool(toolId: string): Pro
  * when the browser reports connectivity. Unlisted tools remain local and are not charged by
  * this journal until their execution boundary is explicitly wired and audited. */
 export async function runOfflineMeteredOperationIfSelected<T>(input: { toolId: string }, operation: () => T | Promise<T>): Promise<T> {
+  // A paid online fallback is server-confirmed before the UI replays the action.
+  // Consume that single-use grant before the local allowance path to avoid double charging.
+  if (consumeAdFallbackExecutionGrant(input.toolId)) return await operation();
+
   const profile = offlineEligibleById.get(input.toolId);
   if (!profile || !profile.billingKey.startsWith("local.") || !profile.platforms.includes("web")) return await operation();
 
@@ -186,7 +196,16 @@ export async function runOfflineMeteredOperationIfSelected<T>(input: { toolId: s
   }, catalogTool));
 
   if (hybridAdTool && await isApplicationOnline()) {
-    // Online access for the selected cohort is guest-friendly and ad-funded, not token-metered.
+    // When Adsterra is active, online hybrid access remains ad-funded only after
+    // a visible creative is confirmed. A server-paid replay is handled above.
+    if (import.meta.env.VITE_ADSTERRA_ENABLED === "true" &&
+        catalogTool && isAdsterraQualifiedTool(catalogTool) &&
+        !hasVerifiedAdsterraToolDelivery(input.toolId)) {
+      throw new OfflineClientError(
+        "AD_FALLBACK_REQUIRED",
+        "An advertisement was not delivered. Sign in or use the approved enV token option before running this tool.",
+      );
+    }
     return await operation();
   }
 
