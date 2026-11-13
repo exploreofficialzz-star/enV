@@ -335,7 +335,7 @@ fun NativeFileWorkspaceScreen(toolId: String) {
                                     if (file.path.contains(needle, ignoreCase = true)) output.add(WorkspaceLine(file.path, "Filename match"))
                                     if (isWorkspaceText(file.name) && file.size in 1..(2L * 1024L * 1024L)) {
                                         context.contentResolver.openInputStream(file.file.uri)?.bufferedReader(Charsets.UTF_8)?.use { reader ->
-                                            reader.forEachLineIndexed { lineNumber, line ->
+                                            reader.lineSequence().forEachIndexed { lineNumber, line ->
                                                 if (line.contains(needle, ignoreCase = true)) output.add(WorkspaceLine(file.path + ":" + (lineNumber + 1), line.trim().take(180)))
                                             }
                                         }
