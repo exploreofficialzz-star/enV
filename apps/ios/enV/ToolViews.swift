@@ -6675,6 +6675,7 @@ enum NativeToolAuthorization: Equatable {
     case allowed
     case signInRequired
     case insufficientCredits
+    case unavailable
     case retry
 }
 
@@ -6707,6 +6708,9 @@ final class NativeToolExecutionTracker {
         } catch {
             let message = error.localizedDescription
             if message.contains("INSUFFICIENT_CREDITS") { return .insufficientCredits }
+            if message.contains("AD_FALLBACK_BILLING_DISABLED") || message.contains("AD_FALLBACK_NOT_AVAILABLE") {
+                return .unavailable
+            }
             if message.contains("AUTH_REQUIRED") || message.contains("NATIVE_SESSION_INVALID") {
                 return .signInRequired
             }
@@ -6797,6 +6801,10 @@ struct NativeExecutionAccessButton<Label: View>: View {
             case .insufficientCredits:
                 Link("Buy enV", destination: URL(string: "https://envtools.store/wallet")!)
                     .buttonStyle(.borderedProminent)
+            case .unavailable:
+                Text("Token access is not enabled for this tool yet.")
+                    .font(.envScaled(size: 12, weight: .regular))
+                    .foregroundStyle(Color.envMuted)
             case .retry:
                 Button("Retry") { authorization = nil }
                     .buttonStyle(.bordered)
@@ -6860,6 +6868,10 @@ private struct NativeActionRow: View {
             case .insufficientCredits:
                 Link("Buy enV", destination: URL(string: "https://envtools.store/wallet")!)
                     .buttonStyle(.borderedProminent)
+            case .unavailable:
+                Text("Token access is not enabled for this tool yet.")
+                    .font(.envScaled(size: 12, weight: .regular))
+                    .foregroundStyle(Color.envMuted)
             case .retry:
                 Button("Retry") { authorization = nil }.buttonStyle(.bordered)
             case .allowed, .none:
