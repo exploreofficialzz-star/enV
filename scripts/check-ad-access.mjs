@@ -117,7 +117,7 @@ assert.match(adPolicy, /export function isHybridAccessToolId/, "The offline acce
 assert.match(offlineClient, /isHybridAccessToolId/, "Web offline billing must use the ad-independent hybrid access policy.");
 assert.match(androidAds, /!tool\.id\.startsWith\("finance-"\)/, "Android must exclude finance-prefixed tools from the hybrid cohort.");
 assert.match(iosAds, /!tool\.id\.hasPrefix\("finance-"\)/, "iOS must exclude finance-prefixed tools from the hybrid cohort.");
-assert.match(iosAds, /NativeAdsPolicy\.adDisplayConfigured && NativeAdsPolicy\.isAdEligibleTool/, "iOS native ad slots must use ad eligibility, not offline-wallet membership.");
+assert.match(iosAds, /NativeAdsPolicy\.adDisplayConfigured\s*&&\s*NativeAdsPolicy\.isAdEligibleTool/, "iOS native ad slots must use ad eligibility, not offline-wallet membership.");
 
 assert.ok(meteredProfiles.profiles.every((profile) => profile.platforms.includes("web") && profile.platforms.includes("android") && profile.platforms.includes("ios")), "Offline metering profiles must have platform parity.");
 assert.match(offlinePolicy, /tokenPolicy: "monetization-pending"/, "Offline execution classification must remain separate from billing rollout.");
