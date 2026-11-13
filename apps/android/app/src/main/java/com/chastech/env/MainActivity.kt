@@ -3150,6 +3150,7 @@ internal enum class NativeToolAuthorization {
     ALLOWED,
     SIGN_IN_REQUIRED,
     INSUFFICIENT_CREDITS,
+    UNAVAILABLE,
     RETRY,
 }
 
@@ -3183,6 +3184,7 @@ internal class NativeToolExecutionTelemetry(
             val message = error.message.orEmpty()
             when {
                 "INSUFFICIENT_CREDITS" in message -> NativeToolAuthorization.INSUFFICIENT_CREDITS
+                "AD_FALLBACK_BILLING_DISABLED" in message || "AD_FALLBACK_NOT_AVAILABLE" in message -> NativeToolAuthorization.UNAVAILABLE
                 "NATIVE_SESSION_INVALID" in message || "AUTH_REQUIRED" in message -> NativeToolAuthorization.SIGN_IN_REQUIRED
                 else -> NativeToolAuthorization.RETRY
             }
@@ -3275,6 +3277,7 @@ private fun ActionRow(onRun: () -> Unit, onReset: () -> Unit) {
             Button(onClick = { openAccountPath("signup") }) { Text("Create account") }
         }
         NativeToolAuthorization.INSUFFICIENT_CREDITS -> Button(onClick = { openAccountPath("wallet") }) { Text("Buy enV") }
+        NativeToolAuthorization.UNAVAILABLE -> Text("Token access is not enabled for this tool yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         NativeToolAuthorization.RETRY -> OutlinedButton(onClick = { accessState = null }) { Text("Retry") }
         else -> Unit
     }
