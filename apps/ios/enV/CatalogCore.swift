@@ -433,6 +433,89 @@ extension Catalog {
             relatedReferenceTools: relatedReferenceTools
         )
     }
+
+    /// Registers the native local File workspace tools alongside the shared catalogue.
+    func includingFileWorkspaceTools() -> Catalog {
+        let definitions: [(String, String, String, String, [String], String)] = [
+            ("file-to-txt", "File to TXT Converter", "Text extraction",
+             "Extract readable text locally from supported text files, DOCX documents and selectable-text PDFs.",
+             ["file to txt", "extract text", "docx to txt", "pdf to txt", "plain text"], "file-converter"),
+            ("file-organizer", "File Organizer", "Organization",
+             "Copy selected files into clearly named type folders without moving or deleting originals.",
+             ["organize files", "sort files", "folders", "file manager", "phone storage"], "custom"),
+            ("batch-file-renamer", "Batch File Renamer", "Organization",
+             "Preview filename numbering, prefixes, suffixes and replacements before exporting renamed copies.",
+             ["batch rename", "bulk rename", "filename pattern", "prefix", "suffix"], "custom"),
+            ("duplicate-file-finder", "Duplicate File Finder", "Verification",
+             "Find identical files using streaming SHA-256 verification after a file-size prefilter.",
+             ["duplicate finder", "identical files", "sha256", "checksum", "free storage"], "custom"),
+            ("folder-size-analyzer", "Folder Size Analyzer", "Analysis",
+             "Inspect folder totals, file-type breakdowns and the largest files on this device.",
+             ["folder size", "disk usage", "du", "largest files", "storage analyzer"], "custom"),
+            ("file-search", "File Search", "Search",
+             "Search filenames and supported text file contents without typing terminal commands.",
+             ["find files", "grep", "search in files", "file finder", "text search"], "custom"),
+            ("file-compare", "File & Folder Compare", "Verification",
+             "Compare two folder selections and verify same-size files with SHA-256 checksums.",
+             ["compare folders", "directory diff", "rsync", "file comparison", "backup compare"], "custom")
+        ]
+        let existing = Set(tools.map(\.id))
+        let additions = definitions.filter { !existing.contains($0.0) }.map { definition -> Tool in
+            let (id, name, subcategory, description, keywords, engineType) = definition
+            return Tool(
+                id: id,
+                name: name,
+                slug: id,
+                description: description,
+                category: "files",
+                subcategory: subcategory,
+                keywords: keywords + ["files", "local", "mobile", "offline"],
+                tags: ["files", "local", "mobile", "offline", "file-workspace"],
+                icon: id == "file-organizer" ? "FolderTree" :
+                    id == "batch-file-renamer" ? "FilePenLine" :
+                    id == "duplicate-file-finder" ? "Files" :
+                    id == "folder-size-analyzer" ? "HardDrive" :
+                    id == "file-search" ? "FileSearch" :
+                    id == "file-compare" ? "GitCompareArrows" : "FileText",
+                popularity: id == "file-organizer" ? 1120 : 1040,
+                featured: true,
+                clientSide: true,
+                requiresBackend: false,
+                requiresAuth: false,
+                status: "active",
+                disclaimer: nil,
+                related: [],
+                engine: ToolEngine(
+                    type: engineType,
+                    id: engineType == "custom" ? id : nil,
+                    op: engineType == "file-converter" ? "file-to-txt" : nil,
+                    configuration: [:]
+                )
+            )
+        }
+        guard !additions.isEmpty else { return self }
+        let updated = tools + additions
+        return Catalog(
+            schemaVersion: schemaVersion,
+            catalogVersion: catalogVersion,
+            counts: CatalogCounts(
+                total: updated.count,
+                active: updated.filter { $0.status == "active" || $0.status == "beta" }.count,
+                planned: updated.filter { $0.status != "active" && $0.status != "beta" }.count,
+                categories: categories.count
+            ),
+            categories: categories,
+            tools: updated.sorted {
+                let left = $0.category.lowercased()
+                let right = $1.category.lowercased()
+                return left == right
+                    ? $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+                    : left < right
+            },
+            relatedReferenceTools: relatedReferenceTools
+        )
+    }
+
 }
 
 extension Catalog {
