@@ -84,7 +84,7 @@ function file(name, content) {
 }
 
 async function selectFilesAndWait(files) {
-  const input = page.locator('input[type="file"]').first();
+  const input = page.locator('section input[type="file"]').first();
   await input.setInputFiles(files);
   try {
     await page.getByText(files.length + " selected", { exact: false }).waitFor({ timeout: 10_000 });
