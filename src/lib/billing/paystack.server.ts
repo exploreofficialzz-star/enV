@@ -3,7 +3,7 @@ import { getSql } from "../db";
 import {
   readWallet, creditVerifiedPurchase, reconcileVerifiedRefund, reconcileVerifiedDispute,
 } from "./ledger.server";
-import { getPaystackLocalChannels, requirePaystackVerificationSecret, resolvePaystackCountryConfiguration } from "./provider-config";
+import { getPaystackLocalChannels, isPaystackLocalCustomer, requirePaystackVerificationSecret, resolvePaystackCountryConfiguration } from "./provider-config";
 import { readBoundedBytes } from "./bounded-json.server";
 import { getCountryPaymentProfile, normalizeCountryCode } from "./country-routing";
 import { getFlutterwaveFundingOption } from "./flutterwave.server";
@@ -110,8 +110,13 @@ export async function getPaystackFundingOption(countryCode: string | null | unde
 }
 
 export async function getFundingOptions(countryCode: string | null = null) {
+  // Paystack's account country controls its settlement currency. Do not allow a
+  // foreign visitor to inherit an NGN/merchant-country checkout just because
+  // international Paystack cards are enabled. Foreign customers use the
+  // Flutterwave Standard profile for their detected country and local currency.
+  const paystackIsLocal = isPaystackLocalCustomer(countryCode, process.env);
   const [paystack, flutterwave] = await Promise.all([
-    getPaystackFundingOption(countryCode),
+    paystackIsLocal ? getPaystackFundingOption(countryCode) : Promise.resolve(null),
     getFlutterwaveFundingOption(countryCode),
   ]);
 
@@ -170,9 +175,11 @@ export async function getFundingOptions(countryCode: string | null = null) {
     provider: firstEnabled?.id ?? null,
     providers,
     anyEnabled: providers.some((provider) => provider.enabled),
-    message: country
-      ? "Payment methods are selected for your detected country. Only configured and approved provider currencies are enabled."
-      : "Your country could not be detected. Retry from an online connection to show local payment methods.",
+    message: !country
+      ? "Your country could not be detected. Retry from an online connection to show country-specific payment methods."
+      : providers.some((provider) => provider.enabled)
+        ? "Payment methods and checkout currency are selected for your detected country."
+        : "No approved payment method is currently available for your detected country and currency. No payment was taken.",
   };
 }
 
