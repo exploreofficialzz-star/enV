@@ -59,6 +59,7 @@ async function openTool(slug, title) {
   const response = await page.goto(baseUrl + "/tools/files/" + slug, { waitUntil: "networkidle" });
   assert.equal(response?.status(), 200, slug + " route returns HTTP 200");
   await page.getByRole("heading", { name: title }).first().waitFor();
+  await page.locator('section[data-file-workspace-ready="true"]').waitFor({ timeout: 15_000 });
 }
 
 async function inspectZip(bytes) {
