@@ -21,7 +21,11 @@ import {
   AdsterraResponsiveBanner,
   type AdsterraDeliveryState,
 } from "@/components/ads/adsterra-ad";
-import { isAdsterraQualifiedTool } from "@/lib/ads/policy";
+import {
+  grantAdFallbackExecution,
+  isAdsterraQualifiedTool,
+  recordAdsterraToolDelivery,
+} from "@/lib/ads/policy";
 import { ADSTERRA_CONSENT_STORAGE_KEY, getAdsterraConsent, openAdsterraSmartlinkFromOutput } from "@/lib/ads/adsterra";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import type { PublicCommunityFeed } from "@/lib/community/public-feed.functions";
@@ -79,9 +83,10 @@ export function ToolShell({
   const authorizedExecutionRef = useRef(false);
   const pendingExecutionRef = useRef<HTMLElement | null>(null);
   const onAdDelivery = useCallback((state: AdsterraDeliveryState) => {
+    recordAdsterraToolDelivery(tool.id, state);
     setAdDelivery((current) => current === "filled" ? current : state);
     if (state === "filled") setFallbackPromptOpen(false);
-  }, []);
+  }, [tool.id]);
   const requiresTokenFallback = adsterraQualified && (adDelivery !== "filled" || isFullscreen);
   const authenticatedAccount = Boolean(accessUser && !accessUser.isDevFallback && !accessUserPending);
   const showAdFallbackGate = requiresTokenFallback && fallbackPromptOpen && !paidExecutionInFlight;
@@ -101,6 +106,12 @@ export function ToolShell({
     }, 15_000);
     return () => window.clearTimeout(timeout);
   }, [tool.id, adsterraQualified, adsterraAdsEnabled]);
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+    setAdDelivery("blocked");
+    recordAdsterraToolDelivery(tool.id, "blocked");
+  }, [tool.id, isFullscreen]);
 
   useEffect(() => {
     if (!requiresTokenFallback || accessUserPending || !authenticatedAccount) {
@@ -177,6 +188,7 @@ export function ToolShell({
         }
         return;
       }
+      grantAdFallbackExecution(tool.id);
       authorizedExecutionRef.current = true;
       setPaidExecutionInFlight(true);
       setFallbackPromptOpen(false);
