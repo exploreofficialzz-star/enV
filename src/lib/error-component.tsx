@@ -1,5 +1,5 @@
 import { useEffect, useId } from "react";
-import type { ErrorComponentProps } from "@tanstack/react-router";
+import { useRouter } from "@tanstack/react-router";
 import { TriangleAlert } from "lucide-react";
 
 const FALLBACK_MESSAGE = "We couldn’t complete this page request. Try again or return to enV.";
@@ -32,7 +32,8 @@ function publicErrorMessage(error: unknown): string {
   return FALLBACK_MESSAGE;
 }
 
-export function AppErrorComponent({ error, reset }: ErrorComponentProps) {
+export function AppErrorComponent({ error }: { error: unknown }) {
+  const router = useRouter();
   const reactId = useId();
   const reference = reactId.replace(/[^a-zA-Z0-9]/g, "").slice(-10).toUpperCase() || "PAGE";
   const status = statusCodeOf(error);
@@ -65,7 +66,7 @@ export function AppErrorComponent({ error, reset }: ErrorComponentProps) {
       <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
         <button
           type="button"
-          onClick={reset}
+          onClick={() => { void router.invalidate(); }}
           className="inline-flex min-h-11 items-center justify-center rounded-xl bg-teal-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2"
         >
           Try again
