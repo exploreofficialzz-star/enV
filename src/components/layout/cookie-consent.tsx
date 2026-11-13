@@ -121,7 +121,7 @@ export function CookieConsent() {
             Cookie preferences
           </h2>
           <p id="env-cookie-description" className="mt-1 text-xs leading-5 text-muted">
-            Essential storage is always active. Analytics and advertising are optional. Ad-supported tools may require sign-in or enV when no ad is delivered.
+            Essential storage is always active. Analytics and advertising are optional. Ad-supported tools may require sign-in or an approved enV charge when no ad is delivered.
           </p>
         </div>
         <a
