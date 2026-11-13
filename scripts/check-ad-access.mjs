@@ -197,8 +197,8 @@ assert.match(iosAds, /didFailToReceiveAdWithError/, "iOS failed native ad reques
 assert.match(iosWallet, /api\/billing\/ad-fallback\/consume/, "iOS must call the server ad-fallback debit endpoint.");
 assert.match(iosCalculator, /func authorizeRun\(\) async -> NativeToolAuthorization/, "iOS native Run must authorize before execution.");
 assert.match(iosCalculator, /NativeAdsAvailability\.shared\.isFilled\(toolID\)/, "iOS native execution must require an ad fill or token fallback.");
-assert.match(iosCalculator, /NativeToolAuthorization\.signInRequired/, "iOS guests without ad fill must receive sign-in and create-account actions.");
-assert.match(iosCalculator, /NativeToolAuthorization\.insufficientCredits/, "iOS users without enough enV must be directed to Wallet.");
+assert.match(iosCalculator, /case \.signInRequired/, "iOS guests without ad fill must receive sign-in and create-account actions.");
+assert.match(iosCalculator, /case \.insufficientCredits/, "iOS users without enough enV must be directed to Wallet.");
 assert.match(iosAds, /restrictedCategories/, "iOS must exclude fitness and personal tools like Web and Android.");
 assert.match(iosAds, /restrictedDisclaimers/, "iOS must exclude health, finance and earnings disclaimer tools.");
 assert.match(iosCalculator, /NativeAdsPolicy\.isHybridTool\(tool\)/, "iOS ad slots and offline gating must use the same per-tool decision.");
