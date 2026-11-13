@@ -2,7 +2,7 @@
 
 ## Selected placements
 
-Adsterra is restricted to qualified Web tool pages. Home, the All tools directory, Blog index, and Blog article pages never render advertising. A tool qualifies when its Web tool record is active and it is outside restricted health/finance/earnings/personal/fitness topics. Eligibility applies across ordinary categories and does not depend on local versus backend execution, account state or the offline-wallet allowlist. Studio workspaces, AI-related tools, Labs and Sandbox experiences are excluded by category and tool metadata.
+Adsterra is restricted to qualified Web tool pages. Home, the All tools directory, Blog index, and Blog article pages never render advertising. A tool qualifies when its Web tool record is active and it is outside restricted health/finance/earnings/personal/fitness topics. Eligibility applies across ordinary categories and does not depend on local versus backend execution, account state or the offline-wallet allowlist. Studio workspaces, AI-related tools, Labs and Sandbox experiences are excluded by category and tool metadata. The private A book notes/journal workspace is also excluded.
 
 | Qualified tool surface | Format | Publisher placement | Purpose |
 |---|---|---:|---|
