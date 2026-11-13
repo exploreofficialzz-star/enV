@@ -3,6 +3,7 @@ import { Component, useState } from "react";
 import type { ReactNode } from "react";
 import { AiResultView } from "@/components/ai/ai-results";
 import { ErrorBanner } from "@/components/tools/error-banner";
+import { FileDropzone } from "@/components/tools/file-dropzone";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -149,7 +150,7 @@ function AiAssistForm({ feature }: { feature: AiFeature }) {
       case "audio":
         return (
           <div className="space-y-1">
-            <Input id={id} type="file" accept={field.accept} onChange={(event) => void onFile(field, event.target.files?.[0])} />
+            <FileDropzone accept={field.accept} label="Drop a file or browse" onFiles={(selected) => void onFile(field, selected[0])} />
             {isFileValue(value) ? (
               <p className="text-xs text-muted">
                 {value.filename ? `${value.filename} · ` : ""}

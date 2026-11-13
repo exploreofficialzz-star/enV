@@ -3,6 +3,7 @@ import { ABookPdfViewer } from "@/components/engines/a-book-pdf-viewer";
 import { extractPdfTextLocally, extractSelectedPdfTextLocally } from "@/lib/a-book/pdf-reader";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { Button } from "@/components/ui/button";
+import { FileDropzone } from "@/components/tools/file-dropzone";
 import {
   addAttachments,
   createNote,
@@ -110,7 +111,6 @@ export function ABookEngine() {
   const [loadedProfileId, setLoadedProfileId] = useState<string | null | undefined>(undefined);
   const [profileSwitchError, setProfileSwitchError] = useState("");
   const [profileSwitchRetry, setProfileSwitchRetry] = useState(0);
-  const fileInput = useRef<HTMLInputElement>(null);
   const importInput = useRef<HTMLInputElement>(null);
   const saveTimer = useRef<number | undefined>(undefined);
   const savedFingerprints = useRef(new Map<string, string>());
@@ -380,7 +380,7 @@ export function ABookEngine() {
     if (note) setCurrentNote({ ...note, ...patch, updatedAt: Date.now() });
   }
 
-  async function attachFiles(files: FileList | null) {
+  async function attachFiles(files: File[] | FileList | null) {
     if (!current || !files?.length) return;
     try {
       const imported = await addAttachments(current.id, Array.from(files));
@@ -390,7 +390,6 @@ export function ABookEngine() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The file could not be saved locally. Check available device storage.");
     }
-    if (fileInput.current) fileInput.current.value = "";
   }
 
   async function runPdfOperation(
@@ -861,11 +860,8 @@ export function ABookEngine() {
           <p className="text-[11px] text-muted">Local revision {current.revision} · Last edited {formatDate(current.updatedAt)}</p>
 
           <section className="space-y-3 rounded-lg border border-border p-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div><h3 className="text-sm font-semibold">Files on this device</h3><p className="text-xs text-muted">Attachments are stored locally in this browser.</p></div>
-              <Button type="button" size="sm" variant="outline" onClick={() => fileInput.current?.click()}>Add files</Button>
-              <input ref={fileInput} type="file" multiple className="hidden" onChange={(event) => void attachFiles(event.target.files)} />
-            </div>
+            <h3 className="text-sm font-semibold">Attachments</h3>
+            <FileDropzone multiple disabled={current.deletedAt !== null} label="Drop files or browse" onFiles={(selected) => void attachFiles(selected)} />
             {attachments.length ? <div className="space-y-2">
               {attachments.map((file) => <div key={file.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-surface-2 px-3 py-2 text-xs">
                 <span className="min-w-0 flex-1 truncate">{file.name} · {(file.size / 1024).toFixed(0)} KB</span>

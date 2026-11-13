@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/tools/error-banner";
+import { FileDropzone } from "@/components/tools/file-dropzone";
 import { downloadBlob } from "@/lib/utils";
 import { apiUrl } from "@/lib/api/base";
 
@@ -54,11 +55,13 @@ export function TranscriptionEngine({ mode, format }: Props) {
     } finally { setBusy(false); }
   };
 
+  const accept = mode === "audio" ? "audio/*,.mp3,.wav,.m4a,.ogg,.flac,.webm" : "video/*,.mp4,.webm,.mov,.m4v,.ogv";
   const reset = () => { setFile(null); setLanguage("auto"); setTranslate(false); setBusy(false); setError(null); setOutput(""); setDownloadUrl(null); };
 
   return <div className="space-y-5">
-    <p className="text-sm text-muted-foreground">Real speech transcription through the configured enV transcription service. The browser sends the selected file only to that configured endpoint.</p>
-    <input className="block w-full rounded-lg border border-border bg-surface p-2 text-sm" type="file" accept={mode === "audio" ? "audio/*,.mp3,.wav,.m4a,.ogg,.flac,.webm" : "video/*,.mp4,.webm,.mov,.m4v,.ogv"} onChange={e => setFile(e.target.files?.[0] ?? null)} />
+    <FileDropzone accept={accept} disabled={busy} label={`Drop ${mode} or browse`} onFiles={(next) => { setFile(next[0] ?? null); setError(null); setOutput(""); setDownloadUrl(null); }} />
+    {file ? <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-2 px-3 py-2 text-sm"><span className="min-w-0 truncate font-medium">{file.name}</span><span className="shrink-0 text-xs text-muted">{(file.size / 1024 / 1024).toFixed(2)} MB</span></div> : null}
+    <p className="text-xs text-muted-foreground">Transcription sends the selected file to the configured enV transcription service.</p>
     <div className="grid gap-3 sm:grid-cols-2">
       <label className="block text-sm">Language
         <input className="mt-1 h-10 w-full rounded-md border border-border bg-surface px-3" value={language} onChange={e => setLanguage(e.target.value)} placeholder="auto or en" />

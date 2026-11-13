@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Copy, FileSearch, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/tools/error-banner";
+import { FileDropzone } from "@/components/tools/file-dropzone";
 
 type MimeEntry = { ext: string; mime: string; name: string; group: string; magic?: number[] };
 const TYPES: MimeEntry[] = [
@@ -19,7 +20,7 @@ export function MimeEngine(_props: { op: string }) {
   return <div className="space-y-5">
     <div className="rounded-xl border border-border bg-surface-2/50 p-4"><div className="flex items-center gap-2 font-medium"><Search className="size-4"/> MIME reference</div><p className="mt-1 text-sm text-subtle">Search by extension, MIME type, name, or category. No network lookup is required.</p><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="e.g. .webp, image/png, pdf" className="mt-3 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"/></div>
     <div className="grid gap-2">{results.map(x=><div key={x.ext+x.mime} className="flex flex-col gap-2 rounded-lg border border-border p-3 sm:flex-row sm:items-center sm:justify-between"><div><div className="font-medium">.{x.ext} · {x.name}</div><div className="text-xs text-muted">{x.mime} · {x.group}</div></div><Button variant="outline" size="sm" onClick={()=>copy(x.mime)}><Copy className="mr-1 size-3"/>Copy MIME</Button></div>)}</div>
-    <div className="rounded-xl border border-border p-4"><div className="flex items-center gap-2 font-medium"><FileSearch className="size-4"/> Inspect a local file</div><p className="mt-1 text-sm text-subtle">Only the first 64 bytes are read. Your file stays on this device.</p><input className="mt-3 block w-full text-sm" type="file" onChange={e=>{const f=e.target.files?.[0]; if(f) void inspect(f);}}/>{error?<ErrorBanner message={error}/>:null}</div>
+    <div className="space-y-3"><FileDropzone label="Drop a file or browse" hint="Only the first 64 bytes are inspected." onFiles={(next)=>{const selected=next[0]; if(selected) void inspect(selected);}} />{error?<ErrorBanner message={error}/>:null}</div>
     {inspection?<div className="rounded-xl border border-border p-4"><div className="grid gap-3 text-sm sm:grid-cols-2"><div><span className="text-muted">Filename</span><div>{file?.name}</div></div><div><span className="text-muted">Browser MIME</span><div>{inspection.browser}</div></div><div><span className="text-muted">Extension</span><div>.{inspection.ext||"none"}</div></div><div><span className="text-muted">Signature match</span><div>{inspection.entry?`${inspection.entry.name} (${inspection.entry.mime})`:"Unknown signature"}</div></div></div><div className="mt-3 rounded-lg bg-surface-2 p-3 font-mono text-xs break-all">{inspection.bytes}</div>{inspection.mismatch?<p className="mt-3 rounded-lg bg-accent-soft p-3 text-sm">The detected signature does not match the filename extension. This can mean the file is mislabeled, renamed, or a format shares a container signature.</p>:null}</div>:null}
   </div>;
 }

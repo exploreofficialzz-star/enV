@@ -1,10 +1,11 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Copy, Download, Plus, RotateCcw, ShieldCheck, Trash2, Workflow } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ErrorBanner } from "@/components/tools/error-banner";
+import { FileDropzone } from "@/components/tools/file-dropzone";
 import { DEVELOPER_RECIPE_OPERATIONS, runDeveloperRecipe } from "@/lib/engines/developer-studios";
 
 type StepDraft = { id: number; op: string; name: string; find: string; replacement: string; pointer: string };
@@ -41,7 +42,6 @@ export function DeveloperRecipeWorkbench() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [nextId, setNextId] = useState(8);
-  const importInputRef = useRef<HTMLInputElement>(null);
   const byteCount = useMemo(() => new TextEncoder().encode(input).byteLength, [input]);
   const currentConfig = () => ({ input, steps: steps.map(({ id: _id, ...step }) => ({ op: step.op, ...(step.name.trim() ? { name: step.name.trim() } : {}), ...(step.op === "replace-literal" ? { find: step.find, replacement: step.replacement } : {}), ...(step.op === "json-pointer-get" ? { pointer: step.pointer } : {}) })) });
 
@@ -86,7 +86,6 @@ export function DeveloperRecipeWorkbench() {
       });
       setInput(parsed.input); setSteps(imported); setNextId(imported.length + 1); setReport(null); setError(null); setNotice("Recipe JSON loaded locally. Review it, then run the recipe.");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not import the local recipe file."); }
-    finally { if (importInputRef.current) importInputRef.current.value = ""; }
   };
   const loadJsonExample = () => {
     setInput('{"items":[{"id":9007199254740993,"name":"enV"}]}');
@@ -118,7 +117,7 @@ export function DeveloperRecipeWorkbench() {
       <div className="flex flex-wrap items-center gap-2"><label className="min-w-0 flex-1 space-y-1"><Label htmlFor="recipe-new-operation">Add operation</Label><select id="recipe-new-operation" value={newOperation} onChange={(event) => setNewOperation(event.target.value)} className="min-h-10 w-full rounded-md border border-border bg-background px-3 text-sm">{DEVELOPER_RECIPE_OPERATIONS.map((op) => <option key={op} value={op}>{readableOp(op)}</option>)}</select></label><Button type="button" variant="outline" className="mt-5" disabled={steps.length >= 16} onClick={() => { setSteps((current) => [...current, { id: nextId, op: newOperation, name: "", find: "", replacement: "", pointer: "" }]); setNextId((id) => id + 1); }}><Plus className="mr-1.5 size-4" />Add step</Button></div>
     </section>
 
-    <div className="flex flex-wrap items-center gap-2"><Button type="button" onClick={() => void run()} disabled={busy || steps.length < 1}><Workflow className="mr-1.5 size-4" />{busy ? "Running recipe…" : "Run recipe"}</Button><Button type="button" variant="outline" onClick={loadExample}><RotateCcw className="mr-1.5 size-4" />Load text example</Button><Button type="button" variant="outline" onClick={loadJsonExample}>Load JSON Pointer example</Button><Button type="button" variant="outline" onClick={() => download(JSON.stringify(currentConfig(), null, 2), "env-recipe.json", "application/json;charset=utf-8")}><Download className="mr-1.5 size-4" />Export recipe</Button><Button type="button" variant="outline" onClick={() => importInputRef.current?.click()}>Import recipe</Button><input ref={importInputRef} type="file" accept="application/json,.json" className="hidden" aria-label="Choose recipe JSON file" onChange={(event) => void importRecipe(event.target.files?.[0])} /><Button type="button" variant="ghost" onClick={() => { setInput(""); setSteps([{ id: 1, op: "trim", name: "Trim", find: "", replacement: "", pointer: "" }]); setNextId(2); setReport(null); setError(null); setNotice(""); }}>Reset</Button><span className="text-xs text-muted">Ctrl/⌘ + Enter runs the recipe.</span></div>
+    <div className="flex flex-wrap items-center gap-2"><Button type="button" onClick={() => void run()} disabled={busy || steps.length < 1}><Workflow className="mr-1.5 size-4" />{busy ? "Running recipe…" : "Run recipe"}</Button><Button type="button" variant="outline" onClick={loadExample}><RotateCcw className="mr-1.5 size-4" />Load text example</Button><Button type="button" variant="outline" onClick={loadJsonExample}>Load JSON Pointer example</Button><Button type="button" variant="outline" onClick={() => download(JSON.stringify(currentConfig(), null, 2), "env-recipe.json", "application/json;charset=utf-8")}><Download className="mr-1.5 size-4" />Export recipe</Button><FileDropzone accept="application/json,.json" label="Import recipe JSON" onFiles={(selected) => void importRecipe(selected[0])} /><Button type="button" variant="ghost" onClick={() => { setInput(""); setSteps([{ id: 1, op: "trim", name: "Trim", find: "", replacement: "", pointer: "" }]); setNextId(2); setReport(null); setError(null); setNotice(""); }}>Reset</Button><span className="text-xs text-muted">Ctrl/⌘ + Enter runs the recipe.</span></div>
     <ErrorBanner message={error} />
     {notice ? <p className="text-sm text-muted" role="status">{notice}</p> : null}
 

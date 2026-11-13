@@ -10,6 +10,7 @@ import {
 } from "@zxing/library";
 import { Button } from "@/components/ui/button";
 import { downloadText } from "@/lib/utils";
+import { FileDropzone } from "@/components/tools/file-dropzone";
 
 type ScanRecord = {
   id: string;
@@ -511,27 +512,8 @@ export function BarcodeReaderEngine() {
 
         <section className="space-y-3" aria-labelledby="reader-upload-heading">
           <h3 id="reader-upload-heading" className="text-sm font-semibold">Read an image</h3>
-          <label className="flex min-h-40 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-border bg-surface-2 p-5 text-center transition-colors hover:border-accent">
-            <span className="mb-3 flex size-11 items-center justify-center rounded-xl bg-surface text-lg" aria-hidden="true">↥</span>
-            <span className="text-sm font-semibold">{imageBusy ? "Reading image…" : "Choose QR or barcode image"}</span>
-            <span className="mt-1 text-xs text-muted">PNG, JPG, WebP or another browser-supported image · 15 MB max</span>
-            <input
-              className="sr-only"
-              type="file"
-              accept="image/*"
-              aria-label="Upload QR or barcode image"
-              disabled={imageBusy}
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0];
-                event.currentTarget.value = "";
-                if (file) void scanImage(file);
-              }}
-            />
-          </label>
-          <div className="rounded-lg bg-surface-2 p-3 text-xs leading-5 text-muted">
-            <strong className="text-fg">Supported examples</strong>
-            <p className="mt-1">QR Code, Data Matrix, PDF417, Aztec, EAN-8/13, UPC-A/E, Code 39/93/128, Codabar and ITF.</p>
-          </div>
+          <FileDropzone accept="image/*" disabled={imageBusy} label={imageBusy ? "Reading image…" : "Drop a QR or barcode image or browse"} hint="15 MB maximum" onFiles={(selected) => { const file = selected[0]; if (file) void scanImage(file); }} />
+          <p className="text-xs text-muted">QR Code · Data Matrix · PDF417 · Aztec · EAN · UPC · Code 39/128 · Codabar · ITF</p>
         </section>
       </div>
 

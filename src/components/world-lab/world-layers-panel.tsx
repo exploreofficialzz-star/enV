@@ -1,5 +1,6 @@
-import {useMemo,useRef,useState} from "react";
+import {useMemo,useState} from "react";
 import {parseWorldObservation,classifyObservationFreshness,type WorldObservation} from "@/lib/world-lab/observation-contract";
+import {FileDropzone} from "@/components/tools/file-dropzone";
 import {earthReferenceLayerAtDepth,atmosphereReferenceLayerAtAltitude,assessLayerEvidence} from "@/lib/world-lab/world-layers";
 
 const field="w-full rounded border border-border bg-bg px-2 py-2 text-sm";
@@ -14,7 +15,6 @@ export function WorldLabReferenceLayersPanel() {
   const [altitudeText,setAltitudeText]=useState("0");
   const [observation,setObservation]=useState<WorldObservation|null>(null);
   const [problem,setProblem]=useState("");
-  const picker=useRef<HTMLInputElement>(null);
   const depth=parseNumber(depthText,0);
   const altitude=parseNumber(altitudeText,0);
   const earth=useMemo(()=>{try{return {value:earthReferenceLayerAtDepth(depth),error:""};}catch(e){return {value:null,error:e instanceof Error?e.message:"Invalid depth."};}},[depth]);
@@ -28,7 +28,6 @@ export function WorldLabReferenceLayersPanel() {
       const parsed=parseWorldObservation(JSON.parse(await file.text()));
       setObservation(parsed);setProblem("");
     }catch(e){setObservation(null);setProblem(e instanceof Error?e.message:"The observation manifest is invalid.");}
-    if(picker.current)picker.current.value="";
   }
   return <section className="mt-3 rounded-xl border border-border p-3" aria-label="World observation and reference layers">
     <h3 className="text-sm font-semibold">Surface, subsurface and atmosphere layers</h3>
@@ -70,10 +69,9 @@ export function WorldLabReferenceLayersPanel() {
         <p>Dataset: {observation.source?.datasetId??observation.modelId??"representative layer"} · version: {observation.source?.datasetVersion??observation.modelVersion??"—"}</p>
         <p>Freshness at current time: {classifyObservationFreshness(observation,now)}</p>
       </div>}
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button className={button} type="button" onClick={()=>picker.current?.click()}>Attach observation manifest</button>
+      <div className="mt-3 space-y-2">
+        <FileDropzone accept=".json,application/json" label="Drop an observation manifest or browse" hint="JSON · 128 KB maximum" onFiles={(selected)=>void attach(selected[0])}/>
         <button className={button} type="button" disabled={!observation} onClick={()=>{setObservation(null);setProblem("");}}>Clear manifest</button>
-        <input ref={picker} className="hidden" type="file" accept=".json,application/json" onChange={e=>void attach(e.target.files?.[0])}/>
       </div>
       {problem&&<p role="alert" className="mt-2 text-xs text-red-600">{problem}</p>}
     </div>

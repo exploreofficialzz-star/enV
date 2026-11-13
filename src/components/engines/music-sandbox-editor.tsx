@@ -12,6 +12,7 @@ import {
 } from "react";
 import { ArrowLeft, Check, FileAudio, FileJson, FileText, Save, Trash2 } from "lucide-react";
 import { useBlocker } from "@tanstack/react-router";
+import { FileDropzone } from "@/components/tools/file-dropzone";
 import { sandboxAudio } from "@/lib/engines/music-sandbox-storage";
 import { inspectSandboxAudio } from "@/lib/engines/music-sandbox-files";
 import { analyzeSandboxAudio, applySandboxAnalysis, sandboxTempoBand } from "@/lib/engines/music-sandbox-analysis";
@@ -348,11 +349,7 @@ export function MusicSandboxEditor({
       </nav>
       <div className="ms-editor-page">
         {section === "music" ? <>
-          <SandboxField label={record.audio ? "Replace audio" : "Add audio"}><input type="file" accept=".mp3,.wav,.flac,.m4a,.ogg,.aac,.aiff,.aif,.opus" onChange={async (e) => {
-            const file = e.target.files?.[0]; e.target.value = ""; if (!file) return;
-            try { await persist(); const next = await onReplace(latest.current, file); latest.current = next; setRecord(next); setAudioUrl(""); setAudioRevision((v) => v + 1); setSaveState("Saved on this device"); }
-            catch (err) { setError(err instanceof Error ? err.message : "Replacing audio failed."); }
-          }} /></SandboxField>
+          <SandboxField label={record.audio ? "Replace audio" : "Add audio"}><FileDropzone accept=".mp3,.wav,.flac,.m4a,.ogg,.aac,.aiff,.aif,.opus,audio/*" label="Drop audio or browse" onFiles={async (selected) => { const file = selected[0]; if (!file) return; try { await persist(); const next = await onReplace(latest.current, file); latest.current = next; setRecord(next); setAudioUrl(""); setAudioRevision((v) => v + 1); setSaveState("Saved on this device"); } catch (err) { setError(err instanceof Error ? err.message : "Replacing audio failed."); } }} /></SandboxField>
           {record.audio ? <p className="ms-analysis-note">{record.audio.filename} · {sandboxBytes(record.audio.size)}</p> : null}
           <div className="ms-fields">
             <SandboxField label="Display title"><input value={record.title} onChange={(e) => update({ ...latest.current, title: e.target.value })} /></SandboxField>
@@ -374,7 +371,7 @@ export function MusicSandboxEditor({
         {section === "lyrics" ? <>
           <label className="ms-check"><input type="checkbox" checked={record.instrumental} onChange={(e) => update({ ...latest.current, instrumental: e.target.checked })} /> This track is instrumental</label>
           <SandboxField label="Lyrics"><textarea className="ms-code ms-lyrics-input" rows={10} value={record.lyrics} onChange={(e) => update({ ...latest.current, lyrics: e.target.value })} placeholder="[verse]\nYour lyrics…" /></SandboxField>
-          <SandboxField label="Import lyrics text"><input type="file" accept=".txt" onChange={async (e) => { const file = e.target.files?.[0]; e.target.value = ""; if (!file) return; if (file.size > 1024 * 1024) { setError("Lyrics text must be 1 MB or smaller."); return; } update({ ...latest.current, lyrics: await file.text() }); }} /></SandboxField>
+          <SandboxField label="Import lyrics text"><FileDropzone accept=".txt,text/plain" label="Drop a TXT file or browse" onFiles={async (selected) => { const file = selected[0]; if (!file) return; if (file.size > 1024 * 1024) { setError("Lyrics text must be 1 MB or smaller."); return; } try { update({ ...latest.current, lyrics: await file.text() }); setError(""); } catch { setError("The lyrics file could not be read."); } }} /></SandboxField>
         </> : null}
         {section === "tags" ? <>
           <p className="ms-analysis-note">Separate tags with commas.</p>

@@ -97,7 +97,7 @@ const zipAnyFileTool: ToolMeta = {
   id: "zip-any-file",
   name: "Zip any file",
   slug: "zip-any-file",
-  description: "Compress one file or a whole selection into a ZIP/ZIP64 archive, or safely extract an archive. Files stay on this device.",
+  description: "Create ZIP archives from files or folders, or extract an archive.",
   category: "files",
   subcategory: "Archives & extraction",
   keywords: ["zip", "zipper", "compress", "compression", "archive", "extract", "unzip", "decompress", "zip64", "large files", "folder", "multiple files", "store", "share", "tar"],

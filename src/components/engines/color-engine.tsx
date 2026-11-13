@@ -4,6 +4,7 @@ import { CodeResult } from "@/components/engines/result-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FileDropzone } from "@/components/tools/file-dropzone";
 import { Select } from "@/components/ui/select";
 import {
   contrastRatio,
@@ -574,16 +575,11 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
         <section className="space-y-3 rounded-xl border border-border bg-surface p-3" aria-labelledby="image-palette-heading">
           <div>
             <h3 id="image-palette-heading" className="text-sm font-semibold text-fg">Extract colors from an image</h3>
-            <p className="mt-1 text-xs leading-5 text-muted">Choose a photo or design file. The image is sampled locally in this browser; it is not uploaded.</p>
           </div>
-          <Input type="file" accept="image/*" aria-label="Choose an image to extract a color palette" disabled={isExtractingPalette} aria-busy={isExtractingPalette} onChange={async (event) => {
-            const file = event.target.files?.[0];
+          <FileDropzone accept="image/*" disabled={isExtractingPalette} label="Drop an image or browse" hint="12 MB maximum" onFiles={async (next) => {
+            const file = next[0];
             if (!file) return;
-            if (file.size > 12 * 1024 * 1024) {
-              setPaletteError("Choose an image smaller than 12 MB.");
-              event.target.value = "";
-              return;
-            }
+            if (file.size > 12 * 1024 * 1024) { setPaletteError("Choose an image smaller than 12 MB."); return; }
             setIsExtractingPalette(true);
             setPaletteError("");
             try {
@@ -593,11 +589,8 @@ export function ColorEngine({ op, toolId }: { op: string; toolId?: string }) {
               setLockedSwatches({});
             } catch (error) {
               setPaletteError(error instanceof Error ? error.message : "Could not read the image.");
-            } finally {
-              setIsExtractingPalette(false);
-              event.target.value = "";
-            }
-          }} className="min-h-11" />
+            } finally { setIsExtractingPalette(false); }
+          }} />
           {isExtractingPalette ? <p role="status" className="text-xs text-muted">Sampling image colors locally…</p> : null}
           {imagePalette.length > 0 ? <div className="flex flex-wrap gap-2" aria-label="Extracted image colors">
             {imagePalette.map((value) => <button key={value} type="button" onClick={() => setColorValue(value)} className="group flex items-center gap-2 rounded-lg border border-border bg-surface-2 p-2 text-xs" aria-label={`Use extracted color ${value}`}>

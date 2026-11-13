@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { ErrorBanner } from "@/components/tools/error-banner";
+import { FileDropzone } from "@/components/tools/file-dropzone";
 import { CodeResult } from "@/components/engines/result-panel";
 import { DEVELOPER_HTTP_STATUS, hashBytes, runDeveloperStudio } from "@/lib/engines/developer-studios";
 import { runRegexStudio, buildRegexHighlightSegments, type RegexStudioMode } from "@/lib/engines/regex-studio";
@@ -332,14 +333,12 @@ export function DeveloperEngine({ op, tool, initialInput }: Props) {
   const handleEnter = (event: KeyboardEvent<HTMLTextAreaElement>) => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); void run(); } };
   return <div className="space-y-4">
     {parentStudio ? <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-3 text-sm"><div><p className="font-medium">Part of {parentStudio.name}</p><p className="mt-0.5 text-xs text-muted">Open the grouped workspace to switch between related developer tasks.</p></div><a href={parentStudioUrl} className="inline-flex min-h-9 items-center rounded-md border border-border px-3 py-2 font-medium hover:bg-surface-2">Open Studio</a></div> : null}
-    <div className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm" role="note">
-      <span className="font-medium">On-device processing.</span> Text operations run in this browser; input is not uploaded by this tool. File hashing reads the selected file locally.
-    </div>
+
     <div className="flex flex-wrap items-center gap-2">
       <Button type="button" variant="outline" size="sm" onClick={loadExample}>Load example</Button>
       <span className="text-xs text-muted">Use Ctrl/⌘ + Enter to run.</span>
     </div>
-    {isFileHash ? <div className="space-y-1.5"><Label htmlFor="dev-file">Local file</Label><input id="dev-file" type="file" onChange={(event) => { setSelectedFile(event.target.files?.[0] ?? null); setOut(""); setError(null); }} className="block w-full rounded-md border border-border p-2 text-sm" /><p className="text-xs text-muted">{selectedFile ? `${selectedFile.name} · ${selectedFile.size.toLocaleString()} bytes` : "The file never leaves this device."}</p></div> : null}
+    {isFileHash ? <div className="space-y-2"><Label>File to hash</Label><FileDropzone label="Drop a file or browse" disabled={false} onFiles={(next) => { setSelectedFile(next[0] ?? null); setOut(""); setError(null); }} />{selectedFile ? <p className="text-xs text-muted">{selectedFile.name} · {selectedFile.size.toLocaleString()} bytes</p> : null}</div> : null}
     <div className="grid gap-4 md:grid-cols-2">
       <label className="block space-y-1.5"><Label htmlFor="dev-input">{isRegexTool && regexMode === "pipeline" ? "Default pattern (unused by layers)" : op.toLowerCase().includes("regex") ? "Regular expression" : "Input"}</Label><Textarea id="dev-input" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleEnter} className="min-h-52 font-mono" placeholder="Paste your code, data, token, URL, or text here…" /></label>
       {needsSecond ? <label className="block space-y-1.5"><Label htmlFor="dev-secondary">{isRegexTool ? regexMode === "pipeline" ? "Pipeline JSON (input + ordered layers)" : regexMode === "benchmark" ? "Test strings JSON" : "Test text or batch JSON" : op.toLowerCase().includes("json-path") ? "JSON path" : "Second input"}</Label><Textarea id="dev-secondary" value={secondary} onChange={(e) => setSecondary(e.target.value)} onKeyDown={handleEnter} className="min-h-52 font-mono" placeholder={isRegexTool && regexMode === "pipeline" ? '{"input":"text","layers":[{"name":"Trim tags","pattern":"<[^>]+>","flags":"g","replacement":""}]}' : isRegexTool && regexMode === "benchmark" ? '["short sample", {"label":"adversarial near miss","text":"..."}]' : op.toLowerCase().includes("json-path") ? "$.items[0].id" : isRegexTool ? 'One sample or JSON array, e.g. ["order-12", "invoice-8"]' : "Paste comparison input or test text…"} /></label> : null}

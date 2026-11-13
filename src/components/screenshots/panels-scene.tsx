@@ -1,5 +1,6 @@
-import { useRef } from "react";
+
 import { Button } from "@/components/ui/button";
+import { FileDropzone } from "@/components/tools/file-dropzone";
 import { ASPECT_PRESETS } from "@/lib/screenshots/geometry";
 import { getPreset } from "@/lib/screenshots/presets";
 import { CANVAS_PRESETS, getCanvasPreset } from "@/lib/screenshots/store-presets";
@@ -17,13 +18,10 @@ export function SourcePanel({ source, recent, onFiles, onPaste, onCapture, onRem
   source: SourceEntry | undefined; recent: SourceEntry[]; onFiles: (f: File[]) => void; onPaste: () => void; onCapture: () => void; onRemove: () => void; onUse: (id: string) => void; onClearAll: () => void;
   canCapture: boolean; canPaste: boolean; multi: boolean; capture: { delay: number; setDelay: (n: number) => void; cursor: boolean; setCursor: (b: boolean) => void; remaining: number | null; cancel: () => void };
 }) {
-  const input = useRef<HTMLInputElement>(null);
   return (
     <div className="ss-stack">
       {source && !multi ? <p className="ss-meta"><strong>{source.name}</strong><br />{source.width} × {source.height} px · {(source.bytes / 1024).toFixed(0)} KB · {source.mime.replace("image/", "").toUpperCase()}{source.hasAlpha ? " · has transparency" : ""}</p> : null}
-      <div className="ss-btnrow">
-        <Button size="sm" variant="outline" onClick={() => input.current?.click()}>{multi ? "Add screenshots" : source ? "Replace image" : "Choose image"}</Button>
-        <input ref={input} type="file" accept="image/*" multiple={multi} hidden onChange={(e) => { const f = Array.from(e.target.files ?? []); e.target.value = ""; if (f.length) onFiles(f); }} />
+      <FileDropzone accept="image/*" multiple={multi} label={multi ? "Drop screenshots or browse" : source ? "Drop a replacement image or browse" : "Drop an image or browse"} onFiles={onFiles} />
         <Button size="sm" variant="outline" onClick={onPaste}>Paste</Button>
         {canCapture ? <Button size="sm" variant="outline" onClick={onCapture} disabled={capture.remaining !== null}>Capture screen</Button> : null}
         {source && !multi ? <Button size="sm" variant="ghost" onClick={onRemove}>Remove</Button> : null}
@@ -141,7 +139,7 @@ export function LayoutPanel({ ctx }: { ctx: PanelCtx }) {
 
 /* ---------------------------------------------------------------- background */
 export function BackgroundPanel({ ctx, onBgFile, hasBgImage }: { ctx: PanelCtx; onBgFile: (f: File) => void; hasBgImage: boolean }) {
-  const { scene, edit, adv } = ctx, bg = scene.background, input = useRef<HTMLInputElement>(null);
+  const { scene, edit, adv } = ctx, bg = scene.background;
   const set = (spec: BackgroundSpec, key?: string) => edit((s) => ({ ...s, background: spec }), key);
   const grad = bg.kind === "linear" ? bg : { kind: "linear" as const, angle: 135, stops: [{ offset: 0, color: "#dbeafe" }, { offset: 1, color: "#e0e7ff" }] };
   return (
@@ -158,8 +156,7 @@ export function BackgroundPanel({ ctx, onBgFile, hasBgImage }: { ctx: PanelCtx; 
             <ColorInput label="Start colour" value={bg.stops[0]?.color ?? "#ffffff"} onChange={(v) => set({ ...bg, stops: [{ offset: 0, color: v }, bg.stops[1] ?? { offset: 1, color: "#ffffff" }] }, "bg0")} />
             <ColorInput label="End colour" value={bg.stops[bg.stops.length - 1]?.color ?? "#ffffff"} onChange={(v) => set({ ...bg, stops: [bg.stops[0] ?? { offset: 0, color: "#ffffff" }, { offset: 1, color: v }] }, "bg1")} /></> : null}
           {bg.kind === "image" ? <>
-            <div className="ss-btnrow"><Button size="sm" variant="outline" onClick={() => input.current?.click()}>{hasBgImage ? "Replace image" : "Choose image"}</Button></div>
-            <input ref={input} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) onBgFile(f); }} />
+            <FileDropzone accept="image/*" label={hasBgImage ? "Drop a replacement background or browse" : "Drop a background image or browse"} onFiles={(selected) => { const file = selected[0]; if (file) onBgFile(file); }} />
             <Segmented label="Image fit" value={bg.fit} options={[{ value: "cover", label: "Fill" }, { value: "contain", label: "Fit" }]} onChange={(v) => set({ ...bg, fit: v }, "bgf")} />
             {bg.fit === "contain" ? <ColorInput label="Behind image" value={bg.color} onChange={(v) => set({ ...bg, color: v }, "bgcol")} /> : null}</> : null}
         </>

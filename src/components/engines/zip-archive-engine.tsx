@@ -308,7 +308,6 @@ export function ZipArchiveEngine() {
             {busy ? <LoaderCircle className="size-4 animate-spin" /> : <FolderOpen className="size-4" />}
             {busy ? "Extracting…" : "Extract files"}
           </button>
-          {!canUseDirectoryPicker ? <p className="text-xs leading-5 text-muted">This browser can extract a single small file directly. For folders, multiple files or large archives, use enV on Android or iOS, or open enV in Chrome or Edge.</p> : null}
         </div>
       )}
 

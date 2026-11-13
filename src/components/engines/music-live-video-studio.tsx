@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { AudioLines, Camera, CameraOff, CheckCircle2, CircleStop, Download, FileAudio, FolderOpen, Headphones, Mic, Music2, Radio, RotateCcw, Save, Search, SlidersHorizontal, Sparkles, Trash2, Video, Waves } from "lucide-react";
+import { AudioLines, Camera, CameraOff, CheckCircle2, CircleStop, Download, FolderOpen, Headphones, Mic, Music2, Radio, RotateCcw, Save, Search, SlidersHorizontal, Sparkles, Trash2, Video, Waves } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/tools/error-banner";
+import { FileDropzone } from "@/components/tools/file-dropzone";
 import { downloadBlob } from "@/lib/utils";
 import { loadAudioSessionFile, saveAudioSessionFile } from "@/lib/engines/audio-session-storage";
 import { connectVocalPreset, EQ_BAND_FREQUENCIES, EQ_PROFILES, getVocalPreset, VOCAL_PRESETS, type AmpCharacter, type EqProfileId, type VocalPresetId } from "@/lib/engines/vocal-presets";
@@ -169,7 +170,6 @@ export function MusicLiveVideoStudio() {
   const [status, setStatus] = useState("Import a local backing track or an instrumental stem exported from Music Studio.");
   const [error, setError] = useState<string | null>(null);
   const cameraRef = useRef<HTMLVideoElement | null>(null);
-  const pickerRef = useRef<HTMLInputElement | null>(null);
   const presetImportRef = useRef<HTMLInputElement | null>(null);
   const spectrumCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const spectrumAnimationRef = useRef<number | null>(null);
@@ -617,8 +617,7 @@ export function MusicLiveVideoStudio() {
       <div className="order-1 min-w-0 space-y-4 lg:order-2">
         <div id="live-backing-panel" className="min-w-0 rounded-xl border border-border p-4">
           <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">1. Add backing / instrumental</h3><span className="text-xs text-muted-foreground">Local only</span></div>
-          <input ref={pickerRef} type="file" className="sr-only" accept="audio/*,.wav,.mp3,.m4a,.ogg,.flac,.webm" onChange={(event) => { const file = event.target.files?.[0]; if (file) void chooseSource(file); event.currentTarget.value = ""; }}/>
-          <Button type="button" variant="outline" className="mt-3 w-full" disabled={recording || finalizing} onClick={() => pickerRef.current?.click()}><FileAudio size={16} className="mr-2"/>{sourceFile ? "Change backing track" : "Import audio / instrumental stem"}</Button>
+          <FileDropzone accept="audio/*,.wav,.mp3,.m4a,.ogg,.flac,.webm" disabled={recording || finalizing} label={sourceFile ? "Drop a replacement track or browse" : "Drop an audio track or browse"} onFiles={(selected) => { const file = selected[0]; if (file) void chooseSource(file); }} />
           {sourceFile ? <div className="mt-3 rounded-lg bg-surface-2 p-3"><strong className="block break-words text-sm">{sourceFile.name}</strong><p className="mt-1 text-xs text-muted-foreground">{sourceMeta}</p>{sourcePreviewUrl ? <audio className="mt-3 w-full" controls preload="metadata" src={sourcePreviewUrl} aria-label="Preview backing audio" /> : null}<label className="mt-3 block text-sm">Start from {cueStartSeconds.toFixed(1)} sec<input aria-label="Backing cue start in seconds" className="mt-2 block w-full" type="range" min="0" max={Math.max(0, sourceBuffer?.duration ?? 0)} step="0.1" value={Math.min(cueStartSeconds, sourceBuffer?.duration ?? 0)} disabled={recording || !sourceBuffer} onChange={(event) => setCueStartSeconds(Number(event.target.value))}/></label><p className="mt-1 text-xs text-muted-foreground">The backing starts at this cue and loops from it if the take runs past the song end.</p><Button type="button" variant="ghost" className="mt-1 h-auto p-0 text-xs" onClick={() => void handoffCurrentSource()}>Open in full Music Studio <Music2 size={13} className="ml-1"/></Button></div> : <p className="mt-3 text-xs text-muted-foreground">You can send an exported vocals-removed/instrumental stem here from the full Music Studio, or import a local audio file.</p>}
           <label className="mt-4 block text-sm">Backing level: {backingGain}%<input className="mt-2 block w-full" type="range" min="0" max="120" value={backingGain} disabled={recording} onChange={(event) => setBackingGain(Number(event.target.value))}/></label>
           <div className="mt-3 flex flex-wrap gap-2">{(["user", "environment"] as const).map((mode) => <button type="button" key={mode} disabled={recording} onClick={() => { setFacingMode(mode); if (cameraStream) { stopCameraPreview(); setStatus("Camera released. Start camera & mic again to apply the selected camera."); } }} aria-pressed={facingMode === mode} className={`min-h-9 rounded-lg border px-3 py-2 text-xs ${facingMode === mode ? "border-primary bg-primary/10 font-semibold" : "border-border hover:bg-surface-2"}`}>{mode === "user" ? "Front camera" : "Rear camera"}</button>)}</div>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/tools/error-banner";
+import { FileDropzone } from "@/components/tools/file-dropzone";
 
 function downloadBlob(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob);
@@ -64,5 +65,14 @@ export function ImageToolsEngine({ op }: { op: string }) {
   }
 
   const multiple = op === "image-comparison";
-  return <div className="space-y-5"><div className="rounded-xl border border-border bg-surface-2/50 p-4"><div className="font-medium">{op === "image-comparison" ? "Image Comparison" : op === "image-screenshot" ? "Image Screenshot" : "Image Print Layout"}</div><p className="mt-1 text-sm text-subtle">Browser-local image processing. Files stay on your device.</p><input className="mt-4 block w-full text-sm" type="file" accept="image/*" multiple={multiple} onChange={e=>{setFiles(Array.from(e.target.files??[]));setError(null);setInfo([]);}} /></div>{op !== "image-comparison" && <label className="block text-sm">Scale <input className="mt-1 h-10 w-full rounded-md border border-border bg-surface px-3" type="number" min="0.1" max="4" step="0.1" value={scale} onChange={e=>setScale(e.target.value)} /></label>}<ErrorBanner message={error}/><Button onClick={run}>Run tool</Button>{info.length ? <div className="rounded-lg bg-surface-2 p-4 text-sm">{info.map(x=><div key={x}>{x}</div>)}</div> : null}</div>;
+  return (
+    <div className="space-y-4">
+      <FileDropzone accept="image/*" multiple={multiple} label={multiple ? "Drop two images or browse" : "Drop an image or browse"} onFiles={(next) => { setFiles(next); setError(null); setInfo([]); }} />
+      {files.length ? <div className="rounded-xl border border-border bg-surface-2 px-3 py-2 text-sm"><p className="font-medium">{files.length} selected</p><ul className="mt-1 space-y-1 text-xs text-muted">{files.map((file,index)=><li key={file.name+index} className="truncate">{file.name} · {(file.size/1024).toFixed(1)} KB</li>)}</ul></div> : null}
+      {op !== "image-comparison" ? <label className="block text-sm">Scale <input className="mt-1 h-10 w-full rounded-md border border-border bg-surface px-3" type="number" min="0.1" max="4" step="0.1" value={scale} onChange={e=>setScale(e.target.value)} /></label> : null}
+      <ErrorBanner message={error} />
+      <Button onClick={run} disabled={multiple ? files.length !== 2 : files.length !== 1}>Run tool</Button>
+      {info.length ? <div className="rounded-lg bg-surface-2 p-4 text-sm">{info.map(x=><div key={x}>{x}</div>)}</div> : null}
+    </div>
+  );
 }

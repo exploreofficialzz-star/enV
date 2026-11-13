@@ -3,6 +3,7 @@ import { PDFDocument, degrees, rgb, StandardFonts } from "pdf-lib";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/tools/copy-button";
 import { ErrorBanner } from "@/components/tools/error-banner";
+import { FileDropzone } from "@/components/tools/file-dropzone";
 
 const PDF_OPS = new Set([
   "merge","split","rotate","images-to-pdf","extract","meta","compress","reorder",
@@ -33,6 +34,8 @@ export function PdfEngine({ op }: { op: string }) {
   const [output, setOutput] = useState<Uint8Array | null>(null); const [outputName, setOutputName] = useState("env-pdf.pdf");
   const [info, setInfo] = useState<string[]>([]); const [error, setError] = useState<string | null>(null);
   const label = useMemo(() => op.replaceAll("-", " ").replace(/\b\w/g, x => x.toUpperCase()), [op]);
+  const needsFiles = op !== "print-layout";
+  const multiple = op === "merge" || op === "images-to-pdf";
 
   async function run() {
     setError(null); setOutput(null); setInfo([]);
@@ -81,17 +84,17 @@ export function PdfEngine({ op }: { op: string }) {
 
   const accept = op === "images-to-pdf" ? "image/png,image/jpeg,.png,.jpg,.jpeg" : "application/pdf,.pdf";
   return <div className="space-y-5">
-    <div className="rounded-xl border border-border bg-surface-2/50 p-4">
-      <div className="font-medium">{label}</div><p className="mt-1 text-sm text-subtle">Browser-local PDF processing. Files are not uploaded to enV.</p>
-      <input className="mt-4 block w-full text-sm" type="file" multiple={op === "merge" || op === "images-to-pdf"} accept={accept} onChange={e=>{setFiles(Array.from(e.target.files??[]));setOutput(null);setError(null);setInfo([]);}} />
-    </div>
+    {needsFiles ? <div className="space-y-3">
+      <FileDropzone accept={accept} multiple={multiple} label={multiple ? "Drop files or browse" : "Drop a PDF or browse"} onFiles={(next) => { setFiles(next); setOutput(null); setError(null); setInfo([]); }} />
+      {files.length ? <div className="rounded-xl border border-border bg-surface-2 px-3 py-2 text-sm"><p className="font-medium">{files.length} selected</p><ul className="mt-1 space-y-1 text-xs text-muted">{files.slice(0, 5).map((file,index)=><li key={file.name+index} className="truncate">{file.name} · {(file.size/1024/1024).toFixed(2)} MB</li>)}</ul>{files.length>5?<p className="mt-1 text-xs text-muted">+{files.length-5} more</p>:null}</div> : null}
+    </div> : null}
     {(["split","extract","reorder"].includes(op)) && <label className="block text-sm">Pages <input className="mt-1 h-10 w-full rounded-md border border-border bg-surface px-3" value={pages} onChange={e=>setPages(e.target.value)} placeholder="1,3-5" /></label>}
     {op === "rotate" && <label className="block text-sm">Rotation <select className="mt-1 h-10 rounded-md border border-border bg-surface px-3" value={angle} onChange={e=>setAngle(e.target.value)}><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></label>}
     {op === "watermark" && <label className="block text-sm">Watermark text <input className="mt-1 h-10 w-full rounded-md border border-border bg-surface px-3" value={text} onChange={e=>setText(e.target.value)} /></label>}
     {op === "metadata" && <div className="grid gap-3 sm:grid-cols-2"><label className="text-sm">Title<input className="mt-1 h-10 w-full rounded-md border border-border bg-surface px-3" value={title} onChange={e=>setTitle(e.target.value)} /></label><label className="text-sm">Author<input className="mt-1 h-10 w-full rounded-md border border-border bg-surface px-3" value={author} onChange={e=>setAuthor(e.target.value)} /></label></div>}
     {op === "protect" && <label className="block text-sm">Password<input type="password" className="mt-1 h-10 w-full rounded-md border border-border bg-surface px-3" value={password} onChange={e=>setPassword(e.target.value)} /></label>}
     <ErrorBanner message={error} />
-    <div className="flex flex-wrap gap-2"><Button onClick={run}>Run {label}</Button>{output && <Button variant="outline" onClick={()=>download(output,outputName)}>{outputName}</Button>}</div>
+    <div className="flex flex-wrap gap-2"><Button onClick={run} disabled={needsFiles && !files.length}>Run {label}</Button>{output && <Button variant="outline" onClick={()=>download(output,outputName)}>{outputName}</Button>}</div>
     {info.length>0 && <div className="rounded-lg bg-surface-2 p-4 text-sm">{info.map(x=><div key={x}>{x}</div>)}</div>}
     {output && <div className="flex gap-2 text-xs text-muted"><CopyButton text={outputName} /> <span className="self-center">Output ready for download.</span></div>}
   </div>;

@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { strToU8, zip } from "fflate";
 import { Button } from "@/components/ui/button";
+import { FileDropzone } from "@/components/tools/file-dropzone";
 import { downloadBlob, formatFileSize, slugify } from "@/lib/utils";
 import { extractMusicMetadata, type MusicMetadata } from "@/lib/media/music-metadata";
 import { downloadUrlMedia, inspectUrlMedia, type UrlMediaInfo, type UrlMediaPlaylistEntry } from "@/lib/media/url-media";
@@ -197,8 +198,6 @@ export function MusicDownloaderEngine() {
   // Preserve verified tracks across partial failures and ZIP retries within one preview.
   const completedRef = useRef<Map<number, DownloadResult>>(new Map());
   const failedRef = useRef<Map<number, MusicDownloadFailure>>(new Map());
-  const manifestInputRef = useRef<HTMLInputElement | null>(null);
-  const localFileInputRef = useRef<HTMLInputElement | null>(null);
 
   async function importManifest(file?: File) {
     if (!file) return;
@@ -468,8 +467,7 @@ export function MusicDownloaderEngine() {
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <label htmlFor="music-download-urls" className="text-sm font-medium">Music links</label>
-            <button type="button" onClick={() => manifestInputRef.current?.click()} className="text-sm font-medium text-accent hover:underline">Import list</button>
-            <input ref={manifestInputRef} type="file" accept=".txt,.m3u,.m3u8,.json,application/json,text/plain" className="hidden" onChange={(event) => void importManifest(event.target.files?.[0])} />
+            <FileDropzone accept=".txt,.m3u,.m3u8,.json,application/json,text/plain" label="Import a link list" onFiles={(selected) => void importManifest(selected[0])} />
           </div>
           <textarea id="music-download-urls" value={urlText} onChange={(event) => { setUrlText(event.target.value); setRightsConfirmed(false); setPreview(null); setFailureSummary(null); completedRef.current.clear(); failedRef.current.clear(); setTrackStates({}); }} rows={5} spellCheck={false} className="w-full resize-y rounded-xl border border-border bg-background px-3 py-3 font-mono text-sm" placeholder={"Paste a song, album, or playlist link\nYou can add more links on separate lines"} />
           <label className="flex min-h-10 items-center gap-2 rounded-xl border border-border px-3 py-2.5 text-sm">
@@ -512,14 +510,7 @@ export function MusicDownloaderEngine() {
         </div>
       ) : (
         <div className="space-y-3 rounded-2xl border border-border p-3 sm:p-4">
-          <input ref={localFileInputRef} id="music-offline-files" type="file" multiple accept={Array.from(MUSIC_AUDIO_EXTENSIONS, (ext) => "." + ext).join(",")} onChange={(event) => { setLocalFiles(Array.from(event.target.files ?? [])); setError(""); setFailureSummary(null); setResult(""); }} className="hidden" />
-          <button type="button" onClick={() => localFileInputRef.current?.click()} className="flex min-h-20 w-full items-center gap-3 rounded-xl border border-dashed border-border bg-surface-2 px-4 py-3 text-left hover:bg-background">
-            <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-xl">♫</span>
-            <span className="min-w-0">
-              <span className="block text-sm font-semibold">{localFiles.length ? "Change music files" : "Choose music files"}</span>
-              <span className="mt-1 block text-xs text-muted">MP3, M4A, FLAC, WAV and more</span>
-            </span>
-          </button>
+          <FileDropzone multiple accept={Array.from(MUSIC_AUDIO_EXTENSIONS, (ext) => "." + ext).join(",")} label="Drop music files or browse" onFiles={(selected) => { setLocalFiles(selected); setError(""); setFailureSummary(null); setResult(""); }} />
           {localFiles.length ? (
             <div className="space-y-1.5">
               <p className="text-xs text-muted">{localFiles.length} track(s) · {formatFileSize(localFiles.reduce((sum, file) => sum + file.size, 0))}</p>

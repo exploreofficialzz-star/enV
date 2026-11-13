@@ -3,6 +3,7 @@ import { createServerMediaAdapter, getServerMediaConfig, isFfmpegConfigured } fr
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/tools/error-banner";
+import { FileDropzone } from "@/components/tools/file-dropzone";
 import { ResultPanel } from "@/components/engines/result-panel";
 import { downloadBlob } from "@/lib/utils";
 import { browserCodecSupport, getMediaCapabilities } from "@/lib/media-runtime";
@@ -278,6 +279,8 @@ export function VideoEngine({ op }: Props) {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
 
+  const serverBacked = ["video-to-mp4","video-to-mp3","video-to-gif","video-to-webm","video-to-mov","video-to-avi","video-resize","video-crop","video-rotate","video-mute","video-fps","video-bitrate","video-resolution-presets","video-audio-volume","video-merger","video-audio-replacer"].includes(op);
+  const usesVideoFile = !["media-capability-checker","webcodecs-video-checker","mediarecorder-support-checker","video-codec-support-checker","media-worker-support-checker"].includes(op);
   const title = useMemo(() => ({
     "extract-audio": "Extract Audio from Video", "video-trimmer": "Video Trimmer", "video-speed": "Video Speed Changer", "video-compressor": "Browser Video Compressor", "video-to-mp4": "Video to MP4", "video-to-mp3": "Video to MP3", "video-to-gif": "Video to GIF", "video-to-webm": "Video to WebM", "video-to-mov": "Video to MOV", "video-to-avi": "Video to AVI", "video-resize": "Video Resizer", "video-crop": "Video Cropper", "video-rotate": "Video Rotator", "video-mute": "Mute Video", "video-fps": "Video Frame Rate Converter", "video-bitrate": "Video Bitrate Converter", "video-merger": "Video Merger", "video-audio-replacer": "Replace Video Audio", thumbnail: "Video Thumbnail Extractor", "frame-png": "Video Frame to PNG", "frame-grid": "Video Frame Contact Sheet", "metadata-json": "Video Metadata JSON", "frame-percent": "Video Frame by Percentage", "bitrate-estimator": "Video Bitrate Estimator", "audio-track-check": "Video Audio Track Checker",
   } as Record<string,string>)[op] ?? "Video File Inspector", [op]);
@@ -374,13 +377,13 @@ export function VideoEngine({ op }: Props) {
   };
 
   return <div className="space-y-5">
-    <div>
-      <h2 className="text-lg font-semibold">{title}</h2>
-      <p className="mt-1 text-sm text-subtle">Process the selected video locally in your browser. Files are not uploaded by this tool.</p>
-    </div>
-    {!["media-capability-checker","webcodecs-video-checker","mediarecorder-support-checker","video-codec-support-checker","media-worker-support-checker"].includes(op) ? (op === "video-merger" ? <input className="block w-full rounded-lg border border-border bg-surface p-2 text-sm" type="file" multiple accept="video/*,.mp4,.webm,.mov,.m4v,.ogv" onChange={(e) => setFiles(Array.from(e.target.files ?? []))} /> : <input className="block w-full rounded-lg border border-border bg-surface p-2 text-sm" type="file" accept="video/*,.mp4,.webm,.mov,.m4v,.ogv" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />) : null}
-    {(["video-to-mp4","video-to-mp3","video-to-gif","video-to-webm","video-to-mov","video-to-avi","video-resize","video-crop","video-rotate","video-mute","video-fps","video-bitrate","video-resolution-presets","video-audio-volume","video-merger","video-audio-replacer"].includes(op)) ? <div className="rounded-xl border border-border bg-surface-2 p-4 text-sm"><strong>FFmpeg media processor required</strong><p className="mt-1 text-subtle">This conversion uses the enV server media processor. Your file is uploaded to that configured endpoint for conversion.</p></div> : null}
-    {op === "video-audio-replacer" ? <input className="block w-full rounded-lg border border-border bg-surface p-2 text-sm" type="file" accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac,.webm" onChange={(e) => setReplacementAudio(e.target.files?.[0] ?? null)} /> : null}
+    <h2 className="text-lg font-semibold">{title}</h2>
+    {usesVideoFile ? <FileDropzone accept="video/*,.mp4,.webm,.mov,.m4v,.ogv" multiple={op === "video-merger"} disabled={busy} label={op === "video-merger" ? "Drop videos or browse" : "Drop a video or browse"} onFiles={(next) => { if (op === "video-merger") setFiles(next); else setFile(next[0] ?? null); setError(null); setResults([]); }} /> : null}
+    {op === "video-merger" && files.length ? <p className="text-xs text-muted">{files.length} videos selected</p> : null}
+    {file ? <p className="truncate text-xs text-muted">{file.name} · {(file.size / 1024 / 1024).toFixed(2)} MB</p> : null}
+    {serverBacked ? <p className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs text-muted">This operation sends the selected media to the configured enV processing endpoint.</p> : null}
+    {op === "video-audio-replacer" ? <FileDropzone accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac,.webm" disabled={busy} label="Drop replacement audio or browse" onFiles={(next) => { setReplacementAudio(next[0] ?? null); setError(null); }} /> : null}
+    {replacementAudio ? <p className="truncate text-xs text-muted">{replacementAudio.name} · replacement audio</p> : null}
     {op === "video-resize" ? <div className="grid gap-3 sm:grid-cols-2"><label className="block text-sm">Width<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="2" value={width} onChange={(e)=>setWidth(e.target.value)} /></label><label className="block text-sm">Height<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="2" value={height} onChange={(e)=>setHeight(e.target.value)} /></label></div> : null}
     {op === "video-crop" ? <div className="grid gap-3 sm:grid-cols-4"><label className="block text-sm">Width<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="2" value={width} onChange={(e)=>setWidth(e.target.value)} /></label><label className="block text-sm">Height<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="2" value={height} onChange={(e)=>setHeight(e.target.value)} /></label><label className="block text-sm">X<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="0" value={cropX} onChange={(e)=>setCropX(e.target.value)} /></label><label className="block text-sm">Y<input className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" type="number" min="0" value={cropY} onChange={(e)=>setCropY(e.target.value)} /></label></div> : null}
     {op === "video-rotate" ? <label className="block text-sm">Rotation<select className="mt-1 block w-full rounded-lg border border-border bg-surface px-3 py-2" value={angle} onChange={(e)=>setAngle(e.target.value)}><option value="90">90° clockwise</option><option value="180">180°</option><option value="270">270° clockwise</option></select></label> : null}
