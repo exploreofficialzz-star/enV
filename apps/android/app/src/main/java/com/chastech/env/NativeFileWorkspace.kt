@@ -257,7 +257,7 @@ fun NativeFileWorkspaceScreen(toolId: String) {
                 NativeExecutionButton(onAuthorized = {
                     val leftUri = folderUri
                     val rightUri = secondFolderUri
-                    if (leftUri == null || rightUri == null) { error = "Choose both folders first."; return@Button }
+                    if (leftUri == null || rightUri == null) { error = "Choose both folders first."; return@NativeExecutionButton }
                     scope.launch {
                         busy = true
                         error = ""
@@ -290,7 +290,7 @@ fun NativeFileWorkspaceScreen(toolId: String) {
             "folder-size-analyzer" -> {
                 OutlinedButton(onClick = { if (!busy) pickFolder.launch(null) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (folderUri == null) "Choose folder" else "Change folder") }
                 NativeExecutionButton(onAuthorized = {
-                    val uri = folderUri ?: run { error = "Choose a folder first."; return@Button }
+                    val uri = folderUri ?: run { error = "Choose a folder first."; return@NativeExecutionButton }
                     scope.launch {
                         busy = true
                         error = ""
@@ -321,9 +321,9 @@ fun NativeFileWorkspaceScreen(toolId: String) {
                 OutlinedButton(onClick = { if (!busy) pickFolder.launch(null) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (folderUri == null) "Choose folder" else "Change folder") }
                 OutlinedTextField(value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Search names or text") }, singleLine = true)
                 NativeExecutionButton(onAuthorized = {
-                    val uri = folderUri ?: run { error = "Choose a folder first."; return@Button }
+                    val uri = folderUri ?: run { error = "Choose a folder first."; return@NativeExecutionButton }
                     val needle = query.trim()
-                    if (needle.isEmpty()) { error = "Enter a search term."; return@Button }
+                    if (needle.isEmpty()) { error = "Enter a search term."; return@NativeExecutionButton }
                     scope.launch {
                         busy = true
                         error = ""
@@ -373,7 +373,7 @@ fun NativeFileWorkspaceScreen(toolId: String) {
                     }
                     "duplicate-file-finder" -> NativeExecutionButton(onAuthorized = {
                         val sources = selected
-                        if (sources.size < 2) { error = "Select at least two files."; return@Button }
+                        if (sources.size < 2) { error = "Select at least two files."; return@NativeExecutionButton }
                         scope.launch {
                             busy = true
                             error = ""
