@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 import { defineHandler } from "nitro/h3";
-import { auth, authConfigurationError, authConfigured } from "../../../../src/lib/auth/server";
+import { auth, authInfrastructureError, authConfigured } from "../../../../src/lib/auth/server";
 import { getSql } from "../../../../src/lib/db";
 import { createProfileMediaEtag, matchesProfileMediaEtag } from "../../../utils/profile-media-etag";
 
@@ -49,7 +49,7 @@ async function readBoundedImage(request: Request, maxBytes: number): Promise<{ b
 }
 
 async function authorize(request: Request): Promise<{ userId: string | null; status: number; error: string | null }> {
-  if (!authConfigured || authConfigurationError || !process.env.DATABASE_URL?.trim()) {
+  if (!authConfigured || authInfrastructureError || !process.env.DATABASE_URL?.trim()) {
     return { userId: null, status: 503, error: "Profile photo storage is not configured." };
   }
 
