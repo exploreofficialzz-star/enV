@@ -73,8 +73,6 @@ export function textToDocx(text: string): Uint8Array {
 }
 
 const MAX_LOCAL_DOCUMENT_TOTAL_BYTES = 200 * 1024 * 1024;
-
-const MAX_LOCAL_DOCUMENT_TOTAL_BYTES = 200 * 1024 * 1024;
 const MAX_LOCAL_PDF_PAGES = 500;
 
 export async function runLocalDocument(op: string, files: File[]): Promise<LocalDocumentResult> {
