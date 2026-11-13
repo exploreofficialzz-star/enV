@@ -191,6 +191,9 @@ assert.match(iosAds, /publisherPrivacyPersonalizationState = \.disabled/, "iOS a
 assert.match(iosAds, /coarseLocationCollectionEnabled = false/, "iOS ads must not collect coarse device location by default.");
 assert.match(iosAds, /static func isAdEligibleTool\(_ tool: Tool\)/, "iOS must evaluate the full catalog record using independent native ad eligibility.");
 assert.match(iosAds, /static func isHybridTool\(_ tool: Tool\)/, "The existing iOS offline-wallet hybrid policy must remain available and unchanged.");
+assert.match(iosAds, /return tool.id != "a-book"/, "The private A book notes workspace must remain outside iOS ad access.");
+assert.match(androidAds, /return tool.id != "a-book"/, "The private A book notes workspace must remain outside Android ad access.");
+assert.match(adPolicy, /return tool.id !== "a-book"/, "The private A book notes workspace must remain outside Web ad access.");
 assert.match(iosAds, /final class NativeAdsAvailability/, "iOS must maintain per-tool native ad fill state.");
 assert.match(iosAds, /bannerViewDidReceiveAd\(_ bannerView: BannerView\)/, "iOS fill state must come from the AdMob success callback.");
 assert.match(iosAds, /didFailToReceiveAdWithError/, "iOS failed native ad requests must remain unfilled.");
