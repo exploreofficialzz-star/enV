@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canShowAdForTool, isAdsterraQualifiedTool, isHybridAccessToolId, isHybridAdSupportedToolId, resolveAdConfig } from "./policy.ts";
+import {
+  canShowAdForTool,
+  consumeAdFallbackExecutionGrant,
+  grantAdFallbackExecution,
+  hasVerifiedAdsterraToolDelivery,
+  isAdsterraQualifiedTool,
+  isHybridAccessToolId,
+  isHybridAdSupportedToolId,
+  recordAdsterraToolDelivery,
+  resolveAdConfig,
+} from "./policy.ts";
 
 const goodEnvironment = {
   enabled: "true",
@@ -173,4 +183,27 @@ test("Adsterra excludes inactive, Studio, AI, Lab/Sandbox and sensitive tools", 
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ keywords: ["sandbox", "training"] })), false);
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ id: "ai-caption-writer" })), false);
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ id: "a-book", name: "A book", category: "productivity", engine: { type: "custom", id: "a-book" } })), false, "Private notes and journal workspaces are not ad-supported.");
+});
+
+
+test("online fallback grants are one-use and tied to one tool", () => {
+  const toolId = "offline-grant-regression";
+  grantAdFallbackExecution(toolId);
+  assert.equal(consumeAdFallbackExecutionGrant(toolId), true);
+  assert.equal(consumeAdFallbackExecutionGrant(toolId), false);
+  grantAdFallbackExecution(toolId);
+  assert.equal(consumeAdFallbackExecutionGrant("another-tool"), false);
+  assert.equal(consumeAdFallbackExecutionGrant(toolId), true);
+});
+
+test("hybrid online access can distinguish verified ad fill from unfilled delivery", () => {
+  const toolId = "verified-ad-delivery-regression";
+  recordAdsterraToolDelivery(toolId, "blocked");
+  assert.equal(hasVerifiedAdsterraToolDelivery(toolId), false);
+  recordAdsterraToolDelivery(toolId, "unfilled");
+  assert.equal(hasVerifiedAdsterraToolDelivery(toolId), false);
+  recordAdsterraToolDelivery(toolId, "filled");
+  assert.equal(hasVerifiedAdsterraToolDelivery(toolId), true);
+  recordAdsterraToolDelivery(toolId, "blocked");
+  assert.equal(hasVerifiedAdsterraToolDelivery(toolId), false);
 });
