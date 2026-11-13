@@ -203,7 +203,7 @@ try {
   await page.getByRole("button", { name: "Choose second folder" }).click();
   await page.getByRole("button", { name: "Compare sets" }).click();
   await page.getByText("Comparison results", { exact: true }).waitFor();
-  const comparison = (await page.locator("section").textContent()) ?? "";
+  const comparison = (await page.locator('section[data-file-workspace-ready="true"]').textContent()) ?? "";
   assert.match(comparison, /common\.txt[\s\S]*same/);
   assert.match(comparison, /diff\.txt[\s\S]*changed/);
   assert.match(comparison, /Old\.txt[\s\S]*removed/);
