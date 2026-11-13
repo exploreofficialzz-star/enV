@@ -44,5 +44,5 @@ test("DOCX extraction skips unrelated archive members without inflating them", (
 test("DOCX extraction rejects oversized document XML from ZIP metadata before inflation", () => {
   const zip = makeDocx();
   setCentralDirectoryUncompressedSize(zip, "word/document.xml", 32 * 1024 * 1024 + 1);
-  assert.throws(() => docxToText(zip), /32 MB local extraction limit/);
+  assert.throws(() => docxToText(zip), /32 MB per-entry or 128 MB aggregate local extraction limit/);
 });
