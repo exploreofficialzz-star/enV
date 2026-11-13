@@ -123,6 +123,7 @@ try {
   await page.locator('input[type="file"]').first().setInputFiles([
     file("first.txt", "same content"), file("copy.txt", "same content"), file("different.txt", "other content"),
   ]);
+  await page.getByText("3 selected", { exact: false }).waitFor({ timeout: 10_000 });
   await page.getByRole("button", { name: "Find identical files" }).click();
   await page.getByText("Duplicate group 1", { exact: false }).waitFor();
   const duplicateReport = await page.locator("pre").innerText();
