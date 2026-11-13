@@ -387,6 +387,8 @@ export function FileWorkspaceEngine({ toolId }: { toolId: string }) {
       <input ref={rightFileInput} type="file" multiple className="hidden" onChange={(event) => receiveFiles(event, "right")} />
       <input ref={folderInput} type="file" multiple className="hidden" onChange={(event) => receiveFiles(event, "left")} />
       <input ref={rightFolderInput} type="file" multiple className="hidden" onChange={(event) => receiveFiles(event, "right")} />
+      {isCompare ? (
+        <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-xl border border-border p-3">
             <p className="text-sm font-medium">First folder or file set</p>
             <Button className="mt-3 w-full" variant="outline" onClick={() => void chooseFolder("left")}>Choose first folder</Button>
