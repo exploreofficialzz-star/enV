@@ -88,7 +88,9 @@ try {
     file("report.txt", "organizer report"),
     file("photo.png", "image placeholder bytes"),
   ]);
-  const organizerDownload = await page.waitForEvent("download", () => page.getByRole("button", { name: "Organize copies into ZIP" }).click());
+  const organizerDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Organize copies into ZIP" }).click();
+  const organizerDownload = await organizerDownloadPromise;
   const organizerFiles = await inspectZip(await readDownload(organizerDownload));
   assert.equal(organizerFiles.get("Documents/report.txt"), "organizer report");
   assert.equal(organizerFiles.get("Images/photo.png"), "image placeholder bytes");
@@ -97,7 +99,9 @@ try {
   await page.locator('input[type="file"]').first().setInputFiles([file("alpha.txt", "alpha"), file("beta.txt", "beta")]);
   await page.getByLabel("Prefix").fill("copy-");
   await page.getByLabel("Suffix").fill("-ready");
-  const renameDownload = await page.waitForEvent("download", () => page.getByRole("button", { name: "Export renamed ZIP" }).click());
+  const renameDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export renamed ZIP" }).click();
+  const renameDownload = await renameDownloadPromise;
   const renamedFiles = await inspectZip(await readDownload(renameDownload));
   assert.equal(renamedFiles.get("001-copy-alpha-ready.txt"), "alpha");
   assert.equal(renamedFiles.get("002-copy-beta-ready.txt"), "beta");
