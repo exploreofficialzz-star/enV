@@ -1030,7 +1030,7 @@ struct NativeFamilyToolView: View {
         self.tool = tool
         self.initialDeveloperMode = initialDeveloperMode
         self.initialDeveloperAction = initialDeveloperAction
-        _executionTracker = State(initialValue: NativeToolExecutionTracker(toolID: tool.id))
+        _executionTracker = State(initialValue: NativeToolExecutionTracker(toolID: tool.id, adSupported: NativeAdsPolicy.isAdEligibleTool(tool)))
     }
 
     var body: some View {
@@ -6677,7 +6677,39 @@ private final class NativeToolExecutionTracker {
     private var startedAt: Date?
     private var resultRecorded = false
 
-    init(toolID: String) { self.toolID = toolID }
+    private let toolID: String
+    private let adSupported: Bool
+    private var startedAt: Date?
+    private var resultRecorded = false
+
+    init(toolID: String, adSupported: Bool = false) {
+        self.toolID = toolID
+        self.adSupported = adSupported
+    }
+
+    func authorizeRun() async -> NativeToolAuthorization {
+        if !adSupported || NativeAdsAvailability.shared.isFilled(toolID) { return .allowed }
+        let online = await NativeAdsPolicy.isApplicationOnline()
+        if !online {
+            guard let journal = try? OfflineWalletJournal(),
+                  let allowanceID = try? journal.activeAllowanceID(),
+                  !allowanceID.isEmpty,
+                  journal.isEligibleTool(toolID) else { return .retry }
+            return .allowed
+        }
+        guard OfflineWalletNativeAPI.isPaired else { return .signInRequired }
+        do {
+            _ = try await OfflineWalletNativeAPI.consumeAdFallback(toolId: toolID)
+            return .allowed
+        } catch {
+            let message = error.localizedDescription
+            if message.contains("INSUFFICIENT_CREDITS") { return .insufficientCredits }
+            if message.contains("AUTH_REQUIRED") || message.contains("NATIVE_SESSION_INVALID") {
+                return .signInRequired
+            }
+            return .retry
+        }
+    }
 
     func start() {
         startedAt = Date()
@@ -6717,6 +6749,8 @@ private final class NativeToolExecutionTracker {
 
 private struct NativeActionRow: View {
     @Environment(\.nativeToolExecutionTracker) private var executionTracker
+    @State private var authorization: NativeToolAuthorization?
+    @State private var isAuthorizing = false
     let output: String
     // Synchronous tools report completion directly so identical repeated output
     // still produces an event. Async tools finish when their result changes.
@@ -6725,18 +6759,52 @@ private struct NativeActionRow: View {
     let reset: () -> Void
 
     var body: some View {
-        HStack(spacing: 10) {
-            Button("Run") {
-                executionTracker?.start()
-                run()
-                if let completion {
-                    executionTracker?.finish(success: completion())
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Button(isAuthorizing ? "…" : "Run") {
+                    guard !isAuthorizing else { return }
+                    isAuthorizing = true
+                    Task { @MainActor in
+                        let decision = await executionTracker?.authorizeRun() ?? .allowed
+                        isAuthorizing = false
+                        guard decision == .allowed else {
+                            authorization = decision
+                            return
+                        }
+                        authorization = nil
+                        executionTracker?.start()
+                        run()
+                        if let completion {
+                            executionTracker?.finish(success: completion())
+                        }
+                    }
                 }
-            }.buttonStyle(.borderedProminent)
-            Button("Reset", action: reset).buttonStyle(.bordered)
-            Button { UIPasteboard.general.string = output } label: {
-                HStack(spacing: 6) { EnVIcon(name: "Copy", size: 14, tint: .envAccent); enVCharacterSpacedText("Copy") }
-            }.buttonStyle(.bordered).disabled(output.isEmpty)
+                .buttonStyle(.borderedProminent)
+                .disabled(isAuthorizing)
+                Button("Reset", action: {
+                    authorization = nil
+                    reset()
+                }).buttonStyle(.bordered)
+                Button { UIPasteboard.general.string = output } label: {
+                    HStack(spacing: 6) { EnVIcon(name: "Copy", size: 14, tint: .envAccent); enVCharacterSpacedText("Copy") }
+                }.buttonStyle(.bordered).disabled(output.isEmpty)
+            }
+            switch authorization {
+            case .signInRequired:
+                HStack(spacing: 8) {
+                    Link("Sign in", destination: URL(string: "https://envtools.store/login")!)
+                        .buttonStyle(.bordered)
+                    Link("Create account", destination: URL(string: "https://envtools.store/signup")!)
+                        .buttonStyle(.borderedProminent)
+                }
+            case .insufficientCredits:
+                Link("Buy enV", destination: URL(string: "https://envtools.store/wallet")!)
+                    .buttonStyle(.borderedProminent)
+            case .retry:
+                Button("Retry") { authorization = nil }.buttonStyle(.bordered)
+            case .allowed, .none:
+                EmptyView()
+            }
         }
     }
 }
