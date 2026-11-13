@@ -122,7 +122,7 @@ jobs:
             npx playwright install --with-deps chromium
           fi
 
-      - name: Verify local DOCX extraction limits and hostile-archive rejection
+      - name: Verify local DOCX and PDF extraction safety limits
         run: node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/documents/local-document.test.ts
 
       - name: Verify Zip any file compression and extraction in the browser
