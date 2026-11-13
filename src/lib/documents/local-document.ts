@@ -8,24 +8,40 @@ const esc = (value: string) => value.replaceAll("&", "&amp;").replaceAll("<", "&
 
 const MAX_LOCAL_DOCX_INPUT_BYTES = 200 * 1024 * 1024;
 const MAX_LOCAL_DOCX_XML_BYTES = 32 * 1024 * 1024;
+const MAX_LOCAL_DOCX_EXPANDED_BYTES = 128 * 1024 * 1024;
+const MAX_LOCAL_DOCX_ENTRIES = 10_000;
 
 export function docxToText(bytes: Uint8Array): string {
   if (bytes.byteLength > MAX_LOCAL_DOCX_INPUT_BYTES) {
     throw new Error("The selected DOCX file exceeds the 200 MB local extraction limit.");
   }
   let documentTooLarge = false;
+  let tooManyEntries = false;
+  let entryCount = 0;
+  let expandedDocumentBytes = 0;
   const files = unzipSync(bytes, {
     filter: (entry) => {
+      entryCount += 1;
+      if (entryCount > MAX_LOCAL_DOCX_ENTRIES) {
+        tooManyEntries = true;
+        return false;
+      }
       if (entry.name !== "word/document.xml") return false;
-      if (entry.originalSize > MAX_LOCAL_DOCX_XML_BYTES) {
+      if (!Number.isSafeInteger(entry.originalSize)
+        || entry.originalSize > MAX_LOCAL_DOCX_XML_BYTES
+        || expandedDocumentBytes + entry.originalSize > MAX_LOCAL_DOCX_EXPANDED_BYTES) {
         documentTooLarge = true;
         return false;
       }
+      expandedDocumentBytes += entry.originalSize;
       return true;
     },
   });
+  if (tooManyEntries) {
+    throw new Error("This DOCX archive contains too many entries to inspect safely.");
+  }
   if (documentTooLarge) {
-    throw new Error("The DOCX document text exceeds the 32 MB local extraction limit.");
+    throw new Error("The DOCX document text exceeds the 32 MB per-entry or 128 MB aggregate local extraction limit.");
   }
   const document = files["word/document.xml"];
   if (!document) throw new Error("This DOCX file does not contain a Word document body.");
