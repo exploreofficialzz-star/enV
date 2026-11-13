@@ -1,6 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 import ZIPFoundation
+import CryptoKit
 
 struct NativeArchiveToolDestinationView: View {
     let tool: Tool
