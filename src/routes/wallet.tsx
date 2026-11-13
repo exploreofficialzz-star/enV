@@ -718,7 +718,7 @@ function Account() {
                 <svg viewBox="0 0 120 64" className="h-10 w-20 sm:h-12 sm:w-28" fill="none" aria-label="Upward token trend">
                   <path d="M4 54 C15 51 19 37 29 41 S43 49 52 31 S68 23 77 27 S91 17 103 15 L113 5 M103 14 L113 5 L112 16" stroke="#52ffd0" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                <button type="button" aria-label="Fund wallet" title="Fund wallet" onClick={() => { if (state.status !== "ready") { window.location.assign("/account"); return; } setFundingFeedback(null); setShowFundingOptions(true); }} disabled={fundingBusy} className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full bg-[#3df1c2] px-3 py-2 text-sm font-semibold text-[#052a2a] no-underline transition hover:bg-[#74f9d7] disabled:cursor-wait disabled:opacity-60 sm:px-4">
+                <button type="button" aria-label="Fund wallet" title="Fund wallet" onClick={() => { setFundingFeedback(null); setShowFundingOptions(true); }} disabled={fundingBusy} className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full bg-[#3df1c2] px-3 py-2 text-sm font-semibold text-[#052a2a] no-underline transition hover:bg-[#74f9d7] disabled:cursor-wait disabled:opacity-60 sm:px-4">
                   <CreditCard size={15} aria-hidden="true"/>{fundingBusy ? "Opening…" : "Add funds"}<ArrowUpRight size={13} aria-hidden="true"/>
                 </button>
               </div>
