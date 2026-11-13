@@ -94,10 +94,15 @@ export function getCelebrationEventInstant(value: string, timeZone: string): Dat
   if (check.getUTCFullYear() !== year || check.getUTCMonth() + 1 !== month || check.getUTCDate() !== day ||
       check.getUTCHours() !== hour || check.getUTCMinutes() !== minute) throw new Error("Enter a real date and time.");
   if (!timeZone.trim()) throw new Error("Choose a time zone.");
-  const formatter = new Intl.DateTimeFormat("en-GB", {
-    timeZone, year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
-  });
+  let formatter: Intl.DateTimeFormat;
+  try {
+    formatter = new Intl.DateTimeFormat("en-GB", {
+      timeZone, year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    });
+  } catch {
+    throw new Error("Choose a valid IANA time zone, such as Africa/Lagos or Europe/London.");
+  }
   const offsets = new Set<number>();
   try {
     for (let hours = -48; hours <= 48; hours += 3) {
