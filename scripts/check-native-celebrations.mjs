@@ -10,7 +10,7 @@ const read = (path) => fs.readFileSync(new URL("../" + path, import.meta.url), "
 for (const platform of ["android", "ios"]) {
   const ids = read("apps/" + platform + "/native-family-coverage/celebrations.txt")
     .split(/\r?\n/).map((line) => line.trim()).filter(Boolean).sort();
-  assert.deepEqual(ids, expected, platform + " must cover all 96 celebration IDs");
+  assert.deepEqual(ids, expected, platform + " must cover all 93 catalogued Celebration IDs");
 }
 const android = read("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt");
 const androidView = read("apps/android/app/src/main/java/com/chastech/env/NativeCelebrationToolForm.kt");
