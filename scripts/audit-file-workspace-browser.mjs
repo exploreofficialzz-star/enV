@@ -83,15 +83,29 @@ function file(name, content) {
   return { name, mimeType: "text/plain", buffer: Buffer.from(content) };
 }
 
+async function clickAndDownload(buttonName) {
+  const pendingDownload = page.waitForEvent("download", { timeout: 20_000 });
+  await page.getByRole("button", { name: buttonName }).click();
+  try {
+    return await pendingDownload;
+  } catch (cause) {
+    const error = (await page.getByRole("alert").allTextContents()).join(" | ");
+    const status = (await page.getByRole("status").allTextContents()).join(" | ");
+    throw new Error(
+      "No download followed " + buttonName + ". Error: " + (error || "none")
+      + ". Status: " + (status || "none")
+      + ". Cause: " + String(cause),
+    );
+  }
+}
+
 try {
   await openTool("file-organizer", "File Organizer");
   await page.locator('input[type="file"]').first().setInputFiles([
     file("report.txt", "organizer report"),
     file("photo.png", "image placeholder bytes"),
   ]);
-  const organizerDownloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Organize copies into ZIP" }).click();
-  const organizerDownload = await organizerDownloadPromise;
+  const organizerDownload = await clickAndDownload("Organize copies into ZIP");
   const organizerFiles = await inspectZip(await readDownload(organizerDownload));
   assert.equal(organizerFiles.get("Documents/report.txt"), "organizer report");
   assert.equal(organizerFiles.get("Images/photo.png"), "image placeholder bytes");
@@ -100,9 +114,7 @@ try {
   await page.locator('input[type="file"]').first().setInputFiles([file("alpha.txt", "alpha"), file("beta.txt", "beta")]);
   await page.getByLabel("Prefix").fill("copy-");
   await page.getByLabel("Suffix").fill("-ready");
-  const renameDownloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Export renamed ZIP" }).click();
-  const renameDownload = await renameDownloadPromise;
+  const renameDownload = await clickAndDownload("Export renamed ZIP");
   const renamedFiles = await inspectZip(await readDownload(renameDownload));
   assert.equal(renamedFiles.get("001-copy-alpha-ready.txt"), "alpha");
   assert.equal(renamedFiles.get("002-copy-beta-ready.txt"), "beta");
