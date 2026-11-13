@@ -185,7 +185,8 @@ internal object NativeAdsPolicy {
             operation in remoteVideoOperations ||
             tool.id in remoteToolIds
 
-        return tool.status == "active" &&
+        return tool.id != "a-book" &&
+            tool.status == "active" &&
             tool.clientSide &&
             !tool.requiresBackend &&
             !tool.requiresAuth &&
