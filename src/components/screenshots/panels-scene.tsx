@@ -22,6 +22,7 @@ export function SourcePanel({ source, recent, onFiles, onPaste, onCapture, onRem
     <div className="ss-stack">
       {source && !multi ? <p className="ss-meta"><strong>{source.name}</strong><br />{source.width} × {source.height} px · {(source.bytes / 1024).toFixed(0)} KB · {source.mime.replace("image/", "").toUpperCase()}{source.hasAlpha ? " · has transparency" : ""}</p> : null}
       <FileDropzone accept="image/*" multiple={multi} label={multi ? "Drop screenshots or browse" : source ? "Drop a replacement image or browse" : "Drop an image or browse"} onFiles={onFiles} />
+      <div className="ss-btnrow">
         <Button size="sm" variant="outline" onClick={onPaste}>Paste</Button>
         {canCapture ? <Button size="sm" variant="outline" onClick={onCapture} disabled={capture.remaining !== null}>Capture screen</Button> : null}
         {source && !multi ? <Button size="sm" variant="ghost" onClick={onRemove}>Remove</Button> : null}

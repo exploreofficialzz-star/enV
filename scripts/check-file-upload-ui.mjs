@@ -34,6 +34,7 @@ const genericUploadSurfaces = [
   "src/components/engines/developer-recipe-workbench.tsx",
   "src/components/engines/music-live-video-studio.tsx",
   "src/components/engines/a-book-engine.tsx",
+  "src/components/world-lab/time-controller.tsx",
   "src/components/world-lab/world-layers-panel.tsx",
   "src/components/screenshots/panels-scene.tsx",
   "src/components/engines/image-engine-legacy.tsx",

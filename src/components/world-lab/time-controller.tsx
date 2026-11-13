@@ -3,6 +3,7 @@ import type {LabRun,ModelInput} from "@/lib/world-lab/model";
 import {createRecordedTimelineCheckpoint,restoreRecordedTimelineCheckpoint,stepRecordedTime} from "@/lib/world-lab/timeline";
 import {createTimeEngineCheckpoint,createTimeEngineState,restoreTimeEngineCheckpoint,type TimeEngineDirection} from "@/lib/world-lab/time-engine";
 import {WorldLabSolarEventsPanel} from "./solar-events-panel";
+import {FileDropzone} from "@/components/tools/file-dropzone";
 import {parseIersBulletinA,utcToTaiTt,utcToTcg,utcToUt1,type IersBulletinASeries} from "@/lib/world-lab/time-scales";
 import {createReplayManifest,decodeAndReplayManifest,REPLAY_MANIFEST_MAX_BYTES} from "@/lib/world-lab/replay-manifest";
 type Props={run:LabRun|null;timeSeconds:number;playing:boolean;rate:number;direction:TimeEngineDirection;
@@ -109,18 +110,16 @@ export function WorldLabTimeController(p:Props){
    {tcg?.value&&<div className="mt-2 text-xs"><dt className="text-muted-foreground">TCG · IAU 2000 constant-rate transform</dt><dd className="font-mono">{tcg.value.tcg}</dd></div>}
    {tcg?.error&&<p className="mt-1 text-xs" role="status">{tcg.error}</p>}
    <div className="mt-3">
-    <label className="block text-xs font-medium" htmlFor="worldlab-iers-bulletin">Import official IERS Bulletin A (ser7.dat)</label>
-    <input id="worldlab-iers-bulletin" className="mt-1 block w-full text-xs" type="file" accept=".dat,.txt,text/plain"
-     onChange={event=>{
-      const file=event.currentTarget.files?.[0];if(!file)return;
-      void file.text().then(source=>{
-       const parsed=parseIersBulletinA(source);
-       setEarthOrientation(parsed);setEarthOrientationError("");
-      }).catch(error=>{
-       setEarthOrientation(null);
-       setEarthOrientationError(error instanceof Error?error.message:"IERS Bulletin A could not be imported.");
-      });
-     }}/>
+    <FileDropzone accept=".dat,.txt,text/plain" label="Drop IERS Bulletin A or browse" hint="ser7.dat or text" onFiles={selected=>{
+     const file=selected[0];if(!file)return;
+     void file.text().then(source=>{
+      const parsed=parseIersBulletinA(source);
+      setEarthOrientation(parsed);setEarthOrientationError("");
+     }).catch(error=>{
+      setEarthOrientation(null);
+      setEarthOrientationError(error instanceof Error?error.message:"IERS Bulletin A could not be imported.");
+     });
+    }}/>
     {earthOrientation&&<p className="mt-1 text-xs text-muted-foreground" role="status">
      IERS Bulletin A · Vol. {earthOrientation.volume} No. {earthOrientation.number} · issued {earthOrientation.issuedDateUTC} · {earthOrientation.samples.length} daily samples · {earthOrientation.samples.filter(x=>x.quality==="observed").length} observed / {earthOrientation.samples.filter(x=>x.quality==="predicted").length} predicted
     </p>}
@@ -188,11 +187,10 @@ export function WorldLabTimeController(p:Props){
    UT1/Earth-orientation, TT/leap-second and astronomical ephemeris conversions are unavailable until versioned authoritative inputs are attached.
    Long-horizon seasonal, orbital, erosion and climate time models are not enabled in this bounded local reference engine.
   </p>
-  <label htmlFor="worldlab-replay-restore" className="mt-2 inline-block text-sm">Open & replay deterministic manifest</label>
-  <input id="worldlab-replay-restore" className="mt-1 block w-full text-sm" type="file"
-   accept=".json,application/json" onChange={event=>{
-    const file=event.currentTarget.files?.[0];event.currentTarget.value="";
-    if(!file)return;
+  <div className="mt-3 space-y-1">
+   <p className="text-sm font-medium">Open & replay deterministic manifest</p>
+   <FileDropzone accept=".json,application/json" label="Drop a replay manifest or browse" hint="JSON · 64 KB maximum" onFiles={selected=>{
+    const file=selected[0];if(!file)return;
     if(file.size>REPLAY_MANIFEST_MAX_BYTES){setReplayStatus("Replay manifest exceeds the 64 KB limit.");return;}
     void file.arrayBuffer().then(buffer=>{
      const replay=decodeAndReplayManifest(new Uint8Array(buffer));
@@ -203,14 +201,14 @@ export function WorldLabTimeController(p:Props){
       "; recomputed "+replay.samples.length+" display samples from the fingerprinted inputs.");
     }).catch(error=>setReplayStatus(error instanceof Error?error.message:"Replay manifest could not be restored."));
    }}/>
+  </div>
   {replayStatus&&<p className="mt-1 text-xs" role="status">{replayStatus}</p>}
-  <label htmlFor="worldlab-checkpoint-restore" className="mt-2 inline-block text-sm">Restore saved time-engine checkpoint</label>
-  <input id="worldlab-checkpoint-restore" className="mt-1 block w-full text-sm" type="file"
-   accept=".json,application/json" disabled={!run} onChange={event=>{
-    const file=event.currentTarget.files?.[0];event.currentTarget.value="";
-    if(!file||!run)return;
+  <div className="mt-3 space-y-1">
+   <p className="text-sm font-medium">Restore saved time-engine checkpoint</p>
+   <FileDropzone accept=".json,application/json" disabled={!run} label="Drop a checkpoint or browse" hint="JSON · 16 KB maximum" onFiles={selected=>{
+    const file=selected[0];if(!file||!run)return;
     if(file.size>16*1024){
-     setRestoreStatus("Checkpoint exceeds the 16 KB import limit.");
+     setRestoreStatus("Checkpoint exceeds the 16 KB limit.");
      return;
     }
     void file.text().then(text=>{
@@ -227,6 +225,7 @@ export function WorldLabTimeController(p:Props){
      setRestoreStatus("Checkpoint restored to the matching immutable run.");
     }).catch(error=>setRestoreStatus(error instanceof Error?error.message:"Checkpoint restore failed."));
    }}/>
+  </div>
   {restoreStatus&&<p className="mt-1 text-xs" role="status">{restoreStatus}</p>}
  </section>;
 }
