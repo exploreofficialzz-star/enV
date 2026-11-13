@@ -5,7 +5,7 @@ import { parseGeneratedCatalog } from "./catalog-reader.mjs";
 const catalog = parseGeneratedCatalog(fs.readFileSync(new URL("../src/data/catalog.ts", import.meta.url), "utf8"));
 const tools = catalog.filter((tool) => tool.category === "celebrations");
 const expected = tools.map((tool) => tool.id).sort();
-assert.equal(expected.length, 96);
+assert.equal(expected.length, 93, "all 93 existing Celebrations tools require native coverage");
 const read = (path) => fs.readFileSync(new URL("../" + path, import.meta.url), "utf8");
 for (const platform of ["android", "ios"]) {
   const ids = read("apps/" + platform + "/native-family-coverage/celebrations.txt")
@@ -21,4 +21,4 @@ assert.match(androidView, /NativeCelebrationEngine/);
 assert.match(ios, /tool\.category == "celebrations" \{ NativeCelebrationToolView\(tool: tool\) \}/);
 assert.match(iosView, /enum NativeCelebrationEngine/);
 assert.match(iosView, /struct NativeCelebrationToolView/);
-console.log("Native Celebrations check PASS: 96 IDs have independent Kotlin and Swift local implementations.");
+console.log("Native Celebrations check PASS: 93 IDs have independent Kotlin and Swift local implementations.");
