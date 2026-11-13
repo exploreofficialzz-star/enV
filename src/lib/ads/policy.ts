@@ -48,7 +48,7 @@ export function hasVerifiedAdsterraToolDelivery(toolId: string): boolean {
 /** A server-confirmed one-run debit authorizes only the immediately replayed Web action. */
 export function grantAdFallbackExecution(toolId: string): void {
   if (!/^[a-z0-9][a-z0-9-]{0,119}$/.test(toolId)) return;
-  adFallbackExecutionGrants.set(toolId, Date.now() + 60_000);
+  adFallbackExecutionGrants.set(toolId, Date.now() + 10_000);
 }
 
 export function consumeAdFallbackExecutionGrant(toolId: string): boolean {
