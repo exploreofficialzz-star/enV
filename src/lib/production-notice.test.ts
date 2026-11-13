@@ -5,7 +5,7 @@ import { isToolUnderProduction } from "./production-notice.ts";
 const releasedCategories = [
   "accessibility", "ai", "audio", "business", "calculators", "career", "communication", "converters",
   "creators", "datetime", "design", "developer", "ecommerce", "education", "events", "files", "fitness",
-  "gaming", "generators", "image", "interactive", "marketing", "network", "personal", "productivity",
+  "gaming", "image", "interactive", "marketing", "network", "personal", "productivity",
   "qr", "random", "relationships", "security", "seo", "social", "streaming", "testdata", "text", "video",
   "webdesign",
 ] as const;
