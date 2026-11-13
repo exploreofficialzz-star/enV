@@ -4,19 +4,32 @@ import UniformTypeIdentifiers
 import ZIPFoundation
 import CryptoKit
 
+@MainActor
 struct NativeArchiveToolDestinationView: View {
     let tool: Tool
+    @State private var executionTracker: NativeToolExecutionTracker
+
+    init(tool: Tool) {
+        self.tool = tool
+        _executionTracker = State(initialValue: NativeToolExecutionTracker(
+            toolID: tool.id,
+            adSupported: NativeAdsPolicy.isAdEligibleTool(tool)
+        ))
+    }
 
     var body: some View {
-        if tool.id == "zip-any-file" {
-            NativeZipArchiveScreen()
-        } else if tool.id == "file-to-txt" {
-            NativeFileToTextScreen()
-        } else if tool.category == "files" && tool.engine.type == "custom" {
-            NativeFileWorkspaceScreen(toolID: tool.id)
-        } else {
-            ToolDestinationView(tool: tool)
+        Group {
+            if tool.id == "zip-any-file" {
+                NativeZipArchiveScreen()
+            } else if tool.id == "file-to-txt" {
+                NativeFileToTextScreen()
+            } else if tool.category == "files" && tool.engine.type == "custom" {
+                NativeFileWorkspaceScreen(toolID: tool.id)
+            } else {
+                ToolDestinationView(tool: tool)
+            }
         }
+        .environment(\.nativeToolExecutionTracker, executionTracker)
     }
 }
 
@@ -114,9 +127,7 @@ struct NativeZipArchiveScreen: View {
                                     Spacer(minLength: 0)
                                 }
                             }
-                            Button {
-                                createArchive()
-                            } label: {
+                            NativeExecutionAccessButton(action: { createArchive() }) {
                                 HStack(spacing: 8) {
                                     if isWorking { ProgressView().tint(Color.envSurface) }
                                     Text(isWorking ? "Creating archive…" : "Create ZIP archive")
@@ -147,7 +158,7 @@ struct NativeZipArchiveScreen: View {
                         .buttonStyle(.bordered)
                         .disabled(isWorking)
                         if selectedArchive != nil {
-                            Button { showFolderImporter = true } label: {
+                            NativeExecutionAccessButton(action: { showFolderImporter = true }) {
                                 Label(destinationFolder == nil ? "Choose folder and extract" : "Change destination folder", systemImage: "folder")
                                     .frame(maxWidth: .infinity)
                             }
@@ -490,9 +501,7 @@ private struct NativeFileToTextScreen: View {
                 }
                 .buttonStyle(.bordered)
                 .disabled(isWorking)
-                Button {
-                    convert()
-                } label: {
+                NativeExecutionAccessButton(action: { convert() }) {
                     if isWorking { ProgressView().frame(maxWidth: .infinity) }
                     else { Text("Convert to TXT").frame(maxWidth: .infinity) }
                 }
@@ -689,7 +698,7 @@ private struct NativeFileWorkspaceScreen: View {
         switch toolID {
         case "file-organizer":
             fileSelection
-            Button { showDestination = true } label: { Label("Choose destination and organize copies", systemImage: "folder.badge.plus").frame(maxWidth: .infinity) }
+            NativeExecutionAccessButton(action: { showDestination = true }) { Label("Choose destination and organize copies", systemImage: "folder.badge.plus").frame(maxWidth: .infinity) }
                 .buttonStyle(.borderedProminent).tint(Color.envInk).foregroundStyle(Color.envSurface)
                 .disabled(selectedFiles.isEmpty || isWorking)
         case "batch-file-renamer":
@@ -707,31 +716,31 @@ private struct NativeFileWorkspaceScreen: View {
                     }
                 }
             }
-            Button { exportRenamedArchive() } label: { Label("Export renamed copies", systemImage: "archivebox").frame(maxWidth: .infinity) }
+            NativeExecutionAccessButton(action: { exportRenamedArchive() }) { Label("Export renamed copies", systemImage: "archivebox").frame(maxWidth: .infinity) }
                 .buttonStyle(.borderedProminent).tint(Color.envInk).foregroundStyle(Color.envSurface)
                 .disabled(selectedFiles.isEmpty || isWorking || hasRenameCollisions)
             if hasRenameCollisions { Text("Two or more files would have the same output name. Adjust the rules before exporting.").font(.caption).foregroundStyle(Color.envInk) }
         case "duplicate-file-finder":
             fileSelection
-            Button { findDuplicates() } label: { Label("Find identical files", systemImage: "doc.on.doc").frame(maxWidth: .infinity) }
+            NativeExecutionAccessButton(action: { findDuplicates() }) { Label("Find identical files", systemImage: "doc.on.doc").frame(maxWidth: .infinity) }
                 .buttonStyle(.borderedProminent).tint(Color.envInk).foregroundStyle(Color.envSurface)
                 .disabled(selectedFiles.count < 2 || isWorking)
         case "folder-size-analyzer":
             folderSelection
-            Button { analyzeFolder() } label: { Text("Analyze storage").frame(maxWidth: .infinity) }
+            NativeExecutionAccessButton(action: { analyzeFolder() }) { Text("Analyze storage").frame(maxWidth: .infinity) }
                 .buttonStyle(.borderedProminent).tint(Color.envInk).foregroundStyle(Color.envSurface)
                 .disabled(firstFolder == nil || isWorking)
         case "file-search":
             folderSelection
             TextField("Search names or text inside files", text: $query).textFieldStyle(.roundedBorder)
-            Button { searchFolder() } label: { Label("Search folder", systemImage: "magnifyingglass").frame(maxWidth: .infinity) }
+            NativeExecutionAccessButton(action: { searchFolder() }) { Label("Search folder", systemImage: "magnifyingglass").frame(maxWidth: .infinity) }
                 .buttonStyle(.borderedProminent).tint(Color.envInk).foregroundStyle(Color.envSurface)
                 .disabled(firstFolder == nil || query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isWorking)
         default:
             VStack(spacing: 8) {
                 Button { showFirstFolder = true } label: { Label(firstFolder?.lastPathComponent ?? "Choose first folder", systemImage: "folder").frame(maxWidth: .infinity) }.buttonStyle(.bordered)
                 Button { showSecondFolder = true } label: { Label(secondFolder?.lastPathComponent ?? "Choose second folder", systemImage: "folder").frame(maxWidth: .infinity) }.buttonStyle(.bordered)
-                Button { compareFolders() } label: { Text("Compare folders").frame(maxWidth: .infinity) }
+                NativeExecutionAccessButton(action: { compareFolders() }) { Text("Compare folders").frame(maxWidth: .infinity) }
                     .buttonStyle(.borderedProminent).tint(Color.envInk).foregroundStyle(Color.envSurface)
                     .disabled(firstFolder == nil || secondFolder == nil || isWorking)
             }
