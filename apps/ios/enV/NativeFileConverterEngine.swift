@@ -44,6 +44,9 @@ enum NativeFileConverterEngine {
     }
     static func convertFileToText(name: String, data: Data, mime: String) throws -> Result {
         guard !data.isEmpty else { throw NativeNativeError.message("The selected file is empty.") }
+        guard data.count <= 200 * 1024 * 1024 else {
+            throw NativeNativeError.message("The selected file exceeds the 200 MB local text extraction limit.")
+        }
         let ext = URL(fileURLWithPath: name).pathExtension.lowercased()
         let text: String
         if ext == "docx" {
@@ -75,6 +78,9 @@ enum NativeFileConverterEngine {
                 .replacingOccurrences(of: "&lt;", with: "<")
                 .replacingOccurrences(of: "&gt;", with: ">")
                 .replacingOccurrences(of: "&quot;", with: "\"")
+                .replacingOccurrences(of: "&apos;", with: "'")
+                .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
         } else {
             let supported: Set<String> = [
                 "txt", "md", "markdown", "csv", "tsv", "json", "xml", "yaml", "yml",
