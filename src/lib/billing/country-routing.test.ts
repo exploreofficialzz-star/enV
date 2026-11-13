@@ -63,6 +63,14 @@ test("country profiles expose the documented Flutterwave local currencies and me
   assert.equal(getCountryPaymentProfile("NO"), null);
   assert.equal(getCountryPaymentProfile("PL"), null);
   assert.equal(getCountryPaymentProfile("JP"), null);
+
+  // Published Flutterwave card currencies not previously represented in enV routing.
+  for (const [country, currency] of [["CA", "CAD"], ["CO", "COP"], ["IN", "INR"], ["SL", "SLL"]] as const) {
+    assert.deepEqual(getCountryPaymentProfile(country), {
+      countryCode: country, currency, paymentOptions: ["card"],
+    });
+    assert.equal(getCurrencyMinorUnitExponent(currency), 2, currency + " must use two decimal minor units");
+  }
 });
 
 test("Flutterwave Standard accepts only exact whole major-unit amounts within int32", () => {
