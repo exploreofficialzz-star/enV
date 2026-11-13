@@ -36,9 +36,11 @@ const iosToolExempt = quotedValues(ios, /!\[([^\]]+)\]\.contains\(id\.lowercased
 assert.deepEqual(webExempt, expectedWebExempt, "Web production policy must expose the implemented Web-ready categories");
 assert.deepEqual(androidExempt, expectedNativeExempt, "Android production policy exposes the implemented native categories");
 assert.deepEqual(iosExempt, expectedNativeExempt, "iOS production policy exposes the implemented native categories");
-assert.deepEqual(webToolExempt, ["a-book", "zip-any-file", "camera-studio"], "Web exposes only implemented tool-specific exceptions");
-assert.deepEqual(androidToolExempt, ["a-book", "zip-any-file", "camera-studio"], "Android exposes only implemented tool-specific exceptions");
-assert.deepEqual(iosToolExempt, ["a-book", "zip-any-file", "camera-studio"], "iOS exposes only implemented tool-specific exceptions");
+const expectedToolExempt = ["a-book", "zip-any-file", "camera-studio", "pdf-merger", "pdf-metadata-viewer", "pdf-metadata-tool", "pdf-page-extractor", "pdf-splitter", "pdf-rotator", "pdf-text-extractor", "docx-text-extractor"];
+assert.deepEqual(webToolExempt, expectedToolExempt, "Web exposes only implemented tool-specific exceptions");
+assert.deepEqual(androidToolExempt, expectedToolExempt, "Android exposes only implemented tool-specific exceptions");
+assert.deepEqual(iosToolExempt, expectedToolExempt, "iOS exposes only implemented tool-specific exceptions");
+for (const id of expectedToolExempt.slice(3)) assert.ok(tools.some((tool) => tool.id === id), `catalog contains released document operation: ${id}`);
 assert.ok(webRegistry.includes('id: "a-book"'), "Web registry includes A book");
 assert.ok(webRegistry.includes('id: "camera-studio"'), "Web registry includes Camera Studio");
 assert.ok(androidCatalog.includes('id = "a-book"'), "Android catalog extension includes A book");
