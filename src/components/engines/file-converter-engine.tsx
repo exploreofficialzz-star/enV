@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+const MAX_FILE_TO_TXT_BYTES = 200 * 1024 * 1024;
+const MAX_FILE_TO_TXT_OUTPUT_BYTES = 32 * 1024 * 1024;
+
 import { Download, FileUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/tools/error-banner";
@@ -52,7 +55,12 @@ export function FileConverterEngine({ op, toolId }: { op: string; toolId?: strin
   const label = useMemo(() => op.replaceAll("-", " ").replace(/\b\w/g, x => x.toUpperCase()), [op]);
   async function run() {
     const startedAt = Date.now();
-    if (!file) { setError("Choose a file first."); return; } setError(null); setOutput(null);
+    if (!file) { setError("Choose a file first."); return; }
+    if (op === "file-to-txt" && file.size > MAX_FILE_TO_TXT_BYTES) {
+      setError("The selected file exceeds the 200 MB local text-extraction limit.");
+      return;
+    }
+    setError(null); setOutput(null);
     try {
       if (image) {
         if (op === "png-to-svg") { const data = await file.arrayBuffer(); const b64 = btoa(String.fromCharCode(...new Uint8Array(data))); const img = await createImageBitmap(file); const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${img.width}" height="${img.height}" viewBox="0 0 ${img.width} ${img.height}"><image href="data:image/png;base64,${b64}" width="100%" height="100%"/></svg>`; const blob = new Blob([svg], {type:"image/svg+xml"}); setOutput({blob,name:file.name.replace(/\.[^.]+$/, ".svg")}); setPreview(svg.slice(0,500)); if (toolId) recordToolExecutionResult(toolId, "success", Date.now() - startedAt, "file_conversion"); return; }
@@ -67,20 +75,21 @@ export function FileConverterEngine({ op, toolId }: { op: string; toolId?: strin
           if (!result.trim()) throw new Error("No selectable text was found. This may be a scanned PDF; OCR is not included in this conversion.");
         } else if (name.endsWith(".docx")) {
           result = docxToText(new Uint8Array(await file.arrayBuffer()));
-        } else if (/\\.(html?|xhtml)$/i.test(name)) {
+        } else if (/\.(html?|xhtml)$/i.test(name)) {
           const markup = await file.text();
           const document = new DOMParser().parseFromString(markup, "text/html");
           document.querySelectorAll("script,style,noscript,template").forEach((node) => node.remove());
-          result = (document.body.textContent ?? "").replace(/\\n{3,}/g, "\\n\\n").trim() + "\\n";
+          result = (document.body.textContent ?? "").replace(/\n{3,}/g, "\n\n").trim() + "\n";
         } else {
-          const supported = /\\.(txt|md|markdown|csv|tsv|json|xml|ya?ml|css|js|mjs|cjs|ts|tsx|jsx|sql|log|ini|toml|sh|properties|conf|cfg|srt|vtt|ics)$/i.test(name);
+          const supported = /\.(txt|md|markdown|csv|tsv|json|xml|ya?ml|css|js|mjs|cjs|ts|tsx|jsx|sql|log|ini|toml|sh|properties|conf|cfg|srt|vtt|ics)$/i.test(name);
           if (!supported && !file.type.startsWith("text/")) throw new Error("Choose a supported text, Markdown, CSV, JSON, XML, YAML, HTML, DOCX or selectable-text PDF file.");
-          result = new TextDecoder("utf-8").decode(await file.arrayBuffer()).replace(/^\\uFEFF/, "");
+          result = new TextDecoder("utf-8", { fatal: true }).decode(await file.arrayBuffer()).replace(/^\uFEFF/, "");
           if (!result.trim()) throw new Error("The selected file contains no readable text.");
-          result += result.endsWith("\\n") ? "" : "\\n";
+          result += result.endsWith("\n") ? "" : "\n";
         }
         const blob = new Blob([result], { type: "text/plain;charset=utf-8" });
-        setOutput({ blob, name: file.name.replace(/\\.[^.]+$/, "") + ".txt" });
+        if (blob.size > MAX_FILE_TO_TXT_OUTPUT_BYTES) throw new Error("The extracted text exceeds the 32 MB local output limit.");
+        setOutput({ blob, name: file.name.replace(/\.[^.]+$/, "") + ".txt" });
         setPreview(result.slice(0, 4000));
         if (toolId) recordToolExecutionResult(toolId, "success", Date.now() - startedAt, "file_conversion");
         return;
