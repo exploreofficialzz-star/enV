@@ -292,6 +292,19 @@ object OfflineWalletNativeApi {
         )
     }
 
+    /** Charge one ad-fallback operation using a server-calculated tool price. */
+    suspend fun consumeAdFallback(context: Context, toolId: String): Double = withContext(Dispatchers.IO) {
+        require(toolId.matches(Regex("[a-z0-9][a-z0-9-]{0,119}"))) { "The tool identifier is invalid." }
+        val bearer = sessionToken(context)
+            ?: throw IllegalStateException("Pair this device from your signed-in enV web Wallet first.")
+        val idempotencyKey = "native-ad-fallback-${UUID.randomUUID().toString().replace("-", "")}"
+        val body = JSONObject().put("toolId", toolId).put("idempotencyKey", idempotencyKey)
+        val data = requireData(request("/api/billing/ad-fallback/consume", "POST", body, bearer))
+        val charged = data.optDouble("chargedTokens", Double.NaN)
+        require(charged.isFinite() && charged > 0) { "The server did not confirm an enV token charge." }
+        charged
+    }
+
     suspend fun checkAvailability(): Result = withContext(Dispatchers.IO) {
         try {
             val response = request("/api/billing/offline/status", "GET")
