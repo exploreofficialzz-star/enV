@@ -202,6 +202,11 @@ assert.match(iosCalculator, /func authorizeRun\(\) async -> NativeToolAuthorizat
 assert.match(iosCalculator, /NativeAdsAvailability\.shared\.isFilled\(toolID\)/, "iOS native execution must require an ad fill or token fallback.");
 assert.match(iosCalculator, /case \.signInRequired/, "iOS guests without ad fill must receive sign-in and create-account actions.");
 assert.match(iosCalculator, /case \.insufficientCredits/, "iOS users without enough enV must be directed to Wallet.");
+assert.match(androidMain, /NativeToolAuthorization\.UNAVAILABLE/, "Android must explain when this tool has no approved fallback rate or billing switch.");
+assert.match(iosCalculator, /case \.unavailable/, "iOS must explain when this tool has no approved fallback rate or billing switch.");
+assert.match(toolShell, /An approved enV price is not available for this tool yet/, "Web must not promise a Wallet unlock when no server-approved price exists.");
+assert.match(toolShell, /enV fallback access is not enabled for this tool yet/, "Web must not present an unusable purchase path while billing is disabled.");
+
 assert.match(iosAds, /restrictedCategories/, "iOS must exclude fitness and personal tools like Web and Android.");
 assert.match(iosAds, /restrictedDisclaimers/, "iOS must exclude health, finance and earnings disclaimer tools.");
 assert.match(iosCalculator, /NativeAdsPolicy\.isHybridTool\(tool\)/, "iOS ad slots and offline gating must use the same per-tool decision.");
