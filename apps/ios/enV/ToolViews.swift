@@ -6681,10 +6681,6 @@ private enum NativeToolAuthorization: Equatable {
 @MainActor
 private final class NativeToolExecutionTracker {
     private let toolID: String
-    private var startedAt: Date?
-    private var resultRecorded = false
-
-    private let toolID: String
     private let adSupported: Bool
     private var startedAt: Date?
     private var resultRecorded = false
