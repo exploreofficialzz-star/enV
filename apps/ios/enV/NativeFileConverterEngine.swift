@@ -3,6 +3,58 @@ import UIKit
 import ImageIO
 import UniformTypeIdentifiers
 import PDFKit
+import ZIPFoundation
+
+private final class NativeWordTextCollector: NSObject, XMLParserDelegate {
+    private(set) var text = ""
+    private var collectingText = false
+
+    private func localName(_ elementName: String, qualifiedName: String?) -> String {
+        let name = qualifiedName ?? elementName
+        return name.split(separator: ":").last.map(String.init) ?? name
+    }
+
+    func parser(
+        _ parser: XMLParser,
+        didStartElement elementName: String,
+        namespaceURI: String?,
+        qualifiedName: String?,
+        attributes attributeDict: [String: String] = [:]
+    ) {
+        switch localName(elementName, qualifiedName: qualifiedName) {
+        case "p":
+            if !text.isEmpty && !text.hasSuffix("\n") { text += "\n" }
+        case "t":
+            collectingText = true
+        case "tab":
+            text += "\t"
+        case "br", "cr":
+            text += "\n"
+        default:
+            break
+        }
+    }
+
+    func parser(_ parser: XMLParser, foundCharacters string: String) {
+        if collectingText { text += string }
+    }
+
+    func parser(
+        _ parser: XMLParser,
+        didEndElement elementName: String,
+        namespaceURI: String?,
+        qualifiedName: String?
+    ) {
+        switch localName(elementName, qualifiedName: qualifiedName) {
+        case "t":
+            collectingText = false
+        case "p":
+            if !text.hasSuffix("\n") { text += "\n" }
+        default:
+            break
+        }
+    }
+}
 
 enum NativeFileConverterEngine {
     struct Result {
@@ -50,14 +102,7 @@ enum NativeFileConverterEngine {
         let ext = URL(fileURLWithPath: name).pathExtension.lowercased()
         let text: String
         if ext == "docx" {
-            guard let document = try? NSAttributedString(
-                data: data,
-                options: [.documentType: "org.openxmlformats-officedocument.wordprocessingml.document"],
-                documentAttributes: nil
-            ) else {
-                throw NativeNativeError.message("This DOCX file could not be read locally.")
-            }
-            text = document.string
+            text = try extractDocxText(data)
         } else if ext == "pdf" {
             guard data.count <= 200 * 1024 * 1024,
                   let pdf = PDFDocument(data: data),
@@ -100,12 +145,105 @@ enum NativeFileConverterEngine {
         }
         return Result(text.trimmingCharacters(in: .newlines) + "\n", nil, "text/plain", "txt")
     }
+
+    private static let maxFileToTextBytes = 200 * 1024 * 1024
+    private static let maxDocxXmlBytes = 32 * 1024 * 1024
+    private static let maxDocxExpandedBytes: UInt64 = 128 * 1024 * 1024
+    private static let maxDocxEntries = 10_000
+
+    private static func extractDocxText(_ data: Data) throws -> String {
+        guard !data.isEmpty else {
+            throw NativeNativeError.message("The selected file is empty.")
+        }
+        guard data.count <= maxFileToTextBytes else {
+            throw NativeNativeError.message("The selected DOCX file exceeds the 200 MB local extraction limit.")
+        }
+
+        let archive = try Archive(data: data, accessMode: .read)
+        var entryCount = 0
+        var expandedBytes: UInt64 = 0
+        var documentEntry: Entry?
+
+        for entry in archive {
+            entryCount += 1
+            guard entryCount <= maxDocxEntries else {
+                throw NativeNativeError.message("This DOCX archive contains too many entries to inspect safely.")
+            }
+            guard entry.type == .file || entry.type == .directory else {
+                throw NativeNativeError.message("This DOCX archive contains a link or unsupported entry type.")
+            }
+
+            let nextExpanded = expandedBytes.addingReportingOverflow(entry.uncompressedSize)
+            guard !nextExpanded.overflow, nextExpanded.partialValue <= maxDocxExpandedBytes else {
+                throw NativeNativeError.message("This DOCX archive expands beyond the 128 MB local safety limit.")
+            }
+            expandedBytes = nextExpanded.partialValue
+
+            if entry.path == "word/document.xml" {
+                guard entry.type == .file, documentEntry == nil else {
+                    throw NativeNativeError.message("This DOCX archive contains an invalid or duplicate document body.")
+                }
+                guard entry.uncompressedSize <= UInt64(maxDocxXmlBytes) else {
+                    throw NativeNativeError.message("The DOCX document XML exceeds the 32 MB local extraction limit.")
+                }
+                documentEntry = entry
+            }
+        }
+
+        guard let documentEntry else {
+            throw NativeNativeError.message("This DOCX file does not contain word/document.xml.")
+        }
+
+        var xmlData = Data()
+        xmlData.reserveCapacity(Int(documentEntry.uncompressedSize))
+        let checksum = try archive.extract(
+            documentEntry,
+            bufferSize: 64 * 1024,
+            consumer: { chunk in
+                guard chunk.count <= Self.maxDocxXmlBytes,
+                      xmlData.count <= Self.maxDocxXmlBytes - chunk.count else {
+                    throw NativeNativeError.message("The DOCX document XML exceeds the 32 MB local extraction limit.")
+                }
+                xmlData.append(chunk)
+            }
+        )
+        guard checksum == documentEntry.checksum else {
+            throw NativeNativeError.message("The DOCX document body failed its archive integrity check.")
+        }
+
+        // Office Open XML does not need external entities. Reject DTDs and keep
+        // Foundation's XML parser from resolving any external resources.
+        guard let xml = String(data: xmlData, encoding: .utf8),
+              !xml.range(of: "<!DOCTYPE", options: .caseInsensitive).map({ _ in true }, default: false),
+              !xml.range(of: "<!ENTITY", options: .caseInsensitive).map({ _ in true }, default: false) else {
+            throw NativeNativeError.message("The DOCX document body is invalid or uses unsupported XML declarations.")
+        }
+
+        let collector = NativeWordTextCollector()
+        let parser = XMLParser(data: xmlData)
+        parser.shouldResolveExternalEntities = false
+        parser.delegate = collector
+        guard parser.parse(), parser.parserError == nil else {
+            throw NativeNativeError.message("The DOCX document body contains invalid XML.")
+        }
+        let output = collector.text.trimmingCharacters(in: .newlines)
+        guard !output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw NativeNativeError.message("The DOCX document contains no readable text.")
+        }
+        return output + "\n"
+    }
+
     private static func document(_ op:String,file:NativeBackendFile)throws->Result {
+        guard file.data.count <= 200 * 1024 * 1024 else {
+            throw NativeNativeError.message("The selected document exceeds the 200 MB local processing limit.")
+        }
         if op == "docx-text-extractor" {
-            guard let attributed = try? NSAttributedString(data:file.data, options:[.documentType:"org.openxmlformats.wordprocessingml.document"], documentAttributes:nil) else { throw NativeNativeError.message("This DOCX file could not be read locally.") }
-            return Result(attributed.string + "\n", nil, "text/plain", "txt")
+            return Result(try extractDocxText(file.data), nil, "text/plain", "txt")
         }
         guard let pdf=PDFDocument(data:file.data) else { throw NativeNativeError.message("Selected file is not a readable PDF.") }
+        guard pdf.pageCount <= 500 else {
+            throw NativeNativeError.message("This PDF exceeds the 500-page local processing limit.")
+        }
         if op == "pdf-metadata-viewer" || op == "pdf-metadata-tool" { let info:[String:Any] = ["pages":pdf.pageCount,"title":pdf.documentAttributes?[PDFDocumentAttribute.titleAttribute] as? String ?? "","author":pdf.documentAttributes?[PDFDocumentAttribute.authorAttribute] as? String ?? ""]; let data=try JSONSerialization.data(withJSONObject:info,options:.prettyPrinted); return Result(String(decoding:data,as:UTF8.self),nil,"application/json","json") }
         if op == "pdf-text-extractor" { return Result((0..<pdf.pageCount).compactMap{pdf.page(at:$0)?.string}.joined(separator:"\n\n")+"\n",nil,"text/plain","txt") }
         if op == "pdf-rotator" { for i in 0..<pdf.pageCount { if let page = pdf.page(at: i) { page.rotation = (page.rotation + 90) % 360 } }; return Result(nil,pdf.dataRepresentation(),"application/pdf","pdf") }
