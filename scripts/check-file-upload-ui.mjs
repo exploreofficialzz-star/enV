@@ -47,7 +47,8 @@ for (const path of genericUploadSurfaces) {
   const source = read(path);
   assert.ok(source.includes("FileDropzone"), path + " must use the shared file picker.");
   if (path !== "src/components/engines/music-live-video-studio.tsx" &&
-      path !== "src/components/engines/a-book-engine.tsx") {
+      path !== "src/components/engines/a-book-engine.tsx" &&
+      path !== "src/components/engines/file-workspace-engine.tsx") {
     assert.doesNotMatch(source, /type=["']file["']/i, path + " must not introduce an independent raw file input.");
   }
 }
@@ -67,6 +68,11 @@ const specialistImporters = {
 for (const [path, rationale] of Object.entries(specialistImporters)) {
   assert.ok(read(path).length > 0, path + " remains a reviewed specialist importer: " + rationale);
 }
+
+const fileWorkspace = read("src/components/engines/file-workspace-engine.tsx");
+assert.match(fileWorkspace, /FileDropzone/, "File workspace file selections use the shared picker.");
+assert.match(fileWorkspace, /showDirectoryPicker/, "Directory selection keeps the native folder picker where supported.");
+assert.match(fileWorkspace, /setAttribute\("webkitdirectory"/, "Directory selection keeps its browser folder-input fallback.");
 
 const liveVideo = read("src/components/engines/music-live-video-studio.tsx");
 assert.match(liveVideo, /FileDropzone/, "Live backing audio must use the shared picker.");
