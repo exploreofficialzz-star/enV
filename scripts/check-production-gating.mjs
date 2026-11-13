@@ -36,7 +36,7 @@ const iosToolExempt = quotedValues(ios, /!\[([^\]]+)\]\.contains\(id\.lowercased
 assert.deepEqual(webExempt, expectedWebExempt, "Web production policy must expose the implemented Web-ready categories");
 assert.deepEqual(androidExempt, expectedNativeExempt, "Android production policy exposes the implemented native categories");
 assert.deepEqual(iosExempt, expectedNativeExempt, "iOS production policy exposes the implemented native categories");
-const expectedToolExempt = ["a-book", "zip-any-file", "camera-studio", "pdf-merger", "pdf-metadata-viewer", "pdf-metadata-tool", "pdf-page-extractor", "pdf-splitter", "pdf-rotator", "pdf-text-extractor", "docx-text-extractor"];
+const expectedToolExempt = ["a-book", "zip-any-file", "camera-studio", "pdf-merger", "pdf-metadata-viewer", "pdf-page-extractor", "pdf-splitter", "pdf-rotator"];
 assert.deepEqual(webToolExempt, expectedToolExempt, "Web exposes only implemented tool-specific exceptions");
 assert.deepEqual(androidToolExempt, expectedToolExempt, "Android exposes only implemented tool-specific exceptions");
 assert.deepEqual(iosToolExempt, expectedToolExempt, "iOS exposes only implemented tool-specific exceptions");
