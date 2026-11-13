@@ -341,7 +341,10 @@ assert.match(walletDashboard, /100 enV = \$1\.00 reference value/);
 assert.doesNotMatch(walletDashboard, /Choose your token pack/, "wallet must not retain the old token-pack card heading");
 assert.match(walletDashboard, /visibleWallet\.recoveryDebtTokens/, "wallet must explain a recovery balance after reversals");
 assert.match(tokenDashboardComponent, /referenceValue\(wallet\.availableTokens\)/, "web token dashboard must calculate reference value from the live balance");
-assert.match(walletDashboard, /final charge is quoted in your local currency after your country is detected/);
+assert.match(walletDashboard, /Payment method/);
+assert.match(walletDashboard, /Try again/);
+assert.match(walletDashboard, /You’ll receive/);
+assert.doesNotMatch(walletDashboard, /Choose a payment method and enter an amount|Checking payment methods for your country|Payment methods are not available for this country right now|Payments are processed securely|final charge is quoted in your local currency|Token reference value is not a cash redemption promise|Secure checkout is unavailable at the moment|No payment was taken/);
 assert.match(cryptomusService, /const pricePerTokenMinor = 1/);
 assert.match(paystackProviderConfig, /PAYSTACK_SECRET_KEY\?\.trim\(\)/,
   "whitespace-only Paystack credentials must not enable checkout");
