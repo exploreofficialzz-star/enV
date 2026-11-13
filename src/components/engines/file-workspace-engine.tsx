@@ -14,6 +14,7 @@ type CompareRow = { path: string; status: "added" | "removed" | "changed" | "sam
 
 const MAX_BROWSER_HASH_BYTES = 64 * 1024 * 1024;
 const MAX_TEXT_SEARCH_BYTES = 8 * 1024 * 1024;
+const MAX_WORKSPACE_FILES = 100_000;
 
 function relativePath(file: File): string {
   return (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
@@ -88,16 +89,20 @@ async function sha256(file: File): Promise<string> {
   return Array.from(new Uint8Array(digest)).map((value) => value.toString(16).padStart(2, "0")).join("");
 }
 
-async function walkDirectory(directory: DirectoryLike, prefix = ""): Promise<File[]> {
+async function walkDirectory(directory: DirectoryLike, prefix = "", state = { count: 0 }): Promise<File[]> {
   const found: File[] = [];
   for await (const [name, entry] of directory.entries()) {
     const path = prefix ? prefix + "/" + name : name;
     if ("getFile" in entry) {
+      state.count += 1;
+      if (state.count > MAX_WORKSPACE_FILES) {
+        throw new Error("This folder contains more than 100,000 files. Select a smaller folder.");
+      }
       const file = await entry.getFile();
       Object.defineProperty(file, "webkitRelativePath", { value: path, configurable: true });
       found.push(file);
     } else {
-      found.push(...await walkDirectory(entry as unknown as DirectoryLike, path));
+      found.push(...await walkDirectory(entry as unknown as DirectoryLike, path, state));
     }
   }
   return found;
@@ -185,9 +190,14 @@ export function FileWorkspaceEngine({ toolId }: { toolId: string }) {
 
   function receiveFiles(event: ChangeEvent<HTMLInputElement>, side: "left" | "right" = "left") {
     const selected = inputFiles(event);
+    resetResult();
+    if (selected.length > MAX_WORKSPACE_FILES) {
+      setError("This selection contains more than 100,000 files. Select a smaller set.");
+      event.target.value = "";
+      return;
+    }
     if (side === "right") setRightFiles(selected);
     else setFiles(selected);
-    resetResult();
     if (selected.length) setStatus(selected.length + " files selected.");
     event.target.value = "";
   }
@@ -331,8 +341,8 @@ export function FileWorkspaceEngine({ toolId }: { toolId: string }) {
     setBusy(true);
     resetResult();
     try {
-      const left = new Map(files.map((file) => [relativePath(file).toLocaleLowerCase(), file]));
-      const right = new Map(rightFiles.map((file) => [relativePath(file).toLocaleLowerCase(), file]));
+      const left = new Map(files.map((file) => [relativePath(file), file]));
+      const right = new Map(rightFiles.map((file) => [relativePath(file), file]));
       const rows: CompareRow[] = [];
       for (const [path, file] of left) {
         const other = right.get(path);
@@ -410,7 +420,7 @@ export function FileWorkspaceEngine({ toolId }: { toolId: string }) {
               <p className="text-xs text-subtle">{files.length} selected · {totalBytes.toLocaleString()} bytes</p>
             </div>
             <div className="flex gap-2">
-              {(isFolderSize || isOrganizer) ? <Button variant="outline" size="sm" onClick={() => void chooseFolder()} disabled={busy}> <FolderOpen className="mr-1 size-4" /> Choose folder</Button> : null}
+              {(isFolderSize || isOrganizer || isSearch) ? <Button variant="outline" size="sm" onClick={() => void chooseFolder()} disabled={busy}> <FolderOpen className="mr-1 size-4" /> Choose folder</Button> : null}
               <Button variant="outline" size="sm" onClick={chooseFiles}>Choose files</Button>
             </div>
           </div>
@@ -464,8 +474,8 @@ export function FileWorkspaceEngine({ toolId }: { toolId: string }) {
       ) : null}
       {report.length ? (
         <div className="rounded-xl border border-border p-3">
-          <div className="mb-2 flex items-center justify-between"><p className="text-sm font-medium">Results</p><Button size="sm" variant="outline" onClick={() => navigator.clipboard.writeText(report.join("\\n"))}><Copy className="mr-1 size-3" /> Copy</Button></div>
-          <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words text-xs text-subtle">{report.join("\\n")}</pre>
+          <div className="mb-2 flex items-center justify-between"><p className="text-sm font-medium">Results</p><Button size="sm" variant="outline" onClick={() => navigator.clipboard.writeText(report.join("\n"))}><Copy className="mr-1 size-3" /> Copy</Button></div>
+          <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words text-xs text-subtle">{report.join("\n")}</pre>
         </div>
       ) : null}
     </section>
