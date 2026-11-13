@@ -83,6 +83,12 @@ assert.match(adPolicy, /ADSTERRA_EXCLUDED_CATEGORIES[\s\S]*?ADSTERRA_EXCLUDED_CO
 assert.match(adsterraWeb, /export type AdsterraDeliveryState[\s\S]*?filled[\s\S]*?unfilled[\s\S]*?blocked/, "The ad component must expose blocked, unfilled and confirmed-fill states.");
 assert.match(adsterraWeb, /new MutationObserver\(reportDelivery\)/, "Web fill detection must observe actual creative insertion.");
 assert.match(adFallbackPolicy, /isAdFallbackBillingEnabled[\s\S]*?fallbackEnabled === "true"[\s\S]*?enforcementEnabled === "true"/, "Ad token fallback must fail closed unless the explicit server billing gates are enabled.");
+assert.match(adPolicy, /recordAdsterraToolDelivery/, "The shared ad policy must retain verified per-tool delivery state.");
+assert.match(adPolicy, /consumeAdFallbackExecutionGrant/, "Online paid runs must use a one-use authorization grant.");
+assert.match(offlineClient, /consumeAdFallbackExecutionGrant\(input\.toolId\)/, "An online server-paid calculator run must consume its one-use grant before the offline journal.");
+assert.match(offlineClient, /hasVerifiedAdsterraToolDelivery\(input\.toolId\)/, "A hybrid online run must not treat an unfilled Adsterra slot as an ad-funded run.");
+assert.match(toolShell, /hasSelectedWebOfflineAllowanceForTool/, "A valid pre-issued offline allowance remains available when the enV origin is unreachable.");
+
 assert.match(adFallbackPolicy, /resolveAdFallbackUnitSubunits/, "Fallback prices must come only from server billing profiles.");
 assert.match(adFallbackServer, /getToolById\(toolId\)/, "The fallback quote must validate the canonical tool record.");
 assert.match(adFallbackServer, /isAdsterraQualifiedTool\(tool\)/, "Only ad-supported tool records may receive a fallback quote.");
