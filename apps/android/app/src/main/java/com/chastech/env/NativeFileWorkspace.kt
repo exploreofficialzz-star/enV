@@ -265,8 +265,8 @@ fun NativeFileWorkspaceScreen(toolId: String) {
                             runCatching {
                                 val leftRoot = DocumentFile.fromTreeUri(context, leftUri) ?: throw IOException("The first folder is unavailable.")
                                 val rightRoot = DocumentFile.fromTreeUri(context, rightUri) ?: throw IOException("The second folder is unavailable.")
-                                val left = scanWorkspaceFolder(leftRoot).associateBy { it.path.lowercase(Locale.ROOT) }
-                                val right = scanWorkspaceFolder(rightRoot).associateBy { it.path.lowercase(Locale.ROOT) }
+                                val left = scanWorkspaceFolder(leftRoot).associateBy { it.path }
+                                val right = scanWorkspaceFolder(rightRoot).associateBy { it.path }
                                 val output = mutableListOf<WorkspaceLine>()
                                 left.forEach { (path, file) ->
                                     val other = right[path]
