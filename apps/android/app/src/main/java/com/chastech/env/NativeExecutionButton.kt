@@ -57,7 +57,6 @@ internal fun NativeExecutionButton(
                     authorizing = false
                     if (authorization == NativeToolAuthorization.ALLOWED) {
                         accessState = null
-                        telemetry.start()
                         onAuthorized()
                     } else {
                         accessState = authorization
