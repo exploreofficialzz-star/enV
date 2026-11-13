@@ -1,7 +1,7 @@
 # Celebrations category — competitive benchmark and implementation record
 
 **Research checked:** 13 November 2026  
-**Scope:** all 96 existing Celebrations catalog tools: 12 occasion families × 8 experiences. No adjacent category is included.
+**Scope:** all 93 existing Celebrations catalog tools: 12 occasion families with the 93 IDs currently present in the generated catalog. No adjacent category is included.
 
 ## Competitor benchmark
 
