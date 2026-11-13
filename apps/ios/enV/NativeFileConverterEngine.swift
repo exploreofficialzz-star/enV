@@ -22,7 +22,7 @@ enum NativeFileConverterEngine {
     private static let documentOps:Set<String> = ["pdf-metadata-viewer","pdf-metadata-tool","pdf-page-extractor","pdf-splitter","pdf-rotator","pdf-merger","pdf-text-extractor","docx-text-extractor"]
     static func supports(_ tool:Tool)->Bool { (tool.engine.type == "file-converter" && (imageOps.contains(operation(tool)) || ["file-to-txt","csv-to-json","json-to-csv","csv-to-tsv","tsv-to-csv","xml-to-json","json-to-xml","yaml-to-json","json-to-yaml","txt-to-csv","csv-to-txt","markdown-to-html","html-to-markdown"].contains(operation(tool)))) || (tool.engine.type == "document-backend" && documentOps.contains(operation(tool))) }
     static func run(_ tool:Tool,file:NativeBackendFile)throws->Result {
-        let op=operation(tool); if op == "file-to-txt" { return try convertFileToText(name: file.name, data: file.data, mime: file.mime) }; if documentOps.contains(op) { return try document(op,file:file) }; if imageOps.contains(op) { return try image(op,file.data) }
+        let op=operation(tool); if op == "file-to-txt" { return try convertFileToText(name: file.name, data: file.data, mime: (UTType(filenameExtension: URL(fileURLWithPath: file.name).pathExtension)?.preferredMIMEType ?? "application/octet-stream")) }; if documentOps.contains(op) { return try document(op,file:file) }; if imageOps.contains(op) { return try image(op,file.data) }
         let input=String(decoding:file.data,as:UTF8.self)
         switch op {
         case "csv-to-json": return Result(try csvToJson(input),nil,"application/json","json")
