@@ -166,7 +166,7 @@ try {
   ]);
   await page.getByRole("button", { name: "Choose folder" }).click();
   await page.getByRole("button", { name: "Analyze storage" }).click();
-  await page.getByText("Files scanned: 2", { exact: true }).waitFor();
+  await page.locator("pre").filter({ hasText: "Files scanned: 2" }).waitFor();
   const folderReport = await page.locator("pre").innerText();
   assert.match(folderReport, /Documents/);
   assert.match(folderReport, /Images/);
