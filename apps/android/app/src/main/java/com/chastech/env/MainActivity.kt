@@ -1293,7 +1293,7 @@ private fun NativeToolInterfaceContent(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val telemetry = remember(tool.id) {
-        NativeToolExecutionTelemetry(context.applicationContext, tool.id) {
+        NativeToolExecutionTelemetry(context.applicationContext, tool.id, NativeAdsPolicy.isAdEligibleTool(tool)) {
             scope.launch { runCatching { NativeAnalytics.flush(context.applicationContext) } }
         }
     }
@@ -3146,13 +3146,50 @@ private fun InputField(value: String, onValueChange: (String) -> Unit, label: St
     OutlinedTextField(value, onValueChange, modifier.fillMaxWidth().then(if (tall) Modifier.height(170.dp) else Modifier), label = { Text(label) }, placeholder = placeholder?.let { { Text(it) } }, minLines = minLines, singleLine = singleLine)
 }
 
+internal enum class NativeToolAuthorization {
+    ALLOWED,
+    SIGN_IN_REQUIRED,
+    INSUFFICIENT_CREDITS,
+    UNAVAILABLE,
+    RETRY,
+}
+
 internal class NativeToolExecutionTelemetry(
     private val context: Context,
     private val toolId: String,
+    private val adSupported: Boolean,
     private val flush: () -> Unit,
 ) {
     private var startedAtMs: Long? = null
     private var resultRecorded = false
+
+    suspend fun authorizeRun(): NativeToolAuthorization {
+        if (!adSupported || NativeAdsAvailability.isFilled(toolId)) return NativeToolAuthorization.ALLOWED
+        val online = runCatching { NativeAdsPolicy.isApplicationOnline(context) }.getOrDefault(false)
+        if (!online) {
+            val journal = runCatching { com.chastech.env.billing.OfflineWalletJournal(context) }.getOrNull()
+                ?: return NativeToolAuthorization.RETRY
+            val allowance = runCatching { journal.activeAllowanceId() }.getOrNull()
+            val offlineEligible = runCatching { journal.isEligibleTool(context, toolId) }.getOrDefault(false)
+            return if (allowance != null && offlineEligible) NativeToolAuthorization.ALLOWED
+                else NativeToolAuthorization.RETRY
+        }
+        if (!com.chastech.env.billing.OfflineWalletNativeApi.isPaired(context)) {
+            return NativeToolAuthorization.SIGN_IN_REQUIRED
+        }
+        return try {
+            com.chastech.env.billing.OfflineWalletNativeApi.consumeAdFallback(context, toolId)
+            NativeToolAuthorization.ALLOWED
+        } catch (error: Exception) {
+            val message = error.message.orEmpty()
+            when {
+                "INSUFFICIENT_CREDITS" in message -> NativeToolAuthorization.INSUFFICIENT_CREDITS
+                "AD_FALLBACK_BILLING_DISABLED" in message || "AD_FALLBACK_NOT_AVAILABLE" in message -> NativeToolAuthorization.UNAVAILABLE
+                "NATIVE_SESSION_INVALID" in message || "AUTH_REQUIRED" in message -> NativeToolAuthorization.SIGN_IN_REQUIRED
+                else -> NativeToolAuthorization.RETRY
+            }
+        }
+    }
 
     @Synchronized fun start() {
         startedAtMs = SystemClock.elapsedRealtime()
@@ -3198,9 +3235,51 @@ internal val LocalNativeToolExecutionTelemetry = staticCompositionLocalOf<Native
 @Composable
 private fun ActionRow(onRun: () -> Unit, onReset: () -> Unit) {
     val telemetry = LocalNativeToolExecutionTelemetry.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var authorizing by remember { mutableStateOf(false) }
+    var accessState by remember { mutableStateOf<NativeToolAuthorization?>(null) }
+
+    fun openAccountPath(path: String) {
+        runCatching {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/$path")))
+        }
+    }
+
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = { telemetry?.start(); onRun() }) { Text("Run") }
-        Button(onClick = onReset) { Text("Reset") }
+        Button(
+            enabled = !authorizing,
+            onClick = {
+                if (telemetry == null) {
+                    onRun()
+                } else {
+                    scope.launch {
+                        authorizing = true
+                        val authorization = telemetry.authorizeRun()
+                        authorizing = false
+                        when (authorization) {
+                            NativeToolAuthorization.ALLOWED -> {
+                                accessState = null
+                                telemetry.start()
+                                onRun()
+                            }
+                            else -> accessState = authorization
+                        }
+                    }
+                }
+            },
+        ) { Text(if (authorizing) "…" else "Run") }
+        Button(onClick = { accessState = null; onReset() }) { Text("Reset") }
+    }
+    when (accessState) {
+        NativeToolAuthorization.SIGN_IN_REQUIRED -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { openAccountPath("login") }) { Text("Sign in") }
+            Button(onClick = { openAccountPath("signup") }) { Text("Create account") }
+        }
+        NativeToolAuthorization.INSUFFICIENT_CREDITS -> Button(onClick = { openAccountPath("wallet") }) { Text("Buy enV") }
+        NativeToolAuthorization.UNAVAILABLE -> Text("Token access is not enabled for this tool yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        NativeToolAuthorization.RETRY -> OutlinedButton(onClick = { accessState = null }) { Text("Retry") }
+        else -> Unit
     }
 }
 

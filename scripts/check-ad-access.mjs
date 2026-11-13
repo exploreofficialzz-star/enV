@@ -36,19 +36,29 @@ const iosCalculator = read("apps/ios/enV/ToolViews.swift");
 const iosPrivacy = read("apps/ios/enV/ContentViews.swift");
 const iosApp = read("apps/ios/enV/enVApp.swift");
 const iosProject = read("apps/ios/enV.xcodeproj/project.pbxproj");
+const adFallbackPolicy = read("src/lib/ads/fallback.ts");
+const adFallbackServer = read("src/lib/ads/fallback.server.ts");
+const adFallbackConsume = read("server/routes/api/billing/ad-fallback/consume.post.ts");
+const androidWallet = read("apps/android/app/src/main/java/com/chastech/env/billing/OfflineWalletNativeApi.kt");
+const iosWallet = read("apps/ios/enV/OfflineWalletNativeAPI.swift");
 
 assert.match(rootRoute, /ca-pub-2492078126313994/, "The AdSense site verification tag must use the publisher ID supplied by the account owner.");
 assert.match(rootRoute, /name: "google-adsense-account", content: ADSENSE_SITE_CLIENT_ID/, "The shared document head must expose Google AdSense site verification.");
 assert.doesNotMatch(rootRoute, /ADSENSE_BOOTSTRAP_SCRIPT|pagead\.googlesyndication\.com/, "The root document must not load AdSense before hydration.");
 assert.match(shell, /<AdSlot tool=\{tool\} \/>/, "Tool details must include the ad placement.");
 assert.match(toolShell, /AdsterraNativeBanner/, "Qualified tool pages must include the publisher's native placement.");
-assert.match(toolShell, /!isFullscreen && adsterraAdsEnabled \? <AdsterraResponsiveBanner \/>/, "Qualified tool pages must actually mount the responsive banner above the interface.");
+assert.match(toolShell, /!isFullscreen && adsterraAdsEnabled \? <AdsterraResponsiveBanner onDelivery=\{onAdDelivery\} \/>/, "Qualified tool pages must mount the responsive banner and report ad-fill state.");
 assert.match(toolShell, /AdsterraBanner format="300x250"/, "Qualified tool pages must include the medium-rectangle banner.");
 assert.match(toolShell, /isAdsterraQualifiedTool\(tool\)/, "Each placement must be limited to the shared Adsterra eligibility policy.");
 assert.match(toolShell, /const adsterraAdsEnabled =\s*adsterraQualified && adsterraConsent === "granted"/, "Adsterra placements must depend on the saved advertising choice, not account state.");
-assert.doesNotMatch(toolShell, /useCurrentUserState|adsterraAuthPending|adsterraAuthError|adsterraUser|AdsterraGuestAccessGate/, "Tool access and ad rendering must not depend on an account check or guest access gate.");
-assert.match(toolShell, /<ToolExecutionTelemetryContext\.Provider value=\{executionTelemetry\}>\s*\{toolContent\}\s*<\/ToolExecutionTelemetryContext\.Provider>/, "Eligible tool content must render directly without an advertising access gate.");
-assert.match(toolShell, /<\/section>\s*\{!isFullscreen && adsterraAdsEnabled[\s\S]*?<AdsterraBanner format="300x250" \/>[\s\S]*?<AdsterraNativeBanner \/>[\s\S]*?\}\s*\{tool\.category !== "creators"/, "Lower Adsterra placements must work for every eligible category, including Creator tools.");
+assert.match(toolShell, /useCurrentUserState\(\)/, "Ad-fallback access must resolve the current authenticated account state.");
+assert.match(toolShell, /hasVisibleAdCreative|AdsterraDeliveryState/, "An ad script load alone must not count as a rendered ad.");
+assert.match(toolShell, /requiresTokenFallback/, "An unfilled, blocked or fullscreen ad-supported run must enter token fallback.");
+assert.match(toolShell, /fallbackPromptOpen/, "The sign-in or token prompt must open only after an execution attempt.");
+assert.match(toolShell, /api\/billing\/ad-fallback\/consume/, "A token debit must be confirmed before resuming the pending execution.");
+assert.match(toolShell, /to="\/login"|to="\/signup"|to="\/wallet"/, "Guests must be offered account access and signed-in users a wallet path.");
+assert.match(toolShell, /<ToolExecutionTelemetryContext\.Provider value=\{executionTelemetry\}>\s*\{toolContent\}\s*<\/ToolExecutionTelemetryContext\.Provider>/, "The existing execution telemetry provider remains mounted around tool content.");
+assert.match(toolShell, /<\/section>\s*\{!isFullscreen && adsterraAdsEnabled[\s\S]*?<AdsterraBanner format="300x250" onDelivery=\{onAdDelivery\} \/>[\s\S]*?<AdsterraNativeBanner onDelivery=\{onAdDelivery\} \/>[\s\S]*?\}\s*\{tool\.category !== "creators"/, "Lower Adsterra placements must report their fill state across all eligible categories.");
 assert.match(toolShell, /openAdsterraSmartlinkFromOutput/, "Output actions must trigger the publisher Smartlink from a direct click.");
 assert.ok(toolShell.includes("copy|download|export|save|output|result|calculate|convert|generate"), "Output triggers must include copy, download, export and common output-producing actions.");
 assert.doesNotMatch(downloadUtils, /openAdsterraSmartlinkFromOutput/, "The download helper must not open a popup after an asynchronous download begins.");
@@ -57,7 +67,7 @@ assert.doesNotMatch(rootRoute, /AdsterraPopunder/, "The root document must not m
 assert.doesNotMatch(toolShell, /AdsterraToolPopunder|ADSTERRA_POPUNDER_SCRIPT/, "Tool pages must not install a page-wide click-triggered ad.");
 assert.doesNotMatch(adsterraWeb, /AdsterraToolPopunder|envAdsterraPopunder|ADSTERRA_POPUNDER_SCRIPT/, "The browser ad components must not load a popunder script.");
 assert.ok(!adsterraConfig.includes("ADSTERRA_POPUNDER_SCRIPT") && !adsterraConfig.includes("abscloud.org"), "The page-wide popunder placement must not be configured.");
-assert.ok(shell.includes('<AdsterraBanner format="300x250" />') && shell.includes("<AdsterraNativeBanner />"), "Qualified tool pages retain fixed banner slots.");
+assert.ok(shell.includes('<AdsterraBanner format="300x250" onDelivery={onAdDelivery} />') && shell.includes('<AdsterraNativeBanner onDelivery={onAdDelivery} />'), "Qualified tool pages retain fixed banner slots with delivery callbacks.");
 assert.match(adsterraWeb, /retryAttempt < 3/, "Failed Adsterra banner requests must retry a bounded number of times.");
 assert.match(adsterraWeb, /Adsterra banner request timed out/, "A stalled banner request must be released so it cannot block later placements.");
 assert.match(adsterraWeb, /window\.setTimeout\(fail, 15_000\)/, "The native banner must time out when the publisher script stalls.");
@@ -70,8 +80,25 @@ assert.match(slot, /isApplicationOnline\(\)/, "Ads must not be requested unless 
 assert.match(adPolicy, /export function isAdsterraQualifiedTool[\s\S]*?ADSTERRA_EXCLUDED_CONCEPTS\.test\(descriptiveIdentity\)/, "Adsterra eligibility must cover active ordinary tool pages and exclude Studio, AI, Labs and Sandbox metadata.");
 assert.match(adPolicy, /new Set\(\["ai", "lab", "labs", "studio", "studios"\]\)/, "Developer and Accessibility categories must remain eligible; only explicit Studio, AI and Labs categories are excluded.");
 assert.match(adPolicy, /ADSTERRA_EXCLUDED_CATEGORIES[\s\S]*?ADSTERRA_EXCLUDED_CONCEPTS/, "Adsterra policy must exclude Studio, AI, Labs and Sandbox experiences.");
-assert.match(privacy, /Declining advertising prevents ad requests only; it never blocks access to an otherwise available tool or forces account creation/i, "Privacy copy must make clear that advertising consent never gates tool access.");
-assert.match(cookieConsent, /Your advertising choice only controls ad requests; it never affects whether you can use a tool/, "Cookie preferences must describe advertising consent as separate from tool access.");
+assert.match(adsterraWeb, /export type AdsterraDeliveryState[\s\S]*?filled[\s\S]*?unfilled[\s\S]*?blocked/, "The ad component must expose blocked, unfilled and confirmed-fill states.");
+assert.match(adsterraWeb, /new MutationObserver\(reportDelivery\)/, "Web fill detection must observe actual creative insertion.");
+assert.match(adFallbackPolicy, /isAdFallbackBillingEnabled[\s\S]*?fallbackEnabled === "true"[\s\S]*?enforcementEnabled === "true"/, "Ad token fallback must fail closed unless the explicit server billing gates are enabled.");
+assert.match(adPolicy, /recordAdsterraToolDelivery/, "The shared ad policy must retain verified per-tool delivery state.");
+assert.match(adPolicy, /consumeAdFallbackExecutionGrant/, "Online paid runs must use a one-use authorization grant.");
+assert.match(offlineClient, /consumeAdFallbackExecutionGrant\(input\.toolId\)/, "An online server-paid calculator run must consume its one-use grant before the offline journal.");
+assert.match(offlineClient, /hasVerifiedAdsterraToolDelivery\(input\.toolId\)/, "A hybrid online run must not treat an unfilled Adsterra slot as an ad-funded run.");
+assert.match(toolShell, /hasSelectedWebOfflineAllowanceForTool/, "A valid pre-issued offline allowance remains available when the enV origin is unreachable.");
+
+assert.match(adFallbackPolicy, /resolveAdFallbackUnitSubunits/, "Fallback prices must come only from server billing profiles.");
+assert.match(adFallbackServer, /getToolById\(toolId\)/, "The fallback quote must validate the canonical tool record.");
+assert.match(adFallbackServer, /isAdsterraQualifiedTool\(tool\)/, "Only ad-supported tool records may receive a fallback quote.");
+assert.match(adFallbackServer, /resolveAdFallbackUnitSubunits\(tool, profile\)/, "The server must reject unpriced, premium and backend profiles.");
+assert.match(adFallbackConsume, /requireOfflineBillingUser\(request\)/, "Token fallback consumption must require a verified web or paired native identity.");
+assert.match(adFallbackConsume, /reserveCredits\(/, "Fallback usage must reserve credits in the server ledger.");
+assert.match(adFallbackConsume, /settleReservation\(/, "Fallback usage must settle a confirmed server-side debit.");
+assert.match(adFallbackConsume, /INSUFFICIENT_CREDITS/, "Insufficient balance must receive an explicit paywall response.");
+assert.match(privacy, /verified ad fill for guest execution[\s\S]*?approved fixed price exists/i, "Privacy copy must accurately describe guest and signed-in ad fallback access.");
+assert.match(cookieConsent, /Ad-supported tools may require sign-in or an approved enV charge when no ad is delivered/, "Cookie preferences must not promise unrestricted ad-free guest execution.");
 assert.match(shell, /!isFullscreen && import\.meta\.env\.VITE_ADSTERRA_ENABLED !== "true" \? <AdSlot tool=\{tool\} \/>/, "The Google fallback must remain tool-only when Adsterra is disabled.");
 
 assert.match(slot, /whenGooglePrivacyConsentDataReady/, "Web ad requests must wait for the CMP consent-data-ready callback.");
@@ -83,7 +110,7 @@ assert.match(adsBrowser, /__envGoogleConsentDataReady/, "Web must retain CMP rea
 assert.match(slot, /requestNonPersonalizedAds = 1/, "Ad requests must default to non-personalized.");
 assert.match(slot, /VITE_ADSENSE_PRIVACY_CONFIGURED/, "Ad requests must require privacy/CMP setup.");
 assert.match(route, /<ToolShell tool=\{tool\}/, "The public tool route must continue to use the regular tool shell.");
-assert.doesNotMatch(route, /SignInGate|RedirectToSignIn/, "The tool route must not gain a guest sign-in gate.");
+assert.doesNotMatch(route, /SignInGate|RedirectToSignIn/, "The route remains publicly reachable; execution is gated inside the tool surface.");
 assert.match(offlineClient, /getToolById\(input\.toolId\)/, "Hybrid offline billing must load the full canonical catalogue record.");
 assert.match(offlineClient, /isHybridAccessToolId\(input\.toolId,[\s\S]*?catalogTool\)/, "Hybrid offline billing must use the selected-tool access policy independently from ad rendering.");
 assert.match(offlineClient, /HYBRID_OFFLINE_ALLOWANCE_REQUIRED/, "Hybrid ad tools must fail closed offline without an allowance.");
@@ -96,7 +123,7 @@ assert.match(adPolicy, /export function isHybridAccessToolId/, "The offline acce
 assert.match(offlineClient, /isHybridAccessToolId/, "Web offline billing must use the ad-independent hybrid access policy.");
 assert.match(androidAds, /!tool\.id\.startsWith\("finance-"\)/, "Android must exclude finance-prefixed tools from the hybrid cohort.");
 assert.match(iosAds, /!tool\.id\.hasPrefix\("finance-"\)/, "iOS must exclude finance-prefixed tools from the hybrid cohort.");
-assert.match(iosAds, /NativeAdsPolicy\.adDisplayConfigured && NativeAdsPolicy\.isAdEligibleTool/, "iOS native ad slots must use ad eligibility, not offline-wallet membership.");
+assert.match(iosAds, /NativeAdsPolicy\.adDisplayConfigured\s*&&\s*NativeAdsPolicy\.isAdEligibleTool/, "iOS native ad slots must use ad eligibility, not offline-wallet membership.");
 
 assert.ok(meteredProfiles.profiles.every((profile) => profile.platforms.includes("web") && profile.platforms.includes("android") && profile.platforms.includes("ios")), "Offline metering profiles must have platform parity.");
 assert.match(offlinePolicy, /tokenPolicy: "monetization-pending"/, "Offline execution classification must remain separate from billing rollout.");
@@ -145,6 +172,14 @@ assert.match(androidAds, /tool\.status == "active"/, "Android ads must exclude n
 assert.match(androidAds, /tool\.requiresBackend|!tool\.requiresBackend/, "Android ads must exclude backend-dependent tools.");
 assert.match(androidAds, /restrictedDisclaimers/, "Android ads must apply the same sensitive-topic exclusions as Web.");
 assert.match(androidAds, /common\.AdLoadCallback|common\.LoadAdError/, "Android must use the current Google Ads callback API.");
+assert.match(androidAds, /NativeAdsAvailability\.setFilled\(toolId, true\)/, "Android ad fill must be based on the native SDK success callback.");
+assert.match(androidAds, /NativeAdsAvailability\.setFilled\(toolId, false\)/, "Android failed, disabled or removed ad placements must be marked unfilled.");
+assert.match(androidMain, /suspend fun authorizeRun\(\)/, "Android native executions must authorize before running.");
+assert.match(androidMain, /NativeAdsAvailability\.isFilled\(toolId\)/, "Android native execution must require a verified ad fill or token fallback.");
+assert.match(androidMain, /OfflineWalletNativeApi\.consumeAdFallback\(context, toolId\)/, "Android native fallback must charge through the server wallet.");
+assert.match(androidMain, /NativeToolAuthorization\.SIGN_IN_REQUIRED/, "Android guests without ad fill must be directed to sign in or create an account.");
+assert.match(androidMain, /NativeToolAuthorization\.INSUFFICIENT_CREDITS/, "Android signed-in users without enough enV must be directed to Wallet.");
+assert.match(androidWallet, /api\/billing\/ad-fallback\/consume/, "Android must call the server ad-fallback charge endpoint.");
 assert.match(androidMain, /NativeToolAdSlot\(tool\)/, "The native Android tool surface must include its ad slot.");
 assert.match(androidMain, /val online = NativeAdsPolicy\.isApplicationOnline\(context\)/, "Android hybrid runs must verify the enV origin.");
 assert.match(androidMain, /allowanceId != null && walletEligible -> runWithOfflineCharge\(\)/, "Android offline use must be journalled against a prepared allowance.");
@@ -162,6 +197,22 @@ assert.match(iosAds, /publisherPrivacyPersonalizationState = \.disabled/, "iOS a
 assert.match(iosAds, /coarseLocationCollectionEnabled = false/, "iOS ads must not collect coarse device location by default.");
 assert.match(iosAds, /static func isAdEligibleTool\(_ tool: Tool\)/, "iOS must evaluate the full catalog record using independent native ad eligibility.");
 assert.match(iosAds, /static func isHybridTool\(_ tool: Tool\)/, "The existing iOS offline-wallet hybrid policy must remain available and unchanged.");
+assert.match(iosAds, /return tool.id != "a-book"/, "The private A book notes workspace must remain outside iOS ad access.");
+assert.match(androidAds, /return tool.id != "a-book"/, "The private A book notes workspace must remain outside Android ad access.");
+assert.match(adPolicy, /return tool.id !== "a-book"/, "The private A book notes workspace must remain outside Web ad access.");
+assert.match(iosAds, /final class NativeAdsAvailability/, "iOS must maintain per-tool native ad fill state.");
+assert.match(iosAds, /bannerViewDidReceiveAd\(_ bannerView: BannerView\)/, "iOS fill state must come from the AdMob success callback.");
+assert.match(iosAds, /didFailToReceiveAdWithError/, "iOS failed native ad requests must remain unfilled.");
+assert.match(iosWallet, /api\/billing\/ad-fallback\/consume/, "iOS must call the server ad-fallback debit endpoint.");
+assert.match(iosCalculator, /func authorizeRun\(\) async -> NativeToolAuthorization/, "iOS native Run must authorize before execution.");
+assert.match(iosCalculator, /NativeAdsAvailability\.shared\.isFilled\(toolID\)/, "iOS native execution must require an ad fill or token fallback.");
+assert.match(iosCalculator, /case \.signInRequired/, "iOS guests without ad fill must receive sign-in and create-account actions.");
+assert.match(iosCalculator, /case \.insufficientCredits/, "iOS users without enough enV must be directed to Wallet.");
+assert.match(androidMain, /NativeToolAuthorization\.UNAVAILABLE/, "Android must explain when this tool has no approved fallback rate or billing switch.");
+assert.match(iosCalculator, /case \.unavailable/, "iOS must explain when this tool has no approved fallback rate or billing switch.");
+assert.match(toolShell, /An approved enV price is not available for this tool yet/, "Web must not promise a Wallet unlock when no server-approved price exists.");
+assert.match(toolShell, /enV fallback access is not enabled for this tool yet/, "Web must not present an unusable purchase path while billing is disabled.");
+
 assert.match(iosAds, /restrictedCategories/, "iOS must exclude fitness and personal tools like Web and Android.");
 assert.match(iosAds, /restrictedDisclaimers/, "iOS must exclude health, finance and earnings disclaimer tools.");
 assert.match(iosCalculator, /NativeAdsPolicy\.isHybridTool\(tool\)/, "iOS ad slots and offline gating must use the same per-tool decision.");
@@ -174,4 +225,5 @@ assert.match(iosPrivacy, /Advertising privacy options/, "iOS must surface advert
 assert.match(iosCalculator, /NativeToolAdSlot\(tool: tool\)/, "The native iOS tool surface must include its ad slot.");
 assert.match(iosCalculator, /NativeHybridAccessError\.offlineAllowanceRequired/, "iOS hybrid tools must block offline execution without a prepared allowance.");
 
-console.log("Ad-access checks PASS: non-blocking tool access, category-wide Adsterra eligibility, explicit advertising preference, native privacy controls and unchanged offline billing.");
+assert.match(env, /BILLING_AD_FALLBACK_ENABLED=false/, "Ad fallback billing must remain fail-closed by default.");
+console.log("Ad-access checks PASS: verified creative delivery, server-authoritative token fallback, guest/account paywall, native authorization, privacy controls and offline allowance separation.");

@@ -68,7 +68,7 @@ enum NativeAdsPolicy {
         let restrictedDisclaimers: Set<String> = ["health", "finance", "earnings"]
         let restrictedCategories: Set<String> = [
             "health", "finance", "earnings", "fitness", "personal",
-            "ai", "developer", "accessibility", "lab", "labs"
+            "ai", "lab", "labs"
         ]
         let localEngineTypes: Set<String> = [
             "calculator", "converter", "datetime", "text", "codec", "color", "qr",
@@ -131,7 +131,8 @@ enum NativeAdsPolicy {
             remoteVideoOperations.contains(operation) ||
             remoteToolIDs.contains(tool.id)
 
-        return tool.status == "active" &&
+        return tool.id != "a-book" &&
+            tool.status == "active" &&
             tool.clientSide &&
             !tool.requiresBackend &&
             !tool.requiresAuth &&
@@ -220,6 +221,23 @@ final class NativeAdsPrivacyManager: ObservableObject {
 }
 
 @MainActor
+final class NativeAdsAvailability: ObservableObject {
+    static let shared = NativeAdsAvailability()
+    @Published private(set) var filledToolIDs: Set<String> = []
+
+    private init() {}
+
+    func isFilled(_ toolID: String) -> Bool {
+        filledToolIDs.contains(toolID)
+    }
+
+    func setFilled(_ toolID: String, _ filled: Bool) {
+        if filled { filledToolIDs.insert(toolID) }
+        else { filledToolIDs.remove(toolID) }
+    }
+}
+
+@MainActor
 private final class NativeAdsReachability: ObservableObject {
     @Published private(set) var hasNetwork = false
     private let monitor = NWPathMonitor()
@@ -239,23 +257,32 @@ struct NativeToolAdSlot: View {
     let tool: Tool
     @StateObject private var consent = NativeAdsPrivacyManager.shared
     @StateObject private var reachability = NativeAdsReachability()
+    @StateObject private var availability = NativeAdsAvailability.shared
     @State private var originReachable = false
+
+    private var canRequestAd: Bool {
+        NativeAdsPolicy.adDisplayConfigured &&
+            NativeAdsPolicy.isAdEligibleTool(tool) &&
+            originReachable && consent.canRequestAds && consent.sdkReady
+    }
 
     var body: some View {
         Group {
-            if NativeAdsPolicy.adDisplayConfigured && NativeAdsPolicy.isAdEligibleTool(tool) && originReachable &&
-                consent.canRequestAds && consent.sdkReady {
+            if canRequestAd {
                 VStack(alignment: .leading, spacing: 5) {
                     Text("Advertisement")
                         .font(.caption2)
                         .foregroundStyle(Color.envMuted)
                     let width = max(320, Int(UIScreen.main.bounds.width - 32))
                     let size = largeAnchoredAdaptiveBanner(width: CGFloat(width))
-                    NativeBannerAdView(adUnitID: NativeAdsPolicy.bannerUnitID, adSize: size)
+                    NativeBannerAdView(adUnitID: NativeAdsPolicy.bannerUnitID, adSize: size, toolID: tool.id)
                         .frame(width: size.size.width, height: size.size.height)
                 }
                 .frame(maxWidth: .infinity, alignment: .center)
             }
+        }
+        .task(id: canRequestAd) {
+            if !canRequestAd { availability.setFilled(tool.id, false) }
         }
         .task(id: reachability.hasNetwork) {
             guard reachability.hasNetwork else {
@@ -273,18 +300,38 @@ struct NativeToolAdSlot: View {
 private struct NativeBannerAdView: UIViewRepresentable {
     let adUnitID: String
     let adSize: AdSize
+    let toolID: String
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(toolID: toolID)
+    }
 
     func makeUIView(context: Context) -> BannerView {
         let banner = BannerView(adSize: adSize)
         banner.adUnitID = adUnitID
+        banner.delegate = context.coordinator
         banner.load(Request())
         return banner
     }
 
     func updateUIView(_ uiView: BannerView, context: Context) {}
 
-    static func dismantleUIView(_ uiView: BannerView, coordinator: ()) {
+    static func dismantleUIView(_ uiView: BannerView, coordinator: Coordinator) {
         uiView.delegate = nil
+        NativeAdsAvailability.shared.setFilled(coordinator.toolID, false)
+    }
+
+    final class Coordinator: NSObject, BannerViewDelegate {
+        let toolID: String
+        init(toolID: String) { self.toolID = toolID }
+
+        func bannerViewDidReceiveAd(_ bannerView: BannerView) {
+            Task { @MainActor in NativeAdsAvailability.shared.setFilled(toolID, true) }
+        }
+
+        func bannerView(_ bannerView: BannerView, didFailToReceiveAdWithError error: Error) {
+            Task { @MainActor in NativeAdsAvailability.shared.setFilled(toolID, false) }
+        }
     }
 }
 

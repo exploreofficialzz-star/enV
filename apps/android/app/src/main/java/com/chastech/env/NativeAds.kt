@@ -16,10 +16,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -50,6 +52,16 @@ import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
 import org.json.JSONObject
+
+internal object NativeAdsAvailability {
+    private val filledByTool = mutableStateMapOf<String, Boolean>()
+
+    fun isFilled(toolId: String): Boolean = filledByTool[toolId] == true
+
+    fun setFilled(toolId: String, filled: Boolean) {
+        filledByTool[toolId] = filled
+    }
+}
 
 internal object NativeAdsPolicy {
     private val toolIdPattern = Regex("[a-z0-9][a-z0-9-]{0,119}")
@@ -110,7 +122,7 @@ internal object NativeAdsPolicy {
         val restrictedDisclaimers = setOf("health", "finance", "earnings")
         val restrictedCategories = setOf(
             "health", "finance", "earnings", "fitness", "personal",
-            "ai", "developer", "accessibility", "lab", "labs",
+            "ai", "lab", "labs",
         )
         val localEngineTypes = setOf(
             "calculator", "converter", "datetime", "text", "codec", "color", "qr",
@@ -173,7 +185,8 @@ internal object NativeAdsPolicy {
             operation in remoteVideoOperations ||
             tool.id in remoteToolIds
 
-        return tool.status == "active" &&
+        return tool.id != "a-book" &&
+            tool.status == "active" &&
             tool.clientSide &&
             !tool.requiresBackend &&
             !tool.requiresAuth &&
@@ -319,20 +332,33 @@ internal fun NativeToolAdSlot(tool: ToolRecord) {
             }
         }
     }
-    if (preview || !supported || !applicationOnline || !NativeAdsPolicy.adDisplayConfigured ||
-        !NativeAdsPrivacyManager.canRequestAds || !NativeAdsPrivacyManager.sdkReady) return
+    val canRequest = !preview && supported && applicationOnline && NativeAdsPolicy.adDisplayConfigured &&
+        NativeAdsPrivacyManager.canRequestAds && NativeAdsPrivacyManager.sdkReady
+    SideEffect {
+        if (!canRequest) NativeAdsAvailability.setFilled(toolId, false)
+    }
+    if (!canRequest) return
     val adView = remember(toolId) { AdView(context) }
     val widthDp = remember(context) {
         (context.resources.displayMetrics.widthPixels / context.resources.displayMetrics.density).toInt().coerceAtLeast(320)
     }
     val adSize = remember(widthDp) { AdSize.getLargeAnchoredAdaptiveBannerAdSize(context, widthDp) }
-    DisposableEffect(adView) { onDispose { adView.destroy() } }
+    DisposableEffect(adView, toolId) {
+        onDispose {
+            NativeAdsAvailability.setFilled(toolId, false)
+            adView.destroy()
+        }
+    }
     LaunchedEffect(adView, adSize, toolId) {
         adView.loadAd(
             BannerAdRequest.Builder(BuildConfig.ENV_ADMOB_BANNER_AD_UNIT_ID, adSize).build(),
             object : AdLoadCallback<BannerAd> {
-                override fun onAdLoaded(ad: BannerAd) = Unit
-                override fun onAdFailedToLoad(adError: LoadAdError) = Unit
+                override fun onAdLoaded(ad: BannerAd) {
+                    NativeAdsAvailability.setFilled(toolId, true)
+                }
+                override fun onAdFailedToLoad(adError: LoadAdError) {
+                    NativeAdsAvailability.setFilled(toolId, false)
+                }
             },
         )
     }

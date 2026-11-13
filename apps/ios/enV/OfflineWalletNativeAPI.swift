@@ -142,6 +142,30 @@ enum OfflineWalletNativeAPI {
         return try responseData(await makeRequest(path: "api/billing/native-wallet", method: "GET", bearer: bearer, queryItems: [URLQueryItem(name: "timezone", value: TimeZone.current.identifier)]))
     }
 
+    /// Charge a single online ad-fallback run at the server-verified tool rate.
+    static func consumeAdFallback(toolId: String) async throws -> Double {
+        guard toolId.range(of: "^[a-z0-9][a-z0-9-]{0,119}$", options: .regularExpression) != nil,
+              let bearer = loadSessionToken() else {
+            throw OfflineWalletNativeAPIError.unavailable("Sign in to your enV account before using this tool.")
+        }
+        let idempotency = "ios-ad-fallback-" + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+        let body = try JSONSerialization.data(withJSONObject: [
+            "toolId": toolId,
+            "idempotencyKey": idempotency,
+        ])
+        let data = try responseData(await makeRequest(
+            path: "api/billing/ad-fallback/consume",
+            method: "POST",
+            body: body,
+            bearer: bearer
+        ))
+        guard let charged = (data["chargedTokens"] as? NSNumber)?.doubleValue,
+              charged.isFinite, charged > 0 else {
+            throw OfflineWalletNativeAPIError.unavailable("The server did not confirm the enV token charge.")
+        }
+        return charged
+    }
+
     static func checkAvailability() async -> (enabled: Bool, code: String, message: String) {
         do {
             let data = try responseData(await makeRequest(path: "api/billing/offline/status", method: "GET"))

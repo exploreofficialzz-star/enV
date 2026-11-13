@@ -247,9 +247,12 @@ fun NativeZipArchiveScreen() {
                             FilterChip(selected = !compressionMaximum, onClick = { compressionMaximum = false }, label = { Text("Balanced") })
                             FilterChip(selected = compressionMaximum, onClick = { compressionMaximum = true }, label = { Text("Maximum") })
                         }
-                        Button(onClick = { if (!busy) createArchive.launch("enV-archive.zip") }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
-                            Text("Create ZIP archive")
-                        }
+                        NativeExecutionButton(
+                            text = "Create ZIP archive",
+                            enabled = !busy,
+                            modifier = Modifier.fillMaxWidth(),
+                            onAuthorized = { if (!busy) createArchive.launch("enV-archive.zip") },
+                        )
                     }
                 }
             }
@@ -263,9 +266,12 @@ fun NativeZipArchiveScreen() {
                     }
                     if (selectedArchive != null) {
                         Text(uriDisplayName(context, selectedArchive!!), style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        Button(onClick = { if (!busy) chooseDestination.launch(null) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
-                            Text("Choose folder and extract")
-                        }
+                        NativeExecutionButton(
+                            text = "Choose folder and extract",
+                            enabled = !busy,
+                            modifier = Modifier.fillMaxWidth(),
+                            onAuthorized = { if (!busy) chooseDestination.launch(null) },
+                        )
                     }
                 }
             }

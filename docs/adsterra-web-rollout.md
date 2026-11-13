@@ -2,7 +2,7 @@
 
 ## Selected placements
 
-Adsterra is restricted to qualified Web tool pages. Home, the All tools directory, Blog index, and Blog article pages never render advertising. A tool qualifies when its Web tool record is active and it is outside restricted health/finance/earnings/personal/fitness topics. Eligibility applies across ordinary categories and does not depend on local versus backend execution, account state or the offline-wallet allowlist. Studio workspaces, AI-related tools, Labs and Sandbox experiences are excluded by category and tool metadata.
+Adsterra is restricted to qualified Web tool pages. Home, the All tools directory, Blog index, and Blog article pages never render advertising. A tool qualifies when its Web tool record is active and it is outside restricted health/finance/earnings/personal/fitness topics. Eligibility applies across ordinary categories and does not depend on local versus backend execution, account state or the offline-wallet allowlist. Studio workspaces, AI-related tools, Labs and Sandbox experiences are excluded by category and tool metadata. The private A book notes/journal workspace is also excluded.
 
 | Qualified tool surface | Format | Publisher placement | Purpose |
 |---|---|---:|---|
@@ -12,16 +12,25 @@ Adsterra is restricted to qualified Web tool pages. Home, the All tools director
 | Qualified tool page | Popunder | Publisher script | Loads only after consent and same-origin reachability; may open a separate tab after an interaction |
 | Qualified tool output action | Smartlink | Publisher URL | Opens from the user's direct copy/download/export action, without delaying or gating the tool output |
 
-Each placement is labelled as an advertisement and is requested only when the production flag is enabled, the visitor has explicitly allowed advertising, and the same-origin page is reachable. The Cookie preferences section remains on the Privacy page; there is no site-wide advertising popup or tool-level access gate. Guests and signed-in users can use an otherwise available tool regardless of their advertising choice. The choice controls ad requests only. No advertising script is requested while offline.
+Each placement is labelled as an advertisement and is requested only when the production flag is enabled, the visitor has explicitly allowed advertising, and the same-origin page is reachable. Script download alone is not considered a fill: the tool shell waits for a visible creative signal. When no qualified creative fills (including blocked browser/DNS requests, refusal, provider failure or offline state), a guest is asked to sign in or create an account before running the tool. A signed-in run requires a server-confirmed enV debit only when the tool has an approved fixed local price. Backend/cloud and measured-cost tools remain blocked until a trustworthy price is available. The same rule applies when the user enters fullscreen, where ad placements are hidden. No advertising script is requested while offline.
 
 ## Production boundaries
 
 - Do not load Adsterra scripts before the visitor's advertising choice in Cookie preferences. The supplied tags may process network/device information and use cookies or similar storage. The privacy notice must keep clear Allow and Decline choices and provide a way to withdraw consent.
-- Declining advertising only prevents Adsterra requests. It never changes tool access, requires account creation, or creates a different experience for guests and signed-in users. Consent remains an optional, persistent choice in Privacy settings.
+- Declining advertising prevents Adsterra requests. For qualified ad-supported tools, a missing fill moves execution to account-backed enV access: guests must sign in/create an account; signed-in users need sufficient balance and a confirmed ledger debit for tools with an approved fixed local price; other tools remain blocked until a trustworthy quote exists. Consent remains an optional, persistent choice in Privacy settings; it is not treated as proof of a filled ad.
 - Ads are only a funding mechanism for the service; a visitor's privacy choice does not turn off enV's monetization configuration for other visitors.
 - Adsterra scripts and publisher URLs are Web-only. Android Kotlin and iOS Swift use separate native AdMob integrations; those native placements remain fail-closed until production app IDs, banner unit IDs and UMP privacy configuration are supplied.
 - Google AdSense remains independently configured and unchanged.
 - The checked-in build flag `VITE_ADSTERRA_ENABLED` defaults to false. Vercel sets it to `true` for the `envtools.store` **Production** target only; Preview and Development targets are intentionally unset so test traffic does not create publisher impressions.
+
+## Ad-fill access and wallet fallback
+
+- Web placements report **filled** only after a visible creative node is rendered in the slot. Script `load` does not unlock guest execution. A bounded timeout or provider/network failure reports unfilled.
+- Tool execution attempts are intercepted at the shared tool surface. The pending action resumes only after a guest signs in or the server confirms a per-run enV debit for a signed-in user.
+- Server quotes are resolved from the canonical tool record and existing local billing profile. Client prices, balances and profile IDs are ignored.
+- Only active, device-local tools with a fixed local per-unit profile can receive a fallback quote. Cloud/backend tools and measured-cost profiles remain locked until a trustworthy price exists; their rates are never inferred from an estimate.
+- `BILLING_AD_FALLBACK_ENABLED` is a dedicated server-only feature switch and defaults to `false`. It must be enabled only after profile-rate review and regression acceptance, in addition to the existing billing launch/enforcement/refund-dispute gates.
+- This ad-fallback online debit is independent of the signed offline allowance ledger. An offline run remains available only through a valid, authenticated, pre-issued offline allowance.
 
 ## Deliberately not enabled yet
 

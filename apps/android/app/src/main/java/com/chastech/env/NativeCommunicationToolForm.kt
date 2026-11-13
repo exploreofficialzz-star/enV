@@ -454,15 +454,18 @@ fun NativeCommunicationToolForm(toolId: String) {
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = {
-                runCatching { NativeCommunicationEngine.generate(toolId, values) }
-                    .onSuccess {
-                        output = it
-                        checks = NativeCommunicationEngine.checks(toolId, values, it)
-                        error = ""
-                    }
-                    .onFailure { output = ""; checks = emptyList(); error = it.message ?: "Could not create the draft." }
-            }) { Text(if (action == "formatter") "Format" else if (action == "template") "Use template" else "Generate") }
+            NativeExecutionButton(
+                text = if (action == "formatter") "Format" else if (action == "template") "Use template" else "Generate",
+                onAuthorized = {
+                    runCatching { NativeCommunicationEngine.generate(toolId, values) }
+                        .onSuccess {
+                            output = it
+                            checks = NativeCommunicationEngine.checks(toolId, values, it)
+                            error = ""
+                        }
+                        .onFailure { output = ""; checks = emptyList(); error = it.message ?: "Could not create the draft." }
+                },
+            )
             OutlinedButton(onClick = { values = mapOf("timezone" to java.util.TimeZone.getDefault().id, "tone" to "professional", "duration" to defaultDuration); output = ""; checks = emptyList(); error = "" }) { Text("Reset") }
         }
         if (error.isNotEmpty()) Text(error, color = MaterialTheme.colorScheme.error)
