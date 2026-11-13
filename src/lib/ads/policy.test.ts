@@ -172,4 +172,5 @@ test("Adsterra excludes inactive, Studio, AI, Lab/Sandbox and sensitive tools", 
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ tags: ["lab"] })), false);
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ keywords: ["sandbox", "training"] })), false);
   assert.equal(isAdsterraQualifiedTool(eligibleTool({ id: "ai-caption-writer" })), false);
+  assert.equal(isAdsterraQualifiedTool(eligibleTool({ id: "a-book", name: "A book", category: "productivity", engine: { type: "custom", id: "a-book" } })), false, "Private notes and journal workspaces are not ad-supported.");
 });
