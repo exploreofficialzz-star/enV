@@ -98,9 +98,11 @@ export function ToolShell({
   useEffect(() => {
     if (!adsterraQualified || !adsterraAdsEnabled) {
       setAdDelivery("blocked");
+      recordAdsterraToolDelivery(tool.id, "blocked");
       return;
     }
     setAdDelivery("blocked");
+    recordAdsterraToolDelivery(tool.id, "blocked");
     const timeout = window.setTimeout(() => {
       setAdDelivery((current) => current === "filled" ? current : "unfilled");
     }, 15_000);
