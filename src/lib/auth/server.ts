@@ -157,7 +157,14 @@ export const auth = betterAuth({
   database,
   trustedOrigins,
   socialProviders: {
-    ...(googleConfigured ? { google: { clientId: googleClientId!, clientSecret: googleClientSecret! } } : {}),
+    ...(googleConfigured ? {
+      google: {
+        clientId: googleClientId!,
+        clientSecret: googleClientSecret!,
+        // Accept Google accounts only when Google asserts the email is verified.
+        requireEmailVerification: true,
+      },
+    } : {}),
     ...(appleConfigured ? { apple: async () => ({ clientId: appleClientId!, clientSecret: await getAppleClientSecret() }) } : {}),
   },
   user: {
