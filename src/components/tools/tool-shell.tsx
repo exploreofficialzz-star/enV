@@ -452,7 +452,7 @@ export function ToolShell({
           const label = [action.getAttribute("aria-label"), action.getAttribute("title"), action.textContent].filter(Boolean).join(" ");
           const isFileDownload = action instanceof HTMLAnchorElement && action.hasAttribute("download");
           const isExecutionAction =
-            /\b(run|calculate|convert|generate|analy[sz]e|process|format|validate|inspect|scan|encode|decode|resize|compress|extract|transcribe|create|execute|search|lookup|compare|merge|split|apply|build|render|submit|start)\b/i.test(label);
+            /\b(run|calculate|convert|generate|analy[sz]e|process|format|validate|inspect|scan|encode|decode|resize|compress|extract|transcribe|create|execute|search|lookup|find|compare|merge|split|apply|build|render|submit|start|organize|rename|rotate|encrypt|decrypt|optimize|repair|clean|crop|watermark|unzip|archive|sort|deduplicate|ocr|recognize|transform|calculate|check)\b/i.test(label);
           if (requiresTokenFallback && isExecutionAction) {
             if (paidExecutionInFlight && !authorizedExecutionRef.current) {
               event.preventDefault();
@@ -466,7 +466,16 @@ export function ToolShell({
               event.stopPropagation();
               return;
             }
-            if (!action.closest("form")) {
+            const form = action instanceof HTMLButtonElement || action instanceof HTMLInputElement
+              ? action.form
+              : action.closest("form");
+            const submitsForm = Boolean(form && (
+              (action instanceof HTMLButtonElement && action.type === "submit") ||
+              (action instanceof HTMLInputElement && ["submit", "image"].includes(action.type))
+            ));
+            if (!submitsForm) {
+              // Consume the one-use authorization on this click. Only a native
+              // submit button may carry it forward into its matching submit event.
               authorizedExecutionRef.current = false;
               setPaidExecutionInFlight(true);
             }
@@ -480,7 +489,7 @@ export function ToolShell({
             // cause mobile browsers to block the new tab.
             openAdsterraSmartlinkFromOutput();
           }
-          if (/\b(run|calculate|convert|generate|analy[sz]e|process|format|validate|inspect|scan|encode|decode|resize|compress|extract|transcribe|create|execute|search|lookup|compare|merge|split|apply|build|render|submit|start)\b/i.test(label)) {
+          if (/\b(run|calculate|convert|generate|analy[sz]e|process|format|validate|inspect|scan|encode|decode|resize|compress|extract|transcribe|create|execute|search|lookup|find|compare|merge|split|apply|build|render|submit|start|organize|rename|rotate|encrypt|decrypt|optimize|repair|clean|crop|watermark|unzip|archive|sort|deduplicate|ocr|recognize|transform|check)\b/i.test(label)) {
             startToolExecution("action_button");
           }
         }}
