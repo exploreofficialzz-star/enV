@@ -287,7 +287,7 @@ export function ToolShell({
       window.removeEventListener("env-tool-execution-result", onExecutionResult);
       window.removeEventListener("pagehide", reportAbandoned);
     };
-  }, [tool.id]);
+  }, [tool.id, requiresTokenFallback]);
 
   useEffect(() => {
     const syncFullscreen = () => {
