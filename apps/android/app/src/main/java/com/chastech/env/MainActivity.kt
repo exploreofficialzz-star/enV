@@ -146,6 +146,7 @@ import com.chastech.env.data.withSongMetadataAnalyzer
 import com.chastech.env.data.withABook
 import com.chastech.env.data.withCameraStudio
 import com.chastech.env.data.withZipArchive
+import com.chastech.env.data.withFileWorkspaceTools
 import com.chastech.env.data.withDateTimeExtensions
 import com.chastech.env.data.search
 import com.chastech.env.engine.NativeAudioEngine
