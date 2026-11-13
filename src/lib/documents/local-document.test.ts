@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { strToU8, zipSync } from "fflate";
-import { docxToText } from "./local-document.ts";
+import { docxToText, runLocalDocument } from "./local-document.ts";
 
 function makeDocx(extraFiles: Record<string, Uint8Array> = {}) {
   const document = strToU8(
@@ -45,4 +45,17 @@ test("DOCX extraction rejects oversized document XML from ZIP metadata before in
   const zip = makeDocx();
   setCentralDirectoryUncompressedSize(zip, "word/document.xml", 32 * 1024 * 1024 + 1);
   assert.throws(() => docxToText(zip), /32 MB per-entry or 128 MB aggregate local extraction limit/);
+});
+
+
+test("local document tools reject oversized selections before reading file bytes", async () => {
+  const huge = new File([], "large.docx");
+  Object.defineProperty(huge, "size", { value: 200 * 1024 * 1024 + 1 });
+  huge.arrayBuffer = async () => {
+    throw new Error("Oversized file bytes should never be read.");
+  };
+  await assert.rejects(
+    () => runLocalDocument("docx-text-extractor", [huge]),
+    /200 MB local processing limit/,
+  );
 });
