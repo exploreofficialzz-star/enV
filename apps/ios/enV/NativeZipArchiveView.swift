@@ -889,8 +889,8 @@ private struct NativeFileWorkspaceScreen: View {
             }
             let left = try nativeWorkspaceFiles(in: leftRoot)
             let right = try nativeWorkspaceFiles(in: rightRoot)
-            let leftByPath = Dictionary(uniqueKeysWithValues: left.map { ($0.relativePath.lowercased(), $0) })
-            let rightByPath = Dictionary(uniqueKeysWithValues: right.map { ($0.relativePath.lowercased(), $0) })
+            let leftByPath = Dictionary(uniqueKeysWithValues: left.map { ($0.relativePath, $0) })
+            let rightByPath = Dictionary(uniqueKeysWithValues: right.map { ($0.relativePath, $0) })
             var output: [String] = []
             for (path, item) in leftByPath {
                 guard let other = rightByPath[path] else { output.append("\(item.relativePath) · missing from second folder"); continue }
