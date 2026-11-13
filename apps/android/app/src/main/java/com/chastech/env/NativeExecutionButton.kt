@@ -72,6 +72,7 @@ internal fun NativeExecutionButton(
                 Button(onClick = { openAccountPath("signup") }) { Text("Create account") }
             }
             NativeToolAuthorization.INSUFFICIENT_CREDITS -> Button(onClick = { openAccountPath("wallet") }) { Text("Buy enV") }
+            NativeToolAuthorization.UNAVAILABLE -> Text("Token access is not enabled for this tool yet.")
             NativeToolAuthorization.RETRY -> OutlinedButton(onClick = { accessState = null }) { Text("Retry") }
             else -> Unit
         }
