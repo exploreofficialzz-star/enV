@@ -80,7 +80,12 @@ test("local document tools reject aggregate selections above the input cap befor
 test("PDF merger rejects the combined page count above the local processing limit", async () => {
   const document = await PDFDocument.create();
   for (let index = 0; index < 501; index += 1) document.addPage();
-  const file = new File([await document.save()], "many-pages.pdf", { type: "application/pdf" });
+  const pdfBytes = await document.save();
+  const pdfBuffer = pdfBytes.buffer.slice(
+    pdfBytes.byteOffset,
+    pdfBytes.byteOffset + pdfBytes.byteLength,
+  ) as ArrayBuffer;
+  const file = new File([pdfBuffer], "many-pages.pdf", { type: "application/pdf" });
   await assert.rejects(
     () => runLocalDocument("pdf-merger", [file]),
     /500-page local processing limit/,
