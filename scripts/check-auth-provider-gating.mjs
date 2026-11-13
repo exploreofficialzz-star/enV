@@ -60,7 +60,7 @@ for (const source of [worldLabJobs, worldLabBackups, worldLabCompute]) {
   assert.ok(source.includes("authInfrastructureError"), "Authenticated World Lab endpoints must keep core infrastructure checks.");
   assert.ok(!source.includes("authConfigurationError"), "Optional auth providers must not disable existing sessions.");
 }
-assert.ok(errorBoundary.includes("onClick={reset}"), "The global error screen must have a real retry action.");
+assert.ok(errorBoundary.includes("router.invalidate()") && errorBoundary.includes("useRouter"), "The global error screen must re-run failed route loaders when retrying.");
 assert.ok(errorBoundary.includes("ENV-PAGE-") && errorBoundary.includes("Reference:"), "The global error screen must expose a support reference.");
 assert.ok(errorBoundary.includes("status === 429") && errorBoundary.includes("status >= 500"), "The global error screen must explain common HTTP failure classes.");
 assert.ok(database.includes("ssl: { ca, rejectUnauthorized: true }"), "Supabase PostgreSQL TLS must verify its CA certificate.");
