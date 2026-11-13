@@ -99,7 +99,8 @@ export function isAdsterraQualifiedTool(tool: AdEligibleTool): boolean {
     ...(tool.tags ?? []),
     ...(tool.keywords ?? []),
   ].join(" ").replace(/[-_]+/g, " ");
-  return tool.status === "active" &&
+  return tool.id !== "a-book" &&
+    tool.status === "active" &&
     !ADSTERRA_EXCLUDED_CATEGORIES.has(category) &&
     !RESTRICTED_CATEGORIES.has(category) &&
     !tool.id.startsWith("finance-") &&
