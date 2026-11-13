@@ -6,7 +6,7 @@ import { ArrowRight, Camera, ChartNoAxesCombined, Check, LogOut, Pencil, Setting
 import { AppShell } from "@/components/layout/app-shell";
 import { AuthPage } from "@/components/auth/auth-page";
 import { authClient, authEnabled, signOut } from "@/lib/auth/client";
-import { auth, authConfigurationError, authConfigured } from "@/lib/auth/server";
+import { auth, authInfrastructureError, authConfigured } from "@/lib/auth/server";
 import { DEV_USER, useCurrentUserState, type AppUser } from "@/lib/auth/use-current-user";
 import {
   cacheAccountProfileMedia,
@@ -25,7 +25,7 @@ const useAccountMediaLayoutEffect = typeof window === "undefined" ? useEffect : 
 // New account navigation does NOT call this function or wait for its response.
 const loadAccountProfile = createServerFn({ method: "GET" }).handler(async () => {
   if (!authConfigured) return DEV_USER;
-  if (authConfigurationError) throw new Error("Account authentication is temporarily unavailable.");
+  if (authInfrastructureError) throw new Error("Account authentication is temporarily unavailable.");
   const request = getRequest();
   if (!request) throw new Error("Account session context is unavailable.");
 
@@ -58,6 +58,31 @@ type ProfileMediaResponse = {
 
 function initialsFor(name: string): string {
   return name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]!.toUpperCase()).join("") || "E";
+}
+
+function getAccountSessionFailureMessage(error: unknown, timedOut: boolean): string {
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    return "Your device appears to be offline. Reconnect and try checking your account again.";
+  }
+  if (timedOut) {
+    return "The account service did not respond in time. Your sign-in status is unknown; try again.";
+  }
+  if (error && typeof error === "object") {
+    const value = error as {
+      status?: unknown;
+      statusCode?: unknown;
+      response?: { status?: unknown };
+      data?: { status?: unknown };
+    };
+    const status = [value.status, value.statusCode, value.response?.status, value.data?.status]
+      .find(candidate => typeof candidate === "number") as number | undefined;
+    if (status === 401) return "Your session could not be confirmed. Sign in again to continue.";
+    if (status === 429) return "The account service is receiving too many requests. Wait a moment and try again.";
+    if (status === 502 || status === 503 || status === 504 || (status !== undefined && status >= 500)) {
+      return "The account service is temporarily unavailable. Your sign-in status is unknown; try again shortly.";
+    }
+  }
+  return "We could not verify your sign-in status. Check your connection and try again.";
 }
 
 function AccountProfileSkeleton() {
@@ -385,7 +410,7 @@ function Account() {
           <section className="w-full rounded-2xl border border-border bg-surface p-6 shadow-sm" role="alert">
             <h1 className="text-xl font-semibold text-fg">We couldn’t check your account</h1>
             <p className="mt-2 text-sm leading-6 text-muted">
-              Your sign-in status could not be verified. Check your connection and try again.
+              {getAccountSessionFailureMessage(sessionError, sessionTimedOut)}
             </p>
             <button
               type="button"
