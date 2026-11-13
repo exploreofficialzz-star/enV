@@ -550,3 +550,107 @@ extension NativeTextEngineTests {
         XCTAssertThrowsError(try NativeTextEngine.run(toolID: "xml-formatter", input: "<!DOCTYPE root [<!ENTITY x SYSTEM 'file:///etc/passwd'>]><root>&x;</root>"))
     }
 }
+
+
+final class NativeFileToTextTests: XCTestCase {
+    private func appendLittleEndian<T: FixedWidthInteger>(_ value: T, to data: inout Data) {
+        var littleEndian = value.littleEndian
+        withUnsafeBytes(of: &littleEndian) { data.append(contentsOf: $0) }
+    }
+
+    private func crc32(_ data: Data) -> UInt32 {
+        var crc: UInt32 = 0xFFFF_FFFF
+        for byte in data {
+            crc ^= UInt32(byte)
+            for _ in 0..<8 {
+                crc = (crc & 1) == 1 ? (crc >> 1) ^ 0xEDB8_8320 : crc >> 1
+            }
+        }
+        return crc ^ 0xFFFF_FFFF
+    }
+
+    private func storedZip(path: String, contents: Data, declaredUncompressedSize: UInt32? = nil) -> Data {
+        let name = Data(path.utf8)
+        let checksum = crc32(contents)
+        let compressedSize = UInt32(contents.count)
+        let uncompressedSize = declaredUncompressedSize ?? compressedSize
+
+        var local = Data()
+        appendLittleEndian(UInt32(0x0403_4B50), to: &local)
+        appendLittleEndian(UInt16(20), to: &local)
+        appendLittleEndian(UInt16(0), to: &local)
+        appendLittleEndian(UInt16(0), to: &local)
+        appendLittleEndian(UInt16(0), to: &local)
+        appendLittleEndian(UInt16(0), to: &local)
+        appendLittleEndian(checksum, to: &local)
+        appendLittleEndian(compressedSize, to: &local)
+        appendLittleEndian(uncompressedSize, to: &local)
+        appendLittleEndian(UInt16(name.count), to: &local)
+        appendLittleEndian(UInt16(0), to: &local)
+        local.append(name)
+        local.append(contents)
+
+        let centralOffset = UInt32(local.count)
+        var central = Data()
+        appendLittleEndian(UInt32(0x0201_4B50), to: &central)
+        appendLittleEndian(UInt16(20), to: &central)
+        appendLittleEndian(UInt16(20), to: &central)
+        appendLittleEndian(UInt16(0), to: &central)
+        appendLittleEndian(UInt16(0), to: &central)
+        appendLittleEndian(UInt16(0), to: &central)
+        appendLittleEndian(UInt16(0), to: &central)
+        appendLittleEndian(checksum, to: &central)
+        appendLittleEndian(compressedSize, to: &central)
+        appendLittleEndian(uncompressedSize, to: &central)
+        appendLittleEndian(UInt16(name.count), to: &central)
+        appendLittleEndian(UInt16(0), to: &central)
+        appendLittleEndian(UInt16(0), to: &central)
+        appendLittleEndian(UInt16(0), to: &central)
+        appendLittleEndian(UInt16(0), to: &central)
+        appendLittleEndian(UInt32(0), to: &central)
+        appendLittleEndian(UInt32(0), to: &central)
+        central.append(name)
+
+        var end = Data()
+        appendLittleEndian(UInt32(0x0605_4B50), to: &end)
+        appendLittleEndian(UInt16(0), to: &end)
+        appendLittleEndian(UInt16(0), to: &end)
+        appendLittleEndian(UInt16(1), to: &end)
+        appendLittleEndian(UInt16(1), to: &end)
+        appendLittleEndian(UInt32(central.count), to: &end)
+        appendLittleEndian(centralOffset, to: &end)
+        appendLittleEndian(UInt16(0), to: &end)
+        return local + central + end
+    }
+
+    func testDocxTextExtractionReadsOpenXmlAndPreservesParagraphs() throws {
+        let xml = Data(
+            #"<w:document xmlns:w="urn:w"><w:body><w:p><w:r><w:t>Hello enV</w:t><w:tab/><w:t>local</w:t></w:r></w:p><w:p><w:r><w:t>Second paragraph</w:t></w:r></w:p></w:body></w:document>"#.utf8
+        )
+        let archive = storedZip(path: "word/document.xml", contents: xml)
+        let result = try NativeFileConverterEngine.convertFileToText(
+            name: "notes.docx",
+            data: archive,
+            mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+        XCTAssertEqual(result.text, "Hello enV\tlocal\nSecond paragraph\n")
+        XCTAssertEqual(result.ext, "txt")
+        XCTAssertEqual(result.mime, "text/plain")
+    }
+
+    func testDocxTextExtractionRejectsOversizedXmlFromArchiveMetadata() {
+        let xml = Data("<w:document/>".utf8)
+        let archive = storedZip(
+            path: "word/document.xml",
+            contents: xml,
+            declaredUncompressedSize: 32 * 1024 * 1024 + 1
+        )
+        XCTAssertThrowsError(
+            try NativeFileConverterEngine.convertFileToText(
+                name: "oversized.docx",
+                data: archive,
+                mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
+        )
+    }
+}
