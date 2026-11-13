@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, BookOpen, ChevronDown, Heart, Maximize2, Minimize2 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { disclaimerText } from "@/lib/content";
 import { recordAnalyticsEvent, recordToolExecutionResult } from "@/lib/analytics/client";
 import { toolDocumentationPath } from "@/lib/tool-documentation";
@@ -19,9 +19,11 @@ import {
   AdsterraBanner,
   AdsterraNativeBanner,
   AdsterraResponsiveBanner,
+  type AdsterraDeliveryState,
 } from "@/components/ads/adsterra-ad";
 import { isAdsterraQualifiedTool } from "@/lib/ads/policy";
 import { ADSTERRA_CONSENT_STORAGE_KEY, getAdsterraConsent, openAdsterraSmartlinkFromOutput } from "@/lib/ads/adsterra";
+import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import type { PublicCommunityFeed } from "@/lib/community/public-feed.functions";
 import { ToolExecutionTelemetryContext, type ToolExecutionTelemetry, type ToolExecutionOutcome } from "@/components/tools/tool-execution-context";
 import { UnderProductionDialog } from "@/components/tools/under-production";
@@ -57,11 +59,124 @@ export function ToolShell({
     };
   }, []);
   const adsterraAdsEnabled = adsterraQualified && adsterraConsent === "granted";
+  const { user: accessUser, isPending: accessUserPending } = useCurrentUserState();
+  const [adDelivery, setAdDelivery] = useState<AdsterraDeliveryState>("blocked");
+  const [fallbackAccess, setFallbackAccess] = useState<{
+    unitSubunits: number;
+    unitTokens: number;
+    availableSubunits: number | null;
+    availableTokens: number | null;
+    billingEnabled: boolean;
+  } | null>(null);
+  const [fallbackQuoteLoading, setFallbackQuoteLoading] = useState(false);
+  const [fallbackChargeLoading, setFallbackChargeLoading] = useState(false);
+  const [paidExecutionInFlight, setPaidExecutionInFlight] = useState(false);
+  const authorizedExecutionRef = useRef(false);
+  const pendingExecutionRef = useRef<HTMLElement | null>(null);
+  const onAdDelivery = useCallback((state: AdsterraDeliveryState) => {
+    setAdDelivery((current) => current === "filled" ? current : state);
+  }, []);
   const toggleFavorite = usePrefs((s) => s.toggleFavorite);
   const favorites = usePrefs((s) => s.favorites);
   const prefsHydrated = usePrefs((s) => s.hydrated);
   const recordRecent = usePrefs((s) => s.recordRecent);
   const storageError = usePrefs((s) => s.storageError);
+  useEffect(() => {
+    if (!adsterraQualified || !adsterraAdsEnabled) {
+      setAdDelivery("blocked");
+      return;
+    }
+    setAdDelivery("blocked");
+    const timeout = window.setTimeout(() => {
+      setAdDelivery((current) => current === "filled" ? current : "unfilled");
+    }, 15_000);
+    return () => window.clearTimeout(timeout);
+  }, [tool.id, adsterraQualified, adsterraAdsEnabled]);
+
+  useEffect(() => {
+    if (!requiresTokenFallback || accessUserPending || !authenticatedAccount) {
+      setFallbackAccess(null);
+      setFallbackQuoteLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    setFallbackQuoteLoading(true);
+    void fetch(`/api/billing/ad-fallback/access?toolId=${encodeURIComponent(tool.id)}`, {
+      credentials: "same-origin",
+      cache: "no-store",
+      signal: controller.signal,
+    }).then(async (response) => {
+      const payload = await response.json() as {
+        ok?: boolean;
+        data?: {
+          unitSubunits?: number;
+          unitTokens?: number;
+          availableSubunits?: number | null;
+          availableTokens?: number | null;
+          billingEnabled?: boolean;
+        };
+      };
+      if (!response.ok || !payload.ok || !payload.data ||
+          !Number.isSafeInteger(payload.data.unitSubunits) ||
+          typeof payload.data.unitTokens !== "number") {
+        throw new Error("AD_FALLBACK_QUOTE_UNAVAILABLE");
+      }
+      setFallbackAccess({
+        unitSubunits: payload.data.unitSubunits!,
+        unitTokens: payload.data.unitTokens,
+        availableSubunits: payload.data.availableSubunits ?? null,
+        availableTokens: payload.data.availableTokens ?? null,
+        billingEnabled: payload.data.billingEnabled === true,
+      });
+    }).catch(() => {
+      if (!controller.signal.aborted) setFallbackAccess(null);
+    }).finally(() => {
+      if (!controller.signal.aborted) setFallbackQuoteLoading(false);
+    });
+    return () => controller.abort();
+  }, [tool.id, requiresTokenFallback, accessUserPending, authenticatedAccount]);
+
+  async function chargeFallbackAndRun() {
+    if (!fallbackAccess || !fallbackAccess.billingEnabled || fallbackChargeLoading) return;
+    setFallbackChargeLoading(true);
+    try {
+      const response = await fetch("/api/billing/ad-fallback/consume", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ toolId: tool.id, idempotencyKey: crypto.randomUUID() }),
+      });
+      const payload = await response.json() as {
+        ok?: boolean;
+        data?: { availableSubunits?: number; availableTokens?: number };
+        error?: string;
+      };
+      if (!response.ok || !payload.ok || !payload.data) {
+        if (response.status === 402 || payload.error === "INSUFFICIENT_CREDITS") {
+          setFallbackAccess((current) => current ? { ...current, availableSubunits: 0, availableTokens: 0 } : current);
+        }
+        return;
+      }
+      authorizedExecutionRef.current = true;
+      setPaidExecutionInFlight(true);
+      setFallbackAccess((current) => current ? {
+        ...current,
+        availableSubunits: payload.data!.availableSubunits ?? null,
+        availableTokens: payload.data!.availableTokens ?? null,
+      } : current);
+      const pending = pendingExecutionRef.current;
+      pendingExecutionRef.current = null;
+      window.setTimeout(() => {
+        if (pending instanceof HTMLFormElement) pending.requestSubmit();
+        else if (pending instanceof HTMLElement) pending.click();
+      }, 0);
+    } catch {
+      // A failed charge never authorizes a local execution.
+    } finally {
+      setFallbackChargeLoading(false);
+    }
+  }
+
   const saved = favorites.includes(tool.id);
   const toolInterfaceRef = useRef<HTMLDivElement | null>(null);
   const toolStartedRef = useRef(false);
@@ -104,6 +219,9 @@ export function ToolShell({
   }), [tool.id]);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isCssFullscreen, setIsCssFullscreen] = useState(false);
+  const requiresTokenFallback = adsterraQualified && (adDelivery !== "filled" || isFullscreen);
+  const authenticatedAccount = Boolean(accessUser && !accessUser.isDevFallback && !accessUserPending);
+  const showAdFallbackGate = requiresTokenFallback && !paidExecutionInFlight;
   const isMusicSandbox = ["song-metadata-analyzer", "audio-analyze-studio"].includes(tool.id);
 
 
@@ -140,6 +258,7 @@ export function ToolShell({
       if (detail?.toolId === tool.id && ["success", "failure", "cancelled"].includes(detail.outcome ?? "")) {
         toolFinishedRef.current = true;
         executionFinishedRef.current = true;
+        if (requiresTokenFallback) setPaidExecutionInFlight(false);
       }
     };
     const reportAbandoned = () => {
@@ -298,7 +417,7 @@ export function ToolShell({
         {tool.category !== "creators" ? <p className="col-start-2 col-span-2 row-start-2 text-sm leading-6 text-muted sm:hidden">{offlineAwareToolDescription(tool)}</p> : null}
       </header>
 
-      {!isFullscreen && adsterraAdsEnabled ? <AdsterraResponsiveBanner /> : null}
+      {!isFullscreen && adsterraAdsEnabled ? <AdsterraResponsiveBanner onDelivery={onAdDelivery} /> : null}
 
       {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
 
@@ -321,10 +440,29 @@ export function ToolShell({
           if (!action || (action instanceof HTMLButtonElement && action.disabled)) return;
           const label = [action.getAttribute("aria-label"), action.getAttribute("title"), action.textContent].filter(Boolean).join(" ");
           const isFileDownload = action instanceof HTMLAnchorElement && action.hasAttribute("download");
+          const isExecutionAction =
+            /\b(run|calculate|convert|generate|analy[sz]e|process|format|validate|inspect|scan|encode|decode|resize|compress|extract|transcribe|create|execute|search|lookup|compare|merge|split|apply|build|render|submit|start)\b/i.test(label);
+          if (requiresTokenFallback && isExecutionAction) {
+            if (paidExecutionInFlight && !authorizedExecutionRef.current) {
+              event.preventDefault();
+              event.stopPropagation();
+              return;
+            }
+            if (!authorizedExecutionRef.current) {
+              pendingExecutionRef.current = action as HTMLElement;
+              event.preventDefault();
+              event.stopPropagation();
+              return;
+            }
+            if (!action.closest("form")) {
+              authorizedExecutionRef.current = false;
+              setPaidExecutionInFlight(true);
+            }
+          }
           const isOutputAction =
             isFileDownload ||
             /\b(copy|download|export|save|output|result|calculate|convert|generate|analy[sz]e|process|format|validate|inspect|scan|encode|decode|resize|compress|extract|transcribe|create|execute|compare|merge|split|apply|build|render)\b/i.test(label);
-          if (adsterraAdsEnabled && isOutputAction) {
+          if (adsterraAdsEnabled && adDelivery === "filled" && isOutputAction) {
             // Open the supplied Smartlink synchronously within the visitor's
             // explicit output-button gesture, before async generation can
             // cause mobile browsers to block the new tab.
@@ -334,20 +472,59 @@ export function ToolShell({
             startToolExecution("action_button");
           }
         }}
-        onSubmitCapture={() => {
+        onSubmitCapture={(event) => {
+          if (requiresTokenFallback) {
+            if (paidExecutionInFlight && !authorizedExecutionRef.current) {
+              event.preventDefault();
+              event.stopPropagation();
+              return;
+            }
+            if (!authorizedExecutionRef.current) {
+              const submitter = (event.nativeEvent as SubmitEvent).submitter;
+              pendingExecutionRef.current = submitter instanceof HTMLElement ? submitter : event.currentTarget;
+              event.preventDefault();
+              event.stopPropagation();
+              return;
+            }
+            authorizedExecutionRef.current = false;
+            setPaidExecutionInFlight(true);
+          }
           startToolExecution("form_submit");
         }}
       >
         <ToolExecutionTelemetryContext.Provider value={executionTelemetry}>
           {toolContent}
         </ToolExecutionTelemetryContext.Provider>
+        {showAdFallbackGate ? (
+          <div className="absolute inset-0 z-40 grid place-items-center rounded-2xl bg-bg/90 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Tool access">
+            <div className="flex w-full max-w-sm flex-wrap items-center justify-center gap-2 rounded-xl border border-border bg-surface p-4 shadow-lg">
+              {!authenticatedAccount ? (
+                <>
+                  <Link to="/login" className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface px-4 text-sm font-semibold text-fg hover:bg-surface-2">Sign in</Link>
+                  <Link to="/signup" className="inline-flex min-h-11 items-center justify-center rounded-lg bg-fg px-4 text-sm font-semibold text-bg hover:opacity-90">Create account</Link>
+                </>
+              ) : (
+                <>
+                  {fallbackAccess?.billingEnabled === true &&
+                  fallbackAccess.availableSubunits !== null &&
+                  fallbackAccess.availableSubunits >= fallbackAccess.unitSubunits ? (
+                    <button type="button" disabled={fallbackChargeLoading || fallbackQuoteLoading} onClick={() => void chargeFallbackAndRun()} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-fg px-4 text-sm font-semibold text-bg disabled:opacity-60">
+                      {fallbackChargeLoading ? "…" : `Use ${fallbackAccess.unitTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} enV`}
+                    </button>
+                  ) : null}
+                  <Link to="/wallet" className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface px-4 text-sm font-semibold text-fg hover:bg-surface-2">Buy enV</Link>
+                </>
+              )}
+            </div>
+          </div>
+        ) : null}
         {!isFullscreen && tool.category !== "creators" ? <ToolCommunityPanel toolId={tool.id} discussionHref={"/community" + toolPath(tool)} initialFeed={initialCommunityFeed} /> : null}
       </section>
 
       {!isFullscreen && adsterraAdsEnabled ? (
         <>
-          <AdsterraBanner format="300x250" />
-          <AdsterraNativeBanner />
+          <AdsterraBanner format="300x250" onDelivery={onAdDelivery} />
+          <AdsterraNativeBanner onDelivery={onAdDelivery} />
         </>
       ) : null}
 
