@@ -443,6 +443,10 @@ try {
   const smallPhone = await browser.newContext({ viewport: { width: 320, height: 568 }, isMobile: true, hasTouch: true });
   const small = await smallPhone.newPage();
   await small.goto(base + "/tools/audio/ai-music-data-sandbox");
+  const smallSplash = small.locator(".ms-splash");
+  await smallSplash.waitFor({ timeout: 90_000 });
+  await small.getByRole("button", { name: /Enter sandbox/ }).click();
+  await smallSplash.waitFor({ state: "detached", timeout: 30_000 });
   await small.getByRole("button", { name: "View AI Music Data Sandbox in full screen" }).click();
   await small.locator(".env-tool-fullscreen__exit").waitFor();
   await small.locator(".ms-page-heading").waitFor();
