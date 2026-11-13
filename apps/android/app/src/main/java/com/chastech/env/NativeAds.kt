@@ -342,7 +342,12 @@ internal fun NativeToolAdSlot(tool: ToolRecord) {
         (context.resources.displayMetrics.widthPixels / context.resources.displayMetrics.density).toInt().coerceAtLeast(320)
     }
     val adSize = remember(widthDp) { AdSize.getLargeAnchoredAdaptiveBannerAdSize(context, widthDp) }
-    DisposableEffect(adView) { onDispose { adView.destroy() } }
+    DisposableEffect(adView, toolId) {
+        onDispose {
+            NativeAdsAvailability.setFilled(toolId, false)
+            adView.destroy()
+        }
+    }
     LaunchedEffect(adView, adSize, toolId) {
         adView.loadAd(
             BannerAdRequest.Builder(BuildConfig.ENV_ADMOB_BANNER_AD_UNIT_ID, adSize).build(),
