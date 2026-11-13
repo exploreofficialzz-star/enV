@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
-const MAX_FILE_TO_TXT_BYTES = 200 * 1024 * 1024;
-const MAX_FILE_TO_TXT_OUTPUT_BYTES = 32 * 1024 * 1024;
-
+import { useMemo, useState } from "react";
 import { Download, FileUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/tools/error-banner";
 import { recordToolExecutionResult } from "@/lib/analytics/client";
 import { docxToText } from "@/lib/documents/local-document";
 import { extractPdfTextLocally } from "@/lib/a-book/pdf-reader";
+
+const MAX_FILE_TO_TXT_BYTES = 200 * 1024 * 1024;
+const MAX_FILE_TO_TXT_OUTPUT_BYTES = 32 * 1024 * 1024;
+
 
 const IMAGE_OPS = new Set(["jpg-to-png", "png-to-jpg", "png-to-webp", "webp-to-png", "jpg-to-webp", "webp-to-jpg", "svg-to-png", "png-to-svg"]);
 const ACCEPT: Record<string, string> = {
@@ -22,7 +23,7 @@ const ACCEPT: Record<string, string> = {
 function download(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
 function parseCsv(text: string, delimiter = ","): string[][] {
@@ -50,7 +51,6 @@ function htmlToMarkdown(text: string) { return text.replace(/<script[\s\S]*?<\/s
 
 export function FileConverterEngine({ op, toolId }: { op: string; toolId?: string }) {
   const [file, setFile] = useState<File | null>(null); const [output, setOutput] = useState<{blob: Blob; name: string} | null>(null); const [error, setError] = useState<string | null>(null); const [preview, setPreview] = useState("");
-  useEffect(() => () => { if (output) URL.revokeObjectURL(URL.createObjectURL(output.blob)); }, [output]);
   const image = IMAGE_OPS.has(op); const accept = ACCEPT[op] ?? "*/*";
   const label = useMemo(() => op.replaceAll("-", " ").replace(/\b\w/g, x => x.toUpperCase()), [op]);
   async function run() {
