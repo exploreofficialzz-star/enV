@@ -1,6 +1,6 @@
 /** Shared fail-closed authentication for owned World Lab job requests. */
 import {randomUUID} from "node:crypto";
-import {auth,authConfigured,authConfigurationError} from "../auth/server";
+import {auth,authConfigured,authInfrastructureError} from "../auth/server";
 import {readBoundedJsonObject} from "../billing/bounded-json.server";
 export const respond=(body:unknown,status=200):Response=>new Response(JSON.stringify(body),{
   status,headers:{"content-type":"application/json; charset=utf-8",
@@ -14,7 +14,7 @@ export async function authorizeWorldLabJobRequest(request:Request):Promise<{
     requestId,userId:null,error:respond({ok:false,code,requestId},status),
   });
   if(process.env.WORLD_LAB_JOBS_ENABLED!=="true"||
-     !process.env.DATABASE_URL?.trim()||!authConfigured||authConfigurationError)
+     !process.env.DATABASE_URL?.trim()||!authConfigured||authInfrastructureError)
     return fail("JOBS_NOT_CONFIGURED",503);
   const configuredOrigin=process.env.BETTER_AUTH_URL?.trim();
   if(!configuredOrigin&&process.env.NODE_ENV==="production")
