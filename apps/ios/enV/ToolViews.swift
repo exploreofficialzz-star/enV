@@ -6671,6 +6671,13 @@ private extension EnvironmentValues {
     }
 }
 
+private enum NativeToolAuthorization: Equatable {
+    case allowed
+    case signInRequired
+    case insufficientCredits
+    case retry
+}
+
 @MainActor
 private final class NativeToolExecutionTracker {
     private let toolID: String
