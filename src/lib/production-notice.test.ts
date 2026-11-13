@@ -14,8 +14,11 @@ test("A book is accessible without exposing the Productivity category", () => {
 });
 
 test("completed PDF/document operations are individually accessible without opening the whole PDF category", () => {
-  for (const id of ["pdf-merger", "pdf-metadata-viewer", "pdf-metadata-tool", "pdf-page-extractor", "pdf-splitter", "pdf-rotator", "pdf-text-extractor", "docx-text-extractor"]) {
+  for (const id of ["pdf-merger", "pdf-metadata-viewer", "pdf-page-extractor", "pdf-splitter", "pdf-rotator"]) {
     assert.equal(isToolUnderProduction({ id, category: "pdf" }), false, `${id} should be accessible`);
+  }
+  for (const id of ["pdf-metadata-tool", "pdf-text-extractor", "docx-text-extractor"]) {
+    assert.equal(isToolUnderProduction({ id, category: "pdf" }), true, `${id} is an operation alias, not a released catalogue tool`);
   }
   assert.equal(isToolUnderProduction({ id: "pdf-to-word", category: "pdf" }), true);
 });
