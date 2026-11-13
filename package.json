@@ -123,7 +123,7 @@
     "check:creator-device-ui": "node scripts/check-creators.mjs && node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/engines/creator.test.ts src/lib/image/platform-presets.creator.test.ts",
     "check:communication": "node scripts/check-communication.mjs && node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/components/engines/communication-engine-utils.test.ts",
     "check:native-communication": "node scripts/check-native-communication.mjs",
-    "check:ads": "node --experimental-strip-types --test src/lib/ads/policy.test.ts src/lib/ads/page-units.test.ts src/lib/ads/adsterra.test.ts && node scripts/check-ad-access.mjs",
+    "check:ads": "node --experimental-strip-types --test src/lib/ads/policy.test.ts src/lib/ads/page-units.test.ts src/lib/ads/adsterra.test.ts src/lib/ads/fallback.test.ts && node scripts/check-ad-access.mjs",
     "audit:file-workspace:browser": "node scripts/audit-file-workspace-browser.mjs",
     "check:file-upload-ui": "node scripts/check-file-upload-ui.mjs"
   },
