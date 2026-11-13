@@ -16,6 +16,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
 /**
@@ -41,7 +42,7 @@ internal fun NativeExecutionButton(
         }
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(androidx.compose.ui.unit.Dp(6f))) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Button(
             modifier = modifier,
             enabled = enabled && !authorizing,
@@ -67,7 +68,7 @@ internal fun NativeExecutionButton(
             Text(if (authorizing) "…" else text)
         }
         when (accessState) {
-            NativeToolAuthorization.SIGN_IN_REQUIRED -> Row(horizontalArrangement = Arrangement.spacedBy(androidx.compose.ui.unit.Dp(8f))) {
+            NativeToolAuthorization.SIGN_IN_REQUIRED -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { openAccountPath("login") }) { Text("Sign in") }
                 Button(onClick = { openAccountPath("signup") }) { Text("Create account") }
             }
