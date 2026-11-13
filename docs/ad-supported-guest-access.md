@@ -14,7 +14,7 @@ The selected hybrid cohort is intersected with `src/data/offline-eligible-tools.
 
 Native AdMob advertising is **off by default** in Android and iOS builds until production publisher IDs, banner units and UMP privacy messaging are configured. Web Adsterra is a separate rollout: its production flag is enabled only for `envtools.store`, while requests remain gated by explicit visitor consent and same-origin availability. Never treat an Adsterra Web flag as proof that native AdMob is configured.
 
-The selected-tool allowlist is the offline-access boundary only and is evaluated independently from ad rendering. Web Adsterra uses a separate policy for active, public, device-local tools across categories, excluding Studio, AI, Labs/Sandbox and restricted sensitive experiences. It does not require membership in the offline-wallet registry. A qualified guest must explicitly allow ads and receive a verified fill to execute. If the ad is declined, blocked or unfilled, the guest must sign in/create an account and a signed-in execution must pass the server-side enV debit. These online access rules do not change offline allowance enforcement.
+The selected-tool allowlist is the offline-access boundary only and is evaluated independently from ad rendering. Web Adsterra uses a separate policy for active, public, device-local tools across categories, excluding Studio, AI, Labs/Sandbox, the private A book notes workspace and restricted sensitive experiences. It does not require membership in the offline-wallet registry. A qualified guest must explicitly allow ads and receive a verified fill to execute. If the ad is declined, blocked or unfilled, the guest must sign in/create an account. Signed-in execution requires a server-side enV debit only when the tool has an approved fixed local billing profile; backend/cloud or measured-cost tools remain blocked until an authoritative price is available. These online access rules do not change offline allowance enforcement.
 
 The following are not supplied by this repository and must not be fabricated:
 
@@ -107,7 +107,7 @@ As of 2026-11-09, the verified GitHub `main` commit `b975bf1b774925e6b29325eadaf
 
 Before launch, verify:
 
-1. A Web guest can use an Adsterra-qualified tool only after explicit advertising consent and a visible creative fill. Declined, blocked or unfilled placements require sign-in; signed-in execution requires a server-confirmed enV debit.
+1. A Web guest can use an Adsterra-qualified tool only after explicit advertising consent and a visible creative fill. Declined, blocked or unfilled placements require sign-in; signed-in execution requires a server-confirmed enV debit only where an approved fixed local price exists. Backend/cloud tools without a measured quote stay blocked.
 2. Web Adsterra scripts are not requested when disabled, unqualified, consent is missing/declined, or the application origin is unreachable. Verify eligibility is independent of offline-wallet enrollment.
 3. Android and iOS use the same guest sign-in and signed-in enV fallback rule when their native ad SDK does not deliver an ad.
 4. UMP consent/refusal and privacy-options paths work on both native platforms.
