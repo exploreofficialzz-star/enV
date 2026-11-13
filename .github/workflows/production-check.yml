@@ -122,8 +122,14 @@ jobs:
             npx playwright install --with-deps chromium
           fi
 
+      - name: Verify local DOCX and PDF extraction safety limits
+        run: node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/documents/local-document.test.ts
+
       - name: Verify Zip any file compression and extraction in the browser
         run: npm run audit:zip-any-file:browser
+
+      - name: Verify local File workspace workflows in the browser
+        run: npm run audit:file-workspace:browser
 
       - name: Check Studio in phone, landscape, tablet and desktop layouts
         run: npm run audit:ux-ui-studio:browser

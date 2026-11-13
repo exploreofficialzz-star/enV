@@ -12,13 +12,19 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 object NativeFileConverterEngine {
+    private const val MAX_FILE_TO_TEXT_BYTES = 200 * 1024 * 1024
+    private const val MAX_DOCX_XML_BYTES = 32 * 1024 * 1024
+    private const val MAX_DOCX_EXPANDED_BYTES = 128L * 1024L * 1024L
+    private const val MAX_DOCX_ENTRIES = 10_000
+    private const val MAX_TEXT_OUTPUT_BYTES = 32 * 1024 * 1024
     data class Result(val text: String? = null, val bytes: ByteArray? = null, val mime: String = "text/plain", val extension: String = "txt")
     private val imageOps = setOf("jpg-to-png","png-to-jpg","png-to-webp","webp-to-png","jpg-to-webp","webp-to-jpg","png-to-svg")
     private val documentOps = setOf("pdf-metadata-viewer","pdf-metadata-tool","pdf-page-extractor","pdf-splitter","pdf-rotator","pdf-merger","pdf-text-extractor","docx-text-extractor")
-    fun supports(tool: ToolRecord): Boolean = (tool.engine.type == "file-converter" && op(tool) in setOf("csv-to-json","json-to-csv","csv-to-tsv","tsv-to-csv","xml-to-json","json-to-xml","yaml-to-json","json-to-yaml","txt-to-csv","csv-to-txt","markdown-to-html","html-to-markdown") + imageOps) || (tool.engine.type == "document-backend" && op(tool) in documentOps)
+    fun supports(tool: ToolRecord): Boolean = (tool.engine.type == "file-converter" && op(tool) in setOf("file-to-txt","csv-to-json","json-to-csv","csv-to-tsv","tsv-to-csv","xml-to-json","json-to-xml","yaml-to-json","json-to-yaml","txt-to-csv","csv-to-txt","markdown-to-html","html-to-markdown") + imageOps) || (tool.engine.type == "document-backend" && op(tool) in documentOps)
     private fun op(t: ToolRecord) = t.engine.extras["op"] ?: t.engine.id ?: t.id
     fun run(tool: ToolRecord, fileName: String, bytes: ByteArray): Result {
         val operation = op(tool)
+        if (operation == "file-to-txt") return fileToText(fileName, bytes)
         if (operation in documentOps) return document(operation, fileName, bytes)
         if (operation in imageOps) return image(operation, fileName, bytes)
         val input = bytes.toString(Charsets.UTF_8)
@@ -38,6 +44,58 @@ object NativeFileConverterEngine {
             else -> error("Unsupported file conversion: $operation")
         }
     }
+    private fun fileToText(name: String, data: ByteArray): Result {
+        require(data.isNotEmpty()) { "The selected file is empty." }
+        require(data.size <= MAX_FILE_TO_TEXT_BYTES) {
+            "The selected file exceeds the 200 MB local text extraction limit."
+        }
+        val ext = name.substringAfterLast('.', "").lowercase()
+        val text = when (ext) {
+            "docx" -> docxText(data)
+            "pdf" -> PDDocument.load(ByteArrayInputStream(data)).use { pdf ->
+                require(pdf.numberOfPages <= 250) { "This PDF exceeds the 250-page local extraction limit." }
+                com.tom_roush.pdfbox.text.PDFTextStripper().getText(pdf).also {
+                    require(it.isNotBlank()) {
+                        "No selectable text was found. Scanned image-only PDFs need OCR and cannot be converted by this tool."
+                    }
+                }
+            }
+            "html", "htm", "xhtml" -> decodeUtf8(data)
+                .replace(Regex("""(?is)<script\b[^>]*>.*?</script>"""), " ")
+                .replace(Regex("""(?is)<style\b[^>]*>.*?</style>"""), " ")
+                .replace(Regex("""(?is)<noscript\b[^>]*>.*?</noscript>"""), " ")
+                .replace(Regex("""(?s)<[^>]+>"""), " ")
+                .replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+                .replace(Regex("""\s+"""), " ").trim()
+            else -> {
+                require(ext in setOf(
+                    "txt", "md", "markdown", "csv", "tsv", "json", "xml", "yaml", "yml", "css",
+                    "js", "mjs", "cjs", "ts", "tsx", "jsx", "sql", "log", "ini", "toml", "sh",
+                    "properties", "conf", "cfg", "srt", "vtt", "ics"
+                )) {
+                    "Choose a supported text, Markdown, CSV, JSON, XML, YAML, HTML, DOCX or selectable-text PDF file."
+                }
+                decodeUtf8(data).removePrefix("\uFEFF").also {
+                    require(it.isNotBlank()) { "The selected file contains no readable text." }
+                }
+            }
+        }
+        val output = text.trimEnd() + "\n"
+        require(output.toByteArray(Charsets.UTF_8).size <= MAX_TEXT_OUTPUT_BYTES) {
+            "The extracted text exceeds the 32 MB local output limit."
+        }
+        return Result(output, extension = "txt", mime = "text/plain")
+    }
+
+    private fun decodeUtf8(data: ByteArray): String = try {
+        Charsets.UTF_8.newDecoder()
+            .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+            .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
+            .decode(java.nio.ByteBuffer.wrap(data))
+            .toString()
+    } catch (_: java.nio.charset.CharacterCodingException) {
+        throw IllegalArgumentException("This file is not valid UTF-8 text.")
+    }
     private fun document(op:String,name:String,data:ByteArray):Result {
         if (op == "docx-text-extractor") return Result(docxText(data), extension="txt", mime="text/plain")
         PDDocument.load(ByteArrayInputStream(data)).use { pdf ->
@@ -47,7 +105,62 @@ object NativeFileConverterEngine {
             val out=PDDocument(); val pages=if(op=="pdf-page-extractor"||op=="pdf-splitter") listOf(0) else (0 until pdf.numberOfPages).toList(); pages.forEach { out.importPage(pdf.getPage(it)) }; val outBytes=ByteArrayOutputStream(); out.save(outBytes); out.close(); return Result(bytes=outBytes.toByteArray(),extension="pdf",mime="application/pdf")
         }
     }
-    private fun docxText(data:ByteArray):String { val xml=ZipInputStream(ByteArrayInputStream(data)).use { z -> var e=z.nextEntry; var result=""; while(e!=null){if(e.name=="word/document.xml") result=z.readBytes().toString(Charsets.UTF_8); e=z.nextEntry}; result }; require(xml.isNotEmpty()){ "This DOCX file does not contain word/document.xml." }; return xml.replace(Regex("<w:tab\\s*/?>"),"\t").replace(Regex("<w:br\\s*/?>"),"\n").replace("</w:p>","\n").replace(Regex("<w:t[^>]*>(.*?)</w:t>")){it.groupValues[1]}.replace(Regex("<[^>]+>"),"").replace("&amp;","&").replace("&lt;","<").replace("&gt;",">").trim()+"\n" }
+    private fun docxText(data: ByteArray): String {
+        require(data.size <= MAX_FILE_TO_TEXT_BYTES) {
+            "The selected DOCX file exceeds the 200 MB local extraction limit."
+        }
+        val xml = ZipInputStream(ByteArrayInputStream(data)).use { archive ->
+            var entry = archive.nextEntry
+            var entryCount = 0
+            var expandedBytes = 0L
+            var documentXml: String? = null
+            val buffer = ByteArray(16 * 1024)
+            while (entry != null) {
+                entryCount += 1
+                require(entryCount <= MAX_DOCX_ENTRIES) {
+                    "This DOCX archive contains too many entries to inspect safely."
+                }
+                val isDocument = entry.name == "word/document.xml"
+                val captured = if (isDocument) ByteArrayOutputStream() else null
+                while (true) {
+                    val count = archive.read(buffer)
+                    if (count < 0) break
+                    expandedBytes += count
+                    require(expandedBytes <= MAX_DOCX_EXPANDED_BYTES) {
+                        "This DOCX archive expands beyond the 128 MB local safety limit."
+                    }
+                    if (isDocument) {
+                        require(captured!!.size() + count <= MAX_DOCX_XML_BYTES) {
+                            "The DOCX document text exceeds the 32 MB local extraction limit."
+                        }
+                        captured.write(buffer, 0, count)
+                    }
+                }
+                if (isDocument) {
+                    documentXml = String(captured!!.toByteArray(), Charsets.UTF_8)
+                    break
+                }
+                archive.closeEntry()
+                entry = archive.nextEntry
+            }
+            documentXml ?: ""
+        }
+        require(xml.isNotEmpty()) { "This DOCX file does not contain word/document.xml." }
+        val text = xml
+            .replace(Regex("""<w:tab\s*/?>"""), "\t")
+            .replace(Regex("""<w:br\s*/?>"""), "\n")
+            .replace("</w:p>", "\n")
+            .replace(Regex("""<w:t[^>]*>(.*?)</w:t>""")) { it.groupValues[1] }
+            .replace(Regex("""<[^>]+>"""), "")
+            .replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+            .replace("&quot;", "\"").replace("&apos;", "'")
+            .trim()
+        require(text.toByteArray(Charsets.UTF_8).size <= MAX_TEXT_OUTPUT_BYTES) {
+            "The extracted text exceeds the 32 MB local output limit."
+        }
+        return text + "\n"
+    }
+
     private fun image(op:String,name:String,data:ByteArray):Result { if(op=="png-to-svg"){val image=BitmapFactory.decodeByteArray(data,0,data.size) ?: error("Unsupported PNG"); val b64=Base64.encodeToString(data,Base64.NO_WRAP); return Result("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"${image.width}\" height=\"${image.height}\"><image href=\"data:image/png;base64,$b64\" width=\"100%\" height=\"100%\"/></svg>",extension="svg",mime="image/svg+xml")}; val bitmap=BitmapFactory.decodeByteArray(data,0,data.size) ?: error("Unsupported image"); val format=when{op.endsWith("png")->android.graphics.Bitmap.CompressFormat.PNG;op.endsWith("webp")->android.graphics.Bitmap.CompressFormat.WEBP;else->android.graphics.Bitmap.CompressFormat.JPEG}; val out=ByteArrayOutputStream(); bitmap.compress(format,92,out); return Result(bytes=out.toByteArray(),extension=if(format==android.graphics.Bitmap.CompressFormat.PNG)"png" else if(format==android.graphics.Bitmap.CompressFormat.WEBP)"webp" else "jpg",mime=if(format==android.graphics.Bitmap.CompressFormat.PNG)"image/png" else "image/jpeg") }
     private fun parseCsv(text:String,delimiter:Char=','):List<List<String>> { val rows=mutableListOf<MutableList<String>>(); var row=mutableListOf<String>(); val cell=StringBuilder(); var quote=false; var i=0; while(i<text.length){val c=text[i];if(c=='"'){if(quote&&i+1<text.length&&text[i+1]=='"'){cell.append('"');i++}else quote=!quote}else if(c==delimiter&&!quote){row.add(cell.toString());cell.clear()}else if((c=='\n'||c=='\r')&&!quote){if(c=='\r'&&i+1<text.length&&text[i+1]=='\n')i++;row.add(cell.toString());cell.clear();if(row.any{it.trim().isNotEmpty()})rows.add(row);row=mutableListOf()}else cell.append(c);i++};if(cell.isNotEmpty()||row.isNotEmpty()){row.add(cell.toString());if(row.any{it.trim().isNotEmpty()})rows.add(row)};return rows}
     private fun csvEscape(v:String)=if(v.any{it==','||it=='\n'||it=='\r'||it=='"'})"\"${v.replace("\"","\"\"")}\"" else v

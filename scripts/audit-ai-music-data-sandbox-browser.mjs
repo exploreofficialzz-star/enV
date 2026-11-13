@@ -390,7 +390,10 @@ try {
   await phone.addInitScript(() => localStorage.setItem("env:view-mode", "desktop"));
   const mobile = await phone.newPage();
   await mobile.goto(base + "/tools/audio/ai-music-data-sandbox");
-  await mobile.locator(".ms-splash").waitFor({ timeout: 90000 });
+  const mobileSplash = mobile.locator(".ms-splash");
+  await mobileSplash.waitFor({ timeout: 90_000 });
+  await mobile.getByRole("button", { name: /Enter sandbox/ }).click();
+  await mobileSplash.waitFor({ state: "detached", timeout: 30_000 });
   await mobile.waitForFunction(() => document.querySelector('meta[name="viewport"]')?.getAttribute("content")?.includes("width=1024"));
   await mobile.getByRole("button", { name: "View AI Music Data Sandbox in full screen" }).click();
   await mobile.locator(".env-tool-fullscreen__exit").waitFor({ state: "visible" });
@@ -440,6 +443,10 @@ try {
   const smallPhone = await browser.newContext({ viewport: { width: 320, height: 568 }, isMobile: true, hasTouch: true });
   const small = await smallPhone.newPage();
   await small.goto(base + "/tools/audio/ai-music-data-sandbox");
+  const smallSplash = small.locator(".ms-splash");
+  await smallSplash.waitFor({ timeout: 90_000 });
+  await small.getByRole("button", { name: /Enter sandbox/ }).click();
+  await smallSplash.waitFor({ state: "detached", timeout: 30_000 });
   await small.getByRole("button", { name: "View AI Music Data Sandbox in full screen" }).click();
   await small.locator(".env-tool-fullscreen__exit").waitFor();
   await small.locator(".ms-page-heading").waitFor();

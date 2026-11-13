@@ -1,8 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Download, FileUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/tools/error-banner";
 import { recordToolExecutionResult } from "@/lib/analytics/client";
+import { docxToText } from "@/lib/documents/local-document";
+import { extractPdfTextLocally } from "@/lib/a-book/pdf-reader";
+
+const MAX_FILE_TO_TXT_BYTES = 200 * 1024 * 1024;
+const MAX_FILE_TO_TXT_OUTPUT_BYTES = 32 * 1024 * 1024;
+
 
 const IMAGE_OPS = new Set(["jpg-to-png", "png-to-jpg", "png-to-webp", "webp-to-png", "jpg-to-webp", "webp-to-jpg", "svg-to-png", "png-to-svg"]);
 const ACCEPT: Record<string, string> = {
@@ -11,12 +17,13 @@ const ACCEPT: Record<string, string> = {
   "csv-to-json": ".csv,text/csv", "json-to-csv": ".json,application/json", "csv-to-tsv": ".csv,text/csv", "tsv-to-csv": ".tsv,text/tab-separated-values",
   "xml-to-json": ".xml,text/xml,application/xml", "json-to-xml": ".json,application/json", "yaml-to-json": ".yaml,.yml,text/yaml", "json-to-yaml": ".json,application/json",
   "txt-to-csv": ".txt,text/plain", "csv-to-txt": ".csv,text/csv", "markdown-to-html": ".md,.markdown,text/markdown", "html-to-markdown": ".html,.htm,text/html",
+  "file-to-txt": ".txt,.md,.markdown,.csv,.tsv,.json,.xml,.yaml,.yml,.html,.htm,.css,.js,.ts,.sql,.log,.ini,.toml,.sh,.docx,.pdf,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 };
 
 function download(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
 function parseCsv(text: string, delimiter = ","): string[][] {
@@ -44,16 +51,48 @@ function htmlToMarkdown(text: string) { return text.replace(/<script[\s\S]*?<\/s
 
 export function FileConverterEngine({ op, toolId }: { op: string; toolId?: string }) {
   const [file, setFile] = useState<File | null>(null); const [output, setOutput] = useState<{blob: Blob; name: string} | null>(null); const [error, setError] = useState<string | null>(null); const [preview, setPreview] = useState("");
-  useEffect(() => () => { if (output) URL.revokeObjectURL(URL.createObjectURL(output.blob)); }, [output]);
   const image = IMAGE_OPS.has(op); const accept = ACCEPT[op] ?? "*/*";
   const label = useMemo(() => op.replaceAll("-", " ").replace(/\b\w/g, x => x.toUpperCase()), [op]);
   async function run() {
     const startedAt = Date.now();
-    if (!file) { setError("Choose a file first."); return; } setError(null); setOutput(null);
+    if (!file) { setError("Choose a file first."); return; }
+    if (op === "file-to-txt" && file.size > MAX_FILE_TO_TXT_BYTES) {
+      setError("The selected file exceeds the 200 MB local text-extraction limit.");
+      return;
+    }
+    setError(null); setOutput(null);
     try {
       if (image) {
         if (op === "png-to-svg") { const data = await file.arrayBuffer(); const b64 = btoa(String.fromCharCode(...new Uint8Array(data))); const img = await createImageBitmap(file); const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${img.width}" height="${img.height}" viewBox="0 0 ${img.width} ${img.height}"><image href="data:image/png;base64,${b64}" width="100%" height="100%"/></svg>`; const blob = new Blob([svg], {type:"image/svg+xml"}); setOutput({blob,name:file.name.replace(/\.[^.]+$/, ".svg")}); setPreview(svg.slice(0,500)); if (toolId) recordToolExecutionResult(toolId, "success", Date.now() - startedAt, "file_conversion"); return; }
         const src = URL.createObjectURL(file); const img = new Image(); await new Promise((res, rej) => { img.onload=()=>res(null); img.onerror=rej; img.src=src; }); const canvas=document.createElement("canvas"); canvas.width=img.naturalWidth; canvas.height=img.naturalHeight; const ctx=canvas.getContext("2d"); if(!ctx) throw new Error("Your browser cannot create a canvas."); if(op.includes("jpg")) { ctx.fillStyle="#fff"; ctx.fillRect(0,0,canvas.width,canvas.height); } ctx.drawImage(img,0,0); const mime=op.endsWith("png")?"image/png":op.endsWith("webp")?"image/webp":"image/jpeg"; const blob=await new Promise<Blob|null>(r=>canvas.toBlob(r,mime,0.92)); URL.revokeObjectURL(src); if(!blob) throw new Error("Could not encode the converted image."); const ext=mime==="image/png"?"png":mime==="image/webp"?"webp":"jpg"; setOutput({blob,name:file.name.replace(/\.[^.]+$/, `.${ext}`)}); if (toolId) recordToolExecutionResult(toolId, "success", Date.now() - startedAt, "file_conversion"); return;
+      }
+      if (op === "file-to-txt") {
+        const name = file.name.toLowerCase();
+        let result = "";
+        if (name.endsWith(".pdf")) {
+          const extracted = await extractPdfTextLocally(file);
+          result = extracted.text;
+          if (!result.trim()) throw new Error("No selectable text was found. This may be a scanned PDF; OCR is not included in this conversion.");
+        } else if (name.endsWith(".docx")) {
+          result = docxToText(new Uint8Array(await file.arrayBuffer()));
+        } else if (/\.(html?|xhtml)$/i.test(name)) {
+          const markup = await file.text();
+          const document = new DOMParser().parseFromString(markup, "text/html");
+          document.querySelectorAll("script,style,noscript,template").forEach((node) => node.remove());
+          result = (document.body.textContent ?? "").replace(/\n{3,}/g, "\n\n").trim() + "\n";
+        } else {
+          const supported = /\.(txt|md|markdown|csv|tsv|json|xml|ya?ml|css|js|mjs|cjs|ts|tsx|jsx|sql|log|ini|toml|sh|properties|conf|cfg|srt|vtt|ics)$/i.test(name);
+          if (!supported && !file.type.startsWith("text/")) throw new Error("Choose a supported text, Markdown, CSV, JSON, XML, YAML, HTML, DOCX or selectable-text PDF file.");
+          result = new TextDecoder("utf-8", { fatal: true }).decode(await file.arrayBuffer()).replace(/^\uFEFF/, "");
+          if (!result.trim()) throw new Error("The selected file contains no readable text.");
+          result += result.endsWith("\n") ? "" : "\n";
+        }
+        const blob = new Blob([result], { type: "text/plain;charset=utf-8" });
+        if (blob.size > MAX_FILE_TO_TXT_OUTPUT_BYTES) throw new Error("The extracted text exceeds the 32 MB local output limit.");
+        setOutput({ blob, name: file.name.replace(/\.[^.]+$/, "") + ".txt" });
+        setPreview(result.slice(0, 4000));
+        if (toolId) recordToolExecutionResult(toolId, "success", Date.now() - startedAt, "file_conversion");
+        return;
       }
       const text=await file.text(); let result=""; let ext="txt";
       if(op==="csv-to-json") { result=csvToJson(text); ext="json"; } else if(op==="json-to-csv") { result=rowsToCsv(jsonToRows(text)); ext="csv"; } else if(op==="csv-to-tsv") { result=rowsToCsv(parseCsv(text),"\t"); ext="tsv"; } else if(op==="tsv-to-csv") { result=rowsToCsv(parseCsv(text,"\t")); ext="csv"; } else if(op==="xml-to-json") { const doc=new DOMParser().parseFromString(text,"application/xml"); if(doc.querySelector("parsererror")) throw new Error("Invalid XML."); result=JSON.stringify({[doc.documentElement.tagName]:xmlToObject(doc.documentElement)},null,2); ext="json"; } else if(op==="json-to-xml") { result='<?xml version="1.0" encoding="UTF-8"?>\n'+objectToXml(JSON.parse(text)); ext="xml"; } else if(op==="yaml-to-json") { result=JSON.stringify(simpleYamlParse(text),null,2); ext="json"; } else if(op==="json-to-yaml") { result=jsonToYaml(JSON.parse(text))+"\n"; ext="yaml"; } else if(op==="txt-to-csv") { result=rowsToCsv(text.split(/\r?\n/).filter(Boolean).map(x=>[x])); ext="csv"; } else if(op==="csv-to-txt") { result=parseCsv(text).map(r=>r.join(" ")).join("\n")+"\n"; ext="txt"; } else if(op==="markdown-to-html") { result='<!doctype html>\n<html><head><meta charset="utf-8"><title>Converted document</title></head><body>\n'+markdownToHtml(text)+'\n</body></html>\n'; ext="html"; } else if(op==="html-to-markdown") { result=htmlToMarkdown(text)+"\n"; ext="md"; } else throw new Error("Unsupported conversion.");

@@ -49,7 +49,7 @@ try {
     Object.defineProperty(window, "showDirectoryPicker", { configurable: true, value: undefined });
   });
 
-  const response = await page.goto(baseUrl + "/tools/productivity/zip-any-file", { waitUntil: "networkidle" });
+  const response = await page.goto(baseUrl + "/tools/files/zip-any-file", { waitUntil: "networkidle" });
   assert.equal(response?.status(), 200, "Zip any file route returns HTTP 200");
   await page.getByRole("heading", { name: "Zip any file" }).first().waitFor();
   await page.waitForFunction(() => document.documentElement.dataset.envToolHydrated === "zip-any-file");
@@ -99,7 +99,7 @@ try {
   assert.deepEqual(localWriteRequests, [], "Compression and extraction do not send files to application APIs");
   console.log(JSON.stringify({
     status: "passed",
-    route: baseUrl + "/tools/productivity/zip-any-file",
+    route: baseUrl + "/tools/files/zip-any-file",
     checks: [
       "tool route renders",
       "multiple local files compress into a readable ZIP",

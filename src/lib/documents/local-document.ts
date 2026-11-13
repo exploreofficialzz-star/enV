@@ -6,11 +6,62 @@ export type LocalDocumentResult = { blob: Blob; name: string; preview?: string }
 const asArrayBuffer = (value: Uint8Array): ArrayBuffer => value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength) as ArrayBuffer;
 const esc = (value: string) => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 
+const MAX_LOCAL_DOCX_INPUT_BYTES = 200 * 1024 * 1024;
+const MAX_LOCAL_DOCX_XML_BYTES = 32 * 1024 * 1024;
+const MAX_LOCAL_DOCX_EXPANDED_BYTES = 128 * 1024 * 1024;
+const MAX_LOCAL_DOCX_ENTRIES = 10_000;
+
 export function docxToText(bytes: Uint8Array): string {
-  const files = unzipSync(bytes);
+  if (bytes.byteLength > MAX_LOCAL_DOCX_INPUT_BYTES) {
+    throw new Error("The selected DOCX file exceeds the 200 MB local extraction limit.");
+  }
+  let documentTooLarge = false;
+  let tooManyEntries = false;
+  let entryCount = 0;
+  let expandedDocumentBytes = 0;
+  const files = unzipSync(bytes, {
+    filter: (entry) => {
+      entryCount += 1;
+      if (entryCount > MAX_LOCAL_DOCX_ENTRIES) {
+        tooManyEntries = true;
+        return false;
+      }
+      if (entry.name !== "word/document.xml") return false;
+      if (!Number.isSafeInteger(entry.originalSize)
+        || entry.originalSize > MAX_LOCAL_DOCX_XML_BYTES
+        || expandedDocumentBytes + entry.originalSize > MAX_LOCAL_DOCX_EXPANDED_BYTES) {
+        documentTooLarge = true;
+        return false;
+      }
+      expandedDocumentBytes += entry.originalSize;
+      return true;
+    },
+  });
+  if (tooManyEntries) {
+    throw new Error("This DOCX archive contains too many entries to inspect safely.");
+  }
+  if (documentTooLarge) {
+    throw new Error("The DOCX document text exceeds the 32 MB per-entry or 128 MB aggregate local extraction limit.");
+  }
   const document = files["word/document.xml"];
   if (!document) throw new Error("This DOCX file does not contain a Word document body.");
-  return strFromU8(document).replace(/<w:tab\s*\/?>/g, "\t").replace(/<w:br\s*\/?>/g, "\n").replace(/<\/w:p>/g, "\n").replace(/<w:t[^>]*>([\s\S]*?)<\/w:t>/g, "$1").replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/\n{3,}/g, "\n\n").trim() + "\n";
+  const text = strFromU8(document)
+    .replace(/<w:tab\s*\/?>/g, "\t")
+    .replace(/<w:br\s*\/?>/g, "\n")
+    .replace(/<\/w:p>/g, "\n")
+    .replace(/<w:t[^>]*>([\s\S]*?)<\/w:t>/g, "$1")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim() + "\n";
+  if (new TextEncoder().encode(text).byteLength > MAX_LOCAL_DOCX_XML_BYTES) {
+    throw new Error("The extracted DOCX text exceeds the 32 MB local output limit.");
+  }
+  return text;
 }
 
 export function textToDocx(text: string): Uint8Array {
@@ -21,15 +72,86 @@ export function textToDocx(text: string): Uint8Array {
   return zipSync({"[Content_Types].xml": strToU8(contentTypes), "_rels/.rels": strToU8(rels), "word/document.xml": strToU8(document)});
 }
 
+const MAX_LOCAL_DOCUMENT_TOTAL_BYTES = 200 * 1024 * 1024;
+const MAX_LOCAL_PDF_PAGES = 500;
+
 export async function runLocalDocument(op: string, files: File[]): Promise<LocalDocumentResult> {
   if (!files.length) throw new Error("Choose a document first.");
+  const totalBytes = files.reduce((total, file) => total + file.size, 0);
+  if (totalBytes > MAX_LOCAL_DOCUMENT_TOTAL_BYTES) {
+    throw new Error("The selected documents exceed the 200 MB local processing limit.");
+  }
+
+  if (op === "pdf-merger") {
+    const out = await PDFDocument.create();
+    let pageCount = 0;
+    for (const file of files) {
+      const doc = await PDFDocument.load(new Uint8Array(await file.arrayBuffer()), { ignoreEncryption: false });
+      pageCount += doc.getPageCount();
+      if (pageCount > MAX_LOCAL_PDF_PAGES) {
+        throw new Error("The merged PDF set exceeds the 500-page local processing limit.");
+      }
+      const copied = await out.copyPages(doc, doc.getPageIndices());
+      copied.forEach(page => out.addPage(page));
+    }
+    return {
+      blob: new Blob([asArrayBuffer(await out.save())], { type: "application/pdf" }),
+      name: "merged.pdf",
+    };
+  }
+
   const first = new Uint8Array(await files[0].arrayBuffer());
-  if (op === "docx-text-extractor") { const text = docxToText(first); return { blob: new Blob([text], { type: "text/plain" }), name: files[0].name.replace(/\.docx$/i, ".txt"), preview: text }; }
-  if (op === "text-to-docx" || op === "txt-to-docx" || op === "markdown-to-docx") { const text = new TextDecoder().decode(first); return { blob: new Blob([asArrayBuffer(textToDocx(text))], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }), name: files[0].name.replace(/\.[^.]+$/, ".docx") }; }
+  if (op === "docx-text-extractor") {
+    const text = docxToText(first);
+    return {
+      blob: new Blob([text], { type: "text/plain" }),
+      name: files[0].name.replace(/\.docx$/i, ".txt"),
+      preview: text,
+    };
+  }
+  if (op === "text-to-docx" || op === "txt-to-docx" || op === "markdown-to-docx") {
+    const text = new TextDecoder().decode(first);
+    return {
+      blob: new Blob([asArrayBuffer(textToDocx(text))], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }),
+      name: files[0].name.replace(/\.[^.]+$/, ".docx"),
+    };
+  }
+
   const pdf = await PDFDocument.load(first, { ignoreEncryption: false });
-  if (op === "pdf-metadata-viewer" || op === "pdf-metadata-tool") { const preview = JSON.stringify({ pages: pdf.getPageCount(), title: pdf.getTitle() ?? "", author: pdf.getAuthor() ?? "", subject: pdf.getSubject() ?? "", creator: pdf.getCreator() ?? "" }, null, 2); return { blob: new Blob([preview], { type: "application/json" }), name: files[0].name.replace(/\.pdf$/i, ".json"), preview }; }
-  if (op === "pdf-page-extractor" || op === "pdf-splitter") { const out = await PDFDocument.create(); const pages = pdf.getPages(); const selected = pages.slice(0, Math.min(10, pages.length)); const copied = await out.copyPages(pdf, selected.map((_, i) => i)); copied.forEach(page => out.addPage(page)); return { blob: new Blob([asArrayBuffer(await out.save())], { type: "application/pdf" }), name: files[0].name.replace(/\.pdf$/i, "-pages.pdf") }; }
-  if (op === "pdf-rotator") { pdf.getPages().forEach(page => page.setRotation(degrees((page.getRotation().angle + 90) % 360))); return { blob: new Blob([asArrayBuffer(await pdf.save())], { type: "application/pdf" }), name: files[0].name.replace(/\.pdf$/i, "-rotated.pdf") }; }
-  if (op === "pdf-merger") { const out = await PDFDocument.create(); for (const file of files) { const doc = await PDFDocument.load(new Uint8Array(await file.arrayBuffer())); const copied = await out.copyPages(doc, doc.getPageIndices()); copied.forEach(page => out.addPage(page)); } return { blob: new Blob([asArrayBuffer(await out.save())], { type: "application/pdf" }), name: "merged.pdf" }; }
+  if (pdf.getPageCount() > MAX_LOCAL_PDF_PAGES) {
+    throw new Error("This PDF exceeds the 500-page local processing limit.");
+  }
+  if (op === "pdf-metadata-viewer" || op === "pdf-metadata-tool") {
+    const preview = JSON.stringify({
+      pages: pdf.getPageCount(),
+      title: pdf.getTitle() ?? "",
+      author: pdf.getAuthor() ?? "",
+      subject: pdf.getSubject() ?? "",
+      creator: pdf.getCreator() ?? "",
+    }, null, 2);
+    return {
+      blob: new Blob([preview], { type: "application/json" }),
+      name: files[0].name.replace(/\.pdf$/i, ".json"),
+      preview,
+    };
+  }
+  if (op === "pdf-page-extractor" || op === "pdf-splitter") {
+    const out = await PDFDocument.create();
+    const pages = pdf.getPages();
+    const selected = pages.slice(0, Math.min(10, pages.length));
+    const copied = await out.copyPages(pdf, selected.map((_, i) => i));
+    copied.forEach(page => out.addPage(page));
+    return {
+      blob: new Blob([asArrayBuffer(await out.save())], { type: "application/pdf" }),
+      name: files[0].name.replace(/\.pdf$/i, "-pages.pdf"),
+    };
+  }
+  if (op === "pdf-rotator") {
+    pdf.getPages().forEach(page => page.setRotation(degrees((page.getRotation().angle + 90) % 360)));
+    return {
+      blob: new Blob([asArrayBuffer(await pdf.save())], { type: "application/pdf" }),
+      name: files[0].name.replace(/\.pdf$/i, "-rotated.pdf"),
+    };
+  }
   throw new Error("This document operation is not available offline yet.");
 }
