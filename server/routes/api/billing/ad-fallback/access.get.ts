@@ -1,11 +1,12 @@
 import { defineHandler } from "nitro/h3";
 import { TOKEN_SUBUNITS_PER_TOKEN } from "../../../../../src/lib/billing/catalog";
-import { getOptionalBillingUserId, jsonResponse, requireOfflineBillingUser } from "../../../../../src/lib/billing/http.server";
+import { getOptionalBillingUserId, isSameOriginRequest, jsonResponse, requireOfflineBillingUser } from "../../../../../src/lib/billing/http.server";
 import { readWallet } from "../../../../../src/lib/billing/ledger.server";
 import { getAdFallbackQuote } from "../../../../../src/lib/ads/fallback.server";
 
 export default defineHandler(async (event) => {
   const request = event.req;
+  if (!isSameOriginRequest(request)) return jsonResponse({ ok: false, error: "CROSS_ORIGIN_REQUEST_BLOCKED" }, 403);
   const toolId = new URL(request.url).searchParams.get("toolId") ?? "";
   const quote = getAdFallbackQuote(toolId);
   if (!quote) return jsonResponse({ ok: false, error: "AD_FALLBACK_NOT_AVAILABLE" }, 404);
