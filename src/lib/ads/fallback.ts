@@ -41,5 +41,5 @@ export function resolveAdFallbackUnitSubunits(
       profile.premiumRequired) return null;
 
   const rate = profile.provisionalSubunitsPerUnit;
-  return Number.isSafeInteger(rate) && rate > 0 && rate <= 1_000_000 ? rate : null;
+  return typeof rate === "number" && Number.isSafeInteger(rate) && rate > 0 && rate <= 1_000_000 ? rate : null;
 }
