@@ -177,10 +177,11 @@ assert.match(iosHome, /\.multilineTextAlignment\(\.leading\)/);
 assert.ok(
   webToolShell.includes("ref={toolInterfaceRef}") &&
   webToolShell.indexOf("<header") < webToolShell.indexOf("ref={toolInterfaceRef}") &&
-  webFullscreenTarget.includes("{children}") &&
-  webFullscreenTarget.includes("Exit full screen") &&
-  !webFullscreenTarget.includes("<h1") &&
-  !webFullscreenTarget.includes("{tool.description}") &&
+  webFullscreenTarget.includes("{toolContent}") &&
+  webToolContent.includes("{children}") &&
+  webToolContent.includes("Exit full screen") &&
+  !webToolContent.includes("<h1") &&
+  !webToolContent.includes("{tool.description}") &&
   webToolShell.includes("requestFullscreen") &&
   webToolShell.includes("fullscreenchange") &&
   webToolShell.includes("env-tool-fullscreen__content") &&
