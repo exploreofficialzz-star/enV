@@ -61,6 +61,11 @@ export function ToolShell({
   const adsterraAdsEnabled = adsterraQualified && adsterraConsent === "granted";
   const { user: accessUser, isPending: accessUserPending } = useCurrentUserState();
   const [adDelivery, setAdDelivery] = useState<AdsterraDeliveryState>("blocked");
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isCssFullscreen, setIsCssFullscreen] = useState(false);
+  const requiresTokenFallback = adsterraQualified && (adDelivery !== "filled" || isFullscreen);
+  const authenticatedAccount = Boolean(accessUser && !accessUser.isDevFallback && !accessUserPending);
+  const showAdFallbackGate = requiresTokenFallback && fallbackPromptOpen && !paidExecutionInFlight;
   const [fallbackAccess, setFallbackAccess] = useState<{
     unitSubunits: number;
     unitTokens: number;
@@ -236,11 +241,6 @@ export function ToolShell({
       }
     },
   }), [tool.id, requiresTokenFallback]);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isCssFullscreen, setIsCssFullscreen] = useState(false);
-  const requiresTokenFallback = adsterraQualified && (adDelivery !== "filled" || isFullscreen);
-  const authenticatedAccount = Boolean(accessUser && !accessUser.isDevFallback && !accessUserPending);
-  const showAdFallbackGate = requiresTokenFallback && fallbackPromptOpen && !paidExecutionInFlight;
   const isMusicSandbox = ["song-metadata-analyzer", "audio-analyze-studio"].includes(tool.id);
 
 
