@@ -83,6 +83,31 @@ function file(name, content) {
   return { name, mimeType: "text/plain", buffer: Buffer.from(content) };
 }
 
+async function selectFilesAndWait(files) {
+  const input = page.locator('input[type="file"]').first();
+  await input.setInputFiles(files);
+  try {
+    await page.getByText(files.length + " selected", { exact: false }).waitFor({ timeout: 10_000 });
+  } catch (cause) {
+    const inputs = await page.locator('input[type="file"]').evaluateAll((elements) =>
+      elements.map((element) => ({
+        name: element.getAttribute("name"),
+        multiple: element.hasAttribute("multiple"),
+        webkitdirectory: element.hasAttribute("webkitdirectory"),
+        fileNames: Array.from(element.files ?? []).map((selected) => selected.name),
+        parent: element.parentElement?.outerHTML.slice(0, 240),
+      })),
+    );
+    const section = await page.locator("section").first().innerText().catch(() => "no workspace section");
+    const errors = await page.getByRole("alert").allTextContents();
+    throw new Error(
+      "Selected files did not appear in the workspace. Inputs: " + JSON.stringify(inputs)
+      + ". Section: " + section + ". Errors: " + JSON.stringify(errors)
+      + ". Cause: " + String(cause),
+    );
+  }
+}
+
 async function clickAndDownload(buttonName) {
   const pendingDownload = page.waitForEvent("download", { timeout: 20_000 })
     .then((download) => ({ download }))
@@ -103,19 +128,17 @@ async function clickAndDownload(buttonName) {
 
 try {
   await openTool("file-organizer", "File Organizer");
-  await page.locator('input[type="file"]').first().setInputFiles([
+  await selectFilesAndWait([
     file("report.txt", "organizer report"),
     file("photo.png", "image placeholder bytes"),
   ]);
-  await page.getByText("2 selected", { exact: false }).waitFor({ timeout: 10_000 });
   const organizerDownload = await clickAndDownload("Organize copies into ZIP");
   const organizerFiles = await inspectZip(await readDownload(organizerDownload));
   assert.equal(organizerFiles.get("Documents/report.txt"), "organizer report");
   assert.equal(organizerFiles.get("Images/photo.png"), "image placeholder bytes");
 
   await openTool("batch-file-renamer", "Batch File Renamer");
-  await page.locator('input[type="file"]').first().setInputFiles([file("alpha.txt", "alpha"), file("beta.txt", "beta")]);
-  await page.getByText("2 selected", { exact: false }).waitFor({ timeout: 10_000 });
+  await selectFilesAndWait([file("alpha.txt", "alpha"), file("beta.txt", "beta")]);
   await page.getByLabel("Prefix").fill("copy-");
   await page.getByLabel("Suffix").fill("-ready");
   const renameDownload = await clickAndDownload("Export renamed ZIP");
@@ -124,10 +147,9 @@ try {
   assert.equal(renamedFiles.get("002-copy-beta-ready.txt"), "beta");
 
   await openTool("duplicate-file-finder", "Duplicate File Finder");
-  await page.locator('input[type="file"]').first().setInputFiles([
+  await selectFilesAndWait([
     file("first.txt", "same content"), file("copy.txt", "same content"), file("different.txt", "other content"),
   ]);
-  await page.getByText("3 selected", { exact: false }).waitFor({ timeout: 10_000 });
   await page.getByRole("button", { name: "Find identical files" }).click();
   await page.getByText("Duplicate group 1", { exact: false }).waitFor();
   const duplicateReport = await page.locator("pre").innerText();
