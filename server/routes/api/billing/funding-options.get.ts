@@ -16,6 +16,7 @@ function publicFundingOptions(funding: Awaited<ReturnType<typeof getFundingOptio
   return {
     countryCode: funding.countryCode,
     currency: funding.currency,
+    message: funding.message,
     methods: {
       card: isCustomerPaymentMethodAvailable(providers, "card"),
       local: isCustomerPaymentMethodAvailable(providers, "local"),
