@@ -74,6 +74,7 @@ export function ToolShell({
   const [fallbackQuoteStatus, setFallbackQuoteStatus] = useState<"idle" | "loading" | "ready" | "unavailable" | "error">("idle");
   const [fallbackChargeLoading, setFallbackChargeLoading] = useState(false);
   const [fallbackPromptOpen, setFallbackPromptOpen] = useState(false);
+  const [offlineAllowanceChecking, setOfflineAllowanceChecking] = useState(false);
   const [paidExecutionInFlight, setPaidExecutionInFlight] = useState(false);
   const authorizedExecutionRef = useRef(false);
   const pendingExecutionRef = useRef<HTMLElement | null>(null);
@@ -476,6 +477,28 @@ export function ToolShell({
               setFallbackPromptOpen(true);
               event.preventDefault();
               event.stopPropagation();
+
+              // Only the regular calculator engine is instrumented with the
+              // existing Web offline journal. A valid selected allowance can
+              // authorize this offline path, but never when the origin responds.
+              if (tool.engine.type === "calculator") {
+                setOfflineAllowanceChecking(true);
+                void import("@/lib/billing/offline-client").then(({ hasSelectedWebOfflineAllowanceForTool }) =>
+                  hasSelectedWebOfflineAllowanceForTool(tool.id)
+                ).then((hasAllowance) => {
+                  setOfflineAllowanceChecking(false);
+                  if (!hasAllowance) return;
+                  const pending = pendingExecutionRef.current;
+                  if (!(pending instanceof HTMLElement)) return;
+                  pendingExecutionRef.current = null;
+                  authorizedExecutionRef.current = true;
+                  setFallbackPromptOpen(false);
+                  window.setTimeout(() => pending.click(), 0);
+                }).catch(() => {
+                  setOfflineAllowanceChecking(false);
+                  // Missing, expired, overdrawn or unreadable allowances do not unlock a run.
+                });
+              }
               return;
             }
             const form = action instanceof HTMLButtonElement || action instanceof HTMLInputElement
@@ -533,7 +556,9 @@ export function ToolShell({
         {showAdFallbackGate ? (
           <div className="absolute inset-0 z-40 grid place-items-center rounded-2xl bg-bg/90 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Tool access">
             <div className="flex w-full max-w-sm flex-wrap items-center justify-center gap-2 rounded-xl border border-border bg-surface p-4 shadow-lg">
-              {!authenticatedAccount ? (
+              {offlineAllowanceChecking ? (
+                <p className="w-full text-center text-sm text-muted">Checking your prepared offline allowance…</p>
+              ) : !authenticatedAccount ? (
                 <>
                   <Link to="/login" className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface px-4 text-sm font-semibold text-fg hover:bg-surface-2">Sign in</Link>
                   <Link to="/signup" className="inline-flex min-h-11 items-center justify-center rounded-lg bg-fg px-4 text-sm font-semibold text-bg hover:opacity-90">Create account</Link>
