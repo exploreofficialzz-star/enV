@@ -4,7 +4,7 @@
 
 The hybrid economy applies only to tool IDs explicitly selected for the cohort.
 
-- **Online:** a selected tool is publicly usable without enV sign-in. Ads are an optional funding placement below the tool interface. Tool execution does not depend on an ad being filled or clicked.
+- **Online:** a selected ad-supported tool can run for a guest only when the ad provider delivers a visible creative. If no ad fills, guests must sign in/create an account; signed-in users must have sufficient enV and the server must confirm a per-run debit before the tool executes.
 - **Offline:** the same selected tool requires an authenticated enV account and a valid, pre-issued offline allowance. The allowance must be active, unexpired, and use the current offline pricing version. A failed/missing allowance rejects the operation before the tool computes or reveals a result.
 - **Unselected tools:** retain their existing access and offline policy. The feature must not silently broaden to every local tool.
 
@@ -14,7 +14,7 @@ The selected hybrid cohort is intersected with `src/data/offline-eligible-tools.
 
 Native AdMob advertising is **off by default** in Android and iOS builds until production publisher IDs, banner units and UMP privacy messaging are configured. Web Adsterra is a separate rollout: its production flag is enabled only for `envtools.store`, while requests remain gated by explicit visitor consent and same-origin availability. Never treat an Adsterra Web flag as proof that native AdMob is configured.
 
-The selected-tool allowlist is the offline-access boundary only and is evaluated independently from ad rendering. Web Adsterra uses a separate policy for active, public, device-local tools across categories, excluding Studio, AI, Labs/Sandbox and restricted sensitive experiences. It does not require membership in the offline-wallet registry. A qualified guest must explicitly allow ads to use that tool; a guest who declines or has not chosen must sign in/create an account, and signed-in users can use the tool without ads. These online access rules do not change offline allowance enforcement.
+The selected-tool allowlist is the offline-access boundary only and is evaluated independently from ad rendering. Web Adsterra uses a separate policy for active, public, device-local tools across categories, excluding Studio, AI, Labs/Sandbox and restricted sensitive experiences. It does not require membership in the offline-wallet registry. A qualified guest must explicitly allow ads and receive a verified fill to execute. If the ad is declined, blocked or unfilled, the guest must sign in/create an account and a signed-in execution must pass the server-side enV debit. These online access rules do not change offline allowance enforcement.
 
 The following are not supplied by this repository and must not be fabricated:
 
@@ -80,6 +80,15 @@ The checked-in iOS app ID is Google's iOS **test app ID** and the ad unit is bla
 
 For Web Adsterra, include suitable active, public, device-local tools across eligible categories; do not limit selection to calculators or intersect this policy with `offline-eligible-tools.json`. Exclude Studio workspaces, AI-related tools, Labs/Sandboxes, health, fitness, finance, earnings, personal-data, account, upload and backend-dependent tools. The tool must be auth-free for guest access and classified as device-local by the execution policy. Android/iOS AdMob eligibility uses its own native check and publisher configuration; it must not reuse the offline-wallet eligibility predicate.
 
+## Online ad-fallback billing
+
+- Web, Android and iOS treat actual ad fill as a delivery result; SDK/script initialization alone is not sufficient.
+- The shared server quote validates the canonical tool, local billing profile, fixed per-unit rate and active status. The client cannot set the price or submit a balance.
+- The server reserves and settles the enV amount through the existing immutable wallet ledger. Insufficient balances return a paywall result; guest requests cannot debit.
+- `BILLING_AD_FALLBACK_ENABLED=false` is the fail-closed default. Do not enable until the tool-rate audit and Web/Android/iOS regression suite pass.
+- The existing local per-unit profile is still provisional. Only tools with a fixed local profile can receive this fallback quote. Backend/cloud/measured-cost tools remain blocked until a measured quote is approved; no generic fee is invented.
+- A valid offline allowance remains the only offline path. It is not inferred from ad-fill state and is not replaced by this online debit.
+
 ## Offline wallet boundary
 
 The client-side gate only uses an existing selected, signed allowance and journals the operation. It does **not** enable the server-side production allowance issuance/settlement lock. Production issuance remains disabled pending independent device-integrity validation, authenticated allowance issuance, replay/recovery testing, approved pricing, and security review. Do not set `BILLING_OFFLINE_ENABLED` or `BILLING_OFFLINE_PRICING_APPROVED` here or in a deployment merely to test this feature.
@@ -98,9 +107,9 @@ As of 2026-11-09, the verified GitHub `main` commit `b975bf1b774925e6b29325eadaf
 
 Before launch, verify:
 
-1. A Web guest can use an Adsterra-qualified tool only after explicitly allowing advertising; declining or leaving consent unset presents a tool-level sign-up/sign-in choice. Signed-in users can use that tool without ads.
+1. A Web guest can use an Adsterra-qualified tool only after explicit advertising consent and a visible creative fill. Declined, blocked or unfilled placements require sign-in; signed-in execution requires a server-confirmed enV debit.
 2. Web Adsterra scripts are not requested when disabled, unqualified, consent is missing/declined, or the application origin is unreachable. Verify eligibility is independent of offline-wallet enrollment.
-3. Android and iOS guest can run the same selected tool while online without sign-in.
+3. Android and iOS use the same guest sign-in and signed-in enV fallback rule when their native ad SDK does not deliver an ad.
 4. UMP consent/refusal and privacy-options paths work on both native platforms.
 5. All three apps reject that tool offline without a selected, current allowance.
 6. A valid allowance records one durable operation before the result appears, and sync/replay recovery is verified.
