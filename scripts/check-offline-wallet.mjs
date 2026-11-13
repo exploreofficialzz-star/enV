@@ -301,7 +301,7 @@ assert.ok(androidKey.includes("AndroidKeyStore") && androidKey.includes("SHA256w
 assert.ok(androidApi.includes("/api/billing/offline/pairing/redeem") && androidApi.includes("/api/billing/offline/allowances") &&
   androidApi.includes("/api/billing/offline/sync") && androidApi.includes("Authorization") && androidApi.includes("TOKEN_CIPHER"),
   "Android native wallet must connect pairing, allowance issuance, synchronization, and encrypted session storage.");
-assert.ok(androidJournal.includes("offline_transactions") && androidJournal.includes("beginTransaction()") && androidJournal.includes("unitCount == 1L") && androidJournal.includes("setOf(\"local.calculator\")"), "Android journal must atomically persist only instrumented calculator operation records.");
+assert.ok(androidJournal.includes("offline_transactions") && androidJournal.includes("beginTransaction()") && androidJournal.includes("unitCount == 1L") && androidJournal.includes('loadEligibility(context).second[toolId]?.billingKey == "local.calculator"'), "Android journal must atomically persist only explicitly eligible calculator operation records.");
 assert.ok(androidJournal.includes("allowance.pendingBatch?.let { pending ->") && androidJournal.includes("db.beginTransaction()") &&
   androidJournal.includes("pending_batch_json IS NULL") && androidJournal.includes("changed == 1"), "Android batch ID and sequence allocation must be atomic and idempotent.");
 assert.ok(androidJournal.includes("Instant.parse(existing.issuedAt) == Instant.parse(issuedAt)") && androidJournal.includes("pricingVersion == pricingVersion"), "Android allowance replay must match immutable issuance metadata.");
