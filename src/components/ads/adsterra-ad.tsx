@@ -23,6 +23,18 @@ declare global {
   }
 }
 
+export type AdsterraDeliveryState = "filled" | "unfilled" | "blocked";
+
+function hasVisibleAdCreative(slot: HTMLElement): boolean {
+  for (const node of Array.from(slot.querySelectorAll<HTMLElement>("iframe, img, video, [data-adsterra-creative]"))) {
+    const style = window.getComputedStyle(node);
+    const rect = node.getBoundingClientRect();
+    if (style.display !== "none" && style.visibility !== "hidden" &&
+        Number(style.opacity) > 0 && rect.width >= 40 && rect.height >= 20) return true;
+  }
+  return false;
+}
+
 let bannerScriptQueue: Promise<void> = Promise.resolve();
 
 function useAdsterraReady(): boolean {
@@ -111,7 +123,13 @@ function appendBannerScript(
   return queued;
 }
 
-export function AdsterraBanner({ format }: { format: AdsterraBannerFormat }) {
+export function AdsterraBanner({
+  format,
+  onDelivery,
+}: {
+  format: AdsterraBannerFormat;
+  onDelivery?: (state: AdsterraDeliveryState) => void;
+}) {
   const ready = useAdsterraReady();
   const slotRef = useRef<HTMLDivElement | null>(null);
   const [failed, setFailed] = useState(false);
@@ -123,12 +141,30 @@ export function AdsterraBanner({ format }: { format: AdsterraBannerFormat }) {
     if (!ready) {
       setFailed(false);
       setRetryAttempt(0);
+      onDelivery?.("blocked");
       return;
     }
     const slot = slotRef.current;
     if (!slot || slot.dataset.envAdsterraRequested === "true") return;
     let active = true;
     let retryTriggered = false;
+    let deliveryReported = false;
+    const reportDelivery = () => {
+      if (!active || deliveryReported || !hasVisibleAdCreative(slot)) return;
+      deliveryReported = true;
+      onDelivery?.("filled");
+      observer.disconnect();
+      window.clearTimeout(creativeTimeout);
+    };
+    const observer = new MutationObserver(reportDelivery);
+    observer.observe(slot, { childList: true, subtree: true, attributes: true });
+    const creativeTimeout = window.setTimeout(() => {
+      reportDelivery();
+      if (active && !deliveryReported) {
+        deliveryReported = true;
+        onDelivery?.("unfilled");
+      }
+    }, 12_000);
     const retryOnAvailability = () => {
       if (!active || retryTriggered || !navigator.onLine || document.visibilityState !== "visible") return;
       retryTriggered = true;
@@ -140,8 +176,12 @@ export function AdsterraBanner({ format }: { format: AdsterraBannerFormat }) {
       setRetryAttempt(retryAttempt + 1);
     };
     slot.dataset.envAdsterraRequested = "true";
-    void appendBannerScript(slot, unit).catch(() => {
+    void appendBannerScript(slot, unit).then(reportDelivery).catch(() => {
       if (!active) return;
+      if (!deliveryReported) {
+        deliveryReported = true;
+        onDelivery?.("unfilled");
+      }
       slot.replaceChildren();
       delete slot.dataset.envAdsterraRequested;
       setFailed(true);
@@ -154,6 +194,8 @@ export function AdsterraBanner({ format }: { format: AdsterraBannerFormat }) {
     });
     return () => {
       active = false;
+      observer.disconnect();
+      window.clearTimeout(creativeTimeout);
       window.removeEventListener("online", retryOnAvailability);
       document.removeEventListener("visibilitychange", retryOnAvailability);
       if (retryTimerRef.current !== null) {
@@ -161,7 +203,7 @@ export function AdsterraBanner({ format }: { format: AdsterraBannerFormat }) {
         retryTimerRef.current = null;
       }
     };
-  }, [ready, unit, retryAttempt]);
+  }, [ready, unit, retryAttempt, onDelivery]);
 
   if (!ready || failed) return null;
 
@@ -181,7 +223,7 @@ export function AdsterraBanner({ format }: { format: AdsterraBannerFormat }) {
   );
 }
 
-export function AdsterraResponsiveBanner() {
+export function AdsterraResponsiveBanner({ onDelivery }: { onDelivery?: (state: AdsterraDeliveryState) => void }) {
   const [format, setFormat] = useState<AdsterraBannerFormat | null>(null);
 
   useEffect(() => {
@@ -192,10 +234,10 @@ export function AdsterraResponsiveBanner() {
     return () => media.removeEventListener("change", update);
   }, []);
 
-  return format ? <AdsterraBanner format={format} /> : null;
+  return format ? <AdsterraBanner format={format} onDelivery={onDelivery} /> : null;
 }
 
-export function AdsterraNativeBanner() {
+export function AdsterraNativeBanner({ onDelivery }: { onDelivery?: (state: AdsterraDeliveryState) => void }) {
   const ready = useAdsterraReady();
   const [failed, setFailed] = useState(false);
   const [retryAttempt, setRetryAttempt] = useState(0);
@@ -206,6 +248,7 @@ export function AdsterraNativeBanner() {
     if (!ready) {
       setFailed(false);
       setRetryAttempt(0);
+      onDelivery?.("blocked");
       return;
     }
     if (scriptRef.current) return;
@@ -224,6 +267,23 @@ export function AdsterraNativeBanner() {
       setRetryAttempt(retryAttempt + 1);
     };
     let failureHandled = false;
+    let deliveryReported = false;
+    const reportDelivery = () => {
+      if (!active || deliveryReported || !hasVisibleAdCreative(container)) return;
+      deliveryReported = true;
+      onDelivery?.("filled");
+      observer.disconnect();
+      window.clearTimeout(creativeTimeout);
+    };
+    const observer = new MutationObserver(reportDelivery);
+    observer.observe(container, { childList: true, subtree: true, attributes: true });
+    const creativeTimeout = window.setTimeout(() => {
+      reportDelivery();
+      if (active && !deliveryReported) {
+        deliveryReported = true;
+        onDelivery?.("unfilled");
+      }
+    }, 12_000);
     const script = document.createElement("script");
     script.async = true;
     script.setAttribute("data-cfasync", "false");
@@ -232,6 +292,12 @@ export function AdsterraNativeBanner() {
       if (!active || failureHandled) return;
       failureHandled = true;
       script.remove();
+      if (!deliveryReported) {
+        deliveryReported = true;
+        onDelivery?.("unfilled");
+      }
+      observer.disconnect();
+      window.clearTimeout(creativeTimeout);
       if (scriptRef.current === script) scriptRef.current = null;
       container.replaceChildren();
       delete container.dataset.envAdsterraRequested;
@@ -249,6 +315,7 @@ export function AdsterraNativeBanner() {
       if (failureHandled) return;
       failureHandled = true;
       if (active) setFailed(false);
+      reportDelivery();
     }, { once: true });
     script.addEventListener("error", () => {
       window.clearTimeout(loadTimeout);
@@ -258,6 +325,8 @@ export function AdsterraNativeBanner() {
     scriptRef.current = script;
     return () => {
       active = false;
+      observer.disconnect();
+      window.clearTimeout(creativeTimeout);
       window.removeEventListener("online", retryOnAvailability);
       document.removeEventListener("visibilitychange", retryOnAvailability);
       if (retryTimerRef.current !== null) {
@@ -269,7 +338,7 @@ export function AdsterraNativeBanner() {
       delete container.dataset.envAdsterraRequested;
       if (scriptRef.current === script) scriptRef.current = null;
     };
-  }, [ready, retryAttempt]);
+  }, [ready, retryAttempt, onDelivery]);
 
   if (!ready || failed) return null;
 
