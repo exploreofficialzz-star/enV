@@ -47,7 +47,7 @@ assert.match(rootRoute, /name: "google-adsense-account", content: ADSENSE_SITE_C
 assert.doesNotMatch(rootRoute, /ADSENSE_BOOTSTRAP_SCRIPT|pagead\.googlesyndication\.com/, "The root document must not load AdSense before hydration.");
 assert.match(shell, /<AdSlot tool=\{tool\} \/>/, "Tool details must include the ad placement.");
 assert.match(toolShell, /AdsterraNativeBanner/, "Qualified tool pages must include the publisher's native placement.");
-assert.match(toolShell, /!isFullscreen && adsterraAdsEnabled \? <AdsterraResponsiveBanner \/>/, "Qualified tool pages must actually mount the responsive banner above the interface.");
+assert.match(toolShell, /!isFullscreen && adsterraAdsEnabled \? <AdsterraResponsiveBanner onDelivery=\{onAdDelivery\} \/>/, "Qualified tool pages must mount the responsive banner and report ad-fill state.");
 assert.match(toolShell, /AdsterraBanner format="300x250"/, "Qualified tool pages must include the medium-rectangle banner.");
 assert.match(toolShell, /isAdsterraQualifiedTool\(tool\)/, "Each placement must be limited to the shared Adsterra eligibility policy.");
 assert.match(toolShell, /const adsterraAdsEnabled =\s*adsterraQualified && adsterraConsent === "granted"/, "Adsterra placements must depend on the saved advertising choice, not account state.");
@@ -58,7 +58,7 @@ assert.match(toolShell, /fallbackPromptOpen/, "The sign-in or token prompt must 
 assert.match(toolShell, /api\/billing\/ad-fallback\/consume/, "A token debit must be confirmed before resuming the pending execution.");
 assert.match(toolShell, /to="\/login"|to="\/signup"|to="\/wallet"/, "Guests must be offered account access and signed-in users a wallet path.");
 assert.match(toolShell, /<ToolExecutionTelemetryContext\.Provider value=\{executionTelemetry\}>\s*\{toolContent\}\s*<\/ToolExecutionTelemetryContext\.Provider>/, "The existing execution telemetry provider remains mounted around tool content.");
-assert.match(toolShell, /<\/section>\s*\{!isFullscreen && adsterraAdsEnabled[\s\S]*?<AdsterraBanner format="300x250" \/>[\s\S]*?<AdsterraNativeBanner \/>[\s\S]*?\}\s*\{tool\.category !== "creators"/, "Lower Adsterra placements must work for every eligible category, including Creator tools.");
+assert.match(toolShell, /<\/section>\s*\{!isFullscreen && adsterraAdsEnabled[\s\S]*?<AdsterraBanner format="300x250" onDelivery=\{onAdDelivery\} \/>[\s\S]*?<AdsterraNativeBanner onDelivery=\{onAdDelivery\} \/>[\s\S]*?\}\s*\{tool\.category !== "creators"/, "Lower Adsterra placements must report their fill state across all eligible categories.");
 assert.match(toolShell, /openAdsterraSmartlinkFromOutput/, "Output actions must trigger the publisher Smartlink from a direct click.");
 assert.ok(toolShell.includes("copy|download|export|save|output|result|calculate|convert|generate"), "Output triggers must include copy, download, export and common output-producing actions.");
 assert.doesNotMatch(downloadUtils, /openAdsterraSmartlinkFromOutput/, "The download helper must not open a popup after an asynchronous download begins.");
@@ -67,7 +67,7 @@ assert.doesNotMatch(rootRoute, /AdsterraPopunder/, "The root document must not m
 assert.doesNotMatch(toolShell, /AdsterraToolPopunder|ADSTERRA_POPUNDER_SCRIPT/, "Tool pages must not install a page-wide click-triggered ad.");
 assert.doesNotMatch(adsterraWeb, /AdsterraToolPopunder|envAdsterraPopunder|ADSTERRA_POPUNDER_SCRIPT/, "The browser ad components must not load a popunder script.");
 assert.ok(!adsterraConfig.includes("ADSTERRA_POPUNDER_SCRIPT") && !adsterraConfig.includes("abscloud.org"), "The page-wide popunder placement must not be configured.");
-assert.ok(shell.includes('<AdsterraBanner format="300x250" />') && shell.includes("<AdsterraNativeBanner />"), "Qualified tool pages retain fixed banner slots.");
+assert.ok(shell.includes('<AdsterraBanner format="300x250" onDelivery={onAdDelivery} />') && shell.includes('<AdsterraNativeBanner onDelivery={onAdDelivery} />'), "Qualified tool pages retain fixed banner slots with delivery callbacks.");
 assert.match(adsterraWeb, /retryAttempt < 3/, "Failed Adsterra banner requests must retry a bounded number of times.");
 assert.match(adsterraWeb, /Adsterra banner request timed out/, "A stalled banner request must be released so it cannot block later placements.");
 assert.match(adsterraWeb, /window\.setTimeout\(fail, 15_000\)/, "The native banner must time out when the publisher script stalls.");
