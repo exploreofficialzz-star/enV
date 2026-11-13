@@ -121,7 +121,7 @@ internal object NativeAdsPolicy {
         val localCustomCategories = setOf(
             "career", "celebrations", "communication", "ecommerce", "events", "food",
             "gaming", "interactive", "marketing", "mockups", "photography",
-            "productivity", "relationships", "screenshots", "social", "streaming",
+            "productivity", "relationships", "screenshots", "social", "streaming", "files",
             "travel", "webdesign",
         )
         val localDocumentIds = setOf(
