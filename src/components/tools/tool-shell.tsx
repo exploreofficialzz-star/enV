@@ -190,7 +190,7 @@ export function ToolShell({
         }
         return;
       }
-      grantAdFallbackExecution(tool.id);
+      if (tool.engine.type === "calculator") grantAdFallbackExecution(tool.id);
       authorizedExecutionRef.current = true;
       setPaidExecutionInFlight(true);
       setFallbackPromptOpen(false);
