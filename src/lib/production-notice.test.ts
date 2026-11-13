@@ -10,7 +10,7 @@ const releasedCategories = [
   "webdesign",
 ] as const;
 
-test("implemented categories are available across platforms", () => {
+test("explicitly available categories stay accessible", () => {
   for (const category of releasedCategories) {
     assert.equal(isToolUnderProduction({ id: `test-${category}`, category }), false, `${category} should be released`);
   }
