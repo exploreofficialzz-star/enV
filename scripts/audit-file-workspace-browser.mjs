@@ -84,19 +84,21 @@ function file(name, content) {
 }
 
 async function clickAndDownload(buttonName) {
-  const pendingDownload = page.waitForEvent("download", { timeout: 20_000 });
+  const pendingDownload = page.waitForEvent("download", { timeout: 20_000 })
+    .then((download) => ({ download }))
+    .catch((cause) => ({ cause }));
   await page.getByRole("button", { name: buttonName }).click();
-  try {
-    return await pendingDownload;
-  } catch (cause) {
+  const result = await pendingDownload;
+  if (result.cause) {
     const error = (await page.getByRole("alert").allTextContents()).join(" | ");
     const status = (await page.getByRole("status").allTextContents()).join(" | ");
     throw new Error(
       "No download followed " + buttonName + ". Error: " + (error || "none")
       + ". Status: " + (status || "none")
-      + ". Cause: " + String(cause),
+      + ". Cause: " + String(result.cause),
     );
   }
+  return result.download;
 }
 
 try {
@@ -105,6 +107,7 @@ try {
     file("report.txt", "organizer report"),
     file("photo.png", "image placeholder bytes"),
   ]);
+  await page.getByText("2 selected", { exact: false }).waitFor({ timeout: 10_000 });
   const organizerDownload = await clickAndDownload("Organize copies into ZIP");
   const organizerFiles = await inspectZip(await readDownload(organizerDownload));
   assert.equal(organizerFiles.get("Documents/report.txt"), "organizer report");
@@ -112,6 +115,7 @@ try {
 
   await openTool("batch-file-renamer", "Batch File Renamer");
   await page.locator('input[type="file"]').first().setInputFiles([file("alpha.txt", "alpha"), file("beta.txt", "beta")]);
+  await page.getByText("2 selected", { exact: false }).waitFor({ timeout: 10_000 });
   await page.getByLabel("Prefix").fill("copy-");
   await page.getByLabel("Suffix").fill("-ready");
   const renameDownload = await clickAndDownload("Export renamed ZIP");
