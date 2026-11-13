@@ -59,3 +59,18 @@ test("local document tools reject oversized selections before reading file bytes
     /200 MB local processing limit/,
   );
 });
+
+
+test("local document tools reject aggregate selections above the input cap before reading bytes", async () => {
+  const first = new File([], "first.pdf");
+  const second = new File([], "second.pdf");
+  Object.defineProperty(first, "size", { value: 110 * 1024 * 1024 });
+  Object.defineProperty(second, "size", { value: 110 * 1024 * 1024 });
+  first.arrayBuffer = second.arrayBuffer = async () => {
+    throw new Error("Oversized document bytes should never be read.");
+  };
+  await assert.rejects(
+    () => runLocalDocument("pdf-merger", [first, second]),
+    /200 MB local processing limit/,
+  );
+});
