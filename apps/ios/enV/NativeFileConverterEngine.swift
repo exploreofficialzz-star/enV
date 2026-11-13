@@ -214,8 +214,8 @@ enum NativeFileConverterEngine {
         // Office Open XML does not need external entities. Reject DTDs and keep
         // Foundation's XML parser from resolving any external resources.
         guard let xml = String(data: xmlData, encoding: .utf8),
-              !xml.range(of: "<!DOCTYPE", options: .caseInsensitive).map({ _ in true }, default: false),
-              !xml.range(of: "<!ENTITY", options: .caseInsensitive).map({ _ in true }, default: false) else {
+              !xml.contains("<!DOCTYPE"),
+              !xml.contains("<!ENTITY") else {
             throw NativeNativeError.message("The DOCX document body is invalid or uses unsupported XML declarations.")
         }
 
