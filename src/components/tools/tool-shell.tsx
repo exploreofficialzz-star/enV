@@ -69,6 +69,7 @@ export function ToolShell({
     billingEnabled: boolean;
   } | null>(null);
   const [fallbackQuoteLoading, setFallbackQuoteLoading] = useState(false);
+  const [fallbackQuoteStatus, setFallbackQuoteStatus] = useState<"idle" | "loading" | "ready" | "unavailable" | "error">("idle");
   const [fallbackChargeLoading, setFallbackChargeLoading] = useState(false);
   const [fallbackPromptOpen, setFallbackPromptOpen] = useState(false);
   const [paidExecutionInFlight, setPaidExecutionInFlight] = useState(false);
@@ -99,10 +100,12 @@ export function ToolShell({
     if (!requiresTokenFallback || accessUserPending || !authenticatedAccount) {
       setFallbackAccess(null);
       setFallbackQuoteLoading(false);
+      setFallbackQuoteStatus("idle");
       return;
     }
     const controller = new AbortController();
     setFallbackQuoteLoading(true);
+    setFallbackQuoteStatus("loading");
     void fetch(`/api/billing/ad-fallback/access?toolId=${encodeURIComponent(tool.id)}`, {
       credentials: "same-origin",
       cache: "no-store",
@@ -118,6 +121,11 @@ export function ToolShell({
           billingEnabled?: boolean;
         };
       };
+      if (response.status === 404) {
+        setFallbackAccess(null);
+        setFallbackQuoteStatus("unavailable");
+        return;
+      }
       if (!response.ok || !payload.ok || !payload.data ||
           !Number.isSafeInteger(payload.data.unitSubunits) ||
           typeof payload.data.unitTokens !== "number") {
@@ -130,8 +138,12 @@ export function ToolShell({
         availableTokens: payload.data.availableTokens ?? null,
         billingEnabled: payload.data.billingEnabled === true,
       });
+      setFallbackQuoteStatus("ready");
     }).catch(() => {
-      if (!controller.signal.aborted) setFallbackAccess(null);
+      if (!controller.signal.aborted) {
+        setFallbackAccess(null);
+        setFallbackQuoteStatus("error");
+      }
     }).finally(() => {
       if (!controller.signal.aborted) setFallbackQuoteLoading(false);
     });
@@ -528,13 +540,24 @@ export function ToolShell({
                 </>
               ) : (
                 <>
-                  {fallbackAccess?.billingEnabled === true &&
-                  fallbackAccess.billingEnabled === true ? (
-                    <button type="button" disabled={fallbackChargeLoading || fallbackQuoteLoading} onClick={() => void chargeFallbackAndRun()} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-fg px-4 text-sm font-semibold text-bg disabled:opacity-60">
-                      {fallbackChargeLoading ? "…" : `Use ${fallbackAccess.unitTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} enV`}
-                    </button>
-                  ) : null}
-                  <Link to="/wallet" className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface px-4 text-sm font-semibold text-fg hover:bg-surface-2">Buy enV</Link>
+                  {fallbackQuoteLoading || fallbackQuoteStatus === "loading" ? (
+                    <p className="w-full text-center text-sm text-muted">Checking token access…</p>
+                  ) : fallbackQuoteStatus === "unavailable" ? (
+                    <p className="w-full text-center text-sm text-muted">An approved enV price is not available for this tool yet.</p>
+                  ) : fallbackQuoteStatus === "error" ? (
+                    <p className="w-full text-center text-sm text-muted">Token access could not be verified. Please retry the tool.</p>
+                  ) : fallbackAccess?.billingEnabled === true ? (
+                    fallbackAccess.availableSubunits !== null &&
+                    fallbackAccess.availableSubunits >= fallbackAccess.unitSubunits ? (
+                      <button type="button" disabled={fallbackChargeLoading} onClick={() => void chargeFallbackAndRun()} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-fg px-4 text-sm font-semibold text-bg disabled:opacity-60">
+                        {fallbackChargeLoading ? "…" : `Use ${fallbackAccess.unitTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} enV`}
+                      </button>
+                    ) : (
+                      <Link to="/wallet" className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface px-4 text-sm font-semibold text-fg hover:bg-surface-2">Buy enV</Link>
+                    )
+                  ) : (
+                    <p className="w-full text-center text-sm text-muted">enV fallback access is not enabled for this tool yet.</p>
+                  )}
                 </>
               )}
             </div>
