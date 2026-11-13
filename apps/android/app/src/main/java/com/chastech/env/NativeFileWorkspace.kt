@@ -254,7 +254,7 @@ fun NativeFileWorkspaceScreen(toolId: String) {
                     OutlinedButton(onClick = { if (!busy) pickFolder.launch(null) }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("First folder") }
                     OutlinedButton(onClick = { if (!busy) pickSecondFolder.launch(null) }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("Second folder") }
                 }
-                Button(onClick = {
+                NativeExecutionButton(onAuthorized = {
                     val leftUri = folderUri
                     val rightUri = secondFolderUri
                     if (leftUri == null || rightUri == null) { error = "Choose both folders first."; return@Button }
@@ -285,11 +285,11 @@ fun NativeFileWorkspaceScreen(toolId: String) {
                             .onFailure { error = it.message ?: "Folder comparison failed."; status = "" }
                         busy = false
                     }
-                }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Compare folders") }
+                }, enabled = !busy, modifier = Modifier.fillMaxWidth(), text = "Compare folders")
             }
             "folder-size-analyzer" -> {
                 OutlinedButton(onClick = { if (!busy) pickFolder.launch(null) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (folderUri == null) "Choose folder" else "Change folder") }
-                Button(onClick = {
+                NativeExecutionButton(onAuthorized = {
                     val uri = folderUri ?: run { error = "Choose a folder first."; return@Button }
                     scope.launch {
                         busy = true
@@ -315,12 +315,12 @@ fun NativeFileWorkspaceScreen(toolId: String) {
                             .onFailure { error = it.message ?: "Folder analysis failed."; status = "" }
                         busy = false
                     }
-                }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Analyze storage") }
+                }, enabled = !busy, modifier = Modifier.fillMaxWidth(), text = "Analyze storage")
             }
             "file-search" -> {
                 OutlinedButton(onClick = { if (!busy) pickFolder.launch(null) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (folderUri == null) "Choose folder" else "Change folder") }
                 OutlinedTextField(value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Search names or text") }, singleLine = true)
-                Button(onClick = {
+                NativeExecutionButton(onAuthorized = {
                     val uri = folderUri ?: run { error = "Choose a folder first."; return@Button }
                     val needle = query.trim()
                     if (needle.isEmpty()) { error = "Enter a search term."; return@Button }
@@ -348,7 +348,7 @@ fun NativeFileWorkspaceScreen(toolId: String) {
                             .onFailure { error = it.message ?: "File search failed."; status = "" }
                         busy = false
                     }
-                }, enabled = !busy && query.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text("Search folder") }
+                }, enabled = !busy && query.isNotBlank(), modifier = Modifier.fillMaxWidth(), text = "Search folder")
             }
             else -> {
                 OutlinedButton(onClick = { if (!busy) pickFiles.launch(arrayOf("*/*")) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
@@ -356,7 +356,7 @@ fun NativeFileWorkspaceScreen(toolId: String) {
                 }
                 if (selected.isNotEmpty()) Text(selected.size.toString() + " selected", style = MaterialTheme.typography.labelMedium)
                 when (toolId) {
-                    "file-organizer" -> Button(onClick = { if (!busy && selected.isNotEmpty()) pickOrganizerDestination.launch(null) }, enabled = !busy && selected.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { Text("Choose destination and organize copies") }
+                    "file-organizer" -> NativeExecutionButton(text = "Choose destination and organize copies", enabled = !busy && selected.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { if (!busy && selected.isNotEmpty()) pickOrganizerDestination.launch(null) }
                     "batch-file-renamer" -> {
                         OutlinedTextField(value = prefix, onValueChange = { prefix = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Prefix") }, singleLine = true)
                         OutlinedTextField(value = suffix, onValueChange = { suffix = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Suffix") }, singleLine = true)
@@ -369,9 +369,9 @@ fun NativeFileWorkspaceScreen(toolId: String) {
                                 Text(prefix + name.substring(0, dot).replace(find, replacement) + suffix + name.substring(dot), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
                             }
                         }
-                        Button(onClick = { if (!busy && selected.isNotEmpty()) saveRenamedZip.launch("enV-renamed-files.zip") }, enabled = !busy && selected.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { Text("Export renamed copies") }
+                        NativeExecutionButton(text = "Export renamed copies", enabled = !busy && selected.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { if (!busy && selected.isNotEmpty()) saveRenamedZip.launch("enV-renamed-files.zip") }
                     }
-                    "duplicate-file-finder" -> Button(onClick = {
+                    "duplicate-file-finder" -> NativeExecutionButton(onAuthorized = {
                         val sources = selected
                         if (sources.size < 2) { error = "Select at least two files."; return@Button }
                         scope.launch {
@@ -392,7 +392,7 @@ fun NativeFileWorkspaceScreen(toolId: String) {
                                 .onFailure { error = it.message ?: "Duplicate verification failed."; status = "" }
                             busy = false
                         }
-                    }, enabled = !busy && selected.size >= 2, modifier = Modifier.fillMaxWidth()) { Text("Find identical files") }
+                    }, enabled = !busy && selected.size >= 2, modifier = Modifier.fillMaxWidth(), text = "Find identical files")
                 }
             }
         }
