@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { chromium } from "playwright";
 import { BlobReader, TextWriter, ZipReader } from "@zip.js/zip.js";
 
@@ -161,14 +162,14 @@ try {
   await page.getByRole("button", { name: "Choose first folder" }).click();
   await page.getByRole("button", { name: "Choose second folder" }).click();
   await page.getByRole("button", { name: "Compare sets" }).click();
-  await page.getByText("SAME", { exact: true }).waitFor();
-  const comparison = await page.locator("section").innerText();
-  assert.match(comparison, /common\.txt[\s\S]*SAME/);
-  assert.match(comparison, /diff\.txt[\s\S]*CHANGED/);
-  assert.match(comparison, /Old\.txt[\s\S]*REMOVED/);
-  assert.match(comparison, /new\.txt[\s\S]*ADDED/);
-  assert.match(comparison, /case\.txt[\s\S]*REMOVED/);
-  assert.match(comparison, /Case\.txt[\s\S]*ADDED/);
+  await page.getByText("Comparison results", { exact: true }).waitFor();
+  const comparison = (await page.locator("section").textContent()) ?? "";
+  assert.match(comparison, /common\.txt[\s\S]*same/);
+  assert.match(comparison, /diff\.txt[\s\S]*changed/);
+  assert.match(comparison, /Old\.txt[\s\S]*removed/);
+  assert.match(comparison, /new\.txt[\s\S]*added/);
+  assert.match(comparison, /case\.txt[\s\S]*removed/);
+  assert.match(comparison, /Case\.txt[\s\S]*added/);
 
   assert.deepEqual(applicationWrites, [], "File workspace operations do not send file content or writes to application APIs");
   console.log(JSON.stringify({
