@@ -6,11 +6,46 @@ export type LocalDocumentResult = { blob: Blob; name: string; preview?: string }
 const asArrayBuffer = (value: Uint8Array): ArrayBuffer => value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength) as ArrayBuffer;
 const esc = (value: string) => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 
+const MAX_LOCAL_DOCX_INPUT_BYTES = 200 * 1024 * 1024;
+const MAX_LOCAL_DOCX_XML_BYTES = 32 * 1024 * 1024;
+
 export function docxToText(bytes: Uint8Array): string {
-  const files = unzipSync(bytes);
+  if (bytes.byteLength > MAX_LOCAL_DOCX_INPUT_BYTES) {
+    throw new Error("The selected DOCX file exceeds the 200 MB local extraction limit.");
+  }
+  let documentTooLarge = false;
+  const files = unzipSync(bytes, {
+    filter: (entry) => {
+      if (entry.name !== "word/document.xml") return false;
+      if (entry.originalSize > MAX_LOCAL_DOCX_XML_BYTES) {
+        documentTooLarge = true;
+        return false;
+      }
+      return true;
+    },
+  });
+  if (documentTooLarge) {
+    throw new Error("The DOCX document text exceeds the 32 MB local extraction limit.");
+  }
   const document = files["word/document.xml"];
   if (!document) throw new Error("This DOCX file does not contain a Word document body.");
-  return strFromU8(document).replace(/<w:tab\s*\/?>/g, "\t").replace(/<w:br\s*\/?>/g, "\n").replace(/<\/w:p>/g, "\n").replace(/<w:t[^>]*>([\s\S]*?)<\/w:t>/g, "$1").replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/\n{3,}/g, "\n\n").trim() + "\n";
+  const text = strFromU8(document)
+    .replace(/<w:tab\s*\/?>/g, "\t")
+    .replace(/<w:br\s*\/?>/g, "\n")
+    .replace(/<\/w:p>/g, "\n")
+    .replace(/<w:t[^>]*>([\s\S]*?)<\/w:t>/g, "$1")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim() + "\n";
+  if (new TextEncoder().encode(text).byteLength > MAX_LOCAL_DOCX_XML_BYTES) {
+    throw new Error("The extracted DOCX text exceeds the 32 MB local output limit.");
+  }
+  return text;
 }
 
 export function textToDocx(text: string): Uint8Array {
