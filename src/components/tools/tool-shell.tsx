@@ -63,9 +63,6 @@ export function ToolShell({
   const [adDelivery, setAdDelivery] = useState<AdsterraDeliveryState>("blocked");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isCssFullscreen, setIsCssFullscreen] = useState(false);
-  const requiresTokenFallback = adsterraQualified && (adDelivery !== "filled" || isFullscreen);
-  const authenticatedAccount = Boolean(accessUser && !accessUser.isDevFallback && !accessUserPending);
-  const showAdFallbackGate = requiresTokenFallback && fallbackPromptOpen && !paidExecutionInFlight;
   const [fallbackAccess, setFallbackAccess] = useState<{
     unitSubunits: number;
     unitTokens: number;
@@ -84,6 +81,9 @@ export function ToolShell({
     setAdDelivery((current) => current === "filled" ? current : state);
     if (state === "filled") setFallbackPromptOpen(false);
   }, []);
+  const requiresTokenFallback = adsterraQualified && (adDelivery !== "filled" || isFullscreen);
+  const authenticatedAccount = Boolean(accessUser && !accessUser.isDevFallback && !accessUserPending);
+  const showAdFallbackGate = requiresTokenFallback && fallbackPromptOpen && !paidExecutionInFlight;
   const toggleFavorite = usePrefs((s) => s.toggleFavorite);
   const favorites = usePrefs((s) => s.favorites);
   const prefsHydrated = usePrefs((s) => s.hydrated);
