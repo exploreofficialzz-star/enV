@@ -20,9 +20,7 @@ appreciation-invitation-generator
 appreciation-memory-page
 appreciation-page-generator
 appreciation-quiz-generator
-appreciation-reveal-page
 appreciation-surprise-page
-birthday-countdown
 birthday-interactive-card
 birthday-invitation-generator
 birthday-memory-page
@@ -92,5 +90,4 @@ valentine-invitation-generator
 valentine-memory-page
 valentine-page-generator
 valentine-quiz-generator
-valentine-reveal-page
 valentine-surprise-page
