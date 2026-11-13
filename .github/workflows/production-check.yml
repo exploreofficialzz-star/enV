@@ -122,6 +122,9 @@ jobs:
             npx playwright install --with-deps chromium
           fi
 
+      - name: Verify bounded local DOCX extraction
+        run: node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/documents/local-document.test.ts
+
       - name: Verify Zip any file compression and extraction in the browser
         run: npm run audit:zip-any-file:browser
 
