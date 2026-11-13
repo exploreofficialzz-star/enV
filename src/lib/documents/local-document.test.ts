@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { strToU8, zipSync } from "fflate";
+import { PDFDocument } from "pdf-lib";
 import { docxToText, runLocalDocument } from "./local-document.ts";
 
 function makeDocx(extraFiles: Record<string, Uint8Array> = {}) {
@@ -72,5 +73,16 @@ test("local document tools reject aggregate selections above the input cap befor
   await assert.rejects(
     () => runLocalDocument("pdf-merger", [first, second]),
     /200 MB local processing limit/,
+  );
+});
+
+
+test("PDF merger rejects the combined page count above the local processing limit", async () => {
+  const document = await PDFDocument.create();
+  for (let index = 0; index < 501; index += 1) document.addPage();
+  const file = new File([await document.save()], "many-pages.pdf", { type: "application/pdf" });
+  await assert.rejects(
+    () => runLocalDocument("pdf-merger", [file]),
+    /500-page local processing limit/,
   );
 });
