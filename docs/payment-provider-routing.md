@@ -17,7 +17,7 @@ The enV reference price is fixed globally at **100 enV tokens = USD $1.00** (one
 
 Paystack and Flutterwave checkout amounts are derived server-side from the selected token pack's USD cents using the latest available USD-base FX snapshot from ExchangeRate-API Open Access. That endpoint updates once per day, is rate-limited, allows commercial currency conversion, and requires visible linked attribution. It is not a live, continuously updated market feed. enV caches a snapshot for up to six hours, rejects upstream data older than 36 hours, and fails closed when it cannot obtain a supported current rate. The source update time, fetch time, quote time and rate are saved in the purchase intent metadata so settlement is verified against the amount originally quoted, not a later rate.
 
-The public funding-options API exposes pack availability and the currency label only; raw FX rates and local checkout amounts remain server-side. The user sees the USD reference value on the pack card. The final payment amount and settlement currency are shown by the provider's hosted checkout. A customer's card issuer may separately apply its own foreign-exchange rules or fees.
+The public funding-options API exposes only customer-facing method availability, detected country/currency and generic guidance; provider identities, raw FX rates and local checkout amounts remain server-side. The user sees the USD reference value on the pack card. The final payment amount and settlement currency are shown by the provider's hosted checkout. A customer's card issuer may separately apply its own foreign-exchange rules or fees.
 
 ## Flutterwave collection coverage
 
