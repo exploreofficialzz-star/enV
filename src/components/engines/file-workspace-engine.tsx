@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { BlobWriter, ZipWriter } from "@zip.js/zip.js";
 import { Archive, Check, Copy, FileSearch, FolderOpen, Search, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -113,6 +113,8 @@ function inputFiles(event: React.ChangeEvent<HTMLInputElement>): File[] {
 }
 
 export function FileWorkspaceEngine({ toolId }: { toolId: string }) {
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
   const [files, setFiles] = useState<File[]>([]);
   const [rightFiles, setRightFiles] = useState<File[]>([]);
   const [query, setQuery] = useState("");
@@ -381,7 +383,7 @@ export function FileWorkspaceEngine({ toolId }: { toolId: string }) {
   const isSearch = toolId === "file-search";
 
   return (
-    <section className="mx-auto w-full max-w-3xl space-y-4">
+    <section data-file-workspace-ready={hydrated ? "true" : "false"} className="mx-auto w-full max-w-3xl space-y-4">
       <header className="flex items-start gap-3 rounded-xl border border-border bg-surface-2/50 p-4">
         <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-surface">
           {isOrganizer ? <FolderOpen className="size-5" /> : isDuplicates ? <ShieldCheck className="size-5" /> : isSearch ? <Search className="size-5" /> : isCompare ? <FileSearch className="size-5" /> : <Archive className="size-5" />}
