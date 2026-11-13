@@ -39,9 +39,6 @@ type FundingMethods = Record<CustomerPaymentMethod, boolean>;
 type FundingOptionsState = {
   status: "loading" | "ready" | "unavailable";
   methods: FundingMethods;
-  countryCode?: string | null;
-  currency?: string | null;
-  message?: string;
 };
 type RewardsData = {
   referralCode: string; videoSignature: string; referralCount: number; pendingReferrals: number; qualifiedReferrals: number;
@@ -99,14 +96,6 @@ function tokenAmount(subunits: number): string {
 
 function tokenValueAmount(tokens: number): string {
   return "$" + (tokens * 0.01).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
-}
-
-function countryDisplayName(countryCode: string): string {
-  try {
-    return new Intl.DisplayNames(undefined, { type: "region" }).of(countryCode) ?? countryCode;
-  } catch {
-    return countryCode;
-  }
 }
 
 function tokenReferenceValue(tokens: number): string {
@@ -194,6 +183,7 @@ function Account() {
   const [customAmountUsd, setCustomAmountUsd] = useState("10");
   const [fundingBusy, setFundingBusy] = useState(false);
   const [showFundingOptions, setShowFundingOptions] = useState(false);
+  const [fundingOptionsReloadKey, setFundingOptionsReloadKey] = useState(0);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<CustomerPaymentMethod>("card");
   const [fundingOptionsState, setFundingOptionsState] = useState<FundingOptionsState>({ status: "loading", methods: { card: false, local: false, more: false } });
   const [fundingFeedback, setFundingFeedback] = useState<{ kind: "success" | "error" | "info"; message: string } | null>(null);
@@ -222,22 +212,20 @@ function Account() {
         const availableMethods: FundingMethods = {
           card: methods.card, local: methods.local, more: methods.more,
         };
-        setFundingOptionsState({ status: "ready", methods: availableMethods,
-          countryCode: payload.data?.countryCode ?? null, currency: payload.data?.currency ?? null });
+        setFundingOptionsState({ status: "ready", methods: availableMethods });
         setSelectedPaymentMethod((current) => availableMethods[current]
           ? current
           : availableMethods.card ? "card" : availableMethods.local ? "local" : "more");
       })
-      .catch((error: unknown) => {
+      .catch(() => {
         if (controller.signal.aborted) return;
         setFundingOptionsState({
           status: "unavailable",
           methods: { card: false, local: false, more: false },
-          message: "Payment options are temporarily unavailable. Please try again.",
         });
       });
     return () => controller.abort();
-  }, [showFundingOptions]);
+  }, [showFundingOptions, fundingOptionsReloadKey]);
 
   useEffect(() => {
     if (!showFundingOptions) return;
@@ -479,11 +467,11 @@ function Account() {
     if (fundingBusy) return;
     const amountUsdCents = parseUsdAmountToCents(customAmountUsd);
     if (amountUsdCents === null) {
-      setFundingFeedback({ kind: "error", message: "Enter at least US$1.00. Amounts can have up to two decimal places." });
+      setFundingFeedback({ kind: "error", message: "Enter at least $1.00." });
       return;
     }
     if (fundingOptionsState.status !== "ready" || !fundingOptionsState.methods[method]) {
-      setFundingFeedback({ kind: "error", message: "This payment method is not available for your detected country yet. No payment was taken." });
+      setFundingFeedback({ kind: "error", message: "Choose an available payment method." });
       return;
     }
 
@@ -502,7 +490,7 @@ function Account() {
       const payload = await response.json().catch(() => null) as {
         ok?: boolean;
         data?: { authorizationUrl?: string; paymentMethod?: string };
-        message?: string;
+        error?: string;
       } | null;
       let checkout: URL | null = null;
       try { if (payload?.data?.authorizationUrl) checkout = new URL(payload.data.authorizationUrl); } catch { checkout = null; }
@@ -512,17 +500,19 @@ function Account() {
           : checkout.hostname === "checkout.paystack.com" || checkout.hostname === "checkout.flutterwave.com"
       );
       if (!response.ok || !payload?.ok || payload.data?.paymentMethod !== method || !checkout || !allowedCheckoutHost) {
-        throw new Error(payload?.message ?? "Secure checkout could not be opened. No tokens were added.");
+        const code = payload?.error;
+        throw new Error(code === "AUTH_REQUIRED" ? "SIGN_IN_REQUIRED"
+          : code === "INVALID_PURCHASE" ? "INVALID_AMOUNT" : "CHECKOUT_START_FAILED");
       }
       window.location.assign(checkout.href);
     } catch (error) {
-      const detail = error instanceof Error ? error.message : "";
-      const requiresSetup = /PAYMENTS_NOT_CONFIGURED|CRYPTOMUS_NOT_CONFIGURED|FLUTTERWAVE_NOT_CONFIGURED|BILLING_AUTH_NOT_CONFIGURED|AUTH_REQUIRED|provider approval|checkout is not configured|approved NGN token price|persistent database|billing launch checks|sign in is required|paystack|flutterwave|cryptomus/i.test(detail);
+      const code = error instanceof Error ? error.message : "";
+      // Keep provider, database, and deployment diagnostics in server logs; the checkout UI only shows an actionable status.
       setFundingFeedback({
         kind: "error",
-        message: requiresSetup
-          ? "Secure checkout is unavailable at the moment. Your wallet has not been charged."
-          : detail || "Secure checkout could not be opened. No payment was taken.",
+        message: code === "SIGN_IN_REQUIRED" ? "Sign in to continue."
+          : code === "INVALID_AMOUNT" ? "Enter a valid amount."
+          : "Couldn't start payment. Try again.",
       });
     } finally {
       setFundingBusy(false);
@@ -696,12 +686,11 @@ function Account() {
   const fundingMethodOptions: Array<{
     id: CustomerPaymentMethod;
     title: string;
-    description: string;
     icon: React.ReactNode;
   }> = [
-    { id: "card", title: "Pay with card", description: "Debit or credit cards supported in your country", icon: <CreditCard size={19} aria-hidden="true" /> },
-    { id: "local", title: "Local payments", description: "Local payment methods supported in your country", icon: <Wallet size={19} aria-hidden="true" /> },
-    { id: "more", title: "More", description: "Other payment options available for your country", icon: <Coins size={19} aria-hidden="true" /> },
+    { id: "card", title: "Card", icon: <CreditCard size={19} aria-hidden="true" /> },
+    { id: "local", title: "Local payment", icon: <Wallet size={19} aria-hidden="true" /> },
+    { id: "more", title: "Other", icon: <Coins size={19} aria-hidden="true" /> },
   ];
   const availableFundingMethodOptions = fundingMethodOptions.filter((option) => methodAvailable(option.id));
 
@@ -762,69 +751,22 @@ function Account() {
               role="dialog"
               aria-modal="true"
               aria-labelledby="funding-dialog-title"
-              className="max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-t-3xl border border-border bg-surface p-4 text-fg shadow-2xl sm:rounded-3xl sm:p-6"
+              className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-border bg-surface p-4 text-fg shadow-2xl sm:rounded-3xl sm:p-5"
             >
-              <div className="flex items-start gap-3">
-                <div className="min-w-0 flex-1">
-                  <h2 id="funding-dialog-title" className="text-lg font-semibold sm:text-xl">Add funds</h2>
-                  <p className="mt-1 text-sm leading-5 text-muted">Choose a payment method and enter an amount.</p>
-                  {fundingOptionsState.status === "ready" && fundingOptionsState.countryCode && fundingOptionsState.currency ? (
-                    <p className="mt-1 text-[11px] text-muted">
-                      Options for {countryDisplayName(fundingOptionsState.countryCode)}
-                      {" · "}{fundingOptionsState.currency}
-                    </p>
-                  ) : null}
-                </div>
+              <div className="flex items-center gap-3">
+                <h2 id="funding-dialog-title" className="min-w-0 flex-1 text-lg font-semibold">Add funds</h2>
                 <button
                   type="button"
                   aria-label="Close payment options"
                   onClick={() => { if (!fundingBusy) setShowFundingOptions(false); }}
                   disabled={fundingBusy}
-                  className="inline-flex size-10 shrink-0 items-center justify-center rounded-full border border-border text-muted hover:bg-surface-2 disabled:opacity-50"
+                  className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-2 disabled:opacity-50"
                 >
                   <X size={18} aria-hidden="true"/>
                 </button>
               </div>
 
-              {fundingOptionsState.status === "loading" ? (
-                <p className="mt-5 rounded-xl border border-border bg-surface-2 p-3 text-sm text-muted" role="status">Checking payment methods for your country…</p>
-              ) : null}
-              {fundingOptionsState.status === "unavailable" ? (
-                <p className="mt-4 rounded-xl border border-rose-500/30 bg-rose-500/5 p-3 text-sm leading-5 text-fg" role="status">{fundingOptionsState.message}</p>
-              ) : null}
-
               <div className="mt-4 space-y-2">
-                <h3 className="text-sm font-semibold">How would you like to pay?</h3>
-                {availableFundingMethodOptions.length > 0 ? (
-                  <div className="grid gap-2">
-                    {availableFundingMethodOptions.map((option) => {
-                      const selected = selectedPaymentMethod === option.id;
-                      return (
-                        <button
-                          key={option.id}
-                          type="button"
-                          aria-pressed={selected}
-                          onClick={() => setSelectedPaymentMethod(option.id)}
-                          className={"flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition " +
-                            (selected ? "border-accent bg-accent/5" : "border-border bg-surface hover:bg-surface-2")}
-                        >
-                          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-fg">{option.icon}</span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block text-sm font-semibold">{option.title}</span>
-                            <span className="mt-1 block text-xs leading-5 text-muted">{option.description}</span>
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : fundingOptionsState.status === "ready" ? (
-                  <p className="rounded-xl border border-border bg-surface-2 p-3 text-sm leading-5 text-muted" role="status">
-                    Payment methods are not available for this country right now. No payment has been taken.
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="mt-5 space-y-3">
                 <label htmlFor="wallet-custom-amount" className="block text-sm font-semibold">Amount (USD)</label>
                 <div className="flex min-h-12 items-center rounded-xl border border-border bg-surface px-3 focus-within:border-accent">
                   <span className="mr-2 text-base font-semibold text-muted">$</span>
@@ -837,12 +779,10 @@ function Account() {
                     max="90000000"
                     value={customAmountUsd}
                     onChange={(event) => setCustomAmountUsd(event.target.value)}
-                    aria-describedby="wallet-amount-help"
                     className="min-w-0 flex-1 bg-transparent py-3 text-base font-semibold text-fg outline-none"
                     placeholder="10.00"
                   />
                 </div>
-                <p id="wallet-amount-help" className="text-xs text-muted">Minimum $1.00. You can enter any amount with up to two decimal places.</p>
                 <div className="flex flex-wrap gap-2" aria-label="Suggested amounts">
                   {[10, 50, 100].map((amount) => (
                     <button
@@ -859,22 +799,63 @@ function Account() {
                     </button>
                   ))}
                 </div>
-                <div className="rounded-xl border border-border bg-surface-2 px-4 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs text-muted">Your amount</span>
-                    <span className="text-sm font-semibold tabular-nums text-fg">
-                      {customAmountCents === null
-                        ? "Enter at least $1.00"
-                        : new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(customAmountCents / 100)}
-                    </span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-3 border-t border-border pt-2">
-                    <span className="text-xs text-muted">enV tokens</span>
-                    <span className="text-lg font-semibold tabular-nums text-fg">{customAmountCents === null ? "—" : customTokenAmount.toLocaleString() + " enV"}</span>
-                  </div>
-                  <p className="mt-2 text-[11px] leading-4 text-muted">100 enV = $1.00 reference value. Your final charge is quoted in your local currency after your country is detected. Token reference value is not a cash redemption promise.</p>
+                <div className="flex items-center justify-between gap-3 rounded-xl bg-surface-2 px-3 py-3">
+                  <span className="text-sm text-muted">You’ll receive</span>
+                  <span className="text-base font-semibold tabular-nums text-fg">
+                    {customAmountCents === null ? "—" : customTokenAmount.toLocaleString() + " enV"}
+                  </span>
                 </div>
               </div>
+
+              <div className="mt-5 space-y-2">
+                <h3 className="text-sm font-semibold">Payment method</h3>
+                {fundingOptionsState.status === "loading" ? (
+                  <div className="flex items-center gap-2 rounded-xl border border-border px-3 py-3 text-sm text-muted" role="status">
+                    <RefreshCw size={15} className="animate-spin" aria-hidden="true"/>
+                    Loading…
+                  </div>
+                ) : fundingOptionsState.status === "unavailable" ? (
+                  <div className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-3">
+                    <span className="text-sm text-muted">Payment methods unavailable</span>
+                    <button
+                      type="button"
+                      onClick={() => setFundingOptionsReloadKey(value => value + 1)}
+                      className="text-sm font-semibold text-accent"
+                    >
+                      Try again
+                    </button>
+                  </div>
+                ) : availableFundingMethodOptions.length > 0 ? (
+                  <div className="grid gap-2">
+                    {availableFundingMethodOptions.map((option) => {
+                      const selected = selectedPaymentMethod === option.id;
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          aria-pressed={selected}
+                          onClick={() => setSelectedPaymentMethod(option.id)}
+                          className={"flex min-h-12 w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition " +
+                            (selected ? "border-accent bg-accent/5" : "border-border bg-surface hover:bg-surface-2")}
+                        >
+                          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-surface-2 text-fg">{option.icon}</span>
+                          <span className="min-w-0 flex-1 text-sm font-medium">{option.title}</span>
+                          <span className={"grid size-5 shrink-0 place-items-center rounded-full border " +
+                            (selected ? "border-accent" : "border-border")}>
+                            {selected ? <span className="size-2.5 rounded-full bg-accent"/> : null}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="rounded-xl border border-border px-3 py-3 text-sm text-muted" role="status">No payment methods available.</p>
+                )}
+              </div>
+
+              {fundingFeedback?.kind === "error" ? (
+                <p className="mt-3 text-sm text-rose-600" role="status" aria-live="polite">{fundingFeedback.message}</p>
+              ) : null}
 
               <button
                 type="button"
@@ -883,11 +864,9 @@ function Account() {
                   !methodAvailable(selectedPaymentMethod) || customAmountCents === null}
                 className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#3df1c2] px-4 py-3 text-sm font-semibold text-[#052a2a] transition hover:bg-[#74f9d7] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <CreditCard size={17} aria-hidden="true"/>
-                {fundingBusy ? "Opening secure checkout…" : "Continue"}
+                {fundingBusy ? "Opening…" : "Continue"}
                 {!fundingBusy ? <ArrowUpRight size={15} aria-hidden="true"/> : null}
               </button>
-              <p className="mt-3 text-center text-[11px] leading-4 text-muted">Payments are processed securely. enV adds tokens only after server-side payment verification.</p>
             </section>
           </div>
         ) : null}
@@ -941,7 +920,7 @@ function Account() {
           </article>
         </section>
 
-        {fundingFeedback ? <p className={`rounded-xl border p-3 text-sm leading-5 ${fundingFeedback.kind === "success" ? "border-emerald-500/30 bg-emerald-500/5 text-fg" : fundingFeedback.kind === "error" ? "border-rose-500/30 bg-rose-500/5 text-fg" : "border-border bg-surface-2 text-muted"}`} role="status" aria-live="polite">{fundingFeedback.message}</p> : null}
+        {fundingFeedback && !(showFundingOptions && fundingFeedback.kind === "error") ? <p className={`rounded-xl border p-3 text-sm leading-5 ${fundingFeedback.kind === "success" ? "border-emerald-500/30 bg-emerald-500/5 text-fg" : fundingFeedback.kind === "error" ? "border-rose-500/30 bg-rose-500/5 text-fg" : "border-border bg-surface-2 text-muted"}`} role="status" aria-live="polite">{fundingFeedback.message}</p> : null}
 
         <section className="mt-3 rounded-[20px] border border-border bg-surface p-3 shadow-sm sm:p-4" aria-labelledby="recent-transactions-title">
           <div className="flex items-center justify-between gap-3">
