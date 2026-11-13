@@ -112,6 +112,24 @@ test("Adsterra includes active ordinary tools across categories without changing
     category: "accessibility",
     engine: { type: "custom", id: "contrast-checker" },
   });
+  const fileOrganizerTool = eligibleTool({
+    id: "file-organizer",
+    name: "File Organizer",
+    category: "files",
+    subcategory: "Organization",
+    keywords: ["organize files", "folders", "file manager"],
+    tags: ["files", "local", "mobile"],
+    engine: { type: "custom", id: "file-organizer" },
+  });
+  const fileToTxtTool = eligibleTool({
+    id: "file-to-txt",
+    name: "File to TXT Converter",
+    category: "files",
+    subcategory: "Text extraction",
+    keywords: ["file to txt", "extract text", "docx to txt"],
+    tags: ["files", "text", "local"],
+    engine: { type: "file-converter", op: "file-to-txt" },
+  });
   const backendTool = eligibleTool({
     id: "video-metadata-inspector",
     name: "Video Metadata Inspector",
@@ -126,6 +144,8 @@ test("Adsterra includes active ordinary tools across categories without changing
   assert.equal(isAdsterraQualifiedTool(businessTool), true);
   assert.equal(isAdsterraQualifiedTool(developerTool), true);
   assert.equal(isAdsterraQualifiedTool(accessibilityTool), true);
+  assert.equal(isAdsterraQualifiedTool(fileOrganizerTool), true);
+  assert.equal(isAdsterraQualifiedTool(fileToTxtTool), true);
   assert.equal(isAdsterraQualifiedTool(backendTool), true, "Ads are page placements and must not depend on device-local execution or account state.");
   assert.equal(isHybridAccessToolId(communicationTool.id, goodEnvironment, communicationTool), false,
     "Ad eligibility must not silently enroll a tool in offline-wallet billing.");
