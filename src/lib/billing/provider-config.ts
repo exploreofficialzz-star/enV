@@ -25,6 +25,22 @@ export function isFlutterwavePaymentOptionsConfigured(
   return env.FLUTTERWAVE_PAYMENT_OPTIONS_DASHBOARD_DISABLED === "true";
 }
 
+/**
+ * enV uses Paystack for customers in the configured merchant's own country.
+ * Cross-border customers are routed through their country-specific Flutterwave
+ * Standard profile instead of inheriting the merchant's Nigerian checkout
+ * currency. A missing/invalid country must never be treated as a local match.
+ */
+export function isPaystackLocalCustomer(
+  customerCountryCode: string | null | undefined,
+  env: Record<string, string | undefined>,
+): boolean {
+  const customerCountry = customerCountryCode?.trim().toUpperCase() ?? "";
+  const merchantCountry = env.PAYSTACK_MERCHANT_COUNTRY?.trim().toUpperCase() ?? "";
+  const validCountry = (value: string) => /^[A-Z]{2}$/.test(value) && value !== "XX" && value !== "ZZ";
+  return validCountry(customerCountry) && validCountry(merchantCountry) && customerCountry === merchantCountry;
+}
+
 const PAYSTACK_LOCAL_CHANNELS: Record<string, readonly string[]> = {
   NG: ["bank", "ussd", "bank_transfer"],
   GH: ["mobile_money", "bank_transfer"],

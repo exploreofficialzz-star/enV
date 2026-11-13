@@ -281,6 +281,10 @@ assert.match(paystackProviderConfig, /PAYSTACK_MERCHANT_ACCEPTED_CURRENCIES/);
 assert.match(paystackProviderConfig, /env.PAYSTACK_PROVIDER_APPROVED === "true" && currencyApproved/);
 assert.match(paystackProviderConfig, /FLUTTERWAVE_PAYMENT_OPTIONS_DASHBOARD_DISABLED/);
 assert.match(paystackProviderConfig, /PAYSTACK_INTERNATIONAL_ENABLED/);
+assert.match(paystackProviderConfig, /isPaystackLocalCustomer/);
+assert.match(paystackService, /isPaystackLocalCustomer\(countryCode, process\.env\)/,
+  "foreign Add Funds visitors must not inherit the Paystack merchant-country checkout");
+
 for (const country of ["NG", "GH", "KE", "ZA", "MW", "UG", "RW", "TZ", "BJ", "BF", "CI", "GW", "ML", "NE", "SN", "TG", "CM", "TD", "CF", "CG", "GQ", "GA", "ZM", "EG", "GB", "US"]) {
   assert.ok(countryRouting.includes(country + ":"), "country routing must include " + country);
 }
@@ -328,13 +332,20 @@ assert.match(fundingOptionsRoute, /methods: \{/,
 assert.match(fundingOptionsRoute, /card: isCustomerPaymentMethodAvailable/);
 assert.match(fundingOptionsRoute, /local: isCustomerPaymentMethodAvailable/);
 assert.match(fundingOptionsRoute, /more: isCustomerPaymentMethodAvailable/);
+assert.match(fundingOptionsRoute, /message: funding\.message/);
+assert.match(paystackService, /foreign visitor to inherit an NGN\/merchant-country checkout/);
+
 assert.doesNotMatch(fundingOptionsRoute, /label: provider\.label|providers: provider\.packs/,
   "the wallet options API must not return gateway labels or provider pack cards");
 assert.doesNotMatch(walletDashboard, /label: "Paystack"|label: "Flutterwave"|Pay with crypto/,
   "gateway names must not appear as wallet payment choices");
 assert.match(walletDashboard, /id="wallet-custom-amount"/, "wallet must use a custom USD amount input");
 assert.match(walletDashboard, /customAmountCents/, "wallet must validate the entered custom amount");
-assert.match(walletDashboard, /Amount \(USD\)/, "wallet must label the entered amount as USD");
+assert.match(walletDashboard, /Amount \(USD reference\)/, "wallet must label the entered amount as the USD reference input");
+assert.match(walletDashboard, /placeholder="Enter amount"/, "wallet amount field must prompt for a custom amount");
+assert.match(walletDashboard, /Enter any amount from \$1, or choose a suggestion below\./, "the 10/50/100 chips must be presented as optional suggestions");
+assert.match(walletDashboard, /Checkout currency:/, "wallet must show the detected checkout currency");
+assert.match(walletDashboard, /const \[customAmountUsd, setCustomAmountUsd\] = useState\(""\)/, "the amount field must start empty instead of selecting a preset automatically");
 assert.match(walletDashboard, /customTokenAmount/, "wallet must show the matching enV token amount");
 assert.match(walletDashboard, /\[10, 50, 100\]/, "wallet must offer the requested custom amount suggestions");
 assert.doesNotMatch(walletDashboard, /100 enV = \$1\.00 reference value/, "reference-value explanation must stay off the checkout screen");

@@ -1,6 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getPaystackLocalChannels, isFlutterwavePaymentOptionsConfigured, requirePaystackVerificationSecret } from "./provider-config.ts";
+import { getPaystackLocalChannels, isFlutterwavePaymentOptionsConfigured, isPaystackLocalCustomer, requirePaystackVerificationSecret } from "./provider-config.ts";
+
+test("Paystack is offered only to customers in the configured merchant country", () => {
+  const env = { PAYSTACK_MERCHANT_COUNTRY: "NG", PAYSTACK_INTERNATIONAL_ENABLED: "true" };
+  assert.equal(isPaystackLocalCustomer("NG", env), true);
+  assert.equal(isPaystackLocalCustomer("GH", env), false);
+  assert.equal(isPaystackLocalCustomer("US", env), false);
+  assert.equal(isPaystackLocalCustomer(null, env), false);
+  assert.equal(isPaystackLocalCustomer("XX", env), false);
+  assert.equal(isPaystackLocalCustomer("NG", {}), false);
+  assert.equal(isPaystackLocalCustomer(" ng ", { PAYSTACK_MERCHANT_COUNTRY: " ng " }), true);
+});
 
 test("Paystack settlement credentials remain usable with new-checkout switches disabled", () => {
   assert.equal(requirePaystackVerificationSecret({
