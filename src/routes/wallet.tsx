@@ -39,6 +39,9 @@ type FundingMethods = Record<CustomerPaymentMethod, boolean>;
 type FundingOptionsState = {
   status: "loading" | "ready" | "unavailable";
   methods: FundingMethods;
+  countryCode?: string | null;
+  currency?: string | null;
+  message?: string;
 };
 type RewardsData = {
   referralCode: string; videoSignature: string; referralCount: number; pendingReferrals: number; qualifiedReferrals: number;
@@ -180,7 +183,7 @@ function Account() {
   const [nativeSessionsMessage, setNativeSessionsMessage] = useState("");
   const [rewardsState, setRewardsState] = useState<RewardsState>({ status: "loading" });
   const [rewardsReloadKey, setRewardsReloadKey] = useState(0);
-  const [customAmountUsd, setCustomAmountUsd] = useState("10");
+  const [customAmountUsd, setCustomAmountUsd] = useState("");
   const [fundingBusy, setFundingBusy] = useState(false);
   const [showFundingOptions, setShowFundingOptions] = useState(false);
   const [fundingOptionsReloadKey, setFundingOptionsReloadKey] = useState(0);
@@ -200,7 +203,12 @@ function Account() {
       .then(async (response) => {
         const payload = await response.json().catch(() => null) as {
           ok?: boolean;
-          data?: { methods?: Partial<FundingMethods>; countryCode?: string | null; currency?: string | null };
+          data?: {
+            methods?: Partial<FundingMethods>;
+            countryCode?: string | null;
+            currency?: string | null;
+            message?: string;
+          };
           message?: string;
         } | null;
         const methods = payload?.data?.methods;
@@ -212,7 +220,13 @@ function Account() {
         const availableMethods: FundingMethods = {
           card: methods.card, local: methods.local, more: methods.more,
         };
-        setFundingOptionsState({ status: "ready", methods: availableMethods });
+        setFundingOptionsState({
+          status: "ready",
+          methods: availableMethods,
+          countryCode: payload.data?.countryCode ?? null,
+          currency: payload.data?.currency ?? null,
+          message: payload.data?.message ?? payload.message,
+        });
         setSelectedPaymentMethod((current) => availableMethods[current]
           ? current
           : availableMethods.card ? "card" : availableMethods.local ? "local" : "more");
@@ -222,6 +236,7 @@ function Account() {
         setFundingOptionsState({
           status: "unavailable",
           methods: { card: false, local: false, more: false },
+          message: "Payment options could not be loaded. Check your connection and try again.",
         });
       });
     return () => controller.abort();
@@ -767,7 +782,7 @@ function Account() {
               </div>
 
               <div className="mt-4 space-y-2">
-                <label htmlFor="wallet-custom-amount" className="block text-sm font-semibold">Amount (USD)</label>
+                <label htmlFor="wallet-custom-amount" className="block text-sm font-semibold">Amount (USD reference)</label>
                 <div className="flex min-h-12 items-center rounded-xl border border-border bg-surface px-3 focus-within:border-accent">
                   <span className="mr-2 text-base font-semibold text-muted">$</span>
                   <input
@@ -779,12 +794,17 @@ function Account() {
                     max="90000000"
                     value={customAmountUsd}
                     onChange={(event) => setCustomAmountUsd(event.target.value)}
+                    aria-describedby="wallet-custom-amount-help"
                     className="min-w-0 flex-1 bg-transparent py-3 text-base font-semibold text-fg outline-none"
-                    placeholder="10.00"
+                    placeholder="Enter amount"
                   />
                 </div>
-                <div className="flex flex-wrap gap-2" aria-label="Suggested amounts">
-                  {[10, 50, 100].map((amount) => (
+                <div className="space-y-2">
+                  <p id="wallet-custom-amount-help" className="text-xs text-muted">
+                    Enter any amount from $1, or choose a suggestion below.
+                  </p>
+                  <div className="flex flex-wrap gap-2" aria-label="Suggested amounts">
+                    {[10, 50, 100].map((amount) => (
                     <button
                       key={amount}
                       type="button"
@@ -797,8 +817,18 @@ function Account() {
                     >
                       ${amount}
                     </button>
-                  ))}
+                    ))}
+                  </div>
                 </div>
+                {fundingOptionsState.status === "ready" &&
+                  (fundingOptionsState.methods.card || fundingOptionsState.methods.local || fundingOptionsState.methods.more) &&
+                  fundingOptionsState.currency ? (
+                  <p className="text-xs leading-5 text-muted" aria-live="polite">
+                    Checkout currency: <strong className="font-semibold text-fg">{fundingOptionsState.currency}</strong>
+                    {fundingOptionsState.countryCode ? " for detected country " + fundingOptionsState.countryCode : ""}.
+                    Your USD reference amount is converted using the current exchange-rate quote.
+                  </p>
+                ) : null}
                 <div className="flex items-center justify-between gap-3 rounded-xl bg-surface-2 px-3 py-3">
                   <span className="text-sm text-muted">You’ll receive</span>
                   <span className="text-base font-semibold tabular-nums text-fg">
@@ -849,7 +879,9 @@ function Account() {
                     })}
                   </div>
                 ) : (
-                  <p className="rounded-xl border border-border px-3 py-3 text-sm text-muted" role="status">No payment methods available.</p>
+                  <p className="rounded-xl border border-border px-3 py-3 text-sm text-muted" role="status">
+                    {fundingOptionsState.message ?? "No approved payment methods are available for your detected country and currency. No payment was taken."}
+                  </p>
                 )}
               </div>
 
