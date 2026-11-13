@@ -91,8 +91,8 @@ assert.match(adFallbackConsume, /requireOfflineBillingUser\(request\)/, "Token f
 assert.match(adFallbackConsume, /reserveCredits\(/, "Fallback usage must reserve credits in the server ledger.");
 assert.match(adFallbackConsume, /settleReservation\(/, "Fallback usage must settle a confirmed server-side debit.");
 assert.match(adFallbackConsume, /INSUFFICIENT_CREDITS/, "Insufficient balance must receive an explicit paywall response.");
-assert.match(privacy, /verified ad fill for guest execution[\s\S]*?sufficient enV tokens/i, "Privacy copy must accurately describe guest and signed-in ad fallback access.");
-assert.match(cookieConsent, /Ad-supported tools may require sign-in or enV when no ad is delivered/, "Cookie preferences must not promise unrestricted ad-free guest execution.");
+assert.match(privacy, /verified ad fill for guest execution[\s\S]*?approved fixed price exists/i, "Privacy copy must accurately describe guest and signed-in ad fallback access.");
+assert.match(cookieConsent, /Ad-supported tools may require sign-in or an approved enV charge when no ad is delivered/, "Cookie preferences must not promise unrestricted ad-free guest execution.");
 assert.match(shell, /!isFullscreen && import\.meta\.env\.VITE_ADSTERRA_ENABLED !== "true" \? <AdSlot tool=\{tool\} \/>/, "The Google fallback must remain tool-only when Adsterra is disabled.");
 
 assert.match(slot, /whenGooglePrivacyConsentDataReady/, "Web ad requests must wait for the CMP consent-data-ready callback.");
