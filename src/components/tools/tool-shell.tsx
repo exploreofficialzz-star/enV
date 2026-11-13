@@ -218,8 +218,12 @@ export function ToolShell({
       if (startedAt === null || executionFinishedRef.current) return;
       executionFinishedRef.current = true;
       recordToolExecutionResult(tool.id, outcome, Date.now() - startedAt, "shared_result", errorCode);
+      if (requiresTokenFallback) {
+        authorizedExecutionRef.current = false;
+        setPaidExecutionInFlight(false);
+      }
     },
-  }), [tool.id]);
+  }), [tool.id, requiresTokenFallback]);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isCssFullscreen, setIsCssFullscreen] = useState(false);
   const requiresTokenFallback = adsterraQualified && (adDelivery !== "filled" || isFullscreen);
@@ -516,8 +520,7 @@ export function ToolShell({
               ) : (
                 <>
                   {fallbackAccess?.billingEnabled === true &&
-                  fallbackAccess.availableSubunits !== null &&
-                  fallbackAccess.availableSubunits >= fallbackAccess.unitSubunits ? (
+                  fallbackAccess.billingEnabled === true ? (
                     <button type="button" disabled={fallbackChargeLoading || fallbackQuoteLoading} onClick={() => void chargeFallbackAndRun()} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-fg px-4 text-sm font-semibold text-bg disabled:opacity-60">
                       {fallbackChargeLoading ? "…" : `Use ${fallbackAccess.unitTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} enV`}
                     </button>
