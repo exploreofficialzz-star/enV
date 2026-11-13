@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 enum NativeCelebrationEngine {
@@ -56,14 +57,6 @@ enum NativeCelebrationEngine {
         "Ocean": ("#246d91", "#f1f9fc", "#18313d"),
         "Midnight": ("#6579d9", "#10172a", "#f4f5fb")
     ]
-    private static let localFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm"
-        formatter.isLenient = false
-        return formatter
-    }()
 
     static func parse(_ toolID: String) -> Parsed? {
         let normalized = toolID.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -88,8 +81,13 @@ enum NativeCelebrationEngine {
         guard let zone = TimeZone(identifier: timeZoneName.trimmingCharacters(in: .whitespacesAndNewlines)) else {
             throw NativeSimpleError.message("Choose a valid IANA time zone, such as Africa/Lagos or Europe/London.")
         }
-        localFormatter.timeZone = zone
-        guard let local = localFormatter.date(from: value.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = zone
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm"
+        formatter.isLenient = false
+        guard let local = formatter.date(from: value.trimmingCharacters(in: .whitespacesAndNewlines)) else {
             throw NativeSimpleError.message("Enter a valid date and time in YYYY-MM-DDTHH:mm format.")
         }
         var calendar = Calendar(identifier: .gregorian)
