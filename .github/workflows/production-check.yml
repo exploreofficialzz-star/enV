@@ -125,6 +125,9 @@ jobs:
       - name: Verify Zip any file compression and extraction in the browser
         run: npm run audit:zip-any-file:browser
 
+      - name: Verify local File workspace workflows in the browser
+        run: npm run audit:file-workspace:browser
+
       - name: Check Studio in phone, landscape, tablet and desktop layouts
         run: npm run audit:ux-ui-studio:browser
 
