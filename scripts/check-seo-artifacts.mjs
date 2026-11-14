@@ -153,11 +153,8 @@ for (const tool of result.tools) {
   assert.ok(result.inventory.includes(inventoryCell(inventoryFlags)), "Inventory misses registry execution/account flags for " + tool.id);
   const guideCoverage = toolDocumentationCoverage(tool);
   const toolInventorySection = result.inventory.split("## Individual usage guide coverage")[0];
-  const guideInventorySection = result.inventory.split("## Individual usage guide coverage")[1] ?? "";
   const toolInventoryRow = toolInventorySection.split("\n").find((row) => row.startsWith("| " + tool.id + " |"));
-  const guideInventoryRow = guideInventorySection.split("\n").find((row) => row.startsWith("| " + tool.id + " |"));
   assert.ok(toolInventoryRow?.split(" | ").includes(guideCoverage), "Tool inventory row has the wrong guide copy-provenance class for " + tool.id);
-  assert.ok(guideInventoryRow?.split(" | ").includes(guideCoverage), "Guide inventory row has the wrong guide copy-provenance class for " + tool.id);
   const route = "/tools/" + tool.category + "/" + tool.slug;
   const guide = "/blog/tool-" + tool.id;
   assert.ok(result.urls.includes(route), "Missing sitemap entry for " + tool.id);
@@ -174,6 +171,10 @@ for (const article of result.articles) {
   assert.ok(result.llms.includes("https://envtools.store/blog/" + article.slug), "Missing article in llms.txt for " + article.slug);
 }
 for (const tool of result.guideTools) {
+  const guideCoverage = toolDocumentationCoverage(tool);
+  const guideInventorySection = result.inventory.split("## Individual usage guide coverage")[1] ?? "";
+  const guideInventoryRow = guideInventorySection.split("\n").find((row) => row.startsWith("| " + tool.id + " |"));
+  assert.ok(guideInventoryRow?.split(" | ").includes(guideCoverage), "Guide inventory row has the wrong guide copy-provenance class for " + tool.id);
   const guideTitle = toolGuideSeoTitle(tool, result.guideTools);
   const guideDescription = toolSeoDescription(tool);
   assert.ok(guideTitle.length <= 65, "Guide SEO title exceeds 65 characters for " + tool.id);
@@ -229,7 +230,7 @@ assert.match(result.inventory, /\| Tool ID \| Usage guide \| Category \| Catalog
 assert.match(result.inventory, /not proof of the live runtime data path, actual local execution, platform parity or successful behavior/);
 assert.match(result.inventory, /does not claim that a human has completed the source\/runtime audit for every tool/);
 assert.match(result.inventory, /Search-intent terms are seeded from each tool's name/m);
-assert.match(result.inventory, /Guide copy provenance classifies where guide copy originates/);
+assert.match(result.inventory, /Provenance classifies where guide copy originates/);
 assert.match(result.inventory, /does not prove control-level accuracy, source\\/runtime verification or human editorial review/);
 assert.equal(result.sitemap.includes("https://envtools.store/sitemap.xml"), false);
 
