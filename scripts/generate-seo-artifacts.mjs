@@ -223,7 +223,7 @@ export function buildSeoArtifacts() {
   const llms = [
     "# enV",
     "",
-    "> enV is a cross-device digital toolkit with browser-based utilities, calculators, converters, creative and media tools, developer workspaces, and practical productivity tools.",
+    "> enV brings together practical tools for calculations, conversions, creative work, development, media, files, business tasks and everyday planning across Web, Android and iOS.",
     "",
     "## Primary pages",
     "- [Home](" + SITE_ORIGIN + "/): Platform overview and tool discovery.",
