@@ -108,7 +108,7 @@
     "audit:design:browser": "node scripts/audit-design-category-browser.mjs",
     "generate:seo": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/generate-seo-artifacts.mjs && node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/submit-indexnow.mjs",
     "prebuild": "npm run check:file-upload-ui && npm run generate:seo",
-    "check:seo": "node --test scripts/seo-artifacts.test.mjs && node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/generate-seo-artifacts.mjs --check",
+    "check:seo": "node --test scripts/seo-artifacts.test.mjs scripts/indexnow.test.mjs && node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/generate-seo-artifacts.mjs --check",
     "audit:seo:rendered": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/check-seo-rendered-routes.mjs",
     "world-lab:worker": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/world-lab-worker.mjs",
     "world-lab:worker:once": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/world-lab-worker.mjs --once",
