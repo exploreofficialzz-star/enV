@@ -66,12 +66,12 @@ internal object NativeCelebrationEngine {
         "party" to "Good people, a shared moment and a reason to celebrate."
     )
     private val themes = mapOf(
-        "Classic" to Triple("#4b5563", "#f8fafc", "#202833"),
-        "Rose" to Triple("#9f4564", "#fff6f8", "#39232d"),
-        "Gold" to Triple("#946b12", "#fffaf0", "#332a18"),
-        "Garden" to Triple("#35745a", "#f4fbf5", "#1c3328"),
-        "Ocean" to Triple("#246d91", "#f1f9fc", "#18313d"),
-        "Midnight" to Triple("#6579d9", "#10172a", "#f4f5fb")
+        "Classic" to Triple("#F05A42", "#172334", "#F8F4EA"),
+        "Rose" to Triple("#00B48A", "#321724", "#F3D9DE"),
+        "Gold" to Triple("#D9A441", "#141B3A", "#F9F1D8"),
+        "Garden" to Triple("#F04A24", "#1F4A3A", "#FEFCF5"),
+        "Ocean" to Triple("#F02391", "#014342", "#FEFCF5"),
+        "Midnight" to Triple("#B8F01E", "#0B1026", "#BCD4F2")
     )
     private val localFormatter = DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm", Locale.ROOT).withResolverStyle(ResolverStyle.STRICT)
 
@@ -204,7 +204,7 @@ internal object NativeCelebrationEngine {
             reveal.takeIf { it.isNotEmpty() }?.let { "The reveal\n$it" },
             clean(values, "quizQuestion").takeIf { it.isNotEmpty() }?.let { "Quiz\n$it\n${lines(clean(values, "quizOptions")).joinToString("\n")}" },
             if (photoHtml.isNotEmpty()) "Photos included: ${photoHtml.count { it == '<' } / 2}" else null,
-            "", "Created locally with enV. This file does not send invitations or collect guest responses."
+            ""
         )
         val content = when (parsed.experience) {
             "interactive-card" -> "<p class=\"eyebrow\">$occasion</p><h1>${escape(title)}</h1><p class=\"lead\">${escape(message)}</p><button type=\"button\" data-reveal>Open your card</button><div hidden data-content><p>${escape(reveal)}</p></div>"
@@ -227,10 +227,36 @@ internal object NativeCelebrationEngine {
                 (details.takeIf { it.isNotEmpty() }?.let { "<p>" + escape(it) + "</p>" } ?: "") + scheduleHtml
         }
         val theme = themes[clean(values, "theme")] ?: themes.getValue("Classic")
+        val glyph = when (parsed.occasion) { "birthday" -> "✳"; "anniversary" -> "∞"; "graduation" -> "✦"; "valentine" -> "♥"; "christmas" -> "✶"; "new-year" -> "✺"; "farewell" -> "〰"; "achievement" -> "✸"; else -> "✧" }
         val script = "<script>(function(){document.querySelectorAll('[data-reveal]').forEach(function(b){b.addEventListener('click',function(){var c=b.parentElement.querySelector('[data-content]');if(c)c.hidden=!c.hidden;});});var q=document.getElementById('choices');if(q)q.addEventListener('click',function(e){var b=e.target.closest('button[data-correct]');if(b)document.getElementById('feedback').textContent=b.dataset.correct==='true'?'That is right!':'Not quite. Try again.';});var t=document.querySelector('[data-countdown]');if(t){var target=Date.parse(t.dataset.countdown);function tick(){if(!Number.isFinite(target))return;var n=Math.max(0,target-Date.now()),s=Math.floor(n/1000);document.getElementById('days').textContent=Math.floor(s/86400);document.getElementById('hours').textContent=String(Math.floor(s%86400/3600)).padStart(2,'0');document.getElementById('minutes').textContent=String(Math.floor(s%3600/60)).padStart(2,'0');document.getElementById('seconds').textContent=String(s%60).padStart(2,'0');}tick();setInterval(tick,1000);}})();</script>"
-        val css = "*,*:before,*:after{box-sizing:border-box}body{margin:0;padding:24px;overflow-wrap:anywhere;background:${theme.second};color:${theme.third};font:16px/1.6 system-ui,sans-serif}.wrap{max-width:760px;margin:6vh auto;padding:clamp(22px,6vw,56px);border-radius:24px;background:${theme.second};box-shadow:0 18px 55px rgba(20,30,45,.12)}.eyebrow{color:${theme.first};text-transform:uppercase;letter-spacing:.12em;font-size:.8rem;font-weight:700}h1{font-size:clamp(2rem,7vw,3.5rem);line-height:1.08;overflow-wrap:anywhere}button,.button{display:inline-block;background:${theme.first};color:white;border:0;border-radius:999px;padding:12px 20px;font:inherit;text-decoration:none;cursor:pointer}button:focus-visible,a:focus-visible{outline:3px solid ${theme.first};outline-offset:3px}.lead{font-size:1.2rem}dl{display:grid;gap:10px}dl div,.countdown div{padding:12px;background:rgba(120,120,120,.12);border-radius:12px}dt{font-size:.8rem;opacity:.7}dd{margin:0;font-weight:600}.countdown{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.countdown div{text-align:center}.countdown strong{display:block;font-size:2rem}.gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}.gallery img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:12px}@media(max-width:420px){body{padding:10px}.wrap{margin:2vh auto;border-radius:16px}.countdown{gap:4px}}@media(prefers-reduced-motion:no-preference){.wrap{animation:appear .3s ease-out}@keyframes appear{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}}"
-        val html = "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>${escape(title)}</title><style>$css</style></head><body><main class=\"wrap\">$content<p class=\"note\">Made with enV · This page is a local export. Guest responses are not collected.</p></main>$script</body></html>"
-        return Result(text.joinToString("\n"), html, checks(parsed, values))
+        val css = """
+            *,*::before,*::after{box-sizing:border-box}
+            :root{--accent:@ACCENT@;--paper:@PAPER@;--ink:@INK@}
+            body{margin:0;min-height:100vh;padding:clamp(12px,4vw,36px);background:radial-gradient(ellipse at 15% 12%,color-mix(in srgb,var(--accent) 18%,transparent),transparent 45%),var(--paper);color:var(--ink);font:16px/1.6 Georgia,serif;overflow-wrap:anywhere}
+            body:before{position:fixed;inset:0;z-index:-1;content:"";pointer-events:none;opacity:.16;background-image:repeating-linear-gradient(0deg,transparent 0 3px,rgba(255,255,255,.08) 3px 4px),repeating-linear-gradient(90deg,transparent 0 5px,rgba(0,0,0,.04) 5px 6px)}
+            .poster{max-width:980px;min-height:min(720px,92vh);margin:auto;padding:clamp(22px,5vw,56px);display:grid;grid-template-columns:minmax(210px,.9fr) minmax(0,1.1fr);align-items:center;gap:clamp(20px,5vw,58px);overflow:hidden;border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);border-radius:28px;background:linear-gradient(140deg,color-mix(in srgb,var(--paper) 95%,white),var(--paper));box-shadow:0 24px 72px rgba(0,0,0,.2)}
+            .hero-art{position:relative;display:grid;min-height:400px;place-items:center;isolation:isolate}
+            .hero-art:before{position:absolute;inset:8% -18%;content:"";border:1px solid color-mix(in srgb,var(--accent) 55%,transparent);border-radius:48% 52% 60% 40%;transform:rotate(-24deg);box-shadow:0 0 0 18px color-mix(in srgb,var(--accent) 7%,transparent),0 0 0 38px color-mix(in srgb,var(--accent) 4%,transparent)}
+            .art-orbit{position:absolute;width:92%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 32% 24%,rgba(255,255,255,.6),transparent 19%),radial-gradient(circle at 50% 50%,var(--accent),color-mix(in srgb,var(--accent) 70%,black) 62%,transparent 64%);filter:drop-shadow(0 24px 40px rgba(0,0,0,.25))}
+            .art-ribbon{position:absolute;left:-20%;right:-24%;top:40%;height:24%;border-radius:50%;background:linear-gradient(180deg,rgba(255,255,255,.8),var(--accent) 22%,var(--accent) 58%,color-mix(in srgb,var(--accent) 72%,black));box-shadow:0 16px 34px rgba(0,0,0,.24),inset 0 2px 8px rgba(255,255,255,.5);transform:rotate(-32deg)}
+            .art-mark{position:relative;z-index:1;font:400 clamp(8rem,22vw,15rem)/1 Georgia,serif;color:var(--ink);text-shadow:0 5px 0 color-mix(in srgb,var(--accent) 35%,transparent),0 20px 30px rgba(0,0,0,.22);transform:rotate(-9deg)}
+            .hero-copy{position:relative;z-index:2;min-width:0}
+            .eyebrow{margin:0 0 16px;color:var(--accent);font:700 .72rem/1.2 system-ui,sans-serif;letter-spacing:.2em;text-transform:uppercase}
+            h1{margin:0 0 18px;font:500 clamp(2.5rem,6vw,5.4rem)/.98 Georgia,serif;letter-spacing:-.05em;overflow-wrap:anywhere}
+            .lead{font:400 clamp(1rem,1.5vw,1.2rem)/1.65 system-ui,sans-serif;opacity:.88}
+            p{overflow-wrap:anywhere}.poster button,.poster .button{display:inline-flex;min-height:46px;align-items:center;justify-content:center;margin-top:18px;padding:12px 22px;border:0;border-radius:999px;background:var(--accent);color:white;font:700 .9rem system-ui,sans-serif;text-decoration:none;cursor:pointer}
+            .poster button:focus-visible,.poster a:focus-visible{outline:3px solid var(--accent);outline-offset:4px}
+            dl{display:grid;gap:8px;margin:24px 0}dl div{display:grid;grid-template-columns:90px minmax(0,1fr);gap:12px;padding:10px 0;border-bottom:1px solid color-mix(in srgb,var(--ink) 18%,transparent)}dt{color:var(--accent);font:700 .68rem system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase}dd{margin:0;font:500 .94rem/1.5 system-ui,sans-serif}
+            .note{color:var(--accent);font:700 .82rem system-ui,sans-serif}.countdown{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:24px 0}.countdown div{padding:14px 5px;text-align:center;border:1px solid color-mix(in srgb,var(--accent) 38%,transparent);border-radius:14px;background:color-mix(in srgb,var(--accent) 10%,transparent)}.countdown strong{display:block;font:600 clamp(1.5rem,4vw,2.8rem) system-ui,sans-serif;color:var(--accent);font-variant-numeric:tabular-nums}.countdown span{font:700 .65rem system-ui,sans-serif;letter-spacing:.1em;text-transform:uppercase}
+            .gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-top:20px}.gallery figure{margin:0}.gallery img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:14px}.reveal{margin-top:18px;padding:18px 20px;border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);border-radius:16px;background:color-mix(in srgb,var(--accent) 9%,transparent)}.schedule{margin-top:24px}.schedule li{padding:8px 0;border-bottom:1px solid color-mix(in srgb,var(--ink) 16%,transparent)}.brand{grid-column:1/-1;text-align:right;margin-top:20px;font:800 .72rem system-ui,sans-serif;letter-spacing:.24em;text-transform:uppercase;opacity:.72}.hidden{display:none}
+            @media(max-width:680px){body{padding:10px}.poster{display:flex;min-height:0;flex-direction:column;align-items:stretch;gap:12px;padding:22px;border-radius:20px}.hero-art{width:100%;min-height:clamp(160px,40vw,240px);height:clamp(160px,40vw,240px)}.art-orbit{width:70%}.art-mark{font-size:clamp(7rem,30vw,11rem)}h1{font-size:clamp(2.5rem,12vw,4.2rem)}}
+            @media(max-width:390px){.countdown{gap:4px}.countdown div{padding:10px 2px}dl div{grid-template-columns:76px minmax(0,1fr)}}
+            @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+        """.trimIndent()
+            .replace("@ACCENT@", theme.first)
+            .replace("@PAPER@", theme.second)
+            .replace("@INK@", theme.third)
+        val html = "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\"><meta name=\"color-scheme\" content=\"light dark\"><title>${escape(title)}</title><style>$css</style></head><body><main class=\"poster\"><div class=\"hero-art\" aria-hidden=\"true\"><span class=\"art-orbit\"></span><span class=\"art-ribbon\"></span><span class=\"art-mark\">$glyph</span></div><section class=\"hero-copy\">$content</section><footer class=\"brand\">enV</footer></main>$script</body></html>"        return Result(text.joinToString("\n"), html, checks(parsed, values))
     }
 }
 
@@ -286,7 +312,6 @@ internal fun NativeCelebrationToolForm(toolId: String) {
     val countdown = if (parsed.experience == "countdown") NativeCelebrationEngine.countdown(values, now) else null
 
     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Create a personal $label experience. Preview and export it on this device.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         @Composable fun field(key: String, title: String, multiline: Boolean = false, maxLines: Int = 4) {
             OutlinedTextField(value = value(key), onValueChange = { set(key, it) }, label = { Text(title) },
                 modifier = Modifier.fillMaxWidth(), minLines = if (multiline) 3 else 1, maxLines = if (multiline) maxLines else 1)
@@ -315,7 +340,7 @@ internal fun NativeCelebrationToolForm(toolId: String) {
         if (memory) {
             field("memories", "Memory notes", true)
             OutlinedButton(onClick = { photoLauncher.launch(arrayOf("image/jpeg", "image/png", "image/webp", "image/avif")) }) { Text("Add photos") }
-            Text(if (value("photosData").isBlank()) "No photos selected" else "${value("photosData").lines().size} photo(s) selected", style = MaterialTheme.typography.bodySmall)
+            Text(if (value("photosData").isBlank()) "No photos" else "${value("photosData").lines().size} selected", style = MaterialTheme.typography.bodySmall)
         }
         if (reveal) field("revealMessage", "Message to reveal", true)
         if (quiz) {
@@ -329,28 +354,12 @@ internal fun NativeCelebrationToolForm(toolId: String) {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(if (countdown.complete) "The celebration has started" else "${countdown.days} days · ${countdown.hours} hours · ${countdown.minutes} minutes · ${countdown.seconds} seconds", style = MaterialTheme.typography.titleMedium)
-                    Text("Time zone: ${value("timezone")}", style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
         if (error.isNotEmpty()) Text(error, color = MaterialTheme.colorScheme.error)
         output?.checks?.takeIf { it.isNotEmpty() }?.let { checks ->
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text("Review before sharing", style = MaterialTheme.typography.titleSmall)
-                    checks.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall) }
-                }
-            }
-        }
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text("Preview", style = MaterialTheme.typography.labelSmall)
-                Text(value("title").ifBlank { "$label celebration" }, style = MaterialTheme.typography.titleLarge)
-                Text(value("message").ifBlank { "Your personal message will appear here." }, style = MaterialTheme.typography.bodyMedium)
-                if (value("honoree").isNotBlank()) Text("For ${value("honoree")}", style = MaterialTheme.typography.bodySmall)
-                if (value("date").isNotBlank()) Text("${value("date")} · ${value("timezone")}", style = MaterialTheme.typography.bodySmall)
-                if (value("location").isNotBlank()) Text(value("location"), style = MaterialTheme.typography.bodySmall)
-            }
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) { checks.forEach { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) } }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = {
@@ -371,6 +380,5 @@ internal fun NativeCelebrationToolForm(toolId: String) {
             }
             Text(it.text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
         }
-        Text("Local export only. enV does not send invitations, host the event or collect guest responses.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
