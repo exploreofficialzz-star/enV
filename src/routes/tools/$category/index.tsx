@@ -4,6 +4,7 @@ import { createFileRoute, notFound } from "@tanstack/react-router";
 import { AppShell } from "@/components/layout/app-shell";
 import { ToolCard } from "@/components/tools/tool-card";
 import { getToolsByCategory } from "@/lib/registry";
+import { groupToolsBySubcategory } from "@/lib/category-tool-groups";
 import { CATEGORY_MAP } from "@/data/categories";
 import { toolIcon } from "@/lib/icons";
 import { DesignCategoryExplorer } from "@/components/tools/design-category-explorer";
@@ -40,6 +41,8 @@ function Category() {
   const developerStudios = category === "developer" ? tools.filter((tool) => tool.tags.includes("developer-studio")) : [];
   const legacyTools = category === "developer" ? tools.filter((tool) => !tool.tags.includes("developer-studio")) : tools;
   const [visibleCount, setVisibleCount] = useState(6);
+  const visibleLegacyTools = legacyTools.slice(0, visibleCount);
+  const groupedLegacyTools = groupToolsBySubcategory(visibleLegacyTools);
   const meta = CATEGORY_MAP[category as CategoryId];
   const Icon = meta ? toolIcon(meta.icon) : Folder;
   useEffect(() => setVisibleCount(6), [category]);
@@ -70,7 +73,22 @@ function Category() {
               <DesignCategoryExplorer tools={tools} />
             ) : (
               <>
-                <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{legacyTools.slice(0, visibleCount).map((tool) => <ToolCard key={tool.id} tool={tool} />)}</div>
+                {groupedLegacyTools ? (
+                  <div className="mt-6 space-y-8">
+                    {groupedLegacyTools.map((group) => (
+                      <section key={group.id} aria-labelledby={category + "-" + group.id}>
+                        <h2 id={category + "-" + group.id} className="mb-3 text-lg font-semibold">{group.label}</h2>
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                          {group.tools.map((tool) => <ToolCard key={tool.id} tool={tool} />)}
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {visibleLegacyTools.map((tool) => <ToolCard key={tool.id} tool={tool} />)}
+                  </div>
+                )}
                 {visibleCount < legacyTools.length ? <div className="mt-4 flex justify-end"><button type="button" onClick={() => setVisibleCount((count) => Math.min(count + 6, legacyTools.length))} className="inline-flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-sm font-semibold text-accent shadow-[var(--shadow-border)] hover:bg-surface-2">See more tools <ArrowRight className="size-4 text-accent" aria-hidden="true" /></button></div> : null}
               </>
             )}
