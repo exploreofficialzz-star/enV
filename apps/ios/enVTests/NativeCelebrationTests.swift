@@ -59,7 +59,7 @@ final class NativeCelebrationTests: XCTestCase {
         let invitation = try NativeCelebrationEngine.build("party-invitation-generator", values: [
             "title": "Party", "honoree": "Alex", "rsvpUrl": "javascript:alert(1)"
         ])
-        XCTAssertFalse(invitation.html.contains("href=\\"javascript:"))
+        XCTAssertFalse(invitation.html.contains("href=\"javascript:"))
         XCTAssertTrue(invitation.checks.contains(where: { $0.contains("http or https") }))
 
         let unanswered = try NativeCelebrationEngine.build("graduation-quiz-generator", values: [
@@ -71,7 +71,7 @@ final class NativeCelebrationTests: XCTestCase {
             "title": "Graduation quiz", "honoree": "Sam",
             "quizQuestion": "Which year?", "quizOptions": "2025\n2026", "quizAnswer": "2026"
         ])
-        XCTAssertTrue(answered.html.contains("data-correct=\\"true\\""))
+        XCTAssertTrue(answered.html.contains("data-correct=\"true\""))
         XCTAssertFalse(answered.checks.contains(where: { $0.contains("correct answer") }))
     }
 
