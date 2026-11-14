@@ -304,7 +304,7 @@ test("every canonical public tool has an individually grounded guide contract", 
     const sections = getToolDocumentation(tool);
     const sectionIds = new Set(sections.map((section) => section.id));
     const whenToUse = sections.find((section) => section.id === "when-to-use");
-    const normalizedDescription = String(tool.description ?? "").replace(/\\s+/g, " ").trim();
+    const normalizedDescription = String(tool.description ?? "").replace(/\s+/g, " ").trim();
     const summary = toolDocumentationSummary(tool);
 
     assert.ok(whenToUse, tool.id + ": public guide must include a when-to-use section");
