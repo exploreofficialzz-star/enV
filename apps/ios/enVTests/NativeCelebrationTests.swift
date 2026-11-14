@@ -81,8 +81,8 @@ final class NativeCelebrationTests: XCTestCase {
             "photosData": [
                 "data:image/png;base64,AAAA",
                 "data:image/svg+xml;base64,PHN2ZyBvbmVycm9yPSJ4Ii8+",
-                "data:image/png;base64,AAAA\\"><svg onload=alert(1)>"
-            ].joined(separator: "\\n")
+                "data:image/png;base64,AAAA\"><svg onload=alert(1)>"
+            ].joined(separator: "\n")
         ])
         XCTAssertEqual(output.html.components(separatedBy: "<figure>").count - 1, 1)
         XCTAssertFalse(output.html.contains("data:image/svg+xml"))
