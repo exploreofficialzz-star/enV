@@ -81,7 +81,10 @@ test("countdown uses the event's time zone and handles past dates", () => {
   assert.deepEqual(celebrationCountdown(input, target + 1000), { complete: true, days: 0, hours: 0, minutes: 0, seconds: 0 });
 });
 
-test("unsupported and unrelated tool IDs fail closed", () => {
+test("uncatalogued combinations and unrelated tool IDs fail closed", () => {
+  for (const id of ["birthday-countdown", "valentine-reveal-page", "appreciation-reveal-page"]) {
+    assert.throws(() => parseCelebrationToolId(id), /not supported/);
+  }
   assert.throws(() => parseCelebrationToolId("wedding-invitation-generator"));
   assert.throws(() => parseCelebrationToolId("birthday-rsvp-page"));
 });
