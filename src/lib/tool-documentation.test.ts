@@ -281,7 +281,8 @@ test("hand-written tool guidance is wrapped with catalogue identity without repe
 });
 
 test("every canonical public tool has an individually grounded guide contract", () => {
-  const toolMap = new Map(getSearchableTools().map((tool) => [tool.id, tool]));
+  const toolMap = new Map<string, ToolMeta>();
+  for (const tool of getSearchableTools()) toolMap.set(tool.id, tool);
   for (const tool of getToolsByCategory("accessibility")) toolMap.set(tool.id, tool);
   const publicTools = canonicalSeoTools([...toolMap.values()].filter(isIndexableTool));
 
@@ -301,8 +302,8 @@ test("every canonical public tool has an individually grounded guide contract", 
 
   for (const tool of publicTools) {
     const sections = getToolDocumentation(tool);
-    const byId = new Map(sections.map((section) => [section.id, section]));
-    const whenToUse = byId.get("when-to-use");
+    const sectionIds = new Set(sections.map((section) => section.id));
+    const whenToUse = sections.find((section) => section.id === "when-to-use");
     const normalizedDescription = String(tool.description ?? "").replace(/\\s+/g, " ").trim();
     const summary = toolDocumentationSummary(tool);
 
@@ -329,7 +330,7 @@ test("every canonical public tool has an individually grounded guide contract", 
     }
 
     for (const sectionId of requiredSections) {
-      assert.ok(byId.has(sectionId), tool.id + ": missing required guide section " + sectionId);
+      assert.ok(sectionIds.has(sectionId), tool.id + ": missing required guide section " + sectionId);
     }
   }
 });
