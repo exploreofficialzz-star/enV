@@ -490,7 +490,7 @@ test("hand-written tool guidance is wrapped with catalogue identity without repe
   }
 });
 
-test("every canonical public tool has an individually grounded guide contract", () => {
+test("every canonical public tool has a complete guide structure tied to its catalogue record", () => {
   const toolMap = new Map<string, ToolMeta>();
   for (const tool of getSearchableTools()) toolMap.set(tool.id, tool);
   for (const tool of getToolsByCategory("accessibility")) toolMap.set(tool.id, tool);
