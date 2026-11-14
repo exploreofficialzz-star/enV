@@ -38,6 +38,11 @@ const EXPERIENCES: CelebrationExperience[] = [
   "page-generator", "interactive-card", "invitation-generator", "countdown",
   "memory-page", "reveal-page", "quiz-generator", "surprise-page",
 ];
+const NOT_CATALOGUED_TOOL_IDS = new Set([
+  "birthday-countdown",
+  "valentine-reveal-page",
+  "appreciation-reveal-page",
+]);
 const OCCASION_LABELS: Record<CelebrationOccasion, string> = {
   birthday: "Birthday", anniversary: "Anniversary", graduation: "Graduation",
   valentine: "Valentine's Day", christmas: "Christmas", "new-year": "New Year",
@@ -77,7 +82,9 @@ export function parseCelebrationToolId(toolId: string): { occasion: CelebrationO
     const prefix = slugify(occasion) + "-";
     if (!normalized.startsWith(prefix)) continue;
     const suffix = normalized.slice(prefix.length) as CelebrationExperience;
-    if (EXPERIENCES.includes(suffix)) return { occasion, experience: suffix };
+    if (EXPERIENCES.includes(suffix) && !NOT_CATALOGUED_TOOL_IDS.has(normalized)) {
+      return { occasion, experience: suffix };
+    }
   }
   throw new Error("This celebration tool is not supported.");
 }
