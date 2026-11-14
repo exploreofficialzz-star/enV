@@ -1,6 +1,8 @@
 import { tools } from "../src/data/catalog.ts";
+import { applyGenericWorkflowPolicy } from "../src/lib/generic-workflow-policy.mjs";
 
-const planned = tools.filter((t) => t.status === "planned");
+const normalizedTools = applyGenericWorkflowPolicy(tools);
+const planned = normalizedTools.filter((t) => t.status === "planned");
 const localCandidates = planned.filter((t) => t.clientSide && !t.requiresBackend && !t.requiresAuth);
 const backendRequired = planned.filter((t) => t.requiresBackend);
 const authRequired = planned.filter((t) => t.requiresAuth);

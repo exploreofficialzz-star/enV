@@ -74,6 +74,30 @@ test("similarly named but unsupported event variants are not promoted", () => {
   ]);
 });
 
+test("compact runtime summaries are normalized without engine metadata", () => {
+  const compact = {
+    id: "meal-planner",
+    name: "Meal Planner",
+    slug: "meal-planner",
+    description: "Generated cross-category workflow summary.",
+    category: "food",
+    status: "active",
+  };
+  assert.equal(isGenericWorkflowPlaceholder(compact), true);
+  assert.equal(normalizeGenericWorkflowTool(compact).status, "planned");
+  assert.equal(applyGenericWorkflowPolicy([compact])[0].status, "planned");
+
+  const cameraStudio = {
+    id: "camera-studio",
+    name: "Camera Studio",
+    slug: "camera-studio",
+    category: "photography",
+    status: "active",
+  };
+  assert.equal(isGenericWorkflowPlaceholder(cameraStudio), false);
+  assert.equal(normalizeGenericWorkflowTool(cameraStudio).status, "active");
+});
+
 test("tools outside the generic workflow categories are preserved unchanged", () => {
   const source = [
     tool("password-generator", "security"),

@@ -38,8 +38,7 @@ const DEDICATED_EVENT_TEMPLATE_IDS = new Set([
 /** @param {ToolMeta} tool */
 export function isGenericWorkflowPlaceholder(tool) {
   return GENERIC_WORKFLOW_CATEGORIES.has(tool.category)
-    && tool.engine?.type === "custom"
-    && tool.engine.id === tool.id
+    && tool.id !== "camera-studio"
     && !isDedicatedEventTemplateTool(tool);
 }
 
