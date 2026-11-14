@@ -19,6 +19,15 @@ const REPORTS = [
   ["docs/seo-tool-inventory.md", "inventory"],
 ];
 
+export function buildIndexNowKeyArtifact(value) {
+  const key = String(value ?? "").trim();
+  if (!key) return null;
+  if (!/^[A-Za-z0-9-]{8,128}$/.test(key)) {
+    throw new Error("INDEXNOW_KEY must contain 8-128 letters, numbers or hyphens.");
+  }
+  return { path: "public/" + key + ".txt", content: key };
+}
+
 function escapeXml(value) {
   return String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;");
 }
@@ -80,7 +89,8 @@ export function buildSitemapArtifacts(inputPaths) {
   return { sitemap: sitemapIndex, files, totalUrls: sortedPaths.length };
 }
 
-export function buildSeoArtifacts() {
+export function buildSeoArtifacts({ indexNowKey = process.env.INDEXNOW_KEY } = {}) {
+  const indexNowKeyFile = buildIndexNowKeyArtifact(indexNowKey);
   const toolMap = new Map(getSearchableTools().map((tool) => [tool.id, tool]));
   for (const tool of getToolsByCategory("accessibility")) toolMap.set(tool.id, tool);
   const eligibleToolRecords = [...toolMap.values()].filter(isPublicTool);
@@ -279,6 +289,7 @@ export function buildSeoArtifacts() {
     guideTools,
     categories,
     articles: BLOG_ARTICLES,
+    indexNowKeyFile,
   };
 }
 
@@ -286,8 +297,10 @@ async function run() {
   const artifacts = buildSeoArtifacts();
   const check = process.argv.includes("--check");
   const mismatches = [];
-  for (const [path, key] of OUTPUTS) {
-    const expected = artifacts[key];
+  const outputs = [...OUTPUTS];
+  if (artifacts.indexNowKeyFile) outputs.push([artifacts.indexNowKeyFile.path, "indexNowKeyFile"]);
+  for (const [path, key] of outputs) {
+    const expected = key === "indexNowKeyFile" ? artifacts.indexNowKeyFile.content : artifacts[key];
     const absolutePath = resolve(process.cwd(), path);
     if (check) {
       let actual = "";
