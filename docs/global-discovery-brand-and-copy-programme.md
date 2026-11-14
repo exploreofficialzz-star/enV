@@ -125,6 +125,7 @@ The most useful comparison is the *actual task flow*, not the headline count of 
 The PR branch audit confirms 43 of 43 catalogue categories have an entry in `CATEGORY_TASK_GUIDANCE`; `scripts/check-support-center.mjs` protects that coverage. The guide fallback now also carries each tool's own refined catalogue task description into its individual guide, and `src/lib/tool-documentation.test.ts` verifies this for every category. This is catalogue-grounded copy coverage, not proof that every active engine's real controls, outputs, errors, privacy path and limits have been manually or browser-verified; that source-level per-tool audit remains required.
 
 For every active, public, canonical tool:
+- Start from the generated `docs/seo-tool-inventory.md`, which now exposes stable IDs, catalogue status, engine operations, client-side/backend/account flags, SEO fields and canonical links for tools and guides. Those registry fields are review leads only; they are not runtime verification.
 - Record tool ID, displayed name, canonical route, category/subcategory, current description, keywords, tags and related tools.
 - Trace the actual route and engine operation; inspect forms, accepted inputs, supported output, controls, errors, limits and actual processing path.
 - Verify client/local, backend, external-provider, AI-assisted, account, network and offline behavior from implementation—not from a marketing label alone.
@@ -222,6 +223,7 @@ A workstream is complete only when its implementation and evidence pass the rele
 - Claims about AI, offline, privacy, processing location, formats and limits match executable behavior.
 
 ### Technical discovery
+- The generated tool inventory includes stable tool IDs, catalogue status, engine operations, execution/account flags and canonical links, while explicitly stating that registry metadata is not runtime proof.
 - `npm run check:seo` passes.
 - `npm run audit:seo:rendered` passes.
 - `npm run build`, typecheck and lint pass.
