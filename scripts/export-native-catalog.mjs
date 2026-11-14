@@ -135,7 +135,7 @@ const inventory = {
   catalogVersion,
   baseCatalogVersion: catalogVersion,
   runtimeExtensionIds,
-  source: "src/data/catalog.ts",
+  source: "src/lib/registry.ts#getAllTools",
   platforms: { android: "Kotlin", ios: "Swift" },
   families: [...familyMap.values()]
     .sort((left, right) => left.family.localeCompare(right.family))
@@ -171,7 +171,7 @@ const inventory = {
     iosImplemented: iosToolIds.size,
   },
 };
-console.log(`Native runtime inventory: v${runtimeInventoryVersion}`);
+console.log(`Shared canonical catalogue: v${catalogVersion}`);
 const inventoryOutput = new URL("../apps/shared/native-engine-inventory.json", import.meta.url);
 writeFileSync(inventoryOutput, `${JSON.stringify(inventory, null, 2)}\n`);
 console.log(
