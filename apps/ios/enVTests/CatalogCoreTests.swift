@@ -59,13 +59,44 @@ final class CatalogCoreTests: XCTestCase {
             Tool(id: "product-generator", name: "Product Generator", slug: "product-generator", description: "Create product records", category: "ecommerce", subcategory: nil, keywords: [], tags: [], icon: "ShoppingCart", popularity: 10, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false, status: "planned", disclaimer: nil, related: [], engine: ToolEngine(type: "custom", id: "product-generator", op: nil)),
             Tool(id: "future-tool", name: "Future Tool", slug: "future-tool", description: "Still planned", category: "marketing", subcategory: nil, keywords: [], tags: [], icon: "Megaphone", popularity: 1, featured: false, clientSide: false, requiresBackend: true, requiresAuth: false, status: "planned", disclaimer: nil, related: [], engine: ToolEngine(type: "custom", id: "future-tool", op: nil))
         ]
-        let native = Catalog(schemaVersion: 1, catalogVersion: "test", counts: CatalogCounts(total: 3, active: 1, planned: 2, categories: 3), categories: [], tools: tools, relatedReferenceTools: nil).nativeFacing()
+        let native = Catalog(schemaVersion: 1, catalogVersion: "test", counts: CatalogCounts(total: 3, active: 2, planned: 1, categories: 3, categoriesWithTools: 3, discoverable: 3, androidImplemented: 2, iosImplemented: 2), categories: [], tools: tools, relatedReferenceTools: nil).nativeFacing()
         XCTAssertEqual(native.tools.first { $0.id == "qr-payload-inspector" }?.name, "QR & Barcode Reader")
         XCTAssertEqual(native.tools.first { $0.id == "qr-payload-inspector" }?.status, "active")
         XCTAssertEqual(native.tools.first { $0.id == "product-generator" }?.status, "active")
         XCTAssertEqual(native.tools.first { $0.id == "future-tool" }?.status, "planned")
+        XCTAssertEqual(native.counts.total, 3)
         XCTAssertEqual(native.counts.active, 2)
         XCTAssertEqual(native.counts.planned, 1)
+        XCTAssertEqual(native.browserActiveToolCount, 2)
+        XCTAssertEqual(native.nativeImplementedToolCount, 2)
+    }
+
+    func testNativeFacingPreservesCanonicalCountsWhenWebOnlyRecordsMoveToReferences() {
+        let webOnly = Tool(
+            id: "webcodecs-video-checker", name: "WebCodecs Video Support", slug: "webcodecs-video-checker",
+            description: "Inspect support", category: "video", subcategory: nil, keywords: [], tags: [],
+            icon: "Video", popularity: 1, featured: false, clientSide: true, requiresBackend: false,
+            requiresAuth: false, status: "active", disclaimer: nil, related: [],
+            engine: ToolEngine(type: "custom", id: "webcodecs-video-checker", op: nil)
+        )
+        let local = Tool(
+            id: "word-counter", name: "Word Counter", slug: "word-counter",
+            description: "Count words", category: "text", subcategory: nil, keywords: [], tags: [],
+            icon: "Type", popularity: 1, featured: false, clientSide: true, requiresBackend: false,
+            requiresAuth: false, status: "active", disclaimer: nil, related: [],
+            engine: ToolEngine(type: "text", id: "word-counter", op: nil)
+        )
+        let source = Catalog(
+            schemaVersion: 1, catalogVersion: "shared",
+            counts: CatalogCounts(total: 2, active: 2, planned: 0, categories: 2, categoriesWithTools: 2, discoverable: 2, androidImplemented: 1, iosImplemented: 1),
+            categories: [], tools: [webOnly, local], relatedReferenceTools: nil
+        )
+        let native = source.nativeFacing()
+        XCTAssertEqual(native.tools.map(\\.id), ["word-counter"])
+        XCTAssertEqual(native.relatedReferenceTools?.map(\\.id), ["webcodecs-video-checker"])
+        XCTAssertEqual(native.counts.total, 2)
+        XCTAssertEqual(native.browserActiveToolCount, 2)
+        XCTAssertEqual(native.nativeImplementedToolCount, 1)
     }
 
     func testSearchIncludesDescriptionKeywordsAndTags() {
