@@ -3,13 +3,15 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { chromium } from "playwright";
 import { fileURLToPath } from "node:url";
+import { parseGeneratedCatalog } from "./catalog-reader.mjs";
 
 const argument = (name, fallback) => process.argv.find((arg) => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const baseUrl = argument("base-url", "http://127.0.0.1:8080").replace(/\/$/, "");
 const reportPath = argument("report", "");
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const catalog = JSON.parse(await fs.readFile(path.resolve(scriptDir, "../apps/shared/catalog.json"), "utf8"));
-const tools = catalog.tools.filter((tool) => tool.category === "celebrations").sort((a, b) => a.id.localeCompare(b.id));
+const catalogSource = await fs.readFile(path.resolve(scriptDir, "../src/data/catalog.ts"), "utf8");
+const catalog = parseGeneratedCatalog(catalogSource);
+const tools = catalog.filter((tool) => tool.category === "celebrations").sort((a, b) => a.id.localeCompare(b.id));
 assert.equal(tools.length, 93, `Expected 93 exact Celebration tools; found ${tools.length}`);
 assert.equal(new Set(tools.map((tool) => tool.id)).size, 93, "Celebration tool IDs must be unique");
 const browser = await chromium.launch({
