@@ -44,7 +44,7 @@ try {
     page.on("pageerror", onPageError);
     try {
       await page.goto(`${baseUrl}/tools/celebrations/${tool.slug}`, { waitUntil: "domcontentloaded" });
-      await page.locator(`html[data-env-tool-hydrated="${tool.id}"]`).waitFor({ state: "attached", timeout: 20000 });
+      await page.locator(`[data-env-tool-id="${tool.id}"]`).waitFor({ state: "attached", timeout: 20000 });
       const title = `QA ${tool.id} & <celebration>`;
       await fillField("Title", title);
       await fillField("Main message", "A safe local message & <friends>");
