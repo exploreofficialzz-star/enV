@@ -32,6 +32,18 @@ test("all 93 existing Celebration catalog IDs resolve to a real experience", () 
   assert.equal(count, 93);
 });
 
+test("page generator includes escaped programme items in its HTML export", () => {
+  const result = buildCelebration({
+    occasion: "birthday", experience: "page-generator", title: "Birthday gathering",
+    schedule: "Welcome\nDinner <after>\nPhotos",
+  });
+  assert.match(result.html, /<h2>Schedule<\/h2><ol>/);
+  assert.match(result.html, /<li>Welcome<\/li>/);
+  assert.match(result.html, /<li>Dinner &lt;after&gt;<\/li>/);
+  assert.match(result.html, /<li>Photos<\/li>/);
+  assert.doesNotMatch(result.html, /<li>Dinner <after>/);
+});
+
 test("local event times are converted using the requested IANA time zone", () => {
   assert.equal(getCelebrationEventInstant("2026-11-05T10:00", "Africa/Lagos").toISOString(), "2026-11-05T09:00:00.000Z");
   assert.throws(() => getCelebrationEventInstant("2026-03-08T02:30", "America/New_York"), /does not exist/);
