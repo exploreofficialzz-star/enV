@@ -1,17 +1,27 @@
 import fs from "node:fs";
 import assert from "node:assert/strict";
-import { tools } from "../src/data/catalog.ts";
+import { getAllTools, getCatalogCounts, getSearchableTools } from "../src/lib/registry.ts";
 
 const shared = JSON.parse(fs.readFileSync(new URL("../apps/shared/catalog.json", import.meta.url), "utf8"));
+const tools = getAllTools();
 const categoryTools = tools.filter((tool) => tool.category === "audio");
 const baseline = JSON.parse(fs.readFileSync(new URL("../docs/audits/enV-audio-studios-baseline-slugs.json", import.meta.url), "utf8"));
 const expectedRuntimeToolCount = tools.length;
+const counts = getCatalogCounts();
 const byId = new Map(tools.map((tool) => [tool.id, tool]));
-assert.equal(byId.size, tools.length, "runtime catalog must have globally unique tool IDs");
-if (!byId.has("song-metadata-analyzer")) byId.set("song-metadata-analyzer", { id: "song-metadata-analyzer", category: "audio", name: "Song Metadata Analyzer", status: "active", engine: { type: "audio", op: "song-metadata-analyzer" } });
-assert.equal(shared.tools.length, expectedRuntimeToolCount, "shared native catalog must match the generated base catalog; platform runtime extensions are registered separately");
-assert.equal(shared.counts.total, expectedRuntimeToolCount, "shared catalog totals must match the generated base catalog");
-assert.equal(shared.counts.categories, shared.categories.length, "shared category count must be consistent");
+assert.equal(byId.size, tools.length, "canonical runtime catalog must have globally unique tool IDs");
+assert.ok(byId.has("song-metadata-analyzer"), "Song Metadata Analyzer must be part of the canonical runtime catalog");
+assert.equal(shared.tools.length, expectedRuntimeToolCount, "shared native catalog must contain every canonical runtime tool exactly once");
+assert.equal(shared.counts.total, counts.total, "shared catalogue total must match the Web registry");
+assert.equal(shared.counts.active, counts.active, "shared active count must match the Web registry");
+assert.equal(shared.counts.planned, counts.planned, "shared planned count must match the Web registry");
+assert.equal(shared.counts.discoverable, getSearchableTools().length, "shared discoverable count must match unique Web discovery entries");
+assert.equal(shared.counts.categories, counts.categories, "shared category count must match the Web registry");
+assert.deepEqual(
+  shared.tools.map((tool) => tool.id).sort(),
+  tools.map((tool) => tool.id).sort(),
+  "shared native catalogue IDs must exactly match canonical Web registry IDs",
+);
 
 const requiredLegacy = [
   "audio-to-wav", "audio-to-wav-server", "audio-to-mp3-server", "audio-to-ogg-server", "audio-to-flac-server",
