@@ -114,7 +114,7 @@ function runtimeRendererCandidates(tool: ToolMeta): string[] {
   if (tool.engine.type === "custom") {
     const byEngineId = CUSTOM_ENGINE_ID_RENDERERS[tool.engine.id ?? ""];
     if (byEngineId) return [byEngineId];
-    if (tool.category === "events") return ["EventTemplateEngine", "PlannedLocalEngine"];
+    if (tool.category === "events") return ["EventTemplateEngine"];
     const byCategory = CUSTOM_CATEGORY_RENDERERS[tool.category];
     return byCategory ? [byCategory] : [];
   }
