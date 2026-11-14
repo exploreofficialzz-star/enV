@@ -2,44 +2,7 @@
 import homeTools from "@/data/home-tools.json";
 import type { SearchTool, ToolMeta, ToolSummary } from "@/types/tool";
 
-const MUSIC_DOWNLOADER_META = {
-  id: "music-downloader",
-  name: "Music Downloader",
-  slug: "music-downloader",
-  description: "Download authorized tracks from supported public song, album and playlist pages or direct audio files, and organize music offline on your device.",
-  category: "audio",
-  icon: "Download",
-  popularity: 10000,
-  featured: true,
-  clientSide: true,
-  status: "active",
-  isNew: true,
-  keywords: ["music", "download", "offline", "online", "album", "playlist", "audio file", "spotify", "apple music", "youtube music", "audiomack", "boomplay", "deezer", "amazon music", "tidal", "soundcloud", "pandora", "mixcloud", "anghami", "qobuz", "napster", "jiosaavn", "iheart radio"],
-  tags: ["music", "download", "album", "playlist", "offline", "online", "audio"],
-  detailShard: "00",
-};
-const ZIP_ARCHIVE_META = {
-  id: "zip-any-file",
-  name: "Zip any file",
-  slug: "zip-any-file",
-  description: "Compress one file or a whole selection into a ZIP/ZIP64 archive, or safely extract an archive. Files stay on this device.",
-  category: "files",
-  subcategory: "Archives & extraction",
-  icon: "Archive",
-  popularity: 1450,
-  featured: true,
-  clientSide: true,
-  status: "active",
-  isNew: true,
-  keywords: ["zip", "zipper", "compress", "compression", "archive", "extract", "unzip", "decompress", "zip64", "large files", "folder", "multiple files"],
-  tags: ["zip", "archive", "compression", "extract", "offline", "local", "files"],
-  detailShard: "00",
-};
-export const CATALOG_COUNTS = {
-  ...homeTools.counts,
-  total: homeTools.counts.total + 2,
-  active: homeTools.counts.active + 2,
-};
+export const CATALOG_COUNTS = homeTools.counts;
 const CATALOG_ROOT = `/catalog-runtime/${homeTools.version}`;
 
 let toolIndex: readonly ToolSummary[] | null = null;
@@ -90,8 +53,9 @@ export function loadToolIndex(): Promise<readonly ToolSummary[]> {
         if (!Array.isArray(data))
           throw new Error("The tool list response was invalid. Retry to load it again.");
         toolIndex = data.slice();
-        if (!toolIndex.some((tool) => tool.id === MUSIC_DOWNLOADER_META.id)) toolIndex.push(MUSIC_DOWNLOADER_META);
-        if (!toolIndex.some((tool) => tool.id === ZIP_ARCHIVE_META.id)) toolIndex.push(ZIP_ARCHIVE_META);
+        if (new Set(toolIndex.map((tool) => tool.id)).size !== toolIndex.length) {
+          throw new Error("The tool list contains duplicate IDs. Reload the catalogue after it is regenerated.");
+        }
         return toolIndex;
       })
       .catch((error: unknown) => {
@@ -114,8 +78,9 @@ export function loadSearchIndex(): Promise<readonly SearchTool[]> {
         if (!Array.isArray(data))
           throw new Error("The search index response was invalid. Retry to search tools.");
         searchIndex = data.slice();
-        if (!searchIndex.some((tool) => tool.id === MUSIC_DOWNLOADER_META.id)) searchIndex.push(MUSIC_DOWNLOADER_META);
-        if (!searchIndex.some((tool) => tool.id === ZIP_ARCHIVE_META.id)) searchIndex.push(ZIP_ARCHIVE_META);
+        if (new Set(searchIndex.map((tool) => tool.id)).size !== searchIndex.length) {
+          throw new Error("The search index contains duplicate IDs. Reload the catalogue after it is regenerated.");
+        }
         return searchIndex;
       })
       .catch((error: unknown) => {
