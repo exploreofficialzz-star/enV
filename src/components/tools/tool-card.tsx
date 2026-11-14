@@ -31,7 +31,7 @@ export function ToolCard({
       <span className="mt-3 text-sm font-semibold tracking-tight text-fg group-hover:text-accent">
         {tool.name}
       </span>
-      <span className="mt-1 line-clamp-2 text-xs leading-5 text-muted">{offlineAwareToolDescription(tool)}</span>
+      {tool.category !== "celebrations" ? <span className="mt-1 line-clamp-2 text-xs leading-5 text-muted">{offlineAwareToolDescription(tool)}</span> : null}
       {underProduction ? (
         <span className="mt-3 inline-flex w-fit rounded-full bg-surface-2 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted">
           Under production
