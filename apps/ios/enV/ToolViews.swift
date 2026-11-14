@@ -6660,11 +6660,11 @@ private enum NativeSimpleError: Error, LocalizedError {
     var errorDescription: String? { if case let .message(text) = self { return text }; return nil }
 }
 
-private struct NativeToolExecutionTrackerKey: EnvironmentKey {
+struct NativeToolExecutionTrackerKey: EnvironmentKey {
     static let defaultValue: NativeToolExecutionTracker? = nil
 }
 
-private extension EnvironmentValues {
+extension EnvironmentValues {
     var nativeToolExecutionTracker: NativeToolExecutionTracker? {
         get { self[NativeToolExecutionTrackerKey.self] }
         set { self[NativeToolExecutionTrackerKey.self] = newValue }
@@ -6672,7 +6672,7 @@ private extension EnvironmentValues {
 }
 
 @MainActor
-private final class NativeToolExecutionTracker {
+final class NativeToolExecutionTracker {
     private let toolID: String
     private var startedAt: Date?
     private var resultRecorded = false
