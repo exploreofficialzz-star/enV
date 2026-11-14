@@ -104,8 +104,6 @@ export async function preloadToolEngine(tool: ToolMeta): Promise<void> {
           pending = import("@/components/engines/gaming-engine");
         } else if (tool.category === "social") {
           pending = import("@/components/engines/social-engine");
-        } else if (["events", "celebrations", "food", "travel", "photography"].includes(tool.category)) {
-          pending = import("@/components/engines/planned-local-engine");
         }
         break;
       case "document": pending = import("@/components/engines/document-engine"); break;
@@ -163,7 +161,6 @@ const ALL_TOOL_ENGINE_MODULES: Array<() => Promise<unknown>> = [
   () => import("@/components/screenshots/screenshot-studio"),
   () => import("@/components/engines/mockups-category-engine"),
   () => import("@/components/engines/social-engine"),
-  () => import("@/components/engines/planned-local-engine"),
   () => import("@/components/engines/transcription-engine"),
   () => import("@/components/engines/image-tools-engine"),
   () => import("@/components/engines/document-tools-engine"),

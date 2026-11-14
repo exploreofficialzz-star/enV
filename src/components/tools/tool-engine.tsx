@@ -49,7 +49,6 @@ const GamingEngine = lazy(() => import("@/components/engines/gaming-engine").the
 const ScreenshotEngine = lazy(() => import("@/components/engines/screenshot-engine").then((m) => ({ default: m.ScreenshotEngine })));
 const MockupsCategoryEngine = lazy(() => import("@/components/engines/mockups-category-engine").then((m) => ({ default: m.MockupsCategoryEngine })));
 const SocialEngine = lazy(() => import("@/components/engines/social-engine").then((m) => ({ default: m.SocialEngine })));
-const PlannedLocalEngine = lazy(() => import("@/components/engines/planned-local-engine").then((m) => ({ default: m.PlannedLocalEngine })));
 const TranscriptionEngine = lazy(() => import("@/components/engines/transcription-engine").then((m) => ({ default: m.TranscriptionEngine })));
 const ImageToolsEngine = lazy(() => import("@/components/engines/image-tools-engine").then((m) => ({ default: m.ImageToolsEngine })));
 const DocumentToolsEngine = lazy(() => import("@/components/engines/document-tools-engine").then((m) => ({ default: m.DocumentToolsEngine })));
@@ -177,7 +176,7 @@ function ToolEngineView({ tool, initialMode, initialAction, initialOp }: ToolEng
       if (tool.category === "interactive") return <InteractiveEngine toolId={tool.id} />;
       if (tool.category === "gaming") return <GamingEngine toolId={tool.id} />;
       if (tool.category === "social") return <SocialEngine toolId={tool.id} />;
-      if (["events","celebrations","food","travel","photography"].includes(tool.category)) return <PlannedLocalEngine toolId={tool.id} />;
+      if (["events","celebrations","food","travel","photography"].includes(tool.category)) return <ComingSoonPanel tool={tool} />;
       return <ComingSoonPanel tool={tool} />;
     case "document":
       return <DocumentEngine op={tool.engine.op} />;

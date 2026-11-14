@@ -93,11 +93,6 @@ const CUSTOM_CATEGORY_RENDERERS: Record<string, string> = {
   interactive: "InteractiveEngine",
   gaming: "GamingEngine",
   social: "SocialEngine",
-  events: "PlannedLocalEngine",
-  celebrations: "PlannedLocalEngine",
-  food: "PlannedLocalEngine",
-  travel: "PlannedLocalEngine",
-  photography: "PlannedLocalEngine",
 };
 
 function runtimeRendererCandidates(tool: ToolMeta): string[] {

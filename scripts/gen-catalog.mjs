@@ -2136,13 +2136,24 @@ for (const tool of tools) {
   else tool.engine = { type: "custom", id: tool.id };
 }
 
-// Event/celebration/food/travel/photography workflows use the real typed
-// workflow engine. It performs calculations, planners, guides, checklists,
-// generators, RSVP/check-in pages and event payload generation from the tool id.
+// Events have a dedicated typed template engine for the exact operations below.
+// Other cross-category entries in Events, Celebrations, Food, Travel and Photography
+// still share a generic placeholder and must not be promoted or indexed as working tools.
+const agendaThemes = ["birthday", "concert", "conference", "dinner", "fundraiser", "graduation", "launch", "party", "sports-event", "webinar", "wedding", "workshop"];
+const scheduleThemes = ["birthday", "concert", "conference", "dinner", "fundraiser", "graduation", "launch", "meeting", "party", "sports-event", "webinar", "wedding", "workshop"];
+const pageThemes = ["birthday", "concert", "conference", "dinner", "fundraiser", "graduation", "launch", "meeting", "party", "sports-event", "webinar", "wedding", "workshop"];
+const eventTemplateToolIds = new Set([
+  ...agendaThemes.map((theme) => `${theme}-agenda-generator`),
+  ...scheduleThemes.map((theme) => `${theme}-schedule-builder`),
+  ...pageThemes.flatMap((theme) => [`${theme}-rsvp-page`, `${theme}-check-in-page`]),
+]);
+const genericWorkflowCategories = new Set(["events", "celebrations", "food", "travel", "photography"]);
 for (const tool of tools) {
-  if (tool.status !== "planned") continue;
-  if (!["events", "celebrations", "food", "travel", "photography"].includes(tool.category)) continue;
-  tool.status = "active";
+  if (!genericWorkflowCategories.has(tool.category)) continue;
+  if (tool.engine?.type !== "custom" || tool.engine.id !== tool.id) continue;
+
+  const hasDedicatedEventTemplate = tool.category === "events" && eventTemplateToolIds.has(tool.id);
+  tool.status = hasDedicatedEventTemplate ? "active" : "planned";
   tool.clientSide = true;
   tool.requiresBackend = false;
   tool.requiresAuth = false;
