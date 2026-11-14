@@ -127,7 +127,8 @@
     "check:native-celebrations": "node scripts/check-native-celebrations.mjs",
     "check:ads": "node --experimental-strip-types --test src/lib/ads/policy.test.ts src/lib/ads/page-units.test.ts src/lib/ads/adsterra.test.ts && node scripts/check-ad-access.mjs",
     "audit:file-workspace:browser": "node scripts/audit-file-workspace-browser.mjs",
-    "check:file-upload-ui": "node scripts/check-file-upload-ui.mjs"
+    "check:file-upload-ui": "node scripts/check-file-upload-ui.mjs",
+    "audit:celebrations:browser": "node scripts/browser-celebrations-audit.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
