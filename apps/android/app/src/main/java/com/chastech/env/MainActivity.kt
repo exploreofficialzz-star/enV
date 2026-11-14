@@ -749,7 +749,7 @@ private fun WebHomeFooter(catalog: Catalog, onInformation: (String) -> Unit, scr
         ) {
             Text("© ${Year.now().value} chAs Technologies LLC · enV", color = footerSubtle,
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 18.sp))
-            if (screenWidth >= 640) Text("${catalog.categories.size} categories · ${catalog.browserActiveToolCount} enV catalogue tools", color = footerSubtle,
+            if (screenWidth >= 640) Text("${catalog.categories.size} categories · ${catalog.counts.total} enV catalogue tools", color = footerSubtle,
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 18.sp))
         }
     }
@@ -759,7 +759,7 @@ private fun WebHomeFooter(catalog: Catalog, onInformation: (String) -> Unit, scr
 private fun BrandFooterIdentity(catalog: Catalog, modifier: Modifier = Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         EnVLogo(Modifier.width(84.dp).height(56.dp))
-        Text("Useful tools. One place. ${catalog.browserActiveToolCount} tools in the shared enV catalogue.",
+        Text("Useful tools. One place. ${catalog.counts.total} tools in the shared enV catalogue.",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 21.sp),
             modifier = Modifier.widthIn(max = 384.dp))
