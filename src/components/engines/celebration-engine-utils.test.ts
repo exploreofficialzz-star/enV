@@ -61,19 +61,20 @@ test("the quiz export has bounded answer choices and reports the selected answer
   assert.doesNotMatch(result.html, /<script>alert/);
 });
 
-test("memory page embeds only supported image data and caps the gallery", () => {
+test("memory page embeds only complete safe image data and caps the gallery", () => {
   const result = buildCelebration({
     occasion: "graduation", experience: "memory-page", title: "The good days",
     photos: [
       "data:image/png;base64,AAAA",
       "data:image/svg+xml;base64,PHN2ZyBvbmVycm9yPSJ4Ii8+",
+      'data:image/png;base64,AAAA"><svg onload=alert(1)>',
       ...Array.from({ length: 9 }, () => "data:image/jpeg;base64,BBBB"),
     ],
   });
   assert.equal((result.html.match(/<figure>/g) ?? []).length, 8);
   assert.doesNotMatch(result.html, /data:image\/svg\+xml/);
+  assert.doesNotMatch(result.html, /<svg onload=/i);
 });
-
 test("countdown uses the event's time zone and handles past dates", () => {
   const input = { occasion: "party", experience: "countdown", date: "2026-11-05T10:00", timezone: "Africa/Lagos" } as const;
   const target = getCelebrationEventInstant(input.date, input.timezone).getTime();
