@@ -41,7 +41,7 @@ test("page generator includes escaped programme items in its HTML export", () =>
   assert.match(result.html, /<li>Welcome<\/li>/);
   assert.match(result.html, /<li>Dinner &lt;after&gt;<\/li>/);
   assert.match(result.html, /<li>Photos<\/li>/);
-  assert.match(result.html, /Hosted by: Sam/);
+  assert.match(result.html, /Hosted by Sam/);
   assert.match(result.html, /Hall &amp; Garden/);
   assert.doesNotMatch(result.html, /<li>Dinner <after>/);
 });
