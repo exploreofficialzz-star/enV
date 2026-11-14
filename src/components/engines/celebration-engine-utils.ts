@@ -281,6 +281,7 @@ export function buildCelebrationHtml(input: CelebrationInput): string {
       '</div><p class="note" data-feedback aria-live="polite">Choose an answer.</p>';
   } else {
     content = '<p class="eyebrow">' + occasion + '</p><h1>' + escapeHtml(title) + '</h1><p class="lead">' + escapeHtml(message) + '</p>' +
+      (host ? '<p>Hosted by: ' + escapeHtml(host) + '</p>' : "") +
       (honoree ? '<p>For <strong>' + escapeHtml(honoree) + '</strong></p>' : "") +
       (date ? '<p><strong>When:</strong> ' + escapeHtml(date) + '</p>' : "") +
       (location ? '<p><strong>Where:</strong> ' + escapeHtml(location) + '</p>' : "") +
