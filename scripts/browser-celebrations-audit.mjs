@@ -26,12 +26,16 @@ page.setDefaultNavigationTimeout(25000);
 const results = [];
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aZ5kAAAAASUVORK5CYII=", "base64");
 
-async function fillField(label, value) {
-  const labelNode = page.locator("label").filter({ hasText: label }).first();
+async function fillField(toolSurface, label, value) {
+  const candidates = toolSurface.locator("label").filter({ hasText: label });
+  const labelNode = candidates.first();
   await labelNode.waitFor({ state: "visible" });
-  const control = labelNode.locator("xpath=..").locator("input, textarea, select").first();
-  assert.equal(await control.count(), 1, `Expected a single control for ${label}`);
+  const field = labelNode.locator("xpath=..");
+  const controls = field.locator("input, textarea, select");
+  assert.equal(await controls.count(), 1, `Expected one control inside the active ${label} field; found ${await controls.count()}`);
+  const control = controls.first();
   await control.fill(value);
+  assert.equal(await control.inputValue(), value, `The ${label} field did not retain the value entered for the active tool.`);
 }
 function preview() {
   return page.frameLocator('iframe[title*="exported page preview"]');
@@ -46,36 +50,37 @@ try {
       await page.goto(`${baseUrl}/tools/celebrations/${tool.slug}`, { waitUntil: "domcontentloaded" });
       await page.locator(`[data-env-tool-id="${tool.id}"]`).waitFor({ state: "attached", timeout: 20000 });
       const title = `QA ${tool.id} & <celebration>`;
-      await fillField("Title", title);
-      await fillField("Main message", "A safe local message & <friends>");
+      const toolSurface = page.locator(`[data-env-tool-id="${tool.id}"]`);
+      await fillField(toolSurface, "Title", title);
+      await fillField(toolSurface, "Main message", "A safe local message & <friends>");
       if (!["interactive-card", "reveal-page", "surprise-page", "quiz-generator", "memory-page"].some((suffix) => tool.id.endsWith(suffix))) {
-        await fillField("Date and time", "2030-01-01T12:00");
-        await fillField("Time zone", "Africa/Lagos");
+        await fillField(toolSurface, "Date and time", "2030-01-01T12:00");
+        await fillField(toolSurface, "Time zone", "Africa/Lagos");
       }
       const experience = ["page-generator", "interactive-card", "invitation-generator", "countdown", "memory-page", "reveal-page", "quiz-generator", "surprise-page"].find((suffix) => tool.id.endsWith("-" + suffix));
       assert.ok(experience, `${tool.id}: unknown Celebration experience`);
       if (tool.id.endsWith("invitation-generator")) {
-        await fillField("RSVP link", "https://example.org/rsvp");
-        await fillField("Reply by", "20 December 2029");
+        await fillField(toolSurface, "RSVP link", "https://example.org/rsvp");
+        await fillField(toolSurface, "Reply by", "20 December 2029");
       }
-      if (tool.id.endsWith("interactive-card")) await fillField("Inside of the card", "A hidden card message.");
-      if (tool.id.endsWith("reveal-page") || tool.id.endsWith("surprise-page")) await fillField("Message to reveal", "A hidden surprise message.");
+      if (tool.id.endsWith("interactive-card")) await fillField(toolSurface, "Inside of the card", "A hidden card message.");
+      if (tool.id.endsWith("reveal-page") || tool.id.endsWith("surprise-page")) await fillField(toolSurface, "Message to reveal", "A hidden surprise message.");
       if (tool.id.endsWith("quiz-generator")) {
-        await fillField("Question", "Which year is the celebration?");
-        await fillField("Answer choices (one per line)", "2028\n2030");
-        await fillField("Correct answer", "2030");
+        await fillField(toolSurface, "Question", "Which year is the celebration?");
+        await fillField(toolSurface, "Answer choices (one per line)", "2028\n2030");
+        await fillField(toolSurface, "Correct answer", "2030");
       }
       if (tool.id.endsWith("memory-page")) {
-        await fillField("Memory notes", "A favourite shared moment.");
+        await fillField(toolSurface, "Memory notes", "A favourite shared moment.");
         await page.locator('input[type="file"]').setInputFiles({ name: "memory.png", mimeType: "image/png", buffer: png });
       }
       if (tool.id.endsWith("page-generator")) {
-        await fillField("Person or group being celebrated", "Alex");
-        await fillField("Host / organiser", "Sam");
-        await fillField("Location / venue", "Hall & Garden");
-        await fillField("Schedule / programme (one item per line)", "Welcome\nCelebration\nPhotos");
+        await fillField(toolSurface, "Person or group being celebrated", "Alex");
+        await fillField(toolSurface, "Host / organiser", "Sam");
+        await fillField(toolSurface, "Location / venue", "Hall & Garden");
+        await fillField(toolSurface, "Schedule / programme (one item per line)", "Welcome\nCelebration\nPhotos");
       }
-      if (tool.id.endsWith("countdown")) await fillField("Location / venue", "Main hall");
+      if (tool.id.endsWith("countdown")) await fillField(toolSurface, "Location / venue", "Main hall");
       const frame = preview();
       await frame.locator("h1").waitFor({ state: "visible" });
       assert.equal(await frame.locator("h1").innerText(), title, `${tool.id}: exported preview title mismatch`);
