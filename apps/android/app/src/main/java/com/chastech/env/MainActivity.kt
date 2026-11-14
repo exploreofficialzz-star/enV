@@ -1302,7 +1302,11 @@ private fun NativeToolInterfaceContent(
     }
     CompositionLocalProvider(LocalNativeToolExecutionTelemetry provides telemetry) {
         when {
-            tool.category == "celebrations" -> NativeCelebrationToolForm(tool.id)
+            tool.category == "celebrations" && runCatching { NativeCelebrationEngine.parse(tool.id) }.isSuccess -> NativeCelebrationToolForm(tool.id)
+            tool.category == "celebrations" -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatusPill("Unavailable")
+                Text("This celebration tool is not supported.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             tool.category == "communication" -> NativeCommunicationToolForm(tool.id)
             backend -> NativeBackendToolForm(tool, true)
             supported -> NativeToolForm(tool, onRelatedTool, startInWorkspace)
