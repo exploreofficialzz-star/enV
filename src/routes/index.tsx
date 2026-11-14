@@ -19,12 +19,12 @@ import type { ToolMeta } from "@/types/tool";
 export const Route = createFileRoute("/")({
   loader: () => loadHomeTrendingTools(),
   head: () => seoPageHead({
-    title: "enV Digital Toolkit by chAs Technologies | Online Tools",
-    description: "enV Digital Toolkit by chAs Technologies LLC brings calculators, converters, developer utilities, media and productivity tools to Web, Android and iOS.",
+    title: "enV | Tools for everyday tasks",
+    description: "Find a tool for the task you are working on. Explore calculators, converters, creative tools, media, developer resources and practical utilities across Web, Android and iOS.",
     path: "/",
     structuredData: pageSchema(
-      "enV Digital Toolkit by chAs Technologies",
-      "A cross-device toolkit of practical browser-based utilities, calculators, converters, developer workspaces, media tools, and productivity tools.",
+      "enV",
+      "Find practical tools for calculations, conversions, creative work, development, media and everyday tasks across Web, Android and iOS.",
       "/",
       "WebPage"
     )
@@ -154,10 +154,10 @@ function Home() {
         </div>
 <MostUsedToolsTray tools={mostUsedTools} />
         <h1 className="mt-6 w-full max-w-3xl self-start text-left text-balance text-2xl font-semibold tracking-tight sm:mt-8 sm:text-4xl">
-          A focused toolkit for
+          Find the right tool for the task.
           <br className="sm:hidden" />
-          <span className="sm:hidden">everyday work.</span>
-          <span className="hidden sm:inline"> everyday work.</span>
+          <span className="sm:hidden"></span>
+          <span className="hidden sm:inline"></span>
         </h1>
       </section>
       <ToolSection title="Trending tools" tools={trendingTools} />
