@@ -1066,7 +1066,7 @@ private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme:
 
 private fun nativeSupported(tool: ToolRecord): Boolean = !NativeCopy.isWebRuntimeOnly(tool.id) && when { tool.category == "communication" -> true; tool.id == "camera-studio" -> true; tool.id == "music-downloader" -> true; NativeBackendEngine.supports(tool) -> false; tool.status == "planned" -> false; NativeAudioEngine.supports(tool) -> true; else -> when (tool.engine.type) {
     "business" -> NativeBusinessEngine.supports(tool)
-    "custom" -> tool.category == "files" || NativeProductivityEngine.supports(tool.id) || NativeAccessibilityEngine.supports(tool.id, tool.category) || NativeEventEngine.supports(tool.id) || NativeEcommerceEngine.supports(tool)
+    "custom" -> tool.category == "files" || tool.category == "celebrations" || NativeProductivityEngine.supports(tool.id) || NativeAccessibilityEngine.supports(tool.id, tool.category) || NativeEventEngine.supports(tool.id) || NativeEcommerceEngine.supports(tool)
     "ai" -> NativeAiEngine.supports(tool)
     "file-converter", "document-backend" -> NativeFileConverterEngine.supports(tool)
     "text" -> NativeTextEngine.operationForTool(tool.id) != null
