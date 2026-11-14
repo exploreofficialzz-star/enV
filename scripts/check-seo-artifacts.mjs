@@ -129,6 +129,17 @@ for (const tool of result.tools) {
   assert.ok(result.inventory.includes(inventoryCell(title)), "Inventory misses SEO title for " + tool.id);
   assert.ok(result.inventory.includes(inventoryCell(description)), "Inventory misses SEO description for " + tool.id);
   assert.ok(result.inventory.includes(inventoryCell(terms.join(", ")) ), "Inventory misses search-intent terms for " + tool.id);
+  assert.ok(result.inventory.includes(inventoryCell(tool.id)), "Inventory misses the stable tool ID for " + tool.id);
+  const inventoryStatus = tool.status === "planned" ? "Planned" : tool.status === "beta" ? "Beta" : "Active";
+  assert.ok(result.inventory.includes(inventoryCell(inventoryStatus)), "Inventory misses catalogue status for " + tool.id);
+  const inventoryEngine = tool.engine.type + " (" + Object.entries(tool.engine).filter(([key]) => key !== "type").map(([key, value]) => key + "=" + String(value)).join(", ") + ")";
+  assert.ok(result.inventory.includes(inventoryCell(inventoryEngine)), "Inventory misses engine operation for " + tool.id);
+  const inventoryFlags = [
+    tool.clientSide ? "client-side flagged" : "not marked client-side",
+    tool.requiresBackend ? "backend required" : "backend not required",
+    tool.requiresAuth ? "sign-in required" : "sign-in not required",
+  ].join("; ");
+  assert.ok(result.inventory.includes(inventoryCell(inventoryFlags)), "Inventory misses registry execution/account flags for " + tool.id);
   const route = "/tools/" + tool.category + "/" + tool.slug;
   const guide = "/blog/tool-" + tool.id;
   assert.ok(result.urls.includes(route), "Missing sitemap entry for " + tool.id);
@@ -190,6 +201,10 @@ assert.equal(largeSitemap.files.length, 3);
 assert.deepEqual(largeSitemap.files.map((file) => file.count), [40_000, 40_000, 1]);
 assert.ok(largeSitemap.files.every((file) => file.content.includes("<urlset")));
 assert.match(result.inventory, /^# enV public tool SEO inventory/m);
+assert.match(result.inventory, /\| Tool ID \| Tool \| Category \| Catalogue status \| Engine operation \| Catalogue execution\/account flags \|/);
+assert.match(result.inventory, /\| Tool ID \| Usage guide \| Category \| Catalogue status \| Engine operation \| Catalogue execution\/account flags \|/);
+assert.match(result.inventory, /not proof of the live runtime data path, actual local execution, platform parity or successful behavior/);
+assert.match(result.inventory, /does not claim that a human has completed the source\/runtime audit for every tool/);
 assert.match(result.inventory, /Search-intent terms are seeded from each tool's name/m);
 assert.equal(result.sitemap.includes("https://envtools.store/sitemap.xml"), false);
 
