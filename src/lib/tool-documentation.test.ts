@@ -6,6 +6,7 @@ import type { ToolMeta } from "@/types/tool";
 import { getSearchableTools, getToolsByCategory } from "@/lib/registry";
 import { canonicalSeoTools, isIndexableTool } from "@/lib/seo-metadata";
 import { getToolDocumentation, toolDocumentationSummary } from "@/lib/tool-documentation";
+import { groupToolsBySubcategory } from "@/lib/category-tool-groups";
 
 const TOOL_ENGINE_SOURCE = readFileSync(
   new URL("../components/tools/tool-engine.tsx", import.meta.url),
@@ -131,6 +132,70 @@ function hasImportedRuntimeRenderer(tool: ToolMeta): boolean {
   );
 }
 
+
+
+test("category workflow groups require repeated catalogue subcategories and preserve all tools", () => {
+  const makeTool = (id: string, subcategory?: string): ToolMeta => ({
+    id,
+    name: id,
+    slug: id,
+    description: "A representative category task for grouping tests.",
+    category: "audio",
+    ...(subcategory ? { subcategory } : {}),
+    keywords: ["audio"],
+    tags: [],
+    icon: "AudioLines",
+    popularity: 0,
+    featured: false,
+    clientSide: true,
+    requiresBackend: false,
+    requiresAuth: false,
+    status: "active",
+    related: [],
+    engine: { type: "audio", op: "convert" },
+  });
+
+  assert.equal(
+    groupToolsBySubcategory([makeTool("plain-a"), makeTool("plain-b")]),
+    null,
+    "A category without subcategory evidence must retain its flat layout.",
+  );
+  assert.equal(
+    groupToolsBySubcategory([
+      makeTool("music-a", "Music"),
+      makeTool("music-b", "Music"),
+      makeTool("plain-a"),
+      makeTool("plain-b"),
+    ]),
+    null,
+    "One repeated subcategory is not enough to introduce workflow sections.",
+  );
+
+  const grouped = groupToolsBySubcategory([
+    makeTool("music-a", "Music"),
+    makeTool("music-b", " music "),
+    makeTool("edit-a", "Editing"),
+    makeTool("edit-b", "Editing"),
+    makeTool("one-off", "Recording"),
+    makeTool("uncategorized"),
+  ]);
+
+  assert.deepEqual(grouped?.map((group) => group.label), [
+    "Music",
+    "Editing",
+    "Other tools",
+  ]);
+  assert.deepEqual(grouped?.map((group) => group.tools.map((tool) => tool.id)), [
+    ["music-a", "music-b"],
+    ["edit-a", "edit-b"],
+    ["one-off", "uncategorized"],
+  ]);
+  assert.equal(
+    grouped?.flatMap((group) => group.tools).length,
+    6,
+    "Grouping must not drop catalogue tools.",
+  );
+});
 
 test("tool-guide fallbacks include a distinct catalogue task statement for every category", () => {
   for (const category of CATEGORIES) {
