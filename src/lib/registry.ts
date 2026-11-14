@@ -309,7 +309,30 @@ const byVirtualId = new Map(virtualStudios.map((tool) => [tool.id, tool] as cons
 // The old audio-analyze-studio URL remains usable, but its shared sandbox is
 // presented once in discovery and related-tool lists.
 const isDiscoverable = (tool: ToolMeta) => tool.id !== "audio-analyze-studio";
-const searchableTools = [...allTools.filter((tool) => tool.category !== "accessibility" && isDiscoverable(tool)), ...virtualStudios];
+
+// Studio entries replace their legacy action records in public discovery. A Map also
+// guarantees that a studio ID which still exists in the source catalogue appears once.
+const searchableTools = [...new Map(
+  [...allTools.filter((tool) => tool.category !== "accessibility" && isDiscoverable(tool)), ...virtualStudios]
+    .map((tool) => [tool.id, tool] as const),
+).values()];
+
+export type PublicCatalogCounts = {
+  total: number;
+  active: number;
+  planned: number;
+  categories: number;
+};
+
+export function getCatalogCounts(): PublicCatalogCounts {
+  const tools = searchableTools;
+  return {
+    total: tools.length,
+    active: tools.filter((tool) => tool.status === "active" || tool.status === "beta").length,
+    planned: tools.filter((tool) => tool.status === "planned").length,
+    categories: new Set(tools.map((tool) => tool.category)).size,
+  };
+}
 
 export function getAllTools(): ToolMeta[] {
   return allTools;
@@ -347,16 +370,10 @@ function alphabeticalKey(value: string): string {
 }
 
 export function getToolsByCategory(category: CategoryId): ToolMeta[] {
-  // Developer tools stay in the full searchable catalog, but category discovery
-  // presents only the thirteen Studio workspaces. Legacy tool URLs remain routable.
-  const items = category === "accessibility"
-    ? accessibilityStudios
-    : category === "developer"
-      ? developerStudios
-      : allTools.filter((t) => t.category === category && isDiscoverable(t));
+  // Category pages show every public tool in that category. Developer workspaces stay
+  // first as guided entry points; the complete individual-tool catalogue follows them.
+  const items = searchableTools.filter((tool) => tool.category === category);
   return items.slice().sort((a, b) => {
-    // Keep the thirteen workspace entry points first. The original long-tail list
-    // follows alphabetically, so every existing catalog URL remains discoverable.
     if (category === "developer") {
       const aStudio = a.tags.includes("developer-studio");
       const bStudio = b.tags.includes("developer-studio");
@@ -404,15 +421,15 @@ export function getRelatedTools(tool: ToolMeta, limit = 6): ToolMeta[] {
 }
 
 export function activeCount(): number {
-  return allTools.filter((t) => t.status === "active" || t.status === "beta").length;
+  return getCatalogCounts().active;
 }
 
 export function plannedCount(): number {
-  return allTools.filter((t) => t.status === "planned").length;
+  return getCatalogCounts().planned;
 }
 
 export function totalToolCount(): number {
-  return allTools.length;
+  return getCatalogCounts().total;
 }
 
 export function categoryLabel(id: CategoryId): string {
