@@ -302,7 +302,7 @@ export function ToolShell({
 
       {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
 
-      {note && tool.category !== "creators" ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
+      {note && tool.category !== "creators" && tool.category !== "celebrations" ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
       <section
         ref={toolInterfaceRef}
         data-env-tool-id={tool.id}
