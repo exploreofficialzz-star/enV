@@ -142,14 +142,15 @@ internal object NativeCelebrationEngine {
         } else if (parsed.experience in setOf("invitation-generator", "countdown")) result += "Add the date and time."
         if (clean(values, "date").isNotEmpty() && clean(values, "timezone").isEmpty()) result += "Add the IANA time zone so the displayed local time is clear."
         if (parsed.experience == "invitation-generator") {
-            if (clean(values, "rsvpUrl").isEmpty()) result += "Add an RSVP link or include a contact method in the message."
-            else if (safeUrl(clean(values, "rsvpUrl")).isEmpty()) result += "Use a complete http or https RSVP link."
+            if (clean(values, "rsvpUrl").isEmpty() && clean(values, "contactMethod").isEmpty()) result += "Add an RSVP link or a contact method guests can use to reply."
+            else if (clean(values, "rsvpUrl").isNotEmpty() && safeUrl(clean(values, "rsvpUrl")).isEmpty()) result += "Use a complete http or https RSVP link."
             if (clean(values, "rsvpBy").isEmpty()) result += "Add an RSVP deadline, or state that replies are open."
         }
         if (parsed.experience == "quiz-generator") {
             val options = lines(clean(values, "quizOptions"))
             if (clean(values, "quizQuestion").isEmpty()) result += "Add the question."
             if (options.size !in 2..6) result += "Add between 2 and 6 answer choices."
+            if (clean(values, "quizAnswer").isEmpty()) result += "Choose the correct answer so the quiz can grade responses."
             if (clean(values, "quizAnswer").isNotEmpty() && options.none { it.equals(clean(values, "quizAnswer"), true) }) result += "The correct answer must match one of the answer choices."
         }
         if (parsed.experience == "memory-page" && clean(values, "memories").isEmpty() && clean(values, "photosData").isEmpty()) result += "Add a memory note or at least one photo."
@@ -183,6 +184,7 @@ internal object NativeCelebrationEngine {
             lines(clean(values, "schedule")).takeIf { it.isNotEmpty() }?.mapIndexed { i, item -> "${i + 1}. $item" }?.joinToString("\n")?.let { "Programme\n$it" },
             clean(values, "memories").takeIf { it.isNotEmpty() }?.let { "Memories\n$it" },
             clean(values, "dressCode").takeIf { it.isNotEmpty() }?.let { "Dress code: $it" },
+            clean(values, "contactMethod").takeIf { it.isNotEmpty() }?.let { "RSVP contact: $it" },
             rsvpBy.takeIf { it.isNotEmpty() }?.let { "Please reply by: $it" },
             rsvp.takeIf { it.isNotEmpty() }?.let { "RSVP: $it" },
             reveal.takeIf { it.isNotEmpty() }?.let { "The reveal\n$it" },
@@ -192,7 +194,7 @@ internal object NativeCelebrationEngine {
         )
         val content = when (parsed.experience) {
             "interactive-card" -> "<p class=\"eyebrow\">$occasion</p><h1>${escape(title)}</h1><p class=\"lead\">${escape(message)}</p><button type=\"button\" data-reveal>Open your card</button><div hidden data-content><p>${escape(reveal)}</p></div>"
-            "invitation-generator" -> "<p class=\"eyebrow\">You are invited</p><h1>${escape(title)}</h1><p class=\"lead\">${escape(message)}</p><dl>${date.takeIf { it.isNotEmpty() }?.let { "<div><dt>When</dt><dd>${escape(it)}</dd></div>" } ?: ""}${location.takeIf { it.isNotEmpty() }?.let { "<div><dt>Where</dt><dd>${escape(it)}</dd></div>" } ?: ""}${host.takeIf { it.isNotEmpty() }?.let { "<div><dt>Hosted by</dt><dd>${escape(it)}</dd></div>" } ?: ""}</dl>${if (rsvp.isNotEmpty()) "<a class=\"button\" href=\"${escape(rsvp)}\" rel=\"noopener noreferrer\">Reply to invitation</a>" else "<p>Contact the host to reply.</p>"}${rsvpBy.takeIf { it.isNotEmpty() }?.let { "<p>Reply by ${escape(it)}</p>" } ?: ""}"
+            "invitation-generator" -> "<p class=\"eyebrow\">You are invited</p><h1>${escape(title)}</h1><p class=\"lead\">${escape(message)}</p><dl>${date.takeIf { it.isNotEmpty() }?.let { "<div><dt>When</dt><dd>${escape(it)}</dd></div>" } ?: ""}${location.takeIf { it.isNotEmpty() }?.let { "<div><dt>Where</dt><dd>${escape(it)}</dd></div>" } ?: ""}${host.takeIf { it.isNotEmpty() }?.let { "<div><dt>Hosted by</dt><dd>${escape(it)}</dd></div>" } ?: ""}</dl>${if (rsvp.isNotEmpty()) "<a class=\"button\" href=\"${escape(rsvp)}\" rel=\"noopener noreferrer\">Reply to invitation</a>" else if (clean(values, "contactMethod").isNotEmpty()) "<p>Reply to: ${escape(clean(values, "contactMethod"))}</p>" else "<p>Contact the host to reply.</p>"}${rsvpBy.takeIf { it.isNotEmpty() }?.let { "<p>Reply by ${escape(it)}</p>" } ?: ""}"
             "countdown" -> {
                 val instant = runCatching { eventInstant(clean(values, "date"), clean(values, "timezone")).toString() }.getOrDefault("")
                 "<p class=\"eyebrow\">$occasion</p><h1>${escape(title)}</h1><p class=\"lead\">${escape(message)}</p><div class=\"countdown\" data-countdown=\"${escape(instant)}\"><div><strong id=\"days\">—</strong><span>Days</span></div><div><strong id=\"hours\">—</strong><span>Hours</span></div><div><strong id=\"minutes\">—</strong><span>Minutes</span></div><div><strong id=\"seconds\">—</strong><span>Seconds</span></div></div>"
@@ -286,6 +288,7 @@ internal fun NativeCelebrationToolForm(toolId: String) {
         if (parsed.experience in setOf("page-generator", "invitation-generator", "countdown")) field("location", "Location / venue")
         if (invite) {
             field("rsvpUrl", "RSVP link (http or https)")
+            field("contactMethod", "RSVP contact (phone or email)")
             field("rsvpBy", "Reply by")
             field("dressCode", "Dress code / theme")
         }
