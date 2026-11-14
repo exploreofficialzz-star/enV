@@ -236,6 +236,8 @@ enum NativeCelebrationEngine {
         ]
         let text = textSections.filter { !$0.isEmpty }.joined(separator: "\n")
         let photos = photoMarkup(values)
+        let scheduleItems = lines(value(values, "schedule")).map { "<li>" + escape($0) + "</li>" }.joined()
+        let scheduleHtml = scheduleItems.isEmpty ? "" : "<section class=\"schedule\"><h2>Schedule</h2><ol>" + scheduleItems + "</ol></section>"
         let content: String
         switch parsed.experience {
         case "interactive-card":
@@ -260,8 +262,13 @@ enum NativeCelebrationEngine {
             }.joined()
             content = "<p class=\"eyebrow\">Celebration quiz</p><h1>\(escape(title))</h1><p class=\"lead\">\(escape(value(values, "quizQuestion")))</p><div id=\"choices\">\(options)</div><p id=\"feedback\" aria-live=\"polite\">Choose an answer.</p>"
         default:
-            content = "<p class=\"eyebrow\">\(escape(occasion))</p><h1>\(escape(title))</h1><p class=\"lead\">\(escape(message))</p><p>For <strong>\(escape(honoree))</strong></p><p>\(escape(details))</p>\(location.isEmpty ? "" : "<p>Where: \(escape(location))</p>")"
-        }
+            content = "<p class=\"eyebrow\">" + escape(occasion) + "</p><h1>" + escape(title) + "</h1><p class=\"lead\">" + escape(message) + "</p>" +
+                (honoree.isEmpty ? "" : "<p>For <strong>" + escape(honoree) + "</strong></p>") +
+                (host.isEmpty ? "" : "<p>Hosted by: " + escape(host) + "</p>") +
+                (date.isEmpty ? "" : "<p><strong>When:</strong> " + escape(date) + "</p>") +
+                (location.isEmpty ? "" : "<p><strong>Where:</strong> " + escape(location) + "</p>") +
+                (details.isEmpty ? "" : "<p>" + escape(details) + "</p>") + scheduleHtml
+
         let theme = themes[value(values, "theme")] ?? themes["Classic"]!
         let css = "*,*:before,*:after{box-sizing:border-box}body{margin:0;padding:24px;background:\(theme.background);color:\(theme.ink);font:16px/1.6 system-ui,sans-serif}.wrap{max-width:760px;margin:6vh auto;padding:clamp(22px,6vw,56px);border-radius:24px;background:\(theme.background);box-shadow:0 18px 55px rgba(20,30,45,.12)}.eyebrow{color:\(theme.accent);text-transform:uppercase;letter-spacing:.12em;font-size:.8rem;font-weight:700}h1{font-size:clamp(2rem,7vw,3.5rem);line-height:1.08}button,.button{display:inline-block;background:\(theme.accent);color:white;border:0;border-radius:999px;padding:12px 20px;font:inherit;text-decoration:none;cursor:pointer}button:focus-visible,a:focus-visible{outline:3px solid \(theme.accent);outline-offset:3px}.lead{font-size:1.2rem}dl{display:grid;gap:10px}dl div,.countdown div{padding:12px;background:rgba(120,120,120,.12);border-radius:12px}dt{font-size:.8rem;opacity:.7}dd{margin:0;font-weight:600}.countdown{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.countdown div{text-align:center}.countdown strong{display:block;font-size:2rem}.gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}.gallery img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:12px}@media(max-width:420px){body{padding:10px}.wrap{margin:2vh auto;border-radius:16px}.countdown{gap:4px}}@media(prefers-reduced-motion:no-preference){.wrap{animation:appear .3s ease-out}@keyframes appear{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}}"
         let script = "<script>(function(){document.querySelectorAll('[data-reveal]').forEach(function(b){b.addEventListener('click',function(){var c=b.parentElement.querySelector('[data-content]');if(c)c.hidden=!c.hidden;});});var q=document.getElementById('choices');if(q)q.addEventListener('click',function(e){var b=e.target.closest('button[data-correct]');if(b)document.getElementById('feedback').textContent=b.dataset.correct==='true'?'That is right!':'Not quite. Try again.';});var t=document.querySelector('[data-countdown]');if(t){var target=Date.parse(t.dataset.countdown);function tick(){if(!Number.isFinite(target))return;var n=Math.max(0,target-Date.now()),s=Math.floor(n/1000);document.getElementById('days').textContent=Math.floor(s/86400);document.getElementById('hours').textContent=String(Math.floor(s%86400/3600)).padStart(2,'0');document.getElementById('minutes').textContent=String(Math.floor(s%3600/60)).padStart(2,'0');document.getElementById('seconds').textContent=String(s%60).padStart(2,'0');}tick();setInterval(tick,1000);}})();</script>"
