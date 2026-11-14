@@ -49,3 +49,16 @@ test("human-reviewed descriptions are preserved exactly", () => {
   };
   assert.equal(refineGeneratedToolDescription(tool), tool.description);
 });
+
+test("catalogue family placeholders are refined without an expanded product name", () => {
+  const tool = {
+    id: "math-break-even-calculator",
+    name: "Break-Even Calculator",
+    category: "calculators",
+    description: "Generated catalogue placeholder for Break-Even Calculator.",
+  };
+  const description = refineGeneratedToolDescription(tool);
+  assert.match(description, /^Calculate break-even from the values you enter\./i);
+  assert.doesNotMatch(description, /generated catalogue placeholder|enV toolkit/i);
+});
+
