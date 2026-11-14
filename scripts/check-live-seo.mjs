@@ -65,7 +65,7 @@ async function checkStaticAssets() {
     const rule = new RegExp("User-agent:\\s*" + agent + "\\s*\\nAllow:\\s*/\\s*\\nDisallow:\\s*/api/", "i");
     assert(rule.test(robots), "robots.txt does not explicitly allow public pages and block API routes for " + agent);
   }
-  for (const agent of ["Google-Extended", "GPTBot", "ClaudeBot", "Applebot-Extended"]) {
+  for (const agent of ["__usage_ai-training", "Google-Extended", "GPTBot", "ClaudeBot", "Applebot-Extended"]) {
     const rule = new RegExp("User-agent:\\s*" + agent + "\\s*\\nDisallow:\\s*/(?:\\s|$)", "i");
     assert(rule.test(robots), "robots.txt no longer applies the configured disallow policy to " + agent);
   }
