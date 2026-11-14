@@ -97,33 +97,66 @@ enum NativeCelebrationEngine {
         guard let zone = TimeZone(identifier: timeZoneName.trimmingCharacters(in: .whitespacesAndNewlines)) else {
             throw NativeCelebrationError.message("Choose a valid IANA time zone, such as Africa/Lagos or Europe/London.")
         }
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.timeZone = zone
-        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm"
-        formatter.isLenient = false
-        guard let local = formatter.date(from: value.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+        let raw = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard raw.range(of: #"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$"#, options: .regularExpression) != nil else {
             throw NativeCelebrationError.message("Enter a valid date and time in YYYY-MM-DDTHH:mm format.")
         }
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = zone
-        let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: local)
-        guard let dayStart = calendar.date(from: DateComponents(year: components.year, month: components.month, day: components.day)) else {
+
+        // Parse the wall-clock fields in UTC first. Parsing directly in the destination
+        // zone can silently normalize a time inside a daylight-saving gap.
+        let wallFormatter = DateFormatter()
+        wallFormatter.locale = Locale(identifier: "en_US_POSIX")
+        wallFormatter.calendar = Calendar(identifier: .gregorian)
+        wallFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+        wallFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm"
+        wallFormatter.isLenient = false
+        guard let wallDate = wallFormatter.date(from: raw) else {
             throw NativeCelebrationError.message("Enter a real calendar date and time.")
         }
-        let first = calendar.nextDate(after: dayStart.addingTimeInterval(-1), matching: components, matchingPolicy: .strict, repeatedTimePolicy: .first, direction: .forward)
-        let last = calendar.nextDate(after: dayStart.addingTimeInterval(-1), matching: components, matchingPolicy: .strict, repeatedTimePolicy: .last, direction: .forward)
+
+        var utcCalendar = Calendar(identifier: .gregorian)
+        utcCalendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let components = utcCalendar.dateComponents([.year, .month, .day, .hour, .minute], from: wallDate)
+        guard let validatedWallDate = utcCalendar.date(from: components) else {
+            throw NativeCelebrationError.message("Enter a real calendar date and time.")
+        }
+        let validated = utcCalendar.dateComponents([.year, .month, .day, .hour, .minute], from: validatedWallDate)
+        guard validated.year == components.year, validated.month == components.month, validated.day == components.day,
+              validated.hour == components.hour, validated.minute == components.minute else {
+            throw NativeCelebrationError.message("Enter a real calendar date and time.")
+        }
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        let dayStart = calendar.date(from: DateComponents(year: components.year, month: components.month, day: components.day))
+        guard let dayStart else {
+            throw NativeCelebrationError.message("Enter a real calendar date and time.")
+        }
+        let first = calendar.nextDate(
+            after: dayStart.addingTimeInterval(-1),
+            matching: components,
+            matchingPolicy: .strict,
+            repeatedTimePolicy: .first,
+            direction: .forward
+        )
+        let last = calendar.nextDate(
+            after: dayStart.addingTimeInterval(-1),
+            matching: components,
+            matchingPolicy: .strict,
+            repeatedTimePolicy: .last,
+            direction: .forward
+        )
         guard let first else {
+            throw NativeCelebrationError.message("That local time does not exist because the clocks change. Choose another time.")
+        }
+        let firstComponents = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: first)
+        guard firstComponents.year == components.year, firstComponents.month == components.month,
+              firstComponents.day == components.day, firstComponents.hour == components.hour,
+              firstComponents.minute == components.minute else {
             throw NativeCelebrationError.message("That local time does not exist because the clocks change. Choose another time.")
         }
         if let last, abs(last.timeIntervalSince(first)) > 60 {
             throw NativeCelebrationError.message("That local time occurs twice because the clocks change. Choose another time.")
-        }
-        let actual = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: first)
-        guard actual.year == components.year, actual.month == components.month, actual.day == components.day,
-              actual.hour == components.hour, actual.minute == components.minute else {
-            throw NativeCelebrationError.message("Enter a real calendar date and time.")
         }
         return first
     }
