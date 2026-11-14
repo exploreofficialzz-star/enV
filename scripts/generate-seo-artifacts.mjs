@@ -6,6 +6,7 @@ import { BLOG_ARTICLES } from "../src/data/blog-articles.ts";
 import { getSearchableTools, getToolsByCategory, toolPath } from "../src/lib/registry.ts";
 import { canonicalSeoTools, canonicalToolPath, isIndexableTool, toolSeoTitle, toolSeoDescription, toolGuideSeoTitle, toolSearchIntentTerms } from "../src/lib/seo-metadata.ts";
 import { toolDocumentationSummary } from "../src/lib/tool-documentation.ts";
+import { buildIndexNowKeyArtifact } from "./indexnow-utils.mjs";
 
 const SITE_ORIGIN = "https://envtools.store";
 const SITEMAP_MAX_URLS = 40_000;
@@ -18,15 +19,6 @@ const OUTPUTS = [
 const REPORTS = [
   ["docs/seo-tool-inventory.md", "inventory"],
 ];
-
-export function buildIndexNowKeyArtifact(value) {
-  const key = String(value ?? "").trim();
-  if (!key) return null;
-  if (!/^[A-Za-z0-9-]{8,128}$/.test(key)) {
-    throw new Error("INDEXNOW_KEY must contain 8-128 letters, numbers or hyphens.");
-  }
-  return { path: "public/" + key + ".txt", content: key };
-}
 
 function escapeXml(value) {
   return String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;");
