@@ -83,11 +83,32 @@ test("IndexNow classifies HTTP 200 and 202 as received submissions", () => {
 test("IndexNow retries only transient HTTP statuses and respects bounded Retry-After", () => {
   assert.equal(indexNowRetryDelayMs(429, "3", 0), 3000);
   assert.equal(indexNowRetryDelayMs(503, null, 0), 1000);
-  assert.equal(indexNowRetryDelayMs(502, "90", 1), 10_000);
+  assert.equal(indexNowRetryDelayMs(502, "90", 1), null);
+  assert.equal(parseIndexNowRetryAfter("90"), 90_000);
   assert.equal(indexNowRetryDelayMs(403, "3", 0), null);
   assert.equal(indexNowRetryDelayMs(422, null, 0), null);
   const now = Date.UTC(2026, 10, 14, 12, 0, 0);
   assert.equal(parseIndexNowRetryAfter(new Date(now + 5000).toUTCString(), now), 5000);
+});
+
+test("long server Retry-After values are deferred instead of retried early", async () => {
+  let calls = 0;
+  const result = await submitIndexNowBatch({
+    endpoint: "https://api.indexnow.org/indexnow",
+    host: "envtools.store",
+    key: "a1b2c3d4",
+    keyLocation: "https://envtools.store/a1b2c3d4.txt",
+    urlList: ["https://envtools.store/"],
+    fetchImpl: async () => {
+      calls += 1;
+      return { status: 429, headers: { get: () => "90" }, text: async () => "retry later" };
+    },
+    sleep: async () => assert.fail("Do not retry before the server-requested delay"),
+  });
+  assert.equal(calls, 1);
+  assert.equal(result.accepted, false);
+  assert.equal(result.status, 429);
+  assert.equal(result.attempts, 1);
 });
 
 test("IndexNow retries a rate-limited batch, then records HTTP 200 acceptance", async () => {
