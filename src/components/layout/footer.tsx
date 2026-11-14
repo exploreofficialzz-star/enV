@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Logo } from "@/components/brand/logo";
 import { CATEGORIES } from "@/data/categories";
-import { activeCount } from "@/lib/registry";
+import { totalToolCount } from "@/lib/registry";
 
 const LEGAL_LINKS = [
   { to: "/privacy", label: "Privacy" },
@@ -11,14 +11,14 @@ const LEGAL_LINKS = [
 ] as const;
 
 export function Footer() {
-  const count = activeCount();
+  const count = totalToolCount();
   return (
     <footer className="mt-auto border-t border-border bg-surface">
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-8 sm:px-6 md:grid-cols-3">
         <div className="md:col-span-2">
           <Logo />
           <p className="mt-3 max-w-sm text-sm leading-6 text-muted">
-            Useful tools. One place. {count} browser tools for everyday tasks.
+            Useful tools. One place. {count} tools in the shared enV catalogue.
           </p>
         </div>
         <nav aria-label="Legal" className="min-w-0">
@@ -35,7 +35,7 @@ export function Footer() {
       <div className="border-t border-border">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 text-xs text-subtle sm:px-6">
           <p>© {new Date().getFullYear()} chAs Technologies LLC · enV</p>
-          <p className="hidden sm:block">{CATEGORIES.length} categories · {count} live tools</p>
+          <p className="hidden sm:block">{CATEGORIES.length} categories · {count} enV catalogue tools</p>
         </div>
       </div>
     </footer>
