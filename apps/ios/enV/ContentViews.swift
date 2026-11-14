@@ -1142,7 +1142,7 @@ struct ToolsView: View {
                                             enVCharacterSpacedText(group.category.id == "celebrations" ? group.category.description : group.category.blurb)
                                                 .font(.envScaled(size: 12, weight: .regular))
                                                 .foregroundStyle(Color.envMuted)
-                                                .lineLimit(2)
+                                                .lineLimit(group.category.id == "celebrations" ? nil : 2)
                                         }
                                     }
                                 }
