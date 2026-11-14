@@ -1,4 +1,6 @@
 import { execFileSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
+import { resolve } from "node:path";
 import { buildSeoArtifacts } from "./generate-seo-artifacts.mjs";
 import { toolPath } from "../src/lib/registry.ts";
 
@@ -37,7 +39,7 @@ function decodeXml(value) {
     .replaceAll("&apos;", "'");
 }
 
-function urlsFromXml(xml) {
+export function urlsFromXml(xml) {
   return [...String(xml).matchAll(/<loc>([\s\S]*?)<\/loc>/g)]
     .map((match) => decodeXml(match[1].trim()))
     .filter((value) => value.startsWith(SITE_ORIGIN + "/"));
@@ -58,7 +60,7 @@ function previousSitemapUrls(baseSha) {
   return [...new Set(urls)];
 }
 
-function routeGroups(artifacts) {
+export function routeGroups(artifacts) {
   const toolPages = artifacts.tools.map((tool) => SITE_ORIGIN + toolPath(tool));
   const guidePages = artifacts.guideTools.map((tool) => SITE_ORIGIN + "/blog/tool-" + tool.id);
   const categoryPages = artifacts.categories.map((category) => SITE_ORIGIN + "/tools/" + category.id);
@@ -72,7 +74,7 @@ function routeGroups(artifacts) {
   };
 }
 
-function selectChangedUrls(files, groups, currentUrls) {
+export function selectChangedUrls(files, groups, currentUrls) {
   const changed = new Set();
   const all = () => groups.all.forEach((url) => changed.add(url));
   const add = (values) => values.forEach((url) => changed.add(url));
@@ -175,4 +177,6 @@ async function main() {
     Math.ceil(urlList.length / MAX_URLS_PER_POST) + " batch(es). This confirms receipt, not crawling or indexing.\n");
 }
 
-await main();
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  await main();
+}
