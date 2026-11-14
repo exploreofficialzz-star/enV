@@ -92,14 +92,18 @@ export function parseIndexNowRetryAfter(value, now = Date.now()) {
   const seconds = Number(header);
   const delay = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(header) - now;
   if (!Number.isFinite(delay)) return null;
-  return Math.min(MAX_RETRY_AFTER_MS, Math.max(0, delay));
+  return Math.max(0, delay);
 }
 
 export function indexNowRetryDelayMs(status, retryAfter, attempt, now = Date.now()) {
   const retryable = status === 429 || (status >= 500 && status <= 599);
   if (!retryable) return null;
   const serverDelay = parseIndexNowRetryAfter(retryAfter, now);
-  if (serverDelay !== null) return serverDelay;
+  if (serverDelay !== null) {
+    // Do not retry earlier than a server-requested delay. If it exceeds this
+    // deployment's retry budget, defer the notification instead of retrying early.
+    return serverDelay <= MAX_RETRY_AFTER_MS ? serverDelay : null;
+  }
   return Math.min(1000 * 2 ** Math.max(0, attempt), MAX_RETRY_AFTER_MS);
 }
 
