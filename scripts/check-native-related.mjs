@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { tools as baseWebTools } from "../src/data/catalog.ts";
+import { applyGenericWorkflowPolicy } from "../src/lib/generic-workflow-policy.mjs";
 import { DATETIME_TOOL_EXTENSIONS } from "../src/lib/datetime/catalog-tools.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -10,7 +11,7 @@ const read = (path) => readFileSync(resolve(root, path), "utf8");
 
 // Merge typed runtime extensions into both generated bases before comparing Web/native catalogue parity.
 const webTools = [
-  ...baseWebTools,
+  ...applyGenericWorkflowPolicy(baseWebTools),
   ...DATETIME_TOOL_EXTENSIONS.filter((extension) => !baseWebTools.some((tool) => tool.id === extension.id)),
 ];
 const sharedBaseTools = JSON.parse(read("apps/shared/catalog.json")).tools;

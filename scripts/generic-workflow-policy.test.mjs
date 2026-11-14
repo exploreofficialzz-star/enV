@@ -108,6 +108,16 @@ test("native catalog and execution-matrix exporters share the publication policy
   assert.match(matrixExporter, /applyGenericWorkflowPolicy\(baseCatalog\)/);
 });
 
+test("native coverage and related-catalog audits normalize availability before comparing platforms", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const [coverage, related] = await Promise.all([
+    readFile(new URL("./check-native-coverage.mjs", import.meta.url), "utf8"),
+    readFile(new URL("./check-native-related.mjs", import.meta.url), "utf8"),
+  ]);
+  assert.match(coverage, /applyGenericWorkflowPolicy\(parseGeneratedCatalog\(catalogSource\)\)/);
+  assert.match(related, /applyGenericWorkflowPolicy\(baseWebTools\)/);
+});
+
 test("tools outside the generic workflow categories are preserved unchanged", () => {
   const source = [
     tool("password-generator", "security"),

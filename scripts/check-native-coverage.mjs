@@ -1,9 +1,10 @@
 import fs from 'node:fs';
 import { parseGeneratedCatalog } from './catalog-reader.mjs';
+import { applyGenericWorkflowPolicy } from '../src/lib/generic-workflow-policy.mjs';
 
 const root = new URL('../', import.meta.url);
 const catalogSource = fs.readFileSync(new URL('../src/data/catalog.ts', import.meta.url), 'utf8');
-const catalog = parseGeneratedCatalog(catalogSource);
+const catalog = applyGenericWorkflowPolicy(parseGeneratedCatalog(catalogSource));
 // The generated JSON contains the 10,000-tool legacy base; additive Audio Studios live in a separate typed array.
 // Include those runtime additions when validating native coverage so implemented new tools can be classified locally.
 const audioStudioBlock = catalogSource.match(/const audioStudioTools: ToolMeta\[\] = \[([\s\S]*?)\n\];\n\n\/\/ Studios are additive/);
