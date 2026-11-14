@@ -78,10 +78,13 @@ final class NativeCelebrationTests: XCTestCase {
         ])
         XCTAssertTrue(unanswered.checks.contains(where: { $0.contains("correct answer") }))
         let answered = try NativeCelebrationEngine.build("graduation-quiz-generator", values: [
-            "title": "Graduation quiz", "honoree": "Sam",
+            "title": "Graduation quiz", "honoree": "Sam", "message": "A quiz introduction.",
             "quizQuestion": "Which year?", "quizOptions": "2025\n2026", "quizAnswer": "2026"
         ])
         XCTAssertTrue(answered.html.contains("data-correct=\"true\""))
+        XCTAssertTrue(answered.html.contains("A quiz introduction."))
+        XCTAssertTrue(answered.html.contains("Which year?"))
+        XCTAssertTrue(answered.html.contains("overflow-wrap:anywhere"))
         XCTAssertFalse(answered.checks.contains(where: { $0.contains("correct answer") }))
     }
 
