@@ -197,6 +197,9 @@ if (legacyDeveloperTool) {
 }
 assert.ok(result.sitemap.includes(result.sitemapFiles.length ? "<sitemapindex" : "<urlset"));
 assert.doesNotMatch(result.sitemap, /<lastmod>/, "Do not fabricate sitemap lastmod values until trustworthy per-route significant-update timestamps exist.");
+for (const file of result.sitemapFiles) {
+  assert.doesNotMatch(file.content, /<lastmod>/, "Sitemap shard " + file.path + " must not contain fabricated lastmod values.");
+}
 assert.equal(result.sitemapUrlCount, result.urls.length);
 assert.ok(result.sitemapFiles.every((file) => file.count <= 40_000 && file.content.includes("<urlset")));
 const largeSitemap = buildSitemapArtifacts(Array.from({ length: 80_001 }, (_, index) => "/scale-test/" + index));
