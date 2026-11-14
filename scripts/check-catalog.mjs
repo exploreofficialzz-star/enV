@@ -37,7 +37,7 @@ for (const tool of tools) {
   if (!tool.name || !tool.description) errors.push(`${tool.id}: missing name/description`);
   const publicDescription = refineGeneratedToolDescription(tool);
   if (!publicDescription || publicDescription.length < 35) errors.push(`${tool.id}: description is too short after refinement`);
-  if (/utility for the enV toolkit|for developers and technical workflows|creator utility for planning and publishing|social-media utility|marketing utility|random utility|relationship\\/social experience|utility for document workflows|design utility for modern interfaces|helper for web design and interface work/i.test(publicDescription)) {
+  if (/utility for the enV toolkit|for developers and technical workflows|creator utility for planning and publishing|social-media utility|marketing utility|random utility|relationship\/social experience|utility for document workflows|design utility for modern interfaces|helper for web design and interface work/i.test(publicDescription)) {
     errors.push(`${tool.id}: generic catalogue description survived refinement`);
   }
   if (!Array.isArray(tool.keywords) || !Array.isArray(tool.tags)) errors.push(`${tool.id}: keywords/tags must be arrays`);
