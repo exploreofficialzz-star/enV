@@ -239,14 +239,6 @@ test("tool-guide fallbacks include a distinct catalogue task statement for every
       engine: { type: "custom", id: "documentation-coverage-" + category.id },
     };
 
-    const operationParser = categoryOperationParsers[tool.category];
-    if (tool.engine.type === "custom" && !tool.requiresBackend && operationParser) {
-      assert.doesNotThrow(
-        () => operationParser(tool.id),
-        tool.id + ": public custom tool must parse to a supported operation in its category engine",
-      );
-    }
-
     const sections = getToolDocumentation(tool);
     const whenToUse = sections.find((section) => section.id === "when-to-use");
     assert.ok(whenToUse, category.id + ": guide must include a when-to-use section");
@@ -537,6 +529,13 @@ test("every canonical public tool has an individually grounded guide contract", 
 
   const missingRuntimeRoutes: string[] = [];
   for (const tool of publicTools) {
+    const operationParser = categoryOperationParsers[tool.category];
+    if (tool.engine.type === "custom" && !tool.requiresBackend && operationParser) {
+      assert.doesNotThrow(
+        () => operationParser(tool.id),
+        tool.id + ": public custom tool must parse to a supported operation in its category engine",
+      );
+    }
     if (!hasImportedRuntimeRenderer(tool)) {
       missingRuntimeRoutes.push(
         tool.id + " (engine=" + tool.engine.type + ", category=" + tool.category + ", engineId=" + ("id" in tool.engine ? tool.engine.id : "") + ")",
