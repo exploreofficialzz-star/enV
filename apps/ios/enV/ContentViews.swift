@@ -1139,7 +1139,7 @@ struct ToolsView: View {
                                             enVCharacterSpacedText(group.category.name)
                                                 .font(.envScaled(size: 18, weight: .bold))
                                                 .foregroundStyle(Color.envAccent)
-                                            enVCharacterSpacedText(group.category.blurb)
+                                            enVCharacterSpacedText(group.category.id == "celebrations" ? group.category.description : group.category.blurb)
                                                 .font(.envScaled(size: 12, weight: .regular))
                                                 .foregroundStyle(Color.envMuted)
                                                 .lineLimit(2)
