@@ -309,9 +309,9 @@ const byVirtualId = new Map(virtualStudios.map((tool) => [tool.id, tool] as cons
 // Legacy accessibility actions remain routable, but the Studio is their single discovery entry.
 // The contrast checker also has an old Design-category record; do not show that record
 // beside the canonical Accessibility Studio with the same ID.
-const accessibilityStudioIds = new Set(accessibilityStudios.map((tool) => tool.id));
-const isDiscoverable = (tool: ToolMeta) =>
-  tool.id !== "audio-analyze-studio" && !accessibilityStudioIds.has(tool.id);
+// Accessibility legacy records are already excluded by category; Studio IDs remain
+// distinct from the source records so both the preserved route and workspace are searchable.
+const isDiscoverable = (tool: ToolMeta) => tool.id !== "audio-analyze-studio";
 
 // Keep search IDs unique. Virtual Studio entries intentionally replace their source records
 // in discovery, while getAllTools() continues to preserve every canonical/legacy tool ID.
