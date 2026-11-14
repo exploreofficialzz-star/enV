@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
+import { routeGroups, selectChangedUrls, urlsFromXml } from "./indexnow-utils.mjs";
 import { resolve } from "node:path";
 import { buildSeoArtifacts } from "./generate-seo-artifacts.mjs";
 
@@ -29,21 +30,6 @@ function changedFiles(baseSha) {
   return output ? output.split(/\r?\n/).filter(Boolean) : [];
 }
 
-function decodeXml(value) {
-  return String(value)
-    .replaceAll("&amp;", "&")
-    .replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    .replaceAll("&quot;", '"')
-    .replaceAll("&apos;", "'");
-}
-
-export function urlsFromXml(xml) {
-  return [...String(xml).matchAll(/<loc>([\s\S]*?)<\/loc>/g)]
-    .map((match) => decodeXml(match[1].trim()))
-    .filter((value) => value.startsWith(SITE_ORIGIN + "/"));
-}
-
 function previousSitemapUrls(baseSha) {
   if (!baseSha) return [];
   const root = gitOutput(["show", baseSha + ":public/sitemap.xml"]);
@@ -57,49 +43,6 @@ function previousSitemapUrls(baseSha) {
     if (shard) urls.push(...urlsFromXml(shard));
   }
   return [...new Set(urls)];
-}
-
-export function routeGroups(artifacts) {
-  const all = artifacts.urls.map((path) => SITE_ORIGIN + path);
-  const toolPages = all.filter((url) => /^\\/tools\\/[^/]+\\/[^/]+$/.test(new URL(url).pathname));
-  const guidePages = all.filter((url) => new URL(url).pathname.startsWith("/blog/tool-"));
-  const categoryPages = all.filter((url) => /^\\/tools\\/[^/]+$/.test(new URL(url).pathname));
-  const articlePages = all.filter((url) => new URL(url).pathname.startsWith("/blog/") && !new URL(url).pathname.startsWith("/blog/tool-"));
-  return {
-    all,
-    tools: [...toolPages, ...guidePages, SITE_ORIGIN + "/tools", ...categoryPages],
-    guides: [...guidePages, ...toolPages],
-    categories: [...categoryPages, SITE_ORIGIN + "/tools"],
-    articles: [...articlePages, SITE_ORIGIN + "/blog"],
-  };
-}
-
-export function selectChangedUrls(files, groups, currentUrls) {
-  const changed = new Set();
-  const all = () => groups.all.forEach((url) => changed.add(url));
-  const add = (values) => values.forEach((url) => changed.add(url));
-  const broad = files.some((path) =>
-    path === "src/lib/seo-metadata.ts" ||
-    path === "src/lib/generated-tool-copy.mjs" ||
-    path === "src/lib/registry.ts" ||
-    path === "scripts/generate-seo-artifacts.mjs" ||
-    path === "src/routes/__root.tsx" ||
-    path === "src/routes/index.tsx" ||
-    path.startsWith("src/routes/") ||
-    path.startsWith("scripts/site-meta-") ||
-    path === "src/data/catalog.ts" ||
-    path === "src/lib/tool-documentation.ts" ||
-    path === "scripts/gen-catalog.mjs"
-  );
-  if (broad) {
-    all();
-  } else {
-    if (files.includes("src/data/categories.ts")) add(groups.categories);
-    if (files.includes("src/data/blog-articles.ts")) add(groups.articles);
-    if (files.some((path) => path === "src/data/catalog.ts" || path === "src/lib/registry.ts")) add(groups.tools);
-    if (files.includes("public/og.jpg") || files.includes("src/lib/og/site.json")) all();
-  }
-  return [...changed].filter((url) => currentUrls.has(url));
 }
 
 async function verifyKeyFile(key) {
