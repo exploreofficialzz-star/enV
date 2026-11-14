@@ -33,14 +33,14 @@ test("public discovery has unique IDs and virtual studios replace legacy discove
     assert.ok(getToolById(tool.id), `searchable entry ${tool.id} must resolve`);
   }
 
-  const contrastMatches = searchable.filter((tool) => tool.id === "contrast-checker");
-  assert.equal(contrastMatches.length, 1, "Contrast Checker must appear once through Accessibility Studio");
-  assert.equal(contrastMatches[0]?.category, "accessibility");
-  assert.equal(
-    getToolsByCategory("design").some((tool) => tool.id === "contrast-checker"),
-    false,
-    "the legacy Design-category record must not duplicate the Accessibility Studio entry",
-  );
+  const legacyContrast = searchable.filter((tool) => tool.id === "contrast-checker");
+  const contrastStudio = searchable.filter((tool) => tool.id === "color-contrast-studio");
+  assert.equal(legacyContrast.length, 1, "The legacy Design tool must remain independently discoverable.");
+  assert.equal(legacyContrast[0]?.category, "design");
+  assert.equal(contrastStudio.length, 1, "The Accessibility workspace must have its own canonical discovery ID.");
+  assert.equal(contrastStudio[0]?.category, "accessibility");
+  assert.ok(getToolById("contrast-checker"), "The legacy Design route must continue to resolve.");
+  assert.equal(getToolById("color-contrast-studio")?.category, "accessibility");
 });
 
 test("all configured categories have canonical counts and visible categories have unique IDs", () => {
