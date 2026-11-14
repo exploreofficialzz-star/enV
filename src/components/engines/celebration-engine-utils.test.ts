@@ -73,11 +73,14 @@ test("HTML export escapes user content and rejects active RSVP URL schemes", () 
 
 test("the quiz export has bounded answer choices and reports the selected answer", () => {
   const result = buildCelebration({
-    occasion: "anniversary", experience: "quiz-generator", title: "Our story",
+    occasion: "anniversary", experience: "quiz-generator", title: "Our story", message: "A quick introduction for the quiz.",
     quizQuestion: "Which month did we meet?", quizOptions: "April\nJune\nOctober", quizAnswer: "June",
   });
   assert.match(result.html, /data-correct="true"/);
   assert.match(result.html, /data-feedback/);
+  assert.match(result.html, /A quick introduction for the quiz\\./);
+  assert.match(result.html, /Which month did we meet\\?/);
+  assert.match(result.html, /overflow-wrap:anywhere/);
   assert.doesNotMatch(result.html, /<script>alert/);
 });
 
