@@ -800,7 +800,7 @@ private struct DiscoveryToolCard: View {
         VStack(alignment: .leading, spacing: 0) {
             iconTile(tool)
             enVCharacterSpacedText(tool.name).font(.envScaled(size: 14, weight: .semibold)).foregroundStyle(Color.envInk).padding(.top, 12)
-            if tool.category != "celebrations" { enVCharacterSpacedText(tool.offlineDescription).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(2).lineSpacing(2).padding(.top, 4) }
+            enVCharacterSpacedText(tool.offlineDescription).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(2).lineSpacing(2).padding(.top, 4)
             if tool.isUnderProduction {
                 enVCharacterSpacedText("Under production").font(.envScaled(size: 10, weight: .medium)).foregroundStyle(Color.envSubtle).padding(.top, 10)
             } else if tool.isPlanned {
