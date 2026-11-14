@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildIndexNowKeyArtifact } from "./generate-seo-artifacts.mjs";
-import { selectChangedUrls, urlsFromXml } from "./submit-indexnow.mjs";
+import { buildIndexNowKeyArtifact, selectChangedUrls, urlsFromXml } from "./indexnow-utils.mjs";
 
 test("IndexNow ownership key files are generated only for valid keys", () => {
   assert.equal(buildIndexNowKeyArtifact(""), null);
