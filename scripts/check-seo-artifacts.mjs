@@ -22,6 +22,9 @@ const inventoryCell = (value) => String(value ?? "").replace(/\s+/g, " ").replac
 const seoMetadataSource = readFileSync(new URL("../src/lib/seo-metadata.ts", import.meta.url), "utf8");
 const rootRouteSource = readFileSync(new URL("../src/routes/__root.tsx", import.meta.url), "utf8");
 const homepageRouteSource = readFileSync(new URL("../src/routes/index.tsx", import.meta.url), "utf8");
+const termsRouteSource = readFileSync(new URL("../src/routes/terms.tsx", import.meta.url), "utf8");
+const assistantPromptSource = readFileSync(new URL("../src/lib/ai/server/tasks/assistant.ts", import.meta.url), "utf8");
+const catalogueGeneratorSource = readFileSync(new URL("./gen-catalog.mjs", import.meta.url), "utf8");
 const toolRouteSource = readFileSync(new URL("../src/routes/tools/$category/$slug.tsx", import.meta.url), "utf8");
 const guideRouteSource = readFileSync(new URL("../src/routes/blog.$slug.tsx", import.meta.url), "utf8");
 const renderedAuditWorkflowSource = readFileSync(new URL("../.github/workflows/accessibility-phase8.yml", import.meta.url), "utf8");
@@ -31,6 +34,9 @@ assert.ok(rootRouteSource.includes('name: "env-build-sha", content: __ENV_BUILD_
 assert.doesNotMatch(seoHeadSource, /env-build-sha/, "The build revision marker must be emitted once by the root document.");
 assert.ok(homepageRouteSource.includes('title: "enV | Tools for everyday tasks"'), "Homepage title must use the enV product name without an appended product label.");
 assert.ok(homepageRouteSource.includes("Find a tool for the task you are working on."), "Homepage description must explain the user purpose in plain language.");
+assert.doesNotMatch(termsRouteSource, /the enV toolkit/i, "Terms structured data must use the canonical enV product name.");
+assert.doesNotMatch(assistantPromptSource, /inside enV Toolkit/i, "The AI Agent must identify itself as part of enV without expanding the platform name.");
+assert.doesNotMatch(catalogueGeneratorSource, /utility for the enV toolkit/i, "Catalogue generation must not seed expanded product-name filler.");
 assert.doesNotMatch(seoHeadSource, /webmasterVerificationMeta\(\)/, "Child routes must not duplicate root verification tags.");
 assert.match(toolRouteSource, /toolSeoTitle\(tool, CANONICAL_SEO_TOOL_PAGES\)/, "Canonical tool route titles must use the full peer collection.");
 assert.match(toolRouteSource, /CANONICAL_SEO_TOOL_PAGES\s*=\s*canonicalSeoTools\([\s\S]*?\.filter\(\(tool\)\s*=>\s*tool\.category\s*!==\s*"developer"\s*\|\|\s*tool\.tags\.includes\("developer-studio"\)\)/, "Tool-route title peers must match the canonical public-tool inventory, excluding legacy Developer aliases.");
