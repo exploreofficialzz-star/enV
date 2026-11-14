@@ -31,11 +31,19 @@ final class NativeCelebrationTests: XCTestCase {
     func testIanaTimeZoneConversionAndDaylightSavingValidation() throws {
         let instant = try NativeCelebrationEngine.eventInstant("2026-11-05T10:00", timeZoneName: "Africa/Lagos")
         XCTAssertEqual(Calendar(identifier: .gregorian).dateComponents(in: TimeZone(secondsFromGMT: 0)!, from: instant).hour, 9)
-        XCTAssertThrowsError(try NativeCelebrationEngine.eventInstant("2026-03-08T02:30", timeZoneName: "America/New_York")) {
-            XCTAssertTrue($0.localizedDescription.contains("does not exist"))
+        XCTAssertThrowsError(try NativeCelebrationEngine.eventInstant("2026-03-08T02:30", timeZoneName: "America/New_York")) { error in
+            guard let nativeError = error as? NativeCelebrationError,
+                  case .message(let message) = nativeError else {
+                return XCTFail("Expected a native validation error for the daylight-saving gap, got: \\(error)")
+            }
+            XCTAssertTrue(message.contains("does not exist"), message)
         }
-        XCTAssertThrowsError(try NativeCelebrationEngine.eventInstant("2026-11-01T01:30", timeZoneName: "America/New_York")) {
-            XCTAssertTrue($0.localizedDescription.contains("occurs twice"))
+        XCTAssertThrowsError(try NativeCelebrationEngine.eventInstant("2026-11-01T01:30", timeZoneName: "America/New_York")) { error in
+            guard let nativeError = error as? NativeCelebrationError,
+                  case .message(let message) = nativeError else {
+                return XCTFail("Expected a native validation error for the repeated daylight-saving time, got: \\(error)")
+            }
+            XCTAssertTrue(message.contains("occurs twice"), message)
         }
     }
 
