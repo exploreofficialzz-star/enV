@@ -126,7 +126,8 @@
     "check:ads": "node --experimental-strip-types --test src/lib/ads/policy.test.ts src/lib/ads/page-units.test.ts src/lib/ads/adsterra.test.ts && node scripts/check-ad-access.mjs",
     "audit:file-workspace:browser": "node scripts/audit-file-workspace-browser.mjs",
     "check:file-upload-ui": "node scripts/check-file-upload-ui.mjs",
-    "check:catalog-runtime": "node scripts/check-catalog-runtime.mjs"
+    "check:catalog-runtime": "node scripts/check-catalog-runtime.mjs",
+    "postbuild": "node scripts/check-catalog-runtime.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
