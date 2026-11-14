@@ -285,6 +285,7 @@ export function buildCelebrationHtml(input: CelebrationInput): string {
       (date ? '<p><strong>When:</strong> ' + escapeHtml(date) + '</p>' : "") +
       (location ? '<p><strong>Where:</strong> ' + escapeHtml(location) + '</p>' : "") +
       (details ? '<p>' + escapeHtml(details) + '</p>' : "") +
+      (nonEmptyLines(input.schedule).length ? '<section class="schedule"><h2>Schedule</h2><ol>' + nonEmptyLines(input.schedule).map((item) => '<li>' + escapeHtml(item) + '</li>').join("") + '</ol></section>' : "") +
       (rsvp ? '<a class="action" href="' + escapeHtml(rsvp) + '" rel="noopener noreferrer">More details</a>' : "");
   }
   const script = '<script>(function(){' +
