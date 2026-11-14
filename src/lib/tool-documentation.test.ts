@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { CATEGORIES } from "@/data/categories";
 import type { ToolMeta } from "@/types/tool";
+import { getSearchableTools, getToolsByCategory } from "@/lib/registry";
+import { canonicalSeoTools, isIndexableTool } from "@/lib/seo-metadata";
 import { getToolDocumentation, toolDocumentationSummary } from "@/lib/tool-documentation";
 
 test("tool-guide fallbacks include a distinct catalogue task statement for every category", () => {
@@ -275,6 +277,60 @@ test("hand-written tool guidance is wrapped with catalogue identity without repe
       whenToUse.paragraphs[1].startsWith("For " + sample.name + ", "),
       sample.id + ": examples must be framed around the named tool",
     );
+  }
+});
+
+test("every canonical public tool has an individually grounded guide contract", () => {
+  const toolMap = new Map(getSearchableTools().map((tool) => [tool.id, tool]));
+  for (const tool of getToolsByCategory("accessibility")) toolMap.set(tool.id, tool);
+  const publicTools = canonicalSeoTools([...toolMap.values()].filter(isIndexableTool));
+
+  assert.ok(publicTools.length > 0, "The public guide inventory must not be empty.");
+  const requiredSections = [
+    "purpose-and-scope",
+    "when-to-use",
+    "before-you-begin",
+    "how-to-use",
+    "inputs-and-options",
+    "results-and-output",
+    "processing-and-privacy",
+    "availability-and-account",
+    "limitations-and-responsible-use",
+    "troubleshooting",
+  ];
+
+  for (const tool of publicTools) {
+    const sections = getToolDocumentation(tool);
+    const byId = new Map(sections.map((section) => [section.id, section]));
+    const whenToUse = byId.get("when-to-use");
+    const normalizedDescription = String(tool.description ?? "").replace(/\\s+/g, " ").trim();
+    const summary = toolDocumentationSummary(tool);
+
+    assert.ok(whenToUse, tool.id + ": public guide must include a when-to-use section");
+    assert.ok(
+      whenToUse.paragraphs[0].startsWith("This guide is specific to " + tool.name + "."),
+      tool.id + ": guide must identify this individual tool",
+    );
+    assert.ok(
+      whenToUse.paragraphs[1].startsWith("For " + tool.name + ", "),
+      tool.id + ": guide example must be framed around this individual tool",
+    );
+
+    if (summary === normalizedDescription) {
+      assert.ok(
+        !whenToUse.paragraphs[0].includes(normalizedDescription),
+        tool.id + ": guide body must not repeat the exact page introduction",
+      );
+    } else {
+      assert.ok(
+        whenToUse.paragraphs[0].includes(normalizedDescription),
+        tool.id + ": guide must retain the catalogue task when the page summary is independently generated",
+      );
+    }
+
+    for (const sectionId of requiredSections) {
+      assert.ok(byId.has(sectionId), tool.id + ": missing required guide section " + sectionId);
+    }
   }
 });
 
