@@ -111,7 +111,7 @@ class CatalogModelsTest {
 
     @Test fun webAndCommerceNativeCategoriesBecomeAvailableWhenParsed() {
         val catalog = Catalog.fromJson("""
-            {"schemaVersion":1,"catalogVersion":"test","counts":{"total":3,"active":0,"planned":3,"categories":3},
+            {"schemaVersion":1,"catalogVersion":"test","counts":{"total":3,"active":2,"planned":1,"categories":3,"categoriesWithTools":3,"discoverable":3,"androidImplemented":2,"iosImplemented":2},
              "categories":[],
              "tools":[
                {"id":"qr-payload-inspector","name":"QR & Barcode Reader","slug":"qr-payload-inspector","description":"Scan codes","category":"qr","keywords":[],"tags":[],"icon":"QrCode","popularity":1,"featured":false,"clientSide":true,"requiresBackend":false,"requiresAuth":false,"status":"planned","related":[],"engine":{"type":"qr","id":"inspect","preset":"inspect"}},
@@ -125,6 +125,25 @@ class CatalogModelsTest {
         assertEquals("planned", catalog.tools.first { it.id == "other-tool" }.status)
         assertEquals(2, catalog.counts.active)
         assertEquals(1, catalog.counts.planned)
+        assertEquals(3, catalog.browserActiveToolCount)
+        assertEquals(2, catalog.nativeImplementedToolCount)
+        assertEquals(3, catalog.counts.discoverable)
+    }
+
+    @Test fun nativeCatalogKeepsCanonicalCountsWhenWebOnlyToolsMoveToReferenceRecords() {
+        val catalog = Catalog.fromJson("""
+            {"schemaVersion":1,"catalogVersion":"shared","counts":{"total":2,"active":2,"planned":0,"categories":2,"categoriesWithTools":2,"discoverable":2,"androidImplemented":1,"iosImplemented":1},
+             "categories":[],
+             "tools":[
+               {"id":"webcodecs-video-checker","name":"WebCodecs Video Support","slug":"webcodecs-video-checker","description":"Inspect support","category":"video","keywords":[],"tags":[],"icon":"Video","popularity":1,"featured":false,"clientSide":true,"requiresBackend":false,"requiresAuth":false,"status":"active","related":[],"engine":{"type":"custom","id":"webcodecs-video-checker"}},
+               {"id":"word-counter","name":"Word Counter","slug":"word-counter","description":"Count words","category":"text","keywords":[],"tags":[],"icon":"Type","popularity":1,"featured":false,"clientSide":true,"requiresBackend":false,"requiresAuth":false,"status":"active","related":[],"engine":{"type":"text","id":"word-counter"}}
+             ]}
+        """.trimIndent())
+        assertEquals(listOf("word-counter"), catalog.tools.map { it.id })
+        assertEquals(listOf("webcodecs-video-checker"), catalog.relatedReferenceTools.map { it.id })
+        assertEquals(2, catalog.counts.total)
+        assertEquals(2, catalog.browserActiveToolCount)
+        assertEquals(1, catalog.nativeImplementedToolCount)
     }
 
     @Test fun searchesNameDescriptionKeywordsTagsAndRanksRelevanceBeforePopularity() {
