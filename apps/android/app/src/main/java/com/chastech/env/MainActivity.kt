@@ -749,7 +749,7 @@ private fun WebHomeFooter(catalog: Catalog, onInformation: (String) -> Unit, scr
         ) {
             Text("© ${Year.now().value} chAs Technologies LLC · enV", color = footerSubtle,
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 18.sp))
-            if (screenWidth >= 640) Text("${catalog.categories.size} categories · ${catalog.browserActiveToolCount} live tools", color = footerSubtle,
+            if (screenWidth >= 640) Text("${catalog.categories.size} categories · ${catalog.browserActiveToolCount} enV catalogue tools", color = footerSubtle,
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 18.sp))
         }
     }
@@ -759,7 +759,7 @@ private fun WebHomeFooter(catalog: Catalog, onInformation: (String) -> Unit, scr
 private fun BrandFooterIdentity(catalog: Catalog, modifier: Modifier = Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         EnVLogo(Modifier.width(84.dp).height(56.dp))
-        Text("Useful tools. One place. ${catalog.browserActiveToolCount} browser tools for everyday tasks.",
+        Text("Useful tools. One place. ${catalog.browserActiveToolCount} tools in the shared enV catalogue.",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 21.sp),
             modifier = Modifier.widthIn(max = 384.dp))
@@ -1054,12 +1054,12 @@ private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme:
             "Sun",
             onClick = onUseSystemTheme,
         )
-        SettingCard("Offline catalog", "${catalog.counts.total} tools are bundled on this device", "Wrench")
+        SettingCard("Shared tool catalogue", "${catalog.counts.total} catalogue tools · ${catalog.nativeImplementedToolCount} IDs in Android native coverage", "Wrench")
         SettingCard("Favorites", "Stored locally with SharedPreferences", "Heart")
         SettingCard("Account", "Sign in or create an account to sync supported enV features.", "Info", onClick = { onOpenInformationPage("account") })
         SettingCard("History", "Recently used tools will appear here.", "Info", onClick = { onOpenInformationPage("history") })
         SettingCard("Instant Contact Exchange", "Nearby peer-to-peer contact sharing with explicit activation and native Contacts saving", "Contact", onClick = onOpenExchange)
-        SettingCard("Migration status", "${catalog.tools.count { (it.status == "active" || it.status == "beta") && nativeSupported(it) }} of ${catalog.counts.active} active tools run natively and offline. Web-only tools are never routed through the website.", "Hammer")
+        SettingCard("Native tool coverage", "${catalog.tools.count { (it.status == "active" || it.status == "beta") && nativeSupported(it) }} of ${catalog.counts.active} active catalogue tools have an Android native handler. ${catalog.nativeImplementedToolCount} IDs are recorded in the native coverage manifest.", "Hammer")
         SettingCard("About enV & chAs Technologies LLC", "Company details, policies, and pricing", "Info", onClick = onOpenInformation)
     }
 }
