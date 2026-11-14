@@ -324,12 +324,14 @@ assert.match(iosContent, /let visibleCount = proxy\.size\.width >= 768 \? 10 : 5
 assert.match(iosContent, /ScrollView\(\.horizontal, showsIndicators: false\)/);
 assert.match(iosContent, /HomeMostUsedToolsTray:[\s\S]*?\.frame\(height: 112\)[\s\S]*?\.frame\(height: 112\)/);
 assert.match(iosContent, /HStack\(spacing: 12\)/);
-assert.match(androidCatalog, /val browserActiveToolCount: Int[\s\S]*?relatedReferenceTools\)\.count \{ it\.status == "active" \|\| it\.status == "beta" \}/);
-assert.match(iosCatalog, /var browserActiveToolCount: Int[\s\S]*?\(tools \+ \(relatedReferenceTools \?\? \[\]\)\)\.filter \{ \$0\.status == "active" \|\| \$0\.status == "beta" \}\.count/);
-assert.match(android, /\$\{catalog\.browserActiveToolCount\} browser tools/);
-assert.match(android, /\$\{catalog\.browserActiveToolCount\} live tools/);
-assert.match(android, /\$\{catalog\.browserActiveToolCount\} live tools/);
-assert.match(iosContent, /WebHomeFooter\(activeCount: store\.catalog\.browserActiveToolCount/);
+assert.match(androidCatalog, /val browserActiveToolCount: Int[\s\S]*?get\(\) = counts\.active/);
+assert.match(iosCatalog, /var browserActiveToolCount: Int \{ counts\.active \}/);
+assert.match(iosContent, /WebHomeFooter\(activeCount: store\.catalog\.counts\.total, nativeCoverageCount: store\.catalog\.nativeImplementedToolCount/);
+
+assert.match(androidCatalog, /val nativeImplementedToolCount: Int[\s\S]*?get\(\) = counts\.androidImplemented/);
+assert.match(iosCatalog, /var nativeImplementedToolCount: Int \{ counts\.iosImplemented \?\? 0 \}/);
+assert.match(android, /\$\{catalog\.counts\.total\} enV catalogue tools/);
+assert.match(android, /SettingCard\("Shared tool catalogue"/);
 
 // All advertised catalog records remain discoverable; general browser-runtime references stay labeled and do not receive a WebView execution fallback.
 assert.match(android, /catalog\.webSearch\(query, includeRelatedReferences = true\)/);
