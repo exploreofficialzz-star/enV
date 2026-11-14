@@ -450,6 +450,30 @@ test("hand-written tool guidance is wrapped with catalogue identity without repe
       engine: { type: "converter", system: "datetime" },
       expectedGuidance: "translate between Unix timestamps and human-readable dates",
     },
+    {
+      id: "youtube-content-calendar",
+      name: "YouTube Content Calendar",
+      description: "Create a dated publishing plan from a campaign, start date, posting days, post count and format mix.",
+      category: "creators",
+      engine: { type: "creator", op: "youtube-content-calendar" },
+      expectedGuidance: "dated publishing plan",
+    },
+    {
+      id: "youtube-content-planner",
+      name: "YouTube Content Planner",
+      description: "Generate platform-aware content ideas for a chosen audience and campaign.",
+      category: "creators",
+      engine: { type: "creator", op: "youtube-content-planner" },
+      expectedGuidance: "generates a set of content ideas",
+    },
+    {
+      id: "youtube-posting-time-helper",
+      name: "YouTube Posting Time Helper",
+      description: "Rank audience posting windows from activity scores supplied from YouTube analytics.",
+      category: "creators",
+      engine: { type: "creator", op: "youtube-posting-time-helper" },
+      expectedGuidance: "ranks posting windows from audience-activity scores",
+    },
   ];
 
   for (const sample of samples) {
