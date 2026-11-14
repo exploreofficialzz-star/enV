@@ -861,7 +861,7 @@ function addFamily(category, prefix, items, engineType = "custom", enginePrefix 
       category,
       description,
       engineType,
-      \`\${enginePrefix}-\${key}\`,
+      `${enginePrefix}-${key}`, 
       keywords.toLowerCase(),
       0,
       25,
@@ -873,7 +873,7 @@ function addFamily(category, prefix, items, engineType = "custom", enginePrefix 
 function addCross(category, prefixes, operations, descriptionTemplate, engineType = "custom", planned = true) {
   for (const prefix of prefixes) {
     for (const operation of operations) {
-      const name = \`\${prefix} \${operation}\`;
+      const name = `${prefix} ${operation}`;
       const id = slugify(name);
       const rawDescription = descriptionTemplate.replace(/\{platform\}/g, prefix).replace(/\{operation\}/g, operation);
       const description = refineGeneratedToolDescription({ id, name, category, description: rawDescription });
@@ -884,7 +884,7 @@ function addCross(category, prefixes, operations, descriptionTemplate, engineTyp
         description,
         engineType,
         id,
-        \`\${prefix} \${operation}\`.toLowerCase(),
+        `${prefix} ${operation}`.toLowerCase(),
         0,
         20,
         planned ? "p" : "",
