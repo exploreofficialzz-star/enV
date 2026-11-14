@@ -1,5 +1,17 @@
 const SITE_ORIGIN = "https://envtools.store";
 
+export function chunkIndexNowUrls(urls, maxUrlsPerPost = 10_000) {
+  if (!Array.isArray(urls)) throw new TypeError("IndexNow URLs must be an array.");
+  if (!Number.isInteger(maxUrlsPerPost) || maxUrlsPerPost < 1 || maxUrlsPerPost > 10_000) {
+    throw new RangeError("IndexNow batches must contain between 1 and 10,000 URLs.");
+  }
+  const batches = [];
+  for (let offset = 0; offset < urls.length; offset += maxUrlsPerPost) {
+    batches.push(urls.slice(offset, offset + maxUrlsPerPost));
+  }
+  return batches;
+}
+
 export function buildIndexNowKeyArtifact(value) {
   const key = String(value ?? "").trim();
   if (!key) return null;
