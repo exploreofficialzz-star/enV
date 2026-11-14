@@ -223,7 +223,8 @@ for (const route of renderedRoutes) {
 
   const expectedStatus = route.expectedStatus ?? 200;
   if (response.status !== expectedStatus) failures.push(route.path + ": expected HTTP " + expectedStatus + ", received " + response.status);
-  if (!title || title.length < 8) failures.push(route.path + ": missing or unhelpful title");
+  // Search-title quality is required for indexable pages. noindex interaction routes and 404 fixtures are validated by their status and robots policy below.
+  if (route.kind === "indexable" && (!title || title.length < 8)) failures.push(route.path + ": missing or unhelpful title");
   if (route.expectedTitle && title !== route.expectedTitle) {
     failures.push(route.path + ": rendered title does not match the canonical peer-aware title (expected " + JSON.stringify(route.expectedTitle) + ", received " + JSON.stringify(title) + ")");
   }
