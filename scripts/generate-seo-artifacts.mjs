@@ -244,7 +244,7 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
     "- Guide copy-provenance counts: " + guideCoverageSummary,
     "- Guide provenance meanings: tool-specific = exact tool ID/name rule; engine-specific = engine-family guidance; category-guidance = category-level guidance; catalogue-fallback = catalogue description plus generic example.",
     "- Provenance classifies where guide copy originates; it does not prove control-level accuracy, source/runtime verification or human editorial review.",
-        "- Eligible catalog records considered: " + eligibleToolRecords.length,
+    "- Eligible catalog records considered: " + eligibleToolRecords.length,
     "- Canonical public tool pages included: " + tools.length,
     "- Canonical public tool guides included: " + guideTools.length,
     "- Identical generated equation variants remain usable in enV but are consolidated to one canonical search page and guide.",
