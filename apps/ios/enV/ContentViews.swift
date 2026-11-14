@@ -800,7 +800,7 @@ private struct DiscoveryToolCard: View {
         VStack(alignment: .leading, spacing: 0) {
             iconTile(tool)
             enVCharacterSpacedText(tool.name).font(.envScaled(size: 14, weight: .semibold)).foregroundStyle(Color.envInk).padding(.top, 12)
-            enVCharacterSpacedText(tool.offlineDescription).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(2).lineSpacing(2).padding(.top, 4)
+            if tool.category != "celebrations" { enVCharacterSpacedText(tool.offlineDescription).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(2).lineSpacing(2).padding(.top, 4) }
             if tool.isUnderProduction {
                 enVCharacterSpacedText("Under production").font(.envScaled(size: 10, weight: .medium)).foregroundStyle(Color.envSubtle).padding(.top, 10)
             } else if tool.isPlanned {
@@ -847,7 +847,7 @@ private struct WebHomeSearchSuggestion: View {
                     else if tool.isPlanned { enVCharacterSpacedText("Coming soon").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
                     else if NativeCopy.isWebRuntimeOnly(tool.id) { enVCharacterSpacedText("Web only").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
                 }
-                enVCharacterSpacedText(tool.offlineDescription).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(1)
+                if tool.category != "celebrations" { enVCharacterSpacedText(tool.offlineDescription).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(1) }
             }
             Spacer(minLength: 4)
             EnVIcon(name: "ArrowRight", size: 16, tint: .envInk).accessibilityHidden(true)
@@ -1093,7 +1093,7 @@ struct ToolsView: View {
                                                         if tool.isPlanned { enVCharacterSpacedText("Coming soon").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
                                                         else if NativeCopy.isWebRuntimeOnly(tool.id) { enVCharacterSpacedText("Web only").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
                                                     }
-                                                    enVCharacterSpacedText(tool.offlineDescription).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(1)
+                                                    if tool.category != "celebrations" { enVCharacterSpacedText(tool.offlineDescription).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(1) }
                                                 }
                                                 .frame(maxWidth: .infinity, alignment: .leading)
                                                 .padding(.horizontal, 12)
@@ -1139,10 +1139,12 @@ struct ToolsView: View {
                                             enVCharacterSpacedText(group.category.name)
                                                 .font(.envScaled(size: 18, weight: .bold))
                                                 .foregroundStyle(Color.envAccent)
-                                            enVCharacterSpacedText(group.category.blurb)
-                                                .font(.envScaled(size: 12, weight: .regular))
-                                                .foregroundStyle(Color.envMuted)
-                                                .lineLimit(2)
+                                            if group.category.id != "celebrations" {
+                                                enVCharacterSpacedText(group.category.blurb)
+                                                    .font(.envScaled(size: 12, weight: .regular))
+                                                    .foregroundStyle(Color.envMuted)
+                                                    .lineLimit(2)
+                                            }
                                         }
                                     }
                                 }
@@ -1221,9 +1223,11 @@ struct CategoryView: View {
                             enVCharacterSpacedText(category.name)
                                 .font(.envScaled(size: 30, weight: .bold))
                                 .foregroundStyle(Color.envAccent)
-                            enVCharacterSpacedText(category.description)
-                                .font(.envScaled(size: 14, weight: .regular))
-                                .foregroundStyle(Color.envMuted)
+                            if categoryID != "celebrations" {
+                                enVCharacterSpacedText(category.description)
+                                    .font(.envScaled(size: 14, weight: .regular))
+                                    .foregroundStyle(Color.envMuted)
+                            }
                         }
                     }
                 }
@@ -1781,7 +1785,7 @@ private struct NativeTokenGuideView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(tool.category.replacingOccurrences(of: "-", with: " ").capitalized).font(.caption2).foregroundStyle(Color.envMuted)
                                 Text(tool.name).font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
-                                Text(tool.offlineDescription).font(.footnote).foregroundStyle(Color.envMuted).lineLimit(3).multilineTextAlignment(.leading)
+                                if tool.category != "celebrations" { Text(tool.offlineDescription).font(.footnote).foregroundStyle(Color.envMuted).lineLimit(3).multilineTextAlignment(.leading) }
                             }
                             Spacer(minLength: 4)
                             Image(systemName: selectedToolID == tool.id ? "chevron.up" : "chevron.down").font(.caption.weight(.semibold)).foregroundStyle(Color.envMuted).padding(.top, 8)
