@@ -149,7 +149,7 @@ enum NativeCelebrationEngine {
     private static func safeURL(_ value: String) -> String {
         guard let components = URLComponents(string: value.trimmingCharacters(in: .whitespacesAndNewlines)),
               let scheme = components.scheme?.lowercased(), ["http", "https"].contains(scheme),
-              components.host != nil else { return "" }
+              components.host != nil, components.user == nil, components.password == nil else { return "" }
         return components.url?.absoluteString ?? ""
     }
     private static func lines(_ value: String) -> [String] {
