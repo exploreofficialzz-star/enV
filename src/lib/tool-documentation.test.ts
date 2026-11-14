@@ -1,10 +1,136 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { readFileSync } from "node:fs";
 import { CATEGORIES } from "@/data/categories";
 import type { ToolMeta } from "@/types/tool";
 import { getSearchableTools, getToolsByCategory } from "@/lib/registry";
 import { canonicalSeoTools, isIndexableTool } from "@/lib/seo-metadata";
 import { getToolDocumentation, toolDocumentationSummary } from "@/lib/tool-documentation";
+
+const TOOL_ENGINE_SOURCE = readFileSync(
+  new URL("../components/tools/tool-engine.tsx", import.meta.url),
+  "utf8",
+);
+
+function switchEngineRenderers(source: string): Map<string, string> {
+  const switchStart = source.indexOf("switch (tool.engine.type)");
+  if (switchStart < 0) return new Map();
+  const open = source.indexOf("{", switchStart);
+  if (open < 0) return new Map();
+
+  let depth = 0;
+  let close = -1;
+  for (let index = open; index < source.length; index += 1) {
+    if (source[index] === "{") depth += 1;
+    if (source[index] === "}") depth -= 1;
+    if (depth === 0) {
+      close = index;
+      break;
+    }
+  }
+  if (close < 0) return new Map();
+
+  const renderers = new Map<string, string>();
+  let pendingCases: string[] = [];
+  for (const line of source.slice(open + 1, close).split("\n")) {
+    for (const match of line.matchAll(/case\s+"([^"]+)"\s*:/g)) {
+      pendingCases.push(match[1]);
+    }
+    const returnedComponent = line.match(/\breturn\s+<([A-Z][A-Za-z0-9]*)\b/);
+    if (returnedComponent && pendingCases.length) {
+      for (const engineType of pendingCases) {
+        if (engineType !== "custom") renderers.set(engineType, returnedComponent[1]);
+      }
+      pendingCases = [];
+    }
+  }
+  return renderers;
+}
+
+const ENGINE_RENDERERS = switchEngineRenderers(TOOL_ENGINE_SOURCE);
+const LAZY_ENGINE_COMPONENTS = new Set(
+  [...TOOL_ENGINE_SOURCE.matchAll(/const\s+([A-Z][A-Za-z0-9]*)\s*=\s*lazy\(/g)]
+    .map((match) => match[1]),
+);
+
+const DIRECT_TOOL_RENDERERS: Record<string, string> = {
+  "smartphone-prototype-lab": "SmartphonePrototypeLabEngine",
+  "camera-studio": "CameraStudioEngine",
+  "a-book": "ABookEngine",
+  "zip-any-file": "ZipArchiveEngine",
+  "music-downloader": "MusicDownloaderEngine",
+  "song-metadata-analyzer": "AiMusicDataSandbox",
+  "qr-payload-inspector": "BarcodeReaderEngine",
+};
+
+const CATEGORY_RENDERERS: Record<string, string> = {
+  mockups: "MockupsCategoryEngine",
+  screenshots: "ScreenshotEngine",
+  ecommerce: "EcommerceEngine",
+  accessibility: "AccessibilityEngine",
+};
+
+const CUSTOM_ENGINE_ID_RENDERERS: Record<string, string> = {
+  "image-comparison": "ImageToolsEngine",
+  "image-screenshot": "ImageToolsEngine",
+  "image-print-layout": "ImageToolsEngine",
+  transcription: "TranscriptionEngine",
+};
+
+const CUSTOM_CATEGORY_RENDERERS: Record<string, string> = {
+  productivity: "ProductivityEngine",
+  personal: "PersonalEngine",
+  communication: "CommunicationEngine",
+  streaming: "StreamingEngine",
+  marketing: "MarketingEngine",
+  webdesign: "WebDesignEngine",
+  career: "CareerEngine",
+  relationships: "RelationshipEngine",
+  interactive: "InteractiveEngine",
+  gaming: "GamingEngine",
+  social: "SocialEngine",
+  events: "PlannedLocalEngine",
+  celebrations: "PlannedLocalEngine",
+  food: "PlannedLocalEngine",
+  travel: "PlannedLocalEngine",
+  photography: "PlannedLocalEngine",
+};
+
+function runtimeRendererCandidates(tool: ToolMeta): string[] {
+  const direct = DIRECT_TOOL_RENDERERS[tool.id];
+  if (direct) return [direct];
+
+  const categoryRenderer = CATEGORY_RENDERERS[tool.category];
+  if (categoryRenderer) return [categoryRenderer];
+
+  if (tool.category === "developer" && tool.tags.includes("developer-studio")) {
+    return [tool.slug === "ux-ui-studio" ? "UxUiStudioEngine" : "DeveloperStudioEngine"];
+  }
+  if (tool.category === "files" && tool.engine.type === "custom") {
+    return ["FileWorkspaceEngine"];
+  }
+  if (tool.requiresBackend && tool.engine.type === "custom") {
+    return ["BackendToolEngine"];
+  }
+  if (tool.engine.type === "custom") {
+    const byEngineId = CUSTOM_ENGINE_ID_RENDERERS[tool.engine.id ?? ""];
+    if (byEngineId) return [byEngineId];
+    if (tool.category === "events") return ["EventTemplateEngine", "PlannedLocalEngine"];
+    const byCategory = CUSTOM_CATEGORY_RENDERERS[tool.category];
+    return byCategory ? [byCategory] : [];
+  }
+
+  const renderer = ENGINE_RENDERERS.get(tool.engine.type);
+  return renderer ? [renderer] : [];
+}
+
+function hasImportedRuntimeRenderer(tool: ToolMeta): boolean {
+  const candidates = runtimeRendererCandidates(tool);
+  return candidates.length > 0 && candidates.every((component) =>
+    LAZY_ENGINE_COMPONENTS.has(component) && TOOL_ENGINE_SOURCE.includes("<" + component),
+  );
+}
+
 
 test("tool-guide fallbacks include a distinct catalogue task statement for every category", () => {
   for (const category of CATEGORIES) {
@@ -301,6 +427,10 @@ test("every canonical public tool has an individually grounded guide contract", 
   ];
 
   for (const tool of publicTools) {
+    assert.ok(
+      hasImportedRuntimeRenderer(tool),
+      tool.id + ": public tool guide must resolve to an imported renderer in the live ToolEngine dispatcher (engine=" + tool.engine.type + ", category=" + tool.category + ", engineId=" + (tool.engine.id ?? "") + ").",
+    );
     const sections = getToolDocumentation(tool);
     const sectionIds = new Set(sections.map((section) => section.id));
     const whenToUse = sections.find((section) => section.id === "when-to-use");
