@@ -109,8 +109,8 @@ class NativeCelebrationEngineTest {
                 "photosData" to listOf(
                     "data:image/png;base64,AAAA",
                     "data:image/svg+xml;base64,PHN2ZyBvbmVycm9yPSJ4Ii8+",
-                    "data:image/png;base64,AAAA\\\"><svg onload=alert(1)>"
-                ).joinToString("\\n")
+                    "data:image/png;base64,AAAA\"><svg onload=alert(1)>"
+                ).joinToString("\n")
             )
         )
         assertEquals(1, Regex("<figure>").findAll(result.html).count())
