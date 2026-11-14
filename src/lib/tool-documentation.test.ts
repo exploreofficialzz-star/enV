@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { CATEGORIES } from "@/data/categories";
 import type { ToolMeta } from "@/types/tool";
-import { getToolDocumentation } from "@/lib/tool-documentation";
+import { getToolDocumentation, toolDocumentationSummary } from "@/lib/tool-documentation";
 
 test("tool-guide fallbacks include a distinct catalogue task statement for every category", () => {
   for (const category of CATEGORIES) {
@@ -31,9 +31,20 @@ test("tool-guide fallbacks include a distinct catalogue task statement for every
     const whenToUse = sections.find((section) => section.id === "when-to-use");
     assert.ok(whenToUse, category.id + ": guide must include a when-to-use section");
     assert.ok(
-      whenToUse.paragraphs[0].includes(description),
-      category.id + ": the guide must carry this tool's own catalogue task description",
+      whenToUse.paragraphs[0].startsWith("This guide is specific to " + name + "."),
+      category.id + ": the guide must identify the individual tool",
     );
+    if (toolDocumentationSummary(tool) === description) {
+      assert.ok(
+        !whenToUse.paragraphs[0].includes(description),
+        category.id + ": the guide body must not repeat the exact page-introduction summary",
+      );
+    } else {
+      assert.ok(
+        whenToUse.paragraphs[0].includes(description),
+        category.id + ": a separately summarized catalogue task must appear in the guide body",
+      );
+    }
     assert.ok(
       whenToUse.paragraphs[1].startsWith("For " + name + ", "),
       category.id + ": the example must be framed around the individual tool",
@@ -64,7 +75,12 @@ test("planned tool guides retain a truthful planned-status explanation with the 
   const sections = getToolDocumentation(tool);
   const whenToUse = sections.find((section) => section.id === "when-to-use");
   const availability = sections.find((section) => section.id === "availability-and-account");
-  assert.ok(whenToUse?.paragraphs[0].includes(tool.description));
+  assert.ok(whenToUse?.paragraphs[0].startsWith("This guide is specific to " + tool.name + "."));
+  if (toolDocumentationSummary(tool) === tool.description) {
+    assert.ok(!whenToUse?.paragraphs[0].includes(tool.description), "The planned task description must not be duplicated verbatim.");
+  } else {
+    assert.ok(whenToUse?.paragraphs[0].includes(tool.description));
+  }
   assert.ok(availability?.paragraphs.some((paragraph) => paragraph.includes("currently marks this tool as planned")));
 });
 
@@ -160,16 +176,104 @@ test("generic engine guide branches preserve each tool's catalogue task statemen
     assert.ok(whenToUse, sample.id + ": guide must include a when-to-use section");
     const normalizedDescription = sample.description.replace(/\s+/g, " ").trim();
     assert.ok(
-      whenToUse.paragraphs[0].includes(normalizedDescription),
-      sample.id + ": engine fallback must include the individual catalogue task",
-    );
-    assert.ok(
       whenToUse.paragraphs[0].startsWith("This guide is specific to " + sample.name + "."),
       sample.id + ": engine fallback must identify the individual tool",
     );
+    if (toolDocumentationSummary(tool) === normalizedDescription) {
+      assert.ok(
+        !whenToUse.paragraphs[0].includes(normalizedDescription),
+        sample.id + ": engine fallback must not duplicate the page-introduction summary",
+      );
+    } else {
+      assert.ok(
+        whenToUse.paragraphs[0].includes(normalizedDescription),
+        sample.id + ": engine fallback must include a catalogue task not already shown in the introduction",
+      );
+    }
     assert.ok(
       whenToUse.paragraphs[1].startsWith("For " + sample.name + ", "),
       sample.id + ": example must be framed around the individual tool",
+    );
+  }
+});
+
+test("hand-written tool guidance is wrapped with catalogue identity without repeating the introduction", () => {
+  const samples: Array<{
+    id: string;
+    name: string;
+    description: string;
+    category: ToolMeta["category"];
+    engine: ToolMeta["engine"];
+    expectedGuidance: string;
+  }> = [
+    {
+      id: "json-formatter",
+      name: "JSON Formatter",
+      description: "Format JSON data with readable indentation and check its syntax.",
+      category: "developer",
+      engine: { type: "developer", op: "format" },
+      expectedGuidance: "working with JSON as structured data",
+    },
+    {
+      id: "qr-generator",
+      name: "QR Code Generator",
+      description: "Create a QR code from a text value or URL for scanning.",
+      category: "qr",
+      engine: { type: "qr", preset: "url" },
+      expectedGuidance: "encodes text or a URL into a QR image",
+    },
+    {
+      id: "password-generator",
+      name: "Password Generator",
+      description: "Generate a unique password using the length and character options shown.",
+      category: "security",
+      engine: { type: "security", op: "password" },
+      expectedGuidance: "generates a password using the length and character options",
+    },
+    {
+      id: "unix-timestamp-converter",
+      name: "Unix Timestamp Converter",
+      description: "Convert Unix timestamps into human-readable dates and back again.",
+      category: "converters",
+      engine: { type: "converter", system: "datetime" },
+      expectedGuidance: "translate between Unix timestamps and human-readable dates",
+    },
+  ];
+
+  for (const sample of samples) {
+    const tool: ToolMeta = {
+      ...sample,
+      slug: sample.id,
+      keywords: [sample.name.toLowerCase(), "documentation", "coverage"],
+      tags: ["documentation", "coverage"],
+      icon: "FileText",
+      popularity: 0,
+      featured: false,
+      clientSide: true,
+      requiresBackend: false,
+      requiresAuth: false,
+      status: "active",
+      related: [],
+    };
+    const whenToUse = getToolDocumentation(tool).find((section) => section.id === "when-to-use");
+    assert.ok(whenToUse, sample.id + ": guide must include a when-to-use section");
+    assert.ok(
+      whenToUse.paragraphs[0].startsWith("This guide is specific to " + sample.name + "."),
+      sample.id + ": hand-written guidance must carry the tool identity",
+    );
+    assert.ok(
+      whenToUse.paragraphs[0].includes(sample.expectedGuidance),
+      sample.id + ": the operation-specific guidance must remain present",
+    );
+    if (toolDocumentationSummary(tool) === tool.description) {
+      assert.ok(
+        !whenToUse.paragraphs[0].includes(tool.description),
+        sample.id + ": the exact page introduction must not be repeated in the guide body",
+      );
+    }
+    assert.ok(
+      whenToUse.paragraphs[1].startsWith("For " + sample.name + ", "),
+      sample.id + ": examples must be framed around the named tool",
     );
   }
 });
