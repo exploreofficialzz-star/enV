@@ -52,6 +52,7 @@ Use only the token value supplied by the relevant provider, not a complete HTML 
 The connected `env` Vercel project was checked without decrypting or displaying secret values:
 
 - `INDEXNOW_KEY`: present as a sensitive Production-only variable.
+- The matching public key file has not yet been verified on the canonical production domain from this PR branch; a configured Vercel secret is not evidence that the deployment published it or that IndexNow accepted a notification.
 - `INDEXNOW_SUBMIT_ALL`: absent, which is correct for routine deployments; add it temporarily only for the documented first full-site synchronization after the key file is live.
 - `VITE_GOOGLE_SITE_VERIFICATION`: not configured.
 - `VITE_BING_SITE_VERIFICATION`: not configured.
