@@ -242,7 +242,7 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
     "This file is generated from the live tool registry during the production build. It is a review and coverage artifact, not a source of search-volume data or a ranking report.",
     "",
     "- Guide copy-provenance counts: " + guideCoverageSummary,
-    "- Guide provenance meanings: tool-specific = exact tool ID/name rule; engine-specific = engine-family guidance; category-guidance = category-level guidance; catalogue-fallback = catalogue description plus generic example.",
+    "- Guide provenance meanings: tool-specific = an explicit tool ID/name match; engine-specific = engine-family guidance; category-guidance = category-level guidance; catalogue-fallback = catalogue description plus generic example.",
     "- Provenance classifies where guide copy originates; it does not prove control-level accuracy, source/runtime verification or human editorial review.",
     "- Eligible catalog records considered: " + eligibleToolRecords.length,
     "- Canonical public tool pages included: " + tools.length,
