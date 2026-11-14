@@ -683,7 +683,7 @@ struct HomeView: View {
                     .padding(.horizontal, 16)
                     .frame(maxWidth: 1152)
                     .frame(maxWidth: .infinity)
-                    WebHomeFooter(activeCount: store.catalog.counts.total, nativeCoverageCount: store.catalog.nativeImplementedToolCount, categoryCount: store.catalog.categories.count, onInformation: onInformation, onTools: onTools)
+                    WebHomeFooter(toolCount: store.catalog.counts.total, nativeCoverageCount: store.catalog.nativeImplementedToolCount, categoryCount: store.catalog.categories.count, onInformation: onInformation, onTools: onTools)
                 }
                 .padding(.top, 4)
                 .frame(maxWidth: .infinity)
@@ -859,7 +859,7 @@ private struct WebHomeSearchSuggestion: View {
 
 private struct WebHomeFooter: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    let activeCount: Int
+    let toolCount: Int
     let nativeCoverageCount: Int
     let categoryCount: Int
     let onInformation: (String) -> Void
@@ -899,7 +899,7 @@ private struct WebHomeFooter: View {
                     .foregroundStyle(Color.envSubtle)
                 Spacer(minLength: 12)
                 if wideLayout {
-                    enVCharacterSpacedText("\(categoryCount) categories · \(activeCount) tools in the shared catalogue")
+                    enVCharacterSpacedText("\(categoryCount) categories · \(toolCount) tools in the shared catalogue")
                         .font(.envScaled(size: 12, weight: .regular))
                         .foregroundStyle(Color.envSubtle)
                         .lineSpacing(4)
@@ -917,7 +917,7 @@ private struct WebHomeFooter: View {
     private var brandBlock: some View {
         VStack(alignment: .leading, spacing: 12) {
             EnVLogo().frame(width: 84, height: 56)
-            enVCharacterSpacedText("Useful tools. One place. \(activeCount) tools in enV's shared catalogue. \(nativeCoverageCount) IDs are recorded in iOS native coverage.")
+            enVCharacterSpacedText("Useful tools. One place. \(toolCount) tools in enV's shared catalogue. \(nativeCoverageCount) IDs are recorded in iOS native coverage.")
                 .font(.envScaled(size: 14, weight: .regular))
                 .foregroundStyle(Color.envMuted)
                 .lineSpacing(4)
