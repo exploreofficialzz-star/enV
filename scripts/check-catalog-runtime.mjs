@@ -1,51 +1,83 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
-import { parseGeneratedCatalog } from "./catalog-reader.mjs";
+import { CATEGORIES } from "../src/data/categories.ts";
+import {
+  getAllTools,
+  getCatalogCounts,
+  getSearchableTools,
+} from "../src/lib/registry.ts";
 
-const catalogSource = readFileSync(new URL("../src/data/catalog.ts", import.meta.url), "utf8");
-const sourceTools = parseGeneratedCatalog(catalogSource);
+const tools = getAllTools();
+const searchableTools = getSearchableTools();
+const counts = getCatalogCounts();
 const homeTools = JSON.parse(
   readFileSync(new URL("../src/data/home-tools.json", import.meta.url), "utf8"),
 );
-const expectedVersion = createHash("sha256").update(catalogSource).digest("hex").slice(0, 12);
-assert.equal(
-  homeTools.version,
-  expectedVersion,
-  "Homepage/runtime catalog version is stale; run npm run update:home-tools.",
+assert.deepEqual(
+  homeTools.counts,
+  counts,
+  "Homepage counts must be generated from the canonical Web registry. Run npm run update:home-tools.",
 );
 
-const runtimeRoot = new URL(`../public/catalog-runtime/${expectedVersion}/`, import.meta.url);
+const runtimeRoot = new URL(`../public/catalog-runtime/${homeTools.version}/`, import.meta.url);
 const index = JSON.parse(readFileSync(new URL("index.json", runtimeRoot), "utf8"));
 const searchIndex = JSON.parse(readFileSync(new URL("search.json", runtimeRoot), "utf8"));
 assert.deepEqual(
   JSON.parse(gunzipSync(readFileSync(new URL("index.json.gz", runtimeRoot))).toString("utf8")),
   index,
-  "The precompressed catalog index does not match its JSON source.",
+  "The precompressed catalogue index does not match its JSON source.",
 );
 assert.deepEqual(
   JSON.parse(gunzipSync(readFileSync(new URL("search.json.gz", runtimeRoot))).toString("utf8")),
   searchIndex,
   "The precompressed search index does not match its JSON source.",
 );
-const shardSize = 250;
-const shardCount = Math.ceil(sourceTools.length / shardSize);
-const shardDigits = Math.max(2, String(shardCount - 1).length);
-const expectedIndex = [];
-const expectedSearchIndex = [];
-const detailRecords = [];
 
-for (let offset = 0; offset < sourceTools.length; offset += shardSize) {
+const assertUniqueIds = (records, label) => {
+  const ids = records.map((record) => record.id);
+  assert.equal(
+    new Set(ids).size,
+    records.length,
+    `${label} contains duplicate tool IDs.`,
+  );
+};
+assertUniqueIds(tools, "Canonical registry");
+assertUniqueIds(searchableTools, "Searchable registry");
+assertUniqueIds(index, "Runtime index");
+assertUniqueIds(searchIndex, "Runtime search index");
+
+assert.equal(index.length, counts.total, "Runtime index must contain every canonical tool exactly once.");
+assert.equal(searchIndex.length, counts.discoverable, "Search index must match the unique discoverable count.");
+assert.deepEqual(
+  index.map((tool) => tool.id),
+  tools.map((tool) => tool.id),
+  "Runtime index ordering and membership must match getAllTools().",
+);
+assert.deepEqual(
+  searchIndex.map((tool) => tool.id),
+  searchableTools.map((tool) => tool.id),
+  "Runtime search ordering and membership must match getSearchableTools().",
+);
+
+const detailById = new Map(tools.map((tool) => [tool.id, tool]));
+for (const tool of searchableTools) detailById.set(tool.id, tool);
+const detailTools = [...detailById.values()];
+const detailRecords = [];
+const shardSize = 250;
+const shardCount = Math.ceil(detailTools.length / shardSize);
+const shardDigits = Math.max(2, String(Math.max(0, shardCount - 1)).length);
+
+for (let offset = 0; offset < detailTools.length; offset += shardSize) {
   const shard = String(Math.floor(offset / shardSize)).padStart(shardDigits, "0");
-  const records = sourceTools.slice(offset, offset + shardSize);
+  const expectedRecords = detailTools.slice(offset, offset + shardSize);
   const actualRecords = JSON.parse(
     readFileSync(new URL(`details/${shard}.json`, runtimeRoot), "utf8"),
   );
   assert.deepEqual(
     actualRecords,
-    records,
-    `Detail shard ${shard} does not match the source catalog.`,
+    expectedRecords,
+    `Detail shard ${shard} does not match the canonical + discovery detail records.`,
   );
   assert.deepEqual(
     JSON.parse(
@@ -55,64 +87,28 @@ for (let offset = 0; offset < sourceTools.length; offset += shardSize) {
     `Precompressed detail shard ${shard} does not match its JSON source.`,
   );
   detailRecords.push(...actualRecords);
-
-  for (const tool of records) {
-    expectedIndex.push({
-      id: tool.id,
-      name: tool.name,
-      slug: tool.slug,
-      description: tool.description,
-      category: tool.category,
-      icon: tool.icon,
-      popularity: tool.popularity,
-      featured: tool.featured,
-      clientSide: tool.clientSide,
-      status: tool.status,
-      ...(tool.isNew ? { isNew: true } : {}),
-      detailShard: shard,
-    });
-    expectedSearchIndex.push({
-      id: tool.id,
-      name: tool.name,
-      slug: tool.slug,
-      description: tool.description,
-      category: tool.category,
-      ...(tool.subcategory ? { subcategory: tool.subcategory } : {}),
-      keywords: tool.keywords,
-      tags: tool.tags,
-      icon: tool.icon,
-      popularity: tool.popularity,
-      clientSide: tool.clientSide,
-      status: tool.status,
-    });
-  }
 }
 
-assert.deepEqual(
-  index,
-  expectedIndex,
-  "The compact catalog index does not match the source catalog.",
-);
-assert.deepEqual(
-  searchIndex,
-  expectedSearchIndex,
-  "The compact search index does not match the source catalog.",
-);
+const detailIds = new Set(detailRecords.map((tool) => tool.id));
+for (const tool of [...tools, ...searchableTools]) {
+  assert.ok(detailIds.has(tool.id), `Detail shards are missing ${tool.id}.`);
+}
+assert.equal(detailRecords.length, detailTools.length, "Detail shards must contain each canonical/discovery ID once.");
+
+const categoryIds = CATEGORIES.map((category) => category.id);
+assert.equal(new Set(categoryIds).size, CATEGORIES.length, "Shared category IDs must be unique.");
+assert.equal(counts.categories, CATEGORIES.length, "All products must report the same configured category count.");
 assert.equal(
-  new Set(index.map((tool) => tool.id)).size,
-  sourceTools.length,
-  "Catalog index contains duplicate IDs.",
+  Object.values(counts.categoryCounts).reduce((sum, count) => sum + count, 0),
+  counts.total,
+  "Category tool counts must sum exactly to the canonical tool total.",
 );
-assert.equal(
-  detailRecords.length,
-  sourceTools.length,
-  "A detail shard is missing catalog records.",
+assert.deepEqual(
+  Object.keys(counts.categoryCounts).sort(),
+  categoryIds.slice().sort(),
+  "Every configured category must have a category count, including zero-tool categories.",
 );
-assert.deepEqual(homeTools.counts, {
-  active: sourceTools.filter((tool) => tool.status === "active" || tool.status === "beta").length,
-  planned: sourceTools.filter((tool) => tool.status === "planned").length,
-  total: sourceTools.length,
-});
+
 console.log(
-  `Verified catalog runtime v${expectedVersion}: ${index.length} list entries, ${searchIndex.length} search entries, ${shardCount} detail shards.`,
+  `Verified shared catalogue v${homeTools.version}: ${counts.total} canonical tools (${counts.active} active, ${counts.planned} planned), ${counts.discoverable} discoverable IDs, ${counts.categories} categories, ${detailRecords.length} detail records and ${shardCount} shards.`,
 );
