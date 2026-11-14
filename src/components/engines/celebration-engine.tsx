@@ -110,6 +110,9 @@ export function CelebrationEngine({ toolId }: { toolId: string }) {
         <Field label="RSVP link">
           <Input value={values.rsvpUrl ?? ""} onChange={(event) => update("rsvpUrl", event.target.value)} placeholder="https://…" inputMode="url" />
         </Field>
+        <Field label="RSVP contact (phone or email)">
+          <Input value={values.contactMethod ?? ""} onChange={(event) => update("contactMethod", event.target.value)} placeholder="Optional reply contact" maxLength={180} />
+        </Field>
         <Field label="Reply by">
           <Input value={values.rsvpBy ?? ""} onChange={(event) => update("rsvpBy", event.target.value)} placeholder="e.g. 20 December" maxLength={80} />
         </Field>
