@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import SwiftUI
 import UIKit
@@ -169,14 +170,15 @@ enum NativeCelebrationEngine {
         }
         if !value(values, "date").isEmpty && value(values, "timezone").isEmpty { result.append("Add the IANA time zone so the displayed local time is clear.") }
         if parsed.experience == "invitation-generator" {
-            if value(values, "rsvpUrl").isEmpty { result.append("Add an RSVP link or include a contact method in the message.") }
-            else if safeURL(value(values, "rsvpUrl")).isEmpty { result.append("Use a complete http or https RSVP link.") }
+            if value(values, "rsvpUrl").isEmpty && value(values, "contactMethod").isEmpty { result.append("Add an RSVP link or a contact method guests can use to reply.") }
+            else if !value(values, "rsvpUrl").isEmpty && safeURL(value(values, "rsvpUrl")).isEmpty { result.append("Use a complete http or https RSVP link.") }
             if value(values, "rsvpBy").isEmpty { result.append("Add an RSVP deadline, or state that replies are open.") }
         }
         if parsed.experience == "quiz-generator" {
             let options = lines(value(values, "quizOptions"))
             if value(values, "quizQuestion").isEmpty { result.append("Add the question.") }
             if !(2...6).contains(options.count) { result.append("Add between 2 and 6 answer choices.") }
+            if value(values, "quizAnswer").isEmpty { result.append("Choose the correct answer so the quiz can grade responses.") }
             if !value(values, "quizAnswer").isEmpty && !options.contains(where: { $0.caseInsensitiveCompare(value(values, "quizAnswer")) == .orderedSame }) {
                 result.append("The correct answer must match one of the answer choices.")
             }
@@ -209,6 +211,7 @@ enum NativeCelebrationEngine {
             lines(value(values, "schedule")).isEmpty ? "" : "Programme\n" + lines(value(values, "schedule")).enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n"),
             value(values, "memories").isEmpty ? "" : "Memories\n" + value(values, "memories"),
             value(values, "dressCode").isEmpty ? "" : "Dress code: " + value(values, "dressCode"),
+            value(values, "contactMethod").isEmpty ? "" : "RSVP contact: " + value(values, "contactMethod"),
             rsvpBy.isEmpty ? "" : "Please reply by: " + rsvpBy,
             rsvp.isEmpty ? "" : "RSVP: " + rsvp,
             reveal.isEmpty ? "" : "The reveal\n" + reveal,
@@ -308,6 +311,7 @@ struct NativeCelebrationToolView: View {
             }
             if invite {
                 input("rsvpUrl", "RSVP link (http or https)")
+                input("contactMethod", "RSVP contact (phone or email)")
                 input("rsvpBy", "Reply by")
                 input("dressCode", "Dress code / theme")
             }
