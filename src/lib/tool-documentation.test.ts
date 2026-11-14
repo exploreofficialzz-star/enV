@@ -535,7 +535,7 @@ test("every canonical public tool has a complete guide structure tied to its cat
       ["tool-specific", "engine-specific", "category-guidance", "catalogue-fallback"].includes(taskGuidanceSource),
       tool.id + ": guide's task-specific usage advice must expose a recognised source classification",
     );
-    taskGuidanceSourceCounts.set(coverage, (taskGuidanceSourceCounts.get(coverage) ?? 0) + 1);
+    taskGuidanceSourceCounts.set(taskGuidanceSource, (taskGuidanceSourceCounts.get(taskGuidanceSource) ?? 0) + 1);
     const operationParser = categoryOperationParsers[tool.category];
     if (tool.engine.type === "custom" && !tool.requiresBackend && operationParser) {
       assert.doesNotThrow(
