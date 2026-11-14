@@ -101,6 +101,23 @@ class NativeCelebrationEngineTest {
         assertFalse(answered.checks.any { it.contains("correct answer") })
     }
 
+    @Test fun memoryPageEmbedsOnlyStrictlyValidatedImageDataUrls() {
+        val result = NativeCelebrationEngine.build(
+            "graduation-memory-page",
+            mapOf(
+                "title" to "The good days",
+                "photosData" to listOf(
+                    "data:image/png;base64,AAAA",
+                    "data:image/svg+xml;base64,PHN2ZyBvbmVycm9yPSJ4Ii8+",
+                    "data:image/png;base64,AAAA\\\"><svg onload=alert(1)>"
+                ).joinToString("\\n")
+            )
+        )
+        assertEquals(1, Regex("<figure>").findAll(result.html).count())
+        assertFalse(result.html.contains("data:image/svg+xml"))
+        assertFalse(result.html.contains("<svg onload="))
+    }
+
     @Test fun countdownHasExactSecondBoundariesAndPastEventsAreComplete() {
         val values = mapOf("date" to "2026-11-05T10:00", "timezone" to "Africa/Lagos")
         val target = Instant.parse("2026-11-05T09:00:00Z")
