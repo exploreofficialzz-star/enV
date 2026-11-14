@@ -229,7 +229,11 @@ assert.match(result.robots, /User-agent: PerplexityBot\nAllow: \/\nDisallow: \/a
 assert.match(result.robots, /Google-Extended remains disallowed/);
 assert.match(result.robots, /User-agent: Googlebot\nAllow: \/\nDisallow: \/api\//);
 assert.match(result.robots, /User-agent: Google-Extended\nDisallow: \/\n/);
-assert.match(result.robots, /User-agent: __usage_ai-training\nDisallow: \/\n/, "Shared AI-training preference must be explicit and separate from crawler access rules.");
+assert.match(
+  result.robots,
+  /User-agent: \*\nAllow: \/\nDisallow: \/api\/\n\nUser-agent: __usage_ai-training\nDisallow: \/\n\nUser-agent: Googlebot\nAllow: \/\nDisallow: \/api\//,
+  "The training-preference token must be isolated from the wildcard and search-crawler groups.",
+);
 assert.match(result.robots, /User-agent: Applebot\nAllow: \/\nDisallow: \/api\//);
 assert.match(result.robots, /User-agent: ClaudeBot\nDisallow: \//);
 assert.match(result.robots, /User-agent: GPTBot\nDisallow: \//);
