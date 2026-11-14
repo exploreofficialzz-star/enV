@@ -47,6 +47,17 @@ Set these Vercel project environment variables for the appropriate deployment en
 
 Use only the token value supplied by the relevant provider, not a complete HTML tag. Save the variables in Vercel, then trigger a new deployment. The values are public verification markers and are intentionally not committed to Git.
 
+### Vercel configuration audit snapshot — 14 November 2026
+
+The connected `env` Vercel project was checked without decrypting or displaying secret values:
+
+- `INDEXNOW_KEY`: present as a sensitive Production-only variable.
+- `INDEXNOW_SUBMIT_ALL`: absent, which is correct for routine deployments; add it temporarily only for the documented first full-site synchronization after the key file is live.
+- `VITE_GOOGLE_SITE_VERIFICATION`: not configured.
+- `VITE_BING_SITE_VERIFICATION`: not configured.
+
+Therefore the IndexNow key is provisioned, but the Google and Bing HTML verification meta tags will not be emitted until the owner adds the corresponding values after completing provider ownership setup. A variable record alone does not prove Search Console or Bing ownership, sitemap processing, or indexing.
+
 DNS verification is often preferable because it is independent of application deployments.
 
 ## 5. Crawler policy
