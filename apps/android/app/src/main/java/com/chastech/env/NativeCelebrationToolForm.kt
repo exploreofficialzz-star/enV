@@ -120,8 +120,19 @@ internal object NativeCelebrationEngine {
     private fun clean(values: Map<String, String>, key: String) = values[key].orEmpty().trim()
     private fun escape(value: String) = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&#39;")
     private fun safeUrl(value: String): String {
-        val uri = runCatching { Uri.parse(value.trim()) }.getOrNull() ?: return ""
-        return if (uri.scheme.equals("https", true) || uri.scheme.equals("http", true)) uri.toString() else ""
+        val candidate = value.trim()
+        if (candidate.any { it.isWhitespace() || it.isISOControl() }) return ""
+        val uri = runCatching { Uri.parse(candidate) }.getOrNull() ?: return ""
+        val allowedScheme = uri.scheme.equals("https", true) || uri.scheme.equals("http", true)
+        return if (allowedScheme && !uri.host.isNullOrBlank() && uri.userInfo == null) uri.toString() else ""
+    }
+    private fun photoMarkup(values: Map<String, String>): String {
+        val safeDataUrl = Regex("""^data:image/(?:png|jpeg|webp|avif);base64,[A-Za-z0-9+/]+={0,2}$""", RegexOption.IGNORE_CASE)
+        return lines(clean(values, "photosData")).asSequence()
+            .filter { it.length <= 3_500_000 && safeDataUrl.matches(it) }
+            .take(8).mapIndexed { index, uri ->
+                "<figure><img alt=\\"Memory ${index + 1}\\" src=\\"$uri\\"><figcaption>Memory ${index + 1}</figcaption></figure>"
+            }.joinToString("")
     }
     private fun dateLabel(values: Map<String, String>): String {
         if (clean(values, "date").isEmpty()) return ""
@@ -172,9 +183,7 @@ internal object NativeCelebrationEngine {
         val rsvp = safeUrl(clean(values, "rsvpUrl"))
         val rsvpBy = clean(values, "rsvpBy")
         val reveal = clean(values, "revealMessage")
-        val photoHtml = clean(values, "photosData").split("\n").filter { it.startsWith("data:image/") }.take(8).mapIndexed { index, uri ->
-            "<figure><img alt=\"Memory ${index + 1}\" src=\"$uri\"><figcaption>Memory ${index + 1}</figcaption></figure>"
-        }.joinToString("")
+        val photoHtml = photoMarkup(values)
         val text = listOfNotNull(
             title, "$occasion · ${parsed.experience.replace('-', ' ')}",
             honoree.takeIf { it.isNotEmpty() }?.let { "For: $it" },
