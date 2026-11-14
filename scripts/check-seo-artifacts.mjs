@@ -231,7 +231,7 @@ assert.match(result.inventory, /not proof of the live runtime data path, actual 
 assert.match(result.inventory, /does not claim that a human has completed the source\/runtime audit for every tool/);
 assert.match(result.inventory, /Search-intent terms are seeded from each tool's name/m);
 assert.match(result.inventory, /Provenance classifies where guide copy originates/);
-assert.match(result.inventory, /does not prove control-level accuracy, source\\/runtime verification or human editorial review/);
+assert.match(result.inventory, /does not prove control-level accuracy, source\/runtime verification or human editorial review/);
 assert.equal(result.sitemap.includes("https://envtools.store/sitemap.xml"), false);
 
 assert.match(result.robots, /User-agent: OAI-SearchBot\nAllow: \/\nDisallow: \/api\//);
