@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { buildSeoArtifacts, buildSitemapArtifacts, buildIndexNowKeyArtifact } from "./generate-seo-artifacts.mjs";
+import { buildSeoArtifacts, buildSitemapArtifacts } from "./generate-seo-artifacts.mjs";
+import { buildIndexNowKeyArtifact } from "./indexnow-utils.mjs";
 import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema, toolSchema, organizationSchema, websiteSchema, boundedToolSeoTitle } from "@/lib/seo-metadata";
 
 const result = buildSeoArtifacts();
