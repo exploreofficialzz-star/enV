@@ -16,9 +16,9 @@ const android = read("apps/android/app/src/main/java/com/chastech/env/MainActivi
 const androidView = read("apps/android/app/src/main/java/com/chastech/env/NativeCelebrationToolForm.kt");
 const ios = read("apps/ios/enV/ToolViews.swift");
 const iosView = read("apps/ios/enV/NativeCelebration.swift");
-assert.match(android, /tool\\.category == "celebrations" && runCatching \\{ NativeCelebrationEngine\\.parse\\(tool\\.id\\) \\}\\.isSuccess -> NativeCelebrationToolForm\\(tool\\.id\\)/);
+assert.match(android, /tool\.category == "celebrations" && runCatching \{ NativeCelebrationEngine\.parse\(tool\.id\) \}\.isSuccess -> NativeCelebrationToolForm\(tool\.id\)/);
 assert.match(androidView, /NativeCelebrationEngine/);
-assert.match(ios, /tool\\.category == "celebrations" \\{ if NativeCelebrationEngine\\.parse\\(tool\\.id\\) != nil \\{ NativeCelebrationToolView\\(tool: tool\\) \\} else \\{ NativeUnavailableToolView\\(tool: tool, backend: false\\) \\} \\}/);
+assert.match(ios, /tool\.category == "celebrations" \{ if NativeCelebrationEngine\.parse\(tool\.id\) != nil \{ NativeCelebrationToolView\(tool: tool\) \} else \{ NativeUnavailableToolView\(tool: tool, backend: false\) \} \}/);
 assert.match(iosView, /enum NativeCelebrationEngine/);
 assert.match(iosView, /struct NativeCelebrationToolView/);
 console.log("Native Celebrations check PASS: 93 IDs have independent Kotlin and Swift local implementations.");
