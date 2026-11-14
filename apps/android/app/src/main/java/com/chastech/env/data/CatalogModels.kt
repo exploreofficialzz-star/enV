@@ -6,7 +6,16 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** Native catalog models intentionally read known fields and safely ignore future keys. */
-data class CatalogCounts(val total: Int, val active: Int, val planned: Int, val categories: Int)
+data class CatalogCounts(
+    val total: Int,
+    val active: Int,
+    val planned: Int,
+    val categories: Int,
+    val categoriesWithTools: Int = categories,
+    val discoverable: Int = total,
+    val androidImplemented: Int = 0,
+    val iosImplemented: Int = 0,
+)
 data class Category(val id: String, val name: String, val description: String, val blurb: String, val icon: String)
 data class EngineInfo(val type: String, val id: String, val extras: Map<String, String> = emptyMap())
 data class ToolRecord(
@@ -38,8 +47,13 @@ data class Catalog(
     val tools: List<ToolRecord>,
     val relatedReferenceTools: List<ToolRecord> = emptyList(),
 ){
+    /** Canonical shared-catalog active count; independent of this app's native route filtering. */
     val browserActiveToolCount: Int
-        get() = (tools + relatedReferenceTools).count { it.status == "active" || it.status == "beta" }
+        get() = counts.active
+
+    /** Number of canonical tool IDs explicitly covered by the Android native implementation manifest. */
+    val nativeImplementedToolCount: Int
+        get() = counts.androidImplemented
 
     companion object {}
 }
@@ -126,15 +140,22 @@ fun Catalog.Companion.fromJson(raw: String): Catalog {
     val availableTools = allTools.filterNot { it.id in retiredDesignBuildCalculatorIds }
     val tools = availableTools.filterNot { NativeCopy.isWebRuntimeOnly(it.id) }
     val relatedReferenceTools = availableTools.filter { NativeCopy.isWebRuntimeOnly(it.id) }
-    val planned = tools.count { it.status.equals("planned", ignoreCase = true) }
-    val active = tools.count { it.status.equals("active", ignoreCase = true) }
+    val sharedCounts = root.optJSONObject("counts") ?: JSONObject()
+    val planned = availableTools.count { it.status.equals("planned", ignoreCase = true) }
+    val active = availableTools.count {
+        it.status.equals("active", ignoreCase = true) || it.status.equals("beta", ignoreCase = true)
+    }
     return Catalog(
         schemaVersion = root.optInt("schemaVersion", 1), catalogVersion = root.stringOrEmpty("catalogVersion"),
         counts = CatalogCounts(
-            total = tools.size,
-            active = active,
-            planned = planned,
-            categories = categories.size,
+            total = sharedCounts.optInt("total", availableTools.size),
+            active = sharedCounts.optInt("active", active),
+            planned = sharedCounts.optInt("planned", planned),
+            categories = sharedCounts.optInt("categories", categories.size),
+            categoriesWithTools = sharedCounts.optInt("categoriesWithTools", categories.count { category -> availableTools.any { it.category == category.id } }),
+            discoverable = sharedCounts.optInt("discoverable", availableTools.size),
+            androidImplemented = sharedCounts.optInt("androidImplemented", 0),
+            iosImplemented = sharedCounts.optInt("iosImplemented", 0),
         ),
         categories = categories,
         tools = tools,
@@ -144,10 +165,11 @@ fun Catalog.Companion.fromJson(raw: String): Catalog {
 
 /**
  * Adds the separately implemented native Music Downloader to the bundled catalog at load time.
- * This feature deliberately does not mutate the generated 10k-tool web catalog.
+ * Legacy-bundle fallback only; current shared catalog exports this record already.
  */
 fun Catalog.withMusicDownloader(): Catalog {
-    if (tools.any { it.id == "music-downloader" }) return this
+        val existingIds = (tools + relatedReferenceTools).mapTo(mutableSetOf()) { it.id }
+        if ("music-downloader" in existingIds) return this
     val tool = ToolRecord(
         id = "music-downloader",
         name = "Music Downloader",
@@ -174,6 +196,9 @@ fun Catalog.withMusicDownloader(): Catalog {
 }
 
 fun Catalog.withSongMetadataAnalyzer(): Catalog {
+    val alreadyRepresented = (tools + relatedReferenceTools).any {
+        it.id == "song-metadata-analyzer" || it.id == "audio-analyze-studio"
+    }
     val tool = ToolRecord(
         id = "song-metadata-analyzer",
         name = "AI Music Data Sandbox",
@@ -196,7 +221,7 @@ fun Catalog.withSongMetadataAnalyzer(): Catalog {
     val remaining = tools.filterNot { it.id == "song-metadata-analyzer" || it.id == "audio-analyze-studio" }
     val updated = remaining + tool
     return copy(
-        counts = counts.copy(total = updated.size, active = updated.count { it.status == "active" || it.status == "beta" }),
+        counts = if (alreadyRepresented) counts else counts.copy(total = counts.total + 1, active = counts.active + 1),
         tools = updated.sortedWith(compareBy<ToolRecord> { it.category }.thenBy { it.name.lowercase(Locale.ROOT) }.thenBy { it.id }),
         relatedReferenceTools = relatedReferenceTools.filterNot { it.id == "audio-analyze-studio" || it.id == "song-metadata-analyzer" },
     )
@@ -205,7 +230,8 @@ fun Catalog.withSongMetadataAnalyzer(): Catalog {
 
 /** Registers A book as a native runtime extension without changing the generated shared catalogue. */
 fun Catalog.withABook(): Catalog {
-    if (tools.any { it.id == "a-book" }) return this
+        val existingIds = (tools + relatedReferenceTools).mapTo(mutableSetOf()) { it.id }
+        if ("a-book" in existingIds) return this
     val tool = ToolRecord(
         id = "a-book",
         name = "A book",
@@ -227,14 +253,15 @@ fun Catalog.withABook(): Catalog {
     )
     val updated = tools + tool
     return copy(
-        counts = counts.copy(total = updated.size, active = updated.count { it.status == "active" || it.status == "beta" }),
+        counts = counts.copy(total = counts.total + additions.size, active = counts.active + additions.count { it.status == "active" || it.status == "beta" }),
         tools = updated.sortedWith(compareBy<ToolRecord> { it.category }.thenBy { it.name.lowercase(Locale.ROOT) }.thenBy { it.id }),
     )
 }
 
 /** Registers the local ZIP64 archive tool without changing the shared web catalogue. */
 fun Catalog.withZipArchive(): Catalog {
-    if (tools.any { it.id == "zip-any-file" }) return this
+        val existingIds = (tools + relatedReferenceTools).mapTo(mutableSetOf()) { it.id }
+        if ("zip-any-file" in existingIds) return this
     val tool = ToolRecord(
         id = "zip-any-file",
         name = "Zip any file",
@@ -271,7 +298,7 @@ fun Catalog.withFileWorkspaceTools(): Catalog {
         Triple("file-search", "File Search", "Search filenames and supported text file contents without a terminal."),
         Triple("file-compare", "File & Folder Compare", "Compare two folders and verify identical files using SHA-256 checksums."),
     )
-    val existing = tools.mapTo(mutableSetOf()) { it.id }
+    val existing = (tools + relatedReferenceTools).mapTo(mutableSetOf()) { it.id }
     val additions = definitions.filterNot { it.first in existing }.mapIndexed { index, item ->
         val (id, name, description) = item
         ToolRecord(
@@ -320,7 +347,8 @@ fun Catalog.withFileWorkspaceTools(): Catalog {
 
 /** Registers Camera Studio in the native tool catalogue without changing the generated shared catalogue. */
 fun Catalog.withCameraStudio(): Catalog {
-    if (tools.any { it.id == "camera-studio" }) return this
+        val existingIds = (tools + relatedReferenceTools).mapTo(mutableSetOf()) { it.id }
+        if ("camera-studio" in existingIds) return this
     val tool = ToolRecord(
         id = "camera-studio",
         name = "Camera Studio",
