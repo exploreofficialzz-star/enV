@@ -230,7 +230,7 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
     taskGuidanceSourceCounts.set(source, (taskGuidanceSourceCounts.get(source) ?? 0) + 1);
   }
   const taskGuidanceSourceSummary = [
-    "tool-specific",
+    "operation-specific",
     "engine-specific",
     "category-guidance",
     "catalogue-fallback",
@@ -242,7 +242,7 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
     "This file is generated from the live tool registry during the production build. It is a review and coverage artifact, not a source of search-volume data or a ranking report.",
     "",
     "- Task guidance source counts: " + taskGuidanceSourceSummary,
-    "- Task guidance source meanings: tool-specific = an explicit tool ID/name match for the guide's usage advice; engine-specific = shared task advice for an engine family; category-guidance = shared task advice for a category; catalogue-fallback = catalogue purpose plus generic usage advice.",
+    "- Task guidance source meanings: operation-specific = a narrow rule for a named tool or closely related task identified by its stable ID/name; engine-specific = shared task advice for an engine family; category-guidance = shared task advice for a category; catalogue-fallback = catalogue purpose plus generic usage advice.",
     "- This classifies only the task-specific overview, example and validation in the guide's 'When to use this tool' section; it does not classify every guide section or prove control-level accuracy, source/runtime verification or human editorial review.",
     "- Eligible catalog records considered: " + eligibleToolRecords.length,
     "- Canonical public tool pages included: " + tools.length,
