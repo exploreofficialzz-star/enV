@@ -532,7 +532,7 @@ test("every canonical public tool has a complete guide structure tied to its cat
   for (const tool of publicTools) {
     const taskGuidanceSource = toolTaskGuidanceSource(tool);
     assert.ok(
-      ["tool-specific", "engine-specific", "category-guidance", "catalogue-fallback"].includes(taskGuidanceSource),
+      ["operation-specific", "engine-specific", "category-guidance", "catalogue-fallback"].includes(taskGuidanceSource),
       tool.id + ": guide's task-specific usage advice must expose a recognised source classification",
     );
     taskGuidanceSourceCounts.set(taskGuidanceSource, (taskGuidanceSourceCounts.get(taskGuidanceSource) ?? 0) + 1);
