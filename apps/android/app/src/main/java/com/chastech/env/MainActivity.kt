@@ -846,7 +846,7 @@ private fun ToolsScreen(catalog: Catalog, category: String?, query: String, onQu
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
                             // Source guard contract: groupCategory.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.primary; contentAlignment = Alignment.CenterEnd; Text("See more tools", color = MaterialTheme.colorScheme.primary)
                             Text(groupCategory.name, style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.primary)
-                            Text(groupCategory.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Text(if (groupCategory.id == "celebrations") groupCategory.description else groupCategory.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = if (groupCategory.id == "celebrations") Int.MAX_VALUE else 2, overflow = if (groupCategory.id == "celebrations") TextOverflow.Clip else TextOverflow.Ellipsis)
                         }
                     }
                     tools.take(visible).chunked(columns).forEach { rowTools ->
@@ -3282,7 +3282,7 @@ private fun CategoryCard(category: com.chastech.env.data.Category, onClick: () -
                 Box(contentAlignment = Alignment.Center) { EnVIcon(category.icon, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface) }
             }
             Text(category.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(category.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(if (category.id == "celebrations") category.description else category.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = if (category.id == "celebrations") Int.MAX_VALUE else 2, overflow = if (category.id == "celebrations") TextOverflow.Clip else TextOverflow.Ellipsis)
         }
     }
 }
