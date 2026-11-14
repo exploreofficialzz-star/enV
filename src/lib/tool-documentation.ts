@@ -507,6 +507,30 @@ function toolSpecificGuidanceBase(tool: ToolMeta): ToolSpecificGuidance {
   const name = tool.name.toLowerCase();
   const category = tool.category;
 
+  if (category === "creators" && id.endsWith("-content-calendar")) {
+    return {
+      source: "operation-specific",
+      overview: "This creator-platform calendar turns a campaign topic and goal into a dated publishing plan. It uses the start date, requested post count, selected weekdays and a comma-separated format mix to rotate platform-specific themes and calls to action. It is a planning output only; it does not connect to a social account, schedule posts with a provider or publish content.",
+      example: "Enter the brand or creator name, campaign topic, goal and start date. Choose between one and thirty posts, list the weekdays you intend to publish, and enter the formats you want rotated through the plan. Review every generated date, theme, format and call to action before transferring the plan into the platform or scheduler you actually use.",
+      validation: "Use a real calendar date and valid weekday names such as Mon, Wed and Fri. Invalid dates or day names are rejected; repeated weekdays are deduplicated. Format labels are planning inputs, not a live check of current platform capabilities. Confirm the selected time zone, platform limits and audience evidence separately; enV does not schedule or publish these posts.",
+    };
+  }
+  if (category === "creators" && id.endsWith("-content-planner")) {
+    return {
+      source: "operation-specific",
+      overview: "This creator-platform planner generates a set of content ideas from the brand, topic, target audience, goal, number of ideas and selected editorial pillar. It combines platform-oriented themes with a suggested format, opening angle and call to action; it does not create a dated posting calendar.",
+      example: "Name the brand or creator, describe the topic and audience, choose the goal and editorial pillar, then request a manageable batch of ideas. Review the concept, proposed format, opening angle and call to action for each idea, and rewrite any suggestion that is not supported by your actual experience or evidence.",
+      validation: "The planner generates ideas from supplied context and built-in editorial patterns. It does not read channel analytics, verify factual claims, check current platform policy, connect to an account, schedule posts or publish content. Confirm any statistics, product claims, rights and platform-specific limits before use.",
+    };
+  }
+  if (category === "creators" && id.endsWith("-posting-time-helper")) {
+    return {
+      source: "operation-specific",
+      overview: "This helper ranks posting windows from audience-activity scores that you enter from a platform's own analytics. It is intentionally evidence-led: without supplied activity data it explains how to collect comparable observations instead of inventing a universal best posting time.",
+      example: "Choose the audience time-zone label and optimisation goal. From the platform's native analytics, enter one observation per line using the format Day HH:mm = score, such as Mon 18:00 = 42. Compare the highest-ranked windows with the same reporting period and test them using comparable posts.",
+      validation: "The helper validates day names, clock times and duplicate day/time entries, then ranks up to the three highest scores you supplied. It does not fetch audience analytics, validate the time-zone label against a provider, predict engagement, schedule posts or guarantee results. Use a consistent activity measure and confirm daylight-saving/time-zone interpretation before applying a window.",
+    };
+  }
   if (id === "percentage-calculator") {
     return {
       source: "operation-specific",
