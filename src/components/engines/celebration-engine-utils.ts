@@ -185,7 +185,7 @@ export function buildCelebrationText(input: CelebrationInput): string {
   const sections = [
     title,
     clean(input.honoree) ? "For: " + clean(input.honoree) : "",
-    clean(input.host) ? "Hosted by: " + clean(input.host) : "",
+    clean(input.host) ? "Hosted by " + clean(input.host) : "",
     date ? "When: " + date + (clean(input.timezone) ? " (" + clean(input.timezone) + ")" : "") : "",
     clean(input.location) ? "Where: " + clean(input.location) : "",
     "",
