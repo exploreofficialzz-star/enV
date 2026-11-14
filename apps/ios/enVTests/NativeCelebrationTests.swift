@@ -75,6 +75,20 @@ final class NativeCelebrationTests: XCTestCase {
         XCTAssertFalse(answered.checks.contains(where: { $0.contains("correct answer") }))
     }
 
+    func testMemoryPageEmbedsOnlyStrictlyValidatedImageDataUrls() throws {
+        let output = try NativeCelebrationEngine.build("graduation-memory-page", values: [
+            "title": "The good days",
+            "photosData": [
+                "data:image/png;base64,AAAA",
+                "data:image/svg+xml;base64,PHN2ZyBvbmVycm9yPSJ4Ii8+",
+                "data:image/png;base64,AAAA\\"><svg onload=alert(1)>"
+            ].joined(separator: "\\n")
+        ])
+        XCTAssertEqual(output.html.components(separatedBy: "<figure>").count - 1, 1)
+        XCTAssertFalse(output.html.contains("data:image/svg+xml"))
+        XCTAssertFalse(output.html.contains("<svg onload="))
+    }
+
     func testCountdownCompletesAndHasSecondPrecision() throws {
         let values = ["date": "2026-11-05T10:00", "timezone": "Africa/Lagos"]
         let target = try NativeCelebrationEngine.eventInstant(values["date"]!, timeZoneName: values["timezone"]!)
