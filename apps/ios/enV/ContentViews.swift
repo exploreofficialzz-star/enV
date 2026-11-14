@@ -1457,7 +1457,7 @@ struct AccountView: View {
                         .font(.envScaled(size: 28, weight: .semibold))
                         .foregroundStyle(Color.envInk)
                     VStack(alignment: .leading, spacing: 12) {
-                        settingsRow("CircleCheck", "Offline catalog", "The complete tool catalog is bundled on this device.")
+                        settingsRow("CircleCheck", "Shared tool catalogue", "\(store.catalog.counts.total) tool IDs · \(store.catalog.nativeImplementedToolCount) IDs in iOS native coverage.")
                         enVCharacterSpacedText("\(NativeCoverage.localActiveToolCount(in: store.catalog)) of \(NativeCoverage.canonicalActiveToolCount(in: store.catalog)) active tools currently execute locally using the native engine families. URL media inspection still requires its remote service.")
                             .font(.footnote)
                             .foregroundStyle(Color.envMuted)
