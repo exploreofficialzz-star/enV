@@ -64,6 +64,32 @@ The following status describes code committed to the draft PR branch, not a prod
 
 Do not mark a workstream complete based solely on source changes, a passing build, sitemap inclusion or crawler permission.
 
+## 2.2 Validation snapshot — 14 November 2026
+
+This snapshot records the latest inspected PR head, `273e86c5b9cc3d51372a3e57193c905870bf48f9` (92 commits ahead of `main`, 0 behind at the time checked). It distinguishes successful discovery checks from unrelated failures and work that is still running.
+
+| Gate | Observed result | Interpretation |
+|---|---|---|
+| Production web build in rendered SEO workflow | Passed; generated 10,174 public URLs and 4,822 public tools | Build and registry-based artifact generation succeeded for this PR head. |
+| Catalogue-wide SEO artifact checks | Passed | Tool and guide metadata, canonical URLs, structured data, sitemap, crawler policy and generated inventory assertions passed. |
+| Rendered SEO/crawler checks | Passed | The workflow verified rendered metadata, canonicals, structured data, noindex policy, `robots.txt`, `sitemap.xml` and `llms.txt`, including title-collision routes. |
+| Tool-guide navigation | Passed | The browser clicked “Read the full guide”, reached the canonical guide URL through client-side navigation and rendered the complete guide. A product article link also reached a successful HTTP 200 page. |
+| Rendered accessibility report | Workflow passed, but report contains nonzero findings | This is not an assertion that every page is accessibility-clean. The report recorded findings on the homepage, tools directory and several other routes; those need their own triage and must not be described as zero violations. |
+| Billing integration validation | Passed | Independent gate; no claim about search visibility. |
+| User Behavior analytics security tests | Passed | Independent gate; no claim about search visibility. |
+| Ad-supported guest access | Passed | Independent gate; no claim about search visibility. |
+| AI provider platform tests | Passed | Independent gate; no claim about AI-search citations. |
+| Date & Time Android and Web checks | Passed | The iOS Date & Time test was still running in the inspected snapshot. |
+| Full Web/Android authoritative gate | Web subjob failed an existing Business Studio source-contract assertion requiring “Optional logo (stays on this device)”; Android subjob was still running | The assertion is in `scripts/check-business-studios.mjs` and the relevant Business Studio implementation is not part of this PR's changed files. Do not change that agent's work in this discovery PR. |
+| Developer Studios quality gate | Failed an existing UI marker assertion for “On-device processing” | This is an independent Developer Studios defect outside the discovery PR's changed-file scope; leave it with that workstream. |
+| Native iOS and native iOS accessibility | Still running at the time checked | No pass is claimed until the jobs finish. |
+| Production Check and other reference/browser checks | Still running at the time checked | No pass is claimed until the jobs finish. |
+| Vercel preview | `Vercel – env` reported a build-rate-limit failure; there was no deployment record for this PR head | A previously READY preview used older commit `865e545e54c85a2d86671cc9cbf1cfb48d639a64`, not this PR head. Do not use that URL as evidence for the latest changes. Production remained on `main`. |
+
+The rendered SEO workflow is linked at https://github.com/exploreofficialzz-star/enV/actions/runs/43605636353. The Web/Android workflow is at https://github.com/exploreofficialzz-star/enV/actions/runs/43605636253. The Developer Studios workflow is at https://github.com/exploreofficialzz-star/enV/actions/runs/43605636267.
+
+These results verify source/build behavior on the PR branch only. They do not establish production deployment, Search Console/Bing ownership, search indexing, ranking, AI citations or live social-preview fetches.
+
 ## 3. Competitor and platform research
 
 The research compares patterns, not wording to copy. enV should use its own language and only claim capabilities demonstrated by its implementation.
