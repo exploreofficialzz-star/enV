@@ -132,7 +132,10 @@ for (const tool of result.tools) {
   assert.ok(result.inventory.includes(inventoryCell(tool.id)), "Inventory misses the stable tool ID for " + tool.id);
   const inventoryStatus = tool.status === "planned" ? "Planned" : tool.status === "beta" ? "Beta" : "Active";
   assert.ok(result.inventory.includes(inventoryCell(inventoryStatus)), "Inventory misses catalogue status for " + tool.id);
-  const inventoryEngine = tool.engine.type + " (" + Object.entries(tool.engine).filter(([key]) => key !== "type").map(([key, value]) => key + "=" + String(value)).join(", ") + ")";
+  const inventoryEngineDetails = Object.entries(tool.engine)
+    .filter(([key]) => key !== "type")
+    .map(([key, value]) => key + "=" + String(value));
+  const inventoryEngine = tool.engine.type + (inventoryEngineDetails.length ? " (" + inventoryEngineDetails.join(", ") + ")" : "");
   assert.ok(result.inventory.includes(inventoryCell(inventoryEngine)), "Inventory misses engine operation for " + tool.id);
   const inventoryFlags = [
     tool.clientSide ? "client-side flagged" : "not marked client-side",
