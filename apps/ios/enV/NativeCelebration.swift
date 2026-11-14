@@ -4,6 +4,16 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
+private enum NativeCelebrationError: LocalizedError {
+    case message(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .message(let text): return text
+        }
+    }
+}
+
 enum NativeCelebrationEngine {
     struct Parsed {
         let occasion: String
@@ -29,6 +39,9 @@ enum NativeCelebrationEngine {
     static let experiences: Set<String> = [
         "page-generator", "interactive-card", "invitation-generator", "countdown",
         "memory-page", "reveal-page", "quiz-generator", "surprise-page"
+    ]
+    private static let unavailableToolIDs: Set<String> = [
+        "birthday-countdown", "valentine-reveal-page", "appreciation-reveal-page"
     ]
     private static let labels: [String: String] = [
         "birthday": "Birthday", "anniversary": "Anniversary", "graduation": "Graduation",
@@ -63,7 +76,9 @@ enum NativeCelebrationEngine {
         let normalized = toolID.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         for occasion in occasions where normalized.hasPrefix(occasion + "-") {
             let experience = String(normalized.dropFirst(occasion.count + 1))
-            if experiences.contains(experience) { return Parsed(occasion: occasion, experience: experience) }
+            if experiences.contains(experience), !unavailableToolIDs.contains(normalized) {
+                return Parsed(occasion: occasion, experience: experience)
+            }
             return nil
         }
         return nil
@@ -80,7 +95,7 @@ enum NativeCelebrationEngine {
 
     static func eventInstant(_ value: String, timeZoneName: String) throws -> Date {
         guard let zone = TimeZone(identifier: timeZoneName.trimmingCharacters(in: .whitespacesAndNewlines)) else {
-            throw NativeSimpleError.message("Choose a valid IANA time zone, such as Africa/Lagos or Europe/London.")
+            throw NativeCelebrationError.message("Choose a valid IANA time zone, such as Africa/Lagos or Europe/London.")
         }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -89,26 +104,26 @@ enum NativeCelebrationEngine {
         formatter.dateFormat = "yyyy-MM-dd'T'HH:mm"
         formatter.isLenient = false
         guard let local = formatter.date(from: value.trimmingCharacters(in: .whitespacesAndNewlines)) else {
-            throw NativeSimpleError.message("Enter a valid date and time in YYYY-MM-DDTHH:mm format.")
+            throw NativeCelebrationError.message("Enter a valid date and time in YYYY-MM-DDTHH:mm format.")
         }
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = zone
         let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: local)
         guard let dayStart = calendar.date(from: DateComponents(year: components.year, month: components.month, day: components.day)) else {
-            throw NativeSimpleError.message("Enter a real calendar date and time.")
+            throw NativeCelebrationError.message("Enter a real calendar date and time.")
         }
         let first = calendar.nextDate(after: dayStart.addingTimeInterval(-1), matching: components, matchingPolicy: .strict, repeatedTimePolicy: .first, direction: .forward)
         let last = calendar.nextDate(after: dayStart.addingTimeInterval(-1), matching: components, matchingPolicy: .strict, repeatedTimePolicy: .last, direction: .forward)
         guard let first else {
-            throw NativeSimpleError.message("That local time does not exist because the clocks change. Choose another time.")
+            throw NativeCelebrationError.message("That local time does not exist because the clocks change. Choose another time.")
         }
         if let last, abs(last.timeIntervalSince(first)) > 60 {
-            throw NativeSimpleError.message("That local time occurs twice because the clocks change. Choose another time.")
+            throw NativeCelebrationError.message("That local time occurs twice because the clocks change. Choose another time.")
         }
         let actual = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: first)
         guard actual.year == components.year, actual.month == components.month, actual.day == components.day,
               actual.hour == components.hour, actual.minute == components.minute else {
-            throw NativeSimpleError.message("Enter a real calendar date and time.")
+            throw NativeCelebrationError.message("Enter a real calendar date and time.")
         }
         return first
     }
@@ -193,7 +208,7 @@ enum NativeCelebrationEngine {
     }
 
     static func build(_ toolID: String, values: [String: String]) throws -> Result {
-        guard let parsed = parse(toolID) else { throw NativeSimpleError.message("This celebration tool is not supported.") }
+        guard let parsed = parse(toolID) else { throw NativeCelebrationError.message("This celebration tool is not supported.") }
         let occasion = labels[parsed.occasion] ?? "Celebration"
         let title = value(values, "title").isEmpty ? occasion + " celebration" : value(values, "title")
         let honoree = value(values, "honoree"), host = value(values, "host")
@@ -396,21 +411,21 @@ struct NativeCelebrationToolView: View {
         .fileImporter(isPresented: $showImporter, allowedContentTypes: [.image], allowsMultipleSelection: true) { result in
             do {
                 let urls = try result.get()
-                guard urls.count <= 8 else { throw NativeSimpleError.message("Choose up to eight photos.") }
+                guard urls.count <= 8 else { throw NativeCelebrationError.message("Choose up to eight photos.") }
                 var encoded: [String] = []
                 var total = 0
                 for url in urls {
                     let scoped = url.startAccessingSecurityScopedResource()
                     defer { if scoped { url.stopAccessingSecurityScopedResource() } }
                     let data = try Data(contentsOf: url)
-                    guard data.count <= 2 * 1024 * 1024 else { throw NativeSimpleError.message("Each photo must be 2 MB or smaller.") }
+                    guard data.count <= 2 * 1024 * 1024 else { throw NativeCelebrationError.message("Each photo must be 2 MB or smaller.") }
                     total += data.count
                     let ext = url.pathExtension.lowercased()
                     let mime = ["jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp", "avif": "image/avif"][ext]
-                    guard let mime else { throw NativeSimpleError.message("Use JPG, PNG, WebP or AVIF photos.") }
+                    guard let mime else { throw NativeCelebrationError.message("Use JPG, PNG, WebP or AVIF photos.") }
                     encoded.append("data:\(mime);base64,\(data.base64EncodedString())")
                 }
-                guard total <= 8 * 1024 * 1024 else { throw NativeSimpleError.message("Keep the selected photos under 8 MB in total.") }
+                guard total <= 8 * 1024 * 1024 else { throw NativeCelebrationError.message("Keep the selected photos under 8 MB in total.") }
                 values["photosData"] = encoded.joined(separator: "\n")
                 output = nil; error = nil
             } catch { self.error = error.localizedDescription }
