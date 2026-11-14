@@ -250,9 +250,9 @@ enum NativeCelebrationEngine {
         let details = value(values, "details"), rsvp = safeURL(value(values, "rsvpUrl"))
         let rsvpBy = value(values, "rsvpBy"), reveal = value(values, "revealMessage")
         let textSections = [
-            title, occasion + " · " + parsed.experience.replacingOccurrences(of: "-", with: " "),
+            title,
             honoree.isEmpty ? "" : "For: " + honoree,
-            host.isEmpty ? "" : "Hosted by: " + host,
+            host.isEmpty ? "" : "Hosted by " + host,
             date.isEmpty ? "" : "When: " + date + " (" + value(values, "timezone") + ")",
             location.isEmpty ? "" : "Where: " + location,
             "", message, details,
@@ -281,7 +281,7 @@ enum NativeCelebrationEngine {
                 (host.isEmpty ? "" : "<div><dt>Hosted by</dt><dd>\(escape(host))</dd></div>") +
                 (honoree.isEmpty ? "" : "<div><dt>Celebrating</dt><dd>\(escape(honoree))</dd></div>") +
                 (value(values, "dressCode").isEmpty ? "" : "<div><dt>Dress code</dt><dd>\(escape(value(values, "dressCode")))</dd></div>")
-            content = "<p class=\"eyebrow\">You are invited</p><h1>\(escape(title))</h1><p class=\"lead\">\(escape(message))</p><dl>\(rows)</dl>\(rsvp.isEmpty ? (value(values, "contactMethod").isEmpty ? "<p>Contact the host to reply.</p>" : "<p>Reply to: \(escape(value(values, "contactMethod")))</p>") : "<a class=\"button\" href=\"\(escape(rsvp))\" rel=\"noopener noreferrer\">Reply to invitation</a>")\(rsvpBy.isEmpty ? "" : "<p>Reply by \(escape(rsvpBy))</p>")"
+            content = "<p class=\"eyebrow\">You are invited</p><h1>\(escape(title))</h1><p class=\"lead\">\(escape(message))</p><dl>\(rows)</dl>\(rsvp.isEmpty ? (value(values, "contactMethod").isEmpty ? "<p></p>" : "<p>Reply to \(escape(value(values, "contactMethod")))</p>") : "<a class=\"button\" href=\"\(escape(rsvp))\" rel=\"noopener noreferrer\">Reply to invitation</a>")\(rsvpBy.isEmpty ? "" : "<p>Reply by \(escape(rsvpBy))</p>")"
         case "countdown":
             let target = (try? eventInstant(value(values, "date"), timeZoneName: value(values, "timezone")).ISO8601Format()) ?? ""
             content = "<p class=\"eyebrow\">\(escape(occasion))</p><h1>\(escape(title))</h1><p class=\"lead\">\(escape(message))</p><div class=\"countdown\" data-countdown=\"\(escape(target))\"><div><strong id=\"days\">—</strong><span>Days</span></div><div><strong id=\"hours\">—</strong><span>Hours</span></div><div><strong id=\"minutes\">—</strong><span>Minutes</span></div><div><strong id=\"seconds\">—</strong><span>Seconds</span></div></div>"
@@ -293,11 +293,11 @@ enum NativeCelebrationEngine {
             let options = lines(value(values, "quizOptions")).prefix(6).map { option in
                 "<button type=\"button\" data-correct=\"\(option.caseInsensitiveCompare(value(values, "quizAnswer")) == .orderedSame)\">\(escape(option))</button>"
             }.joined()
-            content = "<p class=\"eyebrow\">Celebration quiz</p><h1>\(escape(title))</h1><p class=\"lead\">\(escape(message))</p><p class=\"question\">\(escape(value(values, "quizQuestion")))</p><div id=\"choices\">\(options)</div><p id=\"feedback\" aria-live=\"polite\">Choose an answer.</p>"
+            content = "<p class=\"eyebrow\">Celebration quiz</p><h1>\(escape(title))</h1><p class=\"lead\">\(escape(message))</p><p class=\"question\">\(escape(value(values, "quizQuestion")))</p><div id=\"choices\">\(options)</div><p id=\"feedback\" aria-live=\"polite\"></p>"
         default:
             content = "<p class=\"eyebrow\">" + escape(occasion) + "</p><h1>" + escape(title) + "</h1><p class=\"lead\">" + escape(message) + "</p>" +
                 (honoree.isEmpty ? "" : "<p>For <strong>" + escape(honoree) + "</strong></p>") +
-                (host.isEmpty ? "" : "<p>Hosted by: " + escape(host) + "</p>") +
+                (host.isEmpty ? "" : "<p>Hosted by " + escape(host) + "</p>") +
                 (date.isEmpty ? "" : "<p><strong>When:</strong> " + escape(date) + "</p>") +
                 (location.isEmpty ? "" : "<p><strong>Where:</strong> " + escape(location) + "</p>") +
                 (details.isEmpty ? "" : "<p>" + escape(details) + "</p>") + scheduleHtml
