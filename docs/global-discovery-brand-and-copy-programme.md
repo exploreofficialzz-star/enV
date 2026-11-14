@@ -30,7 +30,7 @@ The following findings describe the `main` snapshot used as the baseline for thi
 
 ### Existing foundations to preserve and verify
 - `scripts/generate-seo-artifacts.mjs` generates `robots.txt`, `sitemap.xml`, and `llms.txt` from the catalogue and public-route inventory during the production build.
-- Crawler policy explicitly handles Googlebot, Bingbot, OAI-SearchBot, Claude-SearchBot / Claude-User, PerplexityBot / Perplexity-User and Applebot. Separate training/model-use agents are deliberately blocked in the current policy. Preserve the distinction and obtain an explicit product-policy decision before changing it.
+- Crawler policy explicitly distinguishes Googlebot, Bingbot, OAI-SearchBot, Claude-SearchBot / Claude-User, PerplexityBot / Perplexity-User and Applebot from provider-specific training/model-use controls. The PR now adds the shared `__usage_ai-training` preference as a separate signal while retaining the explicit vendor-specific training blocks.
 - Tool, category, guide and article routes already use canonical metadata and JSON-LD. Private and interaction-only routes have noindex policies.
 - The SEO setup runbook already explains Google Search Console and Bing Webmaster Tools registration and sitemap submission.
 - A live SEO smoke script and a GitHub Actions workflow are present. The workflow is scheduled every 30 minutes and checks selected production discovery assets, canonical redirects and representative rendered routes.
@@ -66,7 +66,7 @@ Do not mark a workstream complete based solely on source changes, a passing buil
 
 ## 2.2 Validation snapshot — 14 November 2026
 
-This snapshot was reconciled against the current draft PR head, `62256234ed175d15f180d3994903784c97f7de11`. The latest completed GitHub Actions evidence returned during this review belongs to the earlier head, `acf37ee5fbca4f60acf7f4715bd457c68ae1546d`. The guide-parser scope fix, SPA-navigation test adjustment, shared `__usage_ai-training` robots preference, and its generator/live/artifact assertions have since been committed. No workflow runs or commit statuses were returned for the newer commits at the time of this check. Therefore, all post-fix source and robots assertions remain **pending fresh CI**, not passed.
+This snapshot is based on the latest source-review baseline, `cc69a94bbb8b9d6e33a3817b23ad738d426ea74f`; the latest commit in the PR at the time of this documentation refresh is a documentation-only reconciliation. The latest completed GitHub Actions evidence inspected belongs to the earlier head, `acf37ee5fbca4f60acf7f4715bd457c68ae1546d`. Since that run, the guide-parser scope fix, SPA-navigation test adjustment, shared `__usage_ai-training` preference, dedicated generator/live/artifact/rendered-route assertions, and guide-contract test clarification have been committed. No workflow runs or commit statuses were returned for the newer source commits at the time of this check. Therefore, all post-fix source and robots assertions remain **pending fresh CI**, not passed.
 
 | Gate | Observed result | Current disposition |
 |---|---|---|
@@ -208,12 +208,15 @@ Each tool gets an accurate explanation at the appropriate depth:
 Do not force every tool into a long article. Simple utilities need short, clear explanations. Complex studios, multi-step workflows, financial/health estimates, media processors and security tools need their additional task-specific context.
 
 ### WS-04 — Rewrite every category
-- Give every category a distinct, plain-language description that defines what belongs there.
-- Add a short category introduction explaining the main jobs people can complete.
-- Group tools by real subcategories or workflows where the catalogue supports that taxonomy.
-- Help users choose between similar tools and link to the relevant canonical tool pages.
-- Feature representative tools only when they are active and the descriptions accurately match their functionality.
+
+**Implemented foundation:** all 43 current category records now have distinct, plain-language descriptions and short task-oriented blurbs. The category route renders both directly above the tool cards; no separate third introduction block is required for the current page structure. The existing grouping helper uses real `subcategory` metadata, creates sections only when at least two subcategories each contain at least two tools, and retains sparse or unlabeled entries under “Other tools”. Where the taxonomy is too thin, it falls back to the flat catalogue rather than fabricating workflow groups.
+
+**Still required:**
+- Compare every category description and blurb with its current active/beta tool inventory and actual runtime capabilities; refine any category whose copy overstates, omits, or misclassifies the available work.
+- Verify subcategory labels against real workflows, check that similar tools are distinguishable, and ensure the correct canonical routes are linked.
+- Feature representative tools only when they are active and their descriptions accurately match their functionality.
 - Remove empty promises, redundant phrases and generic statements shared across unrelated categories.
+- Browser-check the grouped and flat layouts at mobile, tablet and desktop widths, including “See more tools” behavior and categories with sparse taxonomy.
 
 ### WS-05 — Strengthen guide and content quality
 - Keep the tool page as the source of truth for live capability.
