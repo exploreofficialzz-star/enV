@@ -1,12 +1,12 @@
 # enV global discovery, brand and catalogue clarity programme
 
-**Status:** Tracking plan / research baseline  
+**Status:** Research and first implementation wave in progress; external verification outstanding  
 **Scope:** Web discovery, AI-search eligibility, browser retrieval, social sharing, category copy and individual tool explanations  
 **Canonical platform name:** `enV`  
 **Parent company:** `chAs Technologies LLC`  
 **Canonical web origin:** `https://envtools.store`
 
-This document records the research findings and the implementation programme for improving how enV is understood, discovered, crawled, indexed, cited, shared and explained. It is deliberately a tracking plan, not a claim that external search engines have indexed enV or that AI systems already cite it.
+This document records the research findings and delivery programme for improving how enV is understood, discovered, crawled, indexed, cited, shared and explained. PR #146 includes the first implementation wave for product identity, catalogue copy refinement, category explanations and SEO metadata. This document does not claim that external search engines have indexed enV or that AI systems already cite it.
 
 ## 1. Product identity and copy rules
 
@@ -26,7 +26,7 @@ Brand correction must include page titles, visible headings, descriptions, Open 
 
 ## 2. Current repository findings
 
-The following are source-level findings from the `main` branch at the time of this review. They are not a substitute for inspecting current production responses or external webmaster consoles.
+The following findings describe the `main` snapshot used as the baseline for this programme. Changes on the PR branch address some of these items; the remaining bullets distinguish baseline defects from work still requiring verification. They are not a substitute for inspecting current production responses or external webmaster consoles.
 
 ### Existing foundations to preserve and verify
 - `scripts/generate-seo-artifacts.mjs` generates `robots.txt`, `sitemap.xml`, and `llms.txt` from the catalogue and public-route inventory during the production build.
@@ -40,7 +40,7 @@ The following are source-level findings from the `main` branch at the time of th
 - Brand strings are inconsistent with the requested identity. The homepage currently uses `enV Digital Toolkit by chAs Technologies`; the global Open Graph site name and WebSite structured data also use expanded names. Existing SEO tests assert some of this wording, so they must be corrected alongside the user-facing text.
 - Category pages generally show the category description followed by the tool catalogue. Their explanatory content is not consistently deep or tailored to the category's actual workflows.
 - The tool documentation engine includes useful category- and engine-specific advice, but also generic fallback steps and processing language. Each public tool still needs a verified, operation-specific explanation.
-- `scripts/gen-catalog.mjs` contains generic description fallbacks such as `<tool name> utility for the enV toolkit` and broad cross-platform descriptions. These patterns must be audited across generated records; their presence in the generator does not prove every catalogue item uses them.
+- The original catalogue generator used repeated fallback and cross-category templates. The PR adds `src/lib/generated-tool-copy.mjs`, `scripts/generated-tool-copy.test.mjs` and a `check-catalog` refinement gate to replace known legacy boilerplate in generated output. This is a quality filter, not proof that every final description has been reviewed against its real engine; WS-02 and WS-03 still require an evidence-based tool inventory and individual review.
 - Tool and category metadata generally use a shared social image by default. Route-specific share cards are not consistently supplied.
 - The sitemap generator currently emits location entries without `lastmod`. IndexNow integration was not found in the reviewed discovery generator.
 - Source-level crawler allowances do not prove that crawlers fetched pages, pages were indexed, or AI answer engines cited them.
@@ -60,6 +60,19 @@ The research compares patterns, not wording to copy. enV should use its own lang
 | Photopea | Clearly explains browser execution and its local/no-upload behavior, and provides a structured learning path from basic to advanced workflows. | Explain local processing or offline support only where verified; offer deeper guidance for complex studios. |
 | remove.bg | Shows concrete examples, use cases and before/after outcomes for one specific task. | Use real examples and previews to explain outputs; never borrow its AI claims for non-AI enV tools. |
 | Kapwing | Organizes tools by workflow and uses concise action/result descriptions such as adding subtitles, resizing or transcribing. | Make category groupings reflect related user workflows and describe the result in plain language. |
+
+### 3.1 Workflow details verified from product documentation
+
+The most useful comparison is the *actual task flow*, not the headline count of tools:
+
+- **iLovePDF:** its user guide walks through choosing files from a device or supported cloud source, selecting page ranges, arranging page order, choosing compression behavior and downloading the processed result. enV's PDF pages should explain the actual sequence users will encounter, including whether the original file remains unchanged and what output is produced. Source: https://www.ilovepdf.com/help/documentation
+- **CloudConvert:** its conversion-operation documentation exposes the source task, target format, engine/version, timeout and format-dependent options. Its API describes asynchronous and synchronous jobs, webhooks and chained jobs. enV should publish format support only when the particular engine and current code path support that source/target pair; asynchronous processing must not be described as instant local conversion. Sources: https://cloudconvert.com/docs/operations/convert-files and https://cloudconvert.com/apis/file-conversion
+- **Photopea:** its own learning material describes browser-based editing and states that files remain on the device. That is a product-specific privacy and processing disclosure, not a claim to reuse for every browser editor. enV must state the processing path of each tool independently. Source: https://www.photopea.com/learn/
+- **remove.bg:** its help material documents several distinct ways to use its background-removal product, including the website, desktop application, API and integrations. The lesson is to explain the delivery path and batch/API distinction for a specific product; it does not justify describing unrelated enV tools as AI-powered. Source: https://www.remove.bg/help/a/how-can-i-use-remove-bg.class
+- **Smallpdf:** its directory organizes work around verbs such as compress, convert, merge, split, edit, sign and protect. That makes the directory scannable before users open an individual tool. enV should use clear task labels and ensure each card's wording matches the route behind it. Source: https://smallpdf.com/pdf-tools
+- **TinyWow:** its directory groups a large range of utilities into recognizable categories and pairs entries with short task descriptions. enV can adopt the compact navigation pattern, but should avoid scaling page count through near-duplicate keyword variants. Sources: https://tinywow.com/tools and https://tinywow.com/tools/pdf
+- **Kapwing:** its tools directory groups products by workflows such as video editing, subtitles, translation/transcription, audio, social publishing and conversion/compression. enV categories should help people move between related jobs rather than merely list unrelated tool names. Source: https://www.kapwing.com/tools
+- **Canva:** its public product navigation groups a broad creative suite around outputs and work areas such as social content, video, documents and presentations, supported by visual examples. enV can make complex studios easier to choose with genuine previews and examples, but must only show examples generated by the actual tool. Source: https://www.canva.com/
 
 ### Primary research and documentation
 - Google Search Essentials: https://developers.google.com/search/docs/essentials
@@ -130,8 +143,8 @@ Do not force every tool into a long article. Simple utilities need short, clear 
 ### WS-06 — Search and AI discovery engineering
 - Preserve and verify server-rendered, crawlable HTML for all canonical public pages.
 - Keep crawler policy explicit by crawler purpose. Search crawlers, user-triggered retrieval agents and model-training crawlers are not interchangeable.
-- Implement IndexNow with a domain verification key file and server-side notifications for genuinely new, materially updated and removed canonical URLs. Batch and retry safely; record HTTP acknowledgements. A successful submission is not an indexing guarantee. Google does not participate in IndexNow.
-- Add sitemap `lastmod` only when a reliable significant-content update timestamp exists. Do not fabricate timestamps or add meaningless `priority`/`changefreq` values.
+- Implement IndexNow with a domain verification key file and server-side notifications for genuinely new, materially updated and removed canonical URLs. Submit only changed canonical URLs, batch and retry safely, and record acknowledgements. An HTTP 200 means the URL list was received; it does not prove that a page was crawled or indexed. Google does not participate in IndexNow.
+- Add sitemap `lastmod` only when a reliable per-page timestamp reflects a significant content change, such as a reviewed main-content, structured-data or important-link update. A deployment/build time or sitemap-generation time is not a valid substitute. Do not add meaningless `priority`/`changefreq` values.
 - Verify sitemap coverage, shards, canonical host, status codes, robots directives and private-route exclusion.
 - Evaluate whether a small machine-readable public catalogue index adds value for retrieval systems; do not invent a proprietary crawler standard or treat `llms.txt` as a ranking requirement.
 - Test AI-search visibility using repeatable neutral discovery, how-to and branded verification prompts. Record exact citations, canonical URLs, factual accuracy and unsupported claims. Do not promise inclusion in any AI answer engine.
