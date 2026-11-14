@@ -82,7 +82,7 @@ try {
       }
       if (tool.id.endsWith("countdown")) await fillField(toolSurface, "Location / venue", "Main hall");
       const frame = preview();
-      await frame.locator("h1").waitFor({ state: "visible" });
+      await frame.locator("h1").filter({ hasText: title }).waitFor({ state: "visible", timeout: 15000 });
       assert.equal(await frame.locator("h1").innerText(), title, `${tool.id}: exported preview title mismatch`);
       assert.ok((await frame.locator("body").innerText()).includes("A safe local message & <friends>"), `${tool.id}: preview message missing or escaped incorrectly`);
       assert.equal(await frame.locator("html").evaluate((node) => node.scrollWidth <= node.clientWidth), true, `${tool.id}: exported page has horizontal overflow`);
