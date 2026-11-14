@@ -1,9 +1,22 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { buildSeoArtifacts, buildSitemapArtifacts } from "./generate-seo-artifacts.mjs";
+import { buildSeoArtifacts, buildSitemapArtifacts, buildIndexNowKeyArtifact } from "./generate-seo-artifacts.mjs";
 import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema, toolSchema, organizationSchema, websiteSchema, boundedToolSeoTitle } from "@/lib/seo-metadata";
 
 const result = buildSeoArtifacts();
+assert.equal(buildIndexNowKeyArtifact("").path, undefined, "An unset IndexNow key must not produce a public key file.");
+assert.deepEqual(buildIndexNowKeyArtifact("a1b2c3d4-e5f6"), {
+  path: "public/a1b2c3d4-e5f6.txt",
+  content: "a1b2c3d4-e5f6",
+});
+assert.throws(() => buildIndexNowKeyArtifact("bad key"), /INDEXNOW_KEY/);
+assert.throws(() => buildIndexNowKeyArtifact("x".repeat(129)), /INDEXNOW_KEY/);
+if (process.env.VERCEL_ENV === "production" && process.env.INDEXNOW_KEY) {
+  assert.equal(result.indexNowKeyFile.path, "public/" + process.env.INDEXNOW_KEY + ".txt");
+  assert.equal(result.indexNowKeyFile.content, process.env.INDEXNOW_KEY);
+} else {
+  assert.equal(result.indexNowKeyFile, null, "The key verification file must not be generated for non-production builds.");
+}
 const inventoryCell = (value) => String(value ?? "").replace(/\s+/g, " ").replaceAll("|", "\\|").trim();
 const seoMetadataSource = readFileSync(new URL("../src/lib/seo-metadata.ts", import.meta.url), "utf8");
 const rootRouteSource = readFileSync(new URL("../src/routes/__root.tsx", import.meta.url), "utf8");
