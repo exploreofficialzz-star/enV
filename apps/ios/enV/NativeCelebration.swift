@@ -202,7 +202,7 @@ enum NativeCelebrationEngine {
         lines(value(values, "photosData")).prefix(8).enumerated().compactMap { index, item in
             guard item.range(of: #"^data:image/(?:png|jpeg|webp|avif);base64,[A-Za-z0-9+/=]+$"#, options: .regularExpression) != nil,
                   item.count <= 3_500_000 else { return nil }
-            return "<figure><img src=\"\(item)\" alt=\"Celebration memory \(index + 1)\"><figcaption>Memory \(index + 1)</figcaption></figure>"
+            return "<figure><img src=\"\(item)\" alt=\"Celebration memory \(index + 1)\"></figure>"
         }.joined()
     }
 
