@@ -62,6 +62,7 @@ const DIRECT_TOOL_RENDERERS: Record<string, string> = {
   "music-downloader": "MusicDownloaderEngine",
   "song-metadata-analyzer": "AiMusicDataSandbox",
   "qr-payload-inspector": "BarcodeReaderEngine",
+  "flashcard-generator": "DocumentEngine",
 };
 
 const CATEGORY_RENDERERS: Record<string, string> = {

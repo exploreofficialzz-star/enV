@@ -79,6 +79,8 @@ function ToolEngineView({ tool, initialMode, initialAction, initialOp }: ToolEng
   // were previously marked planned. The catalog remains the compatibility index.
   if (tool.id === "smartphone-prototype-lab") return <SmartphonePrototypeLabEngine />;
   if (tool.id === "camera-studio") return <CameraStudioEngine />;
+  // Flashcard Generator uses the implemented document/flashcards operation.
+  if (tool.id === "flashcard-generator") return <DocumentEngine op="flashcards" />;
   if (tool.category === "mockups") return <MockupsCategoryEngine toolId={tool.id} />;
   // Every Screenshot-category tool is rendered by the shared screenshot studio.
   if (tool.category === "screenshots") return <ScreenshotEngine toolId={tool.id} />;
