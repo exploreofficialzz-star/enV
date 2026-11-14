@@ -283,7 +283,16 @@ extension Catalog {
         return Catalog(
             schemaVersion: schemaVersion,
             catalogVersion: catalogVersion,
-            counts: CatalogCounts(total: counts.total + 1, active: counts.active + 1, planned: counts.planned, categories: counts.categories),
+            CatalogCounts(
+                total: counts.total + 1,
+                active: counts.active + 1,
+                planned: counts.planned,
+                categories: counts.categories,
+                categoriesWithTools: counts.categoriesWithTools,
+                discoverable: (counts.discoverable ?? counts.total) + 1,
+                androidImplemented: counts.androidImplemented,
+                iosImplemented: counts.iosImplemented
+            ),
             categories: categories,
             tools: (tools + [tool]).sorted {
                 let leftCategory = $0.category.lowercased()
@@ -328,7 +337,9 @@ extension Catalog {
         return Catalog(
             schemaVersion: schemaVersion,
             catalogVersion: catalogVersion,
-            counts: hasLegacyAlias ? counts : CatalogCounts(total: counts.total + 1, active: counts.active + 1, planned: counts.planned, categories: counts.categories, categoriesWithTools: counts.categoriesWithTools, discoverable: counts.discoverable, androidImplemented: counts.androidImplemented, iosImplemented: counts.iosImplemented),
+            counts: hasLegacyAlias
+                ? CatalogCounts(total: counts.total, active: counts.active, planned: counts.planned, categories: counts.categories, categoriesWithTools: counts.categoriesWithTools, discoverable: (counts.discoverable ?? counts.total) + 1, androidImplemented: counts.androidImplemented, iosImplemented: counts.iosImplemented)
+                : CatalogCounts(total: counts.total + 1, active: counts.active + 1, planned: counts.planned, categories: counts.categories, categoriesWithTools: counts.categoriesWithTools, discoverable: (counts.discoverable ?? counts.total) + 1, androidImplemented: counts.androidImplemented, iosImplemented: counts.iosImplemented),
             categories: categories,
             tools: updated.sorted {
                 let leftCategory = $0.category.lowercased()
@@ -371,7 +382,16 @@ extension Catalog {
         return Catalog(
             schemaVersion: schemaVersion,
             catalogVersion: catalogVersion,
-            counts: CatalogCounts(total: updated.count, active: updated.filter { $0.status == "active" || $0.status == "beta" }.count, planned: counts.planned, categories: counts.categories),
+            counts: CatalogCounts(
+                total: counts.total + 1,
+                active: counts.active + 1,
+                planned: counts.planned,
+                categories: counts.categories,
+                categoriesWithTools: counts.categoriesWithTools,
+                discoverable: (counts.discoverable ?? counts.total) + 1,
+                androidImplemented: counts.androidImplemented,
+                iosImplemented: counts.iosImplemented
+            ),
             categories: categories,
             tools: updated.sorted {
                 let leftCategory = $0.category.lowercased()
@@ -412,7 +432,16 @@ extension Catalog {
         return Catalog(
             schemaVersion: schemaVersion,
             catalogVersion: catalogVersion,
-            counts: CatalogCounts(total: counts.total + 1, active: counts.active + 1, planned: counts.planned, categories: counts.categories),
+            counts: CatalogCounts(
+                total: counts.total + 1,
+                active: counts.active + 1,
+                planned: counts.planned,
+                categories: counts.categories,
+                categoriesWithTools: counts.categoriesWithTools,
+                discoverable: (counts.discoverable ?? counts.total) + 1,
+                androidImplemented: counts.androidImplemented,
+                iosImplemented: counts.iosImplemented
+            ),
             categories: categories,
             tools: (tools + [tool]).sorted {
                 let leftCategory = $0.category.lowercased()
@@ -450,7 +479,16 @@ extension Catalog {
         return Catalog(
             schemaVersion: schemaVersion,
             catalogVersion: catalogVersion,
-            counts: CatalogCounts(total: updated.count, active: updated.filter { $0.status == "active" || $0.status == "beta" }.count, planned: counts.planned, categories: counts.categories),
+            counts: CatalogCounts(
+                total: counts.total + 1,
+                active: counts.active + 1,
+                planned: counts.planned,
+                categories: counts.categories,
+                categoriesWithTools: counts.categoriesWithTools,
+                discoverable: (counts.discoverable ?? counts.total) + 1,
+                androidImplemented: counts.androidImplemented,
+                iosImplemented: counts.iosImplemented
+            ),
             categories: categories,
             tools: updated.sorted {
                 let leftCategory = $0.category.lowercased()
@@ -488,7 +526,7 @@ extension Catalog {
              "Compare two folder selections and verify same-size files with SHA-256 checksums.",
              ["compare folders", "directory diff", "rsync", "file comparison", "backup compare"], "custom")
         ]
-        let existing = Set(tools.map(\.id))
+        let existing = Set((tools + (relatedReferenceTools ?? [])).map(\.id))
         let additions = definitions.filter { !existing.contains($0.0) }.map { definition -> Tool in
             let (id, name, subcategory, description, keywords, engineType) = definition
             return Tool(
@@ -528,10 +566,14 @@ extension Catalog {
             schemaVersion: schemaVersion,
             catalogVersion: catalogVersion,
             counts: CatalogCounts(
-                total: updated.count,
-                active: updated.filter { $0.status == "active" || $0.status == "beta" }.count,
-                planned: updated.filter { $0.status != "active" && $0.status != "beta" }.count,
-                categories: categories.count
+                total: counts.total + additions.count,
+                active: counts.active + additions.filter { $0.status == "active" || $0.status == "beta" }.count,
+                planned: counts.planned,
+                categories: counts.categories,
+                categoriesWithTools: counts.categoriesWithTools,
+                discoverable: (counts.discoverable ?? counts.total) + additions.count,
+                androidImplemented: counts.androidImplemented,
+                iosImplemented: counts.iosImplemented
             ),
             categories: categories,
             tools: updated.sorted {
@@ -995,7 +1037,7 @@ extension Catalog {
             ("duration-calculator", "Duration Calculator", "duration-calculator", "Calculate exact elapsed time between two date and time values.", ["duration", "elapsed", "time", "hours", "minutes", "seconds"], ["duration", "elapsed-time", "date"], 85, false, "duration", ["date-difference", "countdown", "time-until-calculator"]),
             ("meeting-time-planner", "Meeting Time Planner", "meeting-time-planner", "Find shared working-hour slots across cities and export an ICS invite.", ["meeting", "planner", "timezone", "working", "hours", "calendar", "ics"], ["meeting", "timezone", "planner", "calendar"], 91, true, "meeting-planner", ["timezone-converter", "world-clock", "countdown"])
         ]
-        let existing = Set(tools.map(\.id))
+        let existing = Set((tools + (relatedReferenceTools ?? [])).map(\.id))
         let additions = definitions.filter { !existing.contains($0.0) }.map { item in
             Tool(
                 id: item.0,
@@ -1030,10 +1072,14 @@ extension Catalog {
             schemaVersion: schemaVersion,
             catalogVersion: catalogVersion,
             counts: CatalogCounts(
-                total: updated.count,
-                active: updated.filter { $0.status == "active" || $0.status == "beta" }.count,
-                planned: updated.filter { $0.isPlanned }.count,
-                categories: categories.count
+                total: counts.total + additions.count,
+                active: counts.active + additions.filter { $0.status == "active" || $0.status == "beta" }.count,
+                planned: counts.planned,
+                categories: counts.categories,
+                categoriesWithTools: counts.categoriesWithTools,
+                discoverable: (counts.discoverable ?? counts.total) + additions.count,
+                androidImplemented: counts.androidImplemented,
+                iosImplemented: counts.iosImplemented
             ),
             categories: categories,
             tools: updated,
