@@ -25,6 +25,17 @@ const header = read('src/components/layout/header.tsx');
 const footer = read('src/components/layout/footer.tsx');
 const articles = read('src/data/blog-articles.ts');
 const toolDocumentation = read('src/lib/tool-documentation.ts');
+const categorySource = read('src/data/categories.ts');
+const categoryIds = [...categorySource.matchAll(/\\bid:\\s*"([^"]+)"/g)].map((match) => match[1]);
+const categoryGuidanceBlock = toolDocumentation.match(/const CATEGORY_TASK_GUIDANCE:[\\s\\S]*?^};/m)?.[0] ?? '';
+const documentedCategoryIds = new Set(
+  [...categoryGuidanceBlock.matchAll(/^  ([a-z][a-z0-9_]+): \\{/gm)].map((match) => match[1]),
+);
+assert.ok(categoryIds.length > 0, 'The category catalogue must expose category IDs.');
+for (const categoryId of categoryIds) {
+  assert.ok(documentedCategoryIds.has(categoryId), `Tool guides are missing task-specific category guidance for ${categoryId}.`);
+}
+
 const blogIndex = read('src/routes/blog.index.tsx');
 const blogDetail = read('src/routes/blog.$slug.tsx');
 const help = read('src/routes/help.tsx');
@@ -70,4 +81,4 @@ for (const phrase of ['billing_offline_allowances', 'billing_offline_transaction
 for (const phrase of ['Lost offline records do not prove zero usage', 'Shared server', 'Production launch gates']) {
   assert.ok(security.includes(phrase), `Offline security document missing: ${phrase}`);
 }
-console.log(`Support-center audit passed: ${requiredFiles.length} artifacts and navigation/content invariants checked.`);
+console.log(`Support-center audit passed: ${requiredFiles.length} artifacts, ${documentedCategoryIds.size}/${categoryIds.length} category guidance entries, and navigation/content invariants checked.`);
