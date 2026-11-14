@@ -218,6 +218,7 @@ export function celebrationQualityChecks(input: CelebrationInput): string[] {
     const options = nonEmptyLines(input.quizOptions);
     if (!clean(input.quizQuestion)) checks.push("Add the question.");
     if (options.length < 2 || options.length > 6) checks.push("Add between 2 and 6 answer choices.");
+    if (!clean(input.quizAnswer)) checks.push("Choose the correct answer so the quiz can grade responses.");
     if (clean(input.quizAnswer) && !options.some((option) => option.toLowerCase() === clean(input.quizAnswer).toLowerCase())) {
       checks.push("The correct answer must match one of the answer choices.");
     }
