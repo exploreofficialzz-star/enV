@@ -5,6 +5,7 @@
 import { writeFileSync, readFileSync } from "node:fs";
 import { IMAGE_DESCRIPTIONS } from "./image-descriptions.mjs";
 import { refineGeneratedToolDescription } from "../src/lib/generated-tool-copy.mjs";
+import { applyGenericWorkflowPolicy } from "../src/lib/generic-workflow-policy.mjs";
 import mathExpansion from "../src/data/math-expansion.json" with { type: "json" };
 import { describeExpansion, expansionCalculatorName, expansionCalculatorDescription, expansionCalculatorKeywords } from "../src/lib/calc/expansion-rows.mjs";
 import { parseMathExerciseCatalog, mathExercisePresentation } from "./math-exercise-catalog.mjs";
@@ -2136,30 +2137,6 @@ for (const tool of tools) {
   else tool.engine = { type: "custom", id: tool.id };
 }
 
-// Events have a dedicated typed template engine for the exact operations below.
-// Other cross-category entries in Events, Celebrations, Food, Travel and Photography
-// still share a generic placeholder and must not be promoted or indexed as working tools.
-const agendaThemes = ["birthday", "concert", "conference", "dinner", "fundraiser", "graduation", "launch", "party", "sports-event", "webinar", "wedding", "workshop"];
-const scheduleThemes = ["birthday", "concert", "conference", "dinner", "fundraiser", "graduation", "launch", "meeting", "party", "sports-event", "webinar", "wedding", "workshop"];
-const pageThemes = ["birthday", "concert", "conference", "dinner", "fundraiser", "graduation", "launch", "meeting", "party", "sports-event", "webinar", "wedding", "workshop"];
-const eventTemplateToolIds = new Set([
-  ...agendaThemes.map((theme) => `${theme}-agenda-generator`),
-  ...scheduleThemes.map((theme) => `${theme}-schedule-builder`),
-  ...pageThemes.flatMap((theme) => [`${theme}-rsvp-page`, `${theme}-check-in-page`]),
-]);
-const genericWorkflowCategories = new Set(["events", "celebrations", "food", "travel", "photography"]);
-for (const tool of tools) {
-  if (!genericWorkflowCategories.has(tool.category)) continue;
-  if (tool.engine?.type !== "custom" || tool.engine.id !== tool.id) continue;
-
-  const hasDedicatedEventTemplate = tool.category === "events" && eventTemplateToolIds.has(tool.id);
-  tool.status = hasDedicatedEventTemplate ? "active" : "planned";
-  tool.clientSide = true;
-  tool.requiresBackend = false;
-  tool.requiresAuth = false;
-  tool.engine = { type: "custom", id: tool.id };
-}
-
 // Audio tools are bound to the real AudioEngine. Pure calculators/guides are
 // computed locally; file operations use Web Audio or the verified FFmpeg bridge.
 for (const tool of tools) {
@@ -2335,7 +2312,8 @@ for (const tool of tools) {
   tool.description = screenshotRegistry.describeTool(config);
 }
 
-tools.sort((a, b) =>
+const normalizedTools = applyGenericWorkflowPolicy(tools);
+normalizedTools.sort((a, b) =>
   compareAlphabetically(
     alphabeticalKey(CATEGORY_LABELS[a.category] ?? a.category),
     alphabeticalKey(CATEGORY_LABELS[b.category] ?? b.category),
@@ -2344,7 +2322,7 @@ tools.sort((a, b) =>
   compareAlphabetically(a.id, b.id),
 );
 
-const serializedCatalog = js(tools);
+const serializedCatalog = js(normalizedTools);
 const chunkSize = 60_000;
 const catalogChunks = [];
 for (let start = 0; start < serializedCatalog.length; start += chunkSize) {
@@ -2361,6 +2339,6 @@ export const tools: ToolMeta[] = JSON.parse(catalogJson) as ToolMeta[];
 `;
 
 writeFileSync(new URL("../src/data/catalog.ts", import.meta.url), body);
-const active = tools.filter((t) => t.status !== "planned").length;
-const planned = tools.length - active;
-console.log(`Wrote ${tools.length} tools (${active} active, ${planned} planned)`);
+const active = normalizedTools.filter((t) => t.status !== "planned").length;
+const planned = normalizedTools.length - active;
+console.log(`Wrote ${normalizedTools.length} tools (${active} active, ${planned} planned)`);

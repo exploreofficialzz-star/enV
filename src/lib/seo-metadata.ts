@@ -3,6 +3,7 @@ import { CATEGORY_MAP } from "@/data/categories";
 import { isToolUnderProduction } from "@/lib/production-notice";
 import { toolDocumentationSummary } from "@/lib/tool-documentation";
 import { developerStudioForLegacySlug } from "@/lib/developer-studios-catalog";
+import { isGenericWorkflowPlaceholder } from "@/lib/generic-workflow-policy.mjs";
 
 export const SITE_ORIGIN = "https://envtools.store";
 export const DEFAULT_SOCIAL_IMAGE = SITE_ORIGIN + "/og.jpg";
@@ -347,7 +348,9 @@ export function technicalArticleSchema(tool: ToolMeta, description: string, path
 export function isIndexableTool(tool: ToolMeta): boolean {
   // The old Artboard route is a retired label; World Lab is not yet a production SEO landing page.
   if (tool.id === "artboard-studio" || tool.slug === "artboard-studio") return false;
-  return (tool.status === "active" || tool.status === "beta") && !isToolUnderProduction(tool);
+  return !isGenericWorkflowPlaceholder(tool)
+    && (tool.status === "active" || tool.status === "beta")
+    && !isToolUnderProduction(tool);
 }
 
 function expansionSeoFingerprint(tool: ToolMeta): string | null {

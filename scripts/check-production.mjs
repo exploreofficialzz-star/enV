@@ -4,13 +4,14 @@
  */
 import { readFileSync, existsSync } from "node:fs";
 import { parseGeneratedCatalog } from "./catalog-reader.mjs";
+import { applyGenericWorkflowPolicy, isGenericWorkflowPlaceholder } from "../src/lib/generic-workflow-policy.mjs";
 
 const root = new URL("../", import.meta.url);
 const text = (path) => readFileSync(new URL(path, root), "utf8");
 const errors = [];
 const warnings = [];
 
-const tools = parseGeneratedCatalog(text("src/data/catalog.ts"));
+const tools = applyGenericWorkflowPolicy(parseGeneratedCatalog(text("src/data/catalog.ts")));
 const ids = new Set();
 const slugs = new Set();
 const engineTypes = new Set([
@@ -38,6 +39,9 @@ for (const tool of tools) {
     if (!supported.has(tool.category) && !plannedLocalCategories.has(tool.category) && !explicitCustomDispatchers.has(tool.id) && !isPlannedLocal) {
       errors.push(`${tool.id}: active custom tool has no dispatcher category`);
     }
+  }
+  if (isGenericWorkflowPlaceholder(tool) && tool.status !== "planned") {
+    errors.push(`${tool.id}: generic workflow placeholder must remain planned and non-indexable`);
   }
   if (tool.status === "active" && tool.requiresBackend && tool.clientSide) {
     errors.push(`${tool.id}: active tool cannot simultaneously require a backend and claim clientSide`);

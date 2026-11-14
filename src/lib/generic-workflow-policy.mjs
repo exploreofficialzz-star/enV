@@ -39,7 +39,8 @@ const DEDICATED_EVENT_TEMPLATE_IDS = new Set([
 export function isGenericWorkflowPlaceholder(tool) {
   return GENERIC_WORKFLOW_CATEGORIES.has(tool.category)
     && tool.engine?.type === "custom"
-    && tool.engine.id === tool.id;
+    && tool.engine.id === tool.id
+    && !isDedicatedEventTemplateTool(tool);
 }
 
 /** @param {ToolMeta} tool */
@@ -51,10 +52,9 @@ export function isDedicatedEventTemplateTool(tool) {
 export function normalizeGenericWorkflowTool(tool) {
   if (!isGenericWorkflowPlaceholder(tool)) return tool;
 
-  const isImplementedEventTemplate = isDedicatedEventTemplateTool(tool);
   return {
     ...tool,
-    status: isImplementedEventTemplate ? "active" : "planned",
+    status: "planned",
     clientSide: true,
     requiresBackend: false,
     requiresAuth: false,

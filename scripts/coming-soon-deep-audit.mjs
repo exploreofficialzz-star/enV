@@ -1,10 +1,12 @@
 import fs from "node:fs";
 import assert from "node:assert/strict";
+import { applyGenericWorkflowPolicy } from "../src/lib/generic-workflow-policy.mjs";
 
 const text = fs.readFileSync(new URL("../src/data/catalog.ts", import.meta.url), "utf8");
 const m = text.match(/const catalogJson = \[([\s\S]*?)\]\.join\(""\);/);
 assert.ok(m, "catalog format");
-const tools = JSON.parse(JSON.parse(`[${m[1]}]`).join(""));
+const rawTools = JSON.parse(JSON.parse(`[${m[1]}]`).join(""));
+const tools = applyGenericWorkflowPolicy(rawTools);
 
 const genericLocal = tools.filter((t) => t.engine?.id?.startsWith("planned-local:"));
 assert.equal(genericLocal.length, 0, "generic planned-local catalog count");
