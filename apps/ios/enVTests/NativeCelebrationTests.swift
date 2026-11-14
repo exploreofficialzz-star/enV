@@ -31,13 +31,19 @@ final class NativeCelebrationTests: XCTestCase {
     func testIanaTimeZoneConversionAndDaylightSavingValidation() throws {
         let instant = try NativeCelebrationEngine.eventInstant("2026-11-05T10:00", timeZoneName: "Africa/Lagos")
         XCTAssertEqual(Calendar(identifier: .gregorian).dateComponents(in: TimeZone(secondsFromGMT: 0)!, from: instant).hour, 9)
-        XCTAssertThrowsError(try NativeCelebrationEngine.eventInstant("2026-03-08T02:30", timeZoneName: "America/New_York")) { error in
-            let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-            XCTAssertTrue(message.contains("does not exist"), "Unexpected DST-gap error: \\(message)")
+
+        do {
+            _ = try NativeCelebrationEngine.eventInstant("2026-03-08T02:30", timeZoneName: "America/New_York")
+            XCTFail("A nonexistent daylight-saving time must be rejected.")
+        } catch NativeCelebrationError.message(let message) {
+            XCTAssertTrue(message.contains("does not exist"), message)
         }
-        XCTAssertThrowsError(try NativeCelebrationEngine.eventInstant("2026-11-01T01:30", timeZoneName: "America/New_York")) { error in
-            let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-            XCTAssertTrue(message.contains("occurs twice"), "Unexpected repeated-time error: \\(message)")
+
+        do {
+            _ = try NativeCelebrationEngine.eventInstant("2026-11-01T01:30", timeZoneName: "America/New_York")
+            XCTFail("An ambiguous repeated daylight-saving time must be rejected.")
+        } catch NativeCelebrationError.message(let message) {
+            XCTAssertTrue(message.contains("occurs twice"), message)
         }
     }
 
