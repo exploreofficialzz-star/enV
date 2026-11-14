@@ -1,5 +1,5 @@
 import { tools as catalogTools } from "@/data/catalog";
-import { CATEGORY_MAP } from "@/data/categories";
+import { CATEGORIES, CATEGORY_MAP } from "@/data/categories";
 import type { CategoryId, ToolMeta } from "@/types/tool";
 import { makeAccessibilityStudioTools, studioToolForLegacy } from "@/lib/accessibility-studios";
 import { makeDeveloperStudioTools } from "@/lib/developer-studios-catalog";
@@ -306,10 +306,50 @@ const byPath = new Map<string, ToolMeta>([
   ...virtualStudios.map((t) => [`${t.category}/${t.slug}`, t] as const),
 ]);
 const byVirtualId = new Map(virtualStudios.map((tool) => [tool.id, tool] as const));
-// The old audio-analyze-studio URL remains usable, but its shared sandbox is
-// presented once in discovery and related-tool lists.
-const isDiscoverable = (tool: ToolMeta) => tool.id !== "audio-analyze-studio";
-const searchableTools = [...allTools.filter((tool) => tool.category !== "accessibility" && isDiscoverable(tool)), ...virtualStudios];
+// Legacy accessibility actions remain routable, but the Studio is their single discovery entry.
+// The contrast checker also has an old Design-category record; do not show that record
+// beside the canonical Accessibility Studio with the same ID.
+const accessibilityStudioIds = new Set(accessibilityStudios.map((tool) => tool.id));
+const isDiscoverable = (tool: ToolMeta) =>
+  tool.id !== "audio-analyze-studio" && !accessibilityStudioIds.has(tool.id);
+
+// Keep search IDs unique. Virtual Studio entries intentionally replace their source records
+// in discovery, while getAllTools() continues to preserve every canonical/legacy tool ID.
+const searchableById = new Map(
+  allTools
+    .filter((tool) => tool.category !== "accessibility" && isDiscoverable(tool))
+    .map((tool) => [tool.id, tool] as const),
+);
+for (const tool of virtualStudios) searchableById.set(tool.id, tool);
+const searchableTools = [...searchableById.values()];
+
+export type CatalogCountSummary = {
+  total: number;
+  active: number;
+  planned: number;
+  categories: number;
+  categoriesWithTools: number;
+  discoverable: number;
+  categoryCounts: Record<string, number>;
+};
+
+export function getCatalogCounts(): CatalogCountSummary {
+  const categoryCounts = Object.fromEntries(
+    CATEGORIES.map((category) => [
+      category.id,
+      allTools.filter((tool) => tool.category === category.id).length,
+    ]),
+  );
+  return {
+    total: allTools.length,
+    active: allTools.filter((tool) => tool.status === "active" || tool.status === "beta").length,
+    planned: allTools.filter((tool) => tool.status === "planned").length,
+    categories: CATEGORIES.length,
+    categoriesWithTools: Object.values(categoryCounts).filter((count) => count > 0).length,
+    discoverable: searchableTools.length,
+    categoryCounts,
+  };
+}
 
 export function getAllTools(): ToolMeta[] {
   return allTools;
@@ -404,15 +444,15 @@ export function getRelatedTools(tool: ToolMeta, limit = 6): ToolMeta[] {
 }
 
 export function activeCount(): number {
-  return allTools.filter((t) => t.status === "active" || t.status === "beta").length;
+  return getCatalogCounts().active;
 }
 
 export function plannedCount(): number {
-  return allTools.filter((t) => t.status === "planned").length;
+  return getCatalogCounts().planned;
 }
 
 export function totalToolCount(): number {
-  return allTools.length;
+  return getCatalogCounts().total;
 }
 
 export function categoryLabel(id: CategoryId): string {
