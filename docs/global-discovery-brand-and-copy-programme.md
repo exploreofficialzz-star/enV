@@ -122,7 +122,7 @@ The most useful comparison is the *actual task flow*, not the headline count of 
 - Preserve legal company attribution where it belongs; do not erase ownership information or insert it into every product label.
 
 ### WS-02 — Build a verified catalogue content inventory
-The PR branch audit confirms 43 of 43 catalogue categories have an entry in `CATEGORY_TASK_GUIDANCE`; `scripts/check-support-center.mjs` now protects this coverage. This is category-level coverage only and must not be counted as proof that each tool has individually verified copy.
+The PR branch audit confirms 43 of 43 catalogue categories have an entry in `CATEGORY_TASK_GUIDANCE`; `scripts/check-support-center.mjs` protects that coverage. The guide fallback now also carries each tool's own refined catalogue task description into its individual guide, and `src/lib/tool-documentation.test.ts` verifies this for every category. This is catalogue-grounded copy coverage, not proof that every active engine's real controls, outputs, errors, privacy path and limits have been manually or browser-verified; that source-level per-tool audit remains required.
 
 For every active, public, canonical tool:
 - Record tool ID, displayed name, canonical route, category/subcategory, current description, keywords, tags and related tools.
