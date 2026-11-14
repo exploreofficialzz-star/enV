@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { refineGeneratedToolDescription } from "../src/lib/generated-tool-copy.mjs";
+import { applyGenericWorkflowPolicy } from "../src/lib/generic-workflow-policy.mjs";
 
 const root = new URL("../", import.meta.url);
 const catalogSource = readFileSync(new URL("../src/data/catalog.ts", import.meta.url), "utf8");
@@ -14,7 +15,8 @@ const [{ tools }, { CATEGORIES: categories }, { DATETIME_TOOL_EXTENSIONS }] = aw
 // Import the public runtime catalog rather than parsing only catalogJson. Platform-owned
 // runtime extensions are validated below but are not duplicated into the generated base export.
 
-const refinedCatalogTools = tools.map((tool) => {
+const publishedCatalogTools = applyGenericWorkflowPolicy(tools);
+const refinedCatalogTools = publishedCatalogTools.map((tool) => {
   const description = refineGeneratedToolDescription(tool);
   return description === tool.description ? tool : { ...tool, description };
 });

@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { applyGenericWorkflowPolicy } from "../src/lib/generic-workflow-policy.mjs";
 
 const root = new URL("../", import.meta.url);
 const [{ tools: baseCatalog }, { DATETIME_TOOL_EXTENSIONS }] = await Promise.all([
@@ -10,7 +11,7 @@ const platformRuntimeExtensions = [
   { id: "a-book", status: "active", category: "productivity", engine: { type: "custom" } },
 ];
 const catalog = [
-  ...baseCatalog,
+  ...applyGenericWorkflowPolicy(baseCatalog),
   ...DATETIME_TOOL_EXTENSIONS.filter((extension) => !baseCatalog.some((tool) => tool.id === extension.id)),
   ...platformRuntimeExtensions.filter((extension) => !baseCatalog.some((tool) => tool.id === extension.id)),
 ];

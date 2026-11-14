@@ -98,6 +98,16 @@ test("compact runtime summaries are normalized without engine metadata", () => {
   assert.equal(normalizeGenericWorkflowTool(cameraStudio).status, "active");
 });
 
+test("native catalog and execution-matrix exporters share the publication policy", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const [nativeExporter, matrixExporter] = await Promise.all([
+    readFile(new URL("./export-native-catalog.mjs", import.meta.url), "utf8"),
+    readFile(new URL("./export-native-execution-matrix.mjs", import.meta.url), "utf8"),
+  ]);
+  assert.match(nativeExporter, /applyGenericWorkflowPolicy\(tools\)/);
+  assert.match(matrixExporter, /applyGenericWorkflowPolicy\(baseCatalog\)/);
+});
+
 test("tools outside the generic workflow categories are preserved unchanged", () => {
   const source = [
     tool("password-generator", "security"),
