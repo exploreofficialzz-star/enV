@@ -26,10 +26,10 @@ const footer = read('src/components/layout/footer.tsx');
 const articles = read('src/data/blog-articles.ts');
 const toolDocumentation = read('src/lib/tool-documentation.ts');
 const categorySource = read('src/data/categories.ts');
-const categoryIds = [...categorySource.matchAll(/\\bid:\\s*"([^"]+)"/g)].map((match) => match[1]);
-const categoryGuidanceBlock = toolDocumentation.match(/const CATEGORY_TASK_GUIDANCE:[\\s\\S]*?^};/m)?.[0] ?? '';
+const categoryIds = [...categorySource.matchAll(/\bid:\s*"([^"]+)"/g)].map((match) => match[1]);
+const categoryGuidanceBlock = toolDocumentation.match(/const CATEGORY_TASK_GUIDANCE:[\s\S]*?^};/m)?.[0] ?? '';
 const documentedCategoryIds = new Set(
-  [...categoryGuidanceBlock.matchAll(/^  ([a-z][a-z0-9_]+): \\{/gm)].map((match) => match[1]),
+  [...categoryGuidanceBlock.matchAll(/^  ([a-z][a-z0-9_]+): \{/gm)].map((match) => match[1]),
 );
 assert.ok(categoryIds.length > 0, 'The category catalogue must expose category IDs.');
 for (const categoryId of categoryIds) {
