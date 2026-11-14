@@ -47,7 +47,7 @@ export function isDedicatedEventTemplateTool(tool) {
   return tool.category === "events" && DEDICATED_EVENT_TEMPLATE_IDS.has(tool.id);
 }
 
-/** @param {ToolMeta} tool */
+/** @param {ToolMeta} tool @returns {ToolMeta} */
 export function normalizeGenericWorkflowTool(tool) {
   if (!isGenericWorkflowPlaceholder(tool)) return tool;
 
@@ -60,7 +60,7 @@ export function normalizeGenericWorkflowTool(tool) {
   };
 }
 
-/** @template {ToolMeta} T @param {T[]} tools @returns {T[]} */
+/** @param {ToolMeta[]} tools @returns {ToolMeta[]} */
 export function applyGenericWorkflowPolicy(tools) {
   return tools.map(normalizeGenericWorkflowTool);
 }
