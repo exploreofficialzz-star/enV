@@ -302,7 +302,7 @@ export function ToolShell({
 
       {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
 
-      {note && tool.category !== "creators" && tool.category !== "celebrations" ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
+      {note && tool.category !== "creators" ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
       <section
         ref={toolInterfaceRef}
         data-env-tool-id={tool.id}
@@ -356,7 +356,6 @@ export function ToolShell({
       {!isFullscreen && import.meta.env.VITE_ADSTERRA_ENABLED !== "true" ? <AdSlot tool={tool} /> : null}
       <AiAssistPanel toolId={tool.id} />
 
-      {tool.category !== "celebrations" ? (
       <section className="mt-10" aria-labelledby="tool-guide-heading">
         <h2 id="tool-guide-heading" className="text-lg font-semibold">What this tool does</h2>
         <p className="mt-3 text-sm leading-6 text-muted">{offlineAwareToolDescription(tool)}</p>
@@ -369,7 +368,7 @@ export function ToolShell({
         </a>
 
 
-      </section>      ) : null}
+      </section>
 
 
       {related.length > 0 ? (
