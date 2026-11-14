@@ -97,6 +97,25 @@ final class NativeCelebrationTests: XCTestCase {
         XCTAssertFalse(output.html.contains("<svg onload="))
     }
 
+    func testPageGeneratorExportsEscapedScheduleAndEventDetails() throws {
+        let output = try NativeCelebrationEngine.build("birthday-page-generator", values: [
+            "title": "Birthday gathering",
+            "honoree": "Alex",
+            "host": "Sam",
+            "date": "2030-01-01T12:00",
+            "timezone": "Africa/Lagos",
+            "location": "Hall & Garden",
+            "schedule": "Welcome\nDinner <after>\nPhotos"
+        ])
+        XCTAssertTrue(output.html.contains("<h2>Schedule</h2><ol>"))
+        XCTAssertTrue(output.html.contains("<li>Welcome</li>"))
+        XCTAssertTrue(output.html.contains("<li>Dinner &lt;after&gt;</li>"))
+        XCTAssertTrue(output.html.contains("<li>Photos</li>"))
+        XCTAssertTrue(output.html.contains("Hall &amp; Garden"))
+        XCTAssertTrue(output.html.contains("Hosted by: Sam"))
+        XCTAssertFalse(output.html.contains("<li>Dinner <after>"))
+    }
+
     func testCountdownCompletesAndHasSecondPrecision() throws {
         let values = ["date": "2026-11-05T10:00", "timezone": "Africa/Lagos"]
         let target = try NativeCelebrationEngine.eventInstant(values["date"]!, timeZoneName: values["timezone"]!)
