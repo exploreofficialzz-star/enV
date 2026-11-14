@@ -362,7 +362,9 @@ export function refineGeneratedToolDescription(tool) {
     /design utility for modern interfaces\.$/i.test(current) ||
     /helper for web design and interface work\.$/i.test(current) ||
     /a (?:video|audio) utility\.$/i.test(current) ||
-    /mockup\.$/i.test(current);
+    /mockup\.$/i.test(current) ||
+    /utility for games and gaming communities\.$/i.test(current) ||
+    /^create a personalized .* celebration experience\.$/i.test(current);
   if (!lowQuality) return current;
 
   if (tool.category === "calculators") {
