@@ -47,7 +47,7 @@ const BRAND_FACTS = [
 export const assistantChatTask = defineTask({
   kind: "structured",
   id: "assistant.chat",
-  version: "2026-10-19.1",
+  version: "2026-11-14.1",
   description: "Help users identify relevant enV tools, hand off through verified catalog links, and answer factual questions about the enV product and brand.",
   privacy: "sensitive",
   rateUnits: 2,
