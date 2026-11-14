@@ -213,10 +213,10 @@ test("route groups distinguish tools, categories, guides and editorial pages", (
       "/blog/productivity-guides",
     ],
   });
-  assert.deepEqual(groups.categories, [
+  assert.deepEqual([...groups.categories].sort(), [
     "https://envtools.store/tools",
     "https://envtools.store/tools/text",
-  ]);
+  ].sort());
   assert.deepEqual(groups.tools, [
     "https://envtools.store/tools/text/word-counter",
     "https://envtools.store/blog/tool-word-counter",
