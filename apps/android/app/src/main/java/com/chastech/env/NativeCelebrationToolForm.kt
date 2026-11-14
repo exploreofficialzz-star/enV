@@ -44,6 +44,7 @@ internal object NativeCelebrationEngine {
 
     private val occasions = setOf("birthday", "anniversary", "graduation", "valentine", "christmas", "new-year", "congratulations", "thank-you", "appreciation", "farewell", "achievement", "party")
     private val experiences = setOf("page-generator", "interactive-card", "invitation-generator", "countdown", "memory-page", "reveal-page", "quiz-generator", "surprise-page")
+    private val unavailableToolIds = setOf("birthday-countdown", "valentine-reveal-page", "appreciation-reveal-page")
     private val labels = mapOf(
         "birthday" to "Birthday", "anniversary" to "Anniversary", "graduation" to "Graduation",
         "valentine" to "Valentine's Day", "christmas" to "Christmas", "new-year" to "New Year",
@@ -80,7 +81,7 @@ internal object NativeCelebrationEngine {
             val prefix = "$occasion-"
             if (!normalized.startsWith(prefix)) continue
             val experience = normalized.removePrefix(prefix)
-            require(experience in experiences) { "This celebration tool is not supported." }
+            require(experience in experiences && normalized !in unavailableToolIds) { "This celebration tool is not supported." }
             return Parsed(occasion, experience)
         }
         throw IllegalArgumentException("This celebration tool is not supported.")
