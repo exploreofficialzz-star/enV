@@ -64,12 +64,12 @@ enum NativeCelebrationEngine {
         "party": "Good people, a shared moment and a reason to celebrate."
     ]
     private static let themes: [String: (accent: String, background: String, ink: String)] = [
-        "Classic": ("#4b5563", "#f8fafc", "#202833"),
-        "Rose": ("#9f4564", "#fff6f8", "#39232d"),
-        "Gold": ("#946b12", "#fffaf0", "#332a18"),
-        "Garden": ("#35745a", "#f4fbf5", "#1c3328"),
-        "Ocean": ("#246d91", "#f1f9fc", "#18313d"),
-        "Midnight": ("#6579d9", "#10172a", "#f4f5fb")
+        "Classic": ("#F05A42", "#172334", "#F8F4EA"),
+        "Rose": ("#00B48A", "#321724", "#F3D9DE"),
+        "Gold": ("#D9A441", "#141B3A", "#F9F1D8"),
+        "Garden": ("#F04A24", "#1F4A3A", "#FEFCF5"),
+        "Ocean": ("#F02391", "#014342", "#FEFCF5"),
+        "Midnight": ("#B8F01E", "#0B1026", "#BCD4F2")
     ]
 
     static func parse(_ toolID: String) -> Parsed? {
@@ -202,7 +202,7 @@ enum NativeCelebrationEngine {
         lines(value(values, "photosData")).prefix(8).enumerated().compactMap { index, item in
             guard item.range(of: #"^data:image/(?:png|jpeg|webp|avif);base64,[A-Za-z0-9+/=]+$"#, options: .regularExpression) != nil,
                   item.count <= 3_500_000 else { return nil }
-            return "<figure><img src=\"\(item)\" alt=\"Celebration memory \(index + 1)\"><figcaption>Memory \(index + 1)</figcaption></figure>"
+            return "<figure><img src=\"\(item)\" alt=\"Celebration memory \(index + 1)\"></figure>"
         }.joined()
     }
 
@@ -250,9 +250,9 @@ enum NativeCelebrationEngine {
         let details = value(values, "details"), rsvp = safeURL(value(values, "rsvpUrl"))
         let rsvpBy = value(values, "rsvpBy"), reveal = value(values, "revealMessage")
         let textSections = [
-            title, occasion + " · " + parsed.experience.replacingOccurrences(of: "-", with: " "),
+            title,
             honoree.isEmpty ? "" : "For: " + honoree,
-            host.isEmpty ? "" : "Hosted by: " + host,
+            host.isEmpty ? "" : "Hosted by " + host,
             date.isEmpty ? "" : "When: " + date + " (" + value(values, "timezone") + ")",
             location.isEmpty ? "" : "Where: " + location,
             "", message, details,
@@ -265,7 +265,7 @@ enum NativeCelebrationEngine {
             reveal.isEmpty ? "" : "The reveal\n" + reveal,
             value(values, "quizQuestion").isEmpty ? "" : "Quiz\n" + value(values, "quizQuestion") + "\n" + lines(value(values, "quizOptions")).joined(separator: "\n"),
             value(values, "photosData").isEmpty ? "" : "Photos included: " + String(lines(value(values, "photosData")).count),
-            "", "Created locally with enV. This file does not send invitations or collect guest responses."
+            ""
         ]
         let text = textSections.filter { !$0.isEmpty }.joined(separator: "\n")
         let photos = photoMarkup(values)
@@ -281,7 +281,7 @@ enum NativeCelebrationEngine {
                 (host.isEmpty ? "" : "<div><dt>Hosted by</dt><dd>\(escape(host))</dd></div>") +
                 (honoree.isEmpty ? "" : "<div><dt>Celebrating</dt><dd>\(escape(honoree))</dd></div>") +
                 (value(values, "dressCode").isEmpty ? "" : "<div><dt>Dress code</dt><dd>\(escape(value(values, "dressCode")))</dd></div>")
-            content = "<p class=\"eyebrow\">You are invited</p><h1>\(escape(title))</h1><p class=\"lead\">\(escape(message))</p><dl>\(rows)</dl>\(rsvp.isEmpty ? (value(values, "contactMethod").isEmpty ? "<p>Contact the host to reply.</p>" : "<p>Reply to: \(escape(value(values, "contactMethod")))</p>") : "<a class=\"button\" href=\"\(escape(rsvp))\" rel=\"noopener noreferrer\">Reply to invitation</a>")\(rsvpBy.isEmpty ? "" : "<p>Reply by \(escape(rsvpBy))</p>")"
+            content = "<p class=\"eyebrow\">You are invited</p><h1>\(escape(title))</h1><p class=\"lead\">\(escape(message))</p><dl>\(rows)</dl>\(rsvp.isEmpty ? (value(values, "contactMethod").isEmpty ? "<p></p>" : "<p>Reply to \(escape(value(values, "contactMethod")))</p>") : "<a class=\"button\" href=\"\(escape(rsvp))\" rel=\"noopener noreferrer\">Reply to invitation</a>")\(rsvpBy.isEmpty ? "" : "<p>Reply by \(escape(rsvpBy))</p>")"
         case "countdown":
             let target = (try? eventInstant(value(values, "date"), timeZoneName: value(values, "timezone")).ISO8601Format()) ?? ""
             content = "<p class=\"eyebrow\">\(escape(occasion))</p><h1>\(escape(title))</h1><p class=\"lead\">\(escape(message))</p><div class=\"countdown\" data-countdown=\"\(escape(target))\"><div><strong id=\"days\">—</strong><span>Days</span></div><div><strong id=\"hours\">—</strong><span>Hours</span></div><div><strong id=\"minutes\">—</strong><span>Minutes</span></div><div><strong id=\"seconds\">—</strong><span>Seconds</span></div></div>"
@@ -293,20 +293,46 @@ enum NativeCelebrationEngine {
             let options = lines(value(values, "quizOptions")).prefix(6).map { option in
                 "<button type=\"button\" data-correct=\"\(option.caseInsensitiveCompare(value(values, "quizAnswer")) == .orderedSame)\">\(escape(option))</button>"
             }.joined()
-            content = "<p class=\"eyebrow\">Celebration quiz</p><h1>\(escape(title))</h1><p class=\"lead\">\(escape(message))</p><p class=\"question\">\(escape(value(values, "quizQuestion")))</p><div id=\"choices\">\(options)</div><p id=\"feedback\" aria-live=\"polite\">Choose an answer.</p>"
+            content = "<p class=\"eyebrow\">Celebration quiz</p><h1>\(escape(title))</h1><p class=\"lead\">\(escape(message))</p><p class=\"question\">\(escape(value(values, "quizQuestion")))</p><div id=\"choices\">\(options)</div><p id=\"feedback\" aria-live=\"polite\"></p>"
         default:
             content = "<p class=\"eyebrow\">" + escape(occasion) + "</p><h1>" + escape(title) + "</h1><p class=\"lead\">" + escape(message) + "</p>" +
                 (honoree.isEmpty ? "" : "<p>For <strong>" + escape(honoree) + "</strong></p>") +
-                (host.isEmpty ? "" : "<p>Hosted by: " + escape(host) + "</p>") +
+                (host.isEmpty ? "" : "<p>Hosted by " + escape(host) + "</p>") +
                 (date.isEmpty ? "" : "<p><strong>When:</strong> " + escape(date) + "</p>") +
                 (location.isEmpty ? "" : "<p><strong>Where:</strong> " + escape(location) + "</p>") +
                 (details.isEmpty ? "" : "<p>" + escape(details) + "</p>") + scheduleHtml
 
         }
         let theme = themes[value(values, "theme")] ?? themes["Classic"]!
-        let css = "*,*:before,*:after{box-sizing:border-box}body{margin:0;padding:24px;overflow-wrap:anywhere;background:\(theme.background);color:\(theme.ink);font:16px/1.6 system-ui,sans-serif}.wrap{max-width:760px;margin:6vh auto;padding:clamp(22px,6vw,56px);border-radius:24px;background:\(theme.background);box-shadow:0 18px 55px rgba(20,30,45,.12)}.eyebrow{color:\(theme.accent);text-transform:uppercase;letter-spacing:.12em;font-size:.8rem;font-weight:700}h1{font-size:clamp(2rem,7vw,3.5rem);line-height:1.08;overflow-wrap:anywhere}button,.button{display:inline-block;background:\(theme.accent);color:white;border:0;border-radius:999px;padding:12px 20px;font:inherit;text-decoration:none;cursor:pointer}button:focus-visible,a:focus-visible{outline:3px solid \(theme.accent);outline-offset:3px}.lead{font-size:1.2rem}dl{display:grid;gap:10px}dl div,.countdown div{padding:12px;background:rgba(120,120,120,.12);border-radius:12px}dt{font-size:.8rem;opacity:.7}dd{margin:0;font-weight:600}.countdown{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.countdown div{text-align:center}.countdown strong{display:block;font-size:2rem}.gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}.gallery img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:12px}@media(max-width:420px){body{padding:10px}.wrap{margin:2vh auto;border-radius:16px}.countdown{gap:4px}}@media(prefers-reduced-motion:no-preference){.wrap{animation:appear .3s ease-out}@keyframes appear{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}}"
+        let glyph: String = ["birthday": "✳", "anniversary": "∞", "graduation": "✦", "valentine": "♥", "christmas": "✶", "new-year": "✺", "farewell": "〰", "achievement": "✸"][parsed.occasion] ?? "✧"
+        let css = """
+            *,*::before,*::after{box-sizing:border-box}
+            :root{--accent:@ACCENT@;--paper:@PAPER@;--ink:@INK@}
+            body{margin:0;min-height:100vh;padding:clamp(12px,4vw,36px);background:radial-gradient(ellipse at 15% 12%,color-mix(in srgb,var(--accent) 18%,transparent),transparent 45%),var(--paper);color:var(--ink);font:16px/1.6 Georgia,serif;overflow-wrap:anywhere}
+            body:before{position:fixed;inset:0;z-index:-1;content:"";pointer-events:none;opacity:.16;background-image:repeating-linear-gradient(0deg,transparent 0 3px,rgba(255,255,255,.08) 3px 4px),repeating-linear-gradient(90deg,transparent 0 5px,rgba(0,0,0,.04) 5px 6px)}
+            .poster{max-width:980px;min-height:min(720px,92vh);margin:auto;padding:clamp(22px,5vw,56px);display:grid;grid-template-columns:minmax(210px,.9fr) minmax(0,1.1fr);align-items:center;gap:clamp(20px,5vw,58px);overflow:hidden;border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);border-radius:28px;background:linear-gradient(140deg,color-mix(in srgb,var(--paper) 95%,white),var(--paper));box-shadow:0 24px 72px rgba(0,0,0,.2)}
+            .hero-art{position:relative;display:grid;min-height:400px;place-items:center;isolation:isolate}
+            .hero-art:before{position:absolute;inset:8% -18%;content:"";border:1px solid color-mix(in srgb,var(--accent) 55%,transparent);border-radius:48% 52% 60% 40%;transform:rotate(-24deg);box-shadow:0 0 0 18px color-mix(in srgb,var(--accent) 7%,transparent),0 0 0 38px color-mix(in srgb,var(--accent) 4%,transparent)}
+            .art-orbit{position:absolute;width:92%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 32% 24%,rgba(255,255,255,.6),transparent 19%),radial-gradient(circle at 50% 50%,var(--accent),color-mix(in srgb,var(--accent) 70%,black) 62%,transparent 64%);filter:drop-shadow(0 24px 40px rgba(0,0,0,.25))}
+            .art-ribbon{position:absolute;left:-20%;right:-24%;top:40%;height:24%;border-radius:50%;background:linear-gradient(180deg,rgba(255,255,255,.8),var(--accent) 22%,var(--accent) 58%,color-mix(in srgb,var(--accent) 72%,black));box-shadow:0 16px 34px rgba(0,0,0,.24),inset 0 2px 8px rgba(255,255,255,.5);transform:rotate(-32deg)}
+            .art-mark{position:relative;z-index:1;font:400 clamp(8rem,22vw,15rem)/1 Georgia,serif;color:var(--ink);text-shadow:0 5px 0 color-mix(in srgb,var(--accent) 35%,transparent),0 20px 30px rgba(0,0,0,.22);transform:rotate(-9deg)}
+            .hero-copy{position:relative;z-index:2;min-width:0}
+            .eyebrow{margin:0 0 16px;color:var(--accent);font:700 .72rem/1.2 system-ui,sans-serif;letter-spacing:.2em;text-transform:uppercase}
+            h1{margin:0 0 18px;font:500 clamp(2.5rem,6vw,5.4rem)/.98 Georgia,serif;letter-spacing:-.05em;overflow-wrap:anywhere}
+            .lead{font:400 clamp(1rem,1.5vw,1.2rem)/1.65 system-ui,sans-serif;opacity:.88}
+            p{overflow-wrap:anywhere}.poster button,.poster .button{display:inline-flex;min-height:46px;align-items:center;justify-content:center;margin-top:18px;padding:12px 22px;border:0;border-radius:999px;background:var(--accent);color:white;font:700 .9rem system-ui,sans-serif;text-decoration:none;cursor:pointer}
+            .poster button:focus-visible,.poster a:focus-visible{outline:3px solid var(--accent);outline-offset:4px}
+            dl{display:grid;gap:8px;margin:24px 0}dl div{display:grid;grid-template-columns:90px minmax(0,1fr);gap:12px;padding:10px 0;border-bottom:1px solid color-mix(in srgb,var(--ink) 18%,transparent)}dt{color:var(--accent);font:700 .68rem system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase}dd{margin:0;font:500 .94rem/1.5 system-ui,sans-serif}
+            .note{color:var(--accent);font:700 .82rem system-ui,sans-serif}.countdown{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:24px 0}.countdown div{padding:14px 5px;text-align:center;border:1px solid color-mix(in srgb,var(--accent) 38%,transparent);border-radius:14px;background:color-mix(in srgb,var(--accent) 10%,transparent)}.countdown strong{display:block;font:600 clamp(1.5rem,4vw,2.8rem) system-ui,sans-serif;color:var(--accent);font-variant-numeric:tabular-nums}.countdown span{font:700 .65rem system-ui,sans-serif;letter-spacing:.1em;text-transform:uppercase}
+            .gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-top:20px}.gallery figure{margin:0}.gallery img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:14px}.reveal{margin-top:18px;padding:18px 20px;border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);border-radius:16px;background:color-mix(in srgb,var(--accent) 9%,transparent)}.schedule{margin-top:24px}.schedule li{padding:8px 0;border-bottom:1px solid color-mix(in srgb,var(--ink) 16%,transparent)}.brand{grid-column:1/-1;text-align:right;margin-top:20px;font:800 .72rem system-ui,sans-serif;letter-spacing:.24em;text-transform:uppercase;opacity:.72}.hidden{display:none}
+            @media(max-width:680px){body{padding:10px}.poster{display:flex;min-height:0;flex-direction:column;align-items:stretch;gap:12px;padding:22px;border-radius:20px}.hero-art{width:100%;min-height:clamp(160px,40vw,240px);height:clamp(160px,40vw,240px)}.art-orbit{width:70%}.art-mark{font-size:clamp(7rem,30vw,11rem)}h1{font-size:clamp(2.5rem,12vw,4.2rem)}}
+            @media(max-width:390px){.countdown{gap:4px}.countdown div{padding:10px 2px}dl div{grid-template-columns:76px minmax(0,1fr)}}
+            @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+        """.replacingOccurrences(of: "@ACCENT@", with: theme.accent)
+            .replacingOccurrences(of: "@PAPER@", with: theme.background)
+            .replacingOccurrences(of: "@INK@", with: theme.ink)
         let script = "<script>(function(){document.querySelectorAll('[data-reveal]').forEach(function(b){b.addEventListener('click',function(){var c=b.parentElement.querySelector('[data-content]');if(c)c.hidden=!c.hidden;});});var q=document.getElementById('choices');if(q)q.addEventListener('click',function(e){var b=e.target.closest('button[data-correct]');if(b)document.getElementById('feedback').textContent=b.dataset.correct==='true'?'That is right!':'Not quite. Try again.';});var t=document.querySelector('[data-countdown]');if(t){var target=Date.parse(t.dataset.countdown);function tick(){if(!Number.isFinite(target))return;var n=Math.max(0,target-Date.now()),s=Math.floor(n/1000);document.getElementById('days').textContent=Math.floor(s/86400);document.getElementById('hours').textContent=String(Math.floor(s%86400/3600)).padStart(2,'0');document.getElementById('minutes').textContent=String(Math.floor(s%3600/60)).padStart(2,'0');document.getElementById('seconds').textContent=String(s%60).padStart(2,'0');}tick();setInterval(tick,1000);}})();</script>"
-        let html = "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>\(escape(title))</title><style>\(css)</style></head><body><main class=\"wrap\">\(content)<p class=\"note\">Made with enV · This page is a local export. Guest responses are not collected.</p></main>\(script)</body></html>"
+        let html = "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\"><meta name=\"color-scheme\" content=\"light dark\"><title>\(escape(title))</title><style>\(css)</style></head><body><main class=\"poster\"><div class=\"hero-art\" aria-hidden=\"true\"><span class=\"art-orbit\"></span><span class=\"art-ribbon\"></span><span class=\"art-mark\">\(glyph)</span></div><section class=\"hero-copy\">\(content)</section><footer class=\"brand\">enV</footer></main>\(script)</body></html>"
         return Result(text: text, html: html, checks: checks(parsed, values: values))
     }
 }
@@ -347,8 +373,6 @@ struct NativeCelebrationToolView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            enVCharacterSpacedText("Create a personal \(label.lowercased()) experience. Preview and export it on this device.")
-                .font(.footnote).foregroundStyle(Color.envMuted)
             input("title", "Title")
             input("honoree", "Person or group being celebrated")
             input("host", "Host / organiser")
@@ -375,7 +399,7 @@ struct NativeCelebrationToolView: View {
             if memory {
                 input("memories", "Memory notes", multiline: true)
                 Button("Add photos") { showImporter = true }.buttonStyle(.bordered)
-                enVCharacterSpacedText("\((values["photosData"] ?? "").components(separatedBy: "\n").filter { !$0.isEmpty }.count) photo(s) selected")
+                enVCharacterSpacedText("\((values["photosData"] ?? "").components(separatedBy: "\n").filter { !$0.isEmpty }.count) selected")
                     .font(.caption).foregroundStyle(Color.envMuted)
             }
             if reveal { input("revealMessage", "Message to reveal", multiline: true) }
@@ -392,22 +416,10 @@ struct NativeCelebrationToolView: View {
                 if let countdown = NativeCelebrationEngine.countdown(values, now: now) {
                     Text(countdown.complete ? "The celebration has started" : "\(countdown.days) days · \(countdown.hours) hours · \(countdown.minutes) minutes · \(countdown.seconds) seconds")
                         .font(.headline).foregroundStyle(Color.envInk)
-                    Text("Time zone: \(values["timezone"] ?? TimeZone.current.identifier)").font(.caption).foregroundStyle(Color.envMuted)
                 } else {
                     Text("Add a valid date, time and IANA time zone to start the countdown.").font(.caption).foregroundStyle(Color.envMuted)
                 }
             }
-            VStack(alignment: .leading, spacing: 5) {
-                Text("Preview").font(.caption.weight(.semibold)).foregroundStyle(Color.envMuted)
-                Text(title).font(.title3.weight(.semibold)).foregroundStyle(Color.envInk)
-                Text(values["message"]?.isEmpty == false ? values["message"]! : "Your personal message will appear here.")
-                    .font(.subheadline).foregroundStyle(Color.envMuted)
-                if let person = values["honoree"], !person.isEmpty { Text("For \(person)").font(.caption).foregroundStyle(Color.envMuted) }
-                if let date = values["date"], !date.isEmpty { Text("\(date) · \(values["timezone"] ?? "")").font(.caption).foregroundStyle(Color.envMuted) }
-                if let location = values["location"], !location.isEmpty { Text(location).font(.caption).foregroundStyle(Color.envMuted) }
-            }
-            .padding(14).frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 12))
             HStack(spacing: 10) {
                 Button("Generate") {
                     executionTracker?.start()
@@ -428,13 +440,11 @@ struct NativeCelebrationToolView: View {
             }
             if let error { Text(error).font(.footnote).foregroundStyle(.red) }
             if let output, !output.checks.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Review before sharing").font(.subheadline.weight(.medium))
+                VStack(alignment: .leading, spacing: 3) {
                     ForEach(output.checks, id: \.self) { check in
-                        Text("• " + check).font(.footnote).foregroundStyle(Color.envMuted)
+                        Text(check).font(.footnote).foregroundStyle(.red)
                     }
-                }.padding(12).frame(maxWidth: .infinity, alignment: .leading)
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
+                }
             }
             if let output {
                 HStack(spacing: 8) {
@@ -445,8 +455,6 @@ struct NativeCelebrationToolView: View {
                 Text(output.text).font(.system(.footnote, design: .monospaced)).foregroundStyle(Color.envInk)
                     .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
             }
-            Text("Local export only. enV does not send invitations, host the event or collect guest responses.")
-                .font(.caption).foregroundStyle(Color.envMuted)
         }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { now = $0 }
         .fileImporter(isPresented: $showImporter, allowedContentTypes: [.image], allowsMultipleSelection: true) { result in

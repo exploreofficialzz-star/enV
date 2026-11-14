@@ -80,11 +80,12 @@ try {
       const frame = preview();
       await frame.locator("h1").filter({ hasText: title }).waitFor({ state: "visible", timeout: 15000 });
       assert.equal(await frame.locator("h1").innerText(), title, `${tool.id}: exported preview title mismatch`);
-      assert.ok((await frame.locator("body").innerText()).includes("A safe local message & <friends>"), `${tool.id}: preview message missing or escaped incorrectly`);
+      const previewText = await frame.locator("body").innerText();
+      assert.ok(previewText.includes("A safe local message & <friends>"), `${tool.id}: preview message missing or escaped incorrectly`);
+      assert.ok(!/this page is a local export|guest responses are not collected|local · no guest tracking/i.test(previewText), `${tool.id}: obsolete export disclaimer remains`);
       assert.equal(await frame.locator("html").evaluate((node) => node.scrollWidth <= node.clientWidth), true, `${tool.id}: exported page has horizontal overflow`);
       if (tool.id.endsWith("invitation-generator")) {
         assert.equal(await frame.locator('a[href="https://example.org/rsvp"]').count(), 1, "Invitation RSVP link missing");
-        assert.ok((await frame.locator("body").innerText()).includes("Guest responses are not collected"), "Invitation privacy boundary missing");
       }
       if (tool.id.endsWith("interactive-card") || tool.id.endsWith("reveal-page") || tool.id.endsWith("surprise-page")) {
         await frame.locator("button[data-reveal]").click();
@@ -92,7 +93,7 @@ try {
       }
       if (tool.id.endsWith("quiz-generator")) {
         await frame.locator('button[data-choice]').filter({ hasText: "2030" }).click();
-        await frame.locator("[data-feedback]").filter({ hasText: "That is right!" }).waitFor({ state: "visible" });
+        await frame.locator("[data-feedback]").filter({ hasText: "Correct." }).waitFor({ state: "visible" });
       }
       if (tool.id.endsWith("memory-page")) {
         await frame.locator(".gallery figure").first().waitFor({ state: "visible" });
@@ -101,7 +102,7 @@ try {
       if (tool.id.endsWith("countdown")) await frame.locator("[data-countdown]").waitFor({ state: "visible" });
       if (tool.id.endsWith("page-generator")) {
         assert.equal(await frame.locator("ol li").count(), 3, "Programme items were not included in the exported page");
-        assert.ok((await frame.locator("body").innerText()).includes("Hosted by: Sam"), "Host was not included in the exported page");
+        assert.ok((await frame.locator("body").innerText()).includes("Hosted by Sam"), "Host was not included in the exported page");
         assert.ok((await frame.locator("body").innerText()).includes("Hall & Garden"), "Venue was not included in the exported page");
         assert.equal(await frame.locator("ol li").nth(0).innerText(), "Welcome");
         assert.equal(await frame.locator("ol li").nth(1).innerText(), "Celebration");

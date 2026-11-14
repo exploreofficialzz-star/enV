@@ -277,7 +277,7 @@ export function ToolShell({
               </button>
               {tool.status === "planned" ? <ComingSoonBadge /> : null}
             </div>
-            {tool.category !== "creators" ? <p className="mt-1 hidden max-w-2xl text-sm text-muted sm:block">{offlineAwareToolDescription(tool)}</p> : null}
+            {tool.category !== "creators" && tool.category !== "celebrations" ? <p className="mt-1 hidden max-w-2xl text-sm text-muted sm:block">{offlineAwareToolDescription(tool)}</p> : null}
           </div>
         </div>
         {!isFullscreen ? <Button
@@ -295,14 +295,14 @@ export function ToolShell({
           <Heart className="size-4" fill={saved ? "currentColor" : "none"} />
           {saved ? "Saved" : "Save"}
         </Button> : null}
-        {tool.category !== "creators" ? <p className="col-start-2 col-span-2 row-start-2 text-sm leading-6 text-muted sm:hidden">{offlineAwareToolDescription(tool)}</p> : null}
+        {tool.category !== "creators" && tool.category !== "celebrations" ? <p className="col-start-2 col-span-2 row-start-2 text-sm leading-6 text-muted sm:hidden">{offlineAwareToolDescription(tool)}</p> : null}
       </header>
 
       {!isFullscreen && adsterraAdsEnabled ? <AdsterraResponsiveBanner /> : null}
 
       {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
 
-      {note && tool.category !== "creators" ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
+      {note && tool.category !== "creators" && tool.category !== "celebrations" ? <p className="mt-3 text-sm text-muted">{note}</p> : null}
       <section
         ref={toolInterfaceRef}
         data-env-tool-id={tool.id}
@@ -356,6 +356,7 @@ export function ToolShell({
       {!isFullscreen && import.meta.env.VITE_ADSTERRA_ENABLED !== "true" ? <AdSlot tool={tool} /> : null}
       <AiAssistPanel toolId={tool.id} />
 
+      {tool.category !== "celebrations" ? (
       <section className="mt-10" aria-labelledby="tool-guide-heading">
         <h2 id="tool-guide-heading" className="text-lg font-semibold">What this tool does</h2>
         <p className="mt-3 text-sm leading-6 text-muted">{offlineAwareToolDescription(tool)}</p>
@@ -368,7 +369,8 @@ export function ToolShell({
         </a>
 
 
-      </section>
+      </section>      ) : null}
+
 
       {related.length > 0 ? (
         <section className="mt-10">
@@ -385,7 +387,7 @@ export function ToolShell({
                     className="group flex min-h-24 w-full flex-col rounded-lg bg-surface px-4 py-3 text-left text-sm shadow-[var(--shadow-border)] hover:text-accent"
                   >
                     <span className="flex items-center gap-2 font-medium"><ToolAppIcon tool={r} className="size-8" /><span>{r.name}</span></span>
-                    <span className="mt-1 block text-xs text-muted">{r.description}</span>
+                    {tool.category !== "celebrations" ? <span className="mt-1 block text-xs text-muted">{r.description}</span> : null}
                     <span className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-subtle">Under production</span>
                     <ArrowRight className="mt-auto ml-auto size-4" aria-hidden="true" />
                   </button>
@@ -395,7 +397,7 @@ export function ToolShell({
                     className="group flex min-h-24 flex-col rounded-lg bg-surface px-4 py-3 text-sm shadow-[var(--shadow-border)] hover:text-accent"
                   >
                     <span className="flex items-center gap-2 font-medium"><ToolAppIcon tool={r} className="size-8" /><span>{r.name}</span></span>
-                    <span className="mt-1 block text-xs text-muted">{r.description}</span>
+                    {tool.category !== "celebrations" ? <span className="mt-1 block text-xs text-muted">{r.description}</span> : null}
                     <ArrowRight className="mt-auto ml-auto size-4" aria-hidden="true" />
                   </Link>
                 )}

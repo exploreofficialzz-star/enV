@@ -53,8 +53,10 @@ final class NativeCelebrationTests: XCTestCase {
         XCTAssertTrue(output.html.hasPrefix("<!doctype html>"))
         XCTAssertTrue(output.html.contains("A &amp; B &lt;Birthday&gt;"))
         XCTAssertTrue(output.html.contains("Dinner with &lt;friends&gt;"))
-        XCTAssertTrue(output.html.contains("Reply to: host@example.test"))
-        XCTAssertTrue(output.html.contains("Guest responses are not collected"))
+        XCTAssertTrue(output.html.contains("Reply to host@example.test"))
+        XCTAssertTrue(output.html.contains("class=\"poster\""))
+        XCTAssertTrue(output.html.contains("class=\"brand\">enV"))
+        XCTAssertFalse(output.html.contains("This page is a local export"))
         XCTAssertFalse(output.checks.contains(where: { $0.contains("contact method") }))
     }
 
@@ -118,7 +120,7 @@ final class NativeCelebrationTests: XCTestCase {
         XCTAssertTrue(output.html.contains("<li>Dinner &lt;after&gt;</li>"))
         XCTAssertTrue(output.html.contains("<li>Photos</li>"))
         XCTAssertTrue(output.html.contains("Hall &amp; Garden"))
-        XCTAssertTrue(output.html.contains("Hosted by: Sam"))
+        XCTAssertTrue(output.html.contains("Hosted by Sam"))
         XCTAssertFalse(output.html.contains("<li>Dinner <after>"))
     }
 

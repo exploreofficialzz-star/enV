@@ -88,7 +88,6 @@ export function CelebrationEngine({ toolId }: { toolId: string }) {
   const isReveal = parsed.experience === "reveal-page" || parsed.experience === "surprise-page" || parsed.experience === "interactive-card";
 
   return <div className="space-y-5" data-env-celebration-ready={ready ? "true" : undefined}>
-    <p className="text-sm text-muted-foreground">Create a personal {label.toLowerCase()} experience, preview the details and export a clean page or message. Everything is prepared on this device.</p>
     <div className="grid gap-4 sm:grid-cols-2">
       <Field label="Title">
         <Input value={values.title ?? ""} onChange={(event) => update("title", event.target.value)} placeholder={label + " celebration"} maxLength={120} />
@@ -140,7 +139,7 @@ export function CelebrationEngine({ toolId }: { toolId: string }) {
         </Field>
         <Field label="Add photos (up to 8)" full>
           <Input type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple onChange={selectPhotos} />
-          <p className="text-xs text-muted-foreground">{(values.photos ?? []).length} photo(s) selected. Photos stay in this page until you export it.</p>
+          <p className="text-xs text-muted-foreground">{(values.photos ?? []).length} selected</p>
         </Field>
       </> : null}
       {isReveal ? <Field label={parsed.experience === "interactive-card" ? "Inside of the card" : "Message to reveal"} full>
@@ -161,33 +160,19 @@ export function CelebrationEngine({ toolId }: { toolId: string }) {
         <Textarea value={values.message ?? ""} onChange={(event) => update("message", event.target.value)} rows={4} placeholder="Write the message in your own words…" maxLength={3000} />
       </Field>
       {parsed.experience !== "interactive-card" && parsed.experience !== "reveal-page" && parsed.experience !== "surprise-page" && parsed.experience !== "quiz-generator" ? <Field label="Extra details" full>
-        <Textarea value={values.details ?? ""} onChange={(event) => update("details", event.target.value)} rows={3} placeholder="Helpful details, access notes or anything guests should know…" maxLength={3000} />
+        <Textarea value={values.details ?? ""} onChange={(event) => update("details", event.target.value)} rows={3} placeholder="Add details…" maxLength={3000} />
       </Field> : null}
     </div>
 
     {error ? <div className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive" role="alert">{error}</div> : null}
-    {result.checks.length ? <div className="rounded-xl border border-border p-3" role="status">
-      <p className="mb-2 text-sm font-medium">Review before sharing</p>
-      <ul className="space-y-1 text-sm text-muted-foreground">{result.checks.map((check) => <li key={check}>• {check}</li>)}</ul>
-    </div> : null}
+    {result.checks.length ? <ul className="space-y-1 text-xs text-muted-foreground" role="status">{result.checks.map((check) => <li key={check}>{check}</li>)}</ul> : null}
     {isCountdown ? <div className="rounded-xl border border-border p-4" role="status" aria-live="polite">
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Countdown</p>
       <p className="text-lg font-semibold tabular-nums">{countdown ? (countdown.complete ? "The celebration has started" : countdown.days + " days · " + countdown.hours + " hours · " + countdown.minutes + " minutes · " + countdown.seconds + " seconds") : "Add a valid date, time and time zone"}</p>
-      <p className="text-xs text-muted-foreground">Time zone: {values.timezone || "Not set"}</p>
     </div> : null}
-    <div className="rounded-xl border border-border p-4 space-y-2">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Preview</p>
-      <h3 className="text-xl font-semibold">{title}</h3>
-      <p className="text-sm text-muted-foreground">{values.message?.trim() || "Your personal message will appear here."}</p>
-      {values.honoree ? <p className="text-sm">For {values.honoree}</p> : null}
-      {values.date ? <p className="text-sm">{values.date} {values.timezone ? "· " + values.timezone : ""}</p> : null}
-      {values.location ? <p className="text-sm">{values.location}</p> : null}
-      {isMemory && values.photos?.length ? <div className="flex flex-wrap gap-2">{values.photos.map((photo, index) => <img key={index} src={photo} alt={"Memory " + (index + 1)} className="h-16 w-16 rounded-lg object-cover" />)}</div> : null}
-    </div>
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Page preview</p>
-        <p className="text-xs text-muted-foreground">Local · no guest tracking</p>
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Preview</p>
       </div>
       <iframe
         title={title + " — exported page preview"}
@@ -206,6 +191,5 @@ export function CelebrationEngine({ toolId }: { toolId: string }) {
         setError("");
       }}>Reset</Button>
     </div>
-    <p className="text-xs text-muted-foreground">The exported page works without an enV account or guest app. It does not send invitations, host a live event, or collect RSVPs; add your own response link or contact method.</p>
   </div>;
 }

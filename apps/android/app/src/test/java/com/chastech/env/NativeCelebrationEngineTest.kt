@@ -74,8 +74,10 @@ class NativeCelebrationEngineTest {
         assertTrue(result.html.startsWith("<!doctype html>"))
         assertTrue(result.html.contains("A &amp; B &lt;Birthday&gt;"))
         assertTrue(result.html.contains("Dinner with &lt;friends&gt;"))
-        assertTrue(result.html.contains("Reply to: host@example.test"))
-        assertTrue(result.html.contains("Guest responses are not collected"))
+        assertTrue(result.html.contains("Reply to host@example.test"))
+        assertTrue(result.html.contains("class=\"poster\""))
+        assertTrue(result.html.contains("class=\"brand\">enV"))
+        assertFalse(result.html.contains("This page is a local export"))
         assertTrue(result.checks.none { it.contains("contact method") })
         assertFalse(result.html.contains("href=\"javascript:"))
     }
@@ -146,7 +148,7 @@ class NativeCelebrationEngineTest {
         assertTrue(result.html.contains("<li>Dinner &lt;after&gt;</li>"))
         assertTrue(result.html.contains("<li>Photos</li>"))
         assertTrue(result.html.contains("Hall &amp; Garden"))
-        assertTrue(result.html.contains("Hosted by: Sam"))
+        assertTrue(result.html.contains("Hosted by Sam"))
         assertFalse(result.html.contains("<li>Dinner <after>"))
     }
 
