@@ -9,9 +9,11 @@ struct Catalog: Decodable {
     let tools: [Tool]
     let relatedReferenceTools: [Tool]?
 
-    var browserActiveToolCount: Int {
-        (tools + (relatedReferenceTools ?? [])).filter { $0.status == "active" || $0.status == "beta" }.count
-    }
+    /// Canonical shared-catalog active count; independent of native route filtering.
+    var browserActiveToolCount: Int { counts.active }
+
+    /// Canonical tool IDs explicitly recorded in the iOS native coverage manifests.
+    var nativeImplementedToolCount: Int { counts.iosImplemented ?? 0 }
 }
 
 private let retiredDesignBuildCalculatorIDs: Set<String> = [
@@ -52,6 +54,30 @@ struct CatalogCounts: Codable {
     let active: Int
     let planned: Int
     let categories: Int
+    let categoriesWithTools: Int?
+    let discoverable: Int?
+    let androidImplemented: Int?
+    let iosImplemented: Int?
+
+    init(
+        total: Int,
+        active: Int,
+        planned: Int,
+        categories: Int,
+        categoriesWithTools: Int? = nil,
+        discoverable: Int? = nil,
+        androidImplemented: Int? = nil,
+        iosImplemented: Int? = nil
+    ) {
+        self.total = total
+        self.active = active
+        self.planned = planned
+        self.categories = categories
+        self.categoriesWithTools = categoriesWithTools
+        self.discoverable = discoverable
+        self.androidImplemented = androidImplemented
+        self.iosImplemented = iosImplemented
+    }
 }
 
 struct ToolCategory: Codable, Identifiable, Hashable {
@@ -221,7 +247,7 @@ extension Catalog {
         return Catalog(
             schemaVersion: schemaVersion,
             catalogVersion: catalogVersion,
-            counts: CatalogCounts(total: nativeTools.count, active: active, planned: planned, categories: categories.count),
+            counts: counts,
             categories: categories.map { $0.nativeFacing() },
             tools: nativeTools,
             relatedReferenceTools: relatedReferences
@@ -233,7 +259,7 @@ extension Catalog {
 extension Catalog {
     /// Adds the native Music Downloader as a runtime extension without editing the generated shared catalog.
     func includingMusicDownloader() -> Catalog {
-        guard !tools.contains(where: { $0.id == "music-downloader" }) else { return self }
+        guard !(tools + (relatedReferenceTools ?? [])).contains(where: { $0.id == "music-downloader" }) else { return self }
         let tool = Tool(
             id: "music-downloader",
             name: "Music Downloader",
@@ -275,6 +301,9 @@ extension Catalog {
 extension Catalog {
     /// Adds the native Song Metadata Analyzer when loading an older generated catalog.
     func includingSongMetadataAnalyzer() -> Catalog {
+        let hasCanonicalTool = (tools + (relatedReferenceTools ?? [])).contains { $0.id == "song-metadata-analyzer" }
+        if hasCanonicalTool { return self }
+        let hasLegacyAlias = (tools + (relatedReferenceTools ?? [])).contains { $0.id == "audio-analyze-studio" }
         let tool = Tool(
             id: "song-metadata-analyzer",
             name: "AI Music Data Sandbox",
@@ -295,11 +324,11 @@ extension Catalog {
             related: ["audio-file-inspector", "music-studio", "music-downloader"],
             engine: ToolEngine(type: "audio", id: "song-metadata-analyzer", op: "song-metadata-analyzer", configuration: [:])
         )
-        let updated = tools.filter { $0.id != "song-metadata-analyzer" && $0.id != "audio-analyze-studio" } + [tool]
+        let updated = tools.filter { $0.id != "audio-analyze-studio" } + [tool]
         return Catalog(
             schemaVersion: schemaVersion,
             catalogVersion: catalogVersion,
-            counts: CatalogCounts(total: updated.count, active: updated.filter { $0.status == "active" || $0.status == "beta" }.count, planned: counts.planned, categories: counts.categories),
+            counts: hasLegacyAlias ? counts : CatalogCounts(total: counts.total + 1, active: counts.active + 1, planned: counts.planned, categories: counts.categories, categoriesWithTools: counts.categoriesWithTools, discoverable: counts.discoverable, androidImplemented: counts.androidImplemented, iosImplemented: counts.iosImplemented),
             categories: categories,
             tools: updated.sorted {
                 let leftCategory = $0.category.lowercased()
@@ -317,7 +346,7 @@ extension Catalog {
 extension Catalog {
     /// Adds the native-only A book tool while older shared catalogue bundles roll forward.
     func includingABook() -> Catalog {
-        guard !tools.contains(where: { $0.id == "a-book" }) else { return self }
+        guard !(tools + (relatedReferenceTools ?? [])).contains(where: { $0.id == "a-book" }) else { return self }
         let tool = Tool(
             id: "a-book",
             name: "A book",
@@ -359,7 +388,7 @@ extension Catalog {
 extension Catalog {
     /// Adds Camera Studio as a native on-device tool.
     func includingCameraStudio() -> Catalog {
-        guard !tools.contains(where: { $0.id == "camera-studio" }) else { return self }
+        guard !(tools + (relatedReferenceTools ?? [])).contains(where: { $0.id == "camera-studio" }) else { return self }
         let tool = Tool(
             id: "camera-studio",
             name: "Camera Studio",
@@ -396,7 +425,7 @@ extension Catalog {
 
     /// Registers local ZIP64 compression and extraction as a native tool.
     func includingZipArchive() -> Catalog {
-        guard !tools.contains(where: { $0.id == "zip-any-file" }) else { return self }
+        guard !(tools + (relatedReferenceTools ?? [])).contains(where: { $0.id == "zip-any-file" }) else { return self }
         let tool = Tool(
             id: "zip-any-file",
             name: "Zip any file",
