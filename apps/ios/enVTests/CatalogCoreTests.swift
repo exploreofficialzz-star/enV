@@ -91,6 +91,8 @@ final class CatalogCoreTests: XCTestCase {
         let studios = sut.webSearch("", includeRelatedReferences: true).filter { $0.category == "accessibility" }
         XCTAssertEqual(studios.count, 8)
         XCTAssertEqual(Set(studios.map(\.id)).count, 8)
+        XCTAssertEqual(studios.first(where: { $0.slug == "color-contrast-studio" })?.id, "color-contrast-studio")
+        XCTAssertEqual(sut.tools.first(where: { $0.id == "contrast-checker" })?.id, "contrast-checker")
         XCTAssertEqual(sut.webSearch("focus ring", includeRelatedReferences: true).first?.id, "focus-state-checker")
         XCTAssertEqual(sut.accessibilityStudio(for: "focus-state-generator")?.id, "focus-state-checker")
         XCTAssertEqual(sut.relatedTools(for: studios.first(where: { $0.id == "aria-checker" })!, limit: 20).filter { $0.category == "accessibility" }.count, 7)
