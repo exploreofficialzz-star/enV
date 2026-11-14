@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildIndexNowKeyArtifact, selectChangedUrls, urlsFromXml } from "./indexnow-utils.mjs";
+import { buildIndexNowKeyArtifact, indexNowResponseState, indexNowRetryDelayMs, parseIndexNowRetryAfter, routeGroups, selectChangedUrls, submitIndexNowBatch, urlsFromXml } from "./indexnow-utils.mjs";
 
 test("IndexNow ownership key files are generated only for valid keys", () => {
   assert.equal(buildIndexNowKeyArtifact(""), null);
@@ -73,3 +73,112 @@ test("blog-only content changes submit the blog index and article pages", () => 
     groups.articles.sort(),
   );
 });
+
+test("IndexNow classifies HTTP 200 and 202 as received submissions", () => {
+  assert.equal(indexNowResponseState(200), "accepted");
+  assert.equal(indexNowResponseState(202), "accepted-pending-key-validation");
+  assert.equal(indexNowResponseState(403), "rejected");
+});
+
+test("IndexNow retries only transient HTTP statuses and respects bounded Retry-After", () => {
+  assert.equal(indexNowRetryDelayMs(429, "3", 0), 3000);
+  assert.equal(indexNowRetryDelayMs(503, null, 0), 1000);
+  assert.equal(indexNowRetryDelayMs(502, "90", 1), 10_000);
+  assert.equal(indexNowRetryDelayMs(403, "3", 0), null);
+  assert.equal(indexNowRetryDelayMs(422, null, 0), null);
+  const now = Date.UTC(2026, 10, 14, 12, 0, 0);
+  assert.equal(parseIndexNowRetryAfter(new Date(now + 5000).toUTCString(), now), 5000);
+});
+
+test("IndexNow retries a rate-limited batch, then records HTTP 200 acceptance", async () => {
+  const waits = [];
+  const calls = [];
+  const responses = [
+    { status: 429, headers: { get: () => "2" }, text: async () => "slow down" },
+    { status: 200, headers: { get: () => null }, text: async () => "ok" },
+  ];
+  const result = await submitIndexNowBatch({
+    endpoint: "https://api.indexnow.org/indexnow",
+    host: "envtools.store",
+    key: "a1b2c3d4",
+    keyLocation: "https://envtools.store/a1b2c3d4.txt",
+    urlList: ["https://envtools.store/tools/text/example"],
+    fetchImpl: async (...args) => {
+      calls.push(args);
+      return responses.shift();
+    },
+    sleep: async (milliseconds) => waits.push(milliseconds),
+  });
+  assert.equal(result.accepted, true);
+  assert.equal(result.state, "accepted");
+  assert.equal(result.attempts, 2);
+  assert.deepEqual(waits, [2000]);
+  assert.equal(calls.length, 2);
+  assert.deepEqual(JSON.parse(calls[0][1].body).urlList, ["https://envtools.store/tools/text/example"]);
+});
+
+test("HTTP 202 is treated as accepted while key validation remains pending", async () => {
+  let calls = 0;
+  const result = await submitIndexNowBatch({
+    endpoint: "https://api.indexnow.org/indexnow",
+    host: "envtools.store",
+    key: "a1b2c3d4",
+    keyLocation: "https://envtools.store/a1b2c3d4.txt",
+    urlList: ["https://envtools.store/"],
+    fetchImpl: async () => {
+      calls += 1;
+      return { status: 202, headers: { get: () => null }, text: async () => "accepted" };
+    },
+    sleep: async () => assert.fail("HTTP 202 must not be retried"),
+  });
+  assert.equal(calls, 1);
+  assert.equal(result.accepted, true);
+  assert.equal(result.state, "accepted-pending-key-validation");
+});
+
+test("permanent IndexNow client errors are not retried", async () => {
+  let calls = 0;
+  const result = await submitIndexNowBatch({
+    endpoint: "https://api.indexnow.org/indexnow",
+    host: "envtools.store",
+    key: "a1b2c3d4",
+    keyLocation: "https://envtools.store/a1b2c3d4.txt",
+    urlList: ["https://envtools.store/"],
+    fetchImpl: async () => {
+      calls += 1;
+      return { status: 403, headers: { get: () => null }, text: async () => "invalid key" };
+    },
+    sleep: async () => assert.fail("Permanent errors must not be retried"),
+  });
+  assert.equal(calls, 1);
+  assert.equal(result.accepted, false);
+  assert.equal(result.state, "rejected");
+});
+
+test("route groups distinguish tools, categories, guides and editorial pages", () => {
+  const groups = routeGroups({
+    urls: [
+      "/",
+      "/tools",
+      "/tools/text",
+      "/tools/text/word-counter",
+      "/blog/tool-word-counter",
+      "/blog/productivity-guides",
+    ],
+  });
+  assert.deepEqual(groups.categories, [
+    "https://envtools.store/tools",
+    "https://envtools.store/tools/text",
+  ]);
+  assert.deepEqual(groups.tools, [
+    "https://envtools.store/tools/text/word-counter",
+    "https://envtools.store/blog/tool-word-counter",
+    "https://envtools.store/tools",
+    "https://envtools.store/tools/text",
+  ]);
+  assert.deepEqual(groups.articles, [
+    "https://envtools.store/blog/productivity-guides",
+    "https://envtools.store/blog",
+  ]);
+});
+
