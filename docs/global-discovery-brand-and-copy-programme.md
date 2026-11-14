@@ -269,7 +269,7 @@ Do not force every tool into a long article. Simple utilities need short, clear 
 
 **Automated task-guidance-source is now implemented in the registry and generated inventory.** Every canonical public guide receives one of four labels:
 
-- `operation-specific`: an exact tool ID/name rule supplies the overview, example and validation guidance.
+- `operation-specific`: a narrow stable-ID or name-pattern rule supplies task advice for a named operation or a closely related family; it is not necessarily a one-tool-only rule.
 - `engine-specific`: guidance comes from a shared engine-family rule.
 - `category-guidance`: guidance comes from the category-level task guidance.
 - `catalogue-fallback`: the catalogue purpose statement is used with a generic example and validation guidance.
