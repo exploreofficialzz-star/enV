@@ -683,7 +683,7 @@ struct HomeView: View {
                     .padding(.horizontal, 16)
                     .frame(maxWidth: 1152)
                     .frame(maxWidth: .infinity)
-                    WebHomeFooter(activeCount: store.catalog.browserActiveToolCount, nativeCoverageCount: store.catalog.nativeImplementedToolCount, categoryCount: store.catalog.categories.count, onInformation: onInformation, onTools: onTools)
+                    WebHomeFooter(activeCount: store.catalog.counts.total, nativeCoverageCount: store.catalog.nativeImplementedToolCount, categoryCount: store.catalog.categories.count, onInformation: onInformation, onTools: onTools)
                 }
                 .padding(.top, 4)
                 .frame(maxWidth: .infinity)
