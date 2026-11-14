@@ -51,7 +51,9 @@ export function CelebrationEngine({ toolId }: { toolId: string }) {
     theme: "classic", photos: [],
   });
   const [error, setError] = useState("");
+  const [ready, setReady] = useState(false);
   const [now, setNow] = useState(Date.now());
+  useEffect(() => { setReady(true); }, []);
   const result = useMemo(() => buildCelebration(values), [values]);
   const countdown = parsed.experience === "countdown" ? celebrationCountdown(values, now) : null;
   const update = (key: keyof CelebrationInput, value: string | string[]) =>
@@ -85,7 +87,7 @@ export function CelebrationEngine({ toolId }: { toolId: string }) {
   const isQuiz = parsed.experience === "quiz-generator";
   const isReveal = parsed.experience === "reveal-page" || parsed.experience === "surprise-page" || parsed.experience === "interactive-card";
 
-  return <div className="space-y-5">
+  return <div className="space-y-5" data-env-celebration-ready={ready ? "true" : undefined}>
     <p className="text-sm text-muted-foreground">Create a personal {label.toLowerCase()} experience, preview the details and export a clean page or message. Everything is prepared on this device.</p>
     <div className="grid gap-4 sm:grid-cols-2">
       <Field label="Title">
