@@ -21,4 +21,8 @@ assert.match(androidView, /NativeCelebrationEngine/);
 assert.match(ios, /tool\.category == "celebrations" \{ if NativeCelebrationEngine\.parse\(tool\.id\) != nil \{ NativeCelebrationToolView\(tool: tool\) \} else \{ NativeUnavailableToolView\(tool: tool, backend: false\) \} \}/);
 assert.match(iosView, /enum NativeCelebrationEngine/);
 assert.match(iosView, /struct NativeCelebrationToolView/);
+assert.doesNotMatch(androidView, /This page is a local export|Local export only/i);
+assert.doesNotMatch(iosView, /This page is a local export|Local export only/i);
+assert.match(androidView, /class=\\\\\"poster\\\\\"/);
+assert.match(iosView, /class=\\\\\"poster\\\\\"/);
 console.log("Native Celebrations check PASS: 93 IDs have independent Kotlin and Swift local implementations.");
