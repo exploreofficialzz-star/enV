@@ -106,7 +106,7 @@
     "audit:qr-barcode:browser": "node scripts/browser-qr-barcode-reader-audit.mjs",
     "check:design": "node --experimental-strip-types --test src/lib/engines/css-gradient.test.ts src/lib/engines/css-shadow.test.ts src/lib/engines/css-text-shadow.test.ts src/lib/engines/design-component-a11y.test.ts src/lib/engines/css-border.test.ts src/lib/engines/design-layer-utils.test.ts src/lib/engines/palette-image.test.ts src/lib/engines/design-palette.test.ts src/lib/engines/design-color.test.ts src/lib/engines/svg-generators.test.ts src/lib/engines/svg-backgrounds.test.ts src/lib/engines/design-contrast.test.ts src/lib/engines/design-explorer.test.ts src/lib/production-notice.test.ts && node scripts/check-design.mjs",
     "audit:design:browser": "node scripts/audit-design-category-browser.mjs",
-    "generate:seo": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/generate-seo-artifacts.mjs && node scripts/submit-indexnow.mjs",
+    "generate:seo": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/generate-seo-artifacts.mjs && node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/submit-indexnow.mjs",
     "prebuild": "npm run check:file-upload-ui && npm run generate:seo",
     "check:seo": "node --test scripts/seo-artifacts.test.mjs && node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/generate-seo-artifacts.mjs --check",
     "audit:seo:rendered": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/check-seo-rendered-routes.mjs",
