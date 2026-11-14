@@ -28,9 +28,10 @@ class NativeCelebrationEngineTest {
         assertEquals(93, cataloguedIds.toSet().size)
         cataloguedIds.forEach { id ->
             val parsed = NativeCelebrationEngine.parse(id)
-            assertEquals(id.substringBeforeLast("-"), parsed.occasion + "-" + id.substringAfterLast("-").let { "" }.trimEnd('-'))
-            assertTrue(NativeCelebrationEngine.experiences.contains(parsed.experience))
-            assertTrue(NativeCelebrationEngine.occasions.contains(parsed.occasion))
+            val occasion = occasions.first { id.startsWith("$it-") }
+            val experience = id.removePrefix("$occasion-")
+            assertEquals(occasion, parsed.occasion)
+            assertEquals(experience, parsed.experience)
         }
         unavailableCombinations.forEach { id ->
             try {
