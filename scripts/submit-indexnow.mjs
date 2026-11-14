@@ -2,7 +2,6 @@ import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 import { buildSeoArtifacts } from "./generate-seo-artifacts.mjs";
-import { toolPath } from "../src/lib/registry.ts";
 
 const SITE_ORIGIN = "https://envtools.store";
 const INDEXNOW_ENDPOINT = "https://api.indexnow.org/indexnow";
@@ -61,12 +60,13 @@ function previousSitemapUrls(baseSha) {
 }
 
 export function routeGroups(artifacts) {
-  const toolPages = artifacts.tools.map((tool) => SITE_ORIGIN + toolPath(tool));
-  const guidePages = artifacts.guideTools.map((tool) => SITE_ORIGIN + "/blog/tool-" + tool.id);
-  const categoryPages = artifacts.categories.map((category) => SITE_ORIGIN + "/tools/" + category.id);
-  const articlePages = artifacts.articles.map((article) => SITE_ORIGIN + "/blog/" + article.slug);
+  const all = artifacts.urls.map((path) => SITE_ORIGIN + path);
+  const toolPages = all.filter((url) => /^\\/tools\\/[^/]+\\/[^/]+$/.test(new URL(url).pathname));
+  const guidePages = all.filter((url) => new URL(url).pathname.startsWith("/blog/tool-"));
+  const categoryPages = all.filter((url) => /^\\/tools\\/[^/]+$/.test(new URL(url).pathname));
+  const articlePages = all.filter((url) => new URL(url).pathname.startsWith("/blog/") && !new URL(url).pathname.startsWith("/blog/tool-"));
   return {
-    all: artifacts.urls.map((path) => SITE_ORIGIN + path),
+    all,
     tools: [...toolPages, ...guidePages, SITE_ORIGIN + "/tools", ...categoryPages],
     guides: [...guidePages, ...toolPages],
     categories: [...categoryPages, SITE_ORIGIN + "/tools"],
