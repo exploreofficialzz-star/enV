@@ -429,7 +429,7 @@ test("every canonical public tool has an individually grounded guide contract", 
   for (const tool of publicTools) {
     assert.ok(
       hasImportedRuntimeRenderer(tool),
-      tool.id + ": public tool guide must resolve to an imported renderer in the live ToolEngine dispatcher (engine=" + tool.engine.type + ", category=" + tool.category + ", engineId=" + (tool.engine.id ?? "") + ").",
+      tool.id + ": public tool guide must resolve to an imported renderer in the live ToolEngine dispatcher (engine=" + tool.engine.type + ", category=" + tool.category + ", engineId=" + ("id" in tool.engine ? tool.engine.id : "") + ").",
     );
     const sections = getToolDocumentation(tool);
     const sectionIds = new Set(sections.map((section) => section.id));
