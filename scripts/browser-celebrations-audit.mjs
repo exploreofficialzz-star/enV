@@ -37,6 +37,22 @@ function preview() {
 }
 
 try {
+  const firstTool = [...tools].sort((a, b) => b.popularity - a.popularity || a.name.localeCompare(b.name))[0];
+  for (const route of [baseUrl + "/tools", baseUrl + "/tools/celebrations"]) {
+    await page.goto(route, { waitUntil: "domcontentloaded", timeout: 60000 });
+    const card = page.locator('a[href="/tools/celebrations/' + firstTool.slug + '"]').first();
+    await card.waitFor({ state: "visible", timeout: 20000 });
+    const cardText = await card.innerText();
+    const titlePosition = cardText.indexOf(firstTool.name);
+    const descriptionPosition = cardText.indexOf(firstTool.description);
+    assert.ok(titlePosition >= 0, route + ": expected " + firstTool.name + " in the Celebrations card");
+    assert.ok(descriptionPosition > titlePosition, route + ": the tool description must appear directly after " + firstTool.name);
+    const description = card.locator("span").filter({ hasText: firstTool.description }).first();
+    await description.waitFor({ state: "visible" });
+    assert.match((await description.getAttribute("class")) ?? "", /line-clamp-2/,
+      route + ": Celebrations description must use the shared two-line card sizing");
+    console.log("PASS listing description " + route);
+  }
   for (const tool of tools) {
     const errors = [];
     const onPageError = (error) => errors.push(String(error));
