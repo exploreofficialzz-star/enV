@@ -23,6 +23,6 @@ assert.match(iosView, /enum NativeCelebrationEngine/);
 assert.match(iosView, /struct NativeCelebrationToolView/);
 assert.doesNotMatch(androidView, /This page is a local export|Local export only/i);
 assert.doesNotMatch(iosView, /This page is a local export|Local export only/i);
-assert.match(androidView, /class=\\\\\"poster\\\\\"/);
-assert.match(iosView, /class=\\\\\"poster\\\\\"/);
+assert.ok(androidView.includes('class=\\"poster\\"'), "Android export must use the premium poster layout");
+assert.ok(iosView.includes('class=\\"poster\\"'), "iOS export must use the premium poster layout");
 console.log("Native Celebrations check PASS: 93 IDs have independent Kotlin and Swift local implementations.");
