@@ -89,7 +89,7 @@ export function buildSitemapArtifacts(inputPaths) {
   return { sitemap: sitemapIndex, files, totalUrls: sortedPaths.length };
 }
 
-export function buildSeoArtifacts({ indexNowKey = process.env.INDEXNOW_KEY } = {}) {
+export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "production" ? process.env.INDEXNOW_KEY : "") } = {}) {
   const indexNowKeyFile = buildIndexNowKeyArtifact(indexNowKey);
   const toolMap = new Map(getSearchableTools().map((tool) => [tool.id, tool]));
   for (const tool of getToolsByCategory("accessibility")) toolMap.set(tool.id, tool);
