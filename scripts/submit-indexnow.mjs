@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
-import { routeGroups, selectChangedUrls, submitIndexNowBatch, urlsFromXml } from "./indexnow-utils.mjs";
+import { chunkIndexNowUrls, routeGroups, selectChangedUrls, submitIndexNowBatch, urlsFromXml } from "./indexnow-utils.mjs";
 import { resolve } from "node:path";
 import { buildSeoArtifacts } from "./generate-seo-artifacts.mjs";
 
@@ -93,8 +93,8 @@ async function main() {
 
   let submitted = 0;
   let pendingKeyValidationBatches = 0;
-  for (let offset = 0; offset < urlList.length; offset += MAX_URLS_PER_POST) {
-    const batch = urlList.slice(offset, offset + MAX_URLS_PER_POST);
+  const batches = chunkIndexNowUrls(urlList, MAX_URLS_PER_POST);
+  for (const batch of batches) {
     const result = await submitIndexNowBatch({
       endpoint: INDEXNOW_ENDPOINT,
       host: "envtools.store",
@@ -112,7 +112,7 @@ async function main() {
   }
 
   process.stdout.write("IndexNow received " + submitted + " changed or removed canonical URLs in " +
-    Math.ceil(urlList.length / MAX_URLS_PER_POST) + " batch(es)." +
+    batches.length + " batch(es)." +
     (pendingKeyValidationBatches
       ? " Key validation is pending for " + pendingKeyValidationBatches + " batch(es)."
       : " The endpoint returned HTTP 200 for each batch.") +
