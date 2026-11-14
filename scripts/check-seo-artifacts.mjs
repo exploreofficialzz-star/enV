@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildSeoArtifacts, buildSitemapArtifacts } from "./generate-seo-artifacts.mjs";
 import { buildIndexNowKeyArtifact } from "./indexnow-utils.mjs";
+import { toolDocumentationCoverage } from "../src/lib/tool-documentation.ts";
 import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema, toolSchema, organizationSchema, websiteSchema, boundedToolSeoTitle } from "@/lib/seo-metadata";
 
 const result = buildSeoArtifacts();
@@ -150,6 +151,13 @@ for (const tool of result.tools) {
     tool.requiresAuth ? "sign-in required" : "sign-in not required",
   ].join("; ");
   assert.ok(result.inventory.includes(inventoryCell(inventoryFlags)), "Inventory misses registry execution/account flags for " + tool.id);
+  const guideCoverage = toolDocumentationCoverage(tool);
+  const toolInventorySection = result.inventory.split("## Individual usage guide coverage")[0];
+  const guideInventorySection = result.inventory.split("## Individual usage guide coverage")[1] ?? "";
+  const toolInventoryRow = toolInventorySection.split("\n").find((row) => row.startsWith("| " + tool.id + " |"));
+  const guideInventoryRow = guideInventorySection.split("\n").find((row) => row.startsWith("| " + tool.id + " |"));
+  assert.ok(toolInventoryRow?.split(" | ").includes(guideCoverage), "Tool inventory row has the wrong guide copy-provenance class for " + tool.id);
+  assert.ok(guideInventoryRow?.split(" | ").includes(guideCoverage), "Guide inventory row has the wrong guide copy-provenance class for " + tool.id);
   const route = "/tools/" + tool.category + "/" + tool.slug;
   const guide = "/blog/tool-" + tool.id;
   assert.ok(result.urls.includes(route), "Missing sitemap entry for " + tool.id);
@@ -216,11 +224,13 @@ assert.equal(largeSitemap.files.length, 3);
 assert.deepEqual(largeSitemap.files.map((file) => file.count), [40_000, 40_000, 1]);
 assert.ok(largeSitemap.files.every((file) => file.content.includes("<urlset")));
 assert.match(result.inventory, /^# enV public tool SEO inventory/m);
-assert.match(result.inventory, /\| Tool ID \| Tool \| Category \| Catalogue status \| Engine operation \| Catalogue execution\/account flags \|/);
-assert.match(result.inventory, /\| Tool ID \| Usage guide \| Category \| Catalogue status \| Engine operation \| Catalogue execution\/account flags \|/);
+assert.match(result.inventory, /\| Tool ID \| Tool \| Category \| Catalogue status \| Engine operation \| Catalogue execution\/account flags \| Guide copy source \|/);
+assert.match(result.inventory, /\| Tool ID \| Usage guide \| Category \| Catalogue status \| Engine operation \| Catalogue execution\/account flags \| Guide copy source \|/);
 assert.match(result.inventory, /not proof of the live runtime data path, actual local execution, platform parity or successful behavior/);
 assert.match(result.inventory, /does not claim that a human has completed the source\/runtime audit for every tool/);
 assert.match(result.inventory, /Search-intent terms are seeded from each tool's name/m);
+assert.match(result.inventory, /Guide copy provenance classifies where guide copy originates/);
+assert.match(result.inventory, /does not prove control-level accuracy, source\\/runtime verification or human editorial review/);
 assert.equal(result.sitemap.includes("https://envtools.store/sitemap.xml"), false);
 
 assert.match(result.robots, /User-agent: OAI-SearchBot\nAllow: \/\nDisallow: \/api\//);
