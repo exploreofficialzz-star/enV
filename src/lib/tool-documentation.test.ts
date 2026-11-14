@@ -79,7 +79,7 @@ test("generic engine guide branches preserve each tool's catalogue task statemen
     {
       id: "coverage-calculator-operation",
       name: "Example Absolute Value Operation",
-      description: "Calculate absolute value\\nfrom the number provided.",
+      description: "Calculate absolute value\nfrom the number provided.",
       category: "calculators",
       engine: { type: "calculator", formula: "|n|" },
     },
@@ -158,7 +158,7 @@ test("generic engine guide branches preserve each tool's catalogue task statemen
     };
     const whenToUse = getToolDocumentation(tool).find((section) => section.id === "when-to-use");
     assert.ok(whenToUse, sample.id + ": guide must include a when-to-use section");
-    const normalizedDescription = sample.description.replace(/\\s+/g, " ").trim();
+    const normalizedDescription = sample.description.replace(/\s+/g, " ").trim();
     assert.ok(
       whenToUse.paragraphs[0].includes(normalizedDescription),
       sample.id + ": engine fallback must include the individual catalogue task",
