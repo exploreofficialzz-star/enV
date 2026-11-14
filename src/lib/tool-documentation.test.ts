@@ -63,6 +63,8 @@ const DIRECT_TOOL_RENDERERS: Record<string, string> = {
   "song-metadata-analyzer": "AiMusicDataSandbox",
   "qr-payload-inspector": "BarcodeReaderEngine",
   "flashcard-generator": "DocumentEngine",
+  "password-generator": "SecurityEngine",
+  "password-strength-checker": "SecurityEngine",
 };
 
 const CATEGORY_RENDERERS: Record<string, string> = {
@@ -126,11 +128,33 @@ function runtimeRendererCandidates(tool: ToolMeta): string[] {
   return renderer ? [renderer] : [];
 }
 
-function hasImportedRuntimeRenderer(tool: ToolMeta): boolean {
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\function hasImportedRuntimeRenderer(tool: ToolMeta): boolean {
   const candidates = runtimeRendererCandidates(tool);
   return candidates.length > 0 && candidates.every((component) =>
     LAZY_ENGINE_COMPONENTS.has(component) && TOOL_ENGINE_SOURCE.includes("<" + component),
   );
+}");
+}
+
+function hasImportedRuntimeRenderer(tool: ToolMeta): boolean {
+  const candidates = runtimeRendererCandidates(tool);
+  if (!candidates.length) return false;
+
+  return candidates.every((component) => {
+    if (!LAZY_ENGINE_COMPONENTS.has(component)) return false;
+    if (DIRECT_TOOL_RENDERERS[tool.id] === component) {
+      const exactRoute = new RegExp(
+        "if\\s*\\(tool\\.id\\s*===\\s*[\"']" +
+          escapeRegExp(tool.id) +
+          "[\"']\\s*\\)\\s*return\\s*<" +
+          component +
+          "\\b",
+      );
+      return exactRoute.test(TOOL_ENGINE_SOURCE);
+    }
+    return TOOL_ENGINE_SOURCE.includes("<" + component);
+  });
 }
 
 
@@ -492,11 +516,13 @@ test("every canonical public tool has an individually grounded guide contract", 
     "troubleshooting",
   ];
 
+  const missingRuntimeRoutes: string[] = [];
   for (const tool of publicTools) {
-    assert.ok(
-      hasImportedRuntimeRenderer(tool),
-      tool.id + ": public tool guide must resolve to an imported renderer in the live ToolEngine dispatcher (engine=" + tool.engine.type + ", category=" + tool.category + ", engineId=" + ("id" in tool.engine ? tool.engine.id : "") + ").",
-    );
+    if (!hasImportedRuntimeRenderer(tool)) {
+      missingRuntimeRoutes.push(
+        tool.id + " (engine=" + tool.engine.type + ", category=" + tool.category + ", engineId=" + ("id" in tool.engine ? tool.engine.id : "") + ")",
+      );
+    }
     const sections = getToolDocumentation(tool);
     const sectionIds = new Set(sections.map((section) => section.id));
     const whenToUse = sections.find((section) => section.id === "when-to-use");
@@ -529,5 +555,11 @@ test("every canonical public tool has an individually grounded guide contract", 
       assert.ok(sectionIds.has(sectionId), tool.id + ": missing required guide section " + sectionId);
     }
   }
+
+  assert.deepEqual(
+    missingRuntimeRoutes,
+    [],
+    "Every public indexable tool must resolve to an imported runtime renderer through an exact or category-level ToolEngine route.",
+  );
 });
 

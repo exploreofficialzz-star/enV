@@ -81,6 +81,9 @@ function ToolEngineView({ tool, initialMode, initialAction, initialOp }: ToolEng
   if (tool.id === "camera-studio") return <CameraStudioEngine />;
   // Flashcard Generator uses the implemented document/flashcards operation.
   if (tool.id === "flashcard-generator") return <DocumentEngine op="flashcards" />;
+  // These two legacy security records are implemented by the shared local password engine.
+  if (tool.id === "password-generator") return <SecurityEngine op="password-generator" />;
+  if (tool.id === "password-strength-checker") return <SecurityEngine op="password-strength" />;
   if (tool.category === "mockups") return <MockupsCategoryEngine toolId={tool.id} />;
   // Every Screenshot-category tool is rendered by the shared screenshot studio.
   if (tool.category === "screenshots") return <ScreenshotEngine toolId={tool.id} />;

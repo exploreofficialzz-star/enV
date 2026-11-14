@@ -1481,8 +1481,13 @@ for (const row of RAW) {
   const isMockupsTool = cat === "mockups";
   const effectiveEngineType = isCalculatorFamily ? "calculator" : isDeveloperFamily ? "developer" : isTextCustom ? "text" : isCreatorCustom ? "creator" : isBusinessTool ? "business" : engineType;
   const effectiveEngineKey = isCalculatorFamily ? engineKey.toLowerCase() : isDeveloperFamily ? id : isBusinessTool ? id.replace(/-(calculator|generator|template|estimator|planner)$/, "") : engineKey;
+  // Flashcards are a supported document operation with a real browser renderer,
+  // unlike the remaining generic document catalogue entries.
+  const isImplementedFlashcardDocument = id === "flashcard-generator"
+    && effectiveEngineType === "document"
+    && effectiveEngineKey === "flashcards";
   const unsupportedEngineType = ["custom", "ai", "document", "pdf"].includes(effectiveEngineType);
-  const status = isMockupsTool || isCalculatorFamily || isTextCustom || isImageEngine || isCreatorCustom || isBusinessTool || isImplementedDeveloper ? "active" : (isDeveloperFamily || extra.includes("p") || unsupportedEngineType ? "planned" : extra.includes("b") ? "beta" : "active");
+  const status = isMockupsTool || isCalculatorFamily || isTextCustom || isImageEngine || isCreatorCustom || isBusinessTool || isImplementedDeveloper || isImplementedFlashcardDocument ? "active" : (isDeveloperFamily || extra.includes("p") || unsupportedEngineType ? "planned" : extra.includes("b") ? "beta" : "active");
   let disclaimer;
   if (extra.includes("h")) disclaimer = "health";
   else if (extra.includes("f")) disclaimer = "finance";
