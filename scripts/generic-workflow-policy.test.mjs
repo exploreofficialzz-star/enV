@@ -1,0 +1,87 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import {
+  applyGenericWorkflowPolicy,
+  isDedicatedEventTemplateTool,
+  isGenericWorkflowPlaceholder,
+  normalizeGenericWorkflowTool,
+} from "../src/lib/generic-workflow-policy.mjs";
+
+function tool(id, category, overrides = {}) {
+  return {
+    id,
+    name: id,
+    slug: id,
+    description: "A generated catalogue task used to verify workflow publication policy.",
+    category,
+    keywords: [category, id],
+    tags: [category],
+    icon: "Wand2",
+    popularity: 0,
+    featured: false,
+    clientSide: true,
+    requiresBackend: false,
+    requiresAuth: false,
+    status: "active",
+    related: [],
+    engine: { type: "custom", id },
+    ...overrides,
+  };
+}
+
+test("generic cross-category workflow placeholders are planned and non-indexable", () => {
+  const categories = ["events", "celebrations", "food", "travel", "photography"];
+  for (const category of categories) {
+    const candidate = tool(category + "-generic-planner", category);
+    assert.equal(isGenericWorkflowPlaceholder(candidate), true);
+    const normalized = normalizeGenericWorkflowTool(candidate);
+    assert.equal(normalized.status, "planned", category);
+    assert.equal(normalized.clientSide, true, category);
+    assert.equal(normalized.requiresBackend, false, category);
+    assert.equal(normalized.requiresAuth, false, category);
+    assert.equal(candidate.status, "active", "normalization must not mutate the source record");
+  }
+});
+
+test("dedicated event templates remain active and are excluded from generic-placeholder checks", () => {
+  const ids = [
+    "birthday-agenda-generator",
+    "conference-schedule-builder",
+    "wedding-rsvp-page",
+    "workshop-check-in-page",
+    "sports-event-agenda-generator",
+  ];
+  for (const id of ids) {
+    const candidate = tool(id, "events");
+    assert.equal(isDedicatedEventTemplateTool(candidate), true, id);
+    assert.equal(isGenericWorkflowPlaceholder(candidate), false, id);
+    assert.equal(normalizeGenericWorkflowTool(candidate).status, "active", id);
+  }
+});
+
+test("similarly named but unsupported event variants are not promoted", () => {
+  const unsupported = [
+    tool("meeting-agenda-generator", "events"),
+    tool("birthday-ticket-mockup", "events"),
+    tool("birthday-page-generator", "celebrations"),
+    tool("meal-planner", "food"),
+    tool("trip-itinerary-planner", "travel"),
+    tool("passport-photo-cropper", "photography"),
+  ];
+  const normalized = applyGenericWorkflowPolicy(unsupported);
+  assert.deepEqual(normalized.map((item) => item.status), [
+    "planned", "planned", "planned", "planned", "planned", "planned",
+  ]);
+});
+
+test("tools outside the generic workflow categories are preserved unchanged", () => {
+  const source = [
+    tool("password-generator", "security"),
+    tool("temperature-converter", "converters", {
+      engine: { type: "converter", system: "temperature" },
+    }),
+  ];
+  const normalized = applyGenericWorkflowPolicy(source);
+  assert.deepEqual(normalized, source);
+  assert.notEqual(normalized, source, "policy returns a new array without mutating its input array");
+});
