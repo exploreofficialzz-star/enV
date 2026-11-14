@@ -1,8 +1,8 @@
-# enV — Browser Toolkit
+# enV
 
 
 
-**Useful tools. One place.** enV is a responsive collection of browser-based tools for everyday calculations, conversions, color and CSS work, QR codes, image tasks, and mockups. Wherever possible, processing happens in the visitor's browser rather than uploading files to a server.
+**Useful tools. One place.** enV brings together practical tools for everyday calculations, conversions, design, QR codes, image work, media tasks and more. Processing takes place on the device or through connected services according to each tool's actual workflow.
 
 The **AI Music Data Sandbox** is enV’s single music dataset preparation workspace across Web, Android and iOS. It provides persistent folders, drafts, editable tags and lyrics, bounded local audio measurements, and structured dataset exports. Existing song/audio analyzer URLs resolve to this sandbox. See the [sandbox guide](docs/ai-music-data-sandbox.md).
 
