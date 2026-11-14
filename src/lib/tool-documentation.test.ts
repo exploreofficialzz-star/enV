@@ -5,7 +5,7 @@ import { CATEGORIES } from "@/data/categories";
 import type { ToolMeta } from "@/types/tool";
 import { getSearchableTools, getToolsByCategory } from "@/lib/registry";
 import { canonicalSeoTools, isIndexableTool } from "@/lib/seo-metadata";
-import { getToolDocumentation, toolDocumentationSummary } from "@/lib/tool-documentation";
+import { getToolDocumentation, toolDocumentationCoverage, toolDocumentationSummary } from "@/lib/tool-documentation";
 import { groupToolsBySubcategory } from "@/lib/category-tool-groups";
 import { parseMarketingToolId } from "@/components/engines/marketing-engine-utils";
 import { parseSocialToolId } from "@/components/engines/social-engine-utils";
@@ -528,7 +528,14 @@ test("every canonical public tool has a complete guide structure tied to its cat
   ];
 
   const missingRuntimeRoutes: string[] = [];
+  const guideCoverageCounts = new Map<string, number>();
   for (const tool of publicTools) {
+    const coverage = toolDocumentationCoverage(tool);
+    assert.ok(
+      ["tool-specific", "engine-specific", "category-guidance", "catalogue-fallback"].includes(coverage),
+      tool.id + ": guide must expose a recognised copy-provenance classification",
+    );
+    guideCoverageCounts.set(coverage, (guideCoverageCounts.get(coverage) ?? 0) + 1);
     const operationParser = categoryOperationParsers[tool.category];
     if (tool.engine.type === "custom" && !tool.requiresBackend && operationParser) {
       assert.doesNotThrow(
@@ -574,6 +581,11 @@ test("every canonical public tool has a complete guide structure tied to its cat
     }
   }
 
+  assert.equal(
+    [...guideCoverageCounts.values()].reduce((total, count) => total + count, 0),
+    publicTools.length,
+    "Every canonical public tool must have exactly one guide copy-provenance classification.",
+  );
   assert.deepEqual(
     missingRuntimeRoutes,
     [],
