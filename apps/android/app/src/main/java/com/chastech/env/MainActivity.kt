@@ -1200,7 +1200,7 @@ private fun ToolDetail(
                     )
                 }
             }
-            if (tool.category != "celebrations") tool.nativeDisclaimerText()?.let { notice ->
+            tool.nativeDisclaimerText()?.let { notice ->
                 Text(notice, style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp))
             }
             if (!isFullscreen && parentDeveloperStudio != null) {
@@ -1242,7 +1242,6 @@ private fun ToolDetail(
                 Spacer(Modifier.height(16.dp))
                 NativeAiAssistPanel(tool)
             }
-            if (tool.category != "celebrations") {
             Spacer(Modifier.height(40.dp))
             Text("What this tool does", style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.Normal)
             Text(tool.offlineDescription(), style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 20.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
@@ -1256,7 +1255,6 @@ private fun ToolDetail(
                 },
                 modifier = Modifier.padding(top = 2.dp),
             ) { Text("Read the full guide") }
-            }
             if (related.isNotEmpty()) {
                 Spacer(Modifier.height(40.dp))
                 Text("Related tools", style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.primary)
