@@ -253,7 +253,7 @@ fun Catalog.withABook(): Catalog {
     )
     val updated = tools + tool
     return copy(
-        counts = counts.copy(total = counts.total + additions.size, active = counts.active + additions.count { it.status == "active" || it.status == "beta" }),
+        counts = counts.copy(total = counts.total + 1, active = counts.active + 1),
         tools = updated.sortedWith(compareBy<ToolRecord> { it.category }.thenBy { it.name.lowercase(Locale.ROOT) }.thenBy { it.id }),
     )
 }
@@ -283,7 +283,7 @@ fun Catalog.withZipArchive(): Catalog {
     )
     val updated = tools + tool
     return copy(
-        counts = counts.copy(total = updated.size, active = updated.count { it.status == "active" || it.status == "beta" }),
+        counts = counts.copy(total = counts.total + 1, active = counts.active + 1),
         tools = updated.sortedWith(compareBy<ToolRecord> { it.category }.thenBy { it.name.lowercase(Locale.ROOT) }.thenBy { it.id }),
     )
 }
@@ -340,7 +340,7 @@ fun Catalog.withFileWorkspaceTools(): Catalog {
             .thenBy { it.id }
     )
     return copy(
-        counts = counts.copy(total = updated.size, active = updated.count { it.status == "active" || it.status == "beta" }),
+        counts = counts.copy(total = counts.total + additions.size, active = counts.active + additions.count { it.status == "active" || it.status == "beta" }),
         tools = updated,
     )
 }
@@ -370,7 +370,7 @@ fun Catalog.withCameraStudio(): Catalog {
     )
     val updated = tools + tool
     return copy(
-        counts = counts.copy(total = updated.size, active = updated.count { it.status == "active" || it.status == "beta" }),
+        counts = counts.copy(total = counts.total + 1, active = counts.active + 1),
         tools = updated.sortedWith(compareBy<ToolRecord> { it.category }.thenBy { it.name.lowercase(Locale.ROOT) }.thenBy { it.id }),
     )
 }
