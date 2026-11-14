@@ -44,6 +44,7 @@ try {
     try {
       await page.goto(`${baseUrl}/tools/celebrations/${tool.slug}`, { waitUntil: "domcontentloaded" });
       await page.locator(`[data-env-tool-id="${tool.id}"]`).waitFor({ state: "attached", timeout: 20000 });
+      await page.locator(`[data-env-tool-id="${tool.id}"] [data-env-celebration-ready="true"]`).waitFor({ state: "attached", timeout: 20000 });
       const title = `QA ${tool.id} & <celebration>`;
       const toolSurface = page.locator(`[data-env-tool-id="${tool.id}"]`);
       await fillField(toolSurface, "Title", title);
