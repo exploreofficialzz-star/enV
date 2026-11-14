@@ -128,15 +128,6 @@ function runtimeRendererCandidates(tool: ToolMeta): string[] {
   return renderer ? [renderer] : [];
 }
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\function hasImportedRuntimeRenderer(tool: ToolMeta): boolean {
-  const candidates = runtimeRendererCandidates(tool);
-  return candidates.length > 0 && candidates.every((component) =>
-    LAZY_ENGINE_COMPONENTS.has(component) && TOOL_ENGINE_SOURCE.includes("<" + component),
-  );
-}");
-}
-
 function hasImportedRuntimeRenderer(tool: ToolMeta): boolean {
   const candidates = runtimeRendererCandidates(tool);
   if (!candidates.length) return false;
@@ -144,14 +135,12 @@ function hasImportedRuntimeRenderer(tool: ToolMeta): boolean {
   return candidates.every((component) => {
     if (!LAZY_ENGINE_COMPONENTS.has(component)) return false;
     if (DIRECT_TOOL_RENDERERS[tool.id] === component) {
-      const exactRoute = new RegExp(
-        "if\\s*\\(tool\\.id\\s*===\\s*[\"']" +
-          escapeRegExp(tool.id) +
-          "[\"']\\s*\\)\\s*return\\s*<" +
-          component +
-          "\\b",
-      );
-      return exactRoute.test(TOOL_ENGINE_SOURCE);
+      const exactDoubleQuotedRoute =
+        'if (tool.id === "' + tool.id + '") return <' + component;
+      const exactSingleQuotedRoute =
+        "if (tool.id === '" + tool.id + "') return <" + component;
+      return TOOL_ENGINE_SOURCE.includes(exactDoubleQuotedRoute)
+        || TOOL_ENGINE_SOURCE.includes(exactSingleQuotedRoute);
     }
     return TOOL_ENGINE_SOURCE.includes("<" + component);
   });
