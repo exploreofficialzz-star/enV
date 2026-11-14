@@ -24,3 +24,27 @@ const preload = read("src/lib/tool-engine-preload.ts");
 assert.match(web, /CelebrationEngine toolId=\{tool\.id\}/);
 assert.match(preload, /celebration-engine/);
 console.log("Celebrations check PASS: 93 active exact-ID workflows, Web engine dispatch, account-free local execution.");
+
+const categorySource = read("src/data/categories.ts");
+assert.match(categorySource, /id: "celebrations", name: "Celebrations", description: "Birthday, anniversary, graduation, appreciation, and celebration generators\."/);
+const allToolsPage = read("src/routes/tools/index.tsx");
+assert.match(allToolsPage, /category\.id === "celebrations" \? category\.description : category\.blurb/,
+  "the All tools directory must show the full Celebrations category description");
+const categoryTiles = read("src/components/tools/category-card.tsx");
+assert.match(categoryTiles, /category\.id === "celebrations" \? category\.description : category\.blurb/,
+  "category chooser cards must show the full Celebrations category description");
+const categoryPage = read("src/routes/tools/\$category/index.tsx");
+assert.match(categoryPage, /meta\?\.description/,
+  "the Celebrations category route must render its full category description");
+const android = read("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt");
+assert.match(android, /groupCategory\.id == "celebrations"\) groupCategory\.description/,
+  "Android All tools groups must show the full Celebrations category description");
+assert.match(android, /category\.id == "celebrations"\) category\.description/,
+  "Android category chooser must show the full Celebrations category description");
+const ios = read("apps/ios/enV/ContentViews.swift");
+assert.match(ios, /group\.category\.id == "celebrations" \? group\.category\.description/,
+  "iOS All tools groups must show the full Celebrations category description");
+const cards = read("src/components/tools/tool-card.tsx");
+assert.match(cards, /tool\.category !== "celebrations".*offlineAwareToolDescription/,
+  "Celebrations descriptions must remain hidden only inside tool cards");
+console.log("Celebrations category description check PASS: full category description is shown in All tools and category directories on Web, Android, and iOS; card descriptions remain hidden.");
