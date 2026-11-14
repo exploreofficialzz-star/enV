@@ -50,7 +50,8 @@ try {
         await fillField("Date and time", "2030-01-01T12:00");
         await fillField("Time zone", "Africa/Lagos");
       }
-      const experience = tool.id.split("-").slice(1).join("-");
+      const experience = ["page-generator", "interactive-card", "invitation-generator", "countdown", "memory-page", "reveal-page", "quiz-generator", "surprise-page"].find((suffix) => tool.id.endsWith("-" + suffix));
+      assert.ok(experience, `${tool.id}: unknown Celebration experience`);
       if (tool.id.endsWith("invitation-generator")) {
         await fillField("RSVP link", "https://example.org/rsvp");
         await fillField("Reply by", "20 December 2029");
@@ -72,7 +73,7 @@ try {
       await frame.locator("h1").waitFor({ state: "visible" });
       assert.equal(await frame.locator("h1").innerText(), title, `${tool.id}: exported preview title mismatch`);
       assert.ok((await frame.locator("body").innerText()).includes("A safe local message & <friends>"), `${tool.id}: preview message missing or escaped incorrectly`);
-      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, `${tool.id}: mobile page has horizontal overflow`);
+      assert.equal(await frame.locator("html").evaluate((node) => node.scrollWidth <= node.clientWidth), true, `${tool.id}: exported page has horizontal overflow`);
       if (tool.id.endsWith("invitation-generator")) {
         assert.equal(await frame.locator('a[href="https://example.org/rsvp"]').count(), 1, "Invitation RSVP link missing");
         assert.ok((await frame.locator("body").innerText()).includes("Guest responses are not collected"), "Invitation privacy boundary missing");
@@ -91,7 +92,10 @@ try {
       }
       if (tool.id.endsWith("countdown")) await frame.locator("[data-countdown]").waitFor({ state: "visible" });
       if (tool.id.endsWith("page-generator")) {
-        assert.ok((await frame.locator("body").innerText()).includes("1. Welcome"), "Programme items were not numbered");
+        assert.equal(await frame.locator("ol li").count(), 3, "Programme items were not included in the exported page");
+        assert.equal(await frame.locator("ol li").nth(0).innerText(), "Welcome");
+        assert.equal(await frame.locator("ol li").nth(1).innerText(), "Celebration");
+        assert.equal(await frame.locator("ol li").nth(2).innerText(), "Photos");
       }
       if (tool.id.endsWith("page-generator")) {
         const downloadPromise = page.waitForEvent("download");
