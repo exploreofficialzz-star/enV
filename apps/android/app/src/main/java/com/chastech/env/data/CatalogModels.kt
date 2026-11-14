@@ -164,8 +164,8 @@ fun Catalog.Companion.fromJson(raw: String): Catalog {
 }
 
 /**
- * Adds the separately implemented native Music Downloader to the bundled catalog at load time.
- * Legacy-bundle fallback only; current shared catalog exports this record already.
+ * Legacy-bundle compatibility only. Current shared catalog exports Music Downloader already,
+ * so this helper is a no-op for a current catalogue and must not double-count the tool.
  */
 fun Catalog.withMusicDownloader(): Catalog {
         val existingIds = (tools + relatedReferenceTools).mapTo(mutableSetOf()) { it.id }
@@ -232,7 +232,7 @@ fun Catalog.withSongMetadataAnalyzer(): Catalog {
 }
 
 
-/** Registers A book as a native runtime extension without changing the generated shared catalogue. */
+/** Legacy-bundle fallback; current shared catalogue already contains A book. */
 fun Catalog.withABook(): Catalog {
         val existingIds = (tools + relatedReferenceTools).mapTo(mutableSetOf()) { it.id }
         if ("a-book" in existingIds) return this
@@ -262,7 +262,7 @@ fun Catalog.withABook(): Catalog {
     )
 }
 
-/** Registers the local ZIP64 archive tool without changing the shared web catalogue. */
+/** Legacy-bundle fallback; current shared catalogue already contains the ZIP archive tool. */
 fun Catalog.withZipArchive(): Catalog {
         val existingIds = (tools + relatedReferenceTools).mapTo(mutableSetOf()) { it.id }
         if ("zip-any-file" in existingIds) return this
@@ -292,7 +292,7 @@ fun Catalog.withZipArchive(): Catalog {
     )
 }
 
-/** Registers the native local File workspace tools without changing the generated base catalogue. */
+/** Adds File workspace IDs only when an older bundle lacks them. */
 fun Catalog.withFileWorkspaceTools(): Catalog {
     val definitions = listOf(
         Triple("file-organizer", "File Organizer", "Sort selected files into type-based folders and copy them into a destination you choose. Original files are never deleted."),
@@ -349,7 +349,7 @@ fun Catalog.withFileWorkspaceTools(): Catalog {
     )
 }
 
-/** Registers Camera Studio in the native tool catalogue without changing the generated shared catalogue. */
+/** Legacy-bundle fallback; current shared catalogue already contains Camera Studio. */
 fun Catalog.withCameraStudio(): Catalog {
         val existingIds = (tools + relatedReferenceTools).mapTo(mutableSetOf()) { it.id }
         if ("camera-studio" in existingIds) return this
