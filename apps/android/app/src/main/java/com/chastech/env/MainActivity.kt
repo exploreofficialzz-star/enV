@@ -684,7 +684,7 @@ private fun WebHomeToolCard(tool: ToolRecord, onTool: (String) -> Unit, modifier
         Column(Modifier.padding(16.dp).fillMaxWidth()) {
             EnVToolAppIcon(tool, size = 36.dp)
             Text(tool.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Normal, modifier = Modifier.padding(top = 12.dp))
-            Text(tool.offlineDescription(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+            if (tool.category != "celebrations") Text(tool.offlineDescription(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
             if (tool.isUnderProduction()) Text("Under production", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
             else if (tool.status == "planned") Text("Coming soon", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
             else if (NativeCopy.isWebRuntimeOnly(tool.id)) Text("Web only", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 10.dp))
@@ -708,7 +708,7 @@ private fun WebHomeSearchSuggestion(tool: ToolRecord, onTool: (String) -> Unit) 
                 else if (tool.status == "planned") Text("Coming soon", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 else if (NativeCopy.isWebRuntimeOnly(tool.id)) Text("Web only", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Text(tool.offlineDescription(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (tool.category != "celebrations") Text(tool.offlineDescription(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         EnVIcon("ArrowRight", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface)
     }
@@ -1186,12 +1186,12 @@ private fun ToolDetail(
                     horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 16.dp),
                 ) {
                     NativeToolHeader(
-                        tool, compact, Modifier.weight(1f), showDescription = !compact || isFullscreen,
+                        tool, compact, Modifier.weight(1f), showDescription = tool.category != "celebrations" && (!compact || isFullscreen),
                         isFullscreen = isFullscreen, onToggleFullscreen = onToggleFullscreen
                     )
                     if (!isFullscreen) NativeToolSaveButton(isFavorite, onToggleFavorite)
                 }
-                if (compact && !isFullscreen) {
+                if (compact && !isFullscreen && tool.category != "celebrations") {
                     Text(
                         tool.offlineDescription(),
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 20.sp),
@@ -1200,7 +1200,7 @@ private fun ToolDetail(
                     )
                 }
             }
-            tool.nativeDisclaimerText()?.let { notice ->
+            if (tool.category != "celebrations") tool.nativeDisclaimerText()?.let { notice ->
                 Text(notice, style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 12.dp))
             }
             if (!isFullscreen && parentDeveloperStudio != null) {
@@ -1242,6 +1242,7 @@ private fun ToolDetail(
                 Spacer(Modifier.height(16.dp))
                 NativeAiAssistPanel(tool)
             }
+            if (tool.category != "celebrations") {
             Spacer(Modifier.height(40.dp))
             Text("What this tool does", style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.Normal)
             Text(tool.offlineDescription(), style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 20.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
@@ -1255,6 +1256,7 @@ private fun ToolDetail(
                 },
                 modifier = Modifier.padding(top = 2.dp),
             ) { Text("Read the full guide") }
+            }
             if (related.isNotEmpty()) {
                 Spacer(Modifier.height(40.dp))
                 Text("Related tools", style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.primary)
@@ -1406,7 +1408,7 @@ private fun RelatedToolCard(tool: ToolRecord, onClick: () -> Unit) {
                 EnVToolAppIcon(tool, size = 32.dp)
                 Text(tool.name, style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp), fontWeight = FontWeight.Normal, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
-            Text(tool.offlineDescription(), style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (tool.category != "celebrations") Text(tool.offlineDescription(), style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 EnVIcon("ArrowRight", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface)
             }
@@ -3240,7 +3242,7 @@ private fun ToolCard(tool: ToolRecord, favorite: Boolean, onTool: (String) -> Un
                 Column(Modifier.weight(1f)) {
                     EnVToolAppIcon(tool, size = 36.dp)
                     Text(tool.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 12.dp))
-                    Text(tool.offlineDescription(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+                    if (tool.category != "celebrations") Text(tool.offlineDescription(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
                     if (tool.isUnderProduction()) {
                         StatusPill("Under production", Modifier.padding(top = 10.dp))
                     } else if (tool.status == "planned") {
