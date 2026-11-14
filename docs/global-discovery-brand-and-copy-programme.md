@@ -39,7 +39,7 @@ The following findings describe the `main` snapshot used as the baseline for thi
 ### Gaps and risks found
 - Brand strings are inconsistent with the requested identity. The homepage currently uses `enV Digital Toolkit by chAs Technologies`; the global Open Graph site name and WebSite structured data also use expanded names. Existing SEO tests assert some of this wording, so they must be corrected alongside the user-facing text.
 - Category pages generally show the category description followed by the tool catalogue. Their explanatory content is not consistently deep or tailored to the category's actual workflows.
-- The tool documentation engine includes useful category- and engine-specific advice, but also generic fallback steps and processing language. Each public tool still needs a verified, operation-specific explanation.
+- The tool documentation engine includes task guidance for all 43 current categories and explicit tool-level guidance for several important operations. It also uses category/engine-level fallback steps for many other tools. Category coverage is therefore established, but individual tool coverage is not: each active public tool still needs its real controls, inputs, outputs, processing path, errors and limits checked against source.
 - The original catalogue generator used repeated fallback and cross-category templates. The PR adds `src/lib/generated-tool-copy.mjs`, `scripts/generated-tool-copy.test.mjs` and a `check-catalog` refinement gate to replace known legacy boilerplate in generated output. This is a quality filter, not proof that every final description has been reviewed against its real engine; WS-02 and WS-03 still require an evidence-based tool inventory and individual review.
 - Tool and category metadata generally use a shared social image by default. Route-specific share cards are not consistently supplied.
 - The sitemap generator currently emits location entries without `lastmod`. IndexNow integration was not found in the reviewed discovery generator.
@@ -104,6 +104,8 @@ The most useful comparison is the *actual task flow*, not the headline count of 
 - Preserve legal company attribution where it belongs; do not erase ownership information or insert it into every product label.
 
 ### WS-02 — Build a verified catalogue content inventory
+The PR branch audit confirms 43 of 43 catalogue categories have an entry in `CATEGORY_TASK_GUIDANCE`; `scripts/check-support-center.mjs` now protects this coverage. This is category-level coverage only and must not be counted as proof that each tool has individually verified copy.
+
 For every active, public, canonical tool:
 - Record tool ID, displayed name, canonical route, category/subcategory, current description, keywords, tags and related tools.
 - Trace the actual route and engine operation; inspect forms, accepted inputs, supported output, controls, errors, limits and actual processing path.
@@ -197,7 +199,7 @@ A workstream is complete only when its implementation and evidence pass the rele
 - No prohibited expanded platform-name variants remain in public product copy or metadata, except documented migration/history references where required.
 - Company attribution appears only in relevant company/legal/publisher contexts.
 - Every active public canonical tool has a unique, accurate, reviewed description.
-- Every category has its own meaningful explanation.
+- Every category has its own meaningful explanation; the support-center audit verifies task-guidance coverage against the category registry.
 - No generic generator fallback is allowed to publish as final user-facing copy without review.
 - Claims about AI, offline, privacy, processing location, formats and limits match executable behavior.
 
