@@ -7,6 +7,16 @@ import { getSearchableTools, getToolsByCategory } from "@/lib/registry";
 import { canonicalSeoTools, isIndexableTool } from "@/lib/seo-metadata";
 import { getToolDocumentation, toolDocumentationSummary } from "@/lib/tool-documentation";
 import { groupToolsBySubcategory } from "@/lib/category-tool-groups";
+import { parseMarketingToolId } from "@/components/engines/marketing-engine-utils";
+import { parseSocialToolId } from "@/components/engines/social-engine-utils";
+import { parseInteractiveToolId } from "@/components/engines/interactive-engine-utils";
+import { parseGamingToolId } from "@/components/engines/gaming-engine-utils";
+import { parseCareerToolId } from "@/components/engines/career-engine-utils";
+import { parseRelationshipToolId } from "@/components/engines/relationship-engine-utils";
+import { parseWebDesignToolId } from "@/components/engines/webdesign-engine-utils";
+import { parseEcommerceToolId } from "@/components/engines/ecommerce-engine-utils";
+import { parseStreamingToolId } from "@/components/engines/streaming-engine-utils";
+import { parseToolId as parseCommunicationToolId } from "@/components/engines/communication-engine-utils";
 
 const TOOL_ENGINE_SOURCE = readFileSync(
   new URL("../components/tools/tool-engine.tsx", import.meta.url),
@@ -228,6 +238,14 @@ test("tool-guide fallbacks include a distinct catalogue task statement for every
       related: [],
       engine: { type: "custom", id: "documentation-coverage-" + category.id },
     };
+
+    const operationParser = categoryOperationParsers[tool.category];
+    if (tool.engine.type === "custom" && !tool.requiresBackend && operationParser) {
+      assert.doesNotThrow(
+        () => operationParser(tool.id),
+        tool.id + ": public custom tool must parse to a supported operation in its category engine",
+      );
+    }
 
     const sections = getToolDocumentation(tool);
     const whenToUse = sections.find((section) => section.id === "when-to-use");
@@ -487,6 +505,23 @@ test("every canonical public tool has an individually grounded guide contract", 
   const publicTools = canonicalSeoTools([...toolMap.values()].filter(isIndexableTool));
 
   assert.ok(publicTools.length > 0, "The public guide inventory must not be empty.");
+  const categoryOperationParsers: Partial<Record<string, (toolId: string) => unknown>> = {
+    marketing: parseMarketingToolId,
+    social: parseSocialToolId,
+    interactive: parseInteractiveToolId,
+    gaming: parseGamingToolId,
+    career: parseCareerToolId,
+    relationships: parseRelationshipToolId,
+    webdesign: parseWebDesignToolId,
+    ecommerce: parseEcommerceToolId,
+    streaming: (toolId) => {
+      const parsed = parseStreamingToolId(toolId);
+      assert.ok(parsed, toolId + ": streaming tool ID must resolve to a supported platform operation");
+      return parsed;
+    },
+    communication: parseCommunicationToolId,
+  };
+
   const requiredSections = [
     "purpose-and-scope",
     "when-to-use",
