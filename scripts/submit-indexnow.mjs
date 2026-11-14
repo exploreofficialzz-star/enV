@@ -116,7 +116,7 @@ async function main() {
     (pendingKeyValidationBatches
       ? " Key validation is pending for " + pendingKeyValidationBatches + " batch(es)."
       : " The endpoint returned HTTP 200 for each batch.") +
-    " Receipt does not prove crawling or indexing.\\n");
+    " Receipt does not prove crawling or indexing.\n");
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
