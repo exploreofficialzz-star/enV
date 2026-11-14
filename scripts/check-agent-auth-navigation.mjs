@@ -157,7 +157,8 @@ const blogPage = requireText("src/routes/blog.index.tsx", [
   'placeholder="Search blogs, guides, and tools…"',
   "md:flex-row md:items-center md:justify-between",
   "Search blogs, guides, and tools",
-  "toolDocumentationPath(tool)",
+  'to="/blog/$slug"',
+  'params={{ slug: "tool-" + tool.id }}',
   "compareToolNames",
   "Browse product articles",
   "Back to tool guides",
@@ -177,7 +178,7 @@ if (blogPage.includes('aria-label="Knowledge centre contents"')
   || blogPage.includes("BLOG_ARTICLES.length.toLocaleString()")) {
   errors.push("Web Blogs & Guides must not show the removed catalogue summary cards or count badges.");
 }
-if (!blogPage.includes('href={toolDocumentationPath(tool)}')) errors.push("Tool catalogue entries must use direct navigable guide URLs.");
+if (!blogPage.includes('to="/blog/$slug"') || !blogPage.includes('params={{ slug: "tool-" + tool.id }}')) errors.push("Tool catalogue entries must use typed, directly addressable guide URLs.");
 if (!blogPage.includes('sensitivity: "base", numeric: true')) errors.push("Tool guides on the Blogs & Guides page must be sorted alphabetically.");
 if (blogPage.includes('placeholder="Search tools and guides…')) errors.push("Web Blogs & Guides must not show a duplicate search field below the header.");
 if (!blogPage.includes('md:flex-row md:items-center md:justify-between') || !blogPage.includes('md:w-[24rem] md:shrink-0')) errors.push("Blogs & Guides heading and search must share one aligned header row at desktop widths.");
