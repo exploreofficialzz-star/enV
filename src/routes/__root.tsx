@@ -10,7 +10,7 @@ import type { CategoryId } from "@/types/tool";
 import { businessStudioAnchorSlug } from "@/lib/business-studios-catalog";
 import { VIEW_MODE_BOOTSTRAP_SCRIPT } from "@/lib/view-mode";
 
-const APP_NAME = "enV — Browser Toolkit";
+const APP_NAME = "enV";
 const ADSENSE_SITE_CLIENT_ID = "ca-pub-2492078126313994";
 
 const NON_INDEXABLE_PATHS = [
@@ -115,7 +115,7 @@ export const Route = createRootRoute({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: APP_NAME },
-      { name: "description", content: "Discover practical online tools for calculations, conversions, image and audio work, developer tasks, productivity, business, and more across web and mobile." },
+      { name: "description", content: "Find practical tools for calculations, conversions, creative work, development, media and everyday tasks across Web, Android and iOS." },
       { name: "robots", content: routeRobotsPolicy(matches) },
       { name: "google-adsense-account", content: ADSENSE_SITE_CLIENT_ID },
       { name: "env-build-sha", content: __ENV_BUILD_SHA__ },

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const ORIGIN = "https://envtools.store";
-const EXPECTED_HOMEPAGE_TITLE = "enV Digital Toolkit by chAs Technologies | Online Tools";
+const EXPECTED_HOMEPAGE_TITLE = "enV | Tools for everyday tasks";
 const EXPECTED_BUILD_SHA = process.env.GITHUB_SHA?.trim() ?? "";
 const USER_AGENT = "enV-production-seo-smoke/1.0";
 const failures = [];
@@ -232,8 +232,8 @@ async function checkRenderedRoute(path, schema) {
 
   assert(title.length >= 8 && title.length <= 65, path + " title is missing or exceeds 65 characters (" + title.length + ")");
   if (path === "/") {
-    assert(title === EXPECTED_HOMEPAGE_TITLE, "Homepage title must disambiguate the enV brand: " + title);
-    assert(description.includes("enV Digital Toolkit by chAs Technologies LLC"), "Homepage description must identify the parent brand.");
+    assert(title === EXPECTED_HOMEPAGE_TITLE, "Homepage title must use the canonical enV product identity: " + title);
+    assert(description.includes("Find a tool for the task you are working on."), "Homepage description must explain the product in plain language.");
   }
   assert(description.length >= 40 && description.length <= 170, path + " has an invalid description length (" + description.length + ")");
   assert(robots && !robots.includes("noindex"), path + " should be indexable but has robots=" + robots);

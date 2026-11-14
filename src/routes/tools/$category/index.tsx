@@ -4,6 +4,7 @@ import { createFileRoute, notFound } from "@tanstack/react-router";
 import { AppShell } from "@/components/layout/app-shell";
 import { ToolCard } from "@/components/tools/tool-card";
 import { getToolsByCategory } from "@/lib/registry";
+import { groupToolsBySubcategory } from "@/lib/category-tool-groups";
 import { CATEGORY_MAP } from "@/data/categories";
 import { toolIcon } from "@/lib/icons";
 import { DesignCategoryExplorer } from "@/components/tools/design-category-explorer";
@@ -40,6 +41,8 @@ function Category() {
   const developerStudios = category === "developer" ? tools.filter((tool) => tool.tags.includes("developer-studio")) : [];
   const legacyTools = category === "developer" ? tools.filter((tool) => !tool.tags.includes("developer-studio")) : tools;
   const [visibleCount, setVisibleCount] = useState(6);
+  const visibleLegacyTools = legacyTools.slice(0, visibleCount);
+  const groupedLegacyTools = groupToolsBySubcategory(visibleLegacyTools);
   const meta = CATEGORY_MAP[category as CategoryId];
   const Icon = meta ? toolIcon(meta.icon) : Folder;
   useEffect(() => setVisibleCount(6), [category]);
@@ -48,7 +51,16 @@ function Category() {
     <AppShell>
       <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
         <>
-          <div className="flex items-center gap-3"><span className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-black dark:text-white"><Icon className="size-5" aria-hidden="true" /></span><div><h1 className="text-3xl font-bold text-accent">{meta?.name ?? category}</h1><p className="mt-1 text-muted">{meta?.description ?? "Tools in this category."}</p></div></div>
+          <header className="flex items-start gap-3">
+            <span className="mt-1 inline-flex size-11 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-black dark:text-white">
+              <Icon className="size-5" aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <h1 className="text-3xl font-bold text-accent">{meta?.name ?? category}</h1>
+              <p className="mt-1 max-w-3xl text-muted">{meta?.description ?? "Tools in this category."}</p>
+              {meta?.blurb ? <p className="mt-2 text-sm font-medium text-accent">{meta.blurb}</p> : null}
+            </div>
+          </header>
           {tools.length === 0 ? <p className="mt-8 rounded-xl bg-surface p-6 text-sm text-muted shadow-[var(--shadow-border)]">No tools in this category yet.</p> : <>
             {category === "business" ? <div className="mt-7"><div className="mb-3"><h2 className="text-xl font-semibold">Business Studios</h2><p className="mt-1 text-sm text-muted">Private, focused workspaces for documents, unit economics, naming, and everyday operations. Existing tool URLs remain available below.</p></div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div className="rounded-xl border bg-surface p-4 transition hover:bg-surface-2"><a href="/tools/business/document-studio?mode=invoice" className="block"><h3 className="font-semibold">Document Studio</h3><p className="mt-1 text-sm text-muted">Invoices, receipts, quotations, estimates and purchase orders.</p></a><div className="mt-3 flex flex-wrap gap-x-3 gap-y-2 text-xs">{[["Invoice", "invoice"], ["Receipt", "receipt"], ["Quotation", "quotation"], ["Estimate", "estimate"], ["Purchase order", "purchase-order"]].map(([label, mode]) => <a key={mode} className="min-h-10 inline-flex items-center underline underline-offset-2" href={`/tools/business/document-studio?mode=${mode}`}>{label}</a>)}</div></div>
@@ -61,7 +73,22 @@ function Category() {
               <DesignCategoryExplorer tools={tools} />
             ) : (
               <>
-                <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{legacyTools.slice(0, visibleCount).map((tool) => <ToolCard key={tool.id} tool={tool} />)}</div>
+                {groupedLegacyTools ? (
+                  <div className="mt-6 space-y-8">
+                    {groupedLegacyTools.map((group) => (
+                      <section key={group.id} aria-labelledby={category + "-" + group.id}>
+                        <h2 id={category + "-" + group.id} className="mb-3 text-lg font-semibold">{group.label}</h2>
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                          {group.tools.map((tool) => <ToolCard key={tool.id} tool={tool} />)}
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {visibleLegacyTools.map((tool) => <ToolCard key={tool.id} tool={tool} />)}
+                  </div>
+                )}
                 {visibleCount < legacyTools.length ? <div className="mt-4 flex justify-end"><button type="button" onClick={() => setVisibleCount((count) => Math.min(count + 6, legacyTools.length))} className="inline-flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-sm font-semibold text-accent shadow-[var(--shadow-border)] hover:bg-surface-2">See more tools <ArrowRight className="size-4 text-accent" aria-hidden="true" /></button></div> : null}
               </>
             )}

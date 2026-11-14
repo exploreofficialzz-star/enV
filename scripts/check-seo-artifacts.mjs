@@ -1,21 +1,42 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildSeoArtifacts, buildSitemapArtifacts } from "./generate-seo-artifacts.mjs";
+import { buildIndexNowKeyArtifact } from "./indexnow-utils.mjs";
 import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema, toolSchema, organizationSchema, websiteSchema, boundedToolSeoTitle } from "@/lib/seo-metadata";
 
 const result = buildSeoArtifacts();
+assert.equal(buildIndexNowKeyArtifact(""), null, "An unset IndexNow key must not produce a public key file.");
+assert.deepEqual(buildIndexNowKeyArtifact("a1b2c3d4-e5f6"), {
+  path: "public/a1b2c3d4-e5f6.txt",
+  content: "a1b2c3d4-e5f6",
+});
+assert.throws(() => buildIndexNowKeyArtifact("bad key"), /INDEXNOW_KEY/);
+assert.throws(() => buildIndexNowKeyArtifact("x".repeat(129)), /INDEXNOW_KEY/);
+if (process.env.VERCEL_ENV === "production" && process.env.INDEXNOW_KEY) {
+  assert.equal(result.indexNowKeyFile.path, "public/" + process.env.INDEXNOW_KEY + ".txt");
+  assert.equal(result.indexNowKeyFile.content, process.env.INDEXNOW_KEY);
+} else {
+  assert.equal(result.indexNowKeyFile, null, "The key verification file must not be generated for non-production builds.");
+}
 const inventoryCell = (value) => String(value ?? "").replace(/\s+/g, " ").replaceAll("|", "\\|").trim();
 const seoMetadataSource = readFileSync(new URL("../src/lib/seo-metadata.ts", import.meta.url), "utf8");
 const rootRouteSource = readFileSync(new URL("../src/routes/__root.tsx", import.meta.url), "utf8");
 const homepageRouteSource = readFileSync(new URL("../src/routes/index.tsx", import.meta.url), "utf8");
+const termsRouteSource = readFileSync(new URL("../src/routes/terms.tsx", import.meta.url), "utf8");
+const assistantPromptSource = readFileSync(new URL("../src/lib/ai/server/tasks/assistant.ts", import.meta.url), "utf8");
+const catalogueGeneratorSource = readFileSync(new URL("./gen-catalog.mjs", import.meta.url), "utf8");
 const toolRouteSource = readFileSync(new URL("../src/routes/tools/$category/$slug.tsx", import.meta.url), "utf8");
 const guideRouteSource = readFileSync(new URL("../src/routes/blog.$slug.tsx", import.meta.url), "utf8");
+const renderedAuditWorkflowSource = readFileSync(new URL("../.github/workflows/accessibility-phase8.yml", import.meta.url), "utf8");
 const seoHeadSource = seoMetadataSource.slice(seoMetadataSource.indexOf("export function seoPageHead"), seoMetadataSource.indexOf("export function organizationSchema"));
 assert.ok(rootRouteSource.includes("...webmasterVerificationMeta()"), "Search Console verification must be emitted once from the root document.");
 assert.ok(rootRouteSource.includes('name: "env-build-sha", content: __ENV_BUILD_SHA__'), "Every route must expose the source revision used to build it.");
 assert.doesNotMatch(seoHeadSource, /env-build-sha/, "The build revision marker must be emitted once by the root document.");
-assert.ok(homepageRouteSource.includes('title: "enV Digital Toolkit by chAs Technologies | Online Tools"'), "Homepage title must identify the enV product and parent brand.");
-assert.ok(homepageRouteSource.includes("enV Digital Toolkit by chAs Technologies LLC"), "Homepage description must disambiguate the enV brand from unrelated EnvTools products.");
+assert.ok(homepageRouteSource.includes('title: "enV | Tools for everyday tasks"'), "Homepage title must use the enV product name without an appended product label.");
+assert.ok(homepageRouteSource.includes("Find a tool for the task you are working on."), "Homepage description must explain the user purpose in plain language.");
+assert.doesNotMatch(termsRouteSource, /the enV toolkit/i, "Terms structured data must use the canonical enV product name.");
+assert.doesNotMatch(assistantPromptSource, /inside enV Toolkit/i, "The AI Agent must identify itself as part of enV without expanding the platform name.");
+assert.doesNotMatch(catalogueGeneratorSource, /utility for the enV toolkit/i, "Catalogue generation must not seed expanded product-name filler.");
 assert.doesNotMatch(seoHeadSource, /webmasterVerificationMeta\(\)/, "Child routes must not duplicate root verification tags.");
 assert.match(toolRouteSource, /toolSeoTitle\(tool, CANONICAL_SEO_TOOL_PAGES\)/, "Canonical tool route titles must use the full peer collection.");
 assert.match(toolRouteSource, /CANONICAL_SEO_TOOL_PAGES\s*=\s*canonicalSeoTools\([\s\S]*?\.filter\(\(tool\)\s*=>\s*tool\.category\s*!==\s*"developer"\s*\|\|\s*tool\.tags\.includes\("developer-studio"\)\)/, "Tool-route title peers must match the canonical public-tool inventory, excluding legacy Developer aliases.");
@@ -59,12 +80,14 @@ const website = websiteSchema();
 assert.equal(organization.name, "chAs Technologies LLC");
 assert.equal(organization.legalName, "chAs Technologies LLC");
 assert.ok(organization.description.includes("enV"));
-assert.ok(organization.brand.alternateName.includes("enV Digital Toolkit"));
+assert.equal(organization.brand.name, "enV");
+assert.equal(organization.brand.alternateName, undefined);
 assert.ok(organization.sameAs.includes("https://x.com/chAstechllc"));
 assert.ok(organization.brand.sameAs.includes("https://x.com/envtoolz"));
 const serializedWebsite = JSON.stringify(website);
-assert.ok(serializedWebsite.includes("enV Digital Toolkit"));
-assert.ok(serializedWebsite.includes("enV by chAs Technologies LLC"));
+assert.ok(serializedWebsite.includes('"name":"enV"'));
+assert.doesNotMatch(serializedWebsite, /enV Digital Toolkit|enV Browser Toolkit|enV by chAs Technologies LLC/);
+
 const longTargetX = boundedToolSeoTitle("Advanced Matrix Formula Calculator — Solve for Determinant", " Online | enV");
 const longTargetY = boundedToolSeoTitle("Advanced Matrix Formula Calculator — Solve for Inverse", " Online | enV");
 const guideTargetX = boundedToolSeoTitle("Advanced Matrix Formula Calculator — Solve for Determinant", " documentation | enV");
@@ -113,6 +136,20 @@ for (const tool of result.tools) {
   assert.ok(result.inventory.includes(inventoryCell(title)), "Inventory misses SEO title for " + tool.id);
   assert.ok(result.inventory.includes(inventoryCell(description)), "Inventory misses SEO description for " + tool.id);
   assert.ok(result.inventory.includes(inventoryCell(terms.join(", ")) ), "Inventory misses search-intent terms for " + tool.id);
+  assert.ok(result.inventory.includes(inventoryCell(tool.id)), "Inventory misses the stable tool ID for " + tool.id);
+  const inventoryStatus = tool.status === "planned" ? "Planned" : tool.status === "beta" ? "Beta" : "Active";
+  assert.ok(result.inventory.includes(inventoryCell(inventoryStatus)), "Inventory misses catalogue status for " + tool.id);
+  const inventoryEngineDetails = Object.entries(tool.engine)
+    .filter(([key]) => key !== "type")
+    .map(([key, value]) => key + "=" + String(value));
+  const inventoryEngine = tool.engine.type + (inventoryEngineDetails.length ? " (" + inventoryEngineDetails.join(", ") + ")" : "");
+  assert.ok(result.inventory.includes(inventoryCell(inventoryEngine)), "Inventory misses engine operation for " + tool.id);
+  const inventoryFlags = [
+    tool.clientSide ? "client-side flagged" : "not marked client-side",
+    tool.requiresBackend ? "backend required" : "backend not required",
+    tool.requiresAuth ? "sign-in required" : "sign-in not required",
+  ].join("; ");
+  assert.ok(result.inventory.includes(inventoryCell(inventoryFlags)), "Inventory misses registry execution/account flags for " + tool.id);
   const route = "/tools/" + tool.category + "/" + tool.slug;
   const guide = "/blog/tool-" + tool.id;
   assert.ok(result.urls.includes(route), "Missing sitemap entry for " + tool.id);
@@ -120,6 +157,7 @@ for (const tool of result.tools) {
   assert.ok(result.llms.includes("https://envtools.store" + route), "Missing llms.txt tool link for " + tool.id);
   assert.ok(result.llms.includes("https://envtools.store" + guide), "Missing llms.txt guide link for " + tool.id);
 }
+assert.ok(renderedAuditWorkflowSource.includes("docs/seo-tool-inventory.md"), "Rendered SEO workflow must upload the generated per-tool review inventory as an artifact.");
 for (const article of result.articles) {
   const title = articleSeoTitle(article.title);
   assert.ok(title.length <= 65, "Article SEO title exceeds 65 characters for " + article.slug);
@@ -166,6 +204,10 @@ if (legacyDeveloperTool) {
   assert.ok(guideSchema.includes('"url":"https://envtools.store' + canonicalToolPath(legacyDeveloperTool) + '"'), "Legacy guide SoftwareApplication must use the canonical Studio URL.");
 }
 assert.ok(result.sitemap.includes(result.sitemapFiles.length ? "<sitemapindex" : "<urlset"));
+assert.doesNotMatch(result.sitemap, /<lastmod>/, "Do not fabricate sitemap lastmod values until trustworthy per-route significant-update timestamps exist.");
+for (const file of result.sitemapFiles) {
+  assert.doesNotMatch(file.content, /<lastmod>/, "Sitemap shard " + file.path + " must not contain fabricated lastmod values.");
+}
 assert.equal(result.sitemapUrlCount, result.urls.length);
 assert.ok(result.sitemapFiles.every((file) => file.count <= 40_000 && file.content.includes("<urlset")));
 const largeSitemap = buildSitemapArtifacts(Array.from({ length: 80_001 }, (_, index) => "/scale-test/" + index));
@@ -174,6 +216,10 @@ assert.equal(largeSitemap.files.length, 3);
 assert.deepEqual(largeSitemap.files.map((file) => file.count), [40_000, 40_000, 1]);
 assert.ok(largeSitemap.files.every((file) => file.content.includes("<urlset")));
 assert.match(result.inventory, /^# enV public tool SEO inventory/m);
+assert.match(result.inventory, /\| Tool ID \| Tool \| Category \| Catalogue status \| Engine operation \| Catalogue execution\/account flags \|/);
+assert.match(result.inventory, /\| Tool ID \| Usage guide \| Category \| Catalogue status \| Engine operation \| Catalogue execution\/account flags \|/);
+assert.match(result.inventory, /not proof of the live runtime data path, actual local execution, platform parity or successful behavior/);
+assert.match(result.inventory, /does not claim that a human has completed the source\/runtime audit for every tool/);
 assert.match(result.inventory, /Search-intent terms are seeded from each tool's name/m);
 assert.equal(result.sitemap.includes("https://envtools.store/sitemap.xml"), false);
 

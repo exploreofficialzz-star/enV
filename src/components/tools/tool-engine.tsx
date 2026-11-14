@@ -49,7 +49,6 @@ const GamingEngine = lazy(() => import("@/components/engines/gaming-engine").the
 const ScreenshotEngine = lazy(() => import("@/components/engines/screenshot-engine").then((m) => ({ default: m.ScreenshotEngine })));
 const MockupsCategoryEngine = lazy(() => import("@/components/engines/mockups-category-engine").then((m) => ({ default: m.MockupsCategoryEngine })));
 const SocialEngine = lazy(() => import("@/components/engines/social-engine").then((m) => ({ default: m.SocialEngine })));
-const PlannedLocalEngine = lazy(() => import("@/components/engines/planned-local-engine").then((m) => ({ default: m.PlannedLocalEngine })));
 const TranscriptionEngine = lazy(() => import("@/components/engines/transcription-engine").then((m) => ({ default: m.TranscriptionEngine })));
 const ImageToolsEngine = lazy(() => import("@/components/engines/image-tools-engine").then((m) => ({ default: m.ImageToolsEngine })));
 const DocumentToolsEngine = lazy(() => import("@/components/engines/document-tools-engine").then((m) => ({ default: m.DocumentToolsEngine })));
@@ -79,6 +78,11 @@ function ToolEngineView({ tool, initialMode, initialAction, initialOp }: ToolEng
   // were previously marked planned. The catalog remains the compatibility index.
   if (tool.id === "smartphone-prototype-lab") return <SmartphonePrototypeLabEngine />;
   if (tool.id === "camera-studio") return <CameraStudioEngine />;
+  // Flashcard Generator uses the implemented document/flashcards operation.
+  if (tool.id === "flashcard-generator") return <DocumentEngine op="flashcards" />;
+  // These two legacy security records are implemented by the shared local password engine.
+  if (tool.id === "password-generator") return <SecurityEngine op="password-generator" />;
+  if (tool.id === "password-strength-checker") return <SecurityEngine op="password-strength" />;
   if (tool.category === "mockups") return <MockupsCategoryEngine toolId={tool.id} />;
   // Every Screenshot-category tool is rendered by the shared screenshot studio.
   if (tool.category === "screenshots") return <ScreenshotEngine toolId={tool.id} />;
@@ -172,7 +176,7 @@ function ToolEngineView({ tool, initialMode, initialAction, initialOp }: ToolEng
       if (tool.category === "interactive") return <InteractiveEngine toolId={tool.id} />;
       if (tool.category === "gaming") return <GamingEngine toolId={tool.id} />;
       if (tool.category === "social") return <SocialEngine toolId={tool.id} />;
-      if (["events","celebrations","food","travel","photography"].includes(tool.category)) return <PlannedLocalEngine toolId={tool.id} />;
+      if (["events","celebrations","food","travel","photography"].includes(tool.category)) return <ComingSoonPanel tool={tool} />;
       return <ComingSoonPanel tool={tool} />;
     case "document":
       return <DocumentEngine op={tool.engine.op} />;

@@ -5,8 +5,8 @@ import { seoPageHead, pageSchema } from "@/lib/seo-metadata";
 
 export const Route = createFileRoute("/about")({
   head: () => seoPageHead({
-    title: "About enV | Digital Tools and Creative Workspaces",
-    description: "Learn about enV, a cross-device toolkit bringing practical calculators, converters, developer utilities, creator tools, media workflows, and productivity features together.",
+    title: "About enV | Platform and Company",
+    description: "Learn about enV, its tools across Web, Android and iOS, how the platform works, and the company that develops and operates it.",
     path: "/about",
     structuredData: pageSchema("About enV", "Platform and company information for enV, developed by chAs Technologies LLC.", "/about", "AboutPage")
   }),
@@ -20,13 +20,13 @@ function About() {
         <section className="rounded-2xl border border-border bg-surface-2 p-5 sm:p-8">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">About the platform</p>
           <h2 className="mt-3 max-w-2xl text-2xl font-semibold leading-tight text-fg sm:text-3xl">
-            Useful digital tools, brought together in one focused workspace.
+            Practical tools for the work you need to do.
           </h2>
           <p className="mt-4 max-w-3xl text-base leading-7 text-muted">
-            enV brings practical calculators, converters, generators, and creator and developer utilities into one searchable workspace. Browse by category or search by task to find a tool, understand what it does, and get on with your work without unnecessary friction.
+            enV brings together tools for calculations, conversions, design, development, media, files, business tasks and everyday planning. Browse by category or search for a task to find a tool and understand what it does before you use it.
           </p>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">
-            Use enV on the web, Android, or iOS. Our focus is practical functionality, clear guidance, and a consistent experience across devices.
+            Use enV on the web, Android or iOS. Each version is built for its platform, with clear guidance about the capabilities and processing requirements of individual tools.
           </p>
         </section>
 

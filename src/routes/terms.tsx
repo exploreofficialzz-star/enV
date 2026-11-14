@@ -7,7 +7,7 @@ export const Route = createFileRoute("/terms")({
     title: "enV Terms of Use | Web, Android and iOS",
     description: "Review the terms for using enV across Web, Android and iOS, including eligibility, accounts, user content, tool outputs, connected services, and responsible use.",
     path: "/terms",
-    structuredData: pageSchema("enV Terms of Use", "Terms governing use of the enV toolkit and its connected features.", "/terms", "WebPage")
+    structuredData: pageSchema("enV Terms of Use", "Terms governing use of enV and its connected features.", "/terms", "WebPage")
   }),
   component: Terms
 });

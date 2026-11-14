@@ -479,7 +479,22 @@ export function toolDocumentationSummary(tool: ToolMeta): string {
   return `Use ${name} with the inputs and options available on the page. Review the result against your requirements before copying, exporting, or sharing it.`;
 }
 
-function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
+function withCatalogueTask(tool: ToolMeta, guidance: ToolSpecificGuidance): ToolSpecificGuidance {
+  const purpose = String(tool.description ?? "").replace(/\s+/g, " ").trim();
+  const purposeIsInPageSummary = purpose && toolDocumentationSummary(tool) === purpose;
+  const example = guidance.example.trim();
+  return {
+    overview: "This guide is specific to " + tool.name + "."
+      + (purpose && !purposeIsInPageSummary ? " The catalogue describes its task as: " + purpose : "")
+      + " " + guidance.overview,
+    example: example
+      ? "For " + tool.name + ", " + example.charAt(0).toLowerCase() + example.slice(1)
+      : "Use a small, representative example for " + tool.name + " and check the result against an independent reference.",
+    validation: guidance.validation,
+  };
+}
+
+function toolSpecificGuidanceBase(tool: ToolMeta): ToolSpecificGuidance {
   const id = tool.id.toLowerCase();
   const name = tool.name.toLowerCase();
   const category = tool.category;
@@ -690,11 +705,16 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
       validation: categoryGuidance.validation,
     };
   }
+  const purpose = String(tool.description ?? "").trim();
   return {
-    overview: "This guide is tailored to the catalogued purpose, category, and execution metadata for " + tool.name + ". Use the current page's labels and controls as the authority for exact input requirements and behavior.",
-    example: "Run a small, non-sensitive example that represents the task you intend to complete. Confirm the output matches the expected purpose before moving on to a larger or more consequential input.",
-    validation: "Check required fields, supported input types, output completeness, and any assumptions implied by the task. The guide does not claim support for an option unless it is documented by the catalogue or visible in the current interface.",
+    overview: purpose || ("Use " + tool.name + " for the task described by its current page. Check the visible controls and notices to confirm the operation available in this release."),
+    example: "Start with a small, non-sensitive example that represents the task you need to complete. Use values or a source item whose expected result you can check, then review the output before trying a larger or more important input.",
+    validation: "Confirm that the selected operation matches your task. Check required fields, units or formats, warnings, output completeness, and whether the result is suitable for the system or person that will receive it. Do not assume an input type or option is supported unless the current interface lists it.",
   };
+}
+
+function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
+  return withCatalogueTask(tool, toolSpecificGuidanceBase(tool));
 }
 
 function engineLabel(tool: ToolMeta): string {
