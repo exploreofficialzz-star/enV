@@ -64,12 +64,12 @@ const OCCASION_COPY: Record<CelebrationOccasion, string> = {
   party: "Good people, a shared moment and a reason to celebrate.",
 };
 const THEMES: Record<string, { accent: string; background: string; ink: string; soft: string }> = {
-  rose: { accent: "#9f4564", background: "#fff6f8", ink: "#39232d", soft: "#f7e3eb" },
-  gold: { accent: "#946b12", background: "#fffaf0", ink: "#332a18", soft: "#f5ebd0" },
-  midnight: { accent: "#6579d9", background: "#10172a", ink: "#f4f5fb", soft: "#222d4c" },
-  garden: { accent: "#35745a", background: "#f4fbf5", ink: "#1c3328", soft: "#dcefe1" },
-  ocean: { accent: "#246d91", background: "#f1f9fc", ink: "#18313d", soft: "#d9edf5" },
-  classic: { accent: "#4b5563", background: "#f8fafc", ink: "#202833", soft: "#e8edf2" },
+  rose: { accent: "#00B48A", background: "#321724", ink: "#F3D9DE", soft: "#4A2636" },
+  gold: { accent: "#D9A441", background: "#141B3A", ink: "#F9F1D8", soft: "#293256" },
+  midnight: { accent: "#B8F01E", background: "#0B1026", ink: "#BCD4F2", soft: "#1C2A4A" },
+  garden: { accent: "#F04A24", background: "#1F4A3A", ink: "#FEFCF5", soft: "#2C614D" },
+  ocean: { accent: "#F02391", background: "#014342", ink: "#FEFCF5", soft: "#155D5A" },
+  classic: { accent: "#F05A42", background: "#172334", ink: "#F8F4EA", soft: "#26374B" },
 };
 
 const clean = (value?: string) => String(value ?? "").trim();
@@ -174,7 +174,7 @@ function dateLabel(input: CelebrationInput): string {
 function photoMarkup(photos: string[]): string {
   return photos.filter((photo) => /^data:image\/(?:png|jpeg|webp|avif);base64,[A-Za-z0-9+/]+={0,2}$/i.test(photo) && photo.length <= 3500000)
     .slice(0, 8).map((photo, index) =>
-      '<figure><img src="' + photo + '" alt="Celebration memory ' + (index + 1) + '" loading="lazy"><figcaption>Memory ' + (index + 1) + '</figcaption></figure>',
+      '<figure><img src="' + photo + '" alt="Celebration memory ' + (index + 1) + '" loading="lazy"></figure>',
     ).join("");
 }
 
@@ -184,7 +184,6 @@ export function buildCelebrationText(input: CelebrationInput): string {
   const date = dateLabel(input);
   const sections = [
     title,
-    occasion + " · " + input.experience.replace(/-/g, " "),
     clean(input.honoree) ? "For: " + clean(input.honoree) : "",
     clean(input.host) ? "Hosted by: " + clean(input.host) : "",
     date ? "When: " + date + (clean(input.timezone) ? " (" + clean(input.timezone) + ")" : "") : "",
@@ -202,7 +201,6 @@ export function buildCelebrationText(input: CelebrationInput): string {
     clean(input.quizQuestion) ? "\nQuiz\n" + clean(input.quizQuestion) + "\n" + nonEmptyLines(input.quizOptions).map((item) => "• " + item).join("\n") : "",
     input.photos?.length ? "Photos included: " + input.photos.length : "",
     "",
-    "Created locally with enV. This file does not send invitations or collect guest responses.",
   ];
   return sections.filter((section, index) => section !== "" || index === 0).join("\n");
 }
@@ -252,13 +250,22 @@ export function buildCelebrationHtml(input: CelebrationInput): string {
   const rsvp = safeHttpUrl(clean(input.rsvpUrl));
   const rsvpBy = clean(input.rsvpBy);
   const dressCode = clean(input.dressCode);
-  const eventInstant = clean(input.date) ? (() => { try { return getCelebrationEventInstant(clean(input.date), clean(input.timezone)).toISOString(); } catch { return ""; } })() : "";
+  const eventInstant = clean(input.date) ? (() => {
+    try { return getCelebrationEventInstant(clean(input.date), clean(input.timezone)).toISOString(); }
+    catch { return ""; }
+  })() : "";
   const photos = photoMarkup(input.photos ?? []);
   const options = nonEmptyLines(input.quizOptions).slice(0, 6);
   const experience = input.experience;
+  const glyphs: Record<CelebrationOccasion, string> = {
+    birthday: "✳", anniversary: "∞", graduation: "✦", valentine: "♥",
+    christmas: "✶", "new-year": "✺", congratulations: "✦", "thank-you": "✧",
+    appreciation: "✳", farewell: "〰", achievement: "✸", party: "✺",
+  };
+  const glyph = glyphs[input.occasion] ?? "✦";
   let content = "";
   if (experience === "interactive-card") {
-    content = '<section class="card"><p class="eyebrow">' + occasion + '</p><h1>' + escapeHtml(title) + '</h1><p>' + escapeHtml(message) + '</p><button type="button" data-reveal>Open your card</button><div class="hidden reveal" data-reveal-content><p>' + escapeHtml(clean(input.revealMessage) || ("A special message for " + (honoree || "you") + ".")) + '</p></div></section>';
+    content = '<p class="eyebrow">' + escapeHtml(occasion) + '</p><h1>' + escapeHtml(title) + '</h1><p class="lead">' + escapeHtml(message) + '</p><button type="button" data-reveal aria-expanded="false">Open your card</button><div class="hidden reveal" data-reveal-content><p>' + escapeHtml(clean(input.revealMessage) || ("A special message for " + (honoree || "you") + ".")) + '</p></div>';
   } else if (experience === "invitation-generator") {
     content = '<p class="eyebrow">You are invited</p><h1>' + escapeHtml(title) + '</h1><p class="lead">' + escapeHtml(message) + '</p><dl>' +
       (date ? '<div><dt>When</dt><dd>' + escapeHtml(date) + '</dd></div>' : "") +
@@ -268,38 +275,43 @@ export function buildCelebrationHtml(input: CelebrationInput): string {
       (clean(input.contactMethod) ? '<div><dt>RSVP contact</dt><dd>' + escapeHtml(clean(input.contactMethod)) + '</dd></div>' : "") +
       (dressCode ? '<div><dt>Dress code</dt><dd>' + escapeHtml(dressCode) + '</dd></div>' : "") +
       (rsvpBy ? '<div><dt>Reply by</dt><dd>' + escapeHtml(rsvpBy) + '</dd></div>' : "") +
-      '</dl>' + (rsvp ? '<a class="action" href="' + escapeHtml(rsvp) + '" rel="noopener noreferrer">Reply to invitation</a>' : '<p class="note">Contact the host to reply.</p>');
+      '</dl>' + (rsvp ? '<a class="action" href="' + escapeHtml(rsvp) + '" rel="noopener noreferrer">Reply to invitation</a>' :
+        (clean(input.contactMethod) ? '<p class="note">Reply to ' + escapeHtml(clean(input.contactMethod)) + '</p>' : ""));
   } else if (experience === "countdown") {
-    content = '<p class="eyebrow">' + occasion + '</p><h1>' + escapeHtml(title) + '</h1><p class="lead">' + escapeHtml(message) + '</p><div class="countdown" data-countdown data-target="' + escapeHtml(eventInstant) + '"><div><strong data-days>—</strong><span>Days</span></div><div><strong data-hours>—</strong><span>Hours</span></div><div><strong data-minutes>—</strong><span>Minutes</span></div><div><strong data-seconds>—</strong><span>Seconds</span></div></div><p class="note">' + escapeHtml(date) + '</p>';
+    content = '<p class="eyebrow">' + escapeHtml(occasion) + '</p><h1>' + escapeHtml(title) + '</h1><p class="lead">' + escapeHtml(message) + '</p><div class="countdown" data-countdown data-target="' + escapeHtml(eventInstant) + '"><div><strong data-days>—</strong><span>Days</span></div><div><strong data-hours>—</strong><span>Hours</span></div><div><strong data-minutes>—</strong><span>Minutes</span></div><div><strong data-seconds>—</strong><span>Seconds</span></div></div>' +
+      (date ? '<p class="event-date">' + escapeHtml(date) + '</p>' : "");
   } else if (experience === "memory-page") {
-    content = '<p class="eyebrow">A collection of memories</p><h1>' + escapeHtml(title) + '</h1><p class="lead">' + escapeHtml(message) + '</p><p>' + escapeHtml(clean(input.memories)) + '</p><div class="gallery">' + photos + '</div>';
+    content = '<p class="eyebrow">A collection of memories</p><h1>' + escapeHtml(title) + '</h1><p class="lead">' + escapeHtml(message) + '</p>' +
+      (clean(input.memories) ? '<p class="memory-copy">' + escapeHtml(clean(input.memories)) + '</p>' : "") +
+      (photos ? '<div class="gallery">' + photos + '</div>' : "");
   } else if (experience === "reveal-page" || experience === "surprise-page") {
-    content = '<p class="eyebrow">' + (experience === "reveal-page" ? "A moment to reveal" : "A little surprise") + '</p><h1>' + escapeHtml(title) + '</h1><p class="lead">' + escapeHtml(message) + '</p><button type="button" data-reveal>' + (experience === "reveal-page" ? "Reveal the message" : "Open your surprise") + '</button><div class="hidden reveal" data-reveal-content><p>' + escapeHtml(clean(input.revealMessage) || details) + '</p></div>';
+    content = '<p class="eyebrow">' + escapeHtml(occasion) + '</p><h1>' + escapeHtml(title) + '</h1><p class="lead">' + escapeHtml(message) + '</p><button type="button" data-reveal aria-expanded="false">' +
+      (experience === "reveal-page" ? "Reveal the message" : "Open your surprise") +
+      '</button><div class="hidden reveal" data-reveal-content><p>' + escapeHtml(clean(input.revealMessage) || details) + '</p></div>';
   } else if (experience === "quiz-generator") {
-    content = '<p class="eyebrow">A celebration quiz</p><h1>' + escapeHtml(title) + '</h1><p class="lead">' + escapeHtml(message) + '</p><p class="question">' + escapeHtml(clean(input.quizQuestion)) + '</p><div class="choices" data-quiz>' +
+    content = '<p class="eyebrow">' + escapeHtml(occasion) + '</p><h1>' + escapeHtml(title) + '</h1><p class="lead">' + escapeHtml(message) + '</p><p class="question">' + escapeHtml(clean(input.quizQuestion)) + '</p><div class="choices" data-quiz>' +
       options.map((option) => '<button type="button" data-choice data-correct="' + (option.toLowerCase() === clean(input.quizAnswer).toLowerCase() ? "true" : "false") + '">' + escapeHtml(option) + '</button>').join("") +
-      '</div><p class="note" data-feedback aria-live="polite">Choose an answer.</p>';
+      '</div><p class="note" data-feedback aria-live="polite"></p>';
   } else {
-    content = '<p class="eyebrow">' + occasion + '</p><h1>' + escapeHtml(title) + '</h1><p class="lead">' + escapeHtml(message) + '</p>' +
-      (host ? '<p>Hosted by: ' + escapeHtml(host) + '</p>' : "") +
-      (honoree ? '<p>For <strong>' + escapeHtml(honoree) + '</strong></p>' : "") +
-      (date ? '<p><strong>When:</strong> ' + escapeHtml(date) + '</p>' : "") +
-      (location ? '<p><strong>Where:</strong> ' + escapeHtml(location) + '</p>' : "") +
-      (details ? '<p>' + escapeHtml(details) + '</p>' : "") +
+    content = '<p class="eyebrow">' + escapeHtml(occasion) + '</p><h1>' + escapeHtml(title) + '</h1><p class="lead">' + escapeHtml(message) + '</p>' +
+      (honoree ? '<p class="recipient">For <strong>' + escapeHtml(honoree) + '</strong></p>' : "") +
+      (host ? '<p class="host">Hosted by ' + escapeHtml(host) + '</p>' : "") +
+      (date ? '<p class="event-date">' + escapeHtml(date) + '</p>' : "") +
+      (location ? '<p class="event-location">' + escapeHtml(location) + '</p>' : "") +
+      (details ? '<p class="extra-details">' + escapeHtml(details) + '</p>' : "") +
       (nonEmptyLines(input.schedule).length ? '<section class="schedule"><h2>Schedule</h2><ol>' + nonEmptyLines(input.schedule).map((item) => '<li>' + escapeHtml(item) + '</li>').join("") + '</ol></section>' : "") +
       (rsvp ? '<a class="action" href="' + escapeHtml(rsvp) + '" rel="noopener noreferrer">More details</a>' : "");
   }
   const script = '<script>(function(){' +
     'document.querySelectorAll("[data-reveal]").forEach(function(button){button.addEventListener("click",function(){var panel=button.parentElement.querySelector("[data-reveal-content]");if(panel){panel.classList.toggle("hidden");button.setAttribute("aria-expanded",String(!panel.classList.contains("hidden")));}});});' +
-    'var quiz=document.querySelector("[data-quiz]");if(quiz){quiz.addEventListener("click",function(event){var button=event.target.closest("[data-choice]");if(!button)return;var feedback=document.querySelector("[data-feedback]");feedback.textContent=button.dataset.correct==="true"?"That is right!":"Not quite. Try another answer.";});}' +
-    'var timer=document.querySelector("[data-countdown]");if(timer){var target=Date.parse(timer.dataset.target);function update(){if(!Number.isFinite(target)){return;}var left=Math.max(0,target-Date.now());var seconds=Math.floor(left/1000);timer.querySelector("[data-days]").textContent=String(Math.floor(seconds/86400));timer.querySelector("[data-hours]").textContent=String(Math.floor((seconds%86400)/3600)).padStart(2,"0");timer.querySelector("[data-minutes]").textContent=String(Math.floor((seconds%3600)/60)).padStart(2,"0");timer.querySelector("[data-seconds]").textContent=String(seconds%60).padStart(2,"0");}update();setInterval(update,1000);}' +
+    'var quiz=document.querySelector("[data-quiz]");if(quiz){quiz.addEventListener("click",function(event){var button=event.target.closest("[data-choice]");if(!button)return;var feedback=document.querySelector("[data-feedback]");feedback.textContent=button.dataset.correct==="true"?"Correct.":"Try again.";});}' +
+    'var timer=document.querySelector("[data-countdown]");if(timer){var target=Date.parse(timer.dataset.target);function update(){if(!Number.isFinite(target))return;var left=Math.max(0,target-Date.now());var seconds=Math.floor(left/1000);timer.querySelector("[data-days]").textContent=String(Math.floor(seconds/86400));timer.querySelector("[data-hours]").textContent=String(Math.floor((seconds%86400)/3600)).padStart(2,"0");timer.querySelector("[data-minutes]").textContent=String(Math.floor((seconds%3600)/60)).padStart(2,"0");timer.querySelector("[data-seconds]").textContent=String(seconds%60).padStart(2,"0");}update();setInterval(update,1000);}' +
     '})();</script>';
-  const css = '*,*::before,*::after{box-sizing:border-box}body{overflow-wrap:anywhere;margin:0;background:' + theme.background + ';color:' + theme.ink + ';font:16px/1.6 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:24px}.wrap{max-width:760px;margin:6vh auto;background:' + theme.background + ';border:1px solid ' + theme.soft + ';border-radius:24px;padding:clamp(22px,6vw,56px);box-shadow:0 18px 55px rgba(20,30,45,.10)}.eyebrow{font-size:.8rem;letter-spacing:.12em;text-transform:uppercase;color:' + theme.accent + ';font-weight:700}h1{font-size:clamp(2rem,7vw,3.7rem);line-height:1.08;margin:.4em 0;overflow-wrap:anywhere}p{white-space:pre-wrap}.lead{font-size:1.2rem}.action,button{display:inline-block;border:0;border-radius:999px;padding:12px 20px;background:' + theme.accent + ';color:#fff;text-decoration:none;font:inherit;font-weight:650;cursor:pointer}button:focus-visible,a:focus-visible{outline:3px solid ' + theme.accent + ';outline-offset:3px}dl{display:grid;gap:10px}dl div{padding:12px 14px;background:' + theme.soft + ';border-radius:12px}dt{font-size:.8rem;opacity:.72}dd{margin:0;font-weight:600}.hidden{display:none}.reveal{padding:18px;margin-top:18px;border-radius:14px;background:' + theme.soft + '}.countdown{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:28px 0}.countdown div{text-align:center;background:' + theme.soft + ';border-radius:14px;padding:14px 6px}.countdown strong{display:block;font-size:clamp(1.6rem,6vw,2.6rem);line-height:1.2}.countdown span{font-size:.75rem}.gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px}.gallery figure{margin:0}.gallery img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:14px}.gallery figcaption{font-size:.8rem}.choices{display:grid;gap:10px}.choices button{text-align:left;border-radius:12px}.note{opacity:.72;font-size:.9rem}@media(max-width:420px){body{padding:10px}.wrap{margin:2vh auto;border-radius:16px}.countdown{gap:5px}.countdown div{padding:10px 3px}}@media(prefers-reduced-motion:no-preference){.wrap{animation:enter .35s ease-out}@keyframes enter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}}';
-  return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>' +
-    escapeHtml(title) + '</title><style>' + css + '</style></head><body><main class="wrap" data-experience="' + experience + '">' +
-    content + '<p class="note">Made with enV · This page is a local export. Guest responses are not collected.</p></main>' + script + '</body></html>';
-}
-
-export function buildCelebration(input: CelebrationInput) {
+  const css = '*,*::before,*::after{box-sizing:border-box}html{min-height:100%;background:' + theme.background + '}body{position:relative;isolation:isolate;overflow-wrap:anywhere;min-height:100vh;margin:0;padding:clamp(14px,4vw,42px);background:radial-gradient(ellipse at 14% 10%,' + theme.accent + '26,transparent 42%),' + theme.background + ';color:' + theme.ink + ';font:16px/1.6 Georgia,"Times New Roman",serif}body:before{position:fixed;z-index:-1;inset:0;content:"";pointer-events:none;opacity:.16;background-image:repeating-linear-gradient(0deg,transparent 0 3px,rgba(255,255,255,.08) 3px 4px),repeating-linear-gradient(90deg,transparent 0 5px,rgba(0,0,0,.04) 5px 6px);mix-blend-mode:soft-light}.poster{position:relative;display:grid;grid-template-columns:minmax(230px,.92fr) minmax(0,1.08fr);align-items:center;gap:clamp(22px,5vw,64px);max-width:1040px;min-height:min(760px,calc(100vh - 56px));margin:auto;padding:clamp(24px,5vw,64px);overflow:hidden;border:1px solid ' + theme.accent + '55;border-radius:clamp(18px,3vw,34px);background:linear-gradient(138deg,' + theme.background + ',' + theme.background + 'f2);box-shadow:0 28px 90px rgba(0,0,0,.2),inset 0 1px rgba(255,255,255,.12)}.poster-art{position:relative;display:grid;min-width:0;min-height:440px;place-items:center;overflow:visible;isolation:isolate}.poster-art:before{position:absolute;inset:7% -18% 5% -18%;content:"";border:1px solid ' + theme.accent + '66;border-radius:48% 52% 60% 40%;transform:rotate(-24deg);box-shadow:0 0 0 18px ' + theme.accent + '0d,0 0 0 38px ' + theme.accent + '0a}.art-orbit{position:absolute;width:92%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 32% 24%,rgba(255,255,255,.6),transparent 19%),radial-gradient(circle at 50% 50%,' + theme.accent + ',' + theme.accent + 'bb 62%,transparent 64%);filter:drop-shadow(0 25px 45px rgba(0,0,0,.28));transform:rotate(-17deg)}.art-ribbon{position:absolute;left:-22%;right:-25%;top:39%;height:24%;border-radius:50%;background:linear-gradient(180deg,rgba(255,255,255,.8),' + theme.accent + ' 22%,' + theme.accent + ' 58%,' + theme.accent + 'aa);box-shadow:0 18px 36px rgba(0,0,0,.25),inset 0 2px 8px rgba(255,255,255,.5);transform:rotate(-32deg);opacity:.95}.art-mark{position:relative;z-index:1;color:' + theme.ink + ';font-family:Georgia,"Times New Roman",serif;font-size:clamp(9rem,22vw,17rem);line-height:1;font-weight:400;text-shadow:0 5px 0 ' + theme.accent + '45,0 24px 34px rgba(0,0,0,.25);transform:rotate(-9deg)}.poster-copy{position:relative;z-index:2;min-width:0}.eyebrow{margin:0 0 18px;color:' + theme.accent + ';font:700 .72rem/1.2 system-ui,sans-serif;letter-spacing:.22em;text-transform:uppercase}.poster h1{max-width:14ch;margin:0 0 20px;color:' + theme.ink + ';font:500 clamp(2.7rem,6.2vw,5.8rem)/.98 Georgia,"Times New Roman",serif;letter-spacing:-.055em;text-wrap:balance;overflow-wrap:anywhere}.lead{max-width:38rem;margin:0 0 26px;color:' + theme.ink + ';font:400 clamp(1rem,1.55vw,1.3rem)/1.65 system-ui,-apple-system,"Segoe UI",sans-serif;opacity:.86}.poster p{overflow-wrap:anywhere}.recipient,.host,.event-date,.event-location,.extra-details{margin:10px 0;font:500 .95rem/1.55 system-ui,sans-serif}.poster button,.poster .action{display:inline-flex;min-height:48px;align-items:center;justify-content:center;gap:8px;margin-top:22px;border:0;border-radius:999px;padding:12px 22px;background:' + theme.accent + ';color:#fff;text-decoration:none;font:700 .9rem/1 system-ui,sans-serif;box-shadow:0 10px 24px ' + theme.accent + '40;cursor:pointer;transition:transform .18s ease,box-shadow .18s ease}.poster button:hover,.poster .action:hover{transform:translateY(-2px);box-shadow:0 14px 28px ' + theme.accent + '55}.poster button:focus-visible,.poster a:focus-visible{outline:3px solid ' + theme.accent + ';outline-offset:4px}.poster dl{display:grid;gap:9px;margin:24px 0}.poster dl div{display:grid;grid-template-columns:92px minmax(0,1fr);gap:12px;padding:11px 0;border-bottom:1px solid ' + theme.ink + '28}.poster dt{color:' + theme.accent + ';font:700 .68rem/1.5 system-ui,sans-serif;letter-spacing:.13em;text-transform:uppercase}.poster dd{margin:0;color:' + theme.ink + ';font:500 .94rem/1.5 system-ui,sans-serif}.reveal{margin-top:18px;padding:20px 22px;border:1px solid ' + theme.accent + '55;border-radius:16px;background:' + theme.accent + '18;font:400 1.05rem/1.7 Georgia,serif}.hidden{display:none}.countdown{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:30px 0}.countdown div{padding:16px 6px;border:1px solid ' + theme.accent + '55;border-radius:14px;background:' + theme.accent + '18;text-align:center}.countdown strong{display:block;color:' + theme.accent + ';font:600 clamp(1.8rem,4vw,3rem)/1.1 system-ui,sans-serif;font-variant-numeric:tabular-nums}.countdown span{font:700 .64rem/1.3 system-ui,sans-serif;letter-spacing:.1em;text-transform:uppercase}.memory-copy{margin:22px 0;font:400 1.05rem/1.8 Georgia,serif;white-space:pre-wrap}.gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-top:24px}.gallery figure{margin:0}.gallery img{display:block;width:100%;aspect-ratio:1;object-fit:cover;border-radius:14px;border:1px solid rgba(255,255,255,.3)}.choices{display:grid;gap:10px;margin-top:22px}.choices button{width:100%;justify-content:flex-start;margin:0;border:1px solid ' + theme.accent + '55;background:' + theme.accent + '18;color:' + theme.ink + ';box-shadow:none;text-align:left}.note{min-height:1.4em;margin:14px 0 0;color:' + theme.accent + ';font:700 .82rem/1.4 system-ui,sans-serif}.schedule{margin-top:28px}.schedule h2{margin:0 0 12px;font:700 .72rem/1.3 system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:' + theme.accent + '}.schedule ol{margin:0;padding:0;list-style:none;counter-reset:program}.schedule li{counter-increment:program;display:grid;grid-template-columns:36px minmax(0,1fr);gap:10px;padding:10px 0;border-bottom:1px solid ' + theme.ink + '28;font:500 .95rem/1.5 system-ui,sans-serif}.schedule li:before{content:counter(program,decimal-leading-zero);color:' + theme.accent + ';font:700 .7rem/1.8 system-ui,sans-serif;letter-spacing:.08em}.brand{grid-column:1/-1;display:flex;justify-content:flex-end;margin-top:24px;color:' + theme.ink + ';font:800 .72rem/1 system-ui,sans-serif;letter-spacing:.26em;text-transform:uppercase;opacity:.7}.brand:before{content:"";width:28px;height:1px;margin:auto 12px auto 0;background:' + theme.accent + '}@media(max-width:720px){body{padding:10px}.poster{display:flex;min-height:auto;flex-direction:column;align-items:stretch;gap:12px;padding:clamp(20px,6vw,34px);border-radius:20px}.poster-art{width:100%;min-height:clamp(170px,42vw,260px);height:clamp(170px,42vw,260px);flex:none;margin:-10px 0 2px}.art-orbit{width:68%}.art-mark{font-size:clamp(7rem,30vw,12rem)}.art-ribbon{top:42%;height:24%}.poster-copy{width:100%}.poster h1{font-size:clamp(2.6rem,12vw,4.6rem)}.brand{margin-top:30px}}@media(max-width:390px){.countdown{gap:5px}.countdown div{padding:12px 3px}.poster dl div{grid-template-columns:76px minmax(0,1fr)}}@media(prefers-reduced-motion:reduce){.poster button,.poster .action{transition:none}.poster button:hover,.poster .action:hover{transform:none}}';
+  return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="color-scheme" content="light dark"><title>' +
+    escapeHtml(title) + '</title><style>' + css + '</style></head><body><main class="poster" data-experience="' + experience + '">' +
+    '<div class="poster-art" aria-hidden="true"><span class="art-orbit"></span><span class="art-ribbon"></span><span class="art-mark">' + glyph + '</span></div>' +
+    '<section class="poster-copy">' + content + '</section><footer class="brand">enV</footer></main>' + script + '</body></html>';
+}export function buildCelebration(input: CelebrationInput) {
   return { text: buildCelebrationText(input), html: buildCelebrationHtml(input), checks: celebrationQualityChecks(input) };
 }
