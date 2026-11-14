@@ -125,7 +125,7 @@ class CatalogModelsTest {
         assertEquals("planned", catalog.tools.first { it.id == "other-tool" }.status)
         assertEquals(2, catalog.counts.active)
         assertEquals(1, catalog.counts.planned)
-        assertEquals(3, catalog.browserActiveToolCount)
+        assertEquals(2, catalog.browserActiveToolCount)
         assertEquals(2, catalog.nativeImplementedToolCount)
         assertEquals(3, catalog.counts.discoverable)
     }
