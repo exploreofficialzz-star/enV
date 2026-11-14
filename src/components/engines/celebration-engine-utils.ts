@@ -171,9 +171,9 @@ function dateLabel(input: CelebrationInput): string {
   } catch { return clean(input.date); }
 }
 function photoMarkup(photos: string[]): string {
-  return photos.filter((photo) => /^data:image\/(?:png|jpeg|webp|avif);base64,/i.test(photo) && photo.length <= 3500000)
+  return photos.filter((photo) => /^data:image\/(?:png|jpeg|webp|avif);base64,[A-Za-z0-9+/]+={0,2}$/i.test(photo) && photo.length <= 3500000)
     .slice(0, 8).map((photo, index) =>
-      '<figure><img src="' + photo + '" alt="Celebration memory ' + (index + 1) + '" loading="lazy"><figcaption>Memory ' + (index + 1) + "</figcaption></figure>",
+      '<figure><img src="' + photo + '" alt="Celebration memory ' + (index + 1) + '" loading="lazy"><figcaption>Memory ' + (index + 1) + '</figcaption></figure>',
     ).join("");
 }
 
