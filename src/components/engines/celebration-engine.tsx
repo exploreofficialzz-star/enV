@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import type { ChangeEvent, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { CopyButton } from "@/components/tools/copy-button";
-import { ResultPanel } from "@/components/engines/result-panel";
 import { downloadText } from "@/lib/utils";
 import {
   buildCelebration,
@@ -14,7 +14,7 @@ import {
   type CelebrationInput,
 } from "./celebration-engine-utils";
 
-function Field({ label, children, full = false }: { label: string; children: React.ReactNode; full?: boolean }) {
+function Field({ label, children, full = false }: { label: string; children: ReactNode; full?: boolean }) {
   return <div className={full ? "flex flex-col gap-1.5 sm:col-span-2" : "flex flex-col gap-1.5"}>
     <Label>{label}</Label>
     {children}
@@ -53,7 +53,7 @@ export function CelebrationEngine({ toolId }: { toolId: string }) {
     return () => window.clearInterval(handle);
   }, [parsed.experience]);
 
-  async function selectPhotos(event: React.ChangeEvent<HTMLInputElement>) {
+  async function selectPhotos(event: ChangeEvent<HTMLInputElement>) {
     setError("");
     const files = Array.from(event.target.files ?? []);
     if (files.length > 8) { setError("Choose up to 8 photos."); event.target.value = ""; return; }
@@ -156,10 +156,11 @@ export function CelebrationEngine({ toolId }: { toolId: string }) {
       <p className="mb-2 text-sm font-medium">Review before sharing</p>
       <ul className="space-y-1 text-sm text-muted-foreground">{result.checks.map((check) => <li key={check}>• {check}</li>)}</ul>
     </div> : null}
-    {isCountdown ? <ResultPanel items={[
-      { label: "Countdown", value: countdown ? (countdown.complete ? "The celebration has started" : countdown.days + " days · " + countdown.hours + " hours · " + countdown.minutes + " minutes · " + countdown.seconds + " seconds") : "Add a valid date, time and time zone", primary: true },
-      { label: "Time zone", value: values.timezone || "Not set" },
-    ]} /> : null}
+    {isCountdown ? <div className="rounded-xl border border-border p-4" role="status" aria-live="polite">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Countdown</p>
+      <p className="text-lg font-semibold tabular-nums">{countdown ? (countdown.complete ? "The celebration has started" : countdown.days + " days · " + countdown.hours + " hours · " + countdown.minutes + " minutes · " + countdown.seconds + " seconds") : "Add a valid date, time and time zone"}</p>
+      <p className="text-xs text-muted-foreground">Time zone: {values.timezone || "Not set"}</p>
+    </div> : null}
     <div className="rounded-xl border border-border p-4 space-y-2">
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Preview</p>
       <h3 className="text-xl font-semibold">{title}</h3>
@@ -169,11 +170,19 @@ export function CelebrationEngine({ toolId }: { toolId: string }) {
       {values.location ? <p className="text-sm">{values.location}</p> : null}
       {isMemory && values.photos?.length ? <div className="flex flex-wrap gap-2">{values.photos.map((photo, index) => <img key={index} src={photo} alt={"Memory " + (index + 1)} className="h-16 w-16 rounded-lg object-cover" />)}</div> : null}
     </div>
-    <ResultPanel items={[
-      { label: "Experience", value: parsed.experience.replace(/-/g, " ") },
-      { label: "Export", value: "Editable HTML page + plain-text copy" },
-      { label: "Privacy", value: "Local export · no guest responses stored" },
-    ]} />
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Page preview</p>
+        <p className="text-xs text-muted-foreground">Local · no guest tracking</p>
+      </div>
+      <iframe
+        title={title + " — exported page preview"}
+        srcDoc={result.html}
+        sandbox="allow-scripts"
+        loading="lazy"
+        className="h-[420px] w-full rounded-xl border border-border bg-background"
+      />
+    </div>
     <div className="flex flex-wrap gap-2">
       <CopyButton text={result.text} />
       <Button type="button" variant="outline" onClick={() => downloadText(result.html, "env-" + toolId + ".html", "text/html")}>Download page</Button>
