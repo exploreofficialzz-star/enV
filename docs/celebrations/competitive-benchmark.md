@@ -11,8 +11,21 @@
 | Apple Invites | Hosts can create and manage events, customize background, description, date/time and location, invite guests, approve or deny RSVP requests, and collaborate on shared albums/playlists. Guests can use the web link with or without an Apple Account. | Hosting requires iCloud+. Guests without an Apple Account can RSVP but cannot add items to the shared album or playlist; collaborative playlists also have Apple Music subscription/profile conditions. Feature availability can vary by region. |
 | Paperless Post | Designed cards/flyers; direct sends through its service support delivery/open/RSVP tracking and host tracking pages. Hosts can instead share a link through their own text, email or social channels. | A shareable link does not track sends or opens; guests appear on the tracking page after they RSVP. The share-link price follows the design's paid elements and may require Coins. Direct-sending tracking and share-link distribution are separate workflows. |
 | Canva Invitations | Large customizable template library; photos, graphics, animation and icons; shareable online invitations and one-page websites; optional printed cards, proofing and multiple paper/finish choices. | Strong design and print focus. Brand Kit and Magic Switch are Pro features. Print availability, price and shipping depend on country, quantity and selected stock/finish. |
-| Greetings Island | Large card and invitation selection with customization, photo/text personalization and downloadable designs; the current Trustpilot snapshot remains strongly positive overall. | Recent Trustpilot summaries praise template choice and personalization but also mention watermarks remaining on downloads or features perceived as unexpectedly restricted. Treat review-site material as self-selected feedback, not representative measurement. |
+| Greetings Island | Card and invitation maker with photo/text personalization and downloadable image/PDF/GIF designs; its current site also advertises hosted RSVP pages with deadlines, guest limits, reminders, QR/link sharing, response tracking and guest communication. | Premium unlocks additional designs/editing and removes watermarks. Hosted RSVP features are separate from a downloaded card; enV must not imply its local file collects responses. |
 | Evite | Free and Premium invitations; built-in RSVP tracker, guest-list and +1 controls, guest messaging, automatic reminders, shared photo albums and email/text/link sharing. Its separate Event Pages are free and link-first. | Event Pages have fewer controls than full Invitations: the current help page says there is no capacity limit or RSVP deadline, the guest list is visible, and guests can bring up to nine additional people. A link shared outside Evite's guest list does not trigger automatic RSVP reminders. Keep the distinction between a downloaded enV export and a hosted, managed guest workflow explicit. |
+
+## Benchmark by enV experience
+
+| enV experience | Closest specialist benchmarks | What those products add | enV’s deliberate product boundary and next acceptance target |
+|---|---|---|---|
+| Page Generator | Canva one-page invitation websites; Evite Event Pages; Partiful event pages | Hosted event links, location/maps, guest-facing updates, sign-up sheets and service-managed guest lists | enV produces a self-contained local page with occasion copy and a numbered programme. Require complete person/host/date/time/venue/programme content, mobile fit, escaped copy and repeatable download. A local file is not a permanent hosted URL. |
+| Interactive Card | Greetings Island Card Maker; Canva cards; Genially interactions | Rich photo/layout editing, downloadable image/PDF/GIF outputs, reusable templates and click-triggered interactive elements | enV focuses on a compact one-action reveal and personal message that works offline. Keep the reveal keyboard-operable, visible without animation when appropriate, and fully functional in the exported HTML. |
+| Invitation Generator | Partiful, Evite, Paperless Post, Apple Invites and Greetings Island RSVP | Hosted RSVP collection, guest lists, approval, +1s, capacity/waitlists, reminders, messages and sometimes tickets/shared albums | enV accepts an external RSVP URL or reply contact and explicitly says it does not collect responses. Never present the external link as an enV RSVP form or report send/delivery/open state. |
+| Countdown | TickCounter and date/time countdown services | Time-zone selection, styling/layout settings, embed/share widgets, finish behaviors and reusable remote counter links | enV provides a self-contained countdown page without a third-party widget or tracking dependency. Require explicit IANA timezone handling, exact second updates, a completed state for past events, and daylight-saving gap/repeat rejection. |
+| Memory Page | Apple Invites shared albums; Evite shared photo albums; Canva photo designs | Hosted multi-guest contribution, collaborative albums, ongoing access and broader design/print workflows | enV keeps notes and up to eight validated photos inside the local export. Require safe raster-only data URLs, per-photo/aggregate limits, responsive gallery rendering and no upload. Collaborative albums are a separate service capability. |
+| Reveal Page | Genially click-to-reveal, tooltips, popups and interaction triggers | Multi-element hotspots, pop-up windows, hover/click triggers, drag/drop and richer animation sequences | enV offers one clear reveal action that works without an account or network. Require usable keyboard focus, readable primary details before reveal, reduced-motion behavior and a reveal that still works from the downloaded file. |
+| Quiz Generator | Kahoot! quiz and question-type creator | Multi-question sessions, timed answers, points, multiple item types, media, polls and reports; some formats and options depend on paid plans | enV currently makes a self-paced, one-question multiple-choice quiz with two to six choices and local feedback. Keep answer-key validation and escaped output; multi-question games, timed multiplayer and leaderboards are clearly future hosted/session capabilities, not implied features. |
+| Surprise Page | Genially click-to-reveal/animation interactions; Canva interactive pages | Multiple reveal targets, layered media, interactive navigation and hosted sharing | enV keeps one surprise action and the message in a self-contained file. Require one-action completion, no hidden tracking or remote assets, clear focus state and reduced-motion support. |
 
 ## User feedback translated into testable requirements
 
@@ -54,6 +67,14 @@ This PR deliberately does **not** claim parity with hosted event products for:
 
 Those are separate product capabilities with provider integrations, consent, abuse controls, retention/deletion rules, delivery-status semantics and a secure host/guest data model. Do not simulate them locally or imply that a downloadable HTML file is a live event service.
 
+The adjacent design/interaction gaps are intentionally scoped too:
+- richer card composition, multiple images/typography templates and print-production workflows;
+- time-zone aware but remotely embeddable/managed countdown widgets;
+- multi-target reveal pages, layered hotspots and collaborative interactions;
+- multi-question quizzes, timed rounds, scores, multiplayer sessions, question formats and host reports.
+
+These require a separate product decision and acceptance set. A local download must never pretend to be a live collaborative or hosted experience.
+
 ## Release gates and regression evidence
 
 1. All 93 current catalog IDs remain active, exact-match routed and account-free for local execution.
@@ -82,6 +103,11 @@ Those are separate product capabilities with provider integrations, consent, abu
 - Evite — [Event Page RSVP settings](https://support.evite.com/products/invitations/create-and-edit/event-pages) (capacity, guest-list visibility, +1 and RSVP-deadline limits on link-first Event Pages).
 - Evite — [Invitation reminders](https://support.evite.com/products/invitations/create-and-edit/invitation-reminder) (host-scheduled reminders, delivery channel and reminder-status behavior).
 - Evite — [Trustpilot review snapshot](https://www.trustpilot.com/review/www.evite.com) (68 reviews and 1.7 TrustScore at research time; reports on pricing, spam/deliverability and RSVP/guest-count issues are anecdotal and self-selected).
+- Greetings Island — [Invitation and Card Maker](https://www.greetingsisland.com/) (hosted RSVP rules, deadlines, guest limits, reminders, real-time responses, QR/link sharing, and downloadable/printable cards).
+- TickCounter — [Countdown builder](https://www.tickcounter.com/) (timezone selection, widget styling/layout, share/embed code, and premium branding controls).
+- Genially — [Interactive features](https://genially.com/features/) (click-to-reveal, hotspots, tooltips, popups, hover/click triggers, drag-and-drop and animations).
+- Kahoot! — [Question types](https://support.kahoot.com/hc/en-us/articles/115002308428-Kahoot-question-types) (multiple-choice answer limits, correct-answer marking, timers, points, polls and plan-dependent question types).
+- Kahoot! — [Create a kahoot](https://support.kahoot.com/hc/en-us/articles/115002884788-How-to-make-a-kahoot) (multi-question quiz creation, media and importing questions).
 - Greetings Island — [Trustpilot review snapshot](https://www.trustpilot.com/review/greetingsisland.com) (2,428 reviews shown at research time; strong recent sentiment plus watermark/feature-restriction complaints).
 - Reddit — [Guest preference: text versus email RSVP links](https://www.reddit.com/r/weddingplanning/comments/1xaj6gb/as_wedding_guest_would_you_prefer_receiving_rsvp/) (20 October 2026; self-reported and mixed preference: some guests prefer text because email may be missed, while others prefer email).
 
