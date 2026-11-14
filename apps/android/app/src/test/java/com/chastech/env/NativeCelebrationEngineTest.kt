@@ -125,6 +125,28 @@ class NativeCelebrationEngineTest {
         assertFalse(result.html.contains("<svg onload="))
     }
 
+    @Test fun pageGeneratorExportsEscapedScheduleAndEventDetails() {
+        val result = NativeCelebrationEngine.build(
+            "birthday-page-generator",
+            mapOf(
+                "title" to "Birthday gathering",
+                "honoree" to "Alex",
+                "host" to "Sam",
+                "date" to "2030-01-01T12:00",
+                "timezone" to "Africa/Lagos",
+                "location" to "Hall & Garden",
+                "schedule" to "Welcome\nDinner <after>\nPhotos"
+            )
+        )
+        assertTrue(result.html.contains("<h2>Schedule</h2><ol>"))
+        assertTrue(result.html.contains("<li>Welcome</li>"))
+        assertTrue(result.html.contains("<li>Dinner &lt;after&gt;</li>"))
+        assertTrue(result.html.contains("<li>Photos</li>"))
+        assertTrue(result.html.contains("Hall &amp; Garden"))
+        assertTrue(result.html.contains("Hosted by: Sam"))
+        assertFalse(result.html.contains("<li>Dinner <after>"))
+    }
+
     @Test fun countdownHasExactSecondBoundariesAndPastEventsAreComplete() {
         val values = mapOf("date" to "2026-11-05T10:00", "timezone" to "Africa/Lagos")
         val target = Instant.parse("2026-11-05T09:00:00Z")
