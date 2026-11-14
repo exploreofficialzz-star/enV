@@ -846,7 +846,7 @@ private fun ToolsScreen(catalog: Catalog, category: String?, query: String, onQu
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
                             // Source guard contract: groupCategory.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.primary; contentAlignment = Alignment.CenterEnd; Text("See more tools", color = MaterialTheme.colorScheme.primary)
                             Text(groupCategory.name, style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.primary)
-                            Text(groupCategory.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Text(if (groupCategory.id == "celebrations") groupCategory.description else groupCategory.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
                     }
                     tools.take(visible).chunked(columns).forEach { rowTools ->
