@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildIndexNowKeyArtifact, indexNowResponseState, indexNowRetryDelayMs, parseIndexNowRetryAfter, routeGroups, selectChangedUrls, submitIndexNowBatch, urlsFromXml } from "./indexnow-utils.mjs";
+import { buildIndexNowKeyArtifact, chunkIndexNowUrls, indexNowResponseState, indexNowRetryDelayMs, parseIndexNowRetryAfter, routeGroups, selectChangedUrls, submitIndexNowBatch, urlsFromXml } from "./indexnow-utils.mjs";
 
 test("IndexNow ownership key files are generated only for valid keys", () => {
   assert.equal(buildIndexNowKeyArtifact(""), null);
@@ -248,5 +248,14 @@ test("route groups distinguish tools, categories, guides and editorial pages", (
     "https://envtools.store/blog/productivity-guides",
     "https://envtools.store/blog",
   ]);
+});
+test("IndexNow chunks notifications at the protocol's 10,000 URL limit", () => {
+  const urls = Array.from({ length: 10_001 }, (_, index) => "https://envtools.store/tool/" + index);
+  const batches = chunkIndexNowUrls(urls);
+  assert.deepEqual(batches.map((batch) => batch.length), [10_000, 1]);
+  assert.equal(batches.flat().length, urls.length);
+  assert.deepEqual(batches.flat(), urls);
+  assert.throws(() => chunkIndexNowUrls(urls, 10_001), /between 1 and 10,000/);
+  assert.throws(() => chunkIndexNowUrls(urls, 0), /between 1 and 10,000/);
 });
 
