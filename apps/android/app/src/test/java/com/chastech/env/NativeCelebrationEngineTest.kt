@@ -102,9 +102,12 @@ class NativeCelebrationEngineTest {
         assertTrue(quiz.checks.any { it.contains("correct answer") })
         val answered = NativeCelebrationEngine.build(
             "graduation-quiz-generator",
-            mapOf("title" to "Graduation quiz", "honoree" to "Sam", "quizQuestion" to "Which year?", "quizOptions" to "2025\n2026", "quizAnswer" to "2026")
+            mapOf("title" to "Graduation quiz", "honoree" to "Sam", "message" to "A quiz introduction.", "quizQuestion" to "Which year?", "quizOptions" to "2025\n2026", "quizAnswer" to "2026")
         )
         assertTrue(answered.html.contains("data-correct=\"true\""))
+        assertTrue(answered.html.contains("A quiz introduction."))
+        assertTrue(answered.html.contains("Which year?"))
+        assertTrue(answered.html.contains("overflow-wrap:anywhere"))
         assertFalse(answered.checks.any { it.contains("correct answer") })
     }
 
