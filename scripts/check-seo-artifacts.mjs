@@ -24,6 +24,7 @@ const rootRouteSource = readFileSync(new URL("../src/routes/__root.tsx", import.
 const homepageRouteSource = readFileSync(new URL("../src/routes/index.tsx", import.meta.url), "utf8");
 const toolRouteSource = readFileSync(new URL("../src/routes/tools/$category/$slug.tsx", import.meta.url), "utf8");
 const guideRouteSource = readFileSync(new URL("../src/routes/blog.$slug.tsx", import.meta.url), "utf8");
+const renderedAuditWorkflowSource = readFileSync(new URL("../.github/workflows/accessibility-phase8.yml", import.meta.url), "utf8");
 const seoHeadSource = seoMetadataSource.slice(seoMetadataSource.indexOf("export function seoPageHead"), seoMetadataSource.indexOf("export function organizationSchema"));
 assert.ok(rootRouteSource.includes("...webmasterVerificationMeta()"), "Search Console verification must be emitted once from the root document.");
 assert.ok(rootRouteSource.includes('name: "env-build-sha", content: __ENV_BUILD_SHA__'), "Every route must expose the source revision used to build it.");
@@ -130,6 +131,7 @@ for (const tool of result.tools) {
   assert.ok(result.inventory.includes(inventoryCell(description)), "Inventory misses SEO description for " + tool.id);
   assert.ok(result.inventory.includes(inventoryCell(terms.join(", ")) ), "Inventory misses search-intent terms for " + tool.id);
   assert.ok(result.inventory.includes(inventoryCell(tool.id)), "Inventory misses the stable tool ID for " + tool.id);
+assert.ok(renderedAuditWorkflowSource.includes("docs/seo-tool-inventory.md"), "Rendered SEO workflow must upload the generated per-tool review inventory as an artifact.");
   const inventoryStatus = tool.status === "planned" ? "Planned" : tool.status === "beta" ? "Beta" : "Active";
   assert.ok(result.inventory.includes(inventoryCell(inventoryStatus)), "Inventory misses catalogue status for " + tool.id);
   const inventoryEngineDetails = Object.entries(tool.engine)
