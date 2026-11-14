@@ -45,6 +45,23 @@ const ios = read("apps/ios/enV/ContentViews.swift");
 assert.match(ios, /group\.category\.id == "celebrations" \? group\.category\.description/,
   "iOS All tools groups must show the full Celebrations category description");
 const cards = read("src/components/tools/tool-card.tsx");
-assert.match(cards, /tool\.category !== "celebrations".*offlineAwareToolDescription/,
-  "Celebrations descriptions must remain hidden only inside tool cards");
-console.log("Celebrations category description check PASS: full category description is shown in All tools and category directories on Web, Android, and iOS; card descriptions remain hidden.");
+assert.match(cards, /offlineAwareToolDescription\(tool\)/,
+  "Celebrations tool cards must show each tool description below its title");
+assert.match(cards, /line-clamp-2 text-xs leading-5 text-muted/,
+  "Celebrations tool cards must keep the same two-line description sizing as other categories");
+assert.doesNotMatch(cards, /tool\.category !== "celebrations"/,
+  "Celebrations must not be excluded from standard tool-card descriptions");
+
+const androidCardSource = read("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt");
+assert.match(androidCardSource, /private fun WebHomeToolCard[\s\S]*?Text\(tool\.offlineDescription\(\), style = MaterialTheme\.typography\.bodySmall,[\s\S]*?maxLines = 2/);
+assert.match(androidCardSource, /private fun WebToolsCard[\s\S]*?Text\(tool\.offlineDescription\(\), style = MaterialTheme\.typography\.bodySmall\.copy\(lineHeight = 20\.sp\)[\s\S]*?maxLines = 2/);
+assert.match(androidCardSource, /private fun ToolCard[\s\S]*?Text\(tool\.offlineDescription\(\), style = MaterialTheme\.typography\.bodySmall,[\s\S]*?maxLines = 2/);
+
+const iosCardSource = read("apps/ios/enV/ContentViews.swift");
+assert.match(iosCardSource, /private struct DiscoveryToolCard[\s\S]*?enVCharacterSpacedText\(tool\.offlineDescription\)[\s\S]*?lineLimit\(2\)/);
+
+const webToolPage = read("src/components/tools/tool-shell.tsx");
+assert.match(webToolPage, /offlineAwareToolDescription\(tool\)/,
+  "individual Celebrations tool pages must continue showing the description under the title");
+
+console.log("Celebrations description check PASS: full category description and per-tool descriptions appear on listing cards and tool pages; cards retain the standard two-line description treatment.");
