@@ -49,6 +49,12 @@ test("HTML export escapes user content and rejects active RSVP URL schemes", () 
   assert.doesNotMatch(result.html, /<script>alert\(1\)<\/script>/);
   assert.doesNotMatch(result.html, /href="javascript:/);
   assert.match(result.checks.join(" "), /http or https/);
+  const credentialUrl = buildCelebration({
+    occasion: "party", experience: "invitation-generator", title: "Party",
+    rsvpUrl: "https://guest@trusted.example/rsvp",
+  });
+  assert.doesNotMatch(credentialUrl.html, /href="https:\/\/guest@trusted\.example/);
+  assert.match(credentialUrl.checks.join(" "), /http or https/);
 });
 
 test("the quiz export has bounded answer choices and reports the selected answer", () => {
