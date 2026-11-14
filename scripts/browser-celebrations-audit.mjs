@@ -51,6 +51,35 @@ try {
     await description.waitFor({ state: "visible" });
     assert.match((await description.getAttribute("class")) ?? "", /line-clamp-2/,
       route + ": Celebrations description must use the shared two-line card sizing");
+    if (route === baseUrl + "/tools") {
+      const candidates = page.locator("a.group.flex.flex-col.rounded-xl");
+      let referenceCard;
+      for (let index = 0; index < await candidates.count(); index += 1) {
+        const candidate = candidates.nth(index);
+        const href = await candidate.getAttribute("href");
+        if (href && !href.includes("/tools/celebrations/")) {
+          referenceCard = candidate;
+          break;
+        }
+      }
+      assert.ok(referenceCard, "All tools page must contain a non-Celebrations reference card for sizing comparison");
+      const cardSizing = async (element) => element.evaluate((node) => {
+        const cardStyle = getComputedStyle(node);
+        const descriptionStyle = getComputedStyle(node.querySelector(".line-clamp-2"));
+        return {
+          padding: cardStyle.padding,
+          borderRadius: cardStyle.borderRadius,
+          display: cardStyle.display,
+          flexDirection: cardStyle.flexDirection,
+          descriptionMarginTop: descriptionStyle.marginTop,
+          descriptionFontSize: descriptionStyle.fontSize,
+          descriptionLineHeight: descriptionStyle.lineHeight,
+          descriptionLineClamp: descriptionStyle.webkitLineClamp,
+        };
+      });
+      assert.deepEqual(await cardSizing(card), await cardSizing(referenceCard),
+        "Celebrations cards must keep the same layout and description sizing as other category cards");
+    }
     console.log("PASS listing description " + route);
   }
   for (const tool of tools) {
