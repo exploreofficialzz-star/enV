@@ -131,7 +131,7 @@ internal object NativeCelebrationEngine {
         return lines(clean(values, "photosData")).asSequence()
             .filter { it.length <= 3_500_000 && safeDataUrl.matches(it) }
             .take(8).mapIndexed { index, uri ->
-                "<figure><img alt=\\"Memory ${index + 1}\\" src=\\"$uri\\"><figcaption>Memory ${index + 1}</figcaption></figure>"
+                "<figure><img alt=\"Memory ${index + 1}\" src=\"$uri\"><figcaption>Memory ${index + 1}</figcaption></figure>"
             }.joinToString("")
     }
     private fun dateLabel(values: Map<String, String>): String {
