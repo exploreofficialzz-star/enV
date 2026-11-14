@@ -847,7 +847,7 @@ function slugify(value) {
 }
 
 function cleanLabel(value) {
-  return String(value ?? "").trim().replace(/\\s+/g, " ").replace(/\\b\\w/g, (letter) => letter.toUpperCase());
+  return String(value ?? "").trim().replace(/\s+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function lowerLabel(value) {
@@ -859,7 +859,6 @@ function generatedOperationDescription(category, prefix, operation) {
   const title = cleanLabel(prefix);
   const action = lowerLabel(operation);
   const is = (value) => action === value;
-  const starts = (value) => action.startsWith(value);
   const has = (value) => action.includes(value);
 
   if (category === "converters") {
@@ -1190,14 +1189,14 @@ function generatedFamilyDescription(category, prefix, name, item) {
     return `Calculate ${lowerLabel(base)} from the values you enter. Review the displayed units and any calculation steps before using the result.`;
   }
   if (category === "developer") {
-    const match = name.match(/^(.*?)\\s+(Formatter|Validator|Beautifier|Minifier|Parser|Converter|Generator|Diff|Inspector|Preview|Tester|Decoder|Encoder|Explainer|Builder)$/i);
+    const match = name.match(/^(.*?)\s+(Formatter|Validator|Beautifier|Minifier|Parser|Converter|Generator|Diff|Inspector|Preview|Tester|Decoder|Encoder|Explainer|Builder)$/i);
     if (match) return generatedOperationDescription("developer", match[1], match[2]);
   }
   if (category === "converters") {
-    const match = name.match(/^(.+?)\\s+to\\s+(.+?)\\s+(Converter|Helper)$/i);
+    const match = name.match(/^(.+?)\s+to\s+(.+?)\s+(Converter|Helper)$/i);
     if (match) return `Convert ${match[1].toUpperCase()} to ${match[2].toUpperCase()} using the formats supported by this tool. Review the output before using it.`;
   }
-  return generatedOperationDescription(category, prefix, name.replace(new RegExp("^" + prefix.replace(/[.*+?^$\\{\\}()|[\\]\\\\]/g, "\\\\$&") + "\\\\s+", "i"), ""));
+  return generatedOperationDescription(category, prefix, name.slice(prefix.length).trim());
 }
 
 function addFamily(category, prefix, items, engineType = "custom", enginePrefix = prefix) {
@@ -1221,7 +1220,7 @@ function addFamily(category, prefix, items, engineType = "custom", enginePrefix 
   }
 }
 
-function addCross(category, prefixes, operations, descriptionTemplate, engineType = "custom", planned = true) {
+function addCross(category, prefixes, operations, _descriptionTemplate, engineType = "custom", planned = true) {
   for (const prefix of prefixes) {
     for (const operation of operations) {
       const name = `${prefix} ${operation}`;
