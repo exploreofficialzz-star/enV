@@ -277,7 +277,7 @@ export function ToolShell({
               </button>
               {tool.status === "planned" ? <ComingSoonBadge /> : null}
             </div>
-            {tool.category !== "creators" && tool.category !== "celebrations" ? <p className="mt-1 hidden max-w-2xl text-sm text-muted sm:block">{offlineAwareToolDescription(tool)}</p> : null}
+            {tool.category !== "creators" ? <p className="mt-1 hidden max-w-2xl text-sm text-muted sm:block">{offlineAwareToolDescription(tool)}</p> : null}
           </div>
         </div>
         {!isFullscreen ? <Button
@@ -295,7 +295,7 @@ export function ToolShell({
           <Heart className="size-4" fill={saved ? "currentColor" : "none"} />
           {saved ? "Saved" : "Save"}
         </Button> : null}
-        {tool.category !== "creators" && tool.category !== "celebrations" ? <p className="col-start-2 col-span-2 row-start-2 text-sm leading-6 text-muted sm:hidden">{offlineAwareToolDescription(tool)}</p> : null}
+        {tool.category !== "creators" ? <p className="col-start-2 col-span-2 row-start-2 text-sm leading-6 text-muted sm:hidden">{offlineAwareToolDescription(tool)}</p> : null}
       </header>
 
       {!isFullscreen && adsterraAdsEnabled ? <AdsterraResponsiveBanner /> : null}
