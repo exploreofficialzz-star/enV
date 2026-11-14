@@ -274,7 +274,7 @@ for (const route of renderedRoutes) {
 
 async function auditStaticDiscoveryFiles() {
   const assets = [
-    { path: "/robots.txt", required: ["User-agent: OAI-SearchBot", "User-agent: GPTBot", "Sitemap: https://envtools.store/sitemap.xml"] },
+    { path: "/robots.txt", required: ["User-agent: OAI-SearchBot", "User-agent: __usage_ai-training", "User-agent: GPTBot", "User-agent: Google-Extended", "Sitemap: https://envtools.store/sitemap.xml"] },
     { path: "/sitemap.xml", required: [] },
     { path: "/llms.txt", required: ["# enV", "## Public tool categories", "## Canonical public tool pages", "## All public tool guides", "## Product articles", "https://envtools.store/tools/developer/json-studio", "https://envtools.store/blog/a-more-private-way-to-use-online-tools"] },
     { path: "/og.jpg", image: true },
