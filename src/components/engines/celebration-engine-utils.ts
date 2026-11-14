@@ -17,6 +17,7 @@ export type CelebrationInput = {
   message?: string;
   details?: string;
   rsvpUrl?: string;
+  contactMethod?: string;
   rsvpBy?: string;
   dressCode?: string;
   schedule?: string;
@@ -187,6 +188,7 @@ export function buildCelebrationText(input: CelebrationInput): string {
     clean(input.memories) ? "\nMemories\n" + clean(input.memories) : "",
     clean(input.dressCode) ? "Dress code: " + clean(input.dressCode) : "",
     clean(input.rsvpBy) ? "Please reply by: " + clean(input.rsvpBy) : "",
+    clean(input.contactMethod) ? "RSVP contact: " + clean(input.contactMethod) : "",
     clean(input.rsvpUrl) ? "RSVP / details: " + clean(input.rsvpUrl) : "",
     clean(input.revealMessage) ? "\nThe reveal\n" + clean(input.revealMessage) : "",
     clean(input.quizQuestion) ? "\nQuiz\n" + clean(input.quizQuestion) + "\n" + nonEmptyLines(input.quizOptions).map((item) => "• " + item).join("\n") : "",
@@ -209,7 +211,7 @@ export function celebrationQualityChecks(input: CelebrationInput): string[] {
   }
   if (clean(input.date) && !clean(input.timezone)) checks.push("Add the IANA time zone so the displayed local time is clear.");
   if (clean(input.rsvpUrl) && !safeHttpUrl(clean(input.rsvpUrl))) checks.push("Use a complete http or https RSVP link.");
-  if (input.experience === "invitation-generator" && !clean(input.rsvpUrl)) checks.push("Add an RSVP link or include a contact method in the message.");
+  if (input.experience === "invitation-generator" && !clean(input.rsvpUrl) && !clean(input.contactMethod)) checks.push("Add an RSVP link or a contact method guests can use to reply.");
   if (input.experience === "invitation-generator" && !clean(input.rsvpBy)) checks.push("Add an RSVP deadline, or state that replies are open.");
   if (input.experience === "countdown" && !clean(input.date)) checks.push("Choose the event date and time to calculate the countdown.");
   if (input.experience === "quiz-generator") {
@@ -254,6 +256,7 @@ export function buildCelebrationHtml(input: CelebrationInput): string {
       (location ? '<div><dt>Where</dt><dd>' + escapeHtml(location) + '</dd></div>' : "") +
       (host ? '<div><dt>Hosted by</dt><dd>' + escapeHtml(host) + '</dd></div>' : "") +
       (honoree ? '<div><dt>Celebrating</dt><dd>' + escapeHtml(honoree) + '</dd></div>' : "") +
+      (clean(input.contactMethod) ? '<div><dt>RSVP contact</dt><dd>' + escapeHtml(clean(input.contactMethod)) + '</dd></div>' : "") +
       (dressCode ? '<div><dt>Dress code</dt><dd>' + escapeHtml(dressCode) + '</dd></div>' : "") +
       (rsvpBy ? '<div><dt>Reply by</dt><dd>' + escapeHtml(rsvpBy) + '</dd></div>' : "") +
       '</dl>' + (rsvp ? '<a class="action" href="' + escapeHtml(rsvp) + '" rel="noopener noreferrer">Reply to invitation</a>' : '<p class="note">Contact the host to reply.</p>');
