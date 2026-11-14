@@ -4,130 +4,60 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = new URL("../", import.meta.url);
-const catalogSource = readFileSync(new URL("../src/data/catalog.ts", import.meta.url), "utf8");
-const [{ tools }, { CATEGORIES: categories }, { DATETIME_TOOL_EXTENSIONS }] = await Promise.all([
-  import("../src/data/catalog.ts"),
+const [{ getAllTools, getSearchableTools }, { CATEGORIES }, { tools: baseCatalogTools }] = await Promise.all([
+  import("../src/lib/registry.ts"),
   import("../src/data/categories.ts"),
-  import("../src/lib/datetime/catalog-tools.ts"),
+  import("../src/data/catalog.ts"),
 ]);
-// Import the public runtime catalog rather than parsing only catalogJson. Platform-owned
-// runtime extensions are validated below but are not duplicated into the generated base export.
 
-// A book is a local-only native/web tool; keep this extension exported to every platform.
-const runtimeCatalogExtensions = [
-  {
-    id: "song-metadata-analyzer",
-    name: "Song Metadata Analyzer",
-    slug: "song-metadata-analyzer",
-    description: "Analyze song genre, style, language, tempo, key, mood, vocals, instruments, and technical metadata. Batch tracks or ZIP collections and export reports.",
-    category: "audio",
-    subcategory: "Music",
-    keywords: ["song", "music", "metadata", "analyzer", "bpm", "tempo", "key", "genre", "mood", "vocals", "instruments", "batch", "zip", "afrobeats", "afro-pop"],
-    tags: ["song", "music", "metadata", "analysis", "bpm", "key", "genre", "batch"],
-    icon: "AudioLines",
-    iconBackground: "#0f766e",
-    iconAccent: "#67e8f9",
-    popularity: 9900,
-    featured: true,
-    clientSide: true,
-    requiresBackend: false,
-    requiresAuth: false,
-    status: "active",
-    related: ["audio-file-inspector", "music-studio", "music-downloader"],
-    engine: { type: "audio", op: "song-metadata-analyzer" },
-    platformRuntimeExtension: true,
-  },
-  {
-    id: "zip-any-file",
-    name: "Zip any file",
-    slug: "zip-any-file",
-    description: "Compress one file or many files into a ZIP/ZIP64 archive, or safely extract archives locally on this device.",
-    category: "files",
-    subcategory: "Archives & extraction",
-    keywords: ["zip", "zipper", "compress", "compression", "archive", "extract", "unzip", "decompress", "zip64", "large files", "folder", "multiple files", "tar"],
-    tags: ["zip", "archive", "compression", "extract", "offline", "local", "files", "tar"],
-    icon: "Archive",
-    popularity: 1450,
-    featured: true,
-    clientSide: true,
-    requiresBackend: false,
-    requiresAuth: false,
-    status: "active",
-    related: ["file-converter", "pdf-merger", "document-editor"],
-    engine: { type: "custom", id: "zip-any-file" },
-    platformRuntimeExtension: true,
-  },
-  {
-    id: "a-book",
-    name: "A book",
-    slug: "a-book",
-    description: "Private local notes and document workspace. Write, organize, search, attach files, and read, extract text from and rotate supported PDFs on this device.",
-    category: "productivity",
-    subcategory: "Notes & documents",
-    keywords: ["a book", "notes", "notepad", "notebook", "local notes", "offline notes", "pdf", "document", "attachments", "markdown", "writing", "journal", "search", "folders", "tags"],
-    tags: ["notes", "notebook", "documents", "pdf", "local", "offline", "productivity"],
-    icon: "FileText",
-    iconBackground: "#24354a",
-    iconAccent: "#d6e7f5",
-    popularity: 950,
-    featured: true,
-    clientSide: true,
-    requiresBackend: false,
-    requiresAuth: false,
-    status: "active",
-    related: ["pdf-merger", "pdf-splitter", "pdf-text-extractor"],
-    engine: { type: "custom", id: "a-book" },
-    platformRuntimeExtension: true,
-  },
-  {
-    id: "camera-studio",
-    name: "Camera Studio",
-    slug: "camera-studio",
-    description: "Take photos and record videos with your phone camera. Switch front/rear cameras and save captures locally.",
-    category: "photography",
-    subcategory: "Camera",
-    keywords: ["camera", "camera studio", "photo", "photography", "video", "selfie", "front camera", "rear camera", "recording", "capture", "flash", "torch"],
-    tags: ["camera", "photo", "video", "creator"],
-    icon: "Camera",
-    iconBackground: "#171b1e",
-    iconAccent: "#2ec4b6",
-    popularity: 1200,
-    featured: true,
-    clientSide: true,
-    requiresBackend: false,
-    requiresAuth: false,
-    status: "active",
-    related: [],
-    engine: { type: "custom", id: "camera-studio" },
-    platformRuntimeExtension: true,
-  },
-];
-const expandedTools = [
-  ...tools,
-  ...runtimeCatalogExtensions.filter((extension) => !tools.some((tool) => tool.id === extension.id)),
-  ...DATETIME_TOOL_EXTENSIONS.filter((extension) => !tools.some((tool) => tool.id === extension.id)),
-];
-const exportedTools = [
-  ...tools,
-  ...runtimeCatalogExtensions.filter((extension) =>
-    extension.platformRuntimeExtension !== true && !tools.some((tool) => tool.id === extension.id)),
-];
+// The Web registry is the single canonical definition of tool IDs. Platform
+// implementation is tracked separately through the native coverage manifests.
+const expandedTools = getAllTools();
+const exportedTools = expandedTools;
+const categories = CATEGORIES;
+const searchableTools = getSearchableTools();
+const canonicalIds = expandedTools.map((tool) => tool.id);
+const canonicalIdSet = new Set(canonicalIds);
+if (canonicalIdSet.size !== expandedTools.length) {
+  const duplicates = canonicalIds.filter((id, index) => canonicalIds.indexOf(id) !== index);
+  throw new Error(`Canonical registry contains duplicate tool IDs: ${[...new Set(duplicates)].join(", ")}`);
+}
+if (new Set(searchableTools.map((tool) => tool.id)).size !== searchableTools.length) {
+  throw new Error("Searchable registry contains duplicate tool IDs.");
+}
 const categoryIds = new Set(categories.map((category) => category.id));
 if (categoryIds.size !== categories.length) {
   throw new Error("Category IDs in src/data/categories.ts must be unique.");
 }
-const missingCategories = [...new Set(expandedTools.map((tool) => tool.category))].filter(
+const unknownCategories = [...new Set(expandedTools.map((tool) => tool.category))].filter(
   (categoryId) => !categoryIds.has(categoryId),
 );
-if (missingCategories.length) {
-  throw new Error(`Catalog tools reference unknown categories: ${missingCategories.join(", ")}`);
+if (unknownCategories.length) {
+  throw new Error(`Canonical tools reference unknown categories: ${unknownCategories.join(", ")}`);
 }
-const active = exportedTools.filter((tool) => tool.status === "active" || tool.status === "beta").length;
-const planned = exportedTools.length - active;
-const catalogVersion = createHash("sha256").update(catalogSource).digest("hex").slice(0, 12);
-const runtimeInventoryVersion = createHash("sha256")
-  .update(catalogSource + JSON.stringify(runtimeCatalogExtensions.map(({ platformRuntimeExtension, ...tool }) => tool)))
+const categoryCounts = Object.fromEntries(
+  categories.map((category) => [
+    category.id,
+    expandedTools.filter((tool) => tool.category === category.id).length,
+  ]),
+);
+if (Object.values(categoryCounts).reduce((sum, count) => sum + count, 0) !== expandedTools.length) {
+  throw new Error("Per-category canonical tool counts do not sum to the canonical total.");
+}
+const active = expandedTools.filter((tool) => tool.status === "active" || tool.status === "beta").length;
+const planned = expandedTools.filter((tool) => tool.status === "planned").length;
+if (active + planned !== expandedTools.length) {
+  throw new Error("Every canonical tool must have an active/beta or planned status.");
+}
+const catalogVersion = createHash("sha256")
+  .update(JSON.stringify({ categories, tools: expandedTools, searchable: searchableTools }))
   .digest("hex").slice(0, 12);
+const baseIds = new Set(baseCatalogTools.map((tool) => tool.id));
+const runtimeExtensionIds = expandedTools
+  .filter((tool) => !baseIds.has(tool.id))
+  .map((tool) => tool.id)
+  .sort();
+
 const readImplementedIds = (...relativePaths) => {
   const paths = relativePaths.flatMap((relativePath) => {
     const path = new URL(relativePath, root);
@@ -165,7 +95,17 @@ for (const [platform, ids] of [["Android", androidToolIds], ["iOS", iosToolIds]]
 const payload = {
   schemaVersion: 1,
   catalogVersion,
-  counts: { total: exportedTools.length, active, planned, categories: categories.length },
+  counts: {
+    total: expandedTools.length,
+    active,
+    planned,
+    categories: categories.length,
+    categoriesWithTools: Object.values(categoryCounts).filter((count) => count > 0).length,
+    discoverable: searchableTools.length,
+    androidImplemented: androidToolIds.size,
+    iosImplemented: iosToolIds.size,
+  },
+  categoryCounts,
   categories,
   tools: exportedTools,
 };
@@ -192,9 +132,9 @@ for (const tool of expandedTools) {
   familyMap.set(family, entry);
 }
 const inventory = {
-  catalogVersion: runtimeInventoryVersion,
+  catalogVersion,
   baseCatalogVersion: catalogVersion,
-  runtimeExtensionIds: runtimeCatalogExtensions.filter((extension) => extension.platformRuntimeExtension === true && !tools.some((tool) => tool.id === extension.id)).map((extension) => extension.id),
+  runtimeExtensionIds,
   source: "src/data/catalog.ts",
   platforms: { android: "Kotlin", ios: "Swift" },
   families: [...familyMap.values()]
@@ -205,10 +145,27 @@ const inventory = {
     })),
   androidToolIds: [...androidToolIds].sort(),
   iosToolIds: [...iosToolIds].sort(),
+  androidMissingToolIds: expandedTools.filter((tool) => !androidToolIds.has(tool.id)).map((tool) => tool.id).sort(),
+  iosMissingToolIds: expandedTools.filter((tool) => !iosToolIds.has(tool.id)).map((tool) => tool.id).sort(),
+  platformCoverage: {
+    android: {
+      implemented: androidToolIds.size,
+      notYetImplemented: expandedTools.length - androidToolIds.size,
+      percentage: Number(((androidToolIds.size / expandedTools.length) * 100).toFixed(2)),
+    },
+    ios: {
+      implemented: iosToolIds.size,
+      notYetImplemented: expandedTools.length - iosToolIds.size,
+      percentage: Number(((iosToolIds.size / expandedTools.length) * 100).toFixed(2)),
+    },
+  },
   summary: {
     totalTools: expandedTools.length,
-    activeTools: expandedTools.filter((tool) => tool.status === "active" || tool.status === "beta").length,
-    plannedTools: expandedTools.filter((tool) => tool.status !== "active" && tool.status !== "beta").length,
+    activeTools: active,
+    plannedTools: planned,
+    discoverableTools: searchableTools.length,
+    categories: categories.length,
+    categoriesWithTools: Object.values(categoryCounts).filter((count) => count > 0).length,
     engineFamilies: familyMap.size,
     androidImplemented: androidToolIds.size,
     iosImplemented: iosToolIds.size,
@@ -218,5 +175,5 @@ console.log(`Native runtime inventory: v${runtimeInventoryVersion}`);
 const inventoryOutput = new URL("../apps/shared/native-engine-inventory.json", import.meta.url);
 writeFileSync(inventoryOutput, `${JSON.stringify(inventory, null, 2)}\n`);
 console.log(
-  `Wrote ${exportedTools.length} catalog tools (${active} active, ${planned} planned) and ${categories.length} categories to ${fileURLToPath(output)} (${statSync(output).size.toLocaleString()} bytes; catalog v${catalogVersion}); inventoried ${familyMap.size} engine families.`,
+  `Wrote ${expandedTools.length} canonical tools (${active} active, ${planned} planned), ${searchableTools.length} discoverable IDs and ${categories.length} categories to ${fileURLToPath(output)} (${statSync(output).size.toLocaleString()} bytes; catalog v${catalogVersion}); native coverage: Android ${androidToolIds.size}, iOS ${iosToolIds.size}; inventoried ${familyMap.size} engine families.`,
 );
