@@ -256,7 +256,8 @@ internal object NativeCelebrationEngine {
             .replace("@ACCENT@", theme.first)
             .replace("@PAPER@", theme.second)
             .replace("@INK@", theme.third)
-        val html = "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\"><meta name=\"color-scheme\" content=\"light dark\"><title>${escape(title)}</title><style>$css</style></head><body><main class=\"poster\"><div class=\"hero-art\" aria-hidden=\"true\"><span class=\"art-orbit\"></span><span class=\"art-ribbon\"></span><span class=\"art-mark\">$glyph</span></div><section class=\"hero-copy\">$content</section><footer class=\"brand\">enV</footer></main>$script</body></html>"        return Result(text.joinToString("\n"), html, checks(parsed, values))
+        val html = "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\"><meta name=\"color-scheme\" content=\"light dark\"><title>${escape(title)}</title><style>$css</style></head><body><main class=\"poster\"><div class=\"hero-art\" aria-hidden=\"true\"><span class=\"art-orbit\"></span><span class=\"art-ribbon\"></span><span class=\"art-mark\">$glyph</span></div><section class=\"hero-copy\">$content</section><footer class=\"brand\">enV</footer></main>$script</body></html>"        
+        return Result(text.joinToString("\n"), html, checks(parsed, values))
     }
 }
 
