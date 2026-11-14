@@ -55,6 +55,14 @@ final class NativeCelebrationTests: XCTestCase {
         XCTAssertFalse(output.checks.contains(where: { $0.contains("contact method") }))
     }
 
+    func testCredentialBearingRsvpUrlIsRejected() throws {
+        let output = try NativeCelebrationEngine.build("party-invitation-generator", values: [
+            "title": "Party", "honoree": "Alex", "rsvpUrl": "https://guest@trusted.example/rsvp"
+        ])
+        XCTAssertFalse(output.html.contains("href=\"https://guest@trusted.example"))
+        XCTAssertTrue(output.checks.contains(where: { $0.contains("http or https") }))
+    }
+
     func testUnsafeRsvpUrlIsNotRenderedAndQuizRequiresAnAnswerKey() throws {
         let invitation = try NativeCelebrationEngine.build("party-invitation-generator", values: [
             "title": "Party", "honoree": "Alex", "rsvpUrl": "javascript:alert(1)"
