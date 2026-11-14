@@ -332,6 +332,8 @@ assert.match(androidCatalog, /val nativeImplementedToolCount: Int[\s\S]*?get\(\)
 assert.match(iosCatalog, /var nativeImplementedToolCount: Int \{ counts\.iosImplemented \?\? 0 \}/);
 assert.match(android, /\$\{catalog\.counts\.total\} enV catalogue tools/);
 assert.match(android, /SettingCard\("Shared tool catalogue"/);
+assert.match(iosContent, /WebHomeFooter\(toolCount: store\.catalog\.counts\.total, nativeCoverageCount:/);
+assert.match(iosContent, /\(toolCount\) tools in enV\'s shared catalogue/);
 
 // All advertised catalog records remain discoverable; general browser-runtime references stay labeled and do not receive a WebView execution fallback.
 assert.match(android, /catalog\.webSearch\(query, includeRelatedReferences = true\)/);
