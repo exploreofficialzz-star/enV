@@ -71,7 +71,7 @@ try {
         await fillField("Person or group being celebrated", "Alex");
         await fillField("Host / organiser", "Sam");
         await fillField("Location / venue", "Hall & Garden");
-        await fillField("Schedule / programme (one item per line)", "Welcome\\nCelebration\\nPhotos");
+        await fillField("Schedule / programme (one item per line)", "Welcome\nCelebration\nPhotos");
       }
       if (tool.id.endsWith("countdown")) await fillField("Location / venue", "Main hall");
       const frame = preview();
