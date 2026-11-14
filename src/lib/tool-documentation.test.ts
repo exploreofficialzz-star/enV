@@ -490,6 +490,73 @@ test("hand-written tool guidance is wrapped with catalogue identity without repe
   }
 });
 
+test("task-guidance source identifies the correct specificity layer", () => {
+  const makeTool = (
+    id: string,
+    name: string,
+    category: ToolMeta["category"],
+    engine: ToolMeta["engine"],
+  ): ToolMeta => ({
+    id,
+    name,
+    slug: id,
+    description: "A representative task for checking guide source classification.",
+    category,
+    keywords: [],
+    tags: [],
+    icon: "FileText",
+    popularity: 0,
+    featured: false,
+    clientSide: true,
+    requiresBackend: false,
+    requiresAuth: false,
+    status: "active",
+    related: [],
+    engine,
+  });
+
+  assert.equal(
+    toolTaskGuidanceSource(makeTool(
+      "percentage-calculator",
+      "Percentage Calculator",
+      "calculators",
+      { type: "calculator", formula: "percentage" },
+    )),
+    "operation-specific",
+    "A narrow tool/operation rule must be labelled operation-specific.",
+  );
+  assert.equal(
+    toolTaskGuidanceSource(makeTool(
+      "generic-calculation",
+      "Generic Calculation",
+      "calculators",
+      { type: "calculator", formula: "generic" },
+    )),
+    "engine-specific",
+    "An unmatched calculator must inherit engine-level task guidance.",
+  );
+  assert.equal(
+    toolTaskGuidanceSource(makeTool(
+      "generic-business-workflow",
+      "Generic Business Workflow",
+      "business",
+      { type: "custom", id: "generic-business-workflow" },
+    )),
+    "category-guidance",
+    "A custom tool without a narrower rule must inherit category guidance.",
+  );
+  assert.equal(
+    toolTaskGuidanceSource(makeTool(
+      "unlisted-workflow",
+      "Unlisted Workflow",
+      "unlisted" as ToolMeta["category"],
+      { type: "custom", id: "unlisted-workflow" },
+    )),
+    "catalogue-fallback",
+    "An unknown category must fail closed to catalogue purpose and generic usage advice.",
+  );
+});
+
 test("every canonical public tool has a complete guide structure tied to its catalogue record", () => {
   const toolMap = new Map<string, ToolMeta>();
   for (const tool of getSearchableTools()) toolMap.set(tool.id, tool);
