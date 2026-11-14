@@ -67,7 +67,12 @@ try {
         await fillField("Memory notes", "A favourite shared moment.");
         await page.locator('input[type="file"]').setInputFiles({ name: "memory.png", mimeType: "image/png", buffer: png });
       }
-      if (tool.id.endsWith("page-generator")) await fillField("Schedule / programme (one item per line)", "Welcome\nCelebration\nPhotos");
+      if (tool.id.endsWith("page-generator")) {
+        await fillField("Person or group being celebrated", "Alex");
+        await fillField("Host / organiser", "Sam");
+        await fillField("Location / venue", "Hall & Garden");
+        await fillField("Schedule / programme (one item per line)", "Welcome\\nCelebration\\nPhotos");
+      }
       if (tool.id.endsWith("countdown")) await fillField("Location / venue", "Main hall");
       const frame = preview();
       await frame.locator("h1").waitFor({ state: "visible" });
@@ -93,6 +98,8 @@ try {
       if (tool.id.endsWith("countdown")) await frame.locator("[data-countdown]").waitFor({ state: "visible" });
       if (tool.id.endsWith("page-generator")) {
         assert.equal(await frame.locator("ol li").count(), 3, "Programme items were not included in the exported page");
+        assert.ok((await frame.locator("body").innerText()).includes("Hosted by: Sam"), "Host was not included in the exported page");
+        assert.ok((await frame.locator("body").innerText()).includes("Hall & Garden"), "Venue was not included in the exported page");
         assert.equal(await frame.locator("ol li").nth(0).innerText(), "Welcome");
         assert.equal(await frame.locator("ol li").nth(1).innerText(), "Celebration");
         assert.equal(await frame.locator("ol li").nth(2).innerText(), "Photos");
