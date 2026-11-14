@@ -5,7 +5,7 @@ import { CATEGORIES } from "../src/data/categories.ts";
 import { BLOG_ARTICLES } from "../src/data/blog-articles.ts";
 import { getSearchableTools, getToolsByCategory, toolPath } from "../src/lib/registry.ts";
 import { canonicalSeoTools, canonicalToolPath, isIndexableTool, toolSeoTitle, toolSeoDescription, toolGuideSeoTitle, toolSearchIntentTerms } from "../src/lib/seo-metadata.ts";
-import { toolDocumentationSummary, toolStatusLabel } from "../src/lib/tool-documentation.ts";
+import { toolDocumentationCoverage, toolDocumentationSummary, toolStatusLabel } from "../src/lib/tool-documentation.ts";
 import { buildIndexNowKeyArtifact } from "./indexnow-utils.mjs";
 
 const SITE_ORIGIN = "https://envtools.store";
@@ -205,6 +205,7 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
       tableCell(toolStatusLabel(tool)),
       tableCell(inventoryEngine(tool)),
       tableCell(inventoryCatalogueFlags(tool)),
+      tableCell(toolDocumentationCoverage(tool)),
       tableCell(toolSeoTitle(tool, tools)),
       tableCell(toolSeoDescription(tool)),
       tableCell(toolSearchIntentTerms(tool).join(", ")),
@@ -218,16 +219,32 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
     tableCell(toolStatusLabel(tool)),
     tableCell(inventoryEngine(tool)),
     tableCell(inventoryCatalogueFlags(tool)),
+    tableCell(toolDocumentationCoverage(tool)),
     tableCell(toolGuideSeoTitle(tool, guideTools)),
     tableCell(toolSeoDescription(tool)),
     "[Open tool](" + SITE_ORIGIN + canonicalToolPath(tool) + ") |",
   ].join(" | "));
+  const guideCoverageCounts = new Map();
+  for (const tool of guideTools) {
+    const source = toolDocumentationCoverage(tool);
+    guideCoverageCounts.set(source, (guideCoverageCounts.get(source) ?? 0) + 1);
+  }
+  const guideCoverageSummary = [
+    "tool-specific",
+    "engine-specific",
+    "category-guidance",
+    "catalogue-fallback",
+  ].map((source) => source + ": " + (guideCoverageCounts.get(source) ?? 0)).join("; ");
+
   const inventory = [
     "# enV public tool SEO inventory",
     "",
     "This file is generated from the live tool registry during the production build. It is a review and coverage artifact, not a source of search-volume data or a ranking report.",
     "",
-    "- Eligible catalog records considered: " + eligibleToolRecords.length,
+    "- Guide copy-provenance counts: " + guideCoverageSummary,
+    "- Guide provenance meanings: tool-specific = exact tool ID/name rule; engine-specific = engine-family guidance; category-guidance = category-level guidance; catalogue-fallback = catalogue description plus generic example.",
+    "- Provenance classifies where guide copy originates; it does not prove control-level accuracy, source/runtime verification or human editorial review.",
+        "- Eligible catalog records considered: " + eligibleToolRecords.length,
     "- Canonical public tool pages included: " + tools.length,
     "- Canonical public tool guides included: " + guideTools.length,
     "- Identical generated equation variants remain usable in enV but are consolidated to one canonical search page and guide.",
@@ -239,14 +256,14 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
     "- This generated inventory does not claim that a human has completed the source/runtime audit for every tool. A build or inventory row is not an individual verification result.",
     "- Search-intent terms are seeded from each tool's name, category, keywords, and tags in the product catalogue. They are not keyword-volume estimates or claims that every phrase has search demand.",
     "",
-    "| Tool ID | Tool | Category | Catalogue status | Engine operation | Catalogue execution/account flags | SEO title | Meta description | Catalogue search-intent seeds | Usage guide |",
-    "|---|---|---|---|---|---|---|---|---|---|",
+    "| Tool ID | Tool | Category | Catalogue status | Engine operation | Catalogue execution/account flags | Guide copy source | SEO title | Meta description | Catalogue search-intent seeds | Usage guide |",
+    "|---|---|---|---|---|---|---|---|---|---|---|",
     ...inventoryRows,
     "",
     "## Individual usage guide coverage",
     "",
-    "| Tool ID | Usage guide | Category | Catalogue status | Engine operation | Catalogue execution/account flags | SEO title | Meta description | Related tool |",
-    "|---|---|---|---|---|---|---|---|---|",
+    "| Tool ID | Usage guide | Category | Catalogue status | Engine operation | Catalogue execution/account flags | Guide copy source | SEO title | Meta description | Related tool |",
+    "|---|---|---|---|---|---|---|---|---|---|",
     ...guideInventoryRows,
     "",
   ].join("\n");
