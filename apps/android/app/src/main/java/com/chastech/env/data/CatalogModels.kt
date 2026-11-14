@@ -190,7 +190,7 @@ fun Catalog.withMusicDownloader(): Catalog {
         subcategory = "Music",
     )
     return copy(
-        counts = counts.copy(total = counts.total + 1, active = counts.active + 1),
+        counts = counts.copy(total = counts.total + 1, active = counts.active + 1, discoverable = (counts.discoverable ?: counts.total) + 1),
         tools = (tools + tool).sortedWith(compareBy<ToolRecord> { it.category }.thenBy { it.name.lowercase(Locale.ROOT) }.thenBy { it.id }),
     )
 }
@@ -221,7 +221,11 @@ fun Catalog.withSongMetadataAnalyzer(): Catalog {
     val remaining = tools.filterNot { it.id == "song-metadata-analyzer" || it.id == "audio-analyze-studio" }
     val updated = remaining + tool
     return copy(
-        counts = if (alreadyRepresented) counts else counts.copy(total = counts.total + 1, active = counts.active + 1),
+        counts = if (alreadyRepresented) {
+            counts.copy(discoverable = (counts.discoverable ?: counts.total) + 1)
+        } else {
+            counts.copy(total = counts.total + 1, active = counts.active + 1, discoverable = (counts.discoverable ?: counts.total) + 1)
+        },
         tools = updated.sortedWith(compareBy<ToolRecord> { it.category }.thenBy { it.name.lowercase(Locale.ROOT) }.thenBy { it.id }),
         relatedReferenceTools = relatedReferenceTools.filterNot { it.id == "audio-analyze-studio" || it.id == "song-metadata-analyzer" },
     )
@@ -253,7 +257,7 @@ fun Catalog.withABook(): Catalog {
     )
     val updated = tools + tool
     return copy(
-        counts = counts.copy(total = counts.total + 1, active = counts.active + 1),
+        counts = counts.copy(total = counts.total + 1, active = counts.active + 1, discoverable = (counts.discoverable ?: counts.total) + 1),
         tools = updated.sortedWith(compareBy<ToolRecord> { it.category }.thenBy { it.name.lowercase(Locale.ROOT) }.thenBy { it.id }),
     )
 }
@@ -283,7 +287,7 @@ fun Catalog.withZipArchive(): Catalog {
     )
     val updated = tools + tool
     return copy(
-        counts = counts.copy(total = counts.total + 1, active = counts.active + 1),
+        counts = counts.copy(total = counts.total + 1, active = counts.active + 1, discoverable = (counts.discoverable ?: counts.total) + 1),
         tools = updated.sortedWith(compareBy<ToolRecord> { it.category }.thenBy { it.name.lowercase(Locale.ROOT) }.thenBy { it.id }),
     )
 }
@@ -340,7 +344,7 @@ fun Catalog.withFileWorkspaceTools(): Catalog {
             .thenBy { it.id }
     )
     return copy(
-        counts = counts.copy(total = counts.total + additions.size, active = counts.active + additions.count { it.status == "active" || it.status == "beta" }),
+        counts = counts.copy(total = counts.total + additions.size, active = counts.active + additions.count { it.status == "active" || it.status == "beta" }, discoverable = (counts.discoverable ?: counts.total) + additions.size),
         tools = updated,
     )
 }
@@ -370,7 +374,7 @@ fun Catalog.withCameraStudio(): Catalog {
     )
     val updated = tools + tool
     return copy(
-        counts = counts.copy(total = counts.total + 1, active = counts.active + 1),
+        counts = counts.copy(total = counts.total + 1, active = counts.active + 1, discoverable = (counts.discoverable ?: counts.total) + 1),
         tools = updated.sortedWith(compareBy<ToolRecord> { it.category }.thenBy { it.name.lowercase(Locale.ROOT) }.thenBy { it.id }),
     )
 }
@@ -490,7 +494,7 @@ fun Catalog.withDateTimeExtensions(): Catalog {
             engine = EngineInfo("datetime", "meeting-planner", mapOf("op" to "meeting-planner")),
         ),
     )
-    val existingIds = tools.mapTo(mutableSetOf()) { it.id }
+    val existingIds = (tools + relatedReferenceTools).mapTo(mutableSetOf()) { it.id }
     val missing = additions.filterNot { it.id in existingIds }
     if (missing.isEmpty()) return this
     val updated = (tools + missing).sortedWith(
@@ -500,8 +504,9 @@ fun Catalog.withDateTimeExtensions(): Catalog {
     )
     return copy(
         counts = counts.copy(
-            total = updated.size,
-            active = updated.count { it.status == "active" || it.status == "beta" },
+            total = counts.total + missing.size,
+            active = counts.active + missing.count { it.status == "active" || it.status == "beta" },
+            discoverable = (counts.discoverable ?: counts.total) + missing.size,
         ),
         tools = updated,
     )
