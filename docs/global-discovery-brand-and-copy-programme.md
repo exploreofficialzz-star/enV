@@ -66,29 +66,35 @@ Do not mark a workstream complete based solely on source changes, a passing buil
 
 ## 2.2 Validation snapshot — 14 November 2026
 
-This snapshot records the latest inspected PR head, `273e86c5b9cc3d51372a3e57193c905870bf48f9` (92 commits ahead of `main`, 0 behind at the time checked). It distinguishes successful discovery checks from unrelated failures and work that is still running.
+This snapshot was reconciled against the current draft PR head, `486202ccd776fd938a4eeeebd11bb83464599fa9`. The latest completed GitHub Actions evidence returned during this review belongs to the immediately preceding head, `acf37ee5fbca4f60acf7f4715bd457c68ae1546d`. Two fixes have since been committed, but the connector returned no new workflow runs for either fix commit at the time of this update. Therefore, post-fix checks are **pending**, not passed.
 
-| Gate | Observed result | Interpretation |
+| Gate | Observed result | Current disposition |
 |---|---|---|
-| Production web build in rendered SEO workflow | Passed; generated 10,174 public URLs and 4,822 public tools | Build and registry-based artifact generation succeeded for this PR head. |
-| Catalogue-wide SEO artifact checks | Passed | Tool and guide metadata, canonical URLs, structured data, sitemap, crawler policy and generated inventory assertions passed. |
-| Rendered SEO/crawler checks | Passed | The workflow verified rendered metadata, canonicals, structured data, noindex policy, `robots.txt`, `sitemap.xml` and `llms.txt`, including title-collision routes. |
-| Tool-guide navigation | Passed | The browser clicked “Read the full guide”, reached the canonical guide URL through client-side navigation and rendered the complete guide. A product article link also reached a successful HTTP 200 page. |
-| Rendered accessibility report | Workflow passed, but report contains nonzero findings | This is not an assertion that every page is accessibility-clean. The report recorded findings on the homepage, tools directory and several other routes; those need their own triage and must not be described as zero violations. |
-| Billing integration validation | Passed | Independent gate; no claim about search visibility. |
-| User Behavior analytics security tests | Passed | Independent gate; no claim about search visibility. |
-| Ad-supported guest access | Passed | Independent gate; no claim about search visibility. |
-| AI provider platform tests | Passed | Independent gate; no claim about AI-search citations. |
-| Date & Time Android and Web checks | Passed | The iOS Date & Time test was still running in the inspected snapshot. |
-| Full Web/Android authoritative gate | Web subjob failed an existing Business Studio source-contract assertion requiring “Optional logo (stays on this device)”; Android subjob was still running | The assertion is in `scripts/check-business-studios.mjs` and the relevant Business Studio implementation is not part of this PR's changed files. Do not change that agent's work in this discovery PR. |
-| Developer Studios quality gate | Failed an existing UI marker assertion for “On-device processing” | This is an independent Developer Studios defect outside the discovery PR's changed-file scope; leave it with that workstream. |
-| Native iOS and native iOS accessibility | Still running at the time checked | No pass is claimed until the jobs finish. |
-| Production Check and other reference/browser checks | Still running at the time checked | No pass is claimed until the jobs finish. |
-| Vercel preview | `Vercel – env` reported a build-rate-limit failure; there was no deployment record for this PR head | A previously READY preview used older commit `865e545e54c85a2d86671cc9cbf1cfb48d639a64`, not this PR head. Do not use that URL as evidence for the latest changes. Production remained on `main`. |
+| Rendered SEO and crawler assertions | Passed on the pre-fix head, including canonical metadata, structured data, noindex policy, `robots.txt`, `sitemap.xml`, `llms.txt`, 128 tool-title collision routes and 132 guide-title collision routes | Source/render checks passed for that commit. They do not prove production indexing or crawler fetches. |
+| Direct tool-guide request | The browser audit fetched `/blog/tool-math-matrix-2x2-determinant` with HTTP 200 and rendered the guide title and required sections | Direct route rendering passed on the pre-fix head. |
+| Guide-link client navigation | Failed on the pre-fix head: the “Read the full guide” click did not satisfy the Playwright URL wait; the test ended at `/blog`. The test required a document `commit` even though this route uses TanStack Router client-side navigation | Updated in `486202ccd776fd938a4eeeebd11bb83464599fa9` to wait for the SPA URL transition without requiring a document commit. This fix still needs a fresh browser run; do not call navigation verified yet. |
+| TypeScript / Web typecheck | Failed on the pre-fix head with `TS2304: Cannot find name 'categoryOperationParsers'` in `src/lib/tool-documentation.test.ts`. The parser map was scoped inside the canonical-public-tool test but was referenced earlier while constructing synthetic category examples | Fixed in `2c509291d68df48191c83f332c867c707b583814`: removed the out-of-scope synthetic check and apply the parser assertion to real canonical public tool records, where the map is in scope. Fresh typecheck is pending. |
+| Web and Android authoritative CI | Android subjob passed; the Web build completed, then Web typecheck failed on the parser-scope error above | Re-run required after the typecheck fix. |
+| Billing integration validation | Billing-specific tests and the production build completed successfully; the workflow failed at the shared TypeScript check | Treat the billing assertions as passed on the pre-fix commit only; workflow as a whole is not green until typecheck reruns. |
+| Date & Time focused verification | Android and iOS focused checks passed and the Web build completed; shared Web typecheck failed on the same parser-scope error | Re-run required after the typecheck fix. |
+| User Behavior analytics security tests | Passed | Independent result; no search/indexing claim. |
+| Developer Studios quality gate | Failed an existing source-contract check because the purpose-built engine did not contain the required “On-device processing” marker | The relevant Developer Studios implementation and its check are outside this PR's changes. Keep this for the Developer Studios workstream; do not patch another agent's implementation here. |
+| Production Check | The verify job timed out waiting for `input[aria-label="Upload QR or barcode image"]` during the browser QR/barcode check; a separate Game Studio job also failed | The QR reader dispatch itself was unchanged by this PR; this is not evidence of a discovery regression, but the independent Production Check remains failed and must be triaged in its owning workstream. |
+| Vercel preview | No deployment was returned for the pre-fix PR head. The latest READY preview found during this review used older commit `0c975e16996caa21c7e0d3f2c5c23df551c68123`; Vercel reported a build-rate-limit failure in PR comments | Do not use the older preview to verify the latest branch. No new Vercel build or deployment was triggered during this review. Production was not changed. |
+| Webmaster and external search evidence | No Google Search Console, Bing Webmaster Tools, or AI answer-engine account evidence was available in the repository checks | Still outstanding; crawler allowances and generated sitemap URLs are not proof of indexing, ranking, or citations. |
 
-The rendered SEO workflow is linked at https://github.com/exploreofficialzz-star/enV/actions/runs/43605636353. The Web/Android workflow is at https://github.com/exploreofficialzz-star/enV/actions/runs/43605636253. The Developer Studios workflow is at https://github.com/exploreofficialzz-star/enV/actions/runs/43605636267.
+Relevant latest inspected workflow runs:
+- Web and Android CI: https://github.com/exploreofficialzz-star/enV/actions/runs/43613992855
+- Production Check: https://github.com/exploreofficialzz-star/enV/actions/runs/43613992804
+- Phase 8 rendered accessibility/SEO workflow: https://github.com/exploreofficialzz-star/enV/actions/runs/43613992954
+- Developer Studios quality gate: https://github.com/exploreofficialzz-star/enV/actions/runs/43613992939
+- Billing integration validation: https://github.com/exploreofficialzz-star/enV/actions/runs/43613992932
+- Date & Time focused verification: https://github.com/exploreofficialzz-star/enV/actions/runs/43613992903
+- User Behavior analytics security tests: https://github.com/exploreofficialzz-star/enV/actions/runs/43613992917
 
-These results verify source/build behavior on the PR branch only. They do not establish production deployment, Search Console/Bing ownership, search indexing, ranking, AI citations or live social-preview fetches.
+The earlier rendered guide index displayed **9,979 searchable guide entries**. A separate prior SEO artifact build reported **4,822 canonical public tool pages** within **10,174 public URLs**. These are different filtered counts: the searchable guide index includes records that the SEO rules may exclude from indexing, so they must not be reported as the same inventory measure. Recalculate both from a fresh current-head build before publishing a new count.
+
+The current PR head remains a draft. The fixes above are source changes awaiting fresh automated evidence. No production release, Search Console/Bing verification, indexing result, AI citation, or live social-preview validation is claimed.
 
 ## 3. Competitor and platform research
 
