@@ -88,6 +88,13 @@ class NativeCelebrationEngineTest {
         assertFalse(invitation.html.contains("href=\"javascript:"))
         assertTrue(invitation.checks.any { it.contains("http or https") })
 
+        val credentialUrl = NativeCelebrationEngine.build(
+            "party-invitation-generator",
+            mapOf("title" to "Party", "honoree" to "Alex", "rsvpUrl" to "https://guest@trusted.example/rsvp")
+        )
+        assertFalse(credentialUrl.html.contains("href=\"https://guest@trusted.example"))
+        assertTrue(credentialUrl.checks.any { it.contains("http or https") })
+
         val quiz = NativeCelebrationEngine.build(
             "graduation-quiz-generator",
             mapOf("title" to "Graduation quiz", "honoree" to "Sam", "quizQuestion" to "Which year?", "quizOptions" to "2025\n2026")
