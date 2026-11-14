@@ -354,7 +354,7 @@ function describe(category, prefix, operation) {
 export function refineGeneratedToolDescription(tool) {
   const current = String(tool.description ?? "").trim();
   const lowQuality =
-    /^generated catalogue placeholder for .+\\.$/i.test(current) ||
+    /^generated catalogue placeholder for .+\.$/i.test(current) ||
     /utility for the enV toolkit/i.test(current) ||
     /^(?:a|an) (?:practical |e-commerce |food and cooking |travel |career |personal |accessibility |communication |streaming |fun |photography |audio |video )?.{1,55} (?:business )?utility\.$/i.test(current) ||
     /for developers and technical workflows\.$/i.test(current) ||
