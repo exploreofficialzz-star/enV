@@ -196,9 +196,9 @@ fun Catalog.withMusicDownloader(): Catalog {
 }
 
 fun Catalog.withSongMetadataAnalyzer(): Catalog {
-    val alreadyRepresented = (tools + relatedReferenceTools).any {
-        it.id == "song-metadata-analyzer" || it.id == "audio-analyze-studio"
-    }
+    val allExisting = tools + relatedReferenceTools
+    if (allExisting.any { it.id == "song-metadata-analyzer" }) return this
+    val hasLegacyAlias = allExisting.any { it.id == "audio-analyze-studio" }
     val tool = ToolRecord(
         id = "song-metadata-analyzer",
         name = "AI Music Data Sandbox",
@@ -221,7 +221,7 @@ fun Catalog.withSongMetadataAnalyzer(): Catalog {
     val remaining = tools.filterNot { it.id == "song-metadata-analyzer" || it.id == "audio-analyze-studio" }
     val updated = remaining + tool
     return copy(
-        counts = if (alreadyRepresented) {
+        counts = if (hasLegacyAlias) {
             counts.copy(discoverable = (counts.discoverable ?: counts.total) + 1)
         } else {
             counts.copy(total = counts.total + 1, active = counts.active + 1, discoverable = (counts.discoverable ?: counts.total) + 1)
