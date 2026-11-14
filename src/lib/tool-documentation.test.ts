@@ -384,6 +384,11 @@ test("generic engine guide branches preserve each tool's catalogue task statemen
       status: "active",
       related: [],
     };
+    assert.equal(
+      toolTaskGuidanceSource(tool),
+      "operation-specific",
+      sample.id + ": this narrowly matched task rule must be classified as operation-specific",
+    );
     const whenToUse = getToolDocumentation(tool).find((section) => section.id === "when-to-use");
     assert.ok(whenToUse, sample.id + ": guide must include a when-to-use section");
     const normalizedDescription = sample.description.replace(/\s+/g, " ").trim();
