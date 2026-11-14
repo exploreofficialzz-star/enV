@@ -353,7 +353,7 @@ A workstream is complete only when its implementation and evidence pass the rele
 - No promise of universal indexing, ranking, AI citations, recommendations or social reach.
 - No mass-generated keyword pages or keyword stuffing.
 - No fabricated reviews, ratings, testimonials, usage counts or supported formats.
-- No change to crawler training/model-use policy without an explicit decision.
+- The branch's new `__usage_ai-training` group is a proposed conservative extension of the existing provider-specific training blocks, not an approved production policy change. Keep PR #146 draft and do not merge/deploy that group until the product owner explicitly approves the shared preference. Existing provider-specific rules remain unchanged.
 - No new analytics tracker where existing first-party reporting can meet the requirement.
 - No unrelated payment, wallet, native, or other agent work in this PR.
 - No claims of external webmaster verification without access to the corresponding account evidence.
