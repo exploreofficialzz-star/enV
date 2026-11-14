@@ -78,7 +78,7 @@ function Tools() {
                           {category.name}
                         </a>
                       </h2>
-                      <p className="text-xs text-muted">{category.blurb}</p>
+                      <p className="text-xs text-muted">{category.id === "celebrations" ? category.description : category.blurb}</p>
                     </div>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
