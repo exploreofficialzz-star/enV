@@ -131,7 +131,6 @@ for (const tool of result.tools) {
   assert.ok(result.inventory.includes(inventoryCell(description)), "Inventory misses SEO description for " + tool.id);
   assert.ok(result.inventory.includes(inventoryCell(terms.join(", ")) ), "Inventory misses search-intent terms for " + tool.id);
   assert.ok(result.inventory.includes(inventoryCell(tool.id)), "Inventory misses the stable tool ID for " + tool.id);
-assert.ok(renderedAuditWorkflowSource.includes("docs/seo-tool-inventory.md"), "Rendered SEO workflow must upload the generated per-tool review inventory as an artifact.");
   const inventoryStatus = tool.status === "planned" ? "Planned" : tool.status === "beta" ? "Beta" : "Active";
   assert.ok(result.inventory.includes(inventoryCell(inventoryStatus)), "Inventory misses catalogue status for " + tool.id);
   const inventoryEngineDetails = Object.entries(tool.engine)
@@ -152,6 +151,7 @@ assert.ok(renderedAuditWorkflowSource.includes("docs/seo-tool-inventory.md"), "R
   assert.ok(result.llms.includes("https://envtools.store" + route), "Missing llms.txt tool link for " + tool.id);
   assert.ok(result.llms.includes("https://envtools.store" + guide), "Missing llms.txt guide link for " + tool.id);
 }
+assert.ok(renderedAuditWorkflowSource.includes("docs/seo-tool-inventory.md"), "Rendered SEO workflow must upload the generated per-tool review inventory as an artifact.");
 for (const article of result.articles) {
   const title = articleSeoTitle(article.title);
   assert.ok(title.length <= 65, "Article SEO title exceeds 65 characters for " + article.slug);
