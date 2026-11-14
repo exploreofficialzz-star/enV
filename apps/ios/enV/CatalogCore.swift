@@ -283,7 +283,7 @@ extension Catalog {
         return Catalog(
             schemaVersion: schemaVersion,
             catalogVersion: catalogVersion,
-            CatalogCounts(
+            counts: CatalogCounts(
                 total: counts.total + 1,
                 active: counts.active + 1,
                 planned: counts.planned,
