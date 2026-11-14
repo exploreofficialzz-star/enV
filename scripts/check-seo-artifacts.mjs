@@ -4,7 +4,7 @@ import { buildSeoArtifacts, buildSitemapArtifacts, buildIndexNowKeyArtifact } fr
 import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema, toolSchema, organizationSchema, websiteSchema, boundedToolSeoTitle } from "@/lib/seo-metadata";
 
 const result = buildSeoArtifacts();
-assert.equal(buildIndexNowKeyArtifact("").path, undefined, "An unset IndexNow key must not produce a public key file.");
+assert.equal(buildIndexNowKeyArtifact(""), null, "An unset IndexNow key must not produce a public key file.");
 assert.deepEqual(buildIndexNowKeyArtifact("a1b2c3d4-e5f6"), {
   path: "public/a1b2c3d4-e5f6.txt",
   content: "a1b2c3d4-e5f6",
