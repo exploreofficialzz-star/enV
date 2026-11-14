@@ -683,10 +683,13 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
     };
   }
   const categoryGuidance = CATEGORY_TASK_GUIDANCE[tool.category];
+  const cataloguePurpose = String(tool.description ?? "").replace(/\\s+/g, " ").trim();
   if (categoryGuidance) {
     return {
-      overview: categoryGuidance.overview,
-      example: categoryGuidance.example,
+      overview: cataloguePurpose
+        ? "This guide is specific to " + tool.name + ". The catalogue describes its task as: " + cataloguePurpose + " " + categoryGuidance.overview
+        : "This guide covers the task described by " + tool.name + ". " + categoryGuidance.overview,
+      example: "For " + tool.name + ", " + categoryGuidance.example.charAt(0).toLowerCase() + categoryGuidance.example.slice(1),
       validation: categoryGuidance.validation,
     };
   }
