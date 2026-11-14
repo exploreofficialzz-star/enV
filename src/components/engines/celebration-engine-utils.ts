@@ -159,7 +159,8 @@ function escapeHtml(value: string): string {
 function safeHttpUrl(value: string): string {
   try {
     const parsed = new URL(value);
-    return parsed.protocol === "https:" || parsed.protocol === "http:" ? parsed.toString() : "";
+    const allowedProtocol = parsed.protocol === "https:" || parsed.protocol === "http:";
+    return allowedProtocol && !parsed.username && !parsed.password ? parsed.toString() : "";
   } catch { return ""; }
 }
 function dateLabel(input: CelebrationInput): string {
