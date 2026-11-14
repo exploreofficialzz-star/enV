@@ -183,6 +183,10 @@ internal object NativeCelebrationEngine {
         val rsvp = safeUrl(clean(values, "rsvpUrl"))
         val rsvpBy = clean(values, "rsvpBy")
         val reveal = clean(values, "revealMessage")
+        val scheduleItems = lines(clean(values, "schedule"))
+        val scheduleHtml = if (scheduleItems.isEmpty()) "" else
+            "<section class=\"schedule\"><h2>Schedule</h2><ol>" +
+                scheduleItems.joinToString("") { "<li>" + escape(it) + "</li>" } + "</ol></section>"
         val photoHtml = photoMarkup(values)
         val text = listOfNotNull(
             title, "$occasion · ${parsed.experience.replace('-', ' ')}",
@@ -215,7 +219,12 @@ internal object NativeCelebrationEngine {
                 val options = lines(clean(values, "quizOptions")).take(6)
                 "<p class=\"eyebrow\">Celebration quiz</p><h1>${escape(title)}</h1><p>${escape(clean(values, "quizQuestion"))}</p><div id=\"choices\">${options.map { "<button type=\"button\" data-correct=\"${it.equals(clean(values, "quizAnswer"), true)}\">${escape(it)}</button>" }.joinToString("")}</div><p id=\"feedback\" aria-live=\"polite\">Choose an answer.</p>"
             }
-            else -> "<p class=\"eyebrow\">$occasion</p><h1>${escape(title)}</h1><p class=\"lead\">${escape(message)}</p><p>${escape(honoree)}</p><p>${escape(details)}</p>"
+            else -> "<p class=\"eyebrow\">" + occasion + "</p><h1>" + escape(title) + "</h1><p class=\"lead\">" + escape(message) + "</p>" +
+                (honoree.takeIf { it.isNotEmpty() }?.let { "<p>For <strong>" + escape(it) + "</strong></p>" } ?: "") +
+                (host.takeIf { it.isNotEmpty() }?.let { "<p>Hosted by: " + escape(it) + "</p>" } ?: "") +
+                (date.takeIf { it.isNotEmpty() }?.let { "<p><strong>When:</strong> " + escape(it) + "</p>" } ?: "") +
+                (location.takeIf { it.isNotEmpty() }?.let { "<p><strong>Where:</strong> " + escape(it) + "</p>" } ?: "") +
+                (details.takeIf { it.isNotEmpty() }?.let { "<p>" + escape(it) + "</p>" } ?: "") + scheduleHtml
         }
         val theme = themes[clean(values, "theme")] ?: themes.getValue("Classic")
         val script = "<script>(function(){document.querySelectorAll('[data-reveal]').forEach(function(b){b.addEventListener('click',function(){var c=b.parentElement.querySelector('[data-content]');if(c)c.hidden=!c.hidden;});});var q=document.getElementById('choices');if(q)q.addEventListener('click',function(e){var b=e.target.closest('button[data-correct]');if(b)document.getElementById('feedback').textContent=b.dataset.correct==='true'?'That is right!':'Not quite. Try again.';});var t=document.querySelector('[data-countdown]');if(t){var target=Date.parse(t.dataset.countdown);function tick(){if(!Number.isFinite(target))return;var n=Math.max(0,target-Date.now()),s=Math.floor(n/1000);document.getElementById('days').textContent=Math.floor(s/86400);document.getElementById('hours').textContent=String(Math.floor(s%86400/3600)).padStart(2,'0');document.getElementById('minutes').textContent=String(Math.floor(s%3600/60)).padStart(2,'0');document.getElementById('seconds').textContent=String(s%60).padStart(2,'0');}tick();setInterval(tick,1000);}})();</script>"
