@@ -78,8 +78,8 @@ test("the quiz export has bounded answer choices and reports the selected answer
   });
   assert.match(result.html, /data-correct="true"/);
   assert.match(result.html, /data-feedback/);
-  assert.match(result.html, /A quick introduction for the quiz\\./);
-  assert.match(result.html, /Which month did we meet\\?/);
+  assert.match(result.html, /A quick introduction for the quiz\./);
+  assert.match(result.html, /Which month did we meet\?/);
   assert.match(result.html, /overflow-wrap:anywhere/);
   assert.doesNotMatch(result.html, /<script>alert/);
 });
