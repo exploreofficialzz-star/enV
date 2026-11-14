@@ -189,9 +189,9 @@ internal object NativeCelebrationEngine {
                 scheduleItems.joinToString("") { "<li>" + escape(it) + "</li>" } + "</ol></section>"
         val photoHtml = photoMarkup(values)
         val text = listOfNotNull(
-            title, "$occasion · ${parsed.experience.replace('-', ' ')}",
+            title,
             honoree.takeIf { it.isNotEmpty() }?.let { "For: $it" },
-            host.takeIf { it.isNotEmpty() }?.let { "Hosted by: $it" },
+            host.takeIf { it.isNotEmpty() }?.let { "Hosted by $it" },
             date.takeIf { it.isNotEmpty() }?.let { "When: $it (${clean(values, "timezone")})" },
             location.takeIf { it.isNotEmpty() }?.let { "Where: $it" },
             "", message, details,
@@ -208,7 +208,7 @@ internal object NativeCelebrationEngine {
         )
         val content = when (parsed.experience) {
             "interactive-card" -> "<p class=\"eyebrow\">$occasion</p><h1>${escape(title)}</h1><p class=\"lead\">${escape(message)}</p><button type=\"button\" data-reveal>Open your card</button><div hidden data-content><p>${escape(reveal)}</p></div>"
-            "invitation-generator" -> "<p class=\"eyebrow\">You are invited</p><h1>${escape(title)}</h1><p class=\"lead\">${escape(message)}</p><dl>${date.takeIf { it.isNotEmpty() }?.let { "<div><dt>When</dt><dd>${escape(it)}</dd></div>" } ?: ""}${location.takeIf { it.isNotEmpty() }?.let { "<div><dt>Where</dt><dd>${escape(it)}</dd></div>" } ?: ""}${host.takeIf { it.isNotEmpty() }?.let { "<div><dt>Hosted by</dt><dd>${escape(it)}</dd></div>" } ?: ""}</dl>${if (rsvp.isNotEmpty()) "<a class=\"button\" href=\"${escape(rsvp)}\" rel=\"noopener noreferrer\">Reply to invitation</a>" else if (clean(values, "contactMethod").isNotEmpty()) "<p>Reply to: ${escape(clean(values, "contactMethod"))}</p>" else "<p>Contact the host to reply.</p>"}${rsvpBy.takeIf { it.isNotEmpty() }?.let { "<p>Reply by ${escape(it)}</p>" } ?: ""}"
+            "invitation-generator" -> "<p class=\"eyebrow\">You are invited</p><h1>${escape(title)}</h1><p class=\"lead\">${escape(message)}</p><dl>${date.takeIf { it.isNotEmpty() }?.let { "<div><dt>When</dt><dd>${escape(it)}</dd></div>" } ?: ""}${location.takeIf { it.isNotEmpty() }?.let { "<div><dt>Where</dt><dd>${escape(it)}</dd></div>" } ?: ""}${host.takeIf { it.isNotEmpty() }?.let { "<div><dt>Hosted by</dt><dd>${escape(it)}</dd></div>" } ?: ""}</dl>${if (rsvp.isNotEmpty()) "<a class=\"button\" href=\"${escape(rsvp)}\" rel=\"noopener noreferrer\">Reply to invitation</a>" else if (clean(values, "contactMethod").isNotEmpty()) "<p>Reply to ${escape(clean(values, "contactMethod"))}</p>" else "<p></p>"}${rsvpBy.takeIf { it.isNotEmpty() }?.let { "<p>Reply by ${escape(it)}</p>" } ?: ""}"
             "countdown" -> {
                 val instant = runCatching { eventInstant(clean(values, "date"), clean(values, "timezone")).toString() }.getOrDefault("")
                 "<p class=\"eyebrow\">$occasion</p><h1>${escape(title)}</h1><p class=\"lead\">${escape(message)}</p><div class=\"countdown\" data-countdown=\"${escape(instant)}\"><div><strong id=\"days\">—</strong><span>Days</span></div><div><strong id=\"hours\">—</strong><span>Hours</span></div><div><strong id=\"minutes\">—</strong><span>Minutes</span></div><div><strong id=\"seconds\">—</strong><span>Seconds</span></div></div>"
@@ -217,11 +217,11 @@ internal object NativeCelebrationEngine {
             "reveal-page", "surprise-page" -> "<p class=\"eyebrow\">$occasion</p><h1>${escape(title)}</h1><p class=\"lead\">${escape(message)}</p><button type=\"button\" data-reveal>Open the reveal</button><div hidden data-content><p>${escape(reveal)}</p></div>"
             "quiz-generator" -> {
                 val options = lines(clean(values, "quizOptions")).take(6)
-                "<p class=\"eyebrow\">Celebration quiz</p><h1>${escape(title)}</h1><p class=\"lead\">${escape(message)}</p><p class=\"question\">${escape(clean(values, "quizQuestion"))}</p><div id=\"choices\">${options.map { "<button type=\"button\" data-correct=\"${it.equals(clean(values, "quizAnswer"), true)}\">${escape(it)}</button>" }.joinToString("")}</div><p id=\"feedback\" aria-live=\"polite\">Choose an answer.</p>"
+                "<p class=\"eyebrow\">Celebration quiz</p><h1>${escape(title)}</h1><p class=\"lead\">${escape(message)}</p><p class=\"question\">${escape(clean(values, "quizQuestion"))}</p><div id=\"choices\">${options.map { "<button type=\"button\" data-correct=\"${it.equals(clean(values, "quizAnswer"), true)}\">${escape(it)}</button>" }.joinToString("")}</div><p id=\"feedback\" aria-live=\"polite\"></p>"
             }
             else -> "<p class=\"eyebrow\">" + occasion + "</p><h1>" + escape(title) + "</h1><p class=\"lead\">" + escape(message) + "</p>" +
                 (honoree.takeIf { it.isNotEmpty() }?.let { "<p>For <strong>" + escape(it) + "</strong></p>" } ?: "") +
-                (host.takeIf { it.isNotEmpty() }?.let { "<p>Hosted by: " + escape(it) + "</p>" } ?: "") +
+                (host.takeIf { it.isNotEmpty() }?.let { "<p>Hosted by " + escape(it) + "</p>" } ?: "") +
                 (date.takeIf { it.isNotEmpty() }?.let { "<p><strong>When:</strong> " + escape(it) + "</p>" } ?: "") +
                 (location.takeIf { it.isNotEmpty() }?.let { "<p><strong>Where:</strong> " + escape(it) + "</p>" } ?: "") +
                 (details.takeIf { it.isNotEmpty() }?.let { "<p>" + escape(it) + "</p>" } ?: "") + scheduleHtml
