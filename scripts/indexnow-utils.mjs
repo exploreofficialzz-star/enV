@@ -76,3 +76,110 @@ export function selectChangedUrls(files, groups, currentUrls) {
   }
   return [...changed].filter((url) => currentUrls.has(url));
 }
+
+
+const MAX_RETRY_AFTER_MS = 10_000;
+
+export function indexNowResponseState(status) {
+  if (status === 200) return "accepted";
+  if (status === 202) return "accepted-pending-key-validation";
+  return "rejected";
+}
+
+export function parseIndexNowRetryAfter(value, now = Date.now()) {
+  const header = String(value ?? "").trim();
+  if (!header) return null;
+  const seconds = Number(header);
+  const delay = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(header) - now;
+  if (!Number.isFinite(delay)) return null;
+  return Math.min(MAX_RETRY_AFTER_MS, Math.max(0, delay));
+}
+
+export function indexNowRetryDelayMs(status, retryAfter, attempt, now = Date.now()) {
+  const retryable = status === 429 || (status >= 500 && status <= 599);
+  if (!retryable) return null;
+  const serverDelay = parseIndexNowRetryAfter(retryAfter, now);
+  if (serverDelay !== null) return serverDelay;
+  return Math.min(1000 * 2 ** Math.max(0, attempt), MAX_RETRY_AFTER_MS);
+}
+
+const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+export async function submitIndexNowBatch({
+  endpoint,
+  host,
+  key,
+  keyLocation,
+  urlList,
+  fetchImpl = fetch,
+  sleep = wait,
+  maxRetries = 2,
+}) {
+  const retries = Math.max(0, Math.min(5, Math.floor(maxRetries)));
+  const body = JSON.stringify({ host, key, keyLocation, urlList });
+
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    let response;
+    try {
+      response = await fetchImpl(endpoint, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+          accept: "application/json, text/plain, */*",
+        },
+        body,
+        signal: AbortSignal.timeout(20_000),
+      });
+    } catch (error) {
+      if (attempt < retries) {
+        await sleep(Math.min(1000 * 2 ** attempt, MAX_RETRY_AFTER_MS));
+        continue;
+      }
+      return {
+        status: 0,
+        accepted: false,
+        state: "network-error",
+        body: String(error).slice(0, 500),
+        attempts: attempt + 1,
+      };
+    }
+
+    const responseBody = await response.text().catch(() => "");
+    const state = indexNowResponseState(response.status);
+    if (state !== "rejected") {
+      return {
+        status: response.status,
+        accepted: true,
+        state,
+        body: responseBody.slice(0, 500),
+        attempts: attempt + 1,
+      };
+    }
+
+    const retryDelay = indexNowRetryDelayMs(
+      response.status,
+      response.headers?.get?.("retry-after"),
+      attempt,
+    );
+    if (retryDelay !== null && attempt < retries) {
+      await sleep(retryDelay);
+      continue;
+    }
+
+    return {
+      status: response.status,
+      accepted: false,
+      state: "rejected",
+      body: responseBody.slice(0, 500),
+      attempts: attempt + 1,
+    };
+  }
+
+  return {
+    status: 0,
+    accepted: false,
+    state: "network-error",
+    body: "IndexNow submission exhausted its retry budget.",
+    attempts: retries + 1,
+  };
+}
