@@ -61,12 +61,12 @@ export function seoPageHead(options: SeoPageOptions) {
       { name: "description", content: description },
       { name: "robots", content: options.robots ?? "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" },
       { property: "og:type", content: type },
-      { property: "og:site_name", content: "enV Digital Toolkit" },
+      { property: "og:site_name", content: "enV" },
       { property: "og:title", content: options.title },
       { property: "og:description", content: description },
       { property: "og:url", content: url },
       { property: "og:image", content: image },
-      { property: "og:image:alt", content: "enV digital toolkit" },
+      { property: "og:image:alt", content: "enV page preview" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@envtoolz" },
       { name: "twitter:title", content: options.title },
@@ -85,7 +85,7 @@ export function organizationSchema() {
     "@type": "Organization",
     name: "chAs Technologies LLC",
     legalName: "chAs Technologies LLC",
-    description: "The company behind enV, a cross-device digital toolkit for practical online tools, calculators, converters, developer utilities, media workflows, and productivity.",
+    description: "chAs Technologies LLC develops and operates enV.",
     url: SITE_ORIGIN,
     logo: absoluteSiteUrl("/chas-technologies-logo-transparent.webp"),
     sameAs: [
@@ -99,8 +99,8 @@ export function organizationSchema() {
     brand: {
       "@type": "Brand",
       name: "enV",
-      alternateName: "enV Digital Toolkit",
-      description: "A cross-device digital toolkit for practical online tools, calculators, converters, developer utilities, creator and media workflows, and everyday productivity.",
+ 
+      description: "enV provides practical tools for calculations, conversions, creative work, development, media and everyday tasks.",
       url: SITE_ORIGIN,
       sameAs: [
         "https://x.com/envtoolz",
@@ -119,9 +119,9 @@ export function websiteSchema() {
       organizationSchema(),
       {
         "@type": "WebSite",
-        name: "enV Digital Toolkit",
-        alternateName: ["enV", "enV by chAs Technologies LLC"],
-        description: "Practical online tools, calculators, converters, developer utilities, creator and media workflows, and productivity tools across Web, Android, and iOS.",
+        name: "enV",
+ 
+        description: "Find practical tools for calculations, conversions, creative work, development, media and everyday tasks across Web, Android and iOS.",
         url: SITE_ORIGIN,
         inLanguage: "en",
         publisher: organizationSchema(),
