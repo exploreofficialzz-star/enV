@@ -111,7 +111,7 @@ try {
   try {
     const guideUrlPromise = page.waitForURL(
       (url) => url.origin === targetUrl.origin && url.pathname === targetUrl.pathname,
-      { timeout: 20_000, waitUntil: "commit" },
+      { timeout: 20_000 },
     );
     await guideLink.click();
     await guideUrlPromise;
