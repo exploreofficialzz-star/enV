@@ -66,7 +66,7 @@ Do not mark a workstream complete based solely on source changes, a passing buil
 
 ## 2.2 Validation snapshot — 14 November 2026
 
-This snapshot is based on the latest source-review baseline, `cc69a94bbb8b9d6e33a3817b23ad738d426ea74f`; the latest commit in the PR at the time of this documentation refresh is a documentation-only reconciliation. The latest completed GitHub Actions evidence inspected belongs to the earlier head, `acf37ee5fbca4f60acf7f4715bd457c68ae1546d`. Since that run, the guide-parser scope fix, SPA-navigation test adjustment, shared `__usage_ai-training` preference, dedicated generator/live/artifact/rendered-route assertions, and guide-contract test clarification have been committed. No workflow runs or commit statuses were returned for the newer source commits at the time of this check. Therefore, all post-fix source and robots assertions remain **pending fresh CI**, not passed.
+This snapshot is based on the latest source-review baseline, `cc69a94bbb8b9d6e33a3817b23ad738d426ea74f`; the latest PR commit at the time of this refresh is `9e63f6eb3a2d9a199b2e5da3d57e7292f7b9d08e`, which only updates this programme's status notes. The latest completed GitHub Actions evidence inspected belongs to the earlier head, `acf37ee5fbca4f60acf7f4715bd457c68ae1546d`. Since that run, the guide-parser scope fix, SPA-navigation test adjustment, shared `__usage_ai-training` preference, dedicated generator/live/artifact/rendered-route assertions, guide-contract test clarification, and category-route exception note have been committed. No workflow runs or commit statuses were returned for the newer source commits at the time of this check. Therefore, all post-fix source and robots assertions remain **pending fresh CI**, not passed.
 
 | Gate | Observed result | Current disposition |
 |---|---|---|
@@ -209,14 +209,16 @@ Do not force every tool into a long article. Simple utilities need short, clear 
 
 ### WS-04 — Rewrite every category
 
-**Implemented foundation:** all 43 current category records now have distinct, plain-language descriptions and short task-oriented blurbs. The category route renders both directly above the tool cards; no separate third introduction block is required for the current page structure. The existing grouping helper uses real `subcategory` metadata, creates sections only when at least two subcategories each contain at least two tools, and retains sparse or unlabeled entries under “Other tools”. Where the taxonomy is too thin, it falls back to the flat catalogue rather than fabricating workflow groups.
+**Implemented foundation:** all 43 current category records now have distinct, plain-language descriptions and short task-oriented blurbs. The standard category route renders the description and blurb above the tool catalogue. The Design category has its own explorer with named workflow groups and explanatory copy. The existing generic grouping helper uses real `subcategory` metadata, creates sections only when at least two subcategories each contain at least two tools, and retains sparse or unlabeled entries under “Other tools”; where taxonomy is too thin, it falls back to the flat catalogue rather than fabricating groups.
+
+**Known route exception:** the Creators & music route returns its dedicated `CreatorCategoryLauncher` before the standard category header, so the category description and blurb currently do not appear on that route. This needs an integration that preserves the specialist launcher's mobile-first layout. It was recorded as an outstanding route-specific gap rather than modifying the specialised launcher, which is outside this PR's original changed-file scope.
 
 **Still required:**
 - Compare every category description and blurb with its current active/beta tool inventory and actual runtime capabilities; refine any category whose copy overstates, omits, or misclassifies the available work.
 - Verify subcategory labels against real workflows, check that similar tools are distinguishable, and ensure the correct canonical routes are linked.
 - Feature representative tools only when they are active and their descriptions accurately match their functionality.
 - Remove empty promises, redundant phrases and generic statements shared across unrelated categories.
-- Browser-check the grouped and flat layouts at mobile, tablet and desktop widths, including “See more tools” behavior and categories with sparse taxonomy.
+- Browser-check the standard, Design, and Creators & music layouts at mobile, tablet and desktop widths, including filter behavior, “See more tools” behavior and categories with sparse taxonomy.
 
 ### WS-05 — Strengthen guide and content quality
 - Keep the tool page as the source of truth for live capability.
