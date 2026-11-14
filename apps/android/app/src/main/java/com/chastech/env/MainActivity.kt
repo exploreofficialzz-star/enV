@@ -708,7 +708,7 @@ private fun WebHomeSearchSuggestion(tool: ToolRecord, onTool: (String) -> Unit) 
                 else if (tool.status == "planned") Text("Coming soon", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 else if (NativeCopy.isWebRuntimeOnly(tool.id)) Text("Web only", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            if (tool.category != "celebrations") Text(tool.offlineDescription(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(tool.offlineDescription(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         EnVIcon("ArrowRight", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface)
     }
@@ -1186,12 +1186,12 @@ private fun ToolDetail(
                     horizontalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 16.dp),
                 ) {
                     NativeToolHeader(
-                        tool, compact, Modifier.weight(1f), showDescription = tool.category != "celebrations" && (!compact || isFullscreen),
+                        tool, compact, Modifier.weight(1f), showDescription = !compact || isFullscreen,
                         isFullscreen = isFullscreen, onToggleFullscreen = onToggleFullscreen
                     )
                     if (!isFullscreen) NativeToolSaveButton(isFavorite, onToggleFavorite)
                 }
-                if (compact && !isFullscreen && tool.category != "celebrations") {
+                if (compact && !isFullscreen) {
                     Text(
                         tool.offlineDescription(),
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 20.sp),

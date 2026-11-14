@@ -847,7 +847,7 @@ private struct WebHomeSearchSuggestion: View {
                     else if tool.isPlanned { enVCharacterSpacedText("Coming soon").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
                     else if NativeCopy.isWebRuntimeOnly(tool.id) { enVCharacterSpacedText("Web only").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
                 }
-                if tool.category != "celebrations" { enVCharacterSpacedText(tool.offlineDescription).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(1) }
+                enVCharacterSpacedText(tool.offlineDescription).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(1)
             }
             Spacer(minLength: 4)
             EnVIcon(name: "ArrowRight", size: 16, tint: .envInk).accessibilityHidden(true)
@@ -1093,7 +1093,7 @@ struct ToolsView: View {
                                                         if tool.isPlanned { enVCharacterSpacedText("Coming soon").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
                                                         else if NativeCopy.isWebRuntimeOnly(tool.id) { enVCharacterSpacedText("Web only").font(.envScaled(size: 9, weight: .semibold)).foregroundStyle(Color.envSubtle) }
                                                     }
-                                                    if tool.category != "celebrations" { enVCharacterSpacedText(tool.offlineDescription).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(1) }
+                                                    enVCharacterSpacedText(tool.offlineDescription).font(.envScaled(size: 12, weight: .regular)).foregroundStyle(Color.envMuted).lineLimit(1)
                                                 }
                                                 .frame(maxWidth: .infinity, alignment: .leading)
                                                 .padding(.horizontal, 12)
@@ -1139,12 +1139,10 @@ struct ToolsView: View {
                                             enVCharacterSpacedText(group.category.name)
                                                 .font(.envScaled(size: 18, weight: .bold))
                                                 .foregroundStyle(Color.envAccent)
-                                            if group.category.id != "celebrations" {
-                                                enVCharacterSpacedText(group.category.blurb)
-                                                    .font(.envScaled(size: 12, weight: .regular))
-                                                    .foregroundStyle(Color.envMuted)
-                                                    .lineLimit(2)
-                                            }
+                                            enVCharacterSpacedText(group.category.blurb)
+                                                .font(.envScaled(size: 12, weight: .regular))
+                                                .foregroundStyle(Color.envMuted)
+                                                .lineLimit(2)
                                         }
                                     }
                                 }
@@ -1223,11 +1221,9 @@ struct CategoryView: View {
                             enVCharacterSpacedText(category.name)
                                 .font(.envScaled(size: 30, weight: .bold))
                                 .foregroundStyle(Color.envAccent)
-                            if categoryID != "celebrations" {
-                                enVCharacterSpacedText(category.description)
-                                    .font(.envScaled(size: 14, weight: .regular))
-                                    .foregroundStyle(Color.envMuted)
-                            }
+                            enVCharacterSpacedText(category.description)
+                                .font(.envScaled(size: 14, weight: .regular))
+                                .foregroundStyle(Color.envMuted)
                         }
                     }
                 }
@@ -1785,7 +1781,7 @@ private struct NativeTokenGuideView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(tool.category.replacingOccurrences(of: "-", with: " ").capitalized).font(.caption2).foregroundStyle(Color.envMuted)
                                 Text(tool.name).font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
-                                if tool.category != "celebrations" { Text(tool.offlineDescription).font(.footnote).foregroundStyle(Color.envMuted).lineLimit(3).multilineTextAlignment(.leading) }
+                                Text(tool.offlineDescription).font(.footnote).foregroundStyle(Color.envMuted).lineLimit(3).multilineTextAlignment(.leading)
                             }
                             Spacer(minLength: 4)
                             Image(systemName: selectedToolID == tool.id ? "chevron.up" : "chevron.down").font(.caption.weight(.semibold)).foregroundStyle(Color.envMuted).padding(.top, 8)
