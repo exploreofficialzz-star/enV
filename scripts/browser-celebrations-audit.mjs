@@ -93,7 +93,7 @@ try {
       }
       if (tool.id.endsWith("quiz-generator")) {
         await frame.locator('button[data-choice]').filter({ hasText: "2030" }).click();
-        await frame.locator("[data-feedback]").filter({ hasText: "That is right!" }).waitFor({ state: "visible" });
+        await frame.locator("[data-feedback]").filter({ hasText: "Correct." }).waitFor({ state: "visible" });
       }
       if (tool.id.endsWith("memory-page")) {
         await frame.locator(".gallery figure").first().waitFor({ state: "visible" });
@@ -102,7 +102,7 @@ try {
       if (tool.id.endsWith("countdown")) await frame.locator("[data-countdown]").waitFor({ state: "visible" });
       if (tool.id.endsWith("page-generator")) {
         assert.equal(await frame.locator("ol li").count(), 3, "Programme items were not included in the exported page");
-        assert.ok((await frame.locator("body").innerText()).includes("Hosted by: Sam"), "Host was not included in the exported page");
+        assert.ok((await frame.locator("body").innerText()).includes("Hosted by Sam"), "Host was not included in the exported page");
         assert.ok((await frame.locator("body").innerText()).includes("Hall & Garden"), "Venue was not included in the exported page");
         assert.equal(await frame.locator("ol li").nth(0).innerText(), "Welcome");
         assert.equal(await frame.locator("ol li").nth(1).innerText(), "Celebration");
