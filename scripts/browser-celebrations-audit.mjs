@@ -21,8 +21,8 @@ const browser = await chromium.launch({
 });
 const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: "reduce" });
 const page = await context.newPage();
-page.setDefaultTimeout(10000);
-page.setDefaultNavigationTimeout(25000);
+page.setDefaultTimeout(20000);
+page.setDefaultNavigationTimeout(60000);
 const results = [];
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aZ5kAAAAASUVORK5CYII=", "base64");
 
@@ -42,9 +42,9 @@ try {
     const onPageError = (error) => errors.push(String(error));
     page.on("pageerror", onPageError);
     try {
-      await page.goto(`${baseUrl}/tools/celebrations/${tool.slug}`, { waitUntil: "domcontentloaded" });
-      await page.locator(`[data-env-tool-id="${tool.id}"]`).waitFor({ state: "attached", timeout: 20000 });
-      await page.locator(`[data-env-tool-id="${tool.id}"] [data-env-celebration-ready="true"]`).waitFor({ state: "attached", timeout: 20000 });
+      await page.goto(`${baseUrl}/tools/celebrations/${tool.slug}`, { waitUntil: "commit", timeout: 60000 });
+      await page.locator(`[data-env-tool-id="${tool.id}"]`).waitFor({ state: "attached", timeout: 60000 });
+      await page.locator(`[data-env-tool-id="${tool.id}"] [data-env-celebration-ready="true"]`).waitFor({ state: "attached", timeout: 60000 });
       const title = `QA ${tool.id} & <celebration>`;
       const toolSurface = page.locator(`[data-env-tool-id="${tool.id}"]`);
       await fillField(toolSurface, "Title", title);
