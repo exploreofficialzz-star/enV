@@ -117,6 +117,53 @@ test("IndexNow retries a rate-limited batch, then records HTTP 200 acceptance", 
   assert.deepEqual(JSON.parse(calls[0][1].body).urlList, ["https://envtools.store/tools/text/example"]);
 });
 
+test("IndexNow retries transient server failures before returning a permanent result", async () => {
+  const waits = [];
+  let calls = 0;
+  const responses = [
+    { status: 503, headers: { get: () => null }, text: async () => "temporarily unavailable" },
+    { status: 200, headers: { get: () => null }, text: async () => "ok" },
+  ];
+  const result = await submitIndexNowBatch({
+    endpoint: "https://api.indexnow.org/indexnow",
+    host: "envtools.store",
+    key: "a1b2c3d4",
+    keyLocation: "https://envtools.store/a1b2c3d4.txt",
+    urlList: ["https://envtools.store/"],
+    fetchImpl: async () => {
+      calls += 1;
+      return responses.shift();
+    },
+    sleep: async (milliseconds) => waits.push(milliseconds),
+  });
+  assert.equal(result.accepted, true);
+  assert.equal(result.attempts, 2);
+  assert.deepEqual(waits, [1000]);
+  assert.equal(calls, 2);
+});
+
+test("IndexNow retries transient network failures within the bounded retry budget", async () => {
+  const waits = [];
+  let calls = 0;
+  const result = await submitIndexNowBatch({
+    endpoint: "https://api.indexnow.org/indexnow",
+    host: "envtools.store",
+    key: "a1b2c3d4",
+    keyLocation: "https://envtools.store/a1b2c3d4.txt",
+    urlList: ["https://envtools.store/"],
+    fetchImpl: async () => {
+      calls += 1;
+      if (calls < 3) throw new Error("temporary network failure");
+      return { status: 200, headers: { get: () => null }, text: async () => "ok" };
+    },
+    sleep: async (milliseconds) => waits.push(milliseconds),
+  });
+  assert.equal(result.accepted, true);
+  assert.equal(result.attempts, 3);
+  assert.deepEqual(waits, [1000, 2000]);
+  assert.equal(calls, 3);
+});
+
 test("HTTP 202 is treated as accepted while key validation remains pending", async () => {
   let calls = 0;
   const result = await submitIndexNowBatch({
