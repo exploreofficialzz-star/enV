@@ -98,13 +98,6 @@ try {
   // TanStack Router performs an in-app navigation here. A browser document-navigation
   // response is not guaranteed, so assert the URL and rendered destination instead;
   // directPage above independently verifies the same URL returns HTTP 200 on refresh.
-  const guideUrlPromise = page.waitForURL(
-    (url) => url.origin === targetUrl.origin && url.pathname === targetUrl.pathname,
-    { timeout: 20_000 },
-  );
-  await guideLink.click();
-  await guideUrlPromise;
-
   // Surface the actual rendered destination when this regression test catches a
   // route that changes the URL but renders an error or the wrong page.
   const diagnostics = async () => ({
@@ -116,6 +109,12 @@ try {
     pageErrors,
   });
   try {
+    const guideUrlPromise = page.waitForURL(
+      (url) => url.origin === targetUrl.origin && url.pathname === targetUrl.pathname,
+      { timeout: 20_000, waitUntil: "commit" },
+    );
+    await guideLink.click();
+    await guideUrlPromise;
     await page.getByRole("heading", { name: /documentation and usage guide/i }).waitFor({ timeout: 15_000 });
     await page.getByRole("heading", { name: "When to use this tool" }).waitFor({ timeout: 15_000 });
     await page.getByRole("heading", { name: "Troubleshooting" }).waitFor({ timeout: 15_000 });
