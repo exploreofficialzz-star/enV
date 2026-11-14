@@ -8,7 +8,7 @@ import { isToolUnderProduction } from "../src/lib/production-notice.ts";
 
 const baseUrl = new URL(process.env.SEO_AUDIT_BASE_URL ?? "http://127.0.0.1:8080");
 const routes = [
-  { path: "/", kind: "indexable", schema: "WebSite", homepageDiscovery: true, expectedTitle: "enV Digital Toolkit by chAs Technologies | Online Tools" },
+  { path: "/", kind: "indexable", schema: "WebSite", homepageDiscovery: true, expectedTitle: "enV | Tools for everyday tasks" },
   { path: "/tools", kind: "indexable", schema: "CollectionPage", categoryDirectory: true },
   { path: "/community", kind: "indexable", schema: "CollectionPage" },
   { path: "/tools/developer/json-studio", kind: "indexable", schema: "SoftwareApplication" },
@@ -239,7 +239,7 @@ for (const route of renderedRoutes) {
     }
     if (!hasSchema) failures.push(route.path + ": expected JSON-LD schema type " + route.schema);
     if (!hasCanonicalAbout) failures.push(route.path + ": guide must reference the canonical parent SoftwareApplication URL");
-    if (ogSiteName !== "enV Digital Toolkit") failures.push(route.path + ": Open Graph site name must disambiguate the enV brand");
+    if (ogSiteName !== "enV") failures.push(route.path + ": Open Graph site name must be exactly enV");
     if (twitterSite !== "@envtoolz") failures.push(route.path + ": Twitter site handle must match the official enV account");
     if (!ogTitle || ogTitle !== title) failures.push(route.path + ": Open Graph title must match the page title");
     if (!ogDescription || ogDescription !== description) failures.push(route.path + ": Open Graph description must match the page description");
