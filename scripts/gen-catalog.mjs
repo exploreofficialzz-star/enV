@@ -851,10 +851,10 @@ function addFamily(category, prefix, items, engineType = "custom", enginePrefix 
   for (const item of items) {
     const name = typeof item === "string" ? item : item.name;
     const key = typeof item === "string" ? slugify(item) : item.key;
-    const id = \`\${slugify(prefix)}-\${key}\`;
-    const rawDescription = typeof item === "string" ? \`\${name} utility for the enV toolkit.\` : item.description;
+    const id = `${slugify(prefix)}-${key}`;
+    const rawDescription = typeof item === "string" ? `${name} utility for the enV toolkit.` : item.description;
     const description = refineGeneratedToolDescription({ id, name, category, description: rawDescription });
-    const keywords = typeof item === "string" ? \`\${prefix} \${name}\` : \`\${prefix} \${item.keywords || name}\`;
+    const keywords = typeof item === "string" ? `${prefix} ${name}` : `${prefix} ${item.keywords || name}`;
     add([[
       id,
       name,
