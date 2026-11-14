@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
-import { routeGroups, selectChangedUrls, urlsFromXml } from "./indexnow-utils.mjs";
+import { routeGroups, selectChangedUrls, submitIndexNowBatch, urlsFromXml } from "./indexnow-utils.mjs";
 import { resolve } from "node:path";
 import { buildSeoArtifacts } from "./generate-seo-artifacts.mjs";
 
@@ -54,17 +54,6 @@ async function verifyKeyFile(key) {
   return { ok: true, url };
 }
 
-async function submitBatch(key, keyLocation, urlList) {
-  const response = await fetch(INDEXNOW_ENDPOINT, {
-    method: "POST",
-    headers: { "content-type": "application/json; charset=utf-8", accept: "application/json, text/plain, */*" },
-    body: JSON.stringify({ host: "envtools.store", key, keyLocation, urlList }),
-    signal: AbortSignal.timeout(20_000),
-  });
-  const body = await response.text().catch(() => "");
-  return { status: response.status, ok: response.status === 200, body: body.slice(0, 500) };
-}
-
 async function main() {
   if (process.env.VERCEL_ENV !== "production") {
     process.stdout.write("IndexNow submission skipped outside the production build.\n");
@@ -103,21 +92,31 @@ async function main() {
   }
 
   let submitted = 0;
+  let pendingKeyValidationBatches = 0;
   for (let offset = 0; offset < urlList.length; offset += MAX_URLS_PER_POST) {
     const batch = urlList.slice(offset, offset + MAX_URLS_PER_POST);
-    const result = await submitBatch(key, verification.url, batch).catch((error) => ({
-      status: 0, ok: false, body: String(error).slice(0, 500),
-    }));
-    if (!result.ok) {
+    const result = await submitIndexNowBatch({
+      endpoint: INDEXNOW_ENDPOINT,
+      host: "envtools.store",
+      key,
+      keyLocation: verification.url,
+      urlList: batch,
+    });
+    if (!result.accepted) {
       process.stderr.write("IndexNow batch was not accepted (HTTP " + result.status + "): " + result.body + "\n");
       process.stderr.write("The deployment is not blocked; retry the notification after resolving the IndexNow response.\n");
       return;
     }
     submitted += batch.length;
+    if (result.state === "accepted-pending-key-validation") pendingKeyValidationBatches += 1;
   }
 
-  process.stdout.write("IndexNow accepted " + submitted + " changed or removed canonical URLs in " +
-    Math.ceil(urlList.length / MAX_URLS_PER_POST) + " batch(es). This confirms receipt, not crawling or indexing.\n");
+  process.stdout.write("IndexNow received " + submitted + " changed or removed canonical URLs in " +
+    Math.ceil(urlList.length / MAX_URLS_PER_POST) + " batch(es)." +
+    (pendingKeyValidationBatches
+      ? " Key validation is pending for " + pendingKeyValidationBatches + " batch(es)."
+      : " The endpoint returned HTTP 200 for each batch.") +
+    " Receipt does not prove crawling or indexing.\\n");
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
