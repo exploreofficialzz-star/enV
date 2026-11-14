@@ -2201,6 +2201,17 @@ for (const tool of tools) {
   tool.status = "active"; tool.clientSide = category !== "video"; tool.requiresBackend = category === "video"; tool.requiresAuth = false;
 }
 
+// Celebrations has its own verified local engine on Web, Android and iOS.
+// Promote all exact occasion/experience IDs rather than the generic planned-local engine.
+for (const tool of tools) {
+  if (tool.category !== "celebrations") continue;
+  tool.status = "active";
+  tool.clientSide = true;
+  tool.requiresBackend = false;
+  tool.requiresAuth = false;
+  tool.engine = { type: "custom", id: tool.id };
+}
+
 for (const tool of tools) {
   if (!["whois-lookup","dns-lookup","website-screenshot"].includes(tool.id)) continue;
   tool.status = "active"; tool.clientSide = false; tool.requiresBackend = true; tool.requiresAuth = false;

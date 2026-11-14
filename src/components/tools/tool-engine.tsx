@@ -49,6 +49,7 @@ const GamingEngine = lazy(() => import("@/components/engines/gaming-engine").the
 const ScreenshotEngine = lazy(() => import("@/components/engines/screenshot-engine").then((m) => ({ default: m.ScreenshotEngine })));
 const MockupsCategoryEngine = lazy(() => import("@/components/engines/mockups-category-engine").then((m) => ({ default: m.MockupsCategoryEngine })));
 const SocialEngine = lazy(() => import("@/components/engines/social-engine").then((m) => ({ default: m.SocialEngine })));
+const CelebrationEngine = lazy(() => import("@/components/engines/celebration-engine").then((m) => ({ default: m.CelebrationEngine })));
 const PlannedLocalEngine = lazy(() => import("@/components/engines/planned-local-engine").then((m) => ({ default: m.PlannedLocalEngine })));
 const TranscriptionEngine = lazy(() => import("@/components/engines/transcription-engine").then((m) => ({ default: m.TranscriptionEngine })));
 const ImageToolsEngine = lazy(() => import("@/components/engines/image-tools-engine").then((m) => ({ default: m.ImageToolsEngine })));
@@ -164,6 +165,7 @@ function ToolEngineView({ tool, initialMode, initialAction, initialOp }: ToolEng
       if (tool.category === "productivity") return <ProductivityEngine op={tool.engine.id} />;
       if (tool.category === "personal") return <PersonalEngine toolId={tool.id} />;
       if (tool.category === "communication") return <CommunicationEngine toolId={tool.id} />;
+      if (tool.category === "celebrations") return <CelebrationEngine toolId={tool.id} />;
       if (tool.category === "streaming") return <StreamingEngine toolId={tool.id} />;
       if (tool.category === "marketing") return <MarketingEngine toolId={tool.id} />;
       if (tool.category === "webdesign") return <WebDesignEngine toolId={tool.id} />;
@@ -172,7 +174,7 @@ function ToolEngineView({ tool, initialMode, initialAction, initialOp }: ToolEng
       if (tool.category === "interactive") return <InteractiveEngine toolId={tool.id} />;
       if (tool.category === "gaming") return <GamingEngine toolId={tool.id} />;
       if (tool.category === "social") return <SocialEngine toolId={tool.id} />;
-      if (["events","celebrations","food","travel","photography"].includes(tool.category)) return <PlannedLocalEngine toolId={tool.id} />;
+      if (["events","food","travel","photography"].includes(tool.category)) return <PlannedLocalEngine toolId={tool.id} />;
       return <ComingSoonPanel tool={tool} />;
     case "document":
       return <DocumentEngine op={tool.engine.op} />;

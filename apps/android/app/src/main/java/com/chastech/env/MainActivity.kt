@@ -284,7 +284,7 @@ private fun CatalogFailureScreen(darkMode: Boolean, onRetry: () -> Unit) {
     }
 }
 
-private val productionExemptCategories = setOf("accessibility", "ai", "audio", "business", "calculators", "career", "communication", "converters", "creators", "datetime", "design", "developer", "ecommerce", "education", "events", "files", "fitness", "gaming", "image", "interactive", "marketing", "network", "personal", "productivity", "qr", "random", "relationships", "security", "seo", "social", "streaming", "testdata", "text", "video", "webdesign")
+private val productionExemptCategories = setOf("accessibility", "ai", "audio", "business", "calculators", "career", "celebrations", "communication", "converters", "creators", "datetime", "design", "developer", "ecommerce", "education", "events", "files", "fitness", "gaming", "image", "interactive", "marketing", "network", "personal", "productivity", "qr", "random", "relationships", "security", "seo", "social", "streaming", "testdata", "text", "video", "webdesign")
 private val productionExemptToolIds = setOf("a-book", "zip-any-file", "camera-studio", "pdf-merger", "pdf-metadata-viewer", "pdf-page-extractor", "pdf-splitter", "pdf-rotator")
 
 private fun ToolRecord.isUnderProduction(): Boolean =
@@ -1066,7 +1066,7 @@ private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme:
 
 private fun nativeSupported(tool: ToolRecord): Boolean = !NativeCopy.isWebRuntimeOnly(tool.id) && when { tool.category == "communication" -> true; tool.id == "camera-studio" -> true; tool.id == "music-downloader" -> true; NativeBackendEngine.supports(tool) -> false; tool.status == "planned" -> false; NativeAudioEngine.supports(tool) -> true; else -> when (tool.engine.type) {
     "business" -> NativeBusinessEngine.supports(tool)
-    "custom" -> tool.category == "files" || NativeProductivityEngine.supports(tool.id) || NativeAccessibilityEngine.supports(tool.id, tool.category) || NativeEventEngine.supports(tool.id) || NativeEcommerceEngine.supports(tool)
+    "custom" -> tool.category == "files" || tool.category == "celebrations" || NativeProductivityEngine.supports(tool.id) || NativeAccessibilityEngine.supports(tool.id, tool.category) || NativeEventEngine.supports(tool.id) || NativeEcommerceEngine.supports(tool)
     "ai" -> NativeAiEngine.supports(tool)
     "file-converter", "document-backend" -> NativeFileConverterEngine.supports(tool)
     "text" -> NativeTextEngine.operationForTool(tool.id) != null
@@ -1302,6 +1302,11 @@ private fun NativeToolInterfaceContent(
     }
     CompositionLocalProvider(LocalNativeToolExecutionTelemetry provides telemetry) {
         when {
+            tool.category == "celebrations" && runCatching { NativeCelebrationEngine.parse(tool.id) }.isSuccess -> NativeCelebrationToolForm(tool.id)
+            tool.category == "celebrations" -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatusPill("Unavailable")
+                Text("This celebration tool is not supported.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             tool.category == "communication" -> NativeCommunicationToolForm(tool.id)
             backend -> NativeBackendToolForm(tool, true)
             supported -> NativeToolForm(tool, onRelatedTool, startInWorkspace)

@@ -5,12 +5,12 @@
     "total": 10002,
     "active": 10002,
     "planned": 0,
-    "offlineNative": 7807,
+    "offlineNative": 7900,
     "backendNative": 1565,
-    "webOnly": 630,
-    "missingActive": 630,
+    "webOnly": 537,
+    "missingActive": 537,
     "divergentActive": 0,
-    "fullyExecutable": 9372
+    "fullyExecutable": 9465
   },
   "tools": [
     {
@@ -61444,8 +61444,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "achievement-interactive-card",
@@ -61453,8 +61453,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "achievement-invitation-generator",
@@ -61462,8 +61462,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "achievement-memory-page",
@@ -61471,8 +61471,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "achievement-page-generator",
@@ -61480,8 +61480,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "achievement-quiz-generator",
@@ -61489,8 +61489,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "achievement-reveal-page",
@@ -61498,8 +61498,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "achievement-surprise-page",
@@ -61507,8 +61507,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "anniversary-countdown",
@@ -61516,8 +61516,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "anniversary-interactive-card",
@@ -61525,8 +61525,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "anniversary-invitation-generator",
@@ -61534,8 +61534,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "anniversary-memory-page",
@@ -61543,8 +61543,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "anniversary-page-generator",
@@ -61552,8 +61552,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "anniversary-quiz-generator",
@@ -61561,8 +61561,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "anniversary-reveal-page",
@@ -61570,8 +61570,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "anniversary-surprise-page",
@@ -61579,8 +61579,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "appreciation-countdown",
@@ -61588,8 +61588,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "appreciation-interactive-card",
@@ -61597,8 +61597,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "appreciation-invitation-generator",
@@ -61606,8 +61606,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "appreciation-memory-page",
@@ -61615,8 +61615,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "appreciation-page-generator",
@@ -61624,8 +61624,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "appreciation-quiz-generator",
@@ -61633,8 +61633,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "appreciation-surprise-page",
@@ -61642,8 +61642,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "birthday-interactive-card",
@@ -61651,8 +61651,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "birthday-invitation-generator",
@@ -61660,8 +61660,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "birthday-memory-page",
@@ -61669,8 +61669,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "birthday-page-generator",
@@ -61678,8 +61678,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "birthday-quiz-generator",
@@ -61687,8 +61687,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "birthday-reveal-page",
@@ -61696,8 +61696,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "birthday-surprise-page",
@@ -61705,8 +61705,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "christmas-countdown",
@@ -61714,8 +61714,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "christmas-interactive-card",
@@ -61723,8 +61723,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "christmas-invitation-generator",
@@ -61732,8 +61732,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "christmas-memory-page",
@@ -61741,8 +61741,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "christmas-page-generator",
@@ -61750,8 +61750,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "christmas-quiz-generator",
@@ -61759,8 +61759,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "christmas-reveal-page",
@@ -61768,8 +61768,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "christmas-surprise-page",
@@ -61777,8 +61777,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "congratulations-countdown",
@@ -61786,8 +61786,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "congratulations-interactive-card",
@@ -61795,8 +61795,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "congratulations-invitation-generator",
@@ -61804,8 +61804,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "congratulations-memory-page",
@@ -61813,8 +61813,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "congratulations-page-generator",
@@ -61822,8 +61822,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "congratulations-quiz-generator",
@@ -61831,8 +61831,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "congratulations-reveal-page",
@@ -61840,8 +61840,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "congratulations-surprise-page",
@@ -61849,8 +61849,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "farewell-countdown",
@@ -61858,8 +61858,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "farewell-interactive-card",
@@ -61867,8 +61867,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "farewell-invitation-generator",
@@ -61876,8 +61876,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "farewell-memory-page",
@@ -61885,8 +61885,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "farewell-page-generator",
@@ -61894,8 +61894,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "farewell-quiz-generator",
@@ -61903,8 +61903,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "farewell-reveal-page",
@@ -61912,8 +61912,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "farewell-surprise-page",
@@ -61921,8 +61921,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "graduation-countdown",
@@ -61930,8 +61930,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "graduation-interactive-card",
@@ -61939,8 +61939,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "graduation-invitation-generator",
@@ -61948,8 +61948,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "graduation-memory-page",
@@ -61957,8 +61957,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "graduation-page-generator",
@@ -61966,8 +61966,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "graduation-quiz-generator",
@@ -61975,8 +61975,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "graduation-reveal-page",
@@ -61984,8 +61984,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "graduation-surprise-page",
@@ -61993,8 +61993,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "new-year-countdown",
@@ -62002,8 +62002,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "new-year-interactive-card",
@@ -62011,8 +62011,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "new-year-invitation-generator",
@@ -62020,8 +62020,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "new-year-memory-page",
@@ -62029,8 +62029,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "new-year-page-generator",
@@ -62038,8 +62038,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "new-year-quiz-generator",
@@ -62047,8 +62047,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "new-year-reveal-page",
@@ -62056,8 +62056,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "new-year-surprise-page",
@@ -62065,8 +62065,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "party-countdown",
@@ -62074,8 +62074,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "party-interactive-card",
@@ -62083,8 +62083,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "party-invitation-generator",
@@ -62092,8 +62092,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "party-memory-page",
@@ -62101,8 +62101,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "party-page-generator",
@@ -62110,8 +62110,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "party-quiz-generator",
@@ -62119,8 +62119,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "party-reveal-page",
@@ -62128,8 +62128,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "party-surprise-page",
@@ -62137,8 +62137,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "thank-you-countdown",
@@ -62146,8 +62146,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "thank-you-interactive-card",
@@ -62155,8 +62155,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "thank-you-invitation-generator",
@@ -62164,8 +62164,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "thank-you-memory-page",
@@ -62173,8 +62173,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "thank-you-page-generator",
@@ -62182,8 +62182,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "thank-you-quiz-generator",
@@ -62191,8 +62191,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "thank-you-reveal-page",
@@ -62200,8 +62200,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "thank-you-surprise-page",
@@ -62209,8 +62209,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "valentine-countdown",
@@ -62218,8 +62218,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "valentine-interactive-card",
@@ -62227,8 +62227,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "valentine-invitation-generator",
@@ -62236,8 +62236,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "valentine-memory-page",
@@ -62245,8 +62245,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "valentine-page-generator",
@@ -62254,8 +62254,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "valentine-quiz-generator",
@@ -62263,8 +62263,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "valentine-surprise-page",
@@ -62272,8 +62272,8 @@
       "status": "active",
       "category": "celebrations",
       "engine": "custom",
-      "android": "web-only",
-      "ios": "web-only"
+      "android": "offline-native",
+      "ios": "offline-native"
     },
     {
       "id": "agenda-builder",

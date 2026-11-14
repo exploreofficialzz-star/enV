@@ -4,7 +4,7 @@ import { isToolUnderProduction } from "./production-notice.ts";
 
 const releasedCategories = [
   "accessibility", "ai", "audio", "business", "calculators", "career", "communication", "converters",
-  "creators", "datetime", "design", "developer", "ecommerce", "education", "events", "files", "fitness",
+  "creators", "datetime", "design", "developer", "ecommerce", "education", "events", "celebrations", "files", "fitness",
   "gaming", "image", "interactive", "marketing", "network", "personal", "productivity",
   "qr", "random", "relationships", "security", "seo", "social", "streaming", "testdata", "text", "video",
   "webdesign",
@@ -17,7 +17,7 @@ test("explicitly available categories stay accessible", () => {
 });
 
 test("unfinished categories remain protected", () => {
-  for (const category of ["celebrations", "food", "mockups", "pdf", "photography", "screenshots", "travel"] as const) {
+  for (const category of ["food", "mockups", "pdf", "photography", "screenshots", "travel"] as const) {
     assert.equal(isToolUnderProduction({ id: `unfinished-${category}`, category }), true, `${category} should remain gated`);
   }
 });

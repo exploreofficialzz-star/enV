@@ -88,6 +88,8 @@ export async function preloadToolEngine(tool: ToolMeta): Promise<void> {
           pending = import("@/components/engines/personal-engine");
         } else if (tool.category === "communication") {
           pending = import("@/components/engines/communication-engine");
+        } else if (tool.category === "celebrations") {
+          pending = import("@/components/engines/celebration-engine");
         } else if (tool.category === "streaming") {
           pending = import("@/components/engines/streaming-engine");
         } else if (tool.category === "marketing") {
@@ -104,7 +106,7 @@ export async function preloadToolEngine(tool: ToolMeta): Promise<void> {
           pending = import("@/components/engines/gaming-engine");
         } else if (tool.category === "social") {
           pending = import("@/components/engines/social-engine");
-        } else if (["events", "celebrations", "food", "travel", "photography"].includes(tool.category)) {
+        } else if (["events", "food", "travel", "photography"].includes(tool.category)) {
           pending = import("@/components/engines/planned-local-engine");
         }
         break;
