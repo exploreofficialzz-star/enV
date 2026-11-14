@@ -131,6 +131,17 @@ jobs:
       - name: Verify local File workspace workflows in the browser
         run: npm run audit:file-workspace:browser
 
+      - name: Verify all 93 Celebrations tools on a mobile browser
+        run: npm run audit:celebrations:browser -- --report=/tmp/env-celebrations-browser-audit/report.json
+
+      - name: Upload Celebrations browser audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: celebrations-browser-audit
+          path: /tmp/env-celebrations-browser-audit
+          if-no-files-found: ignore
+
       - name: Check Studio in phone, landscape, tablet and desktop layouts
         run: npm run audit:ux-ui-studio:browser
 
