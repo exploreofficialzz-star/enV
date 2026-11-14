@@ -27,13 +27,8 @@ const results = [];
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aZ5kAAAAASUVORK5CYII=", "base64");
 
 async function fillField(toolSurface, label, value) {
-  const candidates = toolSurface.locator("label").filter({ hasText: label });
-  const labelNode = candidates.first();
-  await labelNode.waitFor({ state: "visible" });
-  const field = labelNode.locator("xpath=..");
-  const controls = field.locator("input, textarea, select");
-  assert.equal(await controls.count(), 1, `Expected one control inside the active ${label} field; found ${await controls.count()}`);
-  const control = controls.first();
+  const control = toolSurface.getByLabel(label, { exact: true });
+  assert.equal(await control.count(), 1, `Expected one accessible control for ${label}; found ${await control.count()}`);
   await control.fill(value);
   assert.equal(await control.inputValue(), value, `The ${label} field did not retain the value entered for the active tool.`);
 }
