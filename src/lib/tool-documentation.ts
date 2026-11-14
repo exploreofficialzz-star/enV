@@ -498,7 +498,7 @@ function withCatalogueTask(tool: ToolMeta, guidance: ToolSpecificGuidance): Tool
       ? "For " + tool.name + ", " + example.charAt(0).toLowerCase() + example.slice(1)
       : "Use a small, representative example for " + tool.name + " and check the result against an independent reference.",
     validation: guidance.validation,
-    coverage: guidance.coverage ?? "category-guidance",
+    coverage: guidance.coverage ?? "catalogue-fallback",
   };
 }
 
@@ -757,7 +757,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
 
 /** Describe which authored guidance layer supplies a tool guide's task-specific content. */
 export function toolDocumentationCoverage(tool: ToolMeta): ToolDocumentationCoverage {
-  return toolSpecificGuidanceBase(tool).coverage ?? "category-guidance";
+  return toolSpecificGuidanceBase(tool).coverage ?? "catalogue-fallback";
 }
 
 function engineLabel(tool: ToolMeta): string {
