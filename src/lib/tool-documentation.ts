@@ -481,11 +481,12 @@ export function toolDocumentationSummary(tool: ToolMeta): string {
 
 function withCatalogueTask(tool: ToolMeta, guidance: ToolSpecificGuidance): ToolSpecificGuidance {
   const purpose = String(tool.description ?? "").replace(/\s+/g, " ").trim();
+  const purposeIsInPageSummary = purpose && toolDocumentationSummary(tool) === purpose;
   const example = guidance.example.trim();
   return {
-    overview: purpose
-      ? "This guide is specific to " + tool.name + ". The catalogue describes its task as: " + purpose + " " + guidance.overview
-      : "This guide covers the task described by " + tool.name + ". " + guidance.overview,
+    overview: "This guide is specific to " + tool.name + "."
+      + (purpose && !purposeIsInPageSummary ? " The catalogue describes its task as: " + purpose : "")
+      + " " + guidance.overview,
     example: example
       ? "For " + tool.name + ", " + example.charAt(0).toLowerCase() + example.slice(1)
       : "Use a small, representative example for " + tool.name + " and check the result against an independent reference.",
@@ -493,7 +494,7 @@ function withCatalogueTask(tool: ToolMeta, guidance: ToolSpecificGuidance): Tool
   };
 }
 
-function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
+function toolSpecificGuidanceBase(tool: ToolMeta): ToolSpecificGuidance {
   const id = tool.id.toLowerCase();
   const name = tool.name.toLowerCase();
   const category = tool.category;
@@ -634,82 +635,86 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
 
   const engine = tool.engine;
   if (engine.type === "calculator") {
-    return withCatalogueTask(tool, {
+    return {
       overview: "Use the fields to model the calculation you need. Check input units, assumptions, zero values, and expected precision before relying on the result.",
       example: "Choose a small test case for which you can estimate or independently calculate the expected result. Run it once, compare the output with that reference, and only then use more complex values.",
       validation: "Check sign, units, decimal precision, zero values, and boundary cases. Use any formula or assumption note published with this tool, and do not infer precision or financial terms that the interface does not display.",
-    });
+    };
   }
   if (engine.type === "converter") {
-    return withCatalogueTask(tool, {
+    return {
       overview: "Use this converter when you need to move a value between supported units or formats. The choices shown on the page define the actual conversion pairs; do not assume an unlisted unit or format is supported.",
       example: "Convert a familiar value between two listed units and confirm that the displayed unit label accompanies the result. Repeat in the reverse direction when possible to check that the conversion is consistent.",
       validation: "Verify source and target unit selection, scale, sign, rounding, and precision. Keep the unit next to the number when copying the result because the number alone may be ambiguous.",
-    });
+    };
   }
   if (engine.type === "image" || tool.category === "image" || tool.category === "photography") {
-    return withCatalogueTask(tool, {
+    return {
       overview: "Choose image settings based on how the result will be displayed or printed. Compare a representative output against the original at the intended size.",
       example: "Use a duplicate of a small, representative image, process it with the available settings, then inspect the full-size output and compare its properties with the original.",
       validation: "Confirm dimensions, crop, format, transparency, colour appearance, and metadata behavior as relevant to the selected operation. Keep the original until the output has been inspected.",
-    });
+    };
   }
   if (engine.type === "text" || engine.type === "codec" || engine.type === "developer") {
-    return withCatalogueTask(tool, {
+    return {
       overview: "Start with a small, representative input, apply the operation provided by the tool, and validate the output in the format or system that will consume it.",
       example: "Create a small sample containing a normal value and a boundary case, then run the operation on both. This makes it easier to distinguish a genuine formatting or conversion issue from malformed source input.",
       validation: "Pay particular attention to quoting, escaping, whitespace, character encoding, line endings, case sensitivity, and special characters. Preserve the original input until the output has passed downstream validation.",
-    });
+    };
   }
   if (engine.type === "file-converter" || engine.type === "document" || engine.type === "document-backend" || engine.type === "pdf" || engine.type === "audio" || engine.type === "video") {
-    return withCatalogueTask(tool, {
+    return {
       overview: "Select the source type, target format, and processing options exposed by the page. Do not assume a format or control is supported unless it is listed.",
       example: "Use a duplicate of a small file that meets the form's listed requirements. Process it once with the intended settings, then open the result in a viewer or player that supports the target format.",
       validation: "Check file type and extension, output size, playback or document rendering, completeness, and any relevant page order, dimensions, channels, or timing. An output file being present does not prove that its contents are correct.",
-    });
+    };
   }
   if (engine.type === "qr" || engine.type === "barcode") {
-    return withCatalogueTask(tool, {
+    return {
       overview: "Enter the exact payload and code type required for your use case, then verify that the generated code decodes to the intended value.",
       example: "Generate a code from a non-sensitive sample value and test it with the actual phone camera, scanner, or application that will be used in practice.",
       validation: "Verify the decoded payload exactly. Check code format, print size, quiet space, contrast, and the limits of the intended scanner before distributing the code.",
-    });
+    };
   }
   if (engine.type === "url-media" || engine.type === "url-media-info") {
-    return withCatalogueTask(tool, {
+    return {
       overview: "Processing depends on source reachability, provider rules, and the availability of any configured service. Test a supported URL before using a more consequential input.",
       example: "Use a test URL for content you are authorized to inspect, submit it through the form, and confirm that the returned output corresponds to the requested source.",
       validation: "A valid-looking URL does not guarantee that remote processing is allowed or available. Review service errors and follow content rights and platform terms.",
-    });
+    };
   }
   if (engine.type === "security") {
-    return withCatalogueTask(tool, {
+    return {
       overview: "Treat the specific security check shown here as one part of a review, not as a guarantee that an entire system is secure.",
       example: "Use a test value or non-production sample first, then compare the result with the security requirement you intend to satisfy.",
       validation: "Do not infer comprehensive protection from one passing check. Avoid exposing live credentials or secrets, and verify suitability for the destination system.",
-    });
+    };
   }
   if (engine.type === "ai") {
-    return withCatalogueTask(tool, {
+    return {
       overview: "The quality of generated output depends on the context and constraints supplied and on the configured service. Treat the result as a draft that needs review.",
       example: "Try one focused prompt with a clear task, intended audience, and constraints. Review the result, identify missing or unsupported points, and refine the request only where the tool supports it.",
       validation: "Review every factual claim and instruction before reuse. Avoid including sensitive source material unless the tool's processing notice permits it, and do not treat generated content as independently verified.",
-    });
+    };
   }
   const categoryGuidance = CATEGORY_TASK_GUIDANCE[tool.category];
   if (categoryGuidance) {
-    return withCatalogueTask(tool, {
+    return {
       overview: categoryGuidance.overview,
       example: categoryGuidance.example,
       validation: categoryGuidance.validation,
-    });
+    };
   }
   const purpose = String(tool.description ?? "").trim();
-  return withCatalogueTask(tool, {
+  return {
     overview: purpose || ("Use " + tool.name + " for the task described by its current page. Check the visible controls and notices to confirm the operation available in this release."),
     example: "Start with a small, non-sensitive example that represents the task you need to complete. Use values or a source item whose expected result you can check, then review the output before trying a larger or more important input.",
     validation: "Confirm that the selected operation matches your task. Check required fields, units or formats, warnings, output completeness, and whether the result is suitable for the system or person that will receive it. Do not assume an input type or option is supported unless the current interface lists it.",
-  });
+  };
+}
+
+function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
+  return withCatalogueTask(tool, toolSpecificGuidanceBase(tool));
 }
 
 function engineLabel(tool: ToolMeta): string {
