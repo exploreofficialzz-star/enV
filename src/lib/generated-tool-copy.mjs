@@ -39,10 +39,12 @@ const SUFFIXES = [
   "Sensor", "Photo", "FOV", "Schedule", "Calendar"
 ].sort((a, b) => b.length - a.length);
 
+/** @param {unknown} value @returns {string} */
 function lower(value) {
   return String(value ?? "").trim().toLowerCase();
 }
 
+/** @param {string} name @returns {{prefix: string, operation: string}} */
 function splitName(name) {
   for (const suffix of SUFFIXES) {
     if (name.toLowerCase().endsWith(" " + suffix.toLowerCase())) {
@@ -52,11 +54,14 @@ function splitName(name) {
   return { prefix: "", operation: name };
 }
 
+/** @param {string} category @param {string} prefix @param {string} operation @returns {string} */
 function describe(category, prefix, operation) {
   const subject = lower(prefix || "this task");
   const label = prefix || "this task";
   const action = lower(operation);
+  /** @param {string} value */
   const is = (value) => action === value;
+  /** @param {string} value */
   const has = (value) => action.includes(value);
 
   if (category === "converters") {
