@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Children, cloneElement, isValidElement, useEffect, useId, useMemo, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,9 +15,18 @@ import {
 } from "./celebration-engine-utils";
 
 function Field({ label, children, full = false }: { label: string; children: ReactNode; full?: boolean }) {
+  const generatedId = useId();
+  let controlId = generatedId;
+  let controlAssigned = false;
+  const labelledChildren = Children.map(children, (child) => {
+    if (controlAssigned || !isValidElement<{ id?: string }>(child)) return child;
+    controlAssigned = true;
+    controlId = child.props.id ?? generatedId;
+    return cloneElement(child, { id: controlId });
+  });
   return <div className={full ? "flex flex-col gap-1.5 sm:col-span-2" : "flex flex-col gap-1.5"}>
-    <Label>{label}</Label>
-    {children}
+    <Label htmlFor={controlId}>{label}</Label>
+    {labelledChildren}
   </div>;
 }
 
