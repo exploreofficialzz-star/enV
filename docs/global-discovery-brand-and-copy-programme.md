@@ -40,11 +40,29 @@ The following findings describe the `main` snapshot used as the baseline for thi
 - Brand strings are inconsistent with the requested identity. The homepage currently uses `enV Digital Toolkit by chAs Technologies`; the global Open Graph site name and WebSite structured data also use expanded names. Existing SEO tests assert some of this wording, so they must be corrected alongside the user-facing text.
 - Category pages generally show the category description followed by the tool catalogue. Their explanatory content is not consistently deep or tailored to the category's actual workflows.
 - The tool documentation engine includes task guidance for all 43 current categories and explicit tool-level guidance for several important operations. It also uses category/engine-level fallback steps for many other tools. Category coverage is therefore established, but individual tool coverage is not: each active public tool still needs its real controls, inputs, outputs, processing path, errors and limits checked against source.
-- The original catalogue generator used repeated fallback and cross-category templates. The PR adds `src/lib/generated-tool-copy.mjs`, `scripts/generated-tool-copy.test.mjs` and a `check-catalog` refinement gate to replace known legacy boilerplate in generated output. This is a quality filter, not proof that every final description has been reviewed against its real engine; WS-02 and WS-03 still require an evidence-based tool inventory and individual review.
+- The original catalogue generator used repeated fallback and cross-category templates. The PR adds `src/lib/generated-tool-copy.mjs`, tests, registry integration and native export integration to replace known legacy boilerplate with task-oriented wording. This is a quality filter, not proof that every final description has been reviewed against its real engine; WS-02 and WS-03 still require an evidence-based tool inventory and individual review.
 - Tool and category metadata generally use a shared social image by default. Route-specific share cards are not consistently supplied.
-- The sitemap generator currently emits location entries without `lastmod`. IndexNow integration was not found in the reviewed discovery generator.
+- The sitemap does not yet emit `lastmod`, because there is no reliable per-canonical-route significant-content timestamp source. Do not substitute deployment time or sitemap-generation time.
+- IndexNow has been implemented on this PR branch: the production-only Vercel `INDEXNOW_KEY` variable is stored as a sensitive environment variable; the production build generates the matching root-level key file; the notifier checks that the key file is live, selects changed canonical URLs from the generated inventory, includes removed URLs from the previous sitemap when available, batches submissions and handles protocol retry signals. The initial key-file publication and first full-site synchronization still require the PR to be merged/deployed and then verified on the canonical domain.
 - Source-level crawler allowances do not prove that crawlers fetched pages, pages were indexed, or AI answer engines cited them.
 - Search Console and Bing Webmaster ownership verification, sitemap processing status, indexed-page counts, and AI citation results require external account evidence. The repository runbook records these as owner-side release evidence, not completed actions.
+
+## 2.1 Implementation status on PR #146
+
+The following status describes code committed to the draft PR branch, not a production release:
+
+| Workstream | Branch status | Remaining evidence or work |
+|---|---|---|
+| Product identity | First web, SEO, Open Graph, schema, README and native information-screen corrections committed | Search repository-wide for residual public name variants; inspect rendered canonical pages after deployment |
+| Category copy | All 43 current category descriptions and blurbs rewritten | Improve category-page introductions and workflow groupings; verify every description against current category inventory |
+| Generated tool descriptions | Shared rules integrated into web registry, catalogue generation and native export; guard tests added | Audit each active public canonical tool against its real engine; rule-based copy is not an individual capability audit |
+| Tool guides | Generic fallback now starts from each tool's purpose and gives relevant first-use/result checks | Finish per-tool controls, inputs, output, processing, limits and failure-path reviews |
+| IndexNow | Production-only Vercel secret and PR-branch key generation/submission implementation committed | Merge/deploy, verify the root key file, run one-time full sync, observe real IndexNow responses |
+| Sitemap freshness | No fabricated `lastmod` added | Add significant-content timestamps only after reliable route-level update metadata exists |
+| Route-specific social cards | Shared default card remains the current baseline | Design and verify a safe route-specific card strategy and test real platform fetchers |
+| External webmaster and AI proof | Runbook and repeatable test process documented | Google Search Console/Bing ownership, sitemap processing, actual AI citations and social preview evidence still outstanding |
+
+Do not mark a workstream complete based solely on source changes, a passing build, sitemap inclusion or crawler permission.
 
 ## 3. Competitor and platform research
 
@@ -145,7 +163,7 @@ Do not force every tool into a long article. Simple utilities need short, clear 
 ### WS-06 — Search and AI discovery engineering
 - Preserve and verify server-rendered, crawlable HTML for all canonical public pages.
 - Keep crawler policy explicit by crawler purpose. Search crawlers, user-triggered retrieval agents and model-training crawlers are not interchangeable.
-- Implement IndexNow with a domain verification key file and server-side notifications for genuinely new, materially updated and removed canonical URLs. Submit only changed canonical URLs, batch and retry safely, and record acknowledgements. An HTTP 200 means the URL list was received; it does not prove that a page was crawled or indexed. Google does not participate in IndexNow.
+- IndexNow implementation is on the PR branch. Preserve the production-only key file, canonical URL change detection, removed URL handling, batching, retry/backoff and honest receipt reporting. After production deployment, verify the live key file and run the one-time initial full-site synchronization described in `docs/seo-search-console-setup.md`. An HTTP 200 means the URL list was received; it does not prove that a page was crawled or indexed. Google does not participate in IndexNow.
 - Add sitemap `lastmod` only when a reliable per-page timestamp reflects a significant content change, such as a reviewed main-content, structured-data or important-link update. A deployment/build time or sitemap-generation time is not a valid substitute. Do not add meaningless `priority`/`changefreq` values.
 - Verify sitemap coverage, shards, canonical host, status codes, robots directives and private-route exclusion.
 - Evaluate whether a small machine-readable public catalogue index adds value for retrieval systems; do not invent a proprietary crawler standard or treat `llms.txt` as a ranking requirement.
@@ -208,7 +226,7 @@ A workstream is complete only when its implementation and evidence pass the rele
 - `npm run audit:seo:rendered` passes.
 - `npm run build`, typecheck and lint pass.
 - Live SEO smoke verifies the current build SHA, actual robots/sitemap/llms responses, canonical redirects, rendered metadata/schema, required public routes and noindex exclusions.
-- IndexNow key verification and submission behavior pass automated tests; failure/retry paths are covered.
+- IndexNow key-file creation, URL selection, XML parsing, and retry/response-state behavior pass automated tests. Production key-file and endpoint acceptance still require a real canonical-domain deployment.
 - Sitemap lastmod values are accurate and change only for significant updates.
 - Social images return successful public responses and generate usable previews.
 - Structured data passes the relevant schema and search-feature validation without fabricated ratings, review counts or pricing.
