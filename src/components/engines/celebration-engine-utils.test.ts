@@ -34,13 +34,15 @@ test("all 93 existing Celebration catalog IDs resolve to a real experience", () 
 
 test("page generator includes escaped programme items in its HTML export", () => {
   const result = buildCelebration({
-    occasion: "birthday", experience: "page-generator", title: "Birthday gathering",
+    occasion: "birthday", experience: "page-generator", title: "Birthday gathering", host: "Sam", honoree: "Alex", location: "Hall & Garden",
     schedule: "Welcome\nDinner <after>\nPhotos",
   });
   assert.match(result.html, /<h2>Schedule<\/h2><ol>/);
   assert.match(result.html, /<li>Welcome<\/li>/);
   assert.match(result.html, /<li>Dinner &lt;after&gt;<\/li>/);
   assert.match(result.html, /<li>Photos<\/li>/);
+  assert.match(result.html, /Hosted by: Sam/);
+  assert.match(result.html, /Hall &amp; Garden/);
   assert.doesNotMatch(result.html, /<li>Dinner <after>/);
 });
 
