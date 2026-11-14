@@ -13,7 +13,7 @@ test("accessibility discovery presents eight distinct Studios rather than action
 });
 
 test("canonical Studio paths and all historical action paths remain resolvable", () => {
-  assert.equal(getToolByPath("accessibility", "color-contrast-studio")?.id, "contrast-checker");
+  assert.equal(getToolByPath("accessibility", "color-contrast-studio")?.id, "color-contrast-studio");
   assert.equal(getToolByPath("accessibility", "aria-studio")?.id, "aria-checker");
   assert.ok(getToolByPath("accessibility", "focus-state-generator"));
   assert.ok(getToolByPath("accessibility", "line-height-helper"));
