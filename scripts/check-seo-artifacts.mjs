@@ -14,8 +14,8 @@ const seoHeadSource = seoMetadataSource.slice(seoMetadataSource.indexOf("export 
 assert.ok(rootRouteSource.includes("...webmasterVerificationMeta()"), "Search Console verification must be emitted once from the root document.");
 assert.ok(rootRouteSource.includes('name: "env-build-sha", content: __ENV_BUILD_SHA__'), "Every route must expose the source revision used to build it.");
 assert.doesNotMatch(seoHeadSource, /env-build-sha/, "The build revision marker must be emitted once by the root document.");
-assert.ok(homepageRouteSource.includes('title: "enV Digital Toolkit by chAs Technologies | Online Tools"'), "Homepage title must identify the enV product and parent brand.");
-assert.ok(homepageRouteSource.includes("enV Digital Toolkit by chAs Technologies LLC"), "Homepage description must disambiguate the enV brand from unrelated EnvTools products.");
+assert.ok(homepageRouteSource.includes('title: "enV | Tools for everyday tasks"'), "Homepage title must use the enV product name without an appended product label.");
+assert.ok(homepageRouteSource.includes("Find a tool for the task you are working on."), "Homepage description must explain the user purpose in plain language.");
 assert.doesNotMatch(seoHeadSource, /webmasterVerificationMeta\(\)/, "Child routes must not duplicate root verification tags.");
 assert.match(toolRouteSource, /toolSeoTitle\(tool, CANONICAL_SEO_TOOL_PAGES\)/, "Canonical tool route titles must use the full peer collection.");
 assert.match(toolRouteSource, /CANONICAL_SEO_TOOL_PAGES\s*=\s*canonicalSeoTools\([\s\S]*?\.filter\(\(tool\)\s*=>\s*tool\.category\s*!==\s*"developer"\s*\|\|\s*tool\.tags\.includes\("developer-studio"\)\)/, "Tool-route title peers must match the canonical public-tool inventory, excluding legacy Developer aliases.");
@@ -59,12 +59,14 @@ const website = websiteSchema();
 assert.equal(organization.name, "chAs Technologies LLC");
 assert.equal(organization.legalName, "chAs Technologies LLC");
 assert.ok(organization.description.includes("enV"));
-assert.ok(organization.brand.alternateName.includes("enV Digital Toolkit"));
+assert.equal(organization.brand.name, "enV");
+assert.equal(organization.brand.alternateName, undefined);
 assert.ok(organization.sameAs.includes("https://x.com/chAstechllc"));
 assert.ok(organization.brand.sameAs.includes("https://x.com/envtoolz"));
 const serializedWebsite = JSON.stringify(website);
-assert.ok(serializedWebsite.includes("enV Digital Toolkit"));
-assert.ok(serializedWebsite.includes("enV by chAs Technologies LLC"));
+assert.ok(serializedWebsite.includes('"name":"enV"'));
+assert.doesNotMatch(serializedWebsite, /enV Digital Toolkit|enV Browser Toolkit|enV by chAs Technologies LLC/);
+
 const longTargetX = boundedToolSeoTitle("Advanced Matrix Formula Calculator — Solve for Determinant", " Online | enV");
 const longTargetY = boundedToolSeoTitle("Advanced Matrix Formula Calculator — Solve for Inverse", " Online | enV");
 const guideTargetX = boundedToolSeoTitle("Advanced Matrix Formula Calculator — Solve for Determinant", " documentation | enV");
