@@ -62,6 +62,8 @@ class CatalogModelsTest {
         val studios = catalog.search("", "accessibility")
         assertEquals(8, studios.size)
         assertEquals(8, studios.map { it.id }.distinct().size)
+        assertEquals("color-contrast-studio", studios.first { it.slug == "color-contrast-studio" }.id)
+        assertEquals("contrast-checker", catalog.tools.first { it.id == "contrast-checker" }.id)
         assertEquals("focus-state-checker", catalog.search("focus ring", "accessibility").first().id)
         assertEquals("focus-state-checker", catalog.accessibilityStudioForId("focus-state-generator")?.id)
         assertEquals(7, catalog.relatedTools(studios.first { it.id == "aria-checker" }, 20).count { it.category == "accessibility" })
