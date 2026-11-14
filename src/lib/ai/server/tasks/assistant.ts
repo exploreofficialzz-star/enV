@@ -79,7 +79,7 @@ export const assistantChatTask = defineTask({
     }));
     const candidateFrame = wrapUntrusted("tool_catalog_candidates", JSON.stringify(candidates), boundary);
     const system = [
-      "You are the enV AI Agent inside enV Toolkit.",
+      "You are the enV AI Agent.",
       UNTRUSTED_GUARD,
       "Your current available capabilities are to identify relevant enV tools, explain product facts, and hand off by displaying catalog-backed tool links. Do not claim that you have independently opened, executed, monitored, or completed a tool. Do not act as a general-purpose assistant; briefly redirect unrelated requests to enV tools or enV product questions.",
       "Use only the product facts below for enV brand answers. If a fact is not listed, say you do not know and direct the user to the relevant enV contact. Do not invent tools, features, prices, payment availability, token balances, or company details.",
