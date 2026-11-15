@@ -29,13 +29,12 @@ const androidBackend = readIds("android", "backend");
 const iosBackend = readIds("ios", "backend");
 const backendCategories = new Set(["personal","marketing","accessibility","career","ecommerce","relationships","interactive","gaming","social","streaming","webdesign","education","network","security","creator","creators"]);
 const backendTypes = new Set(["developer","image","audio","video","mockup","post","pdf","document-backend"]);
-const explicitBackendIds = new Set(["youtube-audio-extractor","facebook-video-downloader","instagram-video-downloader","video-mute","video-audio-replacer","tiktok-video-downloader","url-media-inspector","video-audio-volume","video-bitrate","video-crop","video-fps","video-merger","video-resize","video-resolution-presets","video-rotate","video-to-avi","video-to-gif","video-to-mov","video-to-mp3","video-to-mp4","video-to-webm","video-url-downloader","x-video-downloader","youtube-video-downloader","whois-lookup","dns-lookup","website-screenshot","audio-to-text","audio-to-subtitles","video-to-text","video-to-subtitles"]);
+const explicitBackendIds = new Set(["music-downloader","youtube-audio-extractor","facebook-video-downloader","instagram-video-downloader","video-mute","video-audio-replacer","tiktok-video-downloader","url-media-inspector","video-audio-volume","video-bitrate","video-crop","video-fps","video-merger","video-resize","video-resolution-presets","video-rotate","video-to-avi","video-to-gif","video-to-mov","video-to-mp3","video-to-mp4","video-to-webm","video-url-downloader","x-video-downloader","youtube-video-downloader","whois-lookup","dns-lookup","website-screenshot","audio-to-text","audio-to-subtitles","video-to-text","video-to-subtitles"]);
 for (const tool of catalog) {
   if (tool.status !== "active" && tool.status !== "beta") continue;
   if (tool.engine.type === "document-backend" || backendCategories.has(tool.category) || backendTypes.has(tool.engine.type) || explicitBackendIds.has(tool.id)) { androidBackend.add(tool.id); iosBackend.add(tool.id); }
 }
 const intentionalWebOnlyReasons = {
-  "music-downloader": "No matching Android/iOS native execution evidence is registered for this active runtime ID; keep it Web-only until both native products expose and verify the same workflow.",
   "smartphone-prototype-lab": "The current experience is a Web scene and does not have an independent Kotlin or Swift implementation; do not wrap the Web experience in a native WebView.",
 };
 const active = new Set(catalog.filter((tool) => tool.status === "active" || tool.status === "beta").map((tool) => tool.id));
