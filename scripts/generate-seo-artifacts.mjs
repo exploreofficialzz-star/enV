@@ -6,6 +6,8 @@ import { pathToFileURL } from "node:url";
 import { CATEGORIES } from "../src/data/categories.ts";
 import { BLOG_ARTICLES } from "../src/data/blog-articles.ts";
 import { getAllTools, getSearchableTools, getToolsByCategory, toolPath } from "../src/lib/registry.ts";
+import { isToolUnderProduction } from "../src/lib/production-notice.ts";
+import { isGenericWorkflowPlaceholder } from "../src/lib/generic-workflow-policy.mjs";
 import { tools as sourceCatalogTools } from "../src/data/catalog.ts";
 import { createSocialCardArtifacts } from "./social-card-images.mjs";
 import { canonicalSeoTools, canonicalSeoToolFor, canonicalToolPath, isIndexableTool, toolSeoTitle, toolSeoDescription, toolGuideSeoTitle, toolSearchIntentTerms } from "../src/lib/seo-metadata.ts";
@@ -270,16 +272,39 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
   const runtimeInventoryRows = [...inventoryById.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([id, entry]) => {
     const tool = entry.runtimeTool ?? entry.sourceTool;
     const canonical = canonicalSeoToolFor(tool, guideTools);
+    const registryRoutes = [...entry.routes].sort();
     let canonicalTarget = canonical ? canonicalToolPath(canonical) : "";
-    let disposition = canonical ? (canonical.id === id ? "Canonical public route" : "Consolidated to " + canonical.id) : "";
+    let disposition = canonical
+      ? (canonical.id === id ? "Canonical public tool page" : "Consolidated generated variant; canonical tool ID: " + canonical.id)
+      : "";
     if (!canonical) {
-      if (tool.status === "planned") disposition = "Planned catalogue record";
-      else if (tool.id === "artboard-studio" || tool.slug === "artboard-studio") disposition = "Retired legacy route";
-      else if (!entry.sources.has("public-search")) disposition = "Not included in public search discovery";
-      else disposition = "No canonical SEO record; inspect production or alias policy";
-      canonicalTarget = "—";
+      if (tool.id === "artboard-studio" || tool.slug === "artboard-studio") {
+        disposition = "Retired legacy route";
+      } else if (isGenericWorkflowPlaceholder(tool)) {
+        disposition = "Generic workflow fallback; not indexable until a dedicated operation replaces it";
+      } else if (tool.status === "planned") {
+        disposition = "Planned catalogue record";
+      } else if (isToolUnderProduction(tool)) {
+        disposition = "Under-production tool; excluded from public indexing";
+      } else if (tool.engine.type === "calculator" && /^exp-product-general-product-relation-\\d+-[abc]$/.test(tool.engine.formula ?? "")) {
+        disposition = "Generic Input A/Input B equation template; excluded from public indexing";
+      } else if (tool.category === "developer" && !tool.tags.includes("developer-studio")) {
+        const legacyTarget = canonicalToolPath(tool);
+        if (legacyTarget !== toolPath(tool)) {
+          canonicalTarget = legacyTarget;
+          disposition = "Legacy Developer alias; resolved to canonical Studio page";
+        } else {
+          disposition = "Legacy Developer entry; canonical Studio target not resolved";
+        }
+      } else if (tool.status !== "active" && tool.status !== "beta") {
+        disposition = "Non-public catalogue status: " + String(tool.status);
+      } else if (!entry.sources.has("public-search")) {
+        disposition = "Not included in public search discovery";
+      } else {
+        disposition = "Indexable candidate without a canonical SEO record; review canonical policy";
+      }
     }
-    return { id, tool, routes: [...entry.routes].sort(), canonicalTarget, disposition, sources: [...entry.sources].sort(), androidManifestListed: androidNativeToolIds.has(id), iosManifestListed: iosNativeToolIds.has(id) };
+    return { id, tool, routes: registryRoutes, canonicalTarget, disposition, sources: [...entry.sources].sort(), androidManifestListed: androidNativeToolIds.has(id), iosManifestListed: iosNativeToolIds.has(id) };
   });
   const sourceDuplicateCount = sourceCatalogTools.length - new Set(sourceCatalogTools.map((tool) => tool.id)).size;
   const runtimeDuplicateCount = runtimeRegistryTools.length - new Set(runtimeRegistryTools.map((tool) => tool.id)).size;
@@ -292,14 +317,18 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
   const categoryCounts = CATEGORIES.map((category) => [category.id, getToolsByCategory(category.id).length]);
   const reconciledRows = runtimeInventoryRows.map((row) => {
     const tool = row.tool;
-    const target = row.canonicalTarget && row.canonicalTarget !== "—" ? "[" + inventoryCell(row.canonicalTarget) + "](" + SITE_ORIGIN + row.canonicalTarget + ")" : inventoryCell(row.disposition);
+    const target = row.canonicalTarget
+      ? "[" + inventoryCell(row.canonicalTarget) + "](" + SITE_ORIGIN + row.canonicalTarget + ")"
+      : "—";
     return [
       "| " + inventoryCell(row.id), inventoryCell(tool.name), inventoryCell(tool.category),
       inventoryCell(tool.subcategory ?? "—"), inventoryCell(tool.status), inventoryCell(tool.slug),
-      inventoryCell(row.routes.join(", ") || "—"), target, inventoryCell(inventoryEngine(tool)),
-      inventoryCell(inventoryCatalogueFlags(tool)), inventoryCell(toolTaskGuidanceSource(tool)),
-      inventoryCell((tool.keywords ?? []).join(", ")), inventoryCell((tool.tags ?? []).join(", ")),
-      inventoryCell((tool.related ?? []).join(", ")), row.androidManifestListed ? "Listed" : "Not listed", row.iosManifestListed ? "Listed" : "Not listed", inventoryCell(row.sources.join(", ")),
+      inventoryCell(row.routes.join(", ") || "—"), target, inventoryCell(row.disposition),
+      inventoryCell(inventoryEngine(tool)), inventoryCell(inventoryCatalogueFlags(tool)),
+      inventoryCell(toolTaskGuidanceSource(tool)), inventoryCell((tool.keywords ?? []).join(", ")),
+      inventoryCell((tool.tags ?? []).join(", ")), inventoryCell((tool.related ?? []).join(", ")),
+      row.androidManifestListed ? "Listed" : "Not listed", row.iosManifestListed ? "Listed" : "Not listed",
+      inventoryCell(row.sources.join(", ")),
     ].join(" | ");
   });
   const socialCards = createSocialCardArtifacts({ categories: CATEGORIES, toolPages: tools, guideTools, articles: BLOG_ARTICLES, siteOrigin: SITE_ORIGIN });
@@ -343,8 +372,8 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
     "- Native expanded inventory records: " + (nativeInventory.summary?.totalTools ?? "unknown") + " across " + (nativeInventory.summary?.engineFamilies ?? nativeFamilies.length) + " engine families (base catalogue fingerprint " + nativeInventory.baseCatalogVersion + ").",
     "- Android native coverage manifest lists " + androidNativeToolIds.size + " unique tool IDs; iOS lists " + iosNativeToolIds.size + " unique tool IDs. Both manifests contain the same stable ID set. A manifest entry is a coverage declaration, not proof of successful behavior on a physical device.",
     "- Native manifest engine-family counts: " + nativeFamilies.map((family) => family.family + "=" + family.total + " (Android " + family.androidImplemented + ", iOS " + family.iosImplemented + ")").join("; "),
-    "| Tool ID | Name | Category | Subcategory | Status | Slug | Registry and category routes | Canonical public route or disposition | Engine operation/configuration | Catalogue execution/account flags | Task guidance source | Keywords | Tags | Related IDs | Android native manifest | iOS native manifest | Source surfaces |",
-    "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
+    "| Tool ID | Name | Category | Subcategory | Status | Slug | Registry and category routes | Canonical public target | Disposition / exclusion reason | Engine operation/configuration | Catalogue execution/account flags | Task guidance source | Keywords | Tags | Related IDs | Android native manifest | iOS native manifest | Source surfaces |"
+    "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ...reconciledRows,
     "",
     "",
@@ -358,7 +387,7 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
     "- Generic Input A/Input B placeholder equations are not published as search landing pages.",
     "- Tool categories included: " + categories.length,
     "- Canonical host: " + SITE_ORIGIN,
-    "- Each row links to the canonical tool page and its detailed usage guide.",
+    "- Indexable records link to their canonical public target; non-indexable, consolidated, legacy and excluded records retain an explicit disposition so count differences can be audited.",
     "- Engine operation, status, client-side/backend and account columns are copied from the current registry. These catalogue flags are review leads, not proof of the live runtime data path, actual local execution, platform parity or successful behavior.",
     "- This generated inventory does not claim that a human has completed the source/runtime audit for every tool. A build or inventory row is not an individual verification result.",
     "- Search-intent terms are seeded from each tool's name, category, keywords, and tags in the product catalogue. They are not keyword-volume estimates or claims that every phrase has search demand.",
