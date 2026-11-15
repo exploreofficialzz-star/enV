@@ -157,3 +157,16 @@ jobs:
         env:
           BROWSER_AUDIT_SAMPLE: 250
         run: npm run verify
+
+      - name: Generate per-tool functional audit ledger
+        if: always()
+        run: npm run audit:tool-ledger -- --output=audit/tool-functional-audit-ledger.json
+
+      - name: Upload per-tool functional audit ledger
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tool-functional-audit-ledger
+          path: audit/tool-functional-audit-ledger.json
+          if-no-files-found: warn
+          retention-days: 30
