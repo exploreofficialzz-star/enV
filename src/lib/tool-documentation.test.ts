@@ -796,3 +796,60 @@ test("category grouping uses only repeated subcategory metadata and preserves ev
   assert.equal(groupToolsBySubcategory([tool("a", "One"), tool("b", "One")]), null,
     "A single repeated subcategory does not justify fabricated group structure.");
 });
+
+
+test("all 93 supported Celebration IDs receive operation-specific documentation", () => {
+  const occasions = [
+    "birthday", "anniversary", "graduation", "valentine", "christmas", "new-year",
+    "congratulations", "thank-you", "appreciation", "farewell", "achievement", "party",
+  ];
+  const experiences = [
+    "page-generator", "interactive-card", "invitation-generator", "countdown",
+    "memory-page", "reveal-page", "quiz-generator", "surprise-page",
+  ];
+  const unavailable = new Set([
+    "birthday-countdown", "valentine-reveal-page", "appreciation-reveal-page",
+  ]);
+  const expectedGuidance = new Map([
+    ["page-generator", "standalone HTML programme page"],
+    ["interactive-card", "second message panel that the recipient opens"],
+    ["invitation-generator", "themed HTML invitation and a copyable text version"],
+    ["countdown", "updates the days, hours, minutes and seconds"],
+    ["memory-page", "written memories and an optional photo gallery"],
+    ["reveal-page", "visitor selects Reveal the message"],
+    ["quiz-generator", "small multiple-choice quiz"],
+    ["surprise-page", "button that opens the surprise content"],
+  ]);
+  let count = 0;
+  for (const occasion of occasions) {
+    for (const experience of experiences) {
+      const id = occasion + "-" + experience;
+      if (unavailable.has(id)) continue;
+      const tool: ToolMeta = {
+        id,
+        name: id,
+        slug: id,
+        description: "Create a celebration page for the selected occasion using the fields provided.",
+        category: "celebrations",
+        keywords: [],
+        tags: [],
+        icon: "PartyPopper",
+        popularity: 0,
+        featured: false,
+        clientSide: true,
+        requiresBackend: false,
+        requiresAuth: false,
+        status: "active",
+        related: [],
+        engine: { type: "custom", id },
+      };
+      assert.equal(toolTaskGuidanceSource(tool), "operation-specific", id);
+      const whenToUse = getToolDocumentation(tool).find((section) => section.id === "when-to-use");
+      assert.ok(whenToUse, id + ": missing its individual 'when to use' guide section");
+      assert.ok(whenToUse.paragraphs[0].includes(expectedGuidance.get(experience) ?? ""), id + ": wrong or missing operation guidance");
+      assert.ok(whenToUse.paragraphs[0].startsWith("This guide is specific to " + id + "."), id + ": guide identity is missing");
+      count += 1;
+    }
+  }
+  assert.equal(count, 93, "Every supported Celebration operation must receive the source-specific guide rule.");
+});
