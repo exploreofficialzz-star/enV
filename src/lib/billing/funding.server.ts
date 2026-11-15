@@ -22,13 +22,14 @@ function publicOrigin(): string | null {
 }
 
 export async function getFundingOptions(countryCode: string | null = null) {
-  // The Paystack adapter is eligible only for the merchant's own country.
-  // Flutterwave is independently resolved against the customer's Flutterwave
-  // country profile, including all markets configured for that merchant.
+  // Nigeria is handled by the local Paystack route. Do not surface Flutterwave
+  // alongside it or silently turn Flutterwave into an alternate Nigeria route.
+  // Customers outside the Paystack merchant country are resolved independently
+  // against Flutterwave's V4 country/currency and live payment-method coverage.
   const paystackIsLocal = isPaystackLocalCustomer(countryCode, process.env);
   const [paystack, flutterwave] = await Promise.all([
     paystackIsLocal ? getPaystackFundingOption(countryCode) : Promise.resolve(null),
-    getFlutterwaveFundingOption(countryCode),
+    paystackIsLocal ? Promise.resolve(null) : getFlutterwaveFundingOption(countryCode),
   ]);
 
   const refundDisputeHandlingApproved =
