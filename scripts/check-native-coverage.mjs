@@ -19,9 +19,13 @@ for (const [label, source, marker] of [
 // Compose screen and iOS has its own SwiftUI flow in ToolViews.swift. Both resolve
 // supported public URLs and download through the configured enV API gateway.
 const androidMusicDownloader = fs.readFileSync(new URL('../apps/android/app/src/main/java/com/chastech/env/NativeMusicDownloader.kt', import.meta.url), 'utf8');
+const iosNativeCatalog = fs.readFileSync(new URL('../apps/ios/enV/CatalogCore.swift', import.meta.url), 'utf8');
 for (const [label, source, marker] of [
-  ['Android Music Downloader route', nativeAnalyzerRoute, 'NativeMusicDownloaderScreen()'],
+  ['Android Music Downloader route', nativeAnalyzerRoute, 'if (tool.id == "music-downloader") { NativeMusicDownloaderScreen(); return }'],
   ['Android Music Downloader API resolver', androidMusicDownloader, 'resolveProviderMusicPage('],
+  ['Android Music Downloader API origin', androidMusicDownloader, 'BuildConfig.ENV_API_BASE_URL'],
+  ['iOS Music Downloader native catalog extension', iosNativeCatalog, 'includingMusicDownloader()'],
+  ['iOS Music Downloader route', iosAnalyzerRoutes, 'else if tool.id == "music-downloader" { NativeMusicDownloaderView() }'],
   ['iOS Music Downloader resolver', iosAnalyzerRoutes, 'nativeMusicResolve('],
   ['iOS Music Downloader download', iosAnalyzerRoutes, 'nativeMusicDownload('],
   ['iOS Music Downloader retry', iosAnalyzerRoutes, 'nativeMusicDownloadWithRetry('],
