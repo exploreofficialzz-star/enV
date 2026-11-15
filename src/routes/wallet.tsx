@@ -98,21 +98,16 @@ type LocalOfflineAllowance = {
 
 function flutterwaveNetworks(countryCode: string | null | undefined): string[] {
   const options: Record<string, string[]> = {
-    GH: ["MTN", "VODAFONE", "AIRTELTIGO"],
-    KE: ["MPESA"],
-    UG: ["MTN", "AIRTEL"],
-    TZ: ["TIGO", "AIRTEL", "VODACOM", "HALOTEL"],
-    RW: ["MTN", "AIRTEL"],
-    MW: ["AIRTEL", "TNM"],
-    CI: ["MTN", "ORANGE", "MOOV"],
+    BF: ["ORANGE", "MOBICASH"],
     CM: ["MTN", "ORANGE"],
-    BJ: ["MTN", "MOOV"],
-    TG: ["TOGOCOM", "MOOV"],
-    BF: ["ORANGE", "MOOV"],
-    ML: ["ORANGE", "MOOV"],
-    NE: ["AIRTEL", "MOOV"],
-    SN: ["ORANGE", "FREE"],
-    SL: ["ORANGE", "AFRICELL"],
+    GH: ["MTN", "TELECEL", "AIRTELTIGO"],
+    CI: ["MTN", "ORANGE", "WAVE"],
+    KE: ["MPESA"],
+    RW: ["AIRTEL", "MTN"],
+    SN: ["ORANGE", "FREE", "WAVE"],
+    TZ: ["AIRTEL", "TIGO", "HALOPESA"],
+    UG: ["AIRTEL", "MTN"],
+    ZM: ["AIRTEL", "MTN", "ZAMTEL"],
   };
   return options[String(countryCode ?? "").toUpperCase()] ?? [];
 }
@@ -236,13 +231,20 @@ function Account() {
   const [flutterwavePhoneNumber, setFlutterwavePhoneNumber] = useState("");
   const [flutterwaveNetwork, setFlutterwaveNetwork] = useState("");
   const [flutterwaveBankCode, setFlutterwaveBankCode] = useState("044");
+  const [flutterwaveAddressLine1, setFlutterwaveAddressLine1] = useState("");
+  const [flutterwaveAddressLine2, setFlutterwaveAddressLine2] = useState("");
+  const [flutterwaveCity, setFlutterwaveCity] = useState("");
+  const [flutterwaveState, setFlutterwaveState] = useState("");
+  const [flutterwavePostalCode, setFlutterwavePostalCode] = useState("");
   const [flutterwaveCardNumber, setFlutterwaveCardNumber] = useState("");
   const [flutterwaveExpiryMonth, setFlutterwaveExpiryMonth] = useState("");
   const [flutterwaveExpiryYear, setFlutterwaveExpiryYear] = useState("");
   const [flutterwaveCvv, setFlutterwaveCvv] = useState("");
   const [flutterwaveChallenge, setFlutterwaveChallenge] = useState<{ reference: string; type: "otp" | "pin" } | null>(null);
   const [flutterwaveAuthorizationValue, setFlutterwaveAuthorizationValue] = useState("");
-  const [fundingOptionsState, setFundingOptionsState] = useState<FundingOptionsState>({ status: "loading", methods: { card: false, local: false, more: false } });
+  const [fundingOptionsState, setFundingOptionsState] = useState<FundingOptionsState>({
+    status: "loading", methods: { card: false, local: false, more: false, flutterwave: false },
+  });
   const [fundingFeedback, setFundingFeedback] = useState<{ kind: "success" | "error" | "info"; message: string } | null>(null);
   const [showAllTransactions, setShowAllTransactions] = useState(false);
   const [showBalance, setShowBalance] = useState(true);
@@ -561,7 +563,7 @@ function Account() {
       let flutterwaveDetails: Record<string, unknown> | undefined;
       if (method === "flutterwave") {
         const phoneNumber = flutterwavePhoneNumber.replace(/\D/g, "");
-        if (phoneNumber.length < 7 || phoneNumber.length > 15) {
+        if (!/^\d{7,10}$/.test(phoneNumber)) {
           throw new Error("Enter a valid phone number to continue with Flutterwave.");
         }
         if (!flutterwaveCustomerName.trim()) {
@@ -573,7 +575,7 @@ function Account() {
           const year = flutterwaveExpiryYear.trim();
           const cvv = flutterwaveCvv.trim();
           if (cardNumber.length < 12 || cardNumber.length > 19 ||
-              !/^0[1-9]|1[0-2]$/.test(month) ||
+              !/^(?:0[1-9]|1[0-2])$/.test(month) ||
               !/^(?:\d{2}|\d{4})$/.test(year) ||
               !/^\d{3,4}$/.test(cvv)) {
             throw new Error("Check the card number, expiry date and security code.");
@@ -633,6 +635,13 @@ function Account() {
           provider: "flutterwave",
           flutterwaveDetails,
           customerName: flutterwaveCustomerName.trim(),
+          customerAddress: {
+            line1: flutterwaveAddressLine1.trim(),
+            line2: flutterwaveAddressLine2.trim(),
+            city: flutterwaveCity.trim(),
+            state: flutterwaveState.trim(),
+            postalCode: flutterwavePostalCode.trim(),
+          },
           amountUsdCents,
           idempotencyKey: "flutterwave-wallet-" + crypto.randomUUID(),
         } : {
@@ -966,15 +975,16 @@ function Account() {
   const visibleWallet = state.status === "ready" ? state.wallet : undefined;
   const customAmountCents = parseUsdAmountToCents(customAmountUsd);
   const customTokenAmount = customAmountCents ?? 0;
-  const methodAvailable = (method: CustomerPaymentMethod) =>
+  const methodAvailable = (method: WalletFundingChoice) =>
     fundingOptionsState.status === "ready" && fundingOptionsState.methods[method];
   const fundingMethodOptions: Array<{
-    id: CustomerPaymentMethod;
+    id: WalletFundingChoice;
     title: string;
     icon: React.ReactNode;
   }> = [
     { id: "card", title: "Card", icon: <CreditCard size={19} aria-hidden="true" /> },
     { id: "local", title: "Local payment", icon: <Wallet size={19} aria-hidden="true" /> },
+    { id: "flutterwave", title: "Flutterwave", icon: <CreditCard size={19} aria-hidden="true" /> },
     { id: "more", title: "Other", icon: <Coins size={19} aria-hidden="true" /> },
   ];
   const availableFundingMethodOptions = fundingMethodOptions.filter((option) => methodAvailable(option.id));
