@@ -4,9 +4,13 @@ import { isSameOriginRequest, jsonResponse, readJsonObject, requireBillingUser }
 import { initializePaystackCheckout, minimumPaystackAmountMinor } from "../../../../src/lib/billing/paystack.server";
 import { initializeCryptomusCheckout } from "../../../../src/lib/billing/cryptomus.server";
 import { initializeFlutterwaveCheckout } from "../../../../src/lib/billing/flutterwave.server";
-import { getCustomerCountry, toFlutterwaveMajorAmount } from "../../../../src/lib/billing/country-routing";
+import {
+  getCustomerCountry, getCurrencyMinorUnitExponent, toFlutterwaveMajorAmount,
+} from "../../../../src/lib/billing/country-routing";
 import { getFundingOptions } from "../../../../src/lib/billing/paystack.server";
-import { quoteTokenPacks, type CurrencyPackQuote } from "../../../../src/lib/billing/fx.server";
+import {
+  getFlutterwaveAmountSuggestions, quoteTokenPacks, type CurrencyPackQuote,
+} from "../../../../src/lib/billing/fx.server";
 import { getFundingCandidates, type CustomerPaymentMethod } from "../../../../src/lib/billing/payment-methods";
 
 const SAFE_CHECKOUT_FAILURES: Record<string, { status: number; message: string }> = {
@@ -63,6 +67,8 @@ export default defineHandler(async (event) => {
 
   let providerOption: (typeof funding.providers)[number] | undefined;
   let pricingQuote: CurrencyPackQuote | undefined;
+  let flutterwaveFractionalCurrency: string | null = null;
+  let flutterwaveQuoteUnavailable = false;
   for (const candidate of candidates) {
     if (candidate.id === "cryptomus") {
       providerOption = candidate;
@@ -72,17 +78,53 @@ export default defineHandler(async (event) => {
       const quote = (await quoteTokenPacks(candidate.currency, [tokens]))[0];
       if (!quote) continue;
       if (candidate.id === "paystack" && quote.amountMinor < minimumPaystackAmountMinor(candidate.currency)) continue;
-      if (candidate.id === "flutterwave" && toFlutterwaveMajorAmount(quote.amountMinor, candidate.currency) === null) continue;
+      if (candidate.id === "flutterwave") {
+        const exponent = getCurrencyMinorUnitExponent(candidate.currency);
+        if (exponent !== null && quote.amountMinor % (10 ** exponent) !== 0) {
+          flutterwaveFractionalCurrency = candidate.currency;
+          continue;
+        }
+        if (toFlutterwaveMajorAmount(quote.amountMinor, candidate.currency) === null) continue;
+      }
       providerOption = candidate;
       pricingQuote = quote;
       break;
     } catch {
-      // Try the next already-approved gateway; never fabricate a fallback amount.
+      if (candidate.id === "flutterwave") flutterwaveQuoteUnavailable = true;
+      // Do not fabricate an FX amount or route a foreign customer into the Nigeria Paystack merchant.
     }
   }
 
   const provider = providerOption?.id;
   if (!providerOption || !providerOption.enabled || !provider) {
+    if (flutterwaveFractionalCurrency) {
+      let suggestions: Awaited<ReturnType<typeof getFlutterwaveAmountSuggestions>> = [];
+      try {
+        suggestions = await getFlutterwaveAmountSuggestions(flutterwaveFractionalCurrency, tokens);
+      } catch {
+        // The actionable currency rule can still be explained without a suggestion.
+      }
+      const suggestionText = suggestions.length
+        ? " Based on the current exchange-rate quote, try " + suggestions.map((item) =>
+            "$" + (item.usdAmountCents / 100).toFixed(2) + " (about " +
+            flutterwaveFractionalCurrency + " " + item.amountMajor.toLocaleString("en-US") + ")",
+          ).join(" or ") + "."
+        : " Adjust the USD amount until the converted amount is a whole " + flutterwaveFractionalCurrency + " unit.";
+      return jsonResponse({
+        ok: false,
+        error: "FLUTTERWAVE_AMOUNT_REQUIRES_WHOLE_UNIT",
+        message: "Flutterwave hosted checkout requires a whole-number charge in " +
+          flutterwaveFractionalCurrency + ". enV will not round your charge or change the tokens you receive." +
+          suggestionText + " No payment was taken.",
+      }, 422);
+    }
+    if (flutterwaveQuoteUnavailable) {
+      return jsonResponse({
+        ok: false,
+        error: "FLUTTERWAVE_QUOTE_UNAVAILABLE",
+        message: "A current exchange-rate quote for Flutterwave is unavailable. No payment was taken. Please retry shortly.",
+      }, 503);
+    }
     return jsonResponse({
       ok: false,
       error: "PAYMENT_METHOD_NOT_AVAILABLE_FOR_COUNTRY",
