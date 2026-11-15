@@ -14,7 +14,7 @@ export default defineHandler(async (event) => {
     return jsonResponse({ ok: false, error: "INVALID_PAYMENT_REFERENCE" }, 400);
   }
   try {
-    const result = await verifyAndCreditFlutterwaveReference(reference);
+    const result = await verifyAndCreditFlutterwaveReference(reference, undefined, undefined, auth.userId);
     return jsonResponse({ ok: true, data: { status: "succeeded", result } });
   } catch (error) {
     const candidate = error as { code?: unknown; status?: unknown; message?: unknown };
