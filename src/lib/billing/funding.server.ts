@@ -1,9 +1,9 @@
 import { normalizeCountryCode, getCountryPaymentProfile } from "./country-routing";
 import { isPaystackLocalCustomer } from "./provider-config";
 import { getPaystackFundingOption } from "./paystack.server";
+import { getFlutterwaveFundingOption } from "./flutterwave.server";
 
 const TOKEN_PACKS = [100, 250, 500, 1_000] as const;
-import { getFlutterwaveFundingOption } from "./flutterwave.server";
 
 /**
  * Provider-neutral wallet funding catalogue.
