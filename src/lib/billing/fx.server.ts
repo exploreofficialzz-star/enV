@@ -183,6 +183,77 @@ export async function quoteTokenPacks(
   });
 }
 
+export type FlutterwaveAmountSuggestion = {
+  usdAmountCents: number;
+  amountMinor: number;
+  amountMajor: number;
+};
+
+/**
+ * Find nearby USD-cent amounts that the Flutterwave V3 hosted checkout can
+ * represent exactly. V3's amount field is an integer in major currency units;
+ * enV must not round the provider amount while crediting the originally entered
+ * token count.
+ */
+export function findNearbyFlutterwaveAmountSuggestions(
+  currencyValue: string,
+  requestedUsdCents: number,
+  rate: number,
+  maxSearchDistanceCents = 10_000,
+): FlutterwaveAmountSuggestion[] {
+  const currency = validIsoCurrency(currencyValue);
+  const exponent = getCurrencyMinorUnitExponent(currency);
+  if (exponent === null || exponent === 0 ||
+      !Number.isSafeInteger(requestedUsdCents) || requestedUsdCents < 100 ||
+      !Number.isFinite(rate) || rate <= 0 ||
+      !Number.isSafeInteger(maxSearchDistanceCents) || maxSearchDistanceCents < 1) {
+    return [];
+  }
+
+  const minorUnitFactor = 10 ** exponent;
+  const radius = Math.min(
+    maxSearchDistanceCents,
+    Math.max(600, Math.ceil(300 / rate) + 100),
+  );
+  let lower: FlutterwaveAmountSuggestion | null = null;
+  let upper: FlutterwaveAmountSuggestion | null = null;
+
+  for (let distance = 1; distance <= radius && (!lower || !upper); distance += 1) {
+    const candidates = [
+      requestedUsdCents - distance,
+      requestedUsdCents + distance,
+    ];
+    for (const usdAmountCents of candidates) {
+      if (usdAmountCents < 100 || usdAmountCents > 9_000_000_000) continue;
+      const amountMinor = usdCentsToMinorAmount(usdAmountCents, currency, rate);
+      if (amountMinor % minorUnitFactor !== 0) continue;
+      const suggestion = {
+        usdAmountCents,
+        amountMinor,
+        amountMajor: amountMinor / minorUnitFactor,
+      };
+      if (usdAmountCents < requestedUsdCents && !lower) lower = suggestion;
+      if (usdAmountCents > requestedUsdCents && !upper) upper = suggestion;
+    }
+  }
+
+  return [lower, upper].filter((value): value is FlutterwaveAmountSuggestion => value !== null);
+}
+
+/** Get current-rate suggestions; checkout always re-quotes before initialization. */
+export async function getFlutterwaveAmountSuggestions(
+  currencyValue: string,
+  requestedUsdCents: number,
+): Promise<FlutterwaveAmountSuggestion[]> {
+  const currency = validIsoCurrency(currencyValue);
+  const snapshot = await readRates();
+  const rate = snapshot.rates[currency];
+  if (typeof rate !== "number" || !Number.isFinite(rate) || rate <= 0) {
+    throw new Error("No current USD exchange rate is available for " + currency + ".");
+  }
+  return findNearbyFlutterwaveAmountSuggestions(currency, requestedUsdCents, rate);
+}
+
 /** Formatting helper shared by wallet and pricing surfaces. */
 export function formatUsdReferenceForTokenPack(tokens: number): string {
   const cents = usdCentsForTokenPack(tokens);
