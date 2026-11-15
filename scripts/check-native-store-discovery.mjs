@@ -8,6 +8,7 @@ const androidManifest = read("apps/android/app/src/main/AndroidManifest.xml");
 const iosInfo = read("apps/ios/enV/Info.plist");
 const iosProject = read("apps/ios/enV.xcodeproj/project.pbxproj");
 const nativeInventory = JSON.parse(read("apps/shared/native-engine-inventory.json"));
+const storeListing = JSON.parse(read("docs/native-store-listing.json"));
 const catalogSource = read("src/data/catalog.ts");
 const seoSource = read("src/lib/seo-metadata.ts");
 const platformSource = read("src/components/platform/platform-landing.tsx");
@@ -63,6 +64,36 @@ assert.deepEqual([...androidIds].sort(), [...iosIds].sort(), "Android and iOS co
 assert.equal(nativeInventory.summary.androidImplemented, androidIds.size, "Android native inventory summary must match its manifest.");
 assert.equal(nativeInventory.summary.iosImplemented, iosIds.size, "iOS native inventory summary must match its manifest.");
 
+
+const play = storeListing.android;
+const appStore = storeListing.ios;
+const byteLength = (value) => Buffer.byteLength(value, "utf8");
+assert.equal(storeListing.status, "draft-not-submitted", "Store metadata must stay a draft until store-account publication is verified.");
+assert.equal(storeListing.productName, "enV", "The product name must remain enV.");
+assert.equal(play.appName, "enV");
+assert.equal(play.applicationId, androidApplicationId);
+assert.ok(play.appName.length <= 30, "Google Play title limit is 30 characters.");
+assert.ok(play.shortDescription.length <= 80, "Google Play short description limit is 80 characters.");
+assert.ok(play.fullDescription.length <= 4000, "Google Play full description limit is 4,000 characters.");
+assert.equal(appStore.appName, "enV");
+assert.equal(appStore.bundleIdentifier, iosBundleIdentifier);
+assert.ok(appStore.appName.length >= 2 && appStore.appName.length <= 30, "App Store name must be 2–30 characters.");
+assert.ok(appStore.subtitle.length <= 30, "App Store subtitle limit is 30 characters.");
+assert.ok(appStore.promotionalText.length <= 170, "App Store promotional text limit is 170 characters.");
+assert.ok(appStore.description.length <= 4000, "App Store description limit is 4,000 characters.");
+assert.ok(byteLength(appStore.keywords) <= 100, "App Store keywords limit is 100 UTF-8 bytes.");
+for (const [platform, listing] of [["Google Play", play], ["App Store", appStore]]) {
+  for (const field of ["supportUrl", "privacyPolicyUrl"]) {
+    const url = new URL(listing[field]);
+    assert.equal(url.protocol, "https:", platform + " " + field + " must use HTTPS.");
+    assert.equal(url.hostname, "envtools.store", platform + " " + field + " must use the canonical enV host.");
+  }
+  assert.equal(listing.listingUrl, null, platform + " listing URL must remain unset until the actual public product page is verified.");
+  assert.ok(listing.assetReadiness.includes("Not verified"), platform + " store assets must not be described as ready without evidence.");
+}
+assert.ok(storeListing.crossSurface.networkDisclosure.includes("Do not claim"), "Store copy must not promise whole-app offline operation.");
+assert.ok(storeListing.crossSurface.nativeAppPolicy.includes("system browser"), "Store copy must distinguish native screens from Web-only browser handoff.");
+
 const report = {
   status: "passed",
   canonicalProductName: "enV",
@@ -93,6 +124,12 @@ const report = {
     iosBuildVersions.length === 1 &&
     iosMarketingVersions[0] === androidVersionName &&
     iosBuildVersions[0] === String(androidVersionCode),
+  storeListingDraft: {
+    status: storeListing.status,
+    googlePlay: { title: play.appName, shortDescriptionCharacters: play.shortDescription.length, fullDescriptionCharacters: play.fullDescription.length, listingUrlVerified: Boolean(play.listingUrl) },
+    appStore: { title: appStore.appName, subtitleCharacters: appStore.subtitle.length, promotionalTextCharacters: appStore.promotionalText.length, descriptionCharacters: appStore.description.length, keywordBytes: byteLength(appStore.keywords), listingUrlVerified: Boolean(appStore.listingUrl) },
+    screenshots: "Not verified; release-build captures are still required.",
+  },
   storeAccountPublication: "Not checked by this source audit; requires Google Play Console and App Store Connect evidence.",
 };
 process.stdout.write(JSON.stringify(report, null, 2) + "\n");
