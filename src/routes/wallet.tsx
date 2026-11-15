@@ -36,7 +36,7 @@ type WalletActivity = {
 
 type WalletState = { status: "loading" | "ready" | "unavailable"; message?: string; wallet?: WalletData; activity?: WalletActivity[] };
 type WalletFundingChoice = CustomerPaymentMethod | "flutterwave";
-type FlutterwaveMethod = "card" | "mobile_money" | "opay" | "ussd" | "bank_transfer";
+type FlutterwaveMethod = "card" | "mobile_money" | "opay" | "ussd" | "bank_account" | "bank_transfer";
 type FlutterwaveBankTransferDetails = {
   accountNumber: string;
   bankName: string;
@@ -286,7 +286,7 @@ function Account() {
         }
         const flutterwaveMethods = Array.isArray(payload.data?.flutterwave?.paymentMethods)
           ? payload.data.flutterwave.paymentMethods.filter((item): item is FlutterwaveMethod =>
-              item === "card" || item === "mobile_money" || item === "opay" || item === "ussd" || item === "bank_transfer")
+              item === "card" || item === "mobile_money" || item === "opay" || item === "ussd" || item === "bank_account" || item === "bank_transfer")
           : [];
         const availableMethods: FundingMethods = {
           card: methods.card, local: methods.local, more: methods.more,
@@ -634,6 +634,8 @@ function Account() {
             phoneNumber,
             ussd: { account_bank: flutterwaveBankCode },
           };
+        } else if (flutterwaveMethod === "bank_account") {
+          flutterwaveDetails = { type: "bank_account", phoneNumber };
         } else if (flutterwaveMethod === "bank_transfer") {
           flutterwaveDetails = { type: "bank_transfer", phoneNumber };
         } else {
@@ -1271,7 +1273,7 @@ function Account() {
                     >
                       {(fundingOptionsState.flutterwave?.paymentMethods ?? ["card"]).map((method) => (
                         <option key={method} value={method}>
-                          {method === "card" ? "Card" : method === "mobile_money" ? "Mobile Money" : method === "opay" ? "OPay" : method === "bank_transfer" ? "Bank Transfer" : "USSD"}
+                          {method === "card" ? "Card" : method === "mobile_money" ? "Mobile Money" : method === "opay" ? "OPay" : method === "bank_account" ? "Pay with Bank" : method === "bank_transfer" ? "Bank Transfer" : "USSD"}
                         </option>
                       ))}
                     </select>
