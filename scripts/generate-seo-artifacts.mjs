@@ -238,6 +238,11 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
     throw new Error("Android/iOS native coverage manifests contain duplicate tool IDs.");
   }
   const nativeFamilies = nativeInventory.families ?? [];
+  const androidOnlyNativeIds = [...androidNativeToolIds].filter((id) => !iosNativeToolIds.has(id));
+  const iosOnlyNativeIds = [...iosNativeToolIds].filter((id) => !androidNativeToolIds.has(id));
+  if (androidOnlyNativeIds.length || iosOnlyNativeIds.length) {
+    throw new Error("Android/iOS native coverage manifests do not contain the same tool IDs. Android-only: " + androidOnlyNativeIds.slice(0, 20).join(", ") + "; iOS-only: " + iosOnlyNativeIds.slice(0, 20).join(", "));
+  }
   const runtimeRegistryTools = getAllTools();
   const searchableRegistryTools = getSearchableTools();
   const categoryRouteTools = CATEGORIES.flatMap((category) => getToolsByCategory(category.id));
@@ -336,7 +341,7 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
     "- Canonical public targets come from the SEO registry; other records show the reason they are not currently canonical public tool pages.",
     "",
     "- Native expanded inventory records: " + (nativeInventory.summary?.totalTools ?? "unknown") + " across " + (nativeInventory.summary?.engineFamilies ?? nativeFamilies.length) + " engine families (base catalogue fingerprint " + nativeInventory.baseCatalogVersion + ").",
-    "- Android native coverage manifest lists " + androidNativeToolIds.size + " unique tool IDs; iOS lists " + iosNativeToolIds.size + " unique tool IDs. A manifest entry is a coverage declaration, not proof of successful behavior on a physical device.",
+    "- Android native coverage manifest lists " + androidNativeToolIds.size + " unique tool IDs; iOS lists " + iosNativeToolIds.size + " unique tool IDs. Both manifests contain the same stable ID set. A manifest entry is a coverage declaration, not proof of successful behavior on a physical device.",
     "- Native manifest engine-family counts: " + nativeFamilies.map((family) => family.family + "=" + family.total + " (Android " + family.androidImplemented + ", iOS " + family.iosImplemented + ")").join("; "),
     "| Tool ID | Name | Category | Subcategory | Status | Slug | Registry and category routes | Canonical public route or disposition | Engine operation/configuration | Catalogue execution/account flags | Task guidance source | Keywords | Tags | Related IDs | Android native manifest | iOS native manifest | Source surfaces |",
     "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
