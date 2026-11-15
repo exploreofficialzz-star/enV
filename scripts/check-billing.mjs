@@ -266,6 +266,10 @@ assert.match(walletDashboard, /checkout\.hostname === "checkout\.flutterwave\.co
 assert.match(walletDashboard, /checkout\.hostname === "pay\.cryptomus\.com"/);
 assert.match(walletDashboard, /checkout\.flutterwave\.com/);
 assert.match(purchasesRoute, /toFlutterwaveMajorAmount/);
+assert.match(purchasesRoute, /FLUTTERWAVE_AMOUNT_REQUIRES_WHOLE_UNIT/);
+assert.match(purchasesRoute, /getFlutterwaveAmountSuggestions/);
+assert.match(flutterwaveService, /normalizeCountryCode\\(countryCode\\) === "NG"/);
+assert.match(flutterwaveService, /billing-flutterwave-checkout/);
 assert.match(purchasesRoute, /minimumPaystackAmountMinor/);
 assert.match(countryRouting, /x-vercel-ip-country/);
 assert.match(countryRouting, /cf-ipcountry/);
