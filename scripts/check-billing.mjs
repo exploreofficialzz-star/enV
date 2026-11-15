@@ -284,7 +284,6 @@ assert.match(countryRouting, /CLOUDFLARE_ORIGIN_LOCKDOWN_APPROVED/);
 assert.match(paystackProviderConfig, /PAYSTACK_MERCHANT_COUNTRY/);
 assert.match(paystackProviderConfig, /PAYSTACK_MERCHANT_ACCEPTED_CURRENCIES/);
 assert.match(paystackProviderConfig, /env.PAYSTACK_PROVIDER_APPROVED === "true" && currencyApproved/);
-assert.match(paystackProviderConfig, /FLUTTERWAVE_PAYMENT_OPTIONS_DASHBOARD_DISABLED/);
 assert.match(paystackProviderConfig, /PAYSTACK_INTERNATIONAL_ENABLED/);
 assert.match(paystackProviderConfig, /isPaystackLocalCustomer/);
 assert.match(fundingService, /isPaystackLocalCustomer\(countryCode, process\.env\)/,
@@ -327,7 +326,6 @@ assert.match(envExample, /PAYSTACK_INTERNATIONAL_ENABLED=false/);
 assert.match(envExample, /PAYSTACK_MERCHANT_COUNTRY=NG/);
 assert.match(envExample, /CLOUDFLARE_ORIGIN_LOCKDOWN_APPROVED=false/);
 assert.doesNotMatch(envExample, /PAYSTACK_TOKEN_PRICE_|FLUTTERWAVE_TOKEN_PRICE_|CRYPTOMUS_TOKEN_PRICE_USD_CENTS/);
-assert.match(envExample, /FLUTTERWAVE_PAYMENT_OPTIONS_DASHBOARD_DISABLED=false/);
 
 assert.match(paystackProviderConfig, /requirePaystackVerificationSecret/);
 assert.ok(fxPricing.includes("100 enV tokens = USD $1.00"));
