@@ -216,7 +216,7 @@ export function buildSocialCardPng({ eyebrow = "TOOLS AND GUIDES", title, descri
   ]);
 }
 
-export function createSocialCardArtifacts({ categories, toolPages, guideTools, siteOrigin }) {
+export function createSocialCardArtifacts({ categories, toolPages, guideTools, articles = [], siteOrigin }) {
   const artifacts = [];
   const add = (path, eyebrow, title, description, alt) => {
     artifacts.push({
@@ -235,6 +235,23 @@ export function createSocialCardArtifacts({ categories, toolPages, guideTools, s
     "enV homepage social preview with the enV brand and tool discovery message",
   );
 
+  add(
+    "public/og/cards/tools-index.png",
+    "EN V · TOOL DIRECTORY",
+    "Explore the enV tool collection",
+    "Browse tool categories, compare practical utilities and open focused workspaces for the task you need to complete.",
+    "enV tools directory preview for the practical tool collection",
+  );
+
+  for (const article of articles) {
+    add(
+      "public/og/cards/articles/" + article.slug + ".png",
+      "EN V · PRODUCT ARTICLE",
+      article.title,
+      article.summary,
+      "enV article preview for " + article.title,
+    );
+  }
   for (const category of categories) {
     add(
       "public/og/cards/categories/" + category.id + ".png",
