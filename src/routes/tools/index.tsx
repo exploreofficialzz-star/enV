@@ -9,6 +9,7 @@ import { getSearchableTools, getToolsByCategory } from "@/lib/registry";
 import { searchTools } from "@/lib/search";
 import { toolIcon } from "@/lib/icons";
 import { isIndexableTool, seoPageHead, categorySchema, canonicalSeoTools } from "@/lib/seo-metadata";
+import { toolsIndexSocialCard } from "@/lib/seo-social-cards";
 
 export const Route = createFileRoute("/tools/")({
   validateSearch: (search: Record<string, unknown>) => ({ q: typeof search.q === "string" ? search.q : "" }),
