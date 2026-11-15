@@ -229,7 +229,7 @@ export function createSocialCardArtifacts({ categories, toolPages, guideTools, a
 
   add(
     "public/og/cards/home.png",
-    "EN V · TOOL DISCOVERY",
+    "enV · TOOL DISCOVERY",
     "Find the right tool for the task",
     "Browse practical calculators, converters, creative tools, file utilities, media tools and workspaces across web and mobile.",
     "enV homepage social preview with the enV brand and tool discovery message",
@@ -237,7 +237,7 @@ export function createSocialCardArtifacts({ categories, toolPages, guideTools, a
 
   add(
     "public/og/cards/tools-index.png",
-    "EN V · TOOL DIRECTORY",
+    "enV · TOOL DIRECTORY",
     "Explore the enV tool collection",
     "Browse tool categories, compare practical utilities and open focused workspaces for the task you need to complete.",
     "enV tools directory preview for the practical tool collection",
@@ -246,7 +246,7 @@ export function createSocialCardArtifacts({ categories, toolPages, guideTools, a
   for (const article of articles) {
     add(
       "public/og/cards/articles/" + article.slug + ".png",
-      "EN V · PRODUCT ARTICLE",
+      "enV · PRODUCT ARTICLE",
       article.title,
       article.summary,
       "enV article preview for " + article.title,
@@ -254,7 +254,7 @@ export function createSocialCardArtifacts({ categories, toolPages, guideTools, a
   }
   add(
     "public/og/cards/blog-index.png",
-    "EN V · BLOGS AND GUIDES",
+    "enV · BLOGS AND GUIDES",
     "Read practical enV tool guides",
     "Find individual tool instructions, product explainers and practical notes about how enV works.",
     "enV Blogs and Guides preview for tool documentation and product articles",
@@ -263,7 +263,7 @@ export function createSocialCardArtifacts({ categories, toolPages, guideTools, a
   for (const category of categories) {
     add(
       "public/og/cards/categories/" + category.id + ".png",
-      "EN V · CATEGORY",
+      "enV · CATEGORY",
       category.name,
       category.description + " " + (category.blurb ?? ""),
       "enV " + category.name + " category preview",
@@ -273,7 +273,7 @@ export function createSocialCardArtifacts({ categories, toolPages, guideTools, a
   for (const tool of socialCardRepresentativeTools(toolPages)) {
     add(
       "public/og/cards/tools/" + tool.id + ".png",
-      "EN V · FEATURED TOOL",
+      "enV · FEATURED TOOL",
       tool.name,
       tool.description,
       "enV preview for " + tool.name,
@@ -283,7 +283,7 @@ export function createSocialCardArtifacts({ categories, toolPages, guideTools, a
   for (const tool of socialCardRepresentativeTools(guideTools)) {
     add(
       "public/og/cards/guides/" + tool.id + ".png",
-      "EN V · TOOL GUIDE",
+      "enV · TOOL GUIDE",
       tool.name + " guide",
       tool.description,
       "enV usage guide preview for " + tool.name,
