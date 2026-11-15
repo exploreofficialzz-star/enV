@@ -35,12 +35,15 @@ type WalletActivity = {
 };
 
 type WalletState = { status: "loading" | "ready" | "unavailable"; message?: string; wallet?: WalletData; activity?: WalletActivity[] };
-type FundingMethods = Record<CustomerPaymentMethod, boolean>;
+type WalletFundingChoice = CustomerPaymentMethod | "flutterwave";
+type FlutterwaveMethod = "card" | "mobile_money" | "opay" | "ussd";
+type FundingMethods = Record<WalletFundingChoice, boolean>;
 type FundingOptionsState = {
   status: "loading" | "ready" | "unavailable";
   methods: FundingMethods;
   countryCode?: string | null;
   currency?: string | null;
+  flutterwave?: { enabled: boolean; currency?: string | null; paymentMethods: FlutterwaveMethod[] };
   message?: string;
 };
 type RewardsData = {
@@ -92,6 +95,46 @@ type LocalOfflineAllowance = {
   pendingBatch: boolean;
   issueIdempotencyKey: string;
 };
+
+function flutterwaveNetworks(countryCode: string | null | undefined): string[] {
+  const options: Record<string, string[]> = {
+    GH: ["MTN", "VODAFONE", "AIRTELTIGO"],
+    KE: ["MPESA"],
+    UG: ["MTN", "AIRTEL"],
+    TZ: ["TIGO", "AIRTEL", "VODACOM", "HALOTEL"],
+    RW: ["MTN", "AIRTEL"],
+    MW: ["AIRTEL", "TNM"],
+    CI: ["MTN", "ORANGE", "MOOV"],
+    CM: ["MTN", "ORANGE"],
+    BJ: ["MTN", "MOOV"],
+    TG: ["TOGOCOM", "MOOV"],
+    BF: ["ORANGE", "MOOV"],
+    ML: ["ORANGE", "MOOV"],
+    NE: ["AIRTEL", "MOOV"],
+    SN: ["ORANGE", "FREE"],
+    SL: ["ORANGE", "AFRICELL"],
+  };
+  return options[String(countryCode ?? "").toUpperCase()] ?? [];
+}
+
+async function encryptFlutterwaveField(value: string, encodedKey: string, nonce: string): Promise<string> {
+  const keyBytes = Uint8Array.from(atob(encodedKey), (character) => character.charCodeAt(0));
+  if (keyBytes.byteLength !== 32) throw new Error("The Flutterwave encryption key is not a valid AES-256 key.");
+  const key = await window.crypto.subtle.importKey("raw", keyBytes, { name: "AES-GCM" }, false, ["encrypt"]);
+  const encrypted = await window.crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: new TextEncoder().encode(nonce) },
+    key,
+    new TextEncoder().encode(value),
+  );
+  return btoa(String.fromCharCode(...new Uint8Array(encrypted)));
+}
+
+function flutterwaveNonce(): string {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const bytes = new Uint8Array(12);
+  window.crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("");
+}
 
 function tokenAmount(subunits: number): string {
   return (subunits / 1_000).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
@@ -187,7 +230,18 @@ function Account() {
   const [fundingBusy, setFundingBusy] = useState(false);
   const [showFundingOptions, setShowFundingOptions] = useState(false);
   const [fundingOptionsReloadKey, setFundingOptionsReloadKey] = useState(0);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<CustomerPaymentMethod>("card");
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<WalletFundingChoice>("card");
+  const [flutterwaveMethod, setFlutterwaveMethod] = useState<FlutterwaveMethod>("card");
+  const [flutterwaveCustomerName, setFlutterwaveCustomerName] = useState("");
+  const [flutterwavePhoneNumber, setFlutterwavePhoneNumber] = useState("");
+  const [flutterwaveNetwork, setFlutterwaveNetwork] = useState("");
+  const [flutterwaveBankCode, setFlutterwaveBankCode] = useState("044");
+  const [flutterwaveCardNumber, setFlutterwaveCardNumber] = useState("");
+  const [flutterwaveExpiryMonth, setFlutterwaveExpiryMonth] = useState("");
+  const [flutterwaveExpiryYear, setFlutterwaveExpiryYear] = useState("");
+  const [flutterwaveCvv, setFlutterwaveCvv] = useState("");
+  const [flutterwaveChallenge, setFlutterwaveChallenge] = useState<{ reference: string; type: "otp" | "pin" } | null>(null);
+  const [flutterwaveAuthorizationValue, setFlutterwaveAuthorizationValue] = useState("");
   const [fundingOptionsState, setFundingOptionsState] = useState<FundingOptionsState>({ status: "loading", methods: { card: false, local: false, more: false } });
   const [fundingFeedback, setFundingFeedback] = useState<{ kind: "success" | "error" | "info"; message: string } | null>(null);
   const [showAllTransactions, setShowAllTransactions] = useState(false);
@@ -198,7 +252,7 @@ function Account() {
   useEffect(() => {
     if (!showFundingOptions) return;
     const controller = new AbortController();
-    setFundingOptionsState({ status: "loading", methods: { card: false, local: false, more: false } });
+    setFundingOptionsState({ status: "loading", methods: { card: false, local: false, more: false, flutterwave: false } });
     void fetch("/api/billing/funding-options", { credentials: "same-origin", signal: controller.signal })
       .then(async (response) => {
         const payload = await response.json().catch(() => null) as {
@@ -208,6 +262,7 @@ function Account() {
             countryCode?: string | null;
             currency?: string | null;
             message?: string;
+            flutterwave?: { enabled?: boolean; currency?: string | null; paymentMethods?: string[] };
           };
           message?: string;
         } | null;
@@ -217,25 +272,35 @@ function Account() {
             typeof methods.more !== "boolean") {
           throw new Error(payload?.message ?? "Payment options could not be loaded.");
         }
+        const flutterwaveMethods = Array.isArray(payload.data?.flutterwave?.paymentMethods)
+          ? payload.data.flutterwave.paymentMethods.filter((item): item is FlutterwaveMethod =>
+              item === "card" || item === "mobile_money" || item === "opay" || item === "ussd")
+          : [];
         const availableMethods: FundingMethods = {
           card: methods.card, local: methods.local, more: methods.more,
+          flutterwave: methods.flutterwave === true && flutterwaveMethods.length > 0,
         };
         setFundingOptionsState({
           status: "ready",
           methods: availableMethods,
           countryCode: payload.data?.countryCode ?? null,
           currency: payload.data?.currency ?? null,
+          flutterwave: {
+            enabled: payload.data?.flutterwave?.enabled === true,
+            currency: payload.data?.flutterwave?.currency ?? null,
+            paymentMethods: flutterwaveMethods,
+          },
           message: payload.data?.message ?? payload.message,
         });
         setSelectedPaymentMethod((current) => availableMethods[current]
           ? current
-          : availableMethods.card ? "card" : availableMethods.local ? "local" : "more");
+          : availableMethods.card ? "card" : availableMethods.local ? "local" : availableMethods.more ? "more" : "flutterwave");
       })
       .catch(() => {
         if (controller.signal.aborted) return;
         setFundingOptionsState({
           status: "unavailable",
-          methods: { card: false, local: false, more: false },
+          methods: { card: false, local: false, more: false, flutterwave: false },
           message: "Payment options could not be loaded. Check your connection and try again.",
         });
       });
