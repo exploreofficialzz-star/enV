@@ -240,7 +240,7 @@ function Account() {
   const [flutterwaveExpiryMonth, setFlutterwaveExpiryMonth] = useState("");
   const [flutterwaveExpiryYear, setFlutterwaveExpiryYear] = useState("");
   const [flutterwaveCvv, setFlutterwaveCvv] = useState("");
-  const [flutterwaveChallenge, setFlutterwaveChallenge] = useState<{ reference: string; type: "otp" | "pin" } | null>(null);
+  const [flutterwaveChallenge, setFlutterwaveChallenge] = useState<{ reference: string; type: "otp" | "pin" | "avs" } | null>(null);
   const [flutterwaveAuthorizationValue, setFlutterwaveAuthorizationValue] = useState("");
   const [fundingOptionsState, setFundingOptionsState] = useState<FundingOptionsState>({
     status: "loading", methods: { card: false, local: false, more: false, flutterwave: false },
@@ -683,18 +683,21 @@ function Account() {
           window.location.assign(checkout.href);
           return;
         }
-        if (payload.data.nextAction === "requires_pin" || payload.data.nextAction === "requires_otp") {
+        if (payload.data.nextAction === "requires_pin" ||
+            payload.data.nextAction === "requires_otp" ||
+            payload.data.nextAction === "requires_additional_fields") {
           if (!payload.data.reference) throw new Error("Flutterwave did not return the payment reference for bank authorization.");
-          setFlutterwaveChallenge({
-            reference: payload.data.reference,
-            type: payload.data.nextAction === "requires_pin" ? "pin" : "otp",
-          });
+          const challengeType = payload.data.nextAction === "requires_pin" ? "pin"
+            : payload.data.nextAction === "requires_otp" ? "otp" : "avs";
+          setFlutterwaveChallenge({ reference: payload.data.reference, type: challengeType });
           setFlutterwaveAuthorizationValue("");
           setFundingFeedback({
             kind: "info",
-            message: payload.data.nextAction === "requires_pin"
-              ? "Your bank requires your card PIN to continue. Enter it below; it is encrypted in your browser."
-              : "Your bank requires a one-time code. Enter the code sent by your bank below.",
+            message: challengeType === "pin"
+              ? "Your bank requires your card PIN to continue. It will be encrypted in your browser."
+              : challengeType === "otp"
+                ? "Your bank requires a one-time code. Enter the code sent by your bank."
+                : "Your bank needs to confirm your billing address. Check the address below, then continue.",
           });
           return;
         }
@@ -744,20 +747,20 @@ function Account() {
   async function submitFlutterwaveAuthorization() {
     if (!flutterwaveChallenge || fundingBusy) return;
     const value = flutterwaveAuthorizationValue.trim();
-    if (!value) {
+    if (flutterwaveChallenge.type !== "avs" && !value) {
       setFundingFeedback({ kind: "error", message: "Enter the requested authorization value." });
       return;
     }
     setFundingBusy(true);
     setFundingFeedback(null);
     try {
-      let body: Record<string, unknown> = {
+      const body: Record<string, unknown> = {
         reference: flutterwaveChallenge.reference,
         authorizationType: flutterwaveChallenge.type,
       };
       if (flutterwaveChallenge.type === "otp") {
         body.otp = value;
-      } else {
+      } else if (flutterwaveChallenge.type === "pin") {
         if (!/^\d{4,6}$/.test(value)) throw new Error("Enter the card PIN requested by your bank.");
         const keyResponse = await fetch("/api/billing/flutterwave/encryption-key", {
           credentials: "same-origin", headers: { accept: "application/json" },
@@ -771,6 +774,14 @@ function Account() {
         const nonce = flutterwaveNonce();
         body.encryptedPin = await encryptFlutterwaveField(value, keyPayload.data.encryptionKey, nonce);
         body.nonce = nonce;
+      } else {
+        body.customerAddress = {
+          line1: flutterwaveAddressLine1.trim(),
+          line2: flutterwaveAddressLine2.trim(),
+          city: flutterwaveCity.trim(),
+          state: flutterwaveState.trim(),
+          postalCode: flutterwavePostalCode.trim(),
+        };
       }
       const response = await fetch("/api/billing/flutterwave/authorize", {
         method: "POST", credentials: "same-origin",
@@ -779,7 +790,7 @@ function Account() {
       });
       const payload = await response.json().catch(() => null) as {
         ok?: boolean;
-        data?: { status?: string; authorizationUrl?: string | null; paymentInstruction?: string | null };
+        data?: { status?: string; authorizationUrl?: string | null; nextAction?: string | null; paymentInstruction?: string | null };
         message?: string;
       } | null;
       if (!response.ok || !payload?.ok || !payload.data) throw new Error(payload?.message ?? "The bank authorization could not be completed.");
@@ -792,6 +803,23 @@ function Account() {
           throw new Error("Flutterwave returned an invalid secure authorization link.");
         }
         window.location.assign(target.href);
+        return;
+      }
+      const nextAction = payload.data.nextAction;
+      if (nextAction === "requires_pin" || nextAction === "requires_otp" || nextAction === "requires_additional_fields") {
+        setFlutterwaveChallenge({
+          reference: flutterwaveChallenge.reference,
+          type: nextAction === "requires_pin" ? "pin" : nextAction === "requires_otp" ? "otp" : "avs",
+        });
+        setFlutterwaveAuthorizationValue("");
+        setFundingFeedback({
+          kind: "info",
+          message: nextAction === "requires_pin"
+            ? "Your bank now requires your card PIN."
+            : nextAction === "requires_otp"
+              ? "Your bank now requires a one-time code."
+              : "Your bank needs you to confirm your billing address.",
+        });
         return;
       }
       if (payload.data.status?.toLowerCase() === "succeeded") {
