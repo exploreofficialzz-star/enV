@@ -1,4 +1,5 @@
 import { deflateSync } from "node:zlib";
+import { socialCardRepresentativeTools } from "../src/lib/seo-social-cards.ts";
 
 const WIDTH = 1200;
 const HEIGHT = 630;
@@ -244,20 +245,7 @@ export function createSocialCardArtifacts({ categories, toolPages, guideTools, s
     );
   }
 
-  const representative = (tools) => {
-    const winners = new Map();
-    for (const tool of tools) {
-      if (tool.status !== "active" && tool.status !== "beta") continue;
-      const current = winners.get(tool.category);
-      if (!current || Number(Boolean(tool.featured)) > Number(Boolean(current.featured))
-        || (Boolean(tool.featured) === Boolean(current.featured) && (tool.popularity ?? 0) > (current.popularity ?? 0))) {
-        winners.set(tool.category, tool);
-      }
-    }
-    return [...winners.values()].sort((a, b) => a.category.localeCompare(b.category));
-  };
-
-  for (const tool of representative(toolPages)) {
+  for (const tool of socialCardRepresentativeTools(toolPages)) {
     add(
       "public/og/cards/tools/" + tool.id + ".png",
       "EN V · FEATURED TOOL",
@@ -267,7 +255,7 @@ export function createSocialCardArtifacts({ categories, toolPages, guideTools, s
     );
   }
 
-  for (const tool of representative(guideTools)) {
+  for (const tool of socialCardRepresentativeTools(guideTools)) {
     add(
       "public/og/cards/guides/" + tool.id + ".png",
       "EN V · TOOL GUIDE",
