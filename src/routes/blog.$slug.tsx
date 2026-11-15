@@ -26,6 +26,7 @@ import {
 } from "@/lib/tool-documentation";
 import type { ToolMeta } from "@/types/tool";
 import { seoPageHead, articleSchema, technicalArticleSchema, isIndexableTool, articleSeoTitle, toolGuideSeoTitle, canonicalSeoTools, canonicalSeoToolFor } from "@/lib/seo-metadata";
+import { toolSocialCard } from "@/lib/seo-social-cards";
 
 const seoGuideCandidateMap = new Map(getSearchableTools().map((tool) => [tool.id, tool]));
 for (const tool of getToolsByCategory("accessibility")) seoGuideCandidateMap.set(tool.id, tool);
@@ -104,6 +105,7 @@ export const Route = createFileRoute("/blog/$slug")({
       description,
       path,
       type: "article",
+      ...toolSocialCard(loaderData.tool, CANONICAL_SEO_GUIDES, "guides"),
       structuredData: technicalArticleSchema(loaderData.tool, description, path)
     });
   },
