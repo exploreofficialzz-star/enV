@@ -6,7 +6,7 @@ import { BLOG_ARTICLES } from "../src/data/blog-articles.ts";
 import { getAllTools, getSearchableTools, getToolsByCategory, toolPath } from "../src/lib/registry.ts";
 import { tools as sourceCatalogTools } from "../src/data/catalog.ts";
 import { createSocialCardArtifacts } from "./social-card-images.mjs";
-import { canonicalSeoTools, canonicalToolPath, isIndexableTool, toolSeoTitle, toolSeoDescription, toolGuideSeoTitle, toolSearchIntentTerms } from "../src/lib/seo-metadata.ts";
+import { canonicalSeoTools, canonicalSeoToolFor, canonicalToolPath, isIndexableTool, toolSeoTitle, toolSeoDescription, toolGuideSeoTitle, toolSearchIntentTerms } from "../src/lib/seo-metadata.ts";
 import { toolTaskGuidanceSource, toolDocumentationSummary, toolStatusLabel } from "../src/lib/tool-documentation.ts";
 import { buildIndexNowKeyArtifact } from "./indexnow-utils.mjs";
 
