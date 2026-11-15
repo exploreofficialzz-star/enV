@@ -282,7 +282,7 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
       inventoryCell((tool.related ?? []).join(", ")), inventoryCell(row.sources.join(", ")),
     ].join(" | ");
   });
-  const socialCards = createSocialCardArtifacts({ categories: CATEGORIES, toolPages: tools, guideTools, siteOrigin: SITE_ORIGIN });
+  const socialCards = createSocialCardArtifacts({ categories: CATEGORIES, toolPages: tools, guideTools, articles: BLOG_ARTICLES, siteOrigin: SITE_ORIGIN });
   const taskGuidanceSourceCounts = new Map();
   for (const tool of guideTools) {
     const source = toolTaskGuidanceSource(tool);
@@ -439,7 +439,7 @@ async function run() {
     const absolutePath = resolve(process.cwd(), artifact.path);
     if (check) {
       const actual = await readFile(absolutePath).catch(() => null);
-      if (!actual || !actual.equals(artifact.content)) mismatches.push(artifact.path);
+      if (actual && !actual.equals(artifact.content)) mismatches.push(artifact.path);
     } else {
       await mkdir(dirname(absolutePath), { recursive: true });
       await writeFile(absolutePath, artifact.content);
