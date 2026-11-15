@@ -65,6 +65,7 @@ export function isGenericWorkflowPlaceholder(tool) {
     && !isDedicatedCelebrationTool(tool);
 }
 
+/** @param {ToolMeta} tool */
 export function isDedicatedCelebrationTool(tool) {
   return tool.category === "celebrations" && DEDICATED_CELEBRATION_TOOL_IDS.has(tool.id);
 }
