@@ -43,42 +43,41 @@ The SEO inventory now carries Android and iOS manifest membership per tool ID al
 
 ## 3. Store listing metadata prepared for review
 
-The following copy is written to describe the product's actual native/web split. It is a preparation draft, **not a published store listing**.
+The source of truth is `docs/native-store-listing.json`. It contains a structured draft for the Android and iOS listings, including platform-specific text, categories, keywords, support/privacy URLs and explicit asset/publication states. The repeatable audit in `scripts/check-native-store-discovery.mjs` validates app identity, field limits, canonical support/privacy links, and that the draft stays unpublished until actual store-account evidence exists.
 
-### Product identity
+| Field | Google Play draft | Apple App Store draft |
+|---|---:|---:|
+| Product name | enV (3/30 characters) | enV (3/30 characters) |
+| Short description | 77/80 characters | — |
+| Subtitle | — | 24/30 characters |
+| Promotional text | — | 95/170 characters |
+| Full description | 831/4,000 characters | 793/4,000 characters |
+| Keywords | — | 76/100 UTF-8 bytes |
+| Primary category | Tools | Utilities |
+| Secondary category | — | Productivity |
+| App identity | `com.chastech.env` | `com.chastech.env` |
 
-- Name: enV
+The copy explains that Android and iOS are native products, native-ready tools remain in the native application, and Web-only tools open separately in the system browser. It does not imply that all Web tools are implemented natively or that the entire app works offline. The copy describes processing as operation-dependent and directs users to each tool's own capability/processing notice.
+
 - Website: https://envtools.store
-- Support URL: https://envtools.store/contact
+- Support URL: https://envtools.store/help
 - Privacy policy URL: https://envtools.store/privacy
-- Android application ID: com.chastech.env
-- iOS bundle identifier: com.chastech.env
+- Android application ID: `com.chastech.env`
+- iOS bundle identifier: `com.chastech.env`
 
-### Google Play draft
+**Source-field checks (15 November 2026):** Google Play lists a 30-character app-name limit, 80-character short-description limit and 4,000-character full-description limit. Its current metadata guidance also says the description should accurately and clearly explain the app, avoid unnecessary repetition, and not use misleading or irrelevant claims. Apple lists a 30-character app name and 30-character subtitle; platform-version metadata includes promotional text up to 170 characters, a 4,000-character description and up to 100 bytes of keywords. The actual listing draft and validator use these limits rather than unbounded copy:
+- Google Play field definitions: https://support.google.com/googleplay/android-developer/answer/9859152
+- Google Play description best practices: https://support.google.com/googleplay/android-developer/answer/13393723
+- Google Play metadata policy: https://support.google.com/googleplay/android-developer/answer/9898842
+- Apple App Store app information: https://developer.apple.com/help/app-store-connect/reference/app-information/app-information
+- Apple platform-version information: https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information
+- Apple product-page guidance: https://developer.apple.com/app-store/product-page/
 
-**Short description (69 of 80 characters):**
+The keyword field is a relevance aid, not a licence to add unrelated terms or other app/company names. Do not assume that the draft is compliant with every country-specific legal or review requirement simply because its text fits the field counters. Recheck the live store forms immediately before submission.
 
-> Native tools for everyday tasks; web-only tools open in your browser.
+**Assets remain unverified.** Store screenshots and preview video must be captured from actual Android/iPhone release builds at the required device sizes. Do not submit Web product screenshots or generated social-card images as native-app screenshots, and do not show features that are missing from the submitted native binary. The JSON draft marks both platforms' asset readiness as not verified.
 
-**Full description:**
-
-> enV brings practical tools for everyday tasks into native Android and iOS apps. Browse available calculators, converters, file and document utilities, QR and barcode tools, and creative and media tools. Tools with native support run inside the enV app; Web-only tools open in your system browser. Availability and capabilities vary by tool and platform. Check each tool's page for supported inputs, processing requirements, account needs and limits.
-
-### Apple App Store draft
-
-**Subtitle (24 of 30 characters):**
-
-> Tools for everyday tasks
-
-Use the same factual long description above, adapted only where App Store Connect fields require separate text. Do not add a keyword list of unsupported capabilities or imply that every web tool is implemented natively.
-
-Google Play's current help pages specify a 30-character app-name limit, an 80-character short-description limit, and a 4,000-character full-description limit. Apple's App Store Connect reference specifies a 30-character app name and 30-character subtitle; Apple also identifies a privacy-policy URL as app information. Recheck the live forms when entering metadata because store requirements and review policies can change:
-- Google Play listing fields: https://support.google.com/googleplay/android-developer/answer/9859152
-- Google Play metadata policy and description guidance: https://support.google.com/googleplay/android-developer/answer/9898842
-- Apple App Store Connect app information: https://developer.apple.com/help/app-store-connect/reference/app-information/app-information
-- Apple product page guidance: https://developer.apple.com/app-store/product-page/
-
-Do not finalize screenshots or preview videos from mockups. Use captures from the actual release builds on supported device sizes, and make sure every visible feature exists in the submitted native build.
+**Publication remains unverified.** Both `listingUrl` values are intentionally `null`; the metadata status is `draft-not-submitted`. Do not create guessed store links or install buttons before a real Play Console/App Store Connect product page has been confirmed.
 
 ## 4. Public listing verification status
 
@@ -134,3 +133,13 @@ The connected Vercel project did not contain VITE_GOOGLE_SITE_VERIFICATION or VI
 | Native parity | Passing Android/iOS native tests plus representative physical-device checks; manifest parity alone is not sufficient |
 
 Do not treat source changes, the existence of an application ID, a generated catalogue, a sitemap entry, or a READY deployment as proof of a public store listing, indexing, user adoption or device-level feature parity.
+
+## 8. Implementation and verification snapshot
+
+The discovery work is being carried on the isolated branch `feat/complete-discovery-ws02-ws09-20261115`, based on main commit `a18c54df64f2cbb0c51413df0824b381458b850a`. The branch was 47 commits ahead and zero commits behind at the time of this snapshot; it had not been merged.
+
+The connected Vercel project produced a READY preview for commit `6929b9935621e5cd7e69ed7e9216f9a0d0a6a7cb` (`env-pjgfy1c21-en-v1.vercel.app`). Its build log shows the native catalogue export and native store identity audit passing, with 10,004 expanded records, 27 engine families and matching 7,902-ID Android/iOS coverage manifests. The production build and postbuild completed; postbuild verified the existing runtime catalogue fingerprint `v58f9a538e469` with 9,976 list entries, 9,976 search entries and 40 detail shards.
+
+That preview predates later Celebration guide and test-contract edits on the branch. It therefore verifies the catalogue/export/SEO-generation build at commit 6929, not the newest branch head. A fresh test/build of the latest branch state remains required before merge. The preview is not production: the canonical production aliases still pointed to the READY main deployment when checked.
+
+Social preview generation, guide contracts and newer documentation must be verified on the newest branch commit before being declared complete. The account-level gates in Section 7 remain open regardless of a successful source build.
