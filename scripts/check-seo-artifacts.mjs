@@ -266,6 +266,16 @@ assert.match(result.inventory, /does not claim that a human has completed the so
 assert.match(result.inventory, /Search-intent terms are seeded from each tool's name/m);
 assert.match(result.inventory, /This classifies only the task-specific overview, example and validation in the guide's 'When to use this tool' section/);
 assert.match(result.inventory, /does not classify every guide section or prove control-level accuracy, source\/runtime verification or human editorial review/);
+for (const row of result.runtimeInventory) {
+  if (row.tool.category === "developer"
+    && !row.tool.tags.includes("developer-studio")
+    && row.canonicalTarget
+    && row.routes.includes("/tools/developer/" + row.tool.slug)
+    && row.canonicalTarget !== "/tools/developer/" + row.tool.slug) {
+    assert.equal(row.disposition, "Legacy Developer alias; resolved to canonical Studio page",
+      "Legacy Developer routes must carry an explicit canonical Studio disposition: " + row.id);
+  }
+}
 assert.equal(result.sitemap.includes("https://envtools.store/sitemap.xml"), false);
 
 assert.match(result.robots, /User-agent: OAI-SearchBot\nAllow: \/\nDisallow: \/api\//);
