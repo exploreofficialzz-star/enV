@@ -286,7 +286,7 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
         disposition = "Planned catalogue record";
       } else if (isToolUnderProduction(tool)) {
         disposition = "Under-production tool; excluded from public indexing";
-      } else if (tool.engine.type === "calculator" && /^exp-product-general-product-relation-\\d+-[abc]$/.test(tool.engine.formula ?? "")) {
+      } else if (tool.engine.type === "calculator" && /^exp-product-general-product-relation-\d+-[abc]$/.test(tool.engine.formula ?? "")) {
         disposition = "Generic Input A/Input B equation template; excluded from public indexing";
       } else if (tool.category === "developer" && !tool.tags.includes("developer-studio")) {
         const legacyTarget = canonicalToolPath(tool);
