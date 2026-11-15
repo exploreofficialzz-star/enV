@@ -35,6 +35,8 @@ The checked-in `tool-functional-audit-evidence.json` contains exact browser, uni
 
 Native tool lists are recorded as manifest membership only. The native execution matrix is a classification artifact, not proof that each native tool was individually executed. A native test promotes only the exact IDs in its evidence selector, and its notes state whether it checked operation dispatch, representative output or fuller device acceptance. Android and iOS evidence are stored separately.
 
+The inventory and native execution matrix both consume `getAllTools()` from `src/lib/registry.ts`, the same unique-ID source used by the individual-tool ledger. The generated matrix must contain every runtime ID exactly once, including runtime extensions and Studio tools; the check fails on missing IDs, extra IDs, duplicates or count drift. Seven file-workspace IDs are classified as local-native only because both platform coverage manifests and both native dispatch paths are present. `music-downloader` and `smartphone-prototype-lab` remain explicitly Web-only in this matrix: the former does not have matching verified native execution exposed on both products, and the latter has a Web scene rather than an independent Kotlin/Swift implementation. These dispositions are classification facts, not functional-test passes.
+
 ## Current known limits
 
 - `STATIC_CHECKED` validates registry metadata and route-resolver lookup, not rendered pages.
