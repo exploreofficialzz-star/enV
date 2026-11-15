@@ -1,4 +1,6 @@
 import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { CATEGORIES } from "../src/data/categories.ts";
@@ -223,6 +225,19 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
     "[Open tool](" + SITE_ORIGIN + canonicalToolPath(tool) + ") |",
   ].join(" | "));
   // Inventory every source/runtime/search/category surface, not only canonical SEO pages.
+  const nativeInventory = JSON.parse(readFileSync(new URL("../apps/shared/native-engine-inventory.json", import.meta.url), "utf8"));
+  const currentBaseCatalogVersion = createHash("sha256")
+    .update(readFileSync(new URL("../src/data/catalog.ts", import.meta.url), "utf8"))
+    .digest("hex").slice(0, 12);
+  if (nativeInventory.baseCatalogVersion !== currentBaseCatalogVersion) {
+    throw new Error("Native inventory is stale for the current source catalogue. Run npm run export:native-catalog before generating discovery artifacts.");
+  }
+  const androidNativeToolIds = new Set(nativeInventory.androidToolIds ?? []);
+  const iosNativeToolIds = new Set(nativeInventory.iosToolIds ?? []);
+  if (androidNativeToolIds.size !== (nativeInventory.androidToolIds ?? []).length || iosNativeToolIds.size !== (nativeInventory.iosToolIds ?? []).length) {
+    throw new Error("Android/iOS native coverage manifests contain duplicate tool IDs.");
+  }
+  const nativeFamilies = nativeInventory.families ?? [];
   const runtimeRegistryTools = getAllTools();
   const searchableRegistryTools = getSearchableTools();
   const categoryRouteTools = CATEGORIES.flatMap((category) => getToolsByCategory(category.id));
@@ -259,7 +274,7 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
       else disposition = "No canonical SEO record; inspect production or alias policy";
       canonicalTarget = "—";
     }
-    return { id, tool, routes: [...entry.routes].sort(), canonicalTarget, disposition, sources: [...entry.sources].sort() };
+    return { id, tool, routes: [...entry.routes].sort(), canonicalTarget, disposition, sources: [...entry.sources].sort(), androidManifestListed: androidNativeToolIds.has(id), iosManifestListed: iosNativeToolIds.has(id) };
   });
   const sourceDuplicateCount = sourceCatalogTools.length - new Set(sourceCatalogTools.map((tool) => tool.id)).size;
   const runtimeDuplicateCount = runtimeRegistryTools.length - new Set(runtimeRegistryTools.map((tool) => tool.id)).size;
@@ -279,7 +294,7 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
       inventoryCell(row.routes.join(", ") || "—"), target, inventoryCell(inventoryEngine(tool)),
       inventoryCell(inventoryCatalogueFlags(tool)), inventoryCell(toolTaskGuidanceSource(tool)),
       inventoryCell((tool.keywords ?? []).join(", ")), inventoryCell((tool.tags ?? []).join(", ")),
-      inventoryCell((tool.related ?? []).join(", ")), inventoryCell(row.sources.join(", ")),
+      inventoryCell((tool.related ?? []).join(", ")), row.androidManifestListed ? "Listed" : "Not listed", row.iosManifestListed ? "Listed" : "Not listed", inventoryCell(row.sources.join(", ")),
     ].join(" | ");
   });
   const socialCards = createSocialCardArtifacts({ categories: CATEGORIES, toolPages: tools, guideTools, articles: BLOG_ARTICLES, siteOrigin: SITE_ORIGIN });
@@ -320,8 +335,11 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
     "- Registry engine configuration and account flags are metadata, not proof that remote services, credentials or native capabilities work.",
     "- Canonical public targets come from the SEO registry; other records show the reason they are not currently canonical public tool pages.",
     "",
-    "| Tool ID | Name | Category | Subcategory | Status | Slug | Registry and category routes | Canonical public route or disposition | Engine operation/configuration | Catalogue execution/account flags | Task guidance source | Keywords | Tags | Related IDs | Source surfaces |",
-    "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
+    "- Native expanded inventory records: " + (nativeInventory.summary?.totalTools ?? "unknown") + " across " + (nativeInventory.summary?.engineFamilies ?? nativeFamilies.length) + " engine families (base catalogue fingerprint " + nativeInventory.baseCatalogVersion + ").",
+    "- Android native coverage manifest lists " + androidNativeToolIds.size + " unique tool IDs; iOS lists " + iosNativeToolIds.size + " unique tool IDs. A manifest entry is a coverage declaration, not proof of successful behavior on a physical device.",
+    "- Native manifest engine-family counts: " + nativeFamilies.map((family) => family.family + "=" + family.total + " (Android " + family.androidImplemented + ", iOS " + family.iosImplemented + ")").join("; "),
+    "| Tool ID | Name | Category | Subcategory | Status | Slug | Registry and category routes | Canonical public route or disposition | Engine operation/configuration | Catalogue execution/account flags | Task guidance source | Keywords | Tags | Related IDs | Android native manifest | iOS native manifest | Source surfaces |",
+    "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ...reconciledRows,
     "",
     "",
