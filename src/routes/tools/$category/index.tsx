@@ -46,7 +46,7 @@ function Category() {
   const meta = CATEGORY_MAP[category as CategoryId];
   const Icon = meta ? toolIcon(meta.icon) : Folder;
   useEffect(() => setVisibleCount(6), [category]);
-  if (category === "creators") return <AppShell showChrome={false}><CreatorCategoryLauncher tools={tools} /></AppShell>;
+  if (category === "creators") return <AppShell showChrome={false}><CreatorCategoryLauncher tools={tools} description={meta?.description ?? "Creator tools for planning and production."} blurb={meta?.blurb ?? ""} /></AppShell>;
   return (
     <AppShell>
       <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
