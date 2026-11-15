@@ -1,6 +1,8 @@
 import { normalizeCountryCode, getCountryPaymentProfile } from "./country-routing";
 import { isPaystackLocalCustomer } from "./provider-config";
-import { getPaystackFundingOption, TOKEN_PACKS } from "./paystack.server";
+import { getPaystackFundingOption } from "./paystack.server";
+
+const TOKEN_PACKS = [100, 250, 500, 1_000] as const;
 import { getFlutterwaveFundingOption } from "./flutterwave.server";
 
 /**
