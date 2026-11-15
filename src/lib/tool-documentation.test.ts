@@ -755,3 +755,36 @@ test("every canonical public tool has a complete guide structure tied to its cat
   );
 });
 
+
+test("all registered categories have distinct, task-oriented descriptions and blurbs", () => {
+  assert.equal(CATEGORIES.length, 43, "The category registry should contain the current 43 category records.");
+  const ids = CATEGORIES.map((category) => category.id);
+  const descriptions = CATEGORIES.map((category) => category.description.trim());
+  const blurbs = CATEGORIES.map((category) => category.blurb.trim());
+  assert.equal(new Set(ids).size, CATEGORIES.length, "Category IDs must be unique.");
+  assert.equal(new Set(descriptions).size, CATEGORIES.length, "Every category needs a distinct explanation.");
+  assert.equal(new Set(blurbs).size, CATEGORIES.length, "Every category needs a distinct short task blurb.");
+  for (const category of CATEGORIES) {
+    assert.ok(category.description.trim().length >= 60, category.id + ": category description must explain a real task scope.");
+    assert.ok(category.blurb.trim().length >= 18, category.id + ": category blurb must communicate a distinct task.");
+  }
+});
+
+test("category grouping uses only repeated subcategory metadata and preserves every visible tool", () => {
+  const tool = (id: string, subcategory?: string): ToolMeta => ({
+    id, name: id, slug: id, description: "A category grouping fixture for a concrete tool task.",
+    category: "files", ...(subcategory ? { subcategory } : {}), keywords: [], tags: [], icon: "FileText",
+    popularity: 0, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false,
+    status: "active", related: [], engine: { type: "custom", id },
+  });
+  const input = [tool("rename-a", "Organization"), tool("rename-b", "Organization"),
+    tool("compare-a", "Verification"), tool("compare-b", "Verification"),
+    tool("single", "Sparse"), tool("unlabelled")];
+  const groups = groupToolsBySubcategory(input);
+  assert.ok(groups, "Two repeated subcategories should create groups.");
+  assert.deepEqual(groups.map((group) => group.label), ["Organization", "Verification", "Other tools"]);
+  assert.deepEqual(groups.flatMap((group) => group.tools.map((item) => item.id)).sort(), input.map((item) => item.id).sort(),
+    "Every visible tool must appear exactly once after grouping.");
+  assert.equal(groupToolsBySubcategory([tool("a", "One"), tool("b", "One")]), null,
+    "A single repeated subcategory does not justify fabricated group structure.");
+});
