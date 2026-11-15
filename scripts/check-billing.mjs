@@ -9,6 +9,7 @@ const refundMigration = await read("migrations/0009_billing_refund_dispute_recon
 const rewardsMigration = await read("migrations/0007_wallet_rewards.sql");
 const rewardsService = await read("src/lib/billing/rewards.server.ts");
 const paystackService = await read("src/lib/billing/paystack.server.ts");
+const fundingService = await read("src/lib/billing/funding.server.ts");
 const fxPricing = await read("src/lib/billing/fx.server.ts");
 const fxPricingTests = await read("src/lib/billing/fx.server.test.ts");
 const countryRouting = await read("src/lib/billing/country-routing.ts");
@@ -212,8 +213,11 @@ assert.match(paymentMethods, /parseUsdAmountToCents/);
 assert.match(paymentMethods, /getFundingCandidates/);
 assert.match(walletDashboard, /const allowedCheckoutHost = checkout\?\.protocol === "https:"/);
 assert.match(walletDashboard, /checkout\.hostname === "checkout\.paystack\.com"/);
-assert.match(walletDashboard, /checkout\.hostname === "checkout\.flutterwave\.com"/);
 assert.match(walletDashboard, /checkout\.hostname === "pay\.cryptomus\.com"/);
+assert.match(walletDashboard, /host === "flutterwave\.com"/);
+assert.match(walletDashboard, /host\.endsWith\("\.flutterwave\.cloud"\)/);
+assert.match(walletDashboard, /provider: "flutterwave"/);
+assert.match(walletDashboard, /encryptFlutterwaveField/);
 assert.match(pairNativePage, /api\/billing\/offline\/pairing/);
 assert.match(pairNativePage, /Generate pairing code/);
 assert.match(envExample, /PAYSTACK_PROVIDER_APPROVED=false/);
@@ -265,7 +269,8 @@ assert.match(walletDashboard, /checkout\.hostname === "checkout\.paystack\.com"/
 assert.match(walletDashboard, /checkout\.hostname === "checkout\.flutterwave\.com"/);
 assert.match(walletDashboard, /checkout\.hostname === "pay\.cryptomus\.com"/);
 assert.match(walletDashboard, /checkout\.flutterwave\.com/);
-assert.match(purchasesRoute, /toFlutterwaveMajorAmount/);
+assert.match(purchasesRoute, /provider === "flutterwave"/);
+assert.match(purchasesRoute, /customerAddress/);
 assert.match(purchasesRoute, /minimumPaystackAmountMinor/);
 assert.match(countryRouting, /x-vercel-ip-country/);
 assert.match(countryRouting, /cf-ipcountry/);
@@ -282,8 +287,12 @@ assert.match(paystackProviderConfig, /env.PAYSTACK_PROVIDER_APPROVED === "true" 
 assert.match(paystackProviderConfig, /FLUTTERWAVE_PAYMENT_OPTIONS_DASHBOARD_DISABLED/);
 assert.match(paystackProviderConfig, /PAYSTACK_INTERNATIONAL_ENABLED/);
 assert.match(paystackProviderConfig, /isPaystackLocalCustomer/);
-assert.match(paystackService, /isPaystackLocalCustomer\(countryCode, process\.env\)/,
-  "foreign Add Funds visitors must not inherit the Paystack merchant-country checkout");
+assert.match(fundingService, /isPaystackLocalCustomer\(countryCode, process\.env\)/,
+  "Paystack checkout must remain restricted to the configured merchant country");
+assert.match(fundingService, /getFlutterwaveFundingOption\(countryCode\)/,
+  "Flutterwave must be resolved as a separate provider");
+assert.doesNotMatch(paystackService, /getFlutterwaveFundingOption|FLUTTERWAVE/,
+  "the Paystack payment adapter must contain no Flutterwave integration");
 
 for (const country of ["NG", "GH", "KE", "ZA", "MW", "UG", "RW", "TZ", "BJ", "BF", "CI", "GW", "ML", "NE", "SN", "TG", "CM", "TD", "CF", "CG", "GQ", "GA", "ZM", "EG", "GB", "US"]) {
   assert.ok(countryRouting.includes(country + ":"), "country routing must include " + country);
@@ -336,7 +345,7 @@ assert.match(fundingOptionsRoute, /card: isCustomerPaymentMethodAvailable/);
 assert.match(fundingOptionsRoute, /local: isCustomerPaymentMethodAvailable/);
 assert.match(fundingOptionsRoute, /more: isCustomerPaymentMethodAvailable/);
 assert.match(fundingOptionsRoute, /message: funding\.message/);
-assert.match(paystackService, /foreign visitor to inherit an NGN\/merchant-country checkout/);
+assert.match(fundingService, /Paystack adapter is eligible only for the merchant's own country/);
 
 assert.doesNotMatch(fundingOptionsRoute, /label: provider\.label|providers: provider\.packs/,
   "the wallet options API must not return gateway labels or provider pack cards");
