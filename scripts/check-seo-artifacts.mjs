@@ -247,7 +247,17 @@ assert.equal(largeSitemap.files.length, 3);
 assert.deepEqual(largeSitemap.files.map((file) => file.count), [40_000, 40_000, 1]);
 assert.ok(largeSitemap.files.every((file) => file.content.includes("<urlset")));
 assert.match(result.inventory, /^# enV public tool SEO inventory/m);
-assert.match(result.inventory, /\\| Canonical public target \\| Disposition \\/ exclusion reason \\|/);
+assert.ok(result.inventory.includes("Canonical public target | Disposition / exclusion reason"), "Full reconciliation rows must separate canonical targets from exclusion reasons.");
+const inventoryGeneratorSource = readFileSync(new URL("./generate-seo-artifacts.mjs", import.meta.url), "utf8");
+for (const disposition of [
+  "Canonical public tool page", "Consolidated generated variant; canonical tool ID:",
+  "Retired legacy route", "Generic workflow fallback; not indexable until a dedicated operation replaces it",
+  "Planned catalogue record", "Under-production tool; excluded from public indexing",
+  "Generic Input A/Input B equation template; excluded from public indexing",
+  "Legacy Developer alias; resolved to canonical Studio page", "Present in source catalogue only; not registered by Web runtime",
+  "Not included in public search discovery", "Non-public catalogue status:",
+]) assert.ok(inventoryGeneratorSource.includes(disposition), "The inventory generator must define disposition: " + disposition);
+assert.doesNotMatch(result.inventory, /No canonical SEO record; inspect production or alias policy/, "Every non-canonical record must have a specific disposition reason.");
 assert.match(result.inventory, /Generic workflow fallback; not indexable until a dedicated operation replaces it|Planned catalogue record|Under-production tool; excluded from public indexing|Generic Input A\\/Input B equation template; excluded from public indexing|Retired legacy route|Legacy Developer alias; resolved to canonical Studio page|Consolidated generated variant/);
 assert.doesNotMatch(result.inventory, /No canonical SEO record; inspect production or alias policy/, "Every non-canonical record must have a specific disposition reason.");
 assert.match(result.inventory, /\| Tool ID \| Tool \| Category \| Catalogue status \| Engine operation \| Catalogue execution\/account flags \| Task guidance source \|/);
