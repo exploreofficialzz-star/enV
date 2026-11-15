@@ -136,7 +136,7 @@ Do not treat source changes, the existence of an application ID, a generated cat
 
 ## 8. Implementation and verification snapshot
 
-This source snapshot is commit `f2055f3f989eebf50453d94cb4db8581ac564553` on the isolated branch `feat/complete-discovery-ws02-ws09-20261115`, based on main commit `a18c54df64f2cbb0c51413df0824b381458b850a`. At that comparison the branch was **66 commits ahead and 0 behind** main. It has not been merged.
+This source snapshot is commit `f2055f3f989eebf50453d94cb4db8581ac564553` on the isolated branch `feat/complete-discovery-ws02-ws09-20261115`, based on main commit `a18c54df64f2cbb0c51413df0824b381458b850a`. That comparison showed 66 commits ahead and 0 behind. Subsequent commits added the Celebration renderer-map contract and expanded the live SEO smoke sample for Creator and Celebration routes. The branch remains ahead of main, 0 commits behind, and has not been merged.
 
 The newest READY preview is `env-pjgfy1c21-en-v1.vercel.app` at commit `6929b9935621e5cd7e69ed7e9216f9a0d0a6a7cb`. That build passed the native catalogue export and native identity audit: 10,004 expanded native records, 27 engine families, matching 7,902-ID Android/iOS manifests, and the application identity checks. The production build and postbuild completed; the runtime catalogue check verified fingerprint `v58f9a538e469` with 9,976 list entries, 9,976 search entries and 40 detail shards.
 
