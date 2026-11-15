@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { isSameOriginRequest, jsonResponse, readJsonObject, requireBillingUser } from "../../../../src/lib/billing/http.server";
 import { initializePaystackCheckout, minimumPaystackAmountMinor } from "../../../../src/lib/billing/paystack.server";
 import { initializeCryptomusCheckout } from "../../../../src/lib/billing/cryptomus.server";
-import { initializeFlutterwaveCheckout } from "../../../../src/lib/billing/flutterwave.server";
+import { initializeFlutterwaveBankTransfer, initializeFlutterwaveCheckout } from "../../../../src/lib/billing/flutterwave.server";
 import { getCustomerCountry } from "../../../../src/lib/billing/country-routing";
 import { getFundingOptions } from "../../../../src/lib/billing/funding.server";
 import { quoteTokenPacks, type CurrencyPackQuote } from "../../../../src/lib/billing/fx.server";
@@ -112,7 +112,24 @@ export default defineHandler(async (event) => {
     const providerMethod = paymentMethod === "card" || paymentMethod === "local" ? paymentMethod : undefined;
     const checkout = provider === "cryptomus"
       ? await initializeCryptomusCheckout(input)
-      : provider === "flutterwave"
+      : provider === "flutterwave" && body.flutterwaveDetails &&
+        typeof body.flutterwaveDetails === "object" &&
+        (body.flutterwaveDetails as Record<string, unknown>).type === "bank_transfer"
+        ? await initializeFlutterwaveBankTransfer({
+            ...input,
+            countryCode,
+            pricingQuote: pricingQuote!,
+            customerName: typeof body.customerName === "string" ? body.customerName : "",
+            customerPhone: typeof body.customerPhone === "string" ? body.customerPhone : "",
+            customerAddress: {
+              city: typeof customerAddress.city === "string" ? customerAddress.city : "",
+              state: typeof customerAddress.state === "string" ? customerAddress.state : "",
+              line1: typeof customerAddress.line1 === "string" ? customerAddress.line1 : "",
+              line2: typeof customerAddress.line2 === "string" ? customerAddress.line2 : undefined,
+              postalCode: typeof customerAddress.postalCode === "string" ? customerAddress.postalCode : "",
+            },
+          })
+        : provider === "flutterwave"
         ? await initializeFlutterwaveCheckout({
             ...input,
             countryCode,
