@@ -5,6 +5,7 @@ import {
   getCustomerCountry,
   getCurrencyMinorUnitExponent,
   normalizeCountryCode,
+  normalizeFlutterwaveAmount,
   parseMajorUnitsToMinor,
   toFlutterwaveMajorAmount,
 } from "./country-routing.ts";
@@ -73,15 +74,17 @@ test("country profiles expose the documented Flutterwave local currencies and me
   }
 });
 
-test("Flutterwave Standard accepts only exact whole major-unit amounts within int32", () => {
-  assert.equal(toFlutterwaveMajorAmount(10_000, "NGN"), 100);
-  assert.equal(toFlutterwaveMajorAmount(12_300, "NGN"), 123);
-  assert.equal(toFlutterwaveMajorAmount(12_350, "NGN"), null);
-  assert.equal(toFlutterwaveMajorAmount(12_345, "NGN"), null);
-  assert.equal(toFlutterwaveMajorAmount(123, "XOF"), 123);
-  assert.equal(toFlutterwaveMajorAmount(214_748_364_800, "NGN"), null);
-  assert.equal(toFlutterwaveMajorAmount(0, "NGN"), null);
-  assert.equal(toFlutterwaveMajorAmount(123, "UNKNOWN"), null);
+test("Flutterwave Standard rounds FX quotes to whole major units and returns matching ledger minor units", () => {
+  assert.deepEqual(normalizeFlutterwaveAmount(10_000, "GHS"), { amountMajor: 100, amountMinor: 10_000 });
+  assert.deepEqual(normalizeFlutterwaveAmount(12_345, "GHS"), { amountMajor: 123, amountMinor: 12_300 });
+  assert.deepEqual(normalizeFlutterwaveAmount(12_350, "GHS"), { amountMajor: 124, amountMinor: 12_400 });
+  assert.equal(toFlutterwaveMajorAmount(12_345, "GHS"), 123);
+  assert.deepEqual(normalizeFlutterwaveAmount(12_345, "GBP"), { amountMajor: 123, amountMinor: 12_300 });
+  assert.deepEqual(normalizeFlutterwaveAmount(123, "XOF"), { amountMajor: 123, amountMinor: 123 });
+  assert.deepEqual(normalizeFlutterwaveAmount(123, "XAF"), { amountMajor: 123, amountMinor: 123 });
+  assert.equal(normalizeFlutterwaveAmount(214_748_364_800, "GHS"), null);
+  assert.equal(normalizeFlutterwaveAmount(0, "GHS"), null);
+  assert.equal(normalizeFlutterwaveAmount(123, "UNKNOWN"), null);
 });
 
 test("provider verification amounts convert to integer minor units without rounding", () => {
