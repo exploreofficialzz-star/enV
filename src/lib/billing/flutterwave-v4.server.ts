@@ -81,14 +81,23 @@ function flutterwaveCredentials() {
   };
 }
 
-function methodsForCountry(countryCode: string, paymentOptions: readonly string[]) {
-  const options = paymentOptions.map((option) => option.toLowerCase());
+const MOBILE_MONEY_NETWORKS: Record<string, readonly string[]> = {
+  BF: ["ORANGE", "MOBICASH"],
+  CM: ["MTN", "ORANGE"],
+  GH: ["MTN", "TELECEL", "AIRTELTIGO"],
+  CI: ["MTN", "ORANGE", "WAVE"],
+  KE: ["MPESA"],
+  RW: ["AIRTEL", "MTN"],
+  SN: ["ORANGE", "FREE", "WAVE"],
+  TZ: ["AIRTEL", "TIGO", "HALOPESA"],
+  UG: ["AIRTEL", "MTN"],
+  ZM: ["AIRTEL", "MTN", "ZAMTEL"],
+};
+
+function methodsForCountry(countryCode: string): FlutterwaveV4Method[] {
   const methods: FlutterwaveV4Method[] = ["card"];
-  if (options.some((option) => option === "mpesa" || option.startsWith("mobilemoney"))) {
-    methods.push("mobile_money");
-  }
-  if (options.includes("opay")) methods.push("opay");
-  if (countryCode === "NG" && options.includes("ussd")) methods.push("ussd");
+  if (MOBILE_MONEY_NETWORKS[countryCode]) methods.push("mobile_money");
+  if (countryCode === "NG") methods.push("opay", "ussd");
   return methods;
 }
 
@@ -100,7 +109,7 @@ function resolveConfiguration(countryCode: string | null | undefined) {
   const currencyEnabled = enabledCurrencies().has(currency);
   const approved = process.env.FLUTTERWAVE_PROVIDER_APPROVED === "true";
   const exponent = getCurrencyMinorUnitExponent(currency);
-  const paymentMethods = methodsForCountry(profile.countryCode, profile.paymentOptions);
+  const paymentMethods = methodsForCountry(profile.countryCode);
   const ready = launchChecksPassed() && approved && currencyEnabled &&
     Boolean(credentials.clientId) && Boolean(credentials.clientSecret) &&
     Boolean(credentials.secretHash) && Boolean(credentials.encryptionKey) &&
@@ -339,13 +348,14 @@ function validatePaymentDetails(
   }
   if (method === "mobile_money") {
     const mobileMoney = asRecord(input.mobile_money);
-    const network = typeof mobileMoney.network === "string" ? mobileMoney.network.trim() : "";
+    const network = typeof mobileMoney.network === "string" ? mobileMoney.network.trim().toUpperCase() : "";
+    const allowedNetworks = MOBILE_MONEY_NETWORKS[countryCode] ?? [];
     const phoneNumber = typeof mobileMoney.phone_number === "string"
       ? mobileMoney.phone_number.replace(/\D/g, "") : "";
     const dialCode = countryCallingCode(countryCode);
-    if (!dialCode || !/^[A-Za-z0-9 _-]{2,32}$/.test(network) ||
-        phoneNumber.length < 7 || phoneNumber.length > 15) {
-      fail("Enter a valid mobile-money network and phone number for your country.", "INVALID_PAYMENT_DETAILS", 400);
+    if (!dialCode || !allowedNetworks.includes(network) ||
+        !/^\d{7,10}$/.test(phoneNumber)) {
+      fail("Choose a supported mobile-money network and enter its 7–10 digit phone number.", "INVALID_PAYMENT_DETAILS", 400);
     }
     return {
       type: "mobile_money",
@@ -383,6 +393,13 @@ export async function initializeFlutterwaveCheckout(input: {
   pricingQuote: CurrencyPackQuote;
   paymentDetails: unknown;
   customerName: string;
+  customerAddress: {
+    city: string;
+    state: string;
+    line1: string;
+    line2?: string;
+    postalCode: string;
+  };
 }) {
   if (!Number.isSafeInteger(input.tokenPack) || input.tokenPack < 100 ||
       input.tokenPack > 9_000_000_000 || !validIdempotencyKey(input.idempotencyKey)) {
@@ -448,8 +465,21 @@ export async function initializeFlutterwaveCheckout(input: {
     : typeof asRecord(input.paymentDetails).phoneNumber === "string"
       ? String(asRecord(input.paymentDetails).phoneNumber).replace(/\D/g, "") : "";
   const dialCode = countryCallingCode(profile.countryCode);
-  if (!dialCode || phone.length < 7 || phone.length > 15) {
-    fail("Enter a valid phone number to continue with Flutterwave.", "ACCOUNT_PHONE_REQUIRED", 400);
+  if (!dialCode || !/^\d{7,10}$/.test(phone)) {
+    fail("Enter a valid 7–10 digit phone number to continue with Flutterwave.", "ACCOUNT_PHONE_REQUIRED", 400);
+  }
+  const address = {
+    city: input.customerAddress.city.trim(),
+    country: profile.countryCode,
+    line1: input.customerAddress.line1.trim(),
+    ...(input.customerAddress.line2?.trim() ? { line2: input.customerAddress.line2.trim() } : {}),
+    postal_code: input.customerAddress.postalCode.trim(),
+    state: input.customerAddress.state.trim(),
+  };
+  if (!address.city || address.city.length > 100 || !address.line1 || address.line1.length > 160 ||
+      !address.postal_code || address.postal_code.length > 24 || !address.state || address.state.length > 100 ||
+      (address.line2 && address.line2.length > 160)) {
+    fail("Enter a complete billing address to continue with Flutterwave.", "INVALID_CUSTOMER_ADDRESS", 400);
   }
   const origin = publicOrigin();
   if (!origin) fail("The secure public callback origin is not configured.", "FLUTTERWAVE_NOT_CONFIGURED", 503);
@@ -488,6 +518,7 @@ export async function initializeFlutterwaveCheckout(input: {
         currency,
         redirect_url: origin + "/api/billing/flutterwave/verify?reference=" + encodeURIComponent(intentId),
         customer: {
+          address,
           email,
           name,
           phone: { country_code: dialCode, number: phone },
