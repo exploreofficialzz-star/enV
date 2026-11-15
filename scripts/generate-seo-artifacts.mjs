@@ -252,7 +252,9 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
   const addInventoryRecord = (tool, source, includeRoute = true) => {
     const entry = inventoryById.get(tool.id) ?? { sourceTool: null, runtimeTool: null, sources: new Set(), routes: new Set() };
     if (source === "source-catalog" && !entry.sourceTool) entry.sourceTool = tool;
-    if (source !== "source-catalog") entry.runtimeTool = tool;
+    // Runtime registry records are authoritative. Search/category/canonical aliases
+    // add discovery surfaces and routes but must never replace the runtime record.
+    if (source !== "source-catalog" && !entry.runtimeTool) entry.runtimeTool = tool;
     entry.sources.add(source);
     if (includeRoute && source !== "source-catalog") entry.routes.add(toolPath(tool));
     inventoryById.set(tool.id, entry);
