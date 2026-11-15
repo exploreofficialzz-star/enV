@@ -296,6 +296,8 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
         } else {
           disposition = "Legacy Developer entry; canonical Studio target not resolved";
         }
+      } else if (!entry.runtimeTool && entry.sourceTool) {
+        disposition = "Present in source catalogue only; not registered by Web runtime";
       } else if (tool.status !== "active" && tool.status !== "beta") {
         disposition = "Non-public catalogue status: " + String(tool.status);
       } else if (!entry.sources.has("public-search")) {
