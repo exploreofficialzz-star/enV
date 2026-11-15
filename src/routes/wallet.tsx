@@ -36,7 +36,16 @@ type WalletActivity = {
 
 type WalletState = { status: "loading" | "ready" | "unavailable"; message?: string; wallet?: WalletData; activity?: WalletActivity[] };
 type WalletFundingChoice = CustomerPaymentMethod | "flutterwave";
-type FlutterwaveMethod = "card" | "mobile_money" | "opay" | "ussd";
+type FlutterwaveMethod = "card" | "mobile_money" | "opay" | "ussd" | "bank_transfer";
+type FlutterwaveBankTransferDetails = {
+  accountNumber: string;
+  bankName: string;
+  currency: string;
+  amount: number;
+  reference: string;
+  expiresAt: string;
+  note: string;
+};
 type FundingMethods = Record<WalletFundingChoice, boolean>;
 type FundingOptionsState = {
   status: "loading" | "ready" | "unavailable";
@@ -242,6 +251,7 @@ function Account() {
   const [flutterwaveCvv, setFlutterwaveCvv] = useState("");
   const [flutterwaveChallenge, setFlutterwaveChallenge] = useState<{ reference: string; type: "otp" | "pin" | "avs" } | null>(null);
   const [flutterwaveAuthorizationValue, setFlutterwaveAuthorizationValue] = useState("");
+  const [flutterwaveBankTransfer, setFlutterwaveBankTransfer] = useState<FlutterwaveBankTransferDetails | null>(null);
   const [fundingOptionsState, setFundingOptionsState] = useState<FundingOptionsState>({
     status: "loading", methods: { card: false, local: false, more: false, flutterwave: false },
   });
@@ -276,7 +286,7 @@ function Account() {
         }
         const flutterwaveMethods = Array.isArray(payload.data?.flutterwave?.paymentMethods)
           ? payload.data.flutterwave.paymentMethods.filter((item): item is FlutterwaveMethod =>
-              item === "card" || item === "mobile_money" || item === "opay" || item === "ussd")
+              item === "card" || item === "mobile_money" || item === "opay" || item === "ussd" || item === "bank_transfer")
           : [];
         const availableMethods: FundingMethods = {
           card: methods.card, local: methods.local, more: methods.more,
