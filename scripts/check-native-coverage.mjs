@@ -15,6 +15,20 @@ for (const [label, source, marker] of [
   if (!source.includes(marker)) throw new Error(`Music data sandbox missing ${label}.`);
 }
 
+// Music Downloader is backend-native on both products: Android has a dedicated
+// Compose screen and iOS has its own SwiftUI flow in ToolViews.swift. Both resolve
+// supported public URLs and download through the configured enV API gateway.
+const androidMusicDownloader = fs.readFileSync(new URL('../apps/android/app/src/main/java/com/chastech/env/NativeMusicDownloader.kt', import.meta.url), 'utf8');
+for (const [label, source, marker] of [
+  ['Android Music Downloader route', nativeAnalyzerRoute, 'NativeMusicDownloaderScreen()'],
+  ['Android Music Downloader API resolver', androidMusicDownloader, 'resolveProviderMusicPage('],
+  ['iOS Music Downloader resolver', iosAnalyzerRoutes, 'nativeMusicResolve('],
+  ['iOS Music Downloader download', iosAnalyzerRoutes, 'nativeMusicDownload('],
+  ['iOS Music Downloader retry', iosAnalyzerRoutes, 'nativeMusicDownloadWithRetry('],
+]) {
+  if (!source.includes(marker)) throw new Error(`Music Downloader native implementation is missing ${label}.`);
+}
+
 // A file-workspace manifest entry is accepted only when its platform has a real
 // screen/engine dispatch, not merely because the ID exists in a catalogue.
 const androidFileDispatch = nativeAnalyzerRoute.includes('NativeFileWorkspaceScreen(tool.id)');
@@ -77,7 +91,7 @@ for (const id of fileWorkspaceIds) {
     throw new Error(`File workspace coverage is missing native implementation evidence for ${id}.`);
   }
 }
-const explicitWebOnlyIds = ['music-downloader', 'smartphone-prototype-lab'];
+const explicitWebOnlyIds = ['smartphone-prototype-lab'];
 for (const id of explicitWebOnlyIds) {
   if (!byId.has(id)) throw new Error(`Expected Web-only runtime tool is absent from registry: ${id}`);
   if (android.has(id) || ios.has(id)) throw new Error(`Web-only runtime tool was incorrectly marked native: ${id}`);
