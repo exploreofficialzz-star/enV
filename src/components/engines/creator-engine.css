@@ -358,3 +358,27 @@
     border-top: 1px solid var(--color-border);
   }
 }
+
+.env-creator-launcher__intro {
+  flex: 0 0 auto;
+  max-width: 920px;
+  margin: -3px 0 0 48px;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.env-creator-launcher__intro > p:first-child {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.env-creator-launcher__blurb {
+  margin-top: 3px;
+  color: var(--color-accent);
+  font-weight: 650;
+}
+@media (max-width: 639px) {
+  .env-creator-launcher__intro { margin-left: 48px; font-size: 11px; }
+  .env-creator-launcher__intro > p:first-child { -webkit-line-clamp: 2; }
+}
