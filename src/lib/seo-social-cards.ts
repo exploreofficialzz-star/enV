@@ -85,3 +85,12 @@ export function articleSocialCard(article: { slug: string; title: string }): Soc
     imageHeight: SOCIAL_CARD_HEIGHT,
   };
 }
+
+export function blogIndexSocialCard(): SocialCardMetadata {
+  return {
+    image: SITE_ORIGIN + "/og/cards/blog-index.png",
+    imageAlt: "enV Blogs and Guides preview for individual tool documentation and product articles",
+    imageWidth: SOCIAL_CARD_WIDTH,
+    imageHeight: SOCIAL_CARD_HEIGHT,
+  };
+}
