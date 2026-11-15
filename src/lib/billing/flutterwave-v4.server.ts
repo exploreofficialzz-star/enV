@@ -16,6 +16,7 @@ const LIVE_API = "https://f4bexperience.flutterwave.com";
 
 type JsonRecord = Record<string, unknown>;
 type FlutterwaveV4Method = "card" | "mobile_money" | "opay" | "ussd";
+type FlutterwaveFundingMethod = FlutterwaveV4Method | "bank_transfer";
 type FlutterwaveV4PaymentDetails = {
   type: FlutterwaveV4Method;
   card?: {
@@ -94,10 +95,20 @@ const MOBILE_MONEY_NETWORKS: Record<string, readonly string[]> = {
   ZM: ["AIRTEL", "MTN", "ZAMTEL"],
 };
 
-function methodsForCountry(countryCode: string): FlutterwaveV4Method[] {
-  const methods: FlutterwaveV4Method[] = ["card"];
+function virtualAccountCurrencies(): Set<string> {
+  const configured = process.env.FLUTTERWAVE_VIRTUAL_ACCOUNT_CURRENCIES;
+  // NGN virtual accounts are enabled by default for Nigerian Flutterwave
+  // merchants. Other currencies require an explicit merchant-account setting.
+  const values = configured === undefined ? ["NGN"] : configured.split(",");
+  return new Set(values.map((value) => value.trim().toUpperCase())
+    .filter((value) => ["NGN", "GHS"].includes(value)));
+}
+
+function methodsForCountry(countryCode: string, currency: string): FlutterwaveFundingMethod[] {
+  const methods: FlutterwaveFundingMethod[] = ["card"];
   if (MOBILE_MONEY_NETWORKS[countryCode]) methods.push("mobile_money");
   if (countryCode === "NG") methods.push("opay", "ussd");
+  if (virtualAccountCurrencies().has(currency)) methods.push("bank_transfer");
   return methods;
 }
 
@@ -109,7 +120,7 @@ function resolveConfiguration(countryCode: string | null | undefined) {
   const currencyEnabled = enabledCurrencies().has(currency);
   const approved = process.env.FLUTTERWAVE_PROVIDER_APPROVED === "true";
   const exponent = getCurrencyMinorUnitExponent(currency);
-  const paymentMethods = methodsForCountry(profile.countryCode)
+  const paymentMethods = methodsForCountry(profile.countryCode, currency)
     .filter((method) => method !== "card" || Boolean(credentials.encryptionKey));
   const ready = launchChecksPassed() && approved && currencyEnabled &&
     Boolean(credentials.clientId) && Boolean(credentials.clientSecret) &&
@@ -320,12 +331,13 @@ function countryCallingCode(countryCode: string): string | null {
 
 function validatePaymentDetails(
   countryCode: string,
-  paymentMethods: readonly FlutterwaveV4Method[],
+  paymentMethods: readonly FlutterwaveFundingMethod[],
   details: unknown,
 ): FlutterwaveV4PaymentDetails {
   const input = asRecord(details);
   const method = input.type;
-  if (typeof method !== "string" || !paymentMethods.includes(method as FlutterwaveV4Method)) {
+  if (typeof method !== "string" || method === "bank_transfer" ||
+      !paymentMethods.includes(method as FlutterwaveFundingMethod)) {
     fail("This Flutterwave payment method is not enabled for your country.", "PAYMENT_METHOD_NOT_AVAILABLE_FOR_COUNTRY", 422);
   }
   if (method === "card") {
