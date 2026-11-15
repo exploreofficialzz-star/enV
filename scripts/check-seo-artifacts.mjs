@@ -85,6 +85,7 @@ for (const card of result.socialCards) {
 }
 assert.equal(result.runtimeInventory.length, new Set(result.runtimeInventory.map((row) => row.id)).size, "Full runtime reconciliation must contain one row per stable tool ID.");
 assert.ok(result.inventory.includes("Android native coverage manifest lists " + nativeInventory.androidToolIds.length + " unique tool IDs; iOS lists " + nativeInventory.iosToolIds.length + " unique tool IDs."), "Native coverage manifest totals must be included in the reconciled report.");
+assert.deepEqual([...nativeInventory.androidToolIds].sort(), [...nativeInventory.iosToolIds].sort(), "Android and iOS native coverage manifests must list the same stable tool IDs.");
 assert.match(result.inventory, /Android native manifest \| iOS native manifest/);
 assert.match(result.inventory, /base catalogue fingerprint/);
 assert.ok(result.tools.length > 0);
