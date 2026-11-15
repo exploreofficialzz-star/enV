@@ -120,11 +120,11 @@ export default defineHandler(async (event) => {
             paymentDetails: body.flutterwaveDetails,
             customerName: typeof body.customerName === "string" ? body.customerName : "",
             customerAddress: {
-              city: typeof customerAddress.city === "string" ? body.customerAddress.city : "",
-              state: typeof customerAddress.state === "string" ? body.customerAddress.state : "",
-              line1: typeof customerAddress.line1 === "string" ? body.customerAddress.line1 : "",
-              line2: typeof customerAddress.line2 === "string" ? body.customerAddress.line2 : undefined,
-              postalCode: typeof customerAddress.postalCode === "string" ? body.customerAddress.postalCode : "",
+              city: typeof customerAddress.city === "string" ? customerAddress.city : "",
+              state: typeof customerAddress.state === "string" ? customerAddress.state : "",
+              line1: typeof customerAddress.line1 === "string" ? customerAddress.line1 : "",
+              line2: typeof customerAddress.line2 === "string" ? customerAddress.line2 : undefined,
+              postalCode: typeof customerAddress.postalCode === "string" ? customerAddress.postalCode : "",
             },
           })
         : await initializePaystackCheckout({ ...input, pricingQuote: pricingQuote!, paymentMethod: providerMethod }, countryCode);
