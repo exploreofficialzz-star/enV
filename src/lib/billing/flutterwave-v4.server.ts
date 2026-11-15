@@ -83,18 +83,32 @@ function flutterwaveCredentials() {
   };
 }
 
-const MOBILE_MONEY_NETWORKS: Record<string, readonly string[]> = {
-  BF: ["ORANGE", "MOBICASH"],
-  CM: ["MTN", "ORANGE"],
-  GH: ["MTN", "TELECEL", "AIRTELTIGO"],
-  CI: ["MTN", "ORANGE", "WAVE"],
-  KE: ["MPESA"],
-  RW: ["AIRTEL", "MTN"],
-  SN: ["ORANGE", "FREE", "WAVE"],
-  TZ: ["AIRTEL", "TIGO", "HALOPESA"],
-  UG: ["AIRTEL", "MTN"],
-  ZM: ["AIRTEL", "MTN", "ZAMTEL"],
-};
+const MOBILE_MONEY_COUNTRIES = new Set([
+  "CG", "CM", "CI", "EG", "ET", "GA", "GH", "KE", "MW", "RW", "SN", "TZ", "TD", "UG", "ZM",
+]);
+type FlutterwaveMobileNetwork = { network: string; name: string };
+const mobileNetworkCache = new Map<string, { expiresAt: number; networks: FlutterwaveMobileNetwork[] }>();
+const MOBILE_NETWORK_CACHE_MS = 15 * 60 * 1_000;
+
+async function getFlutterwaveMobileNetworks(countryCode: string): Promise<FlutterwaveMobileNetwork[]> {
+  if (!MOBILE_MONEY_COUNTRIES.has(countryCode)) return [];
+  const cached = mobileNetworkCache.get(countryCode);
+  if (cached && cached.expiresAt > Date.now()) return cached.networks;
+
+  const response = await flutterwaveRequest("/mobile-networks?country=" + encodeURIComponent(countryCode));
+  const records = Array.isArray(response.items)
+    ? response.items.map(asRecord)
+    : typeof response.network === "string" ? [response] : [];
+  const networks = records.flatMap((record) => {
+    const network = typeof record.network === "string" ? record.network.trim() : "";
+    const name = typeof record.name === "string" ? record.name.trim() : network;
+    return network && /^[A-Za-z0-9 _-]{1,48}$/.test(network) && name && name.length <= 80
+      ? [{ network, name }]
+      : [];
+  });
+  mobileNetworkCache.set(countryCode, { expiresAt: Date.now() + MOBILE_NETWORK_CACHE_MS, networks });
+  return networks;
+}
 
 function virtualAccountCurrencies(): Set<string> {
   const configured = process.env.FLUTTERWAVE_VIRTUAL_ACCOUNT_CURRENCIES;
@@ -107,8 +121,7 @@ function virtualAccountCurrencies(): Set<string> {
 
 function methodsForCountry(countryCode: string, currency: string): FlutterwaveFundingMethod[] {
   const methods: FlutterwaveFundingMethod[] = ["card"];
-  if (MOBILE_MONEY_NETWORKS[countryCode]) methods.push("mobile_money");
-  if (countryCode === "NG") methods.push("opay", "ussd", "bank_account");
+  if (MOBILE_MONEY_COUNTRIES.has(countryCode)) methods.push("mobile_money");
   if (virtualAccountCurrencies().has(currency)) methods.push("bank_transfer");
   return methods;
 }
@@ -246,7 +259,19 @@ function validIdempotencyKey(value: unknown): value is string {
 export async function getFlutterwaveFundingOption(countryCode: string | null | undefined) {
   const configuration = resolveConfiguration(countryCode);
   if (!configuration) return null;
-  const { profile, currency, ready, currencyEnabled, approved, paymentMethods, credentials } = configuration;
+  const { profile, currency, ready, currencyEnabled, approved, credentials } = configuration;
+  let paymentMethods = [...configuration.paymentMethods];
+  let mobileNetworks: FlutterwaveMobileNetwork[] = [];
+  if (ready && paymentMethods.includes("mobile_money")) {
+    try {
+      mobileNetworks = await getFlutterwaveMobileNetworks(profile.countryCode);
+    } catch {
+      mobileNetworks = [];
+    }
+    if (mobileNetworks.length === 0) {
+      paymentMethods = paymentMethods.filter((method) => method !== "mobile_money");
+    }
+  }
   let quotes: CurrencyPackQuote[];
   try {
     quotes = await quoteTokenPacks(currency, TOKEN_PACKS);
@@ -260,6 +285,7 @@ export async function getFlutterwaveFundingOption(countryCode: string | null | u
       packs: [],
       paymentOptions: [...profile.paymentOptions],
       paymentMethods,
+      mobileNetworks,
       localPayments: paymentMethods.some((method) => method !== "card"),
       message: "A current USD exchange-rate quote is unavailable for " + currency + ". No local amount was estimated.",
     };
@@ -299,6 +325,7 @@ export async function getFlutterwaveFundingOption(countryCode: string | null | u
     packs,
     paymentOptions: [...profile.paymentOptions],
     paymentMethods,
+    mobileNetworks,
     localPayments: paymentMethods.some((method) => method !== "card"),
     message: ready && !anyPackAvailable
       ? "Enter a custom amount that can be charged in " + currency + "."
@@ -333,6 +360,7 @@ function countryCallingCode(countryCode: string): string | null {
 function validatePaymentDetails(
   countryCode: string,
   paymentMethods: readonly FlutterwaveFundingMethod[],
+  mobileNetworks: readonly FlutterwaveMobileNetwork[],
   details: unknown,
 ): FlutterwaveV4PaymentDetails {
   const input = asRecord(details);
@@ -364,7 +392,7 @@ function validatePaymentDetails(
   if (method === "mobile_money") {
     const mobileMoney = asRecord(input.mobile_money);
     const network = typeof mobileMoney.network === "string" ? mobileMoney.network.trim().toUpperCase() : "";
-    const allowedNetworks = MOBILE_MONEY_NETWORKS[countryCode] ?? [];
+    const allowedNetworks = mobileNetworks.map((entry) => entry.network.toUpperCase());
     const rawPhoneNumber = typeof mobileMoney.phone_number === "string"
       ? mobileMoney.phone_number.replace(/\D/g, "") : "";
     const phoneNumber = rawPhoneNumber.startsWith("0") ? rawPhoneNumber.slice(1) : rawPhoneNumber;
@@ -436,7 +464,11 @@ export async function initializeFlutterwaveCheckout(input: {
     fail("Flutterwave v4 is not configured for the detected country and currency.", "FLUTTERWAVE_NOT_CONFIGURED", 503);
   }
   const { currency, profile, paymentMethods, credentials } = configuration;
-  const method = validatePaymentDetails(profile.countryCode, paymentMethods, input.paymentDetails);
+  const requestedMethod = asRecord(input.paymentDetails).type;
+  const mobileNetworks = requestedMethod === "mobile_money"
+    ? await getFlutterwaveMobileNetworks(profile.countryCode).catch(() => [])
+    : [];
+  const method = validatePaymentDetails(profile.countryCode, paymentMethods, mobileNetworks, input.paymentDetails);
   const amountMinor = input.pricingQuote.amountMinor;
   const amountMajor = toMajorAmount(amountMinor, currency);
   const creditsSubunits = input.tokenPack * 1_000;
