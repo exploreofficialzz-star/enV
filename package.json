@@ -132,7 +132,8 @@
     "check:catalog-runtime": "node scripts/check-catalog-runtime.mjs",
     "postbuild": "node scripts/check-catalog-runtime.mjs",
     "check:native-discovery": "node scripts/check-native-store-discovery.mjs",
-    "test:discovery": "npm run check:seo && node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/tool-documentation.test.ts src/components/engines/celebration-engine-utils.test.ts && node --test scripts/generic-workflow-policy.test.mjs"
+    "test:discovery": "npm run check:seo && node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/tool-documentation.test.ts src/components/engines/celebration-engine-utils.test.ts && node --test scripts/generic-workflow-policy.test.mjs",
+    "audit:tool-ledger": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/generate-tool-functional-audit-ledger.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
