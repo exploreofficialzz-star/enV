@@ -690,8 +690,10 @@ export async function initializeFlutterwaveBankTransfer(input: {
   let intentId: string;
   if (existing[0]) {
     const prior = existing[0];
+    const priorMetadata = providerMetadata(prior.provider_metadata);
+    const priorQuoteAmountMinor = Number(priorMetadata.baseQuoteAmountMinor ?? prior.amount_minor);
     if (prior.product_id !== "tokens-" + input.tokenPack ||
-        Number(prior.amount_minor) !== amountMinor || prior.currency.toUpperCase() !== currency) {
+        priorQuoteAmountMinor !== amountMinor || prior.currency.toUpperCase() !== currency) {
       fail("This checkout key was already used for a different purchase. Start a new checkout.", "IDEMPOTENCY_CONFLICT", 409);
     }
     if (prior.status === "pending") {
@@ -723,6 +725,7 @@ export async function initializeFlutterwaveBankTransfer(input: {
       fxFetchedAt: input.pricingQuote.fxFetchedAt,
       quotedAt: input.pricingQuote.quotedAt,
       paymentMethod: "bank_transfer",
+      baseQuoteAmountMinor: amountMinor,
     };
     await sql.query(
       "insert into billing_purchase_intents " +
@@ -788,9 +791,15 @@ export async function initializeFlutterwaveBankTransfer(input: {
         account_type: "dynamic",
         narration: "enV wallet funding",
         bank_code: "GH200100",
-        bank_code: "GH200100",
       }),
     }, idempotencyBase);
+    const providerAmountMinor = parseMajorUnitsToMinor(
+      virtualAccount.amount as string | number | undefined, currency,
+    );
+    const providerAmountMajor = providerAmountMinor === null ? null : toMajorAmount(providerAmountMinor, currency);
+    if (providerAmountMinor === null || providerAmountMinor < amountMinor || providerAmountMajor === null) {
+      throw new Error("Flutterwave returned an invalid bank-transfer amount.");
+    }
     const accountNumber = typeof virtualAccount.account_number === "string" ? virtualAccount.account_number : "";
     const bankName = typeof virtualAccount.account_bank_name === "string" ? virtualAccount.account_bank_name : "";
     const returnedReference = typeof virtualAccount.reference === "string" ? virtualAccount.reference : "";
@@ -806,22 +815,24 @@ export async function initializeFlutterwaveBankTransfer(input: {
       accountNumber,
       bankName,
       currency,
-      amount: amountMajor,
+      amount: providerAmountMajor,
       reference: intentId,
       customerReference,
       expiresAt,
       note,
     };
     const update = await sql.query(
-      "update billing_purchase_intents set status = 'pending', provider_metadata = " +
-      "coalesce(provider_metadata, '{}'::jsonb) || $2::jsonb, updated_at = now() " +
-      "where id = $1 and provider = 'flutterwave' and status = 'created' returning id",
-      [intentId, JSON.stringify({
+      "update billing_purchase_intents set amount_minor = $2, status = 'pending', provider_metadata = " +
+      "coalesce(provider_metadata, '{}'::jsonb) || $3::jsonb, updated_at = now() " +
+      "where id = $1 and provider = 'flutterwave' and status = 'created' and amount_minor = $4 returning id",
+      [intentId, providerAmountMinor, JSON.stringify({
         bankTransfer,
         paymentMethod: "bank_transfer",
         customerId,
         virtualAccountId: typeof virtualAccount.id === "string" ? virtualAccount.id : null,
-      })],
+        baseQuoteAmountMinor: amountMinor,
+        providerAmountMinor,
+      }), amountMinor],
     );
     if (!update[0]) fail("The bank-transfer account was created but the purchase record could not be updated. Contact support before transferring.", "PURCHASE_STATE_CONFLICT", 409);
     return { reference: intentId, tokens: input.tokenPack, status: "pending", bankTransfer };
