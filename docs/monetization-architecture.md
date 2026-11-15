@@ -28,7 +28,7 @@
 - `server/routes/api/billing/catalog.get.ts`: public policy and supported-operation preview.
 - `server/routes/api/billing/quote.post.ts`: provisional operation/tool quote. Cloud and AI operations do not receive invented prices in the absence of measured cost.
 - `server/routes/api/billing/wallet.get.ts`: authenticated wallet and ledger activity endpoint; requires configured account auth.
-- `server/routes/api/billing/purchases.post.ts`: server-side, country-aware dispatch to Paystack only for customers in the configured Paystack merchant country, Flutterwave Standard in the detected foreign customer's supported local currency, or the existing Cryptomus adapter. All routes remain fail-closed behind merchant approval, pricing and refund/dispute gates. See `docs/payment-provider-routing.md`.
+- `server/routes/api/billing/purchases.post.ts`: server-side dispatch to Paystack only for customers in the configured Paystack merchant country, independently selected Flutterwave V4 methods for its enabled country/currency profiles (including Nigeria where configured), or the existing Cryptomus adapter. Flutterwave is never a Paystack fallback. All routes remain fail-closed behind merchant approval, pricing and refund/dispute gates. See `docs/payment-provider-routing.md`.
 - `src/components/billing/tool-token-estimate.tsx`: Web tool-detail estimate, explicitly marked provisional and non-billable in this release.
 - Android/iOS/Web pricing and legal copy: aligned on token reference value, no disruptive ads, premium-vs-usage distinction and inactive purchases.
 
@@ -136,11 +136,12 @@ Android/iOS wallet dashboards read the shared balance using a revocable paired-d
 
 ## Multi-provider wallet checkout — implementation
 
-The Web wallet now opens a payment-method chooser before checkout. The server publishes the two configured methods through the existing funding-options endpoint:
+The Web wallet now opens a payment-method chooser before checkout. The server publishes the customer-facing methods through the funding-options endpoint and keeps Flutterwave as an explicit, independent selection:
 
 - **Paystack (NGN):** hosted checkout is initialized with the secret key on the server. The provider must confirm the transaction and enV must match the purchase intent's provider reference, product, amount, currency and transaction ID before the ledger is credited. The signed Paystack webhook uses HMAC-SHA512 with a timing-safe comparison.
+- **Flutterwave V4:** OAuth-authenticated Orchestrator charges support card, regional mobile money, OPay, USSD and Nigeria Pay with Bank. Card fields are encrypted in the browser before transmission. NGN/GHS dynamic virtual-account transfers create a V4 customer and temporary bank account for one purchase reference; the wallet displays the account details and credits tokens only after a matching V4 charge is retrieved. Webhooks use HMAC-SHA256 and are independently verified before ledger settlement.
 - **Cryptomus (crypto invoice):** enV creates a fiat-priced USD invoice, then directs the customer to the provider-hosted invoice page, where the available currencies and networks come from the merchant configuration. The Merchant API request is signed server-side using Cryptomus' documented MD5(base64(JSON body) + payment API key) format. The webhook signature is verified, then the server independently queries the invoice by order ID and matches invoice UUID, expected USD amount, currency, final paid status and the original purchase intent before crediting tokens. Browser return URLs never credit tokens.
-- **Shared ledger:** both methods use the same wallet account, integer milli-token units, purchase-intent table, idempotency constraints, provider transaction uniqueness and verified-purchase ledger transaction. Replayed callbacks do not create a second credit.
+- **Shared ledger:** Paystack, Flutterwave and Cryptomus use the same wallet account, integer milli-token units, purchase-intent table, idempotency constraints, provider transaction uniqueness and verified-purchase ledger transaction. Replayed callbacks do not create a second credit.
 - **Exceptional crypto statuses:** partial, underpaid, paid-over, locked, cancelled, failed or unfinalized invoices do not grant token credit automatically. Paid-over, locked and incorrect-amount invoices are flagged as disputed for manual review; refunds and disputes still require an operator's reconciled resolution under the published policy.
 
 ### Configuration and deliberate launch gates
@@ -158,7 +159,7 @@ Paystack's current international-eligibility guidance lists mobile-wallet busine
 
 ### Native-store restrictions
 
-The Web chooser is responsive and can be used in a mobile browser. Native Android and iOS wallet buttons must not open this Web checkout as a workaround for store billing. Digital token credits generally require Google Play Billing on Google Play and Apple In-App Purchase/StoreKit on the App Store, unless the app and storefront meet a specific published exception or approved external-billing program. Native purchase adapters, signed store transaction verification, restore/revoke handling and store reconciliation are separate launch blockers. Until those adapters are completed and tested, the native Add funds action must state clearly that in-app purchases are not available in that release and must not launch Paystack or crypto checkout.
+The Web chooser is responsive and can be used in a mobile browser. Native Android and iOS wallet buttons must not open this Web checkout as a workaround for store billing. Digital token credits generally require Google Play Billing on Google Play and Apple In-App Purchase/StoreKit on the App Store, unless the app and storefront meet a specific published exception or approved external-billing program. Native purchase adapters, signed store transaction verification, restore/revoke handling and store reconciliation are separate launch blockers. Until those adapters are completed and tested, the native Add funds action must state clearly that in-app purchases are not available in that release and must not launch Paystack, Flutterwave or crypto checkout.
 
 ### Deployment checklist specific to payments
 
