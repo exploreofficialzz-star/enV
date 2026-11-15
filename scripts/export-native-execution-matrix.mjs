@@ -43,7 +43,10 @@ const rows = catalog.map((tool) => {
   const backendA = androidBackend.has(tool.id), backendI = iosBackend.has(tool.id);
   const a = localA ? "offline-native" : backendA ? "backend-native" : "web-only";
   const i = localI ? "offline-native" : backendI ? "backend-native" : "web-only";
-  const dispositionReason = intentionalWebOnlyReasons[tool.id] ?? null;
+  const isWebOnly = a === "web-only" || i === "web-only";
+  const dispositionReason = intentionalWebOnlyReasons[tool.id] ?? (isWebOnly
+    ? "No matching native Android/iOS execution row is currently registered for this tool ID in the reconciled platform coverage sources. Keep it on Web until both native products have a verified dispatcher and acceptance evidence."
+    : null);
   return { id: tool.id, name: tool.name, status: tool.status, category: tool.category, engine: tool.engine.type, android: a, ios: i, ...(dispositionReason ? { dispositionReason } : {}) };
 });
 const activeRows = rows.filter((row) => active.has(row.id));
