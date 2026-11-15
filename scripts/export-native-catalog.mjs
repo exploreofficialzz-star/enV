@@ -4,6 +4,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { refineGeneratedToolDescription } from "../src/lib/generated-tool-copy.mjs";
 import { applyGenericWorkflowPolicy } from "../src/lib/generic-workflow-policy.mjs";
+import { getAllTools } from "../src/lib/registry.ts";
 
 const root = new URL("../", import.meta.url);
 const catalogSource = readFileSync(new URL("../src/data/catalog.ts", import.meta.url), "utf8");
@@ -12,8 +13,10 @@ const [{ tools }, { CATEGORIES: categories }, { DATETIME_TOOL_EXTENSIONS }] = aw
   import("../src/data/categories.ts"),
   import("../src/lib/datetime/catalog-tools.ts"),
 ]);
-// Import the public runtime catalog rather than parsing only catalogJson. Platform-owned
-// runtime extensions are validated below but are not duplicated into the generated base export.
+// The native engine inventory and manifest validation must reconcile every Web runtime
+// identity, including tools that the native products expose through dedicated local screens.
+// The shipped native catalog remains separately assembled below with its intentional extensions.
+const canonicalRuntimeTools = getAllTools();
 
 const publishedCatalogTools = applyGenericWorkflowPolicy(tools);
 const refinedCatalogTools = publishedCatalogTools.map((tool) => {
@@ -134,7 +137,9 @@ const active = exportedTools.filter((tool) => tool.status === "active" || tool.s
 const planned = exportedTools.length - active;
 const catalogVersion = createHash("sha256").update(catalogSource).digest("hex").slice(0, 12);
 const runtimeInventoryVersion = createHash("sha256")
-  .update(catalogSource + JSON.stringify(runtimeCatalogExtensions.map(({ platformRuntimeExtension, ...tool }) => tool)))
+  .update(catalogSource + JSON.stringify(canonicalRuntimeTools.map((tool) => ({
+    id: tool.id, name: tool.name, status: tool.status, category: tool.category, engine: tool.engine,
+  }))))
   .digest("hex").slice(0, 12);
 const readImplementedIds = (...relativePaths) => {
   const paths = relativePaths.flatMap((relativePath) => {
@@ -163,7 +168,7 @@ const iosToolIds = readImplementedIds(
   "apps/ios/native-tool-coverage.txt",
   "apps/ios/native-family-coverage",
 );
-const toolsById = new Map(expandedTools.map((tool) => [tool.id, tool]));
+const toolsById = new Map(canonicalRuntimeTools.map((tool) => [tool.id, tool]));
 for (const [platform, ids] of [["Android", androidToolIds], ["iOS", iosToolIds]]) {
   const invalid = [...ids].filter((id) => !toolsById.has(id) || toolsById.get(id).status === "planned");
   if (invalid.length) {
@@ -181,7 +186,7 @@ const output = new URL("../apps/shared/catalog.json", import.meta.url);
 mkdirSync(dirname(fileURLToPath(output)), { recursive: true });
 writeFileSync(output, `${JSON.stringify(payload)}\n`);
 const familyMap = new Map();
-for (const tool of expandedTools) {
+for (const tool of canonicalRuntimeTools) {
   const family = tool.engine.type;
   const entry = familyMap.get(family) ?? {
     family,
@@ -202,8 +207,8 @@ for (const tool of expandedTools) {
 const inventory = {
   catalogVersion: runtimeInventoryVersion,
   baseCatalogVersion: catalogVersion,
-  runtimeExtensionIds: runtimeCatalogExtensions.filter((extension) => extension.platformRuntimeExtension === true && !tools.some((tool) => tool.id === extension.id)).map((extension) => extension.id),
-  source: "src/data/catalog.ts",
+  runtimeExtensionIds: canonicalRuntimeTools.filter((tool) => !tools.some((baseTool) => baseTool.id === tool.id)).map((tool) => tool.id),
+  source: "src/lib/registry.ts (generated base catalogue plus runtime extensions)",
   platforms: { android: "Kotlin", ios: "Swift" },
   families: [...familyMap.values()]
     .sort((left, right) => left.family.localeCompare(right.family))
@@ -214,9 +219,9 @@ const inventory = {
   androidToolIds: [...androidToolIds].sort(),
   iosToolIds: [...iosToolIds].sort(),
   summary: {
-    totalTools: expandedTools.length,
-    activeTools: expandedTools.filter((tool) => tool.status === "active" || tool.status === "beta").length,
-    plannedTools: expandedTools.filter((tool) => tool.status !== "active" && tool.status !== "beta").length,
+    totalTools: canonicalRuntimeTools.length,
+    activeTools: canonicalRuntimeTools.filter((tool) => tool.status === "active" || tool.status === "beta").length,
+    plannedTools: canonicalRuntimeTools.filter((tool) => tool.status !== "active" && tool.status !== "beta").length,
     engineFamilies: familyMap.size,
     androidImplemented: androidToolIds.size,
     iosImplemented: iosToolIds.size,
