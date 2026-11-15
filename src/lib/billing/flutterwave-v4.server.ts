@@ -35,7 +35,6 @@ type FlutterwaveV4NextAction = {
   requires_pin?: unknown;
   requires_otp?: unknown;
   requires_additional_fields?: { fields?: unknown };
-  requires_additional_fields?: { fields?: unknown };
   [key: string]: unknown;
 };
 
@@ -416,9 +415,6 @@ function validatePaymentDetails(
       type: "mobile_money",
       mobile_money: { country_code: dialCode, network, phone_number: phoneNumber },
     };
-  }
-  if (method === "bank_transfer") {
-    return { type: "bank_transfer" };
   }
   fail("This Flutterwave V4 payment method is not supported by enV.", "PAYMENT_METHOD_NOT_AVAILABLE_FOR_COUNTRY", 422);
 }
