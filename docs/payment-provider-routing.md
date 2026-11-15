@@ -19,37 +19,32 @@ Paystack and Flutterwave checkout amounts are derived server-side from the selec
 
 The public funding-options API exposes only customer-facing method availability, detected country/currency and generic guidance; provider identities, raw FX rates and local checkout amounts remain server-side. The user sees the USD reference value on the pack card. The final payment amount and settlement currency are shown by the provider's hosted checkout. A customer's card issuer may separately apply its own foreign-exchange rules or fees.
 
-## Flutterwave collection coverage
+## Flutterwave v4 collection coverage
 
-The current country profile catalogue is deliberately explicit. Flutterwave's Standard hosted checkout receives the country-specific currency and `payment_options` list. Flutterwave also filters methods that do not apply to a selected currency. For Add Funds, Flutterwave is the preferred and only gateway for customers outside the configured Paystack merchant country; its hosted page collects card details on Flutterwave rather than enV handling raw card numbers.
+Flutterwave is a standalone payment choice in the enV wallet. It is not a Paystack fallback, and choosing it never changes the Paystack Nigeria route. Customers may explicitly choose Flutterwave wherever the detected country has an enV country/currency profile, the currency is enabled on the Flutterwave merchant account, and the V4 method is available. Nigeria can use Flutterwave in its own right when the Flutterwave NGN configuration is enabled; Paystack remains an independent option.
 
-| Customer country | Checkout currency | Methods requested from Flutterwave |
-|---|---:|---|
-| Nigeria | NGN | Card, USSD, bank transfer, bank account, internet banking, NQR, eNaira, OPay |
-| Ghana | GHS | Card, Ghana mobile money (`mobilemoneyghana`) |
-| Kenya | KES | Card, M-Pesa |
-| South Africa | ZAR | Card, bank account, 1Voucher |
-| Malawi | MWK | Card, Malawi mobile money |
-| Uganda | UGX | Card, Uganda mobile money |
-| Rwanda | RWF | Card, Rwanda mobile money |
-| Tanzania | TZS | Card, Tanzania mobile money |
-| Benin, Burkina Faso, Côte d'Ivoire, Guinea-Bissau, Mali, Niger, Senegal, Togo | XOF | Card, West African mobile money |
-| Cameroon, Central African Republic, Chad, Republic of the Congo, Equatorial Guinea, Gabon | XAF | Card, Central African mobile money |
-| Zambia | ZMW | Card, Zambia mobile money |
-| Egypt | EGP | Card, FawryPay |
-| United Kingdom | GBP | Card, bank account |
-| United States | USD | Card, bank account |
-| Canada | CAD | Card |
-| Colombia | COP | Card |
-| India | INR | Card |
-| Sierra Leone | SLL | Card |
-| Euro-area countries (including Bulgaria from 1 January 2026) | EUR | Card, bank account |
+The integration uses the Flutterwave V4 OAuth and Orchestrator APIs. It does not call Standard checkout or any `/v3` endpoint:
 
-Flutterwave's published card-currency list is GBP, CAD, XAF, COP, EGP, EUR, GHS, KES, INR, NGN, RWF, SLL, ZAR, TZS, UGX, USD, XOF and ZMW (its Help Center has a typo `IRN` for India's INR). enV also includes MWK for the documented Malawi local-payment profile. The card currency list does not itself imply a local payment rail in every country; those methods remain tied to their country profiles. Only currencies enabled on the actual merchant account and listed in `FLUTTERWAVE_ENABLED_CURRENCIES` can be purchasable. The token-pack value is converted from the single USD reference price using the FX snapshot; no `FLUTTERWAVE_TOKEN_PRICE_<CURRENCY>_MINOR` variables exist. Flutterwave Standard currently documents `amount` as an int32 in major currency units. enV therefore enables a pack only when the converted amount is an exact whole major unit within the provider's int32 limit; fractional major-unit results are disabled rather than rounded or sent in an unsupported format. Flutterwave's current documentation also requires the account-level **Enable Dashboard Payment Options** switch to be unchecked before per-payment `payment_options` are applied. Set `FLUTTERWAVE_PAYMENT_OPTIONS_DASHBOARD_DISABLED=true` only after verifying that dashboard setting. The deployment also requires `FLW_SECRET_KEY`, `FLW_SECRET_HASH`, `FLUTTERWAVE_PROVIDER_APPROVED=true`, the global billing gates, and `FLUTTERWAVE_REFUND_DISPUTE_HANDLING_APPROVED=true`. The last flag is intentionally false by default: the provider's refund/chargeback reconciliation and wallet reversal policy must be implemented and tested before activation.
+- **Card:** V4 Orchestrator direct charge. The browser encrypts each card field with AES-256-GCM and a unique 12-character nonce before sending it to enV. Raw PAN, expiry and CVV are not posted to or stored by enV.
+- **Mobile money:** V4 Orchestrator with a country-specific network allowlist. The current supported networks are Ghana (MTN, Telecel, AirtelTigo), Kenya (M-Pesa), Côte d'Ivoire (MTN, Orange, Wave), Cameroon (MTN, Orange), Rwanda (Airtel, MTN), Tanzania (Airtel, Tigo, Halopesa), Uganda (Airtel, MTN), Zambia (Airtel, MTN, Zamtel), Burkina Faso (Orange, Mobicash), and Senegal (Orange, Free Money, Wave).
+- **Nigeria NGN:** Card, OPay, USSD, Pay with Bank (bank-account direct debit), and dynamic bank-transfer virtual accounts. Pay with Bank redirects to Flutterwave's bank authorization page. Dynamic virtual accounts are created for one purchase reference and expire after one hour.
+- **Ghana GHS:** Card and the configured mobile-money networks. Dynamic virtual-account bank transfer can be exposed only when the merchant has Ghana virtual-account capability and `GHS` is explicitly added to `FLUTTERWAVE_VIRTUAL_ACCOUNT_CURRENCIES`. Ghana virtual accounts are not automatically available to merchants registered outside Ghana.
+- **Other supported currency profiles:** Card is available only where the profile/currency and merchant account permit it. enV does not advertise a local rail merely because Flutterwave lists a currency.
 
-Flutterwave method identifiers are currency-region specific: Ghana uses `mobilemoneyghana`; West African XOF uses `mobilemoneyxof`; Central African XAF uses `mobilemoneyxaf`. enV follows the named-method list in Flutterwave's payment-method documentation and keeps XOF and XAF rails separate.
+The current enV country profiles include NGN, GHS, KES, ZAR, MWK, UGX, RWF, TZS, XOF, XAF, ZMW, EGP, GBP, USD, CAD, COP, INR, SLL and EUR. A country profile and currency allowlist are necessary but do not guarantee that the merchant account has a particular rail activated. Flutterwave merchant-country rules and feature approval remain authoritative.
 
-The country-to-method table is a request allowlist, not a guarantee that the merchant's Flutterwave account has every method activated. The account's live eligibility, settlement currencies, dashboard settings and provider onboarding remain authoritative.
+The server creates an enV purchase intent before any provider request. Card, mobile-money, OPay, USSD and Pay with Bank payments use V4 direct charges. Bank-transfer payments create a V4 customer and a dynamic virtual account linked to the purchase reference. The final charge is independently retrieved from the V4 Charges API and compared against the saved reference, amount and currency before the shared ledger credits tokens. A bank-transfer account alone never credits tokens.
+
+V4 configuration is server-only:
+
+- `FLW_CLIENT_ID` and `FLW_CLIENT_SECRET`: OAuth client credentials for the selected environment.
+- `FLW_ENVIRONMENT`: `production` or `sandbox`; use credentials from the same environment.
+- `FLW_ENCRYPTION_KEY`: V4 card-field encryption key; never expose it in a browser bundle.
+- `FLW_SECRET_HASH`: V4 webhook HMAC-SHA256 verification key.
+- `FLUTTERWAVE_ENABLED_CURRENCIES`: currencies enabled on the actual Flutterwave merchant account.
+- `FLUTTERWAVE_VIRTUAL_ACCOUNT_CURRENCIES`: dynamic bank-transfer currencies enabled for this merchant. enV defaults to NGN for a Nigerian Flutterwave merchant; add GHS only after Ghana virtual accounts are enabled for the account.
+
+The V4 webhook endpoint verifies the raw request body against the `flutterwave-signature` HMAC-SHA256 header using a timing-safe comparison. `charge.completed` events are verified with the V4 charge retrieval API; asynchronous bank transfers are found by their unique reference through the V4 charge-list endpoint before retrieval. Refund and chargeback callbacks are re-fetched from the V4 Refunds/Chargebacks APIs before the shared ledger can reverse funds. Redirects and webhook payloads alone are never treated as proof of payment.
 
 ## Paystack coverage and account boundaries
 
@@ -67,12 +62,13 @@ Paystack's local channels are controlled by the merchant account and dashboard. 
 
 ## Flutterwave and Paystack checkout integrity
 
-- Checkout initialization creates a purchase intent before calling the provider and uses a unique idempotency key.
-- The browser only receives a validated HTTPS hosted-checkout URL from the provider's expected checkout host.
-- Redirects do not credit the wallet by themselves. Paystack and Flutterwave transaction details are re-fetched from the provider API and compared with the stored reference, transaction ID, exact amount and currency.
-- Flutterwave webhook requests require the exact configured `verif-hash` header to match `FLW_SECRET_HASH`; the handler reads a bounded body and verifies the transaction with Flutterwave before calling the shared idempotent wallet ledger.
-- Tokens are credited only through `creditVerifiedPurchase`, which enforces the stored purchase intent and provider transaction uniqueness.
-- Flutterwave refund and chargeback callbacks are implemented with provider-record re-fetch and purchase-intent matching before wallet reversal. Keep the production refund/dispute approval gate false until the live webhook URL is registered, real provider callbacks are delivered and tested, and the operating/recovery procedure is signed off.
+- Each provider creates an enV purchase intent before checkout and uses a unique idempotency key.
+- Paystack remains limited to the configured merchant country. Flutterwave is independently selected and never used as a silent fallback.
+- V4 card and bank-payment actions are completed on Flutterwave or the selected bank; redirects never credit the wallet by themselves.
+- Flutterwave settlement retrieves the V4 charge and compares the saved purchase reference, exact amount and currency before calling the shared ledger. Bank-transfer webhook references are resolved through the V4 charge list, then retrieved by charge ID.
+- Flutterwave V4 webhook signatures are verified over the bounded raw request body using HMAC-SHA256 and the `flutterwave-signature` header.
+- Tokens are credited only through `creditVerifiedPurchase`, which enforces the stored purchase intent, provider transaction uniqueness and idempotent event handling.
+- Refund and chargeback webhooks are re-fetched from Flutterwave's V4 resource endpoints and reconciled against the original purchase intent before a wallet reversal.
 
 ## Deployment configuration
 
