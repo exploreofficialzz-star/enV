@@ -264,6 +264,7 @@ assert.match(fundingOptionsRoute, /getCustomerCountry/);
 assert.match(purchasesRoute, /getCustomerCountry/);
 assert.match(purchasesRoute, /getFundingOptions\(countryCode\)/);
 assert.match(purchasesRoute, /initializeFlutterwaveCheckout/);
+assert.match(purchasesRoute, /initializeFlutterwaveBankTransfer/);
 assert.match(walletDashboard, /const allowedCheckoutHost = checkout\?\.protocol === "https:"/);
 assert.match(walletDashboard, /checkout\.hostname === "checkout\.paystack\.com"/);
 assert.match(walletDashboard, /checkout\.hostname === "pay\.cryptomus\.com"/);
@@ -274,7 +275,6 @@ assert.match(countryRouting, /x-vercel-ip-country/);
 assert.match(countryRouting, /cf-ipcountry/);
 assert.match(countryRouting, /getCountryPaymentProfile/);
 assert.match(countryRouting, /parseMajorUnitsToMinor/);
-assert.match(countryRouting, /toFlutterwaveMajorAmount/);
 assert.match(countryRouting, /mobilemoneyghana/);
 assert.match(countryRouting, /mobilemoneyxaf/);
 assert.match(countryRouting, /mobilemoneyxof/);
@@ -286,6 +286,8 @@ assert.match(paystackProviderConfig, /PAYSTACK_INTERNATIONAL_ENABLED/);
 assert.match(paystackProviderConfig, /isPaystackLocalCustomer/);
 assert.match(fundingService, /isPaystackLocalCustomer\(countryCode, process\.env\)/,
   "Paystack checkout must remain restricted to the configured merchant country");
+assert.match(fundingService, /paystackIsLocal \? Promise\.resolve\(null\) : getFlutterwaveFundingOption\(countryCode\)/,
+  "Nigeria remains on Paystack and cannot be routed to Flutterwave");
 assert.match(fundingService, /getFlutterwaveFundingOption\(countryCode\)/,
   "Flutterwave must be resolved as a separate provider");
 assert.doesNotMatch(paystackService, /getFlutterwaveFundingOption|FLUTTERWAVE/,
@@ -304,8 +306,11 @@ assert.match(flutterwaveService, /initializeFlutterwaveBankTransfer/);
 assert.match(flutterwaveService, /virtual-accounts/);
 assert.match(flutterwaveService, /FLUTTERWAVE_VIRTUAL_ACCOUNT_CURRENCIES/);
 assert.match(flutterwaveService, /account_type: "dynamic"/);
+assert.match(flutterwaveService, /initializeFlutterwaveBankTransfer/);
+assert.match(flutterwaveService, /virtual-accounts/);
+assert.match(flutterwaveService, /FLUTTERWAVE_VIRTUAL_ACCOUNT_CURRENCIES/);
+assert.match(flutterwaveService, /account_type: "dynamic"/);
 assert.match(flutterwaveService, /bank_transfer/);
-assert.match(flutterwaveService, /bank_account/);
 assert.match(flutterwaveService, /charges\?reference=/);
 assert.match(flutterwaveService, /data\.tx_ref/);
 assert.match(flutterwaveService, /getAccessToken/);
@@ -327,6 +332,7 @@ assert.doesNotMatch(flutterwaveService, /api\.flutterwave\.com\/v3|verify_by_ref
 assert.match(flutterwaveWebhook, /handleFlutterwaveWebhook/);
 assert.match(flutterwaveVerify, /verifyAndCreditFlutterwaveReference/);
 assert.match(envExample, /FLUTTERWAVE_ENABLED_CURRENCIES=/);
+assert.match(envExample, /FLUTTERWAVE_VIRTUAL_ACCOUNT_CURRENCIES=/);
 assert.match(envExample, /FLUTTERWAVE_REFUND_DISPUTE_HANDLING_APPROVED=false/);
 assert.match(envExample, /PAYSTACK_INTERNATIONAL_ENABLED=false/);
 assert.match(envExample, /PAYSTACK_MERCHANT_COUNTRY=NG/);
