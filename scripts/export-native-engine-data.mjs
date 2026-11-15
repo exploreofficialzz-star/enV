@@ -119,6 +119,17 @@ const coverageFamilies = {
   seo: catalog.filter((tool) => tool.engine.type === 'seo').map((tool) => tool.id),
   cssgen: catalog.filter((tool) => tool.engine.type === 'cssgen').map((tool) => tool.id),
   developer: catalog.filter((tool) => tool.engine.type === 'developer').map((tool) => tool.id),
+  // These seven IDs use the dedicated Kotlin/Swift file-workspace screens or
+  // NativeFileConverterEngine, rather than the generic generated engine families.
+  'file-workspace': [
+    'file-to-txt',
+    'file-organizer',
+    'batch-file-renamer',
+    'duplicate-file-finder',
+    'folder-size-analyzer',
+    'file-search',
+    'file-compare',
+  ],
 };
 for (const platform of ['android', 'ios']) {
   for (const [family, ids] of Object.entries(coverageFamilies)) {
