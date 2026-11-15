@@ -15,8 +15,8 @@ function walletRedirect(status: "success" | "pending" | "failed") {
 
 export default defineHandler(async (event) => {
   const url = new URL(event.req.url);
-  const reference = url.searchParams.get("tx_ref") ?? "";
-  const transactionId = url.searchParams.get("transaction_id") ?? "";
+  const reference = url.searchParams.get("reference") ?? url.searchParams.get("tx_ref") ?? "";
+  const transactionId = url.searchParams.get("charge_id") ?? url.searchParams.get("transaction_id") ?? undefined;
   try {
     await verifyAndCreditFlutterwaveReference(reference, transactionId);
     return walletRedirect("success");

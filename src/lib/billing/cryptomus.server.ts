@@ -2,7 +2,7 @@ import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto
 import { getSql } from "../db";
 import { creditVerifiedPurchase, readWallet } from "./ledger.server";
 import { readBoundedBytes } from "./bounded-json.server";
-import { getFundingOptions } from "./paystack.server";
+import { getFundingOptions } from "./funding.server";
 
 
 type CryptomusCredentials = { merchantId: string; apiKey: string };

@@ -35,12 +35,30 @@ type WalletActivity = {
 };
 
 type WalletState = { status: "loading" | "ready" | "unavailable"; message?: string; wallet?: WalletData; activity?: WalletActivity[] };
-type FundingMethods = Record<CustomerPaymentMethod, boolean>;
+type WalletFundingChoice = CustomerPaymentMethod | "flutterwave";
+type FlutterwaveMethod = "card" | "mobile_money" | "bank_transfer";
+type FlutterwaveBankTransferDetails = {
+  accountNumber: string;
+  bankName: string;
+  currency: string;
+  amount: number;
+  reference: string;
+  customerReference?: string;
+  expiresAt: string;
+  note: string;
+};
+type FundingMethods = Record<WalletFundingChoice, boolean>;
 type FundingOptionsState = {
   status: "loading" | "ready" | "unavailable";
   methods: FundingMethods;
   countryCode?: string | null;
   currency?: string | null;
+  flutterwave?: {
+    enabled: boolean;
+    currency?: string | null;
+    paymentMethods: FlutterwaveMethod[];
+    mobileNetworks: Array<{ network: string; name: string }>;
+  };
   message?: string;
 };
 type RewardsData = {
@@ -92,6 +110,25 @@ type LocalOfflineAllowance = {
   pendingBatch: boolean;
   issueIdempotencyKey: string;
 };
+
+async function encryptFlutterwaveField(value: string, encodedKey: string, nonce: string): Promise<string> {
+  const keyBytes = Uint8Array.from(atob(encodedKey), (character) => character.charCodeAt(0));
+  if (keyBytes.byteLength !== 32) throw new Error("The Flutterwave encryption key is not a valid AES-256 key.");
+  const key = await window.crypto.subtle.importKey("raw", keyBytes, { name: "AES-GCM" }, false, ["encrypt"]);
+  const encrypted = await window.crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: new TextEncoder().encode(nonce) },
+    key,
+    new TextEncoder().encode(value),
+  );
+  return btoa(String.fromCharCode(...new Uint8Array(encrypted)));
+}
+
+function flutterwaveNonce(): string {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const bytes = new Uint8Array(12);
+  window.crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("");
+}
 
 function tokenAmount(subunits: number): string {
   return (subunits / 1_000).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
@@ -187,8 +224,26 @@ function Account() {
   const [fundingBusy, setFundingBusy] = useState(false);
   const [showFundingOptions, setShowFundingOptions] = useState(false);
   const [fundingOptionsReloadKey, setFundingOptionsReloadKey] = useState(0);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<CustomerPaymentMethod>("card");
-  const [fundingOptionsState, setFundingOptionsState] = useState<FundingOptionsState>({ status: "loading", methods: { card: false, local: false, more: false } });
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<WalletFundingChoice>("card");
+  const [flutterwaveMethod, setFlutterwaveMethod] = useState<FlutterwaveMethod>("card");
+  const [flutterwaveCustomerName, setFlutterwaveCustomerName] = useState("");
+  const [flutterwavePhoneNumber, setFlutterwavePhoneNumber] = useState("");
+  const [flutterwaveNetwork, setFlutterwaveNetwork] = useState("");
+  const [flutterwaveAddressLine1, setFlutterwaveAddressLine1] = useState("");
+  const [flutterwaveAddressLine2, setFlutterwaveAddressLine2] = useState("");
+  const [flutterwaveCity, setFlutterwaveCity] = useState("");
+  const [flutterwaveState, setFlutterwaveState] = useState("");
+  const [flutterwavePostalCode, setFlutterwavePostalCode] = useState("");
+  const [flutterwaveCardNumber, setFlutterwaveCardNumber] = useState("");
+  const [flutterwaveExpiryMonth, setFlutterwaveExpiryMonth] = useState("");
+  const [flutterwaveExpiryYear, setFlutterwaveExpiryYear] = useState("");
+  const [flutterwaveCvv, setFlutterwaveCvv] = useState("");
+  const [flutterwaveChallenge, setFlutterwaveChallenge] = useState<{ reference: string; type: "otp" | "pin" | "avs" } | null>(null);
+  const [flutterwaveAuthorizationValue, setFlutterwaveAuthorizationValue] = useState("");
+  const [flutterwaveBankTransfer, setFlutterwaveBankTransfer] = useState<FlutterwaveBankTransferDetails | null>(null);
+  const [fundingOptionsState, setFundingOptionsState] = useState<FundingOptionsState>({
+    status: "loading", methods: { card: false, local: false, more: false, flutterwave: false },
+  });
   const [fundingFeedback, setFundingFeedback] = useState<{ kind: "success" | "error" | "info"; message: string } | null>(null);
   const [showAllTransactions, setShowAllTransactions] = useState(false);
   const [showBalance, setShowBalance] = useState(true);
@@ -198,7 +253,7 @@ function Account() {
   useEffect(() => {
     if (!showFundingOptions) return;
     const controller = new AbortController();
-    setFundingOptionsState({ status: "loading", methods: { card: false, local: false, more: false } });
+    setFundingOptionsState({ status: "loading", methods: { card: false, local: false, more: false, flutterwave: false } });
     void fetch("/api/billing/funding-options", { credentials: "same-origin", signal: controller.signal })
       .then(async (response) => {
         const payload = await response.json().catch(() => null) as {
@@ -208,6 +263,12 @@ function Account() {
             countryCode?: string | null;
             currency?: string | null;
             message?: string;
+            flutterwave?: {
+              enabled?: boolean;
+              currency?: string | null;
+              paymentMethods?: string[];
+              mobileNetworks?: Array<{ network?: string; name?: string }>;
+            };
           };
           message?: string;
         } | null;
@@ -217,25 +278,40 @@ function Account() {
             typeof methods.more !== "boolean") {
           throw new Error(payload?.message ?? "Payment options could not be loaded.");
         }
+        const flutterwaveMethods = Array.isArray(payload.data?.flutterwave?.paymentMethods)
+          ? payload.data.flutterwave.paymentMethods.filter((item): item is FlutterwaveMethod =>
+              item === "card" || item === "mobile_money" || item === "bank_transfer")
+          : [];
+        const mobileNetworks = Array.isArray(payload.data?.flutterwave?.mobileNetworks)
+          ? payload.data.flutterwave.mobileNetworks.filter((entry): entry is { network: string; name: string } =>
+              typeof entry.network === "string" && typeof entry.name === "string")
+          : [];
         const availableMethods: FundingMethods = {
           card: methods.card, local: methods.local, more: methods.more,
+          flutterwave: methods.flutterwave === true && flutterwaveMethods.length > 0,
         };
         setFundingOptionsState({
           status: "ready",
           methods: availableMethods,
           countryCode: payload.data?.countryCode ?? null,
           currency: payload.data?.currency ?? null,
+          flutterwave: {
+            enabled: payload.data?.flutterwave?.enabled === true,
+            currency: payload.data?.flutterwave?.currency ?? null,
+            paymentMethods: flutterwaveMethods,
+            mobileNetworks,
+          },
           message: payload.data?.message ?? payload.message,
         });
         setSelectedPaymentMethod((current) => availableMethods[current]
           ? current
-          : availableMethods.card ? "card" : availableMethods.local ? "local" : "more");
+          : availableMethods.card ? "card" : availableMethods.local ? "local" : availableMethods.more ? "more" : "flutterwave");
       })
       .catch(() => {
         if (controller.signal.aborted) return;
         setFundingOptionsState({
           status: "unavailable",
-          methods: { card: false, local: false, more: false },
+          methods: { card: false, local: false, more: false, flutterwave: false },
           message: "Payment options could not be loaded. Check your connection and try again.",
         });
       });
@@ -478,7 +554,7 @@ function Account() {
     await copyReferralLink(code, source, signature);
   }
 
-  async function startFundingCheckout(method: CustomerPaymentMethod) {
+  async function startFundingCheckout(method: WalletFundingChoice) {
     if (fundingBusy) return;
     const amountUsdCents = parseUsdAmountToCents(customAmountUsd);
     if (amountUsdCents === null) {
@@ -493,10 +569,89 @@ function Account() {
     setFundingBusy(true);
     setFundingFeedback(null);
     try {
+      let flutterwaveDetails: Record<string, unknown> | undefined;
+      if (method === "flutterwave") {
+        const rawPhoneNumber = flutterwavePhoneNumber.replace(/\D/g, "");
+        const phoneNumber = rawPhoneNumber.startsWith("0") ? rawPhoneNumber.slice(1) : rawPhoneNumber;
+        if (!/^\d{7,10}$/.test(phoneNumber)) {
+          throw new Error("Enter a valid phone number to continue with Flutterwave.");
+        }
+        if (!flutterwaveCustomerName.trim()) {
+          throw new Error("Enter your first and last name to continue with Flutterwave.");
+        }
+        if (flutterwaveMethod === "card") {
+          const cardNumber = flutterwaveCardNumber.replace(/\D/g, "");
+          const month = flutterwaveExpiryMonth.trim().padStart(2, "0");
+          const year = flutterwaveExpiryYear.trim();
+          const cvv = flutterwaveCvv.trim();
+          if (cardNumber.length < 12 || cardNumber.length > 19 ||
+              !/^(?:0[1-9]|1[0-2])$/.test(month) ||
+              !/^(?:\d{2}|\d{4})$/.test(year) ||
+              !/^\d{3,4}$/.test(cvv)) {
+            throw new Error("Check the card number, expiry date and security code.");
+          }
+          const keyResponse = await fetch("/api/billing/flutterwave/encryption-key", {
+            credentials: "same-origin",
+            headers: { accept: "application/json" },
+          });
+          const keyPayload = await keyResponse.json().catch(() => null) as {
+            ok?: boolean; data?: { encryptionKey?: string };
+          } | null;
+          if (!keyResponse.ok || !keyPayload?.ok || !keyPayload.data?.encryptionKey) {
+            throw new Error("Flutterwave card encryption is not configured. No card details were sent.");
+          }
+          const nonce = flutterwaveNonce();
+          // Flutterwave v4 requires each card field to be AES-256-GCM encrypted
+          // before it leaves the browser. No raw PAN or CVV is posted to enV.
+          const [encryptedCardNumber, encryptedExpiryMonth, encryptedExpiryYear, encryptedCvv] = await Promise.all([
+            encryptFlutterwaveField(cardNumber, keyPayload.data.encryptionKey, nonce),
+            encryptFlutterwaveField(month, keyPayload.data.encryptionKey, nonce),
+            encryptFlutterwaveField(year, keyPayload.data.encryptionKey, nonce),
+            encryptFlutterwaveField(cvv, keyPayload.data.encryptionKey, nonce),
+          ]);
+          flutterwaveDetails = {
+            type: "card",
+            phoneNumber,
+            card: {
+              encrypted_card_number: encryptedCardNumber,
+              encrypted_expiry_month: encryptedExpiryMonth,
+              encrypted_expiry_year: encryptedExpiryYear,
+              encrypted_cvv: encryptedCvv,
+              nonce,
+            },
+          };
+        } else if (flutterwaveMethod === "mobile_money") {
+          if (!flutterwaveNetwork) throw new Error("Choose your mobile-money network.");
+          flutterwaveDetails = {
+            type: "mobile_money",
+            phoneNumber,
+            mobile_money: { network: flutterwaveNetwork, phone_number: phoneNumber },
+          };
+        } else if (flutterwaveMethod === "bank_transfer") {
+          flutterwaveDetails = { type: "bank_transfer", phoneNumber };
+        } else {
+          throw new Error("Choose a Flutterwave payment method supported in your country.");
+        }
+      }
+
       const response = await fetch("/api/billing/purchases", {
         method: "POST", credentials: "same-origin",
         headers: { "content-type": "application/json", accept: "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify(method === "flutterwave" ? {
+          provider: "flutterwave",
+          flutterwaveDetails,
+          customerName: flutterwaveCustomerName.trim(),
+          customerPhone: flutterwavePhoneNumber.trim(),
+          customerAddress: {
+            line1: flutterwaveAddressLine1.trim(),
+            line2: flutterwaveAddressLine2.trim(),
+            city: flutterwaveCity.trim(),
+            state: flutterwaveState.trim(),
+            postalCode: flutterwavePostalCode.trim(),
+          },
+          amountUsdCents,
+          idempotencyKey: "flutterwave-wallet-" + crypto.randomUUID(),
+        } : {
           paymentMethod: method,
           amountUsdCents,
           idempotencyKey: method + "-wallet-topup-" + crypto.randomUUID(),
@@ -504,31 +659,258 @@ function Account() {
       });
       const payload = await response.json().catch(() => null) as {
         ok?: boolean;
-        data?: { authorizationUrl?: string; paymentMethod?: string };
+        data?: {
+          authorizationUrl?: string | null;
+          paymentMethod?: string;
+          provider?: string;
+          reference?: string;
+          chargeId?: string;
+          status?: string;
+          nextAction?: string | null;
+          paymentInstruction?: string | null;
+          bankTransfer?: FlutterwaveBankTransferDetails;
+        };
         error?: string;
+        message?: string;
       } | null;
+      if (!response.ok || !payload?.ok || !payload.data) {
+        throw new Error(payload?.message ?? "CHECKOUT_START_FAILED");
+      }
+
+      if (method === "flutterwave") {
+        if (payload.data.bankTransfer) {
+          setFlutterwaveBankTransfer(payload.data.bankTransfer);
+          setFlutterwaveChallenge(null);
+          setFundingFeedback({
+            kind: "info",
+            message: "Transfer the exact amount shown to this temporary Flutterwave account before it expires. enV will credit your wallet only after the bank transfer is verified.",
+          });
+          return;
+        }
+        const checkoutUrl = payload.data.authorizationUrl;
+        if (checkoutUrl) {
+          let checkout: URL | null = null;
+          try { checkout = new URL(checkoutUrl); } catch { checkout = null; }
+          const host = checkout?.hostname.toLowerCase() ?? "";
+          const providerHost = host === "flutterwave.com" || host.endsWith(".flutterwave.com") ||
+            host === "flutterwave.cloud" || host.endsWith(".flutterwave.cloud");
+          if (!checkout || checkout.protocol !== "https:" || !providerHost) {
+            throw new Error("Flutterwave returned an invalid secure authorization link.");
+          }
+          window.location.assign(checkout.href);
+          return;
+        }
+        if (payload.data.nextAction === "unsupported_additional_fields") {
+          setFundingFeedback({
+            kind: "error",
+            message: "Flutterwave's bank requested extra details this wallet flow cannot collect. Check with your bank for a pending authorization before retrying. enV will credit tokens only after the complete payment is verified.",
+          });
+          setShowFundingOptions(false);
+          return;
+        }
+        if (payload.data.nextAction === "requires_pin" ||
+            payload.data.nextAction === "requires_otp" ||
+            payload.data.nextAction === "requires_additional_fields") {
+          if (!payload.data.reference) throw new Error("Flutterwave did not return the payment reference for bank authorization.");
+          const challengeType = payload.data.nextAction === "requires_pin" ? "pin"
+            : payload.data.nextAction === "requires_otp" ? "otp" : "avs";
+          setFlutterwaveChallenge({ reference: payload.data.reference, type: challengeType });
+          setFlutterwaveAuthorizationValue("");
+          setFundingFeedback({
+            kind: "info",
+            message: challengeType === "pin"
+              ? "Your bank requires your card PIN to continue. It will be encrypted in your browser."
+              : challengeType === "otp"
+                ? "Your bank requires a one-time code. Enter the code sent by your bank."
+                : "Your bank needs to confirm your billing address. Check the address below, then continue.",
+          });
+          return;
+        }
+        if (payload.data.paymentInstruction) {
+          setFundingFeedback({ kind: "info", message: payload.data.paymentInstruction });
+          setShowFundingOptions(false);
+          setReloadKey(value => value + 1);
+          return;
+        }
+        if (payload.data.status === "succeeded") {
+          setFundingFeedback({ kind: "success", message: "Flutterwave confirmed the payment. Your wallet has been refreshed." });
+          setShowFundingOptions(false);
+          setReloadKey(value => value + 1);
+          return;
+        }
+        setFundingFeedback({ kind: "info", message: "Flutterwave is processing this payment. Your wallet will be credited only after the charge is verified." });
+        setShowFundingOptions(false);
+        setReloadKey(value => value + 1);
+        return;
+      }
+
       let checkout: URL | null = null;
-      try { if (payload?.data?.authorizationUrl) checkout = new URL(payload.data.authorizationUrl); } catch { checkout = null; }
+      try { if (payload.data.authorizationUrl) checkout = new URL(payload.data.authorizationUrl); } catch { checkout = null; }
       const allowedCheckoutHost = checkout?.protocol === "https:" && (
         method === "more"
           ? checkout.hostname === "pay.cryptomus.com"
-          : checkout.hostname === "checkout.paystack.com" || checkout.hostname === "checkout.flutterwave.com"
+          : checkout.hostname === "checkout.paystack.com"
       );
-      if (!response.ok || !payload?.ok || payload.data?.paymentMethod !== method || !checkout || !allowedCheckoutHost) {
-        const code = payload?.error;
-        throw new Error(code === "AUTH_REQUIRED" ? "SIGN_IN_REQUIRED"
-          : code === "INVALID_PURCHASE" ? "INVALID_AMOUNT" : "CHECKOUT_START_FAILED");
+      if (payload.data.paymentMethod !== method || !checkout || !allowedCheckoutHost) {
+        throw new Error("CHECKOUT_START_FAILED");
       }
       window.location.assign(checkout.href);
     } catch (error) {
       const code = error instanceof Error ? error.message : "";
-      // Keep provider, database, and deployment diagnostics in server logs; the checkout UI only shows an actionable status.
       setFundingFeedback({
         kind: "error",
         message: code === "SIGN_IN_REQUIRED" ? "Sign in to continue."
           : code === "INVALID_AMOUNT" ? "Enter a valid amount."
-          : "Couldn't start payment. Try again.",
+          : code === "CHECKOUT_START_FAILED" ? "Couldn't start payment. Try again."
+          : code || "Couldn't start payment. Try again.",
       });
+    } finally {
+      setFundingBusy(false);
+    }
+  }
+
+  async function copyFlutterwaveBankAccount() {
+    if (!flutterwaveBankTransfer) return;
+    try {
+      await navigator.clipboard.writeText(flutterwaveBankTransfer.accountNumber);
+      setFundingFeedback({ kind: "success", message: "Flutterwave transfer account number copied." });
+    } catch {
+      setFundingFeedback({ kind: "error", message: "Could not copy the account number. Select the number and copy it manually." });
+    }
+  }
+
+  async function verifyFlutterwaveBankTransfer() {
+    if (!flutterwaveBankTransfer || fundingBusy) return;
+    setFundingBusy(true);
+    setFundingFeedback(null);
+    try {
+      const response = await fetch("/api/billing/flutterwave/verify", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ reference: flutterwaveBankTransfer.reference }),
+      });
+      const payload = await response.json().catch(() => null) as {
+        ok?: boolean; data?: { status?: string }; message?: string;
+      } | null;
+      if (!response.ok || !payload?.ok || !payload.data?.status) {
+        throw new Error(payload?.message ?? "Flutterwave could not verify the transfer yet.");
+      }
+      if (payload.data.status === "succeeded") {
+        setFundingFeedback({ kind: "success", message: "Bank transfer verified by Flutterwave. Your wallet has been refreshed." });
+        setFlutterwaveBankTransfer(null);
+        setShowFundingOptions(false);
+        setReloadKey(value => value + 1);
+      } else {
+        setFundingFeedback({ kind: "info", message: "Flutterwave has not confirmed this transfer yet. Keep the exact amount and account reference, then check again." });
+      }
+    } catch (error) {
+      setFundingFeedback({ kind: "info", message: error instanceof Error ? error.message : "Flutterwave could not verify the transfer yet." });
+    } finally {
+      setFundingBusy(false);
+    }
+  }
+
+  async function submitFlutterwaveAuthorization() {
+    if (!flutterwaveChallenge || fundingBusy) return;
+    const value = flutterwaveAuthorizationValue.trim();
+    if (flutterwaveChallenge.type !== "avs" && !value) {
+      setFundingFeedback({ kind: "error", message: "Enter the requested authorization value." });
+      return;
+    }
+    setFundingBusy(true);
+    setFundingFeedback(null);
+    try {
+      const body: Record<string, unknown> = {
+        reference: flutterwaveChallenge.reference,
+        authorizationType: flutterwaveChallenge.type,
+      };
+      if (flutterwaveChallenge.type === "otp") {
+        body.otp = value;
+      } else if (flutterwaveChallenge.type === "pin") {
+        if (!/^\d{4,6}$/.test(value)) throw new Error("Enter the card PIN requested by your bank.");
+        const keyResponse = await fetch("/api/billing/flutterwave/encryption-key", {
+          credentials: "same-origin", headers: { accept: "application/json" },
+        });
+        const keyPayload = await keyResponse.json().catch(() => null) as {
+          ok?: boolean; data?: { encryptionKey?: string };
+        } | null;
+        if (!keyResponse.ok || !keyPayload?.ok || !keyPayload.data?.encryptionKey) {
+          throw new Error("Flutterwave card encryption is not configured.");
+        }
+        const nonce = flutterwaveNonce();
+        body.encryptedPin = await encryptFlutterwaveField(value, keyPayload.data.encryptionKey, nonce);
+        body.nonce = nonce;
+      } else {
+        body.customerAddress = {
+          line1: flutterwaveAddressLine1.trim(),
+          line2: flutterwaveAddressLine2.trim(),
+          city: flutterwaveCity.trim(),
+          state: flutterwaveState.trim(),
+          postalCode: flutterwavePostalCode.trim(),
+        };
+      }
+      const response = await fetch("/api/billing/flutterwave/authorize", {
+        method: "POST", credentials: "same-origin",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify(body),
+      });
+      const payload = await response.json().catch(() => null) as {
+        ok?: boolean;
+        data?: { status?: string; authorizationUrl?: string | null; nextAction?: string | null; paymentInstruction?: string | null };
+        message?: string;
+      } | null;
+      if (!response.ok || !payload?.ok || !payload.data) throw new Error(payload?.message ?? "The bank authorization could not be completed.");
+      if (payload.data.authorizationUrl) {
+        let target: URL | null = null;
+        try { target = new URL(payload.data.authorizationUrl); } catch { target = null; }
+        const host = target?.hostname.toLowerCase() ?? "";
+        if (!target || target.protocol !== "https:" ||
+            !(host === "flutterwave.com" || host.endsWith(".flutterwave.com") || host === "flutterwave.cloud" || host.endsWith(".flutterwave.cloud"))) {
+          throw new Error("Flutterwave returned an invalid secure authorization link.");
+        }
+        window.location.assign(target.href);
+        return;
+      }
+      const nextAction = payload.data.nextAction;
+      if (nextAction === "unsupported_additional_fields") {
+        setFlutterwaveChallenge(null);
+        setFundingFeedback({
+          kind: "error",
+          message: "Flutterwave's bank requested extra details this wallet flow cannot collect. Check with your bank for a pending authorization before retrying. enV will credit tokens only after the complete payment is verified.",
+        });
+        return;
+      }
+      if (nextAction === "requires_pin" || nextAction === "requires_otp" || nextAction === "requires_additional_fields") {
+        setFlutterwaveChallenge({
+          reference: flutterwaveChallenge.reference,
+          type: nextAction === "requires_pin" ? "pin" : nextAction === "requires_otp" ? "otp" : "avs",
+        });
+        setFlutterwaveAuthorizationValue("");
+        setFundingFeedback({
+          kind: "info",
+          message: nextAction === "requires_pin"
+            ? "Your bank now requires your card PIN."
+            : nextAction === "requires_otp"
+              ? "Your bank now requires a one-time code."
+              : "Your bank needs you to confirm your billing address.",
+        });
+        return;
+      }
+      if (payload.data.status?.toLowerCase() === "succeeded") {
+        setFundingFeedback({ kind: "success", message: "Flutterwave verified the payment. Your wallet has been refreshed." });
+        setFlutterwaveChallenge(null);
+        setFlutterwaveAuthorizationValue("");
+        setShowFundingOptions(false);
+        setReloadKey(value => value + 1);
+      } else {
+        setFundingFeedback({
+          kind: "info",
+          message: payload.data.paymentInstruction ?? "The authorization was received. Flutterwave is still processing the charge; your wallet will update after verification.",
+        });
+      }
+    } catch (error) {
+      setFundingFeedback({ kind: "error", message: error instanceof Error ? error.message : "The bank authorization could not be completed." });
     } finally {
       setFundingBusy(false);
     }
@@ -696,15 +1078,16 @@ function Account() {
   const visibleWallet = state.status === "ready" ? state.wallet : undefined;
   const customAmountCents = parseUsdAmountToCents(customAmountUsd);
   const customTokenAmount = customAmountCents ?? 0;
-  const methodAvailable = (method: CustomerPaymentMethod) =>
+  const methodAvailable = (method: WalletFundingChoice) =>
     fundingOptionsState.status === "ready" && fundingOptionsState.methods[method];
   const fundingMethodOptions: Array<{
-    id: CustomerPaymentMethod;
+    id: WalletFundingChoice;
     title: string;
     icon: React.ReactNode;
   }> = [
     { id: "card", title: "Card", icon: <CreditCard size={19} aria-hidden="true" /> },
     { id: "local", title: "Local payment", icon: <Wallet size={19} aria-hidden="true" /> },
+    { id: "flutterwave", title: "Flutterwave", icon: <CreditCard size={19} aria-hidden="true" /> },
     { id: "more", title: "Other", icon: <Coins size={19} aria-hidden="true" /> },
   ];
   const availableFundingMethodOptions = fundingMethodOptions.filter((option) => methodAvailable(option.id));
@@ -884,6 +1267,196 @@ function Account() {
                   </p>
                 )}
               </div>
+
+              {selectedPaymentMethod === "flutterwave" ? (
+                <div className="mt-4 space-y-3 rounded-xl border border-border bg-surface-2 p-3">
+                  <div>
+                    <label htmlFor="flutterwave-method" className="mb-1 block text-xs font-semibold">Flutterwave payment method</label>
+                    <select
+                      id="flutterwave-method"
+                      value={flutterwaveMethod}
+                      onChange={(event) => setFlutterwaveMethod(event.target.value as FlutterwaveMethod)}
+                      className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg"
+                    >
+                      {(fundingOptionsState.flutterwave?.paymentMethods ?? ["card"]).map((method) => (
+                        <option key={method} value={method}>
+                          {method === "card" ? "Card" : method === "mobile_money" ? "Mobile Money" : "Bank Transfer"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2">
+                    <div>
+                      <label htmlFor="flutterwave-customer-name" className="mb-1 block text-xs font-semibold">Full name</label>
+                      <input id="flutterwave-customer-name" autoComplete="name" value={flutterwaveCustomerName}
+                        onChange={(event) => setFlutterwaveCustomerName(event.target.value)}
+                        placeholder="First and last name"
+                        className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
+                    </div>
+                    <div>
+                      <label htmlFor="flutterwave-phone" className="mb-1 block text-xs font-semibold">Phone number</label>
+                      <input id="flutterwave-phone" type="tel" inputMode="numeric" autoComplete="tel-national"
+                        value={flutterwavePhoneNumber} onChange={(event) => setFlutterwavePhoneNumber(event.target.value)}
+                        placeholder="7–10 digits, including no country code"
+                        className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold">Billing address</p>
+                    <input value={flutterwaveAddressLine1} onChange={(event) => setFlutterwaveAddressLine1(event.target.value)}
+                      autoComplete="address-line1" placeholder="Street address"
+                      className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
+                    <input value={flutterwaveAddressLine2} onChange={(event) => setFlutterwaveAddressLine2(event.target.value)}
+                      autoComplete="address-line2" placeholder="Apartment, suite, unit (optional)"
+                      className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input value={flutterwaveCity} onChange={(event) => setFlutterwaveCity(event.target.value)}
+                        autoComplete="address-level2" placeholder="City"
+                        className="min-h-11 min-w-0 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
+                      <input value={flutterwaveState} onChange={(event) => setFlutterwaveState(event.target.value)}
+                        autoComplete="address-level1" placeholder="State / region"
+                        className="min-h-11 min-w-0 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
+                    </div>
+                    <input value={flutterwavePostalCode} onChange={(event) => setFlutterwavePostalCode(event.target.value)}
+                      autoComplete="postal-code" placeholder="Postal code"
+                      className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
+                    <p className="text-[11px] leading-4 text-muted">
+                      Country is matched to your detected checkout country.
+                    </p>
+                  </div>
+
+                  {flutterwaveMethod === "card" ? (
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold">Card details</p>
+                      <input id="flutterwave-card-number" type="text" inputMode="numeric" autoComplete="cc-number"
+                        value={flutterwaveCardNumber} onChange={(event) => setFlutterwaveCardNumber(event.target.value)}
+                        placeholder="Card number"
+                        className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
+                      <div className="grid grid-cols-3 gap-2">
+                        <input aria-label="Card expiry month" inputMode="numeric" autoComplete="cc-exp-month"
+                          value={flutterwaveExpiryMonth} onChange={(event) => setFlutterwaveExpiryMonth(event.target.value)}
+                          placeholder="MM" maxLength={2}
+                          className="min-h-11 min-w-0 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
+                        <input aria-label="Card expiry year" inputMode="numeric" autoComplete="cc-exp-year"
+                          value={flutterwaveExpiryYear} onChange={(event) => setFlutterwaveExpiryYear(event.target.value)}
+                          placeholder="YY / YYYY" maxLength={4}
+                          className="min-h-11 min-w-0 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
+                        <input aria-label="Card security code" type="password" inputMode="numeric" autoComplete="cc-csc"
+                          value={flutterwaveCvv} onChange={(event) => setFlutterwaveCvv(event.target.value)}
+                          placeholder="CVV" maxLength={4}
+                          className="min-h-11 min-w-0 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
+                      </div>
+                      <p className="text-[11px] leading-4 text-muted">
+                        Card fields are encrypted in your browser before the charge request is sent to enV.
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {flutterwaveMethod === "mobile_money" ? (
+                    <div>
+                      <label htmlFor="flutterwave-network" className="mb-1 block text-xs font-semibold">Mobile-money network</label>
+                      <select id="flutterwave-network" value={flutterwaveNetwork}
+                        onChange={(event) => setFlutterwaveNetwork(event.target.value)}
+                        className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg">
+                        <option value="">Choose a network</option>
+                        {(fundingOptionsState.flutterwave?.mobileNetworks ?? []).map((entry) => (
+                          <option key={entry.network} value={entry.network}>{entry.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : null}
+
+                </div>
+              ) : null}
+
+              {flutterwaveBankTransfer ? (
+                <div className="mt-4 space-y-3 rounded-xl border border-border bg-surface-2 p-3" aria-live="polite">
+                  <div>
+                    <h3 className="text-sm font-semibold">Flutterwave bank transfer</h3>
+                    <p className="mt-1 text-xs leading-5 text-muted">Send the exact amount below to this temporary account before the expiry time.</p>
+                  </div>
+                  <div className="rounded-lg border border-border bg-surface p-3">
+                    <p className="text-xs text-muted">Transfer amount</p>
+                    <p className="mt-0.5 text-lg font-semibold tabular-nums">
+                      {new Intl.NumberFormat(undefined, {
+                        style: "currency", currency: flutterwaveBankTransfer.currency,
+                        minimumFractionDigits: 2, maximumFractionDigits: 2,
+                      }).format(flutterwaveBankTransfer.amount)}
+                    </p>
+                    <p className="mt-3 text-xs text-muted">Bank</p>
+                    <p className="mt-0.5 text-sm font-semibold">{flutterwaveBankTransfer.bankName}</p>
+                    <p className="mt-3 text-xs text-muted">Account number</p>
+                    <div className="mt-0.5 flex items-center justify-between gap-2">
+                      <p className="text-lg font-semibold tracking-wider tabular-nums">{flutterwaveBankTransfer.accountNumber}</p>
+                      <button type="button" onClick={() => void copyFlutterwaveBankAccount()}
+                        className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-lg border border-border px-3 text-xs font-semibold hover:bg-surface-2">
+                        <Copy size={13} aria-hidden="true"/> Copy
+                      </button>
+                    </div>
+                    <p className="mt-3 text-xs text-muted">enV payment reference</p>
+                    <p className="mt-0.5 break-all text-xs font-medium">{flutterwaveBankTransfer.reference}</p>
+                    {flutterwaveBankTransfer.customerReference ? (
+                      <>
+                        <p className="mt-3 text-xs text-muted">Transfer narration (enter this in your bank app)</p>
+                        <p className="mt-0.5 break-all text-sm font-semibold">{flutterwaveBankTransfer.customerReference}</p>
+                      </>
+                    ) : null}
+                    <p className="mt-3 text-xs text-muted">Account expires</p>
+                    <p className="mt-0.5 text-sm font-medium">{new Date(flutterwaveBankTransfer.expiresAt).toLocaleString()}</p>
+                    {flutterwaveBankTransfer.note ? <p className="mt-3 text-xs leading-5 text-muted">{flutterwaveBankTransfer.note}</p> : null}
+                  </div>
+                  <button type="button" onClick={() => void verifyFlutterwaveBankTransfer()} disabled={fundingBusy}
+                    className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-[#3df1c2] px-4 text-sm font-semibold text-[#052a2a] disabled:opacity-50">
+                    {fundingBusy ? "Checking…" : "I've made the transfer"}
+                  </button>
+                  <p className="text-[11px] leading-4 text-muted">
+                    enV adds tokens only after Flutterwave confirms the matching transfer. Do not send a different amount.
+                  </p>
+                </div>
+              ) : null}
+
+              {flutterwaveChallenge ? (
+                <div className="mt-4 space-y-3 rounded-xl border border-border bg-surface-2 p-3" aria-live="polite">
+                  <div>
+                    <h3 className="text-sm font-semibold">Bank authorization</h3>
+                    <p className="mt-1 text-xs leading-5 text-muted">
+                      {flutterwaveChallenge.type === "pin"
+                        ? "Enter the card PIN requested by your bank. It is encrypted in your browser before submission."
+                        : flutterwaveChallenge.type === "otp"
+                          ? "Enter the one-time code sent by your bank."
+                          : "Confirm the billing address you entered so your bank can complete address verification."}
+                    </p>
+                  </div>
+                  {flutterwaveChallenge.type !== "avs" ? (
+                    <div>
+                      <label htmlFor="flutterwave-authorization-value" className="mb-1 block text-xs font-semibold">
+                        {flutterwaveChallenge.type === "pin" ? "Card PIN" : "One-time code"}
+                      </label>
+                      <input
+                        id="flutterwave-authorization-value"
+                        type="password"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        value={flutterwaveAuthorizationValue}
+                        onChange={(event) => setFlutterwaveAuthorizationValue(event.target.value)}
+                        maxLength={flutterwaveChallenge.type === "pin" ? 6 : 8}
+                        placeholder={flutterwaveChallenge.type === "pin" ? "Enter PIN" : "Enter code"}
+                        className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg"
+                      />
+                    </div>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => void submitFlutterwaveAuthorization()}
+                    disabled={fundingBusy || (flutterwaveChallenge.type !== "avs" && !flutterwaveAuthorizationValue.trim())}
+                    className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-[#3df1c2] px-4 text-sm font-semibold text-[#052a2a] disabled:opacity-50"
+                  >
+                    {fundingBusy ? "Verifying…" : flutterwaveChallenge.type === "avs" ? "Confirm billing address" : "Continue"}
+                  </button>
+                </div>
+              ) : null}
 
               {fundingFeedback?.kind === "error" ? (
                 <p className="mt-3 text-sm text-rose-600" role="status" aria-live="polite">{fundingFeedback.message}</p>

@@ -18,13 +18,6 @@ export function requirePaystackVerificationSecret(
   return secret;
 }
 
-/** Per-transaction Flutterwave payment_options work only after dashboard payment options are disabled. */
-export function isFlutterwavePaymentOptionsConfigured(
-  env: Record<string, string | undefined>,
-): boolean {
-  return env.FLUTTERWAVE_PAYMENT_OPTIONS_DASHBOARD_DISABLED === "true";
-}
-
 /**
  * enV uses Paystack for customers in the configured merchant's own country.
  * Cross-border customers are routed through their country-specific Flutterwave

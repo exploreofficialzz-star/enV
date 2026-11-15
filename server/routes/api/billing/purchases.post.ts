@@ -3,9 +3,9 @@ import { randomUUID } from "node:crypto";
 import { isSameOriginRequest, jsonResponse, readJsonObject, requireBillingUser } from "../../../../src/lib/billing/http.server";
 import { initializePaystackCheckout, minimumPaystackAmountMinor } from "../../../../src/lib/billing/paystack.server";
 import { initializeCryptomusCheckout } from "../../../../src/lib/billing/cryptomus.server";
-import { initializeFlutterwaveCheckout } from "../../../../src/lib/billing/flutterwave.server";
-import { getCustomerCountry, toFlutterwaveMajorAmount } from "../../../../src/lib/billing/country-routing";
-import { getFundingOptions } from "../../../../src/lib/billing/paystack.server";
+import { initializeFlutterwaveBankTransfer, initializeFlutterwaveCheckout } from "../../../../src/lib/billing/flutterwave.server";
+import { getCustomerCountry } from "../../../../src/lib/billing/country-routing";
+import { getFundingOptions } from "../../../../src/lib/billing/funding.server";
 import { quoteTokenPacks, type CurrencyPackQuote } from "../../../../src/lib/billing/fx.server";
 import { getFundingCandidates, type CustomerPaymentMethod } from "../../../../src/lib/billing/payment-methods";
 
@@ -21,7 +21,14 @@ const SAFE_CHECKOUT_FAILURES: Record<string, { status: number; message: string }
   CRYPTOMUS_INITIALIZATION_FAILED: { status: 502, message: "Crypto checkout could not be initialized. No wallet tokens were added." },
   CRYPTOMUS_PROVIDER_ERROR: { status: 502, message: "The crypto provider could not initialize checkout. Please retry shortly." },
   FLUTTERWAVE_NOT_CONFIGURED: { status: 503, message: "Flutterwave is not enabled for your detected country or currency. No payment was taken." },
-  FLUTTERWAVE_INITIALIZATION_FAILED: { status: 502, message: "Flutterwave checkout could not be initialized. No wallet tokens were added." },
+  FLUTTERWAVE_INITIALIZATION_FAILED: { status: 502, message: "Flutterwave could not initialize the payment. No wallet tokens were added." },
+  FLUTTERWAVE_AUTH_FAILED: { status: 503, message: "Flutterwave authentication is unavailable. Check the v4 client credentials configured for this deployment." },
+  FLUTTERWAVE_API_ERROR: { status: 502, message: "Flutterwave could not process this request. No wallet tokens were added." },
+  ACCOUNT_NAME_REQUIRED: { status: 400, message: "Add your first and last name to your enV account before funding the wallet." },
+  ACCOUNT_PHONE_REQUIRED: { status: 400, message: "Enter a valid phone number to continue with Flutterwave." },
+  INVALID_CUSTOMER_ADDRESS: { status: 400, message: "Enter a complete billing address to continue with Flutterwave." },
+  INVALID_PAYMENT_DETAILS: { status: 400, message: "Check the payment details and try again." },
+  INVALID_AUTHORIZATION: { status: 400, message: "The bank authorization details are invalid." },
   PAYMENT_METHOD_NOT_AVAILABLE_FOR_COUNTRY: { status: 422, message: "That payment method is not available for your detected country." },
 };
 
@@ -32,8 +39,13 @@ export default defineHandler(async (event) => {
   if (!isSameOriginRequest(request)) return jsonResponse({ ok: false, error: "CROSS_ORIGIN_REQUEST_BLOCKED" }, 403);
   const auth = await requireBillingUser(request);
   if (auth.response || !auth.userId) return auth.response ?? jsonResponse({ ok: false, error: "AUTH_REQUIRED" }, 401);
-  const body = await readJsonObject(request, 2_048);
+  const body = await readJsonObject(request, 12_000);
+  const customerAddress = body?.customerAddress && typeof body.customerAddress === "object" &&
+    !Array.isArray(body.customerAddress)
+    ? body.customerAddress as Record<string, unknown>
+    : {};
   const methodValue = body?.paymentMethod;
+  const flutterwaveDirect = methodValue === "flutterwave" || body?.provider === "flutterwave";
   const paymentMethod = methodValue === "card" || methodValue === "local" || methodValue === "more"
     ? methodValue as CustomerPaymentMethod
     : undefined;
@@ -44,9 +56,10 @@ export default defineHandler(async (event) => {
   if (!body || typeof amountUsdCents !== "number" || !Number.isSafeInteger(amountUsdCents) ||
       amountUsdCents < 100 || amountUsdCents > 9_000_000_000 ||
       typeof body.idempotencyKey !== "string" ||
-      (methodValue !== undefined && !paymentMethod) ||
+      (methodValue !== undefined && !paymentMethod && !flutterwaveDirect) ||
       (!paymentMethod && legacyProvider !== undefined &&
-        legacyProvider !== "paystack" && legacyProvider !== "flutterwave" && legacyProvider !== "cryptomus")) {
+        legacyProvider !== "paystack" && legacyProvider !== "flutterwave" && legacyProvider !== "cryptomus") ||
+      (flutterwaveDirect && (legacyProvider !== undefined && legacyProvider !== "flutterwave"))) {
     return jsonResponse({
       ok: false,
       error: "INVALID_PURCHASE",
@@ -57,9 +70,11 @@ export default defineHandler(async (event) => {
   const tokens = amountUsdCents;
   const countryCode = getCustomerCountry(request);
   const funding = await getFundingOptions(countryCode);
-  const candidates = paymentMethod
-    ? getFundingCandidates(funding.providers, paymentMethod)
-    : funding.providers.filter((item) => item.id === (legacyProvider ?? "paystack") && item.enabled);
+  const candidates = flutterwaveDirect
+    ? funding.providers.filter((item) => item.id === "flutterwave" && item.enabled)
+    : paymentMethod
+      ? getFundingCandidates(funding.providers.filter((item) => item.id !== "flutterwave"), paymentMethod)
+      : funding.providers.filter((item) => item.id === (legacyProvider ?? "paystack") && item.enabled);
 
   let providerOption: (typeof funding.providers)[number] | undefined;
   let pricingQuote: CurrencyPackQuote | undefined;
@@ -72,7 +87,7 @@ export default defineHandler(async (event) => {
       const quote = (await quoteTokenPacks(candidate.currency, [tokens]))[0];
       if (!quote) continue;
       if (candidate.id === "paystack" && quote.amountMinor < minimumPaystackAmountMinor(candidate.currency)) continue;
-      if (candidate.id === "flutterwave" && toFlutterwaveMajorAmount(quote.amountMinor, candidate.currency) === null) continue;
+      if (candidate.id === "flutterwave" && quote.amountMinor <= 0) continue;
       providerOption = candidate;
       pricingQuote = quote;
       break;
@@ -97,16 +112,45 @@ export default defineHandler(async (event) => {
     const providerMethod = paymentMethod === "card" || paymentMethod === "local" ? paymentMethod : undefined;
     const checkout = provider === "cryptomus"
       ? await initializeCryptomusCheckout(input)
-      : provider === "flutterwave"
-        ? await initializeFlutterwaveCheckout({ ...input, countryCode, pricingQuote: pricingQuote!, paymentMethod: providerMethod })
+      : provider === "flutterwave" && body.flutterwaveDetails &&
+        typeof body.flutterwaveDetails === "object" &&
+        (body.flutterwaveDetails as Record<string, unknown>).type === "bank_transfer"
+        ? await initializeFlutterwaveBankTransfer({
+            ...input,
+            countryCode,
+            pricingQuote: pricingQuote!,
+            customerName: typeof body.customerName === "string" ? body.customerName : "",
+            customerPhone: typeof body.customerPhone === "string" ? body.customerPhone : "",
+            customerAddress: {
+              city: typeof customerAddress.city === "string" ? customerAddress.city : "",
+              state: typeof customerAddress.state === "string" ? customerAddress.state : "",
+              line1: typeof customerAddress.line1 === "string" ? customerAddress.line1 : "",
+              line2: typeof customerAddress.line2 === "string" ? customerAddress.line2 : undefined,
+              postalCode: typeof customerAddress.postalCode === "string" ? customerAddress.postalCode : "",
+            },
+          })
+        : provider === "flutterwave"
+        ? await initializeFlutterwaveCheckout({
+            ...input,
+            countryCode,
+            pricingQuote: pricingQuote!,
+            paymentDetails: body.flutterwaveDetails,
+            customerName: typeof body.customerName === "string" ? body.customerName : "",
+            customerAddress: {
+              city: typeof customerAddress.city === "string" ? customerAddress.city : "",
+              state: typeof customerAddress.state === "string" ? customerAddress.state : "",
+              line1: typeof customerAddress.line1 === "string" ? customerAddress.line1 : "",
+              line2: typeof customerAddress.line2 === "string" ? customerAddress.line2 : undefined,
+              postalCode: typeof customerAddress.postalCode === "string" ? customerAddress.postalCode : "",
+            },
+          })
         : await initializePaystackCheckout({ ...input, pricingQuote: pricingQuote!, paymentMethod: providerMethod }, countryCode);
-    // New customer-method clients do not receive a gateway identifier.
-    // Legacy provider clients keep the previous response contract until mobile clients migrate.
-    const checkoutData = { ...checkout, paymentMethod: paymentMethod ?? null };
-    return jsonResponse({
-      ok: true,
-      data: paymentMethod ? checkoutData : { ...checkoutData, provider },
-    }, 201);
+    const checkoutData = {
+      ...checkout,
+      paymentMethod: flutterwaveDirect ? "flutterwave" : paymentMethod ?? null,
+      provider: flutterwaveDirect ? "flutterwave" : undefined,
+    };
+    return jsonResponse({ ok: true, data: checkoutData }, 201);
   } catch (error) {
     const candidate = error as { code?: unknown };
     const candidateCode = typeof candidate.code === "string" ? candidate.code : "";

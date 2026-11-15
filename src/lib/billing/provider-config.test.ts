@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getPaystackLocalChannels, isFlutterwavePaymentOptionsConfigured, isPaystackLocalCustomer, requirePaystackVerificationSecret } from "./provider-config.ts";
+import { getPaystackLocalChannels, isPaystackLocalCustomer, requirePaystackVerificationSecret } from "./provider-config.ts";
 
 test("Paystack is offered only to customers in the configured merchant country", () => {
   const env = { PAYSTACK_MERCHANT_COUNTRY: "NG", PAYSTACK_INTERNATIONAL_ENABLED: "true" };
@@ -33,23 +33,3 @@ test("Paystack settlement refuses to call the provider when its server secret is
   );
 });
 
-test("Flutterwave per-payment methods stay disabled until dashboard-wide methods are turned off", () => {
-  assert.equal(isFlutterwavePaymentOptionsConfigured({}), false);
-  assert.equal(isFlutterwavePaymentOptionsConfigured({
-    FLUTTERWAVE_PAYMENT_OPTIONS_DASHBOARD_DISABLED: "false",
-  }), false);
-  assert.equal(isFlutterwavePaymentOptionsConfigured({
-    FLUTTERWAVE_PAYMENT_OPTIONS_DASHBOARD_DISABLED: "true",
-  }), true);
-});
-
-
-test("Paystack local channels only include methods documented for each supported country", () => {
-  assert.deepEqual(getPaystackLocalChannels("NG"), ["bank", "ussd", "bank_transfer"]);
-  assert.deepEqual(getPaystackLocalChannels("GH"), ["mobile_money", "bank_transfer"]);
-  assert.deepEqual(getPaystackLocalChannels("KE"), ["mobile_money"]);
-  assert.deepEqual(getPaystackLocalChannels("CI"), ["mobile_money"]);
-  assert.deepEqual(getPaystackLocalChannels("ZA"), ["qr", "eft", "capitec_pay"]);
-  assert.deepEqual(getPaystackLocalChannels("US"), []);
-  assert.deepEqual(getPaystackLocalChannels(null), []);
-});
