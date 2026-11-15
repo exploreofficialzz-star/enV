@@ -787,6 +787,7 @@ export async function initializeFlutterwaveBankTransfer(input: {
         currency,
         account_type: "dynamic",
         narration: "enV wallet funding",
+        bank_code: "GH200100",
       }),
     }, idempotencyBase);
     const accountNumber = typeof virtualAccount.account_number === "string" ? virtualAccount.account_number : "";
