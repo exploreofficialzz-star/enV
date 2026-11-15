@@ -27,6 +27,8 @@ assert.equal(canonicalToolPath(legacyContrastTool), "/tools/accessibility/color-
 assert.equal(canonicalToolName(legacyContrastTool), "Color Contrast Studio");
 const contrastInventoryRows = result.runtimeInventory.filter((row) => row.id === "contrast-checker");
 assert.equal(contrastInventoryRows.length, 1, "Legacy Design routing must not duplicate the runtime tool ID.");
+assert.equal(contrastInventoryRows[0].tool.category, "accessibility", "The runtime inventory must retain the canonical Accessibility Studio record.");
+assert.equal(contrastInventoryRows[0].tool.slug, "color-contrast-studio");
 assert.ok(contrastInventoryRows[0].routes.includes("/tools/design/contrast-checker"));
 assert.equal(contrastInventoryRows[0].canonicalTarget, "/tools/accessibility/color-contrast-studio");
 assert.equal(buildIndexNowKeyArtifact(""), null, "An unset IndexNow key must not produce a public key file.");
