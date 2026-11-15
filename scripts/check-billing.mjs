@@ -218,6 +218,10 @@ assert.match(walletDashboard, /host === "flutterwave\.com"/);
 assert.match(walletDashboard, /host\.endsWith\("\.flutterwave\.cloud"\)/);
 assert.match(walletDashboard, /provider: "flutterwave"/);
 assert.match(walletDashboard, /encryptFlutterwaveField/);
+assert.match(walletDashboard, /customerReference/);
+assert.match(walletDashboard, /unsupported_additional_fields/);
+assert.doesNotMatch(walletDashboard, /opay|ussd|bank_account/,
+  "Nigeria-only Flutterwave methods must not appear in the foreign Flutterwave wallet");
 assert.match(pairNativePage, /api\/billing\/offline\/pairing/);
 assert.match(pairNativePage, /Generate pairing code/);
 assert.match(envExample, /PAYSTACK_PROVIDER_APPROVED=false/);
@@ -284,12 +288,16 @@ assert.match(paystackProviderConfig, /PAYSTACK_MERCHANT_ACCEPTED_CURRENCIES/);
 assert.match(paystackProviderConfig, /env.PAYSTACK_PROVIDER_APPROVED === "true" && currencyApproved/);
 assert.match(paystackProviderConfig, /PAYSTACK_INTERNATIONAL_ENABLED/);
 assert.match(paystackProviderConfig, /isPaystackLocalCustomer/);
-assert.match(fundingService, /isPaystackLocalCustomer\(countryCode, process\.env\)/,
-  "Paystack checkout must remain restricted to the configured merchant country");
-assert.match(fundingService, /paystackIsLocal \? Promise\.resolve\(null\) : getFlutterwaveFundingOption\(countryCode\)/,
-  "Nigeria remains on Paystack and cannot be routed to Flutterwave");
-assert.match(fundingService, /getFlutterwaveFundingOption\(countryCode\)/,
+assert.match(fundingService, /const isNigeria = country === "NG"/,
+  "Nigeria must be an explicit routing boundary");
+assert.match(fundingService, /isPaystackLocalCustomer\(country, process\.env\)/,
+  "Nigeria can receive Paystack only when its merchant-country configuration is local");
+assert.match(fundingService, /isNigeria \? Promise\.resolve\(null\) : getFlutterwaveFundingOption\(country\)/,
+  "Nigeria must never receive Flutterwave and foreign customers must not receive Paystack");
+assert.match(fundingService, /getFlutterwaveFundingOption\(country\)/,
   "Flutterwave must be resolved as a separate provider");
+assert.match(flutterwaveService, /profile\.countryCode === "NG"/,
+  "the Flutterwave service itself must reject Nigeria");
 assert.doesNotMatch(paystackService, /getFlutterwaveFundingOption|FLUTTERWAVE/,
   "the Paystack payment adapter must contain no Flutterwave integration");
 
@@ -302,6 +310,13 @@ assert.match(flutterwaveService, /FLW_CLIENT_SECRET/);
 assert.match(flutterwaveService, /FLW_SECRET_HASH/);
 assert.match(flutterwaveService, /FLUTTERWAVE_ENABLED_CURRENCIES/);
 assert.match(flutterwaveService, /orchestration\/direct-charges/);
+assert.match(flutterwaveService, /mobile-networks\?country=/);
+assert.match(flutterwaveService, /isSupportedAvsAdditionalFields/);
+assert.match(flutterwaveService, /providerAmountMinor/);
+assert.match(flutterwaveService, /baseQuoteAmountMinor/);
+assert.match(flutterwaveService, /bank_code: "GH200100"/);
+assert.doesNotMatch(flutterwaveService, /paymentOptions:|payment_options:/,
+  "the V4 Flutterwave adapter must not retain V3 payment-options configuration");
 assert.match(flutterwaveService, /initializeFlutterwaveBankTransfer/);
 assert.match(flutterwaveService, /virtual-accounts/);
 assert.match(flutterwaveService, /FLUTTERWAVE_VIRTUAL_ACCOUNT_CURRENCIES/);
@@ -355,7 +370,7 @@ assert.match(fundingOptionsRoute, /card: isCustomerPaymentMethodAvailable/);
 assert.match(fundingOptionsRoute, /local: isCustomerPaymentMethodAvailable/);
 assert.match(fundingOptionsRoute, /more: isCustomerPaymentMethodAvailable/);
 assert.match(fundingOptionsRoute, /message: funding\.message/);
-assert.match(fundingService, /Paystack adapter is eligible only for the merchant's own country/);
+assert.match(fundingService, /Nigeria is handled by the local Paystack route/);
 
 assert.doesNotMatch(fundingOptionsRoute, /label: provider\.label|providers: provider\.packs/,
   "the wallet options API must not return gateway labels or provider pack cards");
