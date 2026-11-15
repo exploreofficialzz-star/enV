@@ -67,3 +67,21 @@ export function toolSocialCard(
     imageHeight: SOCIAL_CARD_HEIGHT,
   };
 }
+
+export function toolsIndexSocialCard(): SocialCardMetadata {
+  return {
+    image: SITE_ORIGIN + "/og/cards/tools-index.png",
+    imageAlt: "enV tools index preview showing the platform's practical tool collection",
+    imageWidth: SOCIAL_CARD_WIDTH,
+    imageHeight: SOCIAL_CARD_HEIGHT,
+  };
+}
+
+export function articleSocialCard(article: { slug: string; title: string }): SocialCardMetadata {
+  return {
+    image: SITE_ORIGIN + "/og/cards/articles/" + encodeURIComponent(article.slug) + ".png",
+    imageAlt: "enV article preview for " + article.title,
+    imageWidth: SOCIAL_CARD_WIDTH,
+    imageHeight: SOCIAL_CARD_HEIGHT,
+  };
+}
