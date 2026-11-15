@@ -48,13 +48,18 @@ const musicDownloader = m.tools.find((tool) => tool.id === "music-downloader");
 const invalidMusicDownloader = !musicDownloader ||
   musicDownloader.android !== "backend-native" ||
   musicDownloader.ios !== "backend-native";
-if (invalid.length || divergent.length || invalidWebOnly.length || invalidFileWorkspace.length || invalidMusicDownloader) {
+const webOnlyWithoutReason = active.filter((tool) =>
+  (tool.android === "web-only" || tool.ios === "web-only") &&
+  (typeof tool.dispositionReason !== "string" || tool.dispositionReason.trim().length === 0)
+).map((tool) => tool.id);
+if (invalid.length || divergent.length || invalidWebOnly.length || invalidFileWorkspace.length || invalidMusicDownloader || webOnlyWithoutReason.length) {
   throw new Error(
     "Native execution audit failed: invalid=" + invalid.length +
     " divergent=" + divergent.length +
     " webOnlyReasonMissing=" + invalidWebOnly.join(",") +
     " fileWorkspaceCoverageMissing=" + invalidFileWorkspace.join(",") +
-    " musicDownloaderBackendNativeMismatch=" + invalidMusicDownloader
+    " musicDownloaderBackendNativeMismatch=" + invalidMusicDownloader +
+    " webOnlyWithoutDispositionReason=" + webOnlyWithoutReason.join(",")
   );
 }
 console.log(
