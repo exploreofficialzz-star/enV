@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { getAllTools } from '../src/lib/registry.ts';
 
-// Read the same 10,013-ID runtime inventory used by Web discovery and the audit ledger.
+// Read the canonical runtime inventory used by Web discovery and the audit ledger.
 const catalog = getAllTools().slice();
 const nativeAnalyzerRoute = fs.readFileSync(new URL('../apps/android/app/src/main/java/com/chastech/env/MainActivity.kt', import.meta.url), 'utf8');
 const nativeAnalyzerEngine = fs.readFileSync(new URL('../apps/android/app/src/main/java/com/chastech/env/engine/NativeAudioEngine.kt', import.meta.url), 'utf8');
