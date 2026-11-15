@@ -252,6 +252,14 @@ export function createSocialCardArtifacts({ categories, toolPages, guideTools, a
       "enV article preview for " + article.title,
     );
   }
+  add(
+    "public/og/cards/blog-index.png",
+    "EN V · BLOGS AND GUIDES",
+    "Read practical enV tool guides",
+    "Find individual tool instructions, product explainers and practical notes about how enV works.",
+    "enV Blogs and Guides preview for tool documentation and product articles",
+  );
+
   for (const category of categories) {
     add(
       "public/og/cards/categories/" + category.id + ".png",
