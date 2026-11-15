@@ -8,8 +8,8 @@ import { readBoundedBytes } from "./bounded-json.server";
 import {
   getCountryPaymentProfile,
   getCurrencyMinorUnitExponent,
+  normalizeFlutterwaveAmount,
   parseMajorUnitsToMinor,
-  toFlutterwaveMajorAmount,
 } from "./country-routing";
 import { quoteTokenPacks, type CurrencyPackQuote } from "./fx.server";
 
@@ -24,6 +24,14 @@ function publicOrigin(): string | null {
     if (parsed.protocol !== "https:" && production) return null;
     return parsed.origin;
   } catch { return null; }
+}
+
+function safeFlutterwaveMessage(value: unknown): string | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  return value.trim()
+    .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, "[redacted-email]")
+    .replace(/[\r\n\t]+/g, " ")
+    .slice(0, 180);
 }
 
 function enabledCurrencies(): Set<string> {
@@ -76,11 +84,12 @@ export async function getFlutterwaveFundingOption(countryCode: string | null | u
     };
   }
   const packs = quotes.map((quote) => {
-    const amountMajor = toFlutterwaveMajorAmount(quote.amountMinor, currency);
+    const normalized = normalizeFlutterwaveAmount(quote.amountMinor, currency);
     return {
       ...quote,
-      enabled: ready && amountMajor !== null,
-      message: amountMajor === null
+      amountMinor: normalized?.amountMinor ?? quote.amountMinor,
+      enabled: ready && normalized !== null,
+      message: normalized === null
         ? "This pack is outside Flutterwave's supported transaction amount range."
         : undefined,
     };
@@ -161,8 +170,9 @@ export async function initializeFlutterwaveCheckout(input: {
       code: "PAYMENT_METHOD_NOT_AVAILABLE_FOR_COUNTRY", status: 422,
     });
   }
-  const amountMinor = input.pricingQuote.amountMinor;
-  const amountMajor = toFlutterwaveMajorAmount(amountMinor, currency);
+  const normalizedCharge = normalizeFlutterwaveAmount(input.pricingQuote.amountMinor, currency);
+  const amountMinor = normalizedCharge?.amountMinor ?? null;
+  const amountMajor = normalizedCharge?.amountMajor ?? null;
   const creditsSubunits = input.tokenPack * 1_000;
   if (input.pricingQuote.tokens !== input.tokenPack || input.pricingQuote.currency !== currency ||
       input.pricingQuote.usdAmountCents !== input.tokenPack || !Number.isFinite(input.pricingQuote.fxRate) ||
@@ -171,7 +181,8 @@ export async function initializeFlutterwaveCheckout(input: {
       code: "INVALID_PRICE_CONFIGURATION", status: 503,
     });
   }
-  if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0 || amountMajor === null ||
+  if (amountMinor === null || amountMajor === null ||
+      !Number.isSafeInteger(amountMinor) || amountMinor <= 0 ||
       !Number.isSafeInteger(creditsSubunits)) {
     throw Object.assign(new Error("The configured token price is outside the supported range."), {
       code: "INVALID_PRICE_CONFIGURATION", status: 503,
@@ -237,9 +248,17 @@ export async function initializeFlutterwaveCheckout(input: {
         fxNextUpdateAt: input.pricingQuote.fxNextUpdateAt,
         fxFetchedAt: input.pricingQuote.fxFetchedAt,
         quotedAt: input.pricingQuote.quotedAt,
+        originalQuotedAmountMinor: input.pricingQuote.amountMinor,
+        flutterwaveAmountMajor: amountMajor,
+        roundingAdjustmentMinor: amountMinor - input.pricingQuote.amountMinor,
       })],
   );
 
+  let providerHttpStatus: number | null = null;
+  let providerStatus: string | null = null;
+  let providerCode: string | null = null;
+  let providerMessage: string | null = null;
+  let failureStage = "provider_request";
   try {
     const response = await fetch("https://api.flutterwave.com/v3/payments", {
       method: "POST",
@@ -274,15 +293,23 @@ export async function initializeFlutterwaveCheckout(input: {
       }),
       signal: AbortSignal.timeout(12_000),
     });
-    const payload = await response.json() as {
-      status?: string; data?: { link?: string };
-    };
+    providerHttpStatus = response.status;
+    const payload = await response.json().catch(() => null) as {
+      status?: string; message?: string; code?: string; error_id?: string;
+      data?: { link?: string };
+    } | null;
+    providerStatus = typeof payload?.status === "string" ? payload.status : null;
+    providerCode = typeof payload?.code === "string" ? payload.code
+      : typeof payload?.error_id === "string" ? payload.error_id : null;
+    providerMessage = safeFlutterwaveMessage(payload?.message);
+    failureStage = "validate_provider_response";
     let checkout: URL | null = null;
-    try { if (payload.data?.link) checkout = new URL(payload.data.link); } catch { checkout = null; }
-    if (!response.ok || payload.status !== "success" || !checkout ||
+    try { if (payload?.data?.link) checkout = new URL(payload.data.link); } catch { checkout = null; }
+    if (!response.ok || payload?.status !== "success" || !checkout ||
         checkout.protocol !== "https:" || checkout.hostname !== "checkout.flutterwave.com") {
       throw new Error("Flutterwave did not return a valid hosted checkout URL.");
     }
+    failureStage = "persist_checkout";
     await sql.query(
       "update billing_purchase_intents set status = 'pending', checkout_url = $2, " +
       "provider_metadata = $3::jsonb, updated_at = now() where id = $1 and status = 'created'",
@@ -299,10 +326,26 @@ export async function initializeFlutterwaveCheckout(input: {
         fxNextUpdateAt: input.pricingQuote.fxNextUpdateAt,
         fxFetchedAt: input.pricingQuote.fxFetchedAt,
         quotedAt: input.pricingQuote.quotedAt,
+        originalQuotedAmountMinor: input.pricingQuote.amountMinor,
+        flutterwaveAmountMajor: amountMajor,
+        roundingAdjustmentMinor: amountMinor - input.pricingQuote.amountMinor,
       })],
     );
     return { authorizationUrl: checkout.href, reference: intentId, tokens: input.tokenPack };
-  } catch {
+  } catch (error) {
+    console.error("[billing-flutterwave-checkout] " + JSON.stringify({
+      purchaseIntentId: intentId,
+      countryCode: profile.countryCode,
+      currency,
+      amountMajor,
+      paymentOptions: selectedPaymentOptions,
+      stage: failureStage,
+      httpStatus: providerHttpStatus,
+      providerStatus,
+      providerCode,
+      providerMessage,
+      causeType: error instanceof Error ? error.name : "UnknownError",
+    }));
     await sql.query(
       "update billing_purchase_intents set status = 'failed', updated_at = now() where id = $1 and status = 'created'",
       [intentId],
