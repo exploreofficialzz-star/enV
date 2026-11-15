@@ -13,6 +13,7 @@ function publicFundingOptions(funding: Awaited<ReturnType<typeof getFundingOptio
   // The browser receives customer-facing methods only. Gateway identity and
   // provider fallback order stay entirely on the server.
   const providers = funding.providers;
+  const customerVisibleProviders = providers.filter((provider) => provider.id !== "flutterwave");
   const flutterwave = providers.find((provider) => provider.id === "flutterwave") as
     | { enabled?: boolean; currency?: string; paymentMethods?: string[]; message?: string }
     | undefined;
@@ -21,9 +22,9 @@ function publicFundingOptions(funding: Awaited<ReturnType<typeof getFundingOptio
     currency: funding.currency,
     message: funding.message,
     methods: {
-      card: isCustomerPaymentMethodAvailable(providers, "card"),
-      local: isCustomerPaymentMethodAvailable(providers, "local"),
-      more: isCustomerPaymentMethodAvailable(providers, "more"),
+      card: isCustomerPaymentMethodAvailable(customerVisibleProviders, "card"),
+      local: isCustomerPaymentMethodAvailable(customerVisibleProviders, "local"),
+      more: isCustomerPaymentMethodAvailable(customerVisibleProviders, "more"),
       flutterwave: flutterwave?.enabled === true,
     },
     flutterwave: {
