@@ -109,11 +109,11 @@ function resolveConfiguration(countryCode: string | null | undefined) {
   const currencyEnabled = enabledCurrencies().has(currency);
   const approved = process.env.FLUTTERWAVE_PROVIDER_APPROVED === "true";
   const exponent = getCurrencyMinorUnitExponent(currency);
-  const paymentMethods = methodsForCountry(profile.countryCode);
+  const paymentMethods = methodsForCountry(profile.countryCode)
+    .filter((method) => method !== "card" || Boolean(credentials.encryptionKey));
   const ready = launchChecksPassed() && approved && currencyEnabled &&
     Boolean(credentials.clientId) && Boolean(credentials.clientSecret) &&
-    Boolean(credentials.secretHash) && Boolean(credentials.encryptionKey) &&
-    exponent !== null && paymentMethods.length > 0;
+    Boolean(credentials.secretHash) && exponent !== null && paymentMethods.length > 0;
   return { profile, currency, credentials, currencyEnabled, approved, paymentMethods, ready };
 }
 
@@ -268,9 +268,7 @@ export async function getFlutterwaveFundingOption(countryCode: string | null | u
         ? "Flutterwave v4 OAuth client credentials are not configured on this deployment."
         : !credentials.secretHash
           ? "Flutterwave webhook signature verification is not configured."
-          : !credentials.encryptionKey
-            ? "Flutterwave card encryption is not configured."
-            : !launchChecksPassed()
+          : !launchChecksPassed()
               ? "Checkout is disabled until billing, refund and dispute recovery checks are approved."
               : !anyPackAvailable
                 ? "The available token pack amounts cannot be represented for this currency."
@@ -534,6 +532,12 @@ export async function initializeFlutterwaveCheckout(input: {
       throw new Error("Flutterwave v4 returned an incomplete or mismatched charge response.");
     }
     const nextAction = asRecord(data.next_action) as FlutterwaveV4NextAction;
+    const nextAuthorizationType = String(asRecord(nextAction.authorization).type ?? "").toLowerCase();
+    const normalizedNextAction = nextAuthorizationType === "pin" || nextAction.type === "requires_pin"
+      ? "requires_pin"
+      : nextAuthorizationType === "otp" || nextAction.type === "requires_otp"
+        ? "requires_otp"
+        : typeof nextAction.type === "string" ? nextAction.type : null;
     const authorizationUrl = safeProviderRedirect(asRecord(nextAction.redirect_url).url);
     const paymentInstruction = typeof asRecord(nextAction.payment_instruction).note === "string"
       ? String(asRecord(nextAction.payment_instruction).note).slice(0, 500) : null;
@@ -549,7 +553,7 @@ export async function initializeFlutterwaveCheckout(input: {
       chargeId,
       providerStatus,
       authorizationUrl,
-      nextAction: typeof nextAction.type === "string" ? nextAction.type : null,
+      nextAction: normalizedNextAction,
       paymentInstruction,
     };
     await sql.query(
@@ -573,7 +577,8 @@ export async function initializeFlutterwaveCheckout(input: {
     const candidate = error as { code?: unknown };
     if (typeof candidate.code === "string" &&
         ["FLUTTERWAVE_AUTH_FAILED", "FLUTTERWAVE_API_ERROR", "PAYMENT_METHOD_NOT_AVAILABLE_FOR_COUNTRY",
-          "ACCOUNT_PHONE_REQUIRED", "ACCOUNT_NAME_REQUIRED", "INVALID_PAYMENT_DETAILS"].includes(candidate.code)) {
+          "ACCOUNT_PHONE_REQUIRED", "ACCOUNT_NAME_REQUIRED", "INVALID_PAYMENT_DETAILS",
+          "INVALID_CUSTOMER_ADDRESS"].includes(candidate.code)) {
       await sql.query(
         "update billing_purchase_intents set status = 'failed', updated_at = now() where id = $1 and status = 'created'",
         [intentId],
@@ -707,7 +712,7 @@ export async function authorizeFlutterwaveCharge(input: {
   const updated = await flutterwaveRequest("/charges/" + encodeURIComponent(chargeId), {
     method: "PUT",
     body: JSON.stringify({ authorization }),
-  }, createHash("sha256").update(input.reference + ":" + input.authorizationType).digest("hex"));
+  }, createHash("sha256").update(input.reference + ":" + input.authorizationType + ":" + randomUUID()).digest("hex"));
   const nextAction = asRecord(updated.next_action) as FlutterwaveV4NextAction;
   const redirect = safeProviderRedirect(asRecord(nextAction.redirect_url).url);
   const instruction = typeof asRecord(nextAction.payment_instruction).note === "string"
@@ -743,6 +748,7 @@ async function updateFlutterwaveIntentStatus(reference: string, status: "failed"
 
 function asProviderId(value: unknown): string | null {
   if (typeof value === "string" && /^[A-Za-z0-9_-]{1,160}$/.test(value)) return value;
+  if (typeof value === "number" && Number.isSafeInteger(value) && value > 0) return String(value);
   return null;
 }
 
