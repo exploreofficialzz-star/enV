@@ -9,6 +9,10 @@ const [{ tools: baseCatalog }, { DATETIME_TOOL_EXTENSIONS }] = await Promise.all
 const platformRuntimeExtensions = [
   { id: "song-metadata-analyzer", status: "active", category: "audio", engine: { type: "audio" } },
   { id: "a-book", status: "active", category: "productivity", engine: { type: "custom" } },
+  // Keep every platform runtime extension in the matrix as well as the shared
+  // native inventory. Both IDs are covered by the Android and iOS local manifests.
+  { id: "zip-any-file", name: "Zip any file", status: "active", category: "files", engine: { type: "custom" } },
+  { id: "camera-studio", name: "Camera Studio", status: "active", category: "photography", engine: { type: "custom" } },
 ];
 const catalog = [
   ...applyGenericWorkflowPolicy(baseCatalog),
