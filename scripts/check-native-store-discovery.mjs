@@ -48,6 +48,7 @@ assert.equal(iosDisplayName, "enV", "iOS display name must use the canonical pro
 assert.equal(androidNamespace, "com.chastech.env", "Android namespace changed unexpectedly.");
 assert.equal(androidApplicationId, "com.chastech.env", "Android application ID must match the enV package identity.");
 assert.equal(iosBundleIdentifier, "com.chastech.env", "iOS bundle identifier must match the enV app identity.");
+assert.equal(iosBundleIdentifier, androidApplicationId, "Android and iOS must share the same enV product identifier.");
 assert.ok(iosProjectBundleIdentifiers.includes(iosBundleIdentifier), "Xcode app target must use the bundle identifier from Info.plist.");
 assert.equal(siteOrigin, "https://envtools.store", "Native discovery pages must point to the canonical website.");
 assert.ok(platformSource.includes("The native enV app stays native."), "Platform landing page must distinguish the native app from the Web product.");
