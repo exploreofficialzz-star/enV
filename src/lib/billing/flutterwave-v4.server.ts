@@ -545,7 +545,9 @@ export async function initializeFlutterwaveCheckout(input: {
       ? "requires_pin"
       : nextAuthorizationType === "otp" || nextAction.type === "requires_otp"
         ? "requires_otp"
-        : typeof nextAction.type === "string" ? nextAction.type : null;
+        : nextAuthorizationType === "avs" || nextAction.type === "requires_additional_fields"
+          ? "requires_additional_fields"
+          : typeof nextAction.type === "string" ? nextAction.type : null;
     const authorizationUrl = safeProviderRedirect(asRecord(nextAction.redirect_url).url);
     const paymentInstruction = typeof asRecord(nextAction.payment_instruction).note === "string"
       ? String(asRecord(nextAction.payment_instruction).note).slice(0, 500) : null;
@@ -578,7 +580,7 @@ export async function initializeFlutterwaveCheckout(input: {
       chargeId,
       tokens: input.tokenPack,
       status: providerStatus === "succeeded" ? "succeeded" : "pending",
-      nextAction: typeof nextAction.type === "string" ? nextAction.type : null,
+      nextAction: normalizedNextAction,
       paymentInstruction,
     };
   } catch (error) {
@@ -685,10 +687,17 @@ export async function verifyAndCreditFlutterwaveReference(
 export async function authorizeFlutterwaveCharge(input: {
   userId: string;
   reference: string;
-  authorizationType: "otp" | "pin";
+  authorizationType: "otp" | "pin" | "avs";
   otp?: string;
   encryptedPin?: string;
   nonce?: string;
+  customerAddress?: {
+    city: string;
+    state: string;
+    line1: string;
+    line2?: string;
+    postalCode: string;
+  };
 }) {
   if (!/^[a-f0-9-]{36}$/i.test(input.reference)) {
     fail("The Flutterwave purchase reference is invalid.", "INVALID_PAYMENT_REFERENCE", 400);
@@ -706,22 +715,56 @@ export async function authorizeFlutterwaveCharge(input: {
   }
   const chargeId = intent.provider_transaction_id;
   if (!chargeId) fail("The Flutterwave charge is not ready for authorization.", "PAYMENT_NOT_CONFIRMED", 409);
+
   let authorization: JsonRecord;
   if (input.authorizationType === "otp") {
-    if (!input.otp || !/^\d{4,10}$/.test(input.otp)) fail("Enter the valid one-time code from your bank.", "INVALID_AUTHORIZATION", 400);
+    if (!input.otp || !/^\d{4,8}$/.test(input.otp)) {
+      fail("Enter the 4–8 digit one-time code from your bank.", "INVALID_AUTHORIZATION", 400);
+    }
     authorization = { type: "otp", otp: { code: input.otp } };
-  } else {
+  } else if (input.authorizationType === "pin") {
     if (!input.encryptedPin || input.encryptedPin.length > 512 ||
         !input.nonce || !/^[A-Za-z0-9]{12}$/.test(input.nonce)) {
       fail("The encrypted card PIN is invalid. Try again.", "INVALID_AUTHORIZATION", 400);
     }
     authorization = { type: "pin", pin: { nonce: input.nonce, encrypted_pin: input.encryptedPin } };
+  } else {
+    const metadata = providerMetadata(intent.provider_metadata);
+    const countryCode = typeof metadata.countryCode === "string" ? metadata.countryCode : "";
+    const addressInput = input.customerAddress;
+    if (!countryCode || !addressInput) {
+      fail("A complete billing address is required by your bank to continue.", "INVALID_CUSTOMER_ADDRESS", 400);
+    }
+    const address = {
+      city: addressInput.city.trim(),
+      country: countryCode,
+      line1: addressInput.line1.trim(),
+      ...(addressInput.line2?.trim() ? { line2: addressInput.line2.trim() } : {}),
+      postal_code: addressInput.postalCode.trim(),
+      state: addressInput.state.trim(),
+    };
+    if (!address.city || !address.line1 || !address.postal_code || !address.state ||
+        address.city.length > 100 || address.line1.length > 160 ||
+        address.postal_code.length > 24 || address.state.length > 100 ||
+        (address.line2 && address.line2.length > 160)) {
+      fail("Enter a complete billing address to continue.", "INVALID_CUSTOMER_ADDRESS", 400);
+    }
+    authorization = { type: "avs", avs: { address } };
   }
+
   const updated = await flutterwaveRequest("/charges/" + encodeURIComponent(chargeId), {
     method: "PUT",
     body: JSON.stringify({ authorization }),
   }, createHash("sha256").update(input.reference + ":" + input.authorizationType + ":" + randomUUID()).digest("hex"));
   const nextAction = asRecord(updated.next_action) as FlutterwaveV4NextAction;
+  const nextAuthorizationType = String(asRecord(nextAction.authorization).type ?? "").toLowerCase();
+  const normalizedNextAction = nextAuthorizationType === "pin" || nextAction.type === "requires_pin"
+    ? "requires_pin"
+    : nextAuthorizationType === "otp" || nextAction.type === "requires_otp"
+      ? "requires_otp"
+      : nextAuthorizationType === "avs" || nextAction.type === "requires_additional_fields"
+        ? "requires_additional_fields"
+        : typeof nextAction.type === "string" ? nextAction.type : null;
   const redirect = safeProviderRedirect(asRecord(nextAction.redirect_url).url);
   const instruction = typeof asRecord(nextAction.payment_instruction).note === "string"
     ? String(asRecord(nextAction.payment_instruction).note).slice(0, 500) : null;
@@ -731,11 +774,10 @@ export async function authorizeFlutterwaveCharge(input: {
   return {
     status: typeof updated.status === "string" ? updated.status : "pending",
     authorizationUrl: redirect,
-    nextAction: typeof nextAction.type === "string" ? nextAction.type : null,
+    nextAction: normalizedNextAction,
     paymentInstruction: instruction,
   };
 }
-
 function safeEqual(left: string, right: string): boolean {
   const a = Buffer.from(left, "utf8");
   const b = Buffer.from(right, "utf8");
