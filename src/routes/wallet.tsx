@@ -1313,6 +1313,47 @@ function Account() {
                 </div>
               ) : null}
 
+              {flutterwaveChallenge ? (
+                <div className="mt-4 space-y-3 rounded-xl border border-border bg-surface-2 p-3" aria-live="polite">
+                  <div>
+                    <h3 className="text-sm font-semibold">Bank authorization</h3>
+                    <p className="mt-1 text-xs leading-5 text-muted">
+                      {flutterwaveChallenge.type === "pin"
+                        ? "Enter the card PIN requested by your bank. It is encrypted in your browser before submission."
+                        : flutterwaveChallenge.type === "otp"
+                          ? "Enter the one-time code sent by your bank."
+                          : "Confirm the billing address you entered so your bank can complete address verification."}
+                    </p>
+                  </div>
+                  {flutterwaveChallenge.type !== "avs" ? (
+                    <div>
+                      <label htmlFor="flutterwave-authorization-value" className="mb-1 block text-xs font-semibold">
+                        {flutterwaveChallenge.type === "pin" ? "Card PIN" : "One-time code"}
+                      </label>
+                      <input
+                        id="flutterwave-authorization-value"
+                        type="password"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        value={flutterwaveAuthorizationValue}
+                        onChange={(event) => setFlutterwaveAuthorizationValue(event.target.value)}
+                        maxLength={flutterwaveChallenge.type === "pin" ? 6 : 8}
+                        placeholder={flutterwaveChallenge.type === "pin" ? "Enter PIN" : "Enter code"}
+                        className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg"
+                      />
+                    </div>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => void submitFlutterwaveAuthorization()}
+                    disabled={fundingBusy || (flutterwaveChallenge.type !== "avs" && !flutterwaveAuthorizationValue.trim())}
+                    className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-[#3df1c2] px-4 text-sm font-semibold text-[#052a2a] disabled:opacity-50"
+                  >
+                    {fundingBusy ? "Verifying…" : flutterwaveChallenge.type === "avs" ? "Confirm billing address" : "Continue"}
+                  </button>
+                </div>
+              ) : null}
+
               {fundingFeedback?.kind === "error" ? (
                 <p className="mt-3 text-sm text-rose-600" role="status" aria-live="polite">{fundingFeedback.message}</p>
               ) : null}
