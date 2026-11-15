@@ -22,6 +22,7 @@ export const Route = createFileRoute("/")({
     title: "enV | Tools for everyday tasks",
     description: "Find a tool for the task you are working on. Explore calculators, converters, creative tools, media, developer resources and practical utilities across Web, Android and iOS.",
     path: "/",
+    ...homepageSocialCard(),
     structuredData: pageSchema(
       "enV",
       "Find practical tools for calculations, conversions, creative work, development, media and everyday tasks across Web, Android and iOS.",
