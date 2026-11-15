@@ -4,6 +4,8 @@ import path from "node:path";
 import { chromium } from "playwright";
 import { fileURLToPath } from "node:url";
 import { parseGeneratedCatalog } from "./catalog-reader.mjs";
+import { refineGeneratedToolDescription } from "../src/lib/generated-tool-copy.mjs";
+import { isOfflineLocalToolRecord } from "../src/lib/offline/local-operation-policy.mjs";
 
 const argument = (name, fallback) => process.argv.find((arg) => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const baseUrl = argument("base-url", "http://127.0.0.1:8080").replace(/\/$/, "");
@@ -38,16 +40,21 @@ function preview() {
 
 try {
   const firstTool = [...tools].sort((a, b) => b.popularity - a.popularity || a.name.localeCompare(b.name))[0];
+  const refinedDescription = refineGeneratedToolDescription(firstTool);
+  const expectedDescription = isOfflineLocalToolRecord(firstTool) && !/^works offline\\b/i.test(refinedDescription)
+    ? "Works offline. " + refinedDescription
+    : refinedDescription;
+  assert.ok(expectedDescription.length > 0, "The highest-ranked Celebration tool must have a useful runtime description.");
   for (const route of [baseUrl + "/tools", baseUrl + "/tools/celebrations"]) {
     await page.goto(route, { waitUntil: "domcontentloaded", timeout: 60000 });
     const card = page.locator('a[href="/tools/celebrations/' + firstTool.slug + '"]').first();
     await card.waitFor({ state: "visible", timeout: 20000 });
     const cardText = await card.innerText();
     const titlePosition = cardText.indexOf(firstTool.name);
-    const descriptionPosition = cardText.indexOf(firstTool.description);
+    const descriptionPosition = cardText.indexOf(expectedDescription);
     assert.ok(titlePosition >= 0, route + ": expected " + firstTool.name + " in the Celebrations card");
     assert.ok(descriptionPosition > titlePosition, route + ": the tool description must appear directly after " + firstTool.name);
-    const description = card.locator("span").filter({ hasText: firstTool.description }).first();
+    const description = card.locator("span").filter({ hasText: expectedDescription }).first();
     await description.waitFor({ state: "visible" });
     assert.match((await description.getAttribute("class")) ?? "", /line-clamp-2/,
       route + ": Celebrations description must use the shared two-line card sizing");
