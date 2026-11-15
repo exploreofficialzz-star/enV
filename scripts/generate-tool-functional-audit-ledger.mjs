@@ -161,7 +161,16 @@ if (fs.existsSync(celebrationsReportPath)) {
       report.passed === report.results.filter((item) => item.status === "passed").length &&
       report.failed === report.results.filter((item) => item.status === "failed").length &&
       report.passed + report.failed === report.total;
-    const commitConsistent = !currentCommit || !report.observedCommit || report.observedCommit === currentCommit;
+    const inGitHubActions = process.env.GITHUB_ACTIONS === "true";
+    const commitConsistent = inGitHubActions
+      ? Boolean(currentCommit && /^[a-f0-9]{40}$/i.test(report.observedCommit ?? "") && report.observedCommit === currentCommit)
+      : !currentCommit || !report.observedCommit || report.observedCommit === currentCommit;
+    const workflowIdentityValid = !inGitHubActions || (
+      Number.isInteger(report.workflowRunId) &&
+      report.workflowRunId > 0 &&
+      typeof report.jobId === "string" &&
+      report.jobId.length > 0
+    );
     const statusesValid = (report.results ?? []).every((item) => item.status === "passed" || item.status === "failed");
     if (
       expectedIds.length !== 93 ||
@@ -172,6 +181,7 @@ if (fs.existsSync(celebrationsReportPath)) {
       unexpectedIds.length ||
       !countConsistent ||
       !commitConsistent ||
+      !workflowIdentityValid ||
       !statusesValid
     ) {
       invalidEvidence.push({
@@ -187,6 +197,7 @@ if (fs.existsSync(celebrationsReportPath)) {
         currentCommit,
         countConsistent,
         commitConsistent,
+        workflowIdentityValid,
         statusesValid,
       });
     } else {
