@@ -15,8 +15,7 @@ const SANDBOX_API = "https://developersandbox-api.flutterwave.com";
 const LIVE_API = "https://f4bexperience.flutterwave.com";
 
 type JsonRecord = Record<string, unknown>;
-type FlutterwaveV4Method = "card" | "mobile_money" | "opay" | "ussd" | "bank_account";
-type FlutterwaveFundingMethod = FlutterwaveV4Method | "bank_transfer";
+type FlutterwaveV4Method = "card" | "mobile_money" | "bank_transfer";
 type FlutterwaveV4PaymentDetails = {
   type: FlutterwaveV4Method;
   card?: {
@@ -27,13 +26,18 @@ type FlutterwaveV4PaymentDetails = {
     nonce: string;
   };
   mobile_money?: { country_code: string; network: string; phone_number: string };
-  ussd?: { account_bank: string };
-  bank_account?: Record<string, never>;
 };
 type FlutterwaveV4NextAction = {
   type?: string;
   redirect_url?: { url?: string };
-  payment_instruction?: { note?: string; account_number?: string; bank_name?: string; [key: string]: unknown };
+  payment_instruction?: { note?: string; [key: string]: unknown };
+  requires_bank_transfer?: {
+    account_number?: string;
+    account_bank_name?: string;
+    account_expiration_datetime?: string;
+    note?: string;
+    [key: string]: unknown;
+  };
   requires_pin?: unknown;
   requires_otp?: unknown;
   [key: string]: unknown;
@@ -112,11 +116,11 @@ async function getFlutterwaveMobileNetworks(countryCode: string): Promise<Flutte
 
 function virtualAccountCurrencies(): Set<string> {
   const configured = process.env.FLUTTERWAVE_VIRTUAL_ACCOUNT_CURRENCIES;
-  // NGN virtual accounts are enabled by default for Nigerian Flutterwave
-  // merchants. Other currencies require an explicit merchant-account setting.
-  const values = configured === undefined ? ["NGN"] : configured.split(",");
+  // enV reserves Nigeria for Paystack. Flutterwave dynamic virtual accounts
+  // are exposed only for GHS when the merchant has explicitly enabled them.
+  const values = configured === undefined ? [] : configured.split(",");
   return new Set(values.map((value) => value.trim().toUpperCase())
-    .filter((value) => ["NGN", "GHS"].includes(value)));
+    .filter((value) => value === "GHS"));
 }
 
 function methodsForCountry(countryCode: string, currency: string): FlutterwaveFundingMethod[] {
@@ -359,14 +363,13 @@ function countryCallingCode(countryCode: string): string | null {
 
 function validatePaymentDetails(
   countryCode: string,
-  paymentMethods: readonly FlutterwaveFundingMethod[],
+  paymentMethods: readonly FlutterwaveV4Method[],
   mobileNetworks: readonly FlutterwaveMobileNetwork[],
   details: unknown,
 ): FlutterwaveV4PaymentDetails {
   const input = asRecord(details);
   const method = input.type;
-  if (typeof method !== "string" || method === "bank_transfer" ||
-      !paymentMethods.includes(method as FlutterwaveFundingMethod)) {
+  if (typeof method !== "string" || !paymentMethods.includes(method as FlutterwaveV4Method)) {
     fail("This Flutterwave payment method is not enabled for your country.", "PAYMENT_METHOD_NOT_AVAILABLE_FOR_COUNTRY", 422);
   }
   if (method === "card") {
@@ -406,25 +409,10 @@ function validatePaymentDetails(
       mobile_money: { country_code: dialCode, network, phone_number: phoneNumber },
     };
   }
-  if (method === "bank_account") {
-    if (countryCode !== "NG") {
-      fail("Pay with Bank is available for NGN collections only.", "PAYMENT_METHOD_NOT_AVAILABLE_FOR_COUNTRY", 422);
-    }
-    return { type: "bank_account", bank_account: {} };
+  if (method === "bank_transfer") {
+    return { type: "bank_transfer" };
   }
-  if (method === "ussd") {
-    const bankCode = typeof asRecord(input.ussd).account_bank === "string"
-      ? String(asRecord(input.ussd).account_bank) : "";
-    const validBanks = new Set([
-      "044", "050", "070", "011", "214", "058", "030", "082", "303", "105",
-      "221", "232", "032", "033", "215", "090110", "035", "057",
-    ]);
-    if (countryCode !== "NG" || !validBanks.has(bankCode)) {
-      fail("Choose a bank that supports Flutterwave USSD payments.", "INVALID_PAYMENT_DETAILS", 400);
-    }
-    return { type: "ussd", ussd: { account_bank: bankCode } };
-  }
-  return { type: "opay" };
+  fail("This Flutterwave V4 payment method is not supported by enV.", "PAYMENT_METHOD_NOT_AVAILABLE_FOR_COUNTRY", 422);
 }
 
 function customerNameParts(value: string) {
@@ -506,6 +494,8 @@ export async function initializeFlutterwaveCheckout(input: {
         authorizationUrl: typeof metadata.authorizationUrl === "string" ? metadata.authorizationUrl : null,
         nextAction: typeof metadata.nextAction === "string" ? metadata.nextAction : null,
         paymentInstruction: typeof metadata.paymentInstruction === "string" ? metadata.paymentInstruction : null,
+        bankTransfer: metadata.bankTransfer && typeof metadata.bankTransfer === "object"
+          ? metadata.bankTransfer as JsonRecord : undefined,
       };
     }
     fail("This checkout attempt has already been used. Start a new attempt.", "CHECKOUT_ALREADY_USED", 409);
@@ -593,17 +583,32 @@ export async function initializeFlutterwaveCheckout(input: {
       throw new Error("Flutterwave v4 returned an incomplete or mismatched charge response.");
     }
     const nextAction = asRecord(data.next_action) as FlutterwaveV4NextAction;
-    const nextAuthorizationType = String(asRecord(nextAction.authorization).type ?? "").toLowerCase();
-    const normalizedNextAction = nextAuthorizationType === "pin" || nextAction.type === "requires_pin"
-      ? "requires_pin"
-      : nextAuthorizationType === "otp" || nextAction.type === "requires_otp"
-        ? "requires_otp"
-        : nextAuthorizationType === "avs" || nextAction.type === "requires_additional_fields"
-          ? "requires_additional_fields"
-          : typeof nextAction.type === "string" ? nextAction.type : null;
+    const nextActionType = typeof nextAction.type === "string" ? nextAction.type.toLowerCase() : "";
+    const normalizedNextAction = nextActionType || null;
     const authorizationUrl = safeProviderRedirect(asRecord(nextAction.redirect_url).url);
     const paymentInstruction = typeof asRecord(nextAction.payment_instruction).note === "string"
       ? String(asRecord(nextAction.payment_instruction).note).slice(0, 500) : null;
+    const bankAction = asRecord(nextAction.requires_bank_transfer);
+    const accountNumber = typeof bankAction.account_number === "string" ? bankAction.account_number : "";
+    const bankName = typeof bankAction.account_bank_name === "string" ? bankAction.account_bank_name : "";
+    const accountExpiresAt = typeof bankAction.account_expiration_datetime === "string"
+      ? bankAction.account_expiration_datetime : "";
+    const bankNote = typeof bankAction.note === "string" ? bankAction.note.slice(0, 500) : "";
+    const bankTransfer = nextActionType === "requires_bank_transfer" &&
+      /^\d{8,20}$/.test(accountNumber) && bankName && accountExpiresAt
+      ? {
+          accountNumber,
+          bankName,
+          currency,
+          amount: amountMajor,
+          reference: intentId,
+          expiresAt: accountExpiresAt,
+          note: bankNote,
+        }
+      : null;
+    if (nextActionType === "requires_bank_transfer" && !bankTransfer) {
+      throw new Error("Flutterwave returned incomplete bank-transfer instructions.");
+    }
     if (providerStatus === "failed" || providerStatus === "voided") {
       await sql.query(
         "update billing_purchase_intents set status = 'failed', provider_transaction_id = $2, updated_at = now() where id = $1",
@@ -618,6 +623,7 @@ export async function initializeFlutterwaveCheckout(input: {
       authorizationUrl,
       nextAction: normalizedNextAction,
       paymentInstruction,
+      bankTransfer,
     };
     await sql.query(
       "update billing_purchase_intents set status = 'pending', provider_transaction_id = $2, checkout_url = $3, " +
@@ -635,6 +641,7 @@ export async function initializeFlutterwaveCheckout(input: {
       status: providerStatus === "succeeded" ? "succeeded" : "pending",
       nextAction: normalizedNextAction,
       paymentInstruction,
+      bankTransfer: bankTransfer ?? undefined,
     };
   } catch (error) {
     const candidate = error as { code?: unknown };
@@ -1038,14 +1045,7 @@ export async function authorizeFlutterwaveCharge(input: {
     body: JSON.stringify({ authorization }),
   }, createHash("sha256").update(input.reference + ":" + input.authorizationType + ":" + randomUUID()).digest("hex"));
   const nextAction = asRecord(updated.next_action) as FlutterwaveV4NextAction;
-  const nextAuthorizationType = String(asRecord(nextAction.authorization).type ?? "").toLowerCase();
-  const normalizedNextAction = nextAuthorizationType === "pin" || nextAction.type === "requires_pin"
-    ? "requires_pin"
-    : nextAuthorizationType === "otp" || nextAction.type === "requires_otp"
-      ? "requires_otp"
-      : nextAuthorizationType === "avs" || nextAction.type === "requires_additional_fields"
-        ? "requires_additional_fields"
-        : typeof nextAction.type === "string" ? nextAction.type : null;
+  const normalizedNextAction = typeof nextAction.type === "string" ? nextAction.type : null;
   const redirect = safeProviderRedirect(asRecord(nextAction.redirect_url).url);
   const instruction = typeof asRecord(nextAction.payment_instruction).note === "string"
     ? String(asRecord(nextAction.payment_instruction).note).slice(0, 500) : null;
@@ -1072,7 +1072,7 @@ async function updateFlutterwaveIntentStatus(reference: string, status: "failed"
   const sql = await getSql();
   await sql.query(
     "update billing_purchase_intents set status = $2, updated_at = now() " +
-    "where id = $1 and provider = 'flutterwave' and status in ('created', 'pending', 'verified')",
+    "where id = $1 and provider = 'flutterwave' and status in ('created', 'pending')",
     [reference, status],
   );
 }
