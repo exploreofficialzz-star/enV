@@ -11,6 +11,7 @@ import { DesignCategoryExplorer } from "@/components/tools/design-category-explo
 import { CreatorCategoryLauncher } from "@/components/tools/creator-category-launcher";
 import type { CategoryId } from "@/types/tool";
 import { isIndexableTool, seoPageHead, categorySchema, categorySeoTitle, canonicalSeoTools } from "@/lib/seo-metadata";
+import { categorySocialCard } from "@/lib/seo-social-cards";
 
 export const Route = createFileRoute("/tools/$category/")({
   loader: ({ params }) => {
@@ -29,6 +30,7 @@ export const Route = createFileRoute("/tools/$category/")({
       title: categorySeoTitle(meta.name),
       description,
       path: "/tools/" + params.category,
+      ...categorySocialCard(meta.id, meta.name),
       structuredData: categorySchema(meta.name + " tools", description, "/tools/" + params.category, publicTools.slice(0, 6))
     });
   },
