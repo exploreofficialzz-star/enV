@@ -5,6 +5,7 @@ import { buildIndexNowKeyArtifact } from "./indexnow-utils.mjs";
 import { toolTaskGuidanceSource } from "../src/lib/tool-documentation.ts";
 import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema, toolSchema, organizationSchema, websiteSchema, boundedToolSeoTitle } from "@/lib/seo-metadata";
 
+const nativeInventory = JSON.parse(readFileSync(new URL("../apps/shared/native-engine-inventory.json", import.meta.url), "utf8"));
 const result = buildSeoArtifacts();
 assert.equal(buildIndexNowKeyArtifact(""), null, "An unset IndexNow key must not produce a public key file.");
 assert.deepEqual(buildIndexNowKeyArtifact("a1b2c3d4-e5f6"), {
@@ -70,8 +71,10 @@ const socialCardSource = readFileSync(new URL("../src/lib/seo-social-cards.ts", 
 const socialCardGeneratorSource = readFileSync(new URL("./social-card-images.mjs", import.meta.url), "utf8");
 assert.ok(socialCardSource.includes("toolsIndexSocialCard"), "Tools index must have a distinct social card selector.");
 assert.ok(socialCardSource.includes("articleSocialCard"), "Product articles must have route-specific social card selectors.");
+assert.ok(socialCardSource.includes("blogIndexSocialCard"), "Blogs & Guides index must have a dedicated social card selector.");
 assert.ok(socialCardGeneratorSource.includes("public/og/cards/tools-index.png"), "Tools index social image must be generated.");
 assert.ok(socialCardGeneratorSource.includes("public/og/cards/articles/"), "Article social images must be generated.");
+assert.ok(socialCardGeneratorSource.includes("public/og/cards/blog-index.png"), "Blogs & Guides index social image must be generated.");
 assert.ok(result.socialCards.length > result.categories.length, "Social-card artifacts must include homepage, tools index and representative routes in addition to category cards.");
 for (const card of result.socialCards) {
   assert.equal(card.content.readUInt32BE(16), 1200, "Social card width must be 1200px: " + card.path);
@@ -81,7 +84,7 @@ for (const card of result.socialCards) {
   assert.ok(card.alt && card.alt.length > 12, "Social card must have descriptive alternative text: " + card.path);
 }
 assert.equal(result.runtimeInventory.length, new Set(result.runtimeInventory.map((row) => row.id)).size, "Full runtime reconciliation must contain one row per stable tool ID.");
-assert.ok(result.inventory.includes("Android native coverage manifest lists " + 7902 + " unique tool IDs; iOS lists " + 7902 + " unique tool IDs."), "Native coverage manifest totals must be included in the reconciled report.");
+assert.ok(result.inventory.includes("Android native coverage manifest lists " + nativeInventory.androidToolIds.length + " unique tool IDs; iOS lists " + nativeInventory.iosToolIds.length + " unique tool IDs."), "Native coverage manifest totals must be included in the reconciled report.");
 assert.match(result.inventory, /Android native manifest \| iOS native manifest/);
 assert.match(result.inventory, /base catalogue fingerprint/);
 assert.ok(result.tools.length > 0);
