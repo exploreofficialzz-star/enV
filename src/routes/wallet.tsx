@@ -768,6 +768,48 @@ function Account() {
     }
   }
 
+  async function copyFlutterwaveBankAccount() {
+    if (!flutterwaveBankTransfer) return;
+    try {
+      await navigator.clipboard.writeText(flutterwaveBankTransfer.accountNumber);
+      setFundingFeedback({ kind: "success", message: "Flutterwave transfer account number copied." });
+    } catch {
+      setFundingFeedback({ kind: "error", message: "Could not copy the account number. Select the number and copy it manually." });
+    }
+  }
+
+  async function verifyFlutterwaveBankTransfer() {
+    if (!flutterwaveBankTransfer || fundingBusy) return;
+    setFundingBusy(true);
+    setFundingFeedback(null);
+    try {
+      const response = await fetch("/api/billing/flutterwave/verify", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ reference: flutterwaveBankTransfer.reference }),
+      });
+      const payload = await response.json().catch(() => null) as {
+        ok?: boolean; data?: { status?: string }; message?: string;
+      } | null;
+      if (!response.ok || !payload?.ok || !payload.data?.status) {
+        throw new Error(payload?.message ?? "Flutterwave could not verify the transfer yet.");
+      }
+      if (payload.data.status === "succeeded") {
+        setFundingFeedback({ kind: "success", message: "Bank transfer verified by Flutterwave. Your wallet has been refreshed." });
+        setFlutterwaveBankTransfer(null);
+        setShowFundingOptions(false);
+        setReloadKey(value => value + 1);
+      } else {
+        setFundingFeedback({ kind: "info", message: "Flutterwave has not confirmed this transfer yet. Keep the exact amount and account reference, then check again." });
+      }
+    } catch (error) {
+      setFundingFeedback({ kind: "info", message: error instanceof Error ? error.message : "Flutterwave could not verify the transfer yet." });
+    } finally {
+      setFundingBusy(false);
+    }
+  }
+
   async function submitFlutterwaveAuthorization() {
     if (!flutterwaveChallenge || fundingBusy) return;
     const value = flutterwaveAuthorizationValue.trim();
@@ -1229,7 +1271,7 @@ function Account() {
                     >
                       {(fundingOptionsState.flutterwave?.paymentMethods ?? ["card"]).map((method) => (
                         <option key={method} value={method}>
-                          {method === "card" ? "Card" : method === "mobile_money" ? "Mobile Money" : method === "opay" ? "OPay" : "USSD"}
+                          {method === "card" ? "Card" : method === "mobile_money" ? "Mobile Money" : method === "opay" ? "OPay" : method === "bank_transfer" ? "Bank Transfer" : "USSD"}
                         </option>
                       ))}
                     </select>
@@ -1334,6 +1376,46 @@ function Account() {
                       </select>
                     </div>
                   ) : null}
+                </div>
+              ) : null}
+
+              {flutterwaveBankTransfer ? (
+                <div className="mt-4 space-y-3 rounded-xl border border-border bg-surface-2 p-3" aria-live="polite">
+                  <div>
+                    <h3 className="text-sm font-semibold">Flutterwave bank transfer</h3>
+                    <p className="mt-1 text-xs leading-5 text-muted">Send the exact amount below to this temporary account before the expiry time.</p>
+                  </div>
+                  <div className="rounded-lg border border-border bg-surface p-3">
+                    <p className="text-xs text-muted">Transfer amount</p>
+                    <p className="mt-0.5 text-lg font-semibold tabular-nums">
+                      {new Intl.NumberFormat(undefined, {
+                        style: "currency", currency: flutterwaveBankTransfer.currency,
+                        minimumFractionDigits: 2, maximumFractionDigits: 2,
+                      }).format(flutterwaveBankTransfer.amount)}
+                    </p>
+                    <p className="mt-3 text-xs text-muted">Bank</p>
+                    <p className="mt-0.5 text-sm font-semibold">{flutterwaveBankTransfer.bankName}</p>
+                    <p className="mt-3 text-xs text-muted">Account number</p>
+                    <div className="mt-0.5 flex items-center justify-between gap-2">
+                      <p className="text-lg font-semibold tracking-wider tabular-nums">{flutterwaveBankTransfer.accountNumber}</p>
+                      <button type="button" onClick={() => void copyFlutterwaveBankAccount()}
+                        className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-lg border border-border px-3 text-xs font-semibold hover:bg-surface-2">
+                        <Copy size={13} aria-hidden="true"/> Copy
+                      </button>
+                    </div>
+                    <p className="mt-3 text-xs text-muted">Payment reference</p>
+                    <p className="mt-0.5 break-all text-xs font-medium">{flutterwaveBankTransfer.reference}</p>
+                    <p className="mt-3 text-xs text-muted">Account expires</p>
+                    <p className="mt-0.5 text-sm font-medium">{new Date(flutterwaveBankTransfer.expiresAt).toLocaleString()}</p>
+                    {flutterwaveBankTransfer.note ? <p className="mt-3 text-xs leading-5 text-muted">{flutterwaveBankTransfer.note}</p> : null}
+                  </div>
+                  <button type="button" onClick={() => void verifyFlutterwaveBankTransfer()} disabled={fundingBusy}
+                    className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-[#3df1c2] px-4 text-sm font-semibold text-[#052a2a] disabled:opacity-50">
+                    {fundingBusy ? "Checking…" : "I've made the transfer"}
+                  </button>
+                  <p className="text-[11px] leading-4 text-muted">
+                    enV adds tokens only after Flutterwave confirms the matching transfer. Do not send a different amount.
+                  </p>
                 </div>
               ) : null}
 
