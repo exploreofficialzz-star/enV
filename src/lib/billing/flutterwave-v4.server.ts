@@ -352,8 +352,9 @@ function validatePaymentDetails(
     const mobileMoney = asRecord(input.mobile_money);
     const network = typeof mobileMoney.network === "string" ? mobileMoney.network.trim().toUpperCase() : "";
     const allowedNetworks = MOBILE_MONEY_NETWORKS[countryCode] ?? [];
-    const phoneNumber = typeof mobileMoney.phone_number === "string"
+    const rawPhoneNumber = typeof mobileMoney.phone_number === "string"
       ? mobileMoney.phone_number.replace(/\D/g, "") : "";
+    const phoneNumber = rawPhoneNumber.startsWith("0") ? rawPhoneNumber.slice(1) : rawPhoneNumber;
     const dialCode = countryCallingCode(countryCode);
     if (!dialCode || !allowedNetworks.includes(network) ||
         !/^\d{7,10}$/.test(phoneNumber)) {
@@ -467,9 +468,10 @@ export async function initializeFlutterwaveCheckout(input: {
     fail("Add a valid email address to your enV account before funding the wallet.", "ACCOUNT_EMAIL_REQUIRED", 400);
   }
   const name = customerNameParts(input.customerName || users[0]?.name || "");
-  const phone = method.type === "mobile_money" ? method.mobile_money!.phone_number
+  const rawPhone = method.type === "mobile_money" ? method.mobile_money!.phone_number
     : typeof asRecord(input.paymentDetails).phoneNumber === "string"
       ? String(asRecord(input.paymentDetails).phoneNumber).replace(/\D/g, "") : "";
+  const phone = rawPhone.startsWith("0") ? rawPhone.slice(1) : rawPhone;
   const dialCode = countryCallingCode(profile.countryCode);
   if (!dialCode || !/^\d{7,10}$/.test(phone)) {
     fail("Enter a valid 7–10 digit phone number to continue with Flutterwave.", "ACCOUNT_PHONE_REQUIRED", 400);
