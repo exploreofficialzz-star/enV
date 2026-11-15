@@ -52,7 +52,12 @@ type FundingOptionsState = {
   methods: FundingMethods;
   countryCode?: string | null;
   currency?: string | null;
-  flutterwave?: { enabled: boolean; currency?: string | null; paymentMethods: FlutterwaveMethod[] };
+  flutterwave?: {
+    enabled: boolean;
+    currency?: string | null;
+    paymentMethods: FlutterwaveMethod[];
+    mobileNetworks: Array<{ network: string; name: string }>;
+  };
   message?: string;
 };
 type RewardsData = {
@@ -104,22 +109,6 @@ type LocalOfflineAllowance = {
   pendingBatch: boolean;
   issueIdempotencyKey: string;
 };
-
-function flutterwaveNetworks(countryCode: string | null | undefined): string[] {
-  const options: Record<string, string[]> = {
-    BF: ["ORANGE", "MOBICASH"],
-    CM: ["MTN", "ORANGE"],
-    GH: ["MTN", "TELECEL", "AIRTELTIGO"],
-    CI: ["MTN", "ORANGE", "WAVE"],
-    KE: ["MPESA"],
-    RW: ["AIRTEL", "MTN"],
-    SN: ["ORANGE", "FREE", "WAVE"],
-    TZ: ["AIRTEL", "TIGO", "HALOPESA"],
-    UG: ["AIRTEL", "MTN"],
-    ZM: ["AIRTEL", "MTN", "ZAMTEL"],
-  };
-  return options[String(countryCode ?? "").toUpperCase()] ?? [];
-}
 
 async function encryptFlutterwaveField(value: string, encodedKey: string, nonce: string): Promise<string> {
   const keyBytes = Uint8Array.from(atob(encodedKey), (character) => character.charCodeAt(0));
@@ -274,7 +263,12 @@ function Account() {
             countryCode?: string | null;
             currency?: string | null;
             message?: string;
-            flutterwave?: { enabled?: boolean; currency?: string | null; paymentMethods?: string[] };
+            flutterwave?: {
+              enabled?: boolean;
+              currency?: string | null;
+              paymentMethods?: string[];
+              mobileNetworks?: Array<{ network?: string; name?: string }>;
+            };
           };
           message?: string;
         } | null;
@@ -287,6 +281,10 @@ function Account() {
         const flutterwaveMethods = Array.isArray(payload.data?.flutterwave?.paymentMethods)
           ? payload.data.flutterwave.paymentMethods.filter((item): item is FlutterwaveMethod =>
               item === "card" || item === "mobile_money" || item === "opay" || item === "ussd" || item === "bank_account" || item === "bank_transfer")
+          : [];
+        const mobileNetworks = Array.isArray(payload.data?.flutterwave?.mobileNetworks)
+          ? payload.data.flutterwave.mobileNetworks.filter((entry): entry is { network: string; name: string } =>
+              typeof entry.network === "string" && typeof entry.name === "string")
           : [];
         const availableMethods: FundingMethods = {
           card: methods.card, local: methods.local, more: methods.more,
@@ -301,6 +299,7 @@ function Account() {
             enabled: payload.data?.flutterwave?.enabled === true,
             currency: payload.data?.flutterwave?.currency ?? null,
             paymentMethods: flutterwaveMethods,
+            mobileNetworks,
           },
           message: payload.data?.message ?? payload.message,
         });
@@ -1354,8 +1353,8 @@ function Account() {
                         onChange={(event) => setFlutterwaveNetwork(event.target.value)}
                         className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg">
                         <option value="">Choose a network</option>
-                        {flutterwaveNetworks(fundingOptionsState.countryCode).map((network) => (
-                          <option key={network} value={network}>{network.replaceAll("_", " ")}</option>
+                        {(fundingOptionsState.flutterwave?.mobileNetworks ?? []).map((entry) => (
+                          <option key={entry.network} value={entry.network}>{entry.name}</option>
                         ))}
                       </select>
                     </div>
