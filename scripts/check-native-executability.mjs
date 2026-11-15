@@ -31,7 +31,7 @@ const active = m.tools.filter((tool) => tool.status === "active" || tool.status 
 const divergent = active.filter((tool) => tool.android !== tool.ios);
 const invalid = active.filter((tool) => !["offline-native", "backend-native", "web-only"].includes(tool.android) ||
   !["offline-native", "backend-native", "web-only"].includes(tool.ios));
-const requiredWebOnly = ["music-downloader", "smartphone-prototype-lab"];
+const requiredWebOnly = ["smartphone-prototype-lab"];
 const invalidWebOnly = requiredWebOnly.filter((id) => {
   const row = m.tools.find((tool) => tool.id === id);
   return !row || row.android !== "web-only" || row.ios !== "web-only" || !row.dispositionReason;
@@ -44,12 +44,17 @@ const invalidFileWorkspace = fileWorkspaceIds.filter((id) => {
   const row = m.tools.find((tool) => tool.id === id);
   return !row || row.android !== "offline-native" || row.ios !== "offline-native";
 });
-if (invalid.length || divergent.length || invalidWebOnly.length || invalidFileWorkspace.length) {
+const musicDownloader = m.tools.find((tool) => tool.id === "music-downloader");
+const invalidMusicDownloader = !musicDownloader ||
+  musicDownloader.android !== "backend-native" ||
+  musicDownloader.ios !== "backend-native";
+if (invalid.length || divergent.length || invalidWebOnly.length || invalidFileWorkspace.length || invalidMusicDownloader) {
   throw new Error(
     "Native execution audit failed: invalid=" + invalid.length +
     " divergent=" + divergent.length +
     " webOnlyReasonMissing=" + invalidWebOnly.join(",") +
-    " fileWorkspaceCoverageMissing=" + invalidFileWorkspace.join(",")
+    " fileWorkspaceCoverageMissing=" + invalidFileWorkspace.join(",") +
+    " musicDownloaderBackendNativeMismatch=" + invalidMusicDownloader
   );
 }
 console.log(
