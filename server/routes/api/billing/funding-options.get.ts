@@ -15,7 +15,13 @@ function publicFundingOptions(funding: Awaited<ReturnType<typeof getFundingOptio
   const providers = funding.providers;
   const customerVisibleProviders = providers.filter((provider) => provider.id !== "flutterwave");
   const flutterwave = providers.find((provider) => provider.id === "flutterwave") as
-    | { enabled?: boolean; currency?: string; paymentMethods?: string[]; message?: string }
+    | {
+        enabled?: boolean;
+        currency?: string;
+        paymentMethods?: string[];
+        mobileNetworks?: Array<{ network: string; name: string }>;
+        message?: string;
+      }
     | undefined;
   return {
     countryCode: funding.countryCode,
@@ -31,6 +37,7 @@ function publicFundingOptions(funding: Awaited<ReturnType<typeof getFundingOptio
       enabled: flutterwave?.enabled === true,
       currency: flutterwave?.currency ?? null,
       paymentMethods: flutterwave?.paymentMethods ?? [],
+      mobileNetworks: flutterwave?.mobileNetworks ?? [],
     },
   };
 }
