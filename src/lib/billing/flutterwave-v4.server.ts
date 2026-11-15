@@ -126,7 +126,7 @@ function methodsForCountry(countryCode: string, currency: string): FlutterwaveFu
 
 function resolveConfiguration(countryCode: string | null | undefined) {
   const profile = getCountryPaymentProfile(countryCode);
-  if (!profile) return null;
+  if (!profile || profile.countryCode === "NG") return null;
   const currency = profile.currency.toUpperCase();
   const credentials = flutterwaveCredentials();
   const currencyEnabled = enabledCurrencies().has(currency);
@@ -281,7 +281,6 @@ export async function getFlutterwaveFundingOption(countryCode: string | null | u
       currency,
       pricePerTokenMinor: null,
       packs: [],
-      paymentOptions: [...profile.paymentOptions],
       paymentMethods,
       mobileNetworks,
       localPayments: paymentMethods.some((method) => method !== "card"),
@@ -321,7 +320,6 @@ export async function getFlutterwaveFundingOption(countryCode: string | null | u
     fxNextUpdateAt: quotes[0]?.fxNextUpdateAt ?? null,
     fxFetchedAt: quotes[0]?.fxFetchedAt ?? null,
     packs,
-    paymentOptions: [...profile.paymentOptions],
     paymentMethods,
     mobileNetworks,
     localPayments: paymentMethods.some((method) => method !== "card"),
