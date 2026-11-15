@@ -66,6 +66,20 @@ for (const path of [
   "/contact", "/help", "/privacy", "/terms", "/disclaimer",
   "/responsible-use", "/platform/android", "/platform/ios", "/token-guide"
 ]) assert.ok(result.urls.includes(path), "Missing public informational route " + path);
+const socialCardSource = readFileSync(new URL("../src/lib/seo-social-cards.ts", import.meta.url), "utf8");
+const socialCardGeneratorSource = readFileSync(new URL("./social-card-images.mjs", import.meta.url), "utf8");
+assert.ok(socialCardSource.includes("toolsIndexSocialCard"), "Tools index must have a distinct social card selector.");
+assert.ok(socialCardSource.includes("articleSocialCard"), "Product articles must have route-specific social card selectors.");
+assert.ok(socialCardGeneratorSource.includes("public/og/cards/tools-index.png"), "Tools index social image must be generated.");
+assert.ok(socialCardGeneratorSource.includes("public/og/cards/articles/"), "Article social images must be generated.");
+assert.ok(result.socialCards.length > result.categories.length, "Social-card artifacts must include homepage, tools index and representative routes in addition to category cards.");
+for (const card of result.socialCards) {
+  assert.equal(card.content.readUInt32BE(16), 1200, "Social card width must be 1200px: " + card.path);
+  assert.equal(card.content.readUInt32BE(20), 630, "Social card height must be 630px: " + card.path);
+  assert.equal(card.content.subarray(0, 8).toString("hex"), "89504e470d0a1a0a", "Social card must be a valid PNG: " + card.path);
+  assert.ok(card.url.startsWith("https://envtools.store/og/cards/"), "Social image URL must use the canonical host: " + card.path);
+  assert.ok(card.alt && card.alt.length > 12, "Social card must have descriptive alternative text: " + card.path);
+}
 assert.ok(result.tools.length > 0);
 assert.ok(result.guideTools.length >= result.tools.length);
 assert.ok(result.eligibleToolCount > result.guideTools.length, "Duplicate generated equations must be consolidated from SEO discovery while remaining in the app catalog.");
