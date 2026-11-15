@@ -30,7 +30,6 @@ assert.ok(categorySource.includes('id: "celebrations", name: "Celebrations", des
   "Celebrations category must retain the current task-first description.");
 assert.ok(categorySource.includes('blurb: "Make cards, invitations and celebration pages."'),
   "Celebrations category must retain its task-first blurb.");
-assert.match(categorySource, /blurb: "Make cards, invitations and celebration pages\\."/);
 const allToolsPage = read("src/routes/tools/index.tsx");
 assert.match(allToolsPage, /category\.id === "celebrations" \? category\.description : category\.blurb/,
   "the All tools directory must show the full Celebrations category description");
