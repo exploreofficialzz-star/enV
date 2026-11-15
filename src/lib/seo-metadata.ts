@@ -26,6 +26,9 @@ export type SeoPageOptions = {
   description: string;
   path: string;
   image?: string;
+  imageAlt?: string;
+  imageWidth?: number;
+  imageHeight?: number;
   type?: "website" | "article";
   robots?: string;
   structuredData?: Record<string, unknown>;
@@ -43,6 +46,7 @@ export function webmasterVerificationMeta() {
 export function seoPageHead(options: SeoPageOptions) {
   const url = absoluteSiteUrl(options.path);
   const image = options.image ?? DEFAULT_SOCIAL_IMAGE;
+  const imageAlt = options.imageAlt?.trim() || "enV practical tools and product information preview";
   const description = cleanMetaDescription(options.description);
   const type = options.type ?? "website";
   // Structured data can include public user-generated content (e.g. comments).
@@ -67,12 +71,17 @@ export function seoPageHead(options: SeoPageOptions) {
       { property: "og:description", content: description },
       { property: "og:url", content: url },
       { property: "og:image", content: image },
-      { property: "og:image:alt", content: "enV page preview" },
+      { property: "og:image:alt", content: imageAlt },
+      ...(options.imageWidth && options.imageHeight ? [
+        { property: "og:image:width", content: String(options.imageWidth) },
+        { property: "og:image:height", content: String(options.imageHeight) },
+      ] : []),
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@envtoolz" },
       { name: "twitter:title", content: options.title },
       { name: "twitter:description", content: description },
       { name: "twitter:image", content: image },
+      { name: "twitter:image:alt", content: imageAlt },
     ],
     links: [{ rel: "canonical", href: url }],
     scripts: structuredDataJson
