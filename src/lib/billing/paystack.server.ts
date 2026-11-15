@@ -3,10 +3,8 @@ import { getSql } from "../db";
 import {
   readWallet, creditVerifiedPurchase, reconcileVerifiedRefund, reconcileVerifiedDispute,
 } from "./ledger.server";
-import { getPaystackLocalChannels, isPaystackLocalCustomer, requirePaystackVerificationSecret, resolvePaystackCountryConfiguration } from "./provider-config";
+import { getPaystackLocalChannels, requirePaystackVerificationSecret, resolvePaystackCountryConfiguration } from "./provider-config";
 import { readBoundedBytes } from "./bounded-json.server";
-import { getCountryPaymentProfile, normalizeCountryCode } from "./country-routing";
-import { getFlutterwaveFundingOption } from "./flutterwave.server";
 import { quoteTokenPacks, type CurrencyPackQuote } from "./fx.server";
 
 export const TOKEN_PACKS = [100, 250, 500, 1_000] as const;
@@ -106,80 +104,6 @@ export async function getPaystackFundingOption(countryCode: string | null | unde
     message: !anyPackAvailable && enabled
       ? "Enter a custom amount that meets the payment minimum for " + currency + "."
       : message,
-  };
-}
-
-export async function getFundingOptions(countryCode: string | null = null) {
-  // Paystack's account country controls its settlement currency. Do not allow a
-  // foreign visitor to inherit an NGN/merchant-country checkout just because
-  // international Paystack cards are enabled. Foreign customers use the
-  // Flutterwave Standard profile for their detected country and local currency.
-  const paystackIsLocal = isPaystackLocalCustomer(countryCode, process.env);
-  const [paystack, flutterwave] = await Promise.all([
-    paystackIsLocal ? getPaystackFundingOption(countryCode) : Promise.resolve(null),
-    getFlutterwaveFundingOption(countryCode),
-  ]);
-
-  const refundDisputeHandlingApproved =
-    process.env.BILLING_REFUND_DISPUTE_HANDLING_APPROVED === "true";
-  const launchChecksPassed =
-    process.env.BILLING_LAUNCH_ENABLED === "true" &&
-    process.env.BILLING_ENFORCEMENT_ENABLED === "true" &&
-    refundDisputeHandlingApproved && Boolean(publicOrigin());
-
-  const cryptomusMerchantId = process.env.CRYPTOMUS_MERCHANT_ID?.trim() ?? "";
-  const cryptomusApiKey = process.env.CRYPTOMUS_PAYMENT_API_KEY?.trim() ?? "";
-  // Cryptomus charges the same USD reference price: one cent per enV token.
-  const cryptoPricePerTokenMinor = 1;
-  const cryptomusEnabled = launchChecksPassed &&
-    process.env.CRYPTOMUS_PROVIDER_APPROVED === "true" &&
-    /^[a-f0-9-]{36}$/i.test(cryptomusMerchantId) &&
-    Boolean(cryptomusApiKey) &&
-    cryptoPricePerTokenMinor !== null;
-
-  const packsFor = (price: number, currency: string) => TOKEN_PACKS.map((tokens) => ({
-    tokens,
-    amountMinor: tokens * price,
-    currency,
-    enabled: cryptomusEnabled,
-  }));
-
-  const cryptomusMessage = cryptomusEnabled
-    ? "Choose a token pack. enV verifies the final crypto invoice before crediting your wallet."
-    : process.env.CRYPTOMUS_PROVIDER_APPROVED !== "true"
-      ? "Crypto payments are unavailable until Cryptomus onboarding and compliance approval are complete."
-      : !refundDisputeHandlingApproved
-        ? "Crypto payments are disabled until refund and dispute reconciliation has been approved."
-        : "Secure crypto checkout is not configured for this deployment.";
-
-  const providers = [
-    ...(paystack ? [paystack] : []),
-    ...(flutterwave ? [flutterwave] : []),
-    {
-      id: "cryptomus" as const,
-      label: "Pay with crypto",
-      enabled: cryptomusEnabled,
-      currency: "USD",
-      pricePerTokenMinor: cryptoPricePerTokenMinor,
-      packs: packsFor(cryptoPricePerTokenMinor, "USD"),
-      message: cryptomusMessage,
-    },
-  ];
-  const firstEnabled = providers.find((provider) => provider.enabled);
-  const country = normalizeCountryCode(countryCode);
-
-  return {
-    countryCode: country,
-    currency: firstEnabled?.currency ?? getCountryPaymentProfile(country)?.currency ?? null,
-    enabled: Boolean(firstEnabled),
-    provider: firstEnabled?.id ?? null,
-    providers,
-    anyEnabled: providers.some((provider) => provider.enabled),
-    message: !country
-      ? "Your country could not be detected. Retry from an online connection to show country-specific payment methods."
-      : providers.some((provider) => provider.enabled)
-        ? "Payment methods and checkout currency are selected for your detected country."
-        : "No approved payment method is currently available for your detected country and currency. No payment was taken.",
   };
 }
 
