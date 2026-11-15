@@ -562,7 +562,8 @@ function Account() {
     try {
       let flutterwaveDetails: Record<string, unknown> | undefined;
       if (method === "flutterwave") {
-        const phoneNumber = flutterwavePhoneNumber.replace(/\D/g, "");
+        const rawPhoneNumber = flutterwavePhoneNumber.replace(/\D/g, "");
+        const phoneNumber = rawPhoneNumber.startsWith("0") ? rawPhoneNumber.slice(1) : rawPhoneNumber;
         if (!/^\d{7,10}$/.test(phoneNumber)) {
           throw new Error("Enter a valid phone number to continue with Flutterwave.");
         }
