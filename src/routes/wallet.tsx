@@ -629,7 +629,7 @@ function Account() {
         } else if (flutterwaveMethod === "bank_transfer") {
           flutterwaveDetails = { type: "bank_transfer", phoneNumber };
         } else {
-          flutterwaveDetails = { type: "opay", phoneNumber };
+          throw new Error("Choose a Flutterwave payment method supported in your country.");
         }
       }
 
