@@ -142,6 +142,102 @@ if (fs.existsSync(qrReportPath)) {
   }
 }
 
+// The Celebration audit runs against all 93 exact tool IDs on the current
+// mobile browser build. Ingest its per-tool pass/fail evidence rather than relying
+// on the historical checked-in sample when a live workflow report is available.
+const celebrationsReportPath = path.join(root, "artifacts/celebrations-browser-audit/report.json");
+if (fs.existsSync(celebrationsReportPath)) {
+  try {
+    const report = JSON.parse(fs.readFileSync(celebrationsReportPath, "utf8"));
+    const expectedIds = runtimeTools.filter((tool) => tool.category === "celebrations").map((tool) => tool.id).sort();
+    const reportedIds = (report.results ?? []).map((item) => item.tool);
+    const uniqueReportedIds = new Set(reportedIds);
+    const unknownIds = [...uniqueReportedIds].filter((id) => !byId.has(id));
+    const missingIds = expectedIds.filter((id) => !uniqueReportedIds.has(id));
+    const unexpectedIds = [...uniqueReportedIds].filter((id) => !expectedIds.includes(id));
+    const countConsistent =
+      report.total === expectedIds.length &&
+      report.results?.length === report.total &&
+      report.passed === report.results.filter((item) => item.status === "passed").length &&
+      report.failed === report.results.filter((item) => item.status === "failed").length &&
+      report.passed + report.failed === report.total;
+    const commitConsistent = !currentCommit || !report.observedCommit || report.observedCommit === currentCommit;
+    const statusesValid = (report.results ?? []).every((item) => item.status === "passed" || item.status === "failed");
+    if (
+      expectedIds.length !== 93 ||
+      reportedIds.length !== expectedIds.length ||
+      uniqueReportedIds.size !== reportedIds.length ||
+      unknownIds.length ||
+      missingIds.length ||
+      unexpectedIds.length ||
+      !countConsistent ||
+      !commitConsistent ||
+      !statusesValid
+    ) {
+      invalidEvidence.push({
+        auditId: "celebrations-browser-runtime-report",
+        reason: "dynamic-celebrations-report-invalid-or-does-not-match-current-runtime",
+        expectedCount: expectedIds.length,
+        reportedCount: reportedIds.length,
+        duplicateIds: reportedIds.filter((id, index) => reportedIds.indexOf(id) !== index),
+        unknownIds,
+        missingIds,
+        unexpectedIds,
+        reportCommit: report.observedCommit ?? null,
+        currentCommit,
+        countConsistent,
+        commitConsistent,
+        statusesValid,
+      });
+    } else {
+      for (const item of report.results) {
+        const common = {
+          script: "scripts/browser-celebrations-audit.mjs",
+          workflow: "Production Check",
+          workflowRunId: report.workflowRunId ?? null,
+          jobId: report.jobId ?? "verify",
+          step: "Verify all 93 Celebrations tools on a mobile browser",
+          toolIds: [item.tool],
+          testedCommit: report.observedCommit ?? currentCommit,
+        };
+        if (item.status === "passed") {
+          evidenceAudits.push({
+            id: "celebrations-browser-" + item.tool + "-passed",
+            kind: "browser",
+            result: "passed",
+            checks: ["routeRendering", "interactionExecution", "outputValidation", "runtimeErrorCheck"],
+            notes: "Mobile " + (report.viewport?.width ?? "unknown") + "x" + (report.viewport?.height ?? "unknown") +
+              " browser acceptance passed for " + item.tool + " (" + (item.experience ?? "Celebration workflow") + ").",
+            ...common,
+          });
+        } else {
+          evidenceAudits.push({
+            id: "celebrations-browser-" + item.tool + "-blocked",
+            kind: "browser",
+            result: "blocked",
+            checks: [],
+            notes: "The current mobile browser audit did not complete successfully for " + item.tool +
+              ". Failure details: " + String(item.error ?? "No per-tool error detail was recorded."),
+            ...common,
+          });
+        }
+      }
+    }
+  } catch (error) {
+    invalidEvidence.push({
+      auditId: "celebrations-browser-runtime-report",
+      reason: "dynamic-report-invalid",
+      detail: error instanceof Error ? error.message : String(error),
+    });
+  }
+} else if (process.env.GITHUB_ACTIONS === "true") {
+  invalidEvidence.push({
+    auditId: "celebrations-browser-runtime-report",
+    reason: "dynamic-celebrations-report-missing-in-github-actions",
+    path: "artifacts/celebrations-browser-audit/report.json",
+  });
+}
+
 function appendEvidence(target, id, evidence) {
   target.set(id, [...(target.get(id) ?? []), evidence]);
 }
