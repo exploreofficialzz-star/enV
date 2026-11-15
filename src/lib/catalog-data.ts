@@ -1,6 +1,7 @@
 // @ts-nocheck
 import homeTools from "@/data/home-tools.json";
 import type { SearchTool, ToolMeta, ToolSummary } from "@/types/tool";
+import { normalizeGenericWorkflowTool } from "@/lib/generic-workflow-policy.mjs";
 
 const MUSIC_DOWNLOADER_META = {
   id: "music-downloader",
@@ -89,7 +90,7 @@ export function loadToolIndex(): Promise<readonly ToolSummary[]> {
       .then((data) => {
         if (!Array.isArray(data))
           throw new Error("The tool list response was invalid. Retry to load it again.");
-        toolIndex = data.slice();
+        toolIndex = data.map((tool) => normalizeGenericWorkflowTool(tool));
         if (!toolIndex.some((tool) => tool.id === MUSIC_DOWNLOADER_META.id)) toolIndex.push(MUSIC_DOWNLOADER_META);
         if (!toolIndex.some((tool) => tool.id === ZIP_ARCHIVE_META.id)) toolIndex.push(ZIP_ARCHIVE_META);
         return toolIndex;
@@ -113,7 +114,7 @@ export function loadSearchIndex(): Promise<readonly SearchTool[]> {
       .then((data) => {
         if (!Array.isArray(data))
           throw new Error("The search index response was invalid. Retry to search tools.");
-        searchIndex = data.slice();
+        searchIndex = data.map((tool) => normalizeGenericWorkflowTool(tool));
         if (!searchIndex.some((tool) => tool.id === MUSIC_DOWNLOADER_META.id)) searchIndex.push(MUSIC_DOWNLOADER_META);
         if (!searchIndex.some((tool) => tool.id === ZIP_ARCHIVE_META.id)) searchIndex.push(ZIP_ARCHIVE_META);
         return searchIndex;
@@ -135,7 +136,7 @@ export function loadToolDetails(shard: string): Promise<readonly ToolMeta[]> {
     .then((data) => {
       if (!Array.isArray(data))
         throw new Error("The tool details response was invalid. Retry to load this tool.");
-      return data;
+      return data.map((tool) => normalizeGenericWorkflowTool(tool));
     })
     .catch((error: unknown) => {
       detailPromises.delete(shard);

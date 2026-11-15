@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 import { parseGeneratedCatalog } from "./catalog-reader.mjs";
+import { applyGenericWorkflowPolicy } from "../src/lib/generic-workflow-policy.mjs";
 
 const catalogSource = readFileSync(new URL("../src/data/catalog.ts", import.meta.url), "utf8");
 const sourceTools = parseGeneratedCatalog(catalogSource);
@@ -108,10 +109,11 @@ assert.equal(
   sourceTools.length,
   "A detail shard is missing catalog records.",
 );
+const publishedTools = applyGenericWorkflowPolicy(sourceTools);
 assert.deepEqual(homeTools.counts, {
-  active: sourceTools.filter((tool) => tool.status === "active" || tool.status === "beta").length,
-  planned: sourceTools.filter((tool) => tool.status === "planned").length,
-  total: sourceTools.length,
+  active: publishedTools.filter((tool) => tool.status === "active" || tool.status === "beta").length,
+  planned: publishedTools.filter((tool) => tool.status === "planned").length,
+  total: publishedTools.length,
 });
 console.log(
   `Verified catalog runtime v${expectedVersion}: ${index.length} list entries, ${searchIndex.length} search entries, ${shardCount} detail shards.`,

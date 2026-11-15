@@ -110,6 +110,7 @@ jobs:
             artifacts/accessibility-live-audit.json
             artifacts/accessibility-live-audit.md
             artifacts/accessibility-live-audit/screenshots/
+            docs/seo-tool-inventory.md
             ${{ runner.temp }}/env-preview.log
           if-no-files-found: warn
           retention-days: 30

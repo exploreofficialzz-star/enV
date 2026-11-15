@@ -1046,9 +1046,9 @@ private fun AboutInformation() {
         ) {
             ChasTechnologiesLogo(Modifier.fillMaxWidth().aspectRatio(3.2f))
         }
-        InformationSection("A practical toolkit for everyday digital work", listOf(
-            "enV brings practical calculators, converters, generators, and creator and developer utilities into one searchable workspace. Browse by category or search by task to find a tool and understand how it can help.",
-            "Use enV on the web, Android, or iOS. Many tools run directly on your device; for connected features, review the tool-specific guidance and our Privacy page so you know when a server or external provider is involved.",
+        InformationSection("Tools for everyday work", listOf(
+            "enV brings together tools for calculations, conversions, design, development, media, files and everyday tasks. Browse by category or search for the task you need to complete.",
+            "Use enV on the web, Android or iOS. Each tool explains its purpose and, where relevant, whether it needs a network connection, an enV service or an external provider.",
         ), titleSize = 20.sp)
         CompanyContactCard()
         SocialLinksSection("enV")

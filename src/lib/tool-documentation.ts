@@ -201,10 +201,17 @@ const CATEGORY_ADVICE: Partial<Record<CategoryId, CategoryAdvice>> = {
 };
 
 
+export type ToolTaskGuidanceSource =
+  | "operation-specific"
+  | "engine-specific"
+  | "category-guidance"
+  | "catalogue-fallback";
+
 type ToolSpecificGuidance = {
   overview: string;
   example: string;
   validation: string;
+  source?: ToolTaskGuidanceSource;
 };
 
 const CATEGORY_TASK_GUIDANCE: Partial<Record<CategoryId, ToolSpecificGuidance>> = {
@@ -479,13 +486,54 @@ export function toolDocumentationSummary(tool: ToolMeta): string {
   return `Use ${name} with the inputs and options available on the page. Review the result against your requirements before copying, exporting, or sharing it.`;
 }
 
-function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
+function withCatalogueTask(tool: ToolMeta, guidance: ToolSpecificGuidance): ToolSpecificGuidance {
+  const purpose = String(tool.description ?? "").replace(/\s+/g, " ").trim();
+  const purposeIsInPageSummary = purpose && toolDocumentationSummary(tool) === purpose;
+  const example = guidance.example.trim();
+  return {
+    overview: "This guide is specific to " + tool.name + "."
+      + (purpose && !purposeIsInPageSummary ? " The catalogue describes its task as: " + purpose : "")
+      + " " + guidance.overview,
+    example: example
+      ? "For " + tool.name + ", " + example.charAt(0).toLowerCase() + example.slice(1)
+      : "Use a small, representative example for " + tool.name + " and check the result against an independent reference.",
+    validation: guidance.validation,
+    source: guidance.source ?? "catalogue-fallback",
+  };
+}
+
+function toolSpecificGuidanceBase(tool: ToolMeta): ToolSpecificGuidance {
   const id = tool.id.toLowerCase();
   const name = tool.name.toLowerCase();
   const category = tool.category;
 
+  if (category === "creators" && id.endsWith("-content-calendar")) {
+    return {
+      source: "operation-specific",
+      overview: "This creator-platform calendar turns a campaign topic and goal into a dated publishing plan. It uses the start date, requested post count, selected weekdays and a comma-separated format mix to rotate platform-specific themes and calls to action. It is a planning output only; it does not connect to a social account, schedule posts with a provider or publish content.",
+      example: "Enter the brand or creator name, campaign topic, goal and start date. Choose between one and thirty posts, list the weekdays you intend to publish, and enter the formats you want rotated through the plan. Review every generated date, theme, format and call to action before transferring the plan into the platform or scheduler you actually use.",
+      validation: "Use a real calendar date and valid weekday names such as Mon, Wed and Fri. Invalid dates or day names are rejected; repeated weekdays are deduplicated. Format labels are planning inputs, not a live check of current platform capabilities. Confirm the selected time zone, platform limits and audience evidence separately; enV does not schedule or publish these posts.",
+    };
+  }
+  if (category === "creators" && id.endsWith("-content-planner")) {
+    return {
+      source: "operation-specific",
+      overview: "This creator-platform planner generates a set of content ideas from the brand, topic, target audience, goal, number of ideas and selected editorial pillar. It combines platform-oriented themes with a suggested format, opening angle and call to action; it does not create a dated posting calendar.",
+      example: "Name the brand or creator, describe the topic and audience, choose the goal and editorial pillar, then request a manageable batch of ideas. Review the concept, proposed format, opening angle and call to action for each idea, and rewrite any suggestion that is not supported by your actual experience or evidence.",
+      validation: "The planner generates ideas from supplied context and built-in editorial patterns. It does not read channel analytics, verify factual claims, check current platform policy, connect to an account, schedule posts or publish content. Confirm any statistics, product claims, rights and platform-specific limits before use.",
+    };
+  }
+  if (category === "creators" && id.endsWith("-posting-time-helper")) {
+    return {
+      source: "operation-specific",
+      overview: "This helper ranks posting windows from audience-activity scores that you enter from a platform's own analytics. It is intentionally evidence-led: without supplied activity data it explains how to collect comparable observations instead of inventing a universal best posting time.",
+      example: "Choose the audience time-zone label and optimisation goal. From the platform's native analytics, enter one observation per line using the format Day HH:mm = score, such as Mon 18:00 = 42. Compare the highest-ranked windows with the same reporting period and test them using comparable posts.",
+      validation: "The helper validates day names, clock times and duplicate day/time entries, then ranks up to the three highest scores you supplied. It does not fetch audience analytics, validate the time-zone label against a provider, predict engagement, schedule posts or guarantee results. Use a consistent activity measure and confirm daylight-saving/time-zone interpretation before applying a window.",
+    };
+  }
   if (id === "percentage-calculator") {
     return {
+      source: "operation-specific",
       overview: "Use this calculator when you need to express one value as a percentage of another, or when you are comparing a value with a starting amount. Read the direction of each field carefully: a percentage of a number, the percentage represented by a part, and a percentage increase or decrease are related calculations but answer different questions.",
       example: "For a simple check, use a small part and a known whole, calculate the share independently, and compare it with the displayed percentage. For increase or decrease work, identify the starting value before comparing the change; do not substitute the ending value as the base unless that is what the question asks.",
       validation: "Check the denominator or starting amount and the meaning of each percentage field. A zero denominator cannot produce a meaningful share, and percentage change depends on the original value.",
@@ -493,6 +541,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   }
   if (id === "percentage-change-calculator" || /percentage change/.test(name)) {
     return {
+      source: "operation-specific",
       overview: "This guide is for comparing a starting value with a new value and expressing the difference relative to the starting value. The sign matters: a positive percentage indicates an increase under the usual new-minus-original convention, while a negative value indicates a decrease.",
       example: "Test with an easy pair whose relationship you already know, then reverse the two values. The direction should change when the original and new values are switched; this is a useful check that the correct base value was used.",
       validation: "Confirm which input is the original value and which is the new value. The percentage-change calculation is undefined when the original value is zero, and the sign should be interpreted alongside the direction of the change.",
@@ -500,6 +549,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   }
   if (id === "json-formatter" || id === "json-validator" || id === "json-minifier" || /json (formatter|validator|minifier)/.test(name)) {
     return {
+      source: "operation-specific",
       overview: "This workflow is for working with JSON as structured data. Formatting changes whitespace and indentation to make the structure easier to read; validation checks whether the input follows JSON syntax; minification removes unnecessary whitespace. These operations do not guarantee that the data matches an application's business schema.",
       example: 'Begin with a small JSON object such as {"name":"Ada","active":true}. Compare the formatted and compact representations, then deliberately remove a quote or comma to see how the validator reports malformed syntax. Use a harmless sample rather than a production payload containing secrets.',
       validation: "JSON has stricter syntax than JavaScript: property names and strings use double quotes, and comments and trailing commas are not valid standard JSON. After syntax validation, check required fields and value types separately against the receiving application's schema.",
@@ -507,6 +557,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   }
   if (id === "word-counter" || /word counter/.test(name)) {
     return {
+      source: "operation-specific",
       overview: "The Word Counter updates counts for words, characters, sentences, and paragraphs as text is entered. It is useful for checking writing length, content limits, and the overall size of a passage before submission or publication.",
       example: "Paste a short sample containing two sentences and a blank line, then add or remove a word and watch which totals change. This helps you understand how the current counter treats spaces and paragraph breaks before using it on a longer document.",
       validation: "Counting conventions can differ for hyphenated words, abbreviations, emojis, and languages that do not separate words with spaces. Use the destination platform's own count where a strict character or word limit determines acceptance.",
@@ -514,6 +565,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   }
   if (id === "image-compressor" || /image compressor/.test(name)) {
     return {
+      source: "operation-specific",
       overview: "Use this tool to reduce the file size of a compatible image while balancing the resulting visual quality. Compression is useful for web pages, uploads, sharing, and storage when the image must remain recognisable at its intended display size.",
       example: "Keep the original, then process a copy of a compatible JPEG, PNG, or WebP image using the controls displayed by the tool. Compare the original and compressed previews at the same zoom level and compare the resulting file sizes before deciding which version is suitable.",
       validation: "Smaller files can show visible artifacts, soften details, alter transparency behavior, or change metadata depending on the format and selected settings. Do not assume that every format supports the same quality controls or that a target size can always be reached without unacceptable loss.",
@@ -521,6 +573,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   }
   if (id === "image-resizer" || /image resizer/.test(name)) {
     return {
+      source: "operation-specific",
       overview: "This tool changes image dimensions for a target use such as a web asset, profile image, document, or print layout. The important choice is whether the image should fit within a bound, fill a frame, or be resized to exact dimensions.",
       example: "Use a copy of an image with a known width and height, request a smaller output, and check both dimensions after processing. If the interface offers fit or fill modes, compare whether the whole image remains visible or whether cropping is introduced.",
       validation: "Confirm output width, height, units, aspect ratio, and crop behavior. Upscaling cannot recover detail absent from the original, and physical print units depend on the intended resolution or DPI setting where one is provided.",
@@ -528,6 +581,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   }
   if (id === "qr-generator" || /qr code generator/.test(name)) {
     return {
+      source: "operation-specific",
       overview: "The QR Code Generator encodes text or a URL into a QR image that a compatible camera or scanner can read. It is suited to sharing a web destination or short piece of information without requiring people to type it manually.",
       example: "Generate a code from a non-sensitive URL, download the PNG, and scan that downloaded image with a phone camera. Confirm that the decoded destination exactly matches the intended address before placing the code on a poster, label, presentation, or website.",
       validation: "A QR image can be visually correct while encoding the wrong payload. Test the downloaded file—not only the preview—and check contrast, margin, print size, and scan reliability before wider distribution. Do not encode confidential secrets in a publicly visible code.",
@@ -535,6 +589,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   }
   if (id === "password-generator" || /password generator/.test(name)) {
     return {
+      source: "operation-specific",
       overview: "This tool generates a password using the length and character options exposed by its interface. The result should be unique to the account or service where it will be used, and the options should reflect the receiving service's password requirements.",
       example: "Choose a length and character set accepted by your target service, generate a candidate, and verify that it meets the service's documented rules. Store the accepted password in a trusted password manager rather than reusing it across accounts.",
       validation: "Check the requested length and included character types, and confirm that the generated value meets the destination's restrictions. Do not share generated passwords in screenshots, documents, support tickets, or chat messages.",
@@ -542,6 +597,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   }
   if (id === "regex-tester" || /regex tester/.test(name)) {
     return {
+      source: "operation-specific",
       overview: "The Regex Tester evaluates a JavaScript regular expression against sample text and lists matches. It is intended for experimentation and debugging before a pattern is used in search, validation, extraction, or replacement logic.",
       example: "Start with a short sample whose expected matches you can identify by inspection, then try a boundary case and a non-matching string. Add flags only when the field supports them and compare the actual match list with the expected result.",
       validation: "Regular-expression syntax differs across programming languages and engines. A pattern that works in JavaScript may behave differently in another environment; verify escaping, flags, Unicode handling, and performance before using it on large or untrusted input.",
@@ -549,6 +605,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   }
   if (id === "uuid-generator" || /uuid generator/.test(name)) {
     return {
+      source: "operation-specific",
       overview: "The UUID Generator creates version 4 UUID identifiers locally. UUIDs are useful as identifiers in test data, application records, and workflows that need a practically unique value, but generating one does not register it with another system.",
       example: "Generate a small number of values and check that each follows the UUID v4 structure and is distinct from the other values shown. Then confirm the database or API that will receive the identifier accepts that representation.",
       validation: "Do not confuse identifier uniqueness with authentication or secrecy. A UUID is not a substitute for a purpose-built credential, and the destination system may impose additional rules about storage, uniqueness, or ownership.",
@@ -556,6 +613,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   }
   if (id === "unix-timestamp-converter" || /timestamp converter/.test(name) || /unix time/.test(name)) {
     return {
+      source: "operation-specific",
       overview: "This converter helps translate between Unix timestamps and human-readable dates. The critical details are the timestamp unit, the time zone used for display, and whether the value represents seconds, milliseconds, or another format accepted by the interface.",
       example: "Use a known date and convert it to the available timestamp representation, then convert that result back. If the page exposes a time-zone selector, check the same instant in two time zones and distinguish a changed clock display from a changed instant.",
       validation: "A seconds-versus-milliseconds mistake can shift a timestamp by orders of magnitude. Confirm the source unit and time zone before using a converted time for logs, deadlines, scheduled jobs, or incident analysis.",
@@ -563,6 +621,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   }
   if (id === "invoice-generator" || /invoice generator/.test(name)) {
     return {
+      source: "operation-specific",
       overview: "This tool creates a printable invoice from the business details and line items provided in its form. It can help prepare a document for review or delivery, but the generated page should be checked against the real transaction and the requirements that apply to the business.",
       example: "Prepare a draft with fictional or non-sensitive sample details, add a small number of line items, and review the rendered totals and printable layout. When using real transaction data, replace the sample values carefully and verify the document before sending it.",
       validation: "Confirm legal business names, invoice identifiers, dates, quantities, currency, tax treatment, discounts, totals, payment terms, and contact information. Do not assume tax compliance, payment collection, or accounting-system registration unless the implementation explicitly provides it.",
@@ -570,6 +629,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   }
   if (id === "bmi-calculator" || /bmi calculator/.test(name)) {
     return {
+      source: "operation-specific",
       overview: "The BMI Calculator estimates body mass index from height and weight and may display adult reference categories. BMI is a screening measure based on a simple ratio; it does not directly measure body fat or diagnose an individual's health.",
       example: "Enter a height and weight measured in the units requested by the form, then check that the displayed value changes sensibly if one measurement is adjusted. Confirm the units before comparing the number with published reference ranges.",
       validation: "BMI uses weight divided by height squared when expressed in kilograms and metres. Adult category references are not interpreted the same way for children and adolescents, and the result should be discussed with a qualified clinician when making health decisions.",
@@ -577,6 +637,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   }
   if (id === "video-to-mp4" || id === "video-to-mp3" || /video to (mp4|mp3)/.test(name)) {
     return {
+      source: "operation-specific",
       overview: "This media conversion workflow uses a local video file as input and relies on the configured enV media processor when that service is available. The selected output determines whether the resulting file retains video or is converted to audio-only content.",
       example: "Start with a short, non-sensitive file in a format accepted by the active form. Run the conversion, then open the resulting file and verify its duration, playback, audio synchronization where applicable, and actual output extension before using it elsewhere.",
       validation: "The catalogue states that the enV FFmpeg media processor must be configured for this workflow. Support depends on the source codec, available service, file size, and output options; do not assume that every upload or codec is accepted.",
@@ -584,6 +645,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   }
   if (id === "youtube-video-downloader" || /youtube video downloader/.test(name)) {
     return {
+      source: "operation-specific",
       overview: "This tool describes a URL-based media workflow for YouTube when a compliant enV media-processing service is available. Availability depends on the configured service and source restrictions, not just on whether a URL opens in a browser.",
       example: "Use only a public URL for content you are authorized to access and process. Submit it through the active form, follow the service response, and verify any returned media before saving or using it.",
       validation: "The catalogue explicitly conditions this tool on a compliant media-processing service. It may not work when the source blocks access or service support is unavailable. Respect copyright, platform terms, and rights-holder permissions.",
@@ -591,6 +653,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   }
   if (id === "invoice-generator" || /receipt generator|quotation generator/.test(name)) {
     return {
+      source: "operation-specific",
       overview: "This business-document workflow creates a printable record or quote from the details entered in the form. Treat it as a draft until its figures and wording have been reviewed against the underlying sale or transaction.",
       example: "Use a small example with a clear quantity and unit price, then verify the displayed line amount and overall total before substituting verified business details.",
       validation: "Review identifiers, dates, currency, item descriptions, taxes, discounts, terms and totals. A generated document does not itself prove a payment occurred or a transaction was recorded in an accounting system.",
@@ -598,6 +661,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   }
   if (/json to csv|csv to json|json to yaml|yaml to json|json to xml|xml to json/.test(name) || /json.*(csv|yaml|xml)|(csv|yaml|xml).*json/.test(id)) {
     return {
+      source: "operation-specific",
       overview: "This tool converts structured data between the formats named in its title and description. The receiving format has its own rules for field names, values, arrays, nesting, quoting, and escaping, so conversion may require reviewing how the original structure is represented.",
       example: "Start with a small sample containing more than one record and at least one value that needs quoting, such as text with a comma. Convert the sample, then inspect the output and convert it back where the workflow supports a reverse operation.",
       validation: "Check nested structures, null or missing values, escaping, delimiter choices, and data types. Some target formats cannot represent every source structure identically, so use the output schema expected by the consuming system.",
@@ -605,6 +669,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   }
   if (/contrast/.test(name) || /contrast/.test(id)) {
     return {
+      source: "operation-specific",
       overview: "This tool supports evaluation of contrast or colour relationships for a specific design or accessibility task. The result should be interpreted against the actual foreground/background pair, display conditions, and criteria exposed by the interface.",
       example: "Test the intended text colour against the real background colour rather than against a different nearby shade. Compare the result with the criterion your product or project is required to meet and review large text and other element types separately if the interface distinguishes them.",
       validation: "A contrast result covers only the colour combination and measurement method tested. It does not by itself establish that an entire page meets accessibility requirements; review focus, semantics, labels, structure, and interactive states separately.",
@@ -612,6 +677,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   }
   if (/meta tag|serp|sitemap|robots.txt|structured data|schema generator/.test(name) || /meta-tags|serp|sitemap|robots|schema/.test(id)) {
     return {
+      source: "operation-specific",
       overview: "This SEO utility prepares or previews a specific search-related page element, such as metadata, crawl guidance, a sitemap, or structured data. Treat generated output as an implementation aid and confirm that it accurately describes the deployed page.",
       example: "Use a draft page title, canonical URL, and accurate page description, then inspect the generated result before placing it on the site. After deployment, validate the live URL using the relevant search engine's current inspection or testing tools.",
       validation: "Check canonical URLs, escaping, robots directives, schema types, required fields, and the relationship between markup and visible page content. Valid markup does not guarantee crawling, indexing, a rich result, or a particular search ranking.",
@@ -621,6 +687,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   const engine = tool.engine;
   if (engine.type === "calculator") {
     return {
+      source: "engine-specific",
       overview: "Use the fields to model the calculation you need. Check input units, assumptions, zero values, and expected precision before relying on the result.",
       example: "Choose a small test case for which you can estimate or independently calculate the expected result. Run it once, compare the output with that reference, and only then use more complex values.",
       validation: "Check sign, units, decimal precision, zero values, and boundary cases. Use any formula or assumption note published with this tool, and do not infer precision or financial terms that the interface does not display.",
@@ -628,6 +695,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   }
   if (engine.type === "converter") {
     return {
+      source: "engine-specific",
       overview: "Use this converter when you need to move a value between supported units or formats. The choices shown on the page define the actual conversion pairs; do not assume an unlisted unit or format is supported.",
       example: "Convert a familiar value between two listed units and confirm that the displayed unit label accompanies the result. Repeat in the reverse direction when possible to check that the conversion is consistent.",
       validation: "Verify source and target unit selection, scale, sign, rounding, and precision. Keep the unit next to the number when copying the result because the number alone may be ambiguous.",
@@ -635,6 +703,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   }
   if (engine.type === "image" || tool.category === "image" || tool.category === "photography") {
     return {
+      source: "engine-specific",
       overview: "Choose image settings based on how the result will be displayed or printed. Compare a representative output against the original at the intended size.",
       example: "Use a duplicate of a small, representative image, process it with the available settings, then inspect the full-size output and compare its properties with the original.",
       validation: "Confirm dimensions, crop, format, transparency, colour appearance, and metadata behavior as relevant to the selected operation. Keep the original until the output has been inspected.",
@@ -642,6 +711,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   }
   if (engine.type === "text" || engine.type === "codec" || engine.type === "developer") {
     return {
+      source: "engine-specific",
       overview: "Start with a small, representative input, apply the operation provided by the tool, and validate the output in the format or system that will consume it.",
       example: "Create a small sample containing a normal value and a boundary case, then run the operation on both. This makes it easier to distinguish a genuine formatting or conversion issue from malformed source input.",
       validation: "Pay particular attention to quoting, escaping, whitespace, character encoding, line endings, case sensitivity, and special characters. Preserve the original input until the output has passed downstream validation.",
@@ -649,6 +719,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   }
   if (engine.type === "file-converter" || engine.type === "document" || engine.type === "document-backend" || engine.type === "pdf" || engine.type === "audio" || engine.type === "video") {
     return {
+      source: "engine-specific",
       overview: "Select the source type, target format, and processing options exposed by the page. Do not assume a format or control is supported unless it is listed.",
       example: "Use a duplicate of a small file that meets the form's listed requirements. Process it once with the intended settings, then open the result in a viewer or player that supports the target format.",
       validation: "Check file type and extension, output size, playback or document rendering, completeness, and any relevant page order, dimensions, channels, or timing. An output file being present does not prove that its contents are correct.",
@@ -656,6 +727,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   }
   if (engine.type === "qr" || engine.type === "barcode") {
     return {
+      source: "engine-specific",
       overview: "Enter the exact payload and code type required for your use case, then verify that the generated code decodes to the intended value.",
       example: "Generate a code from a non-sensitive sample value and test it with the actual phone camera, scanner, or application that will be used in practice.",
       validation: "Verify the decoded payload exactly. Check code format, print size, quiet space, contrast, and the limits of the intended scanner before distributing the code.",
@@ -663,6 +735,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   }
   if (engine.type === "url-media" || engine.type === "url-media-info") {
     return {
+      source: "engine-specific",
       overview: "Processing depends on source reachability, provider rules, and the availability of any configured service. Test a supported URL before using a more consequential input.",
       example: "Use a test URL for content you are authorized to inspect, submit it through the form, and confirm that the returned output corresponds to the requested source.",
       validation: "A valid-looking URL does not guarantee that remote processing is allowed or available. Review service errors and follow content rights and platform terms.",
@@ -670,6 +743,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   }
   if (engine.type === "security") {
     return {
+      source: "engine-specific",
       overview: "Treat the specific security check shown here as one part of a review, not as a guarantee that an entire system is secure.",
       example: "Use a test value or non-production sample first, then compare the result with the security requirement you intend to satisfy.",
       validation: "Do not infer comprehensive protection from one passing check. Avoid exposing live credentials or secrets, and verify suitability for the destination system.",
@@ -677,6 +751,7 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   }
   if (engine.type === "ai") {
     return {
+      source: "engine-specific",
       overview: "The quality of generated output depends on the context and constraints supplied and on the configured service. Treat the result as a draft that needs review.",
       example: "Try one focused prompt with a clear task, intended audience, and constraints. Review the result, identify missing or unsupported points, and refine the request only where the tool supports it.",
       validation: "Review every factual claim and instruction before reuse. Avoid including sensitive source material unless the tool's processing notice permits it, and do not treat generated content as independently verified.",
@@ -685,16 +760,28 @@ function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
   const categoryGuidance = CATEGORY_TASK_GUIDANCE[tool.category];
   if (categoryGuidance) {
     return {
+      source: "category-guidance",
       overview: categoryGuidance.overview,
       example: categoryGuidance.example,
       validation: categoryGuidance.validation,
     };
   }
+  const purpose = String(tool.description ?? "").trim();
   return {
-    overview: "This guide is tailored to the catalogued purpose, category, and execution metadata for " + tool.name + ". Use the current page's labels and controls as the authority for exact input requirements and behavior.",
-    example: "Run a small, non-sensitive example that represents the task you intend to complete. Confirm the output matches the expected purpose before moving on to a larger or more consequential input.",
-    validation: "Check required fields, supported input types, output completeness, and any assumptions implied by the task. The guide does not claim support for an option unless it is documented by the catalogue or visible in the current interface.",
+    source: "catalogue-fallback",
+    overview: purpose || ("Use " + tool.name + " for the task described by its current page. Check the visible controls and notices to confirm the operation available in this release."),
+    example: "Start with a small, non-sensitive example that represents the task you need to complete. Use values or a source item whose expected result you can check, then review the output before trying a larger or more important input.",
+    validation: "Confirm that the selected operation matches your task. Check required fields, units or formats, warnings, output completeness, and whether the result is suitable for the system or person that will receive it. Do not assume an input type or option is supported unless the current interface lists it.",
   };
+}
+
+function toolSpecificGuidance(tool: ToolMeta): ToolSpecificGuidance {
+  return withCatalogueTask(tool, toolSpecificGuidanceBase(tool));
+}
+
+/** Describe which authored guidance layer supplies a tool guide's task-specific content. */
+export function toolTaskGuidanceSource(tool: ToolMeta): ToolTaskGuidanceSource {
+  return toolSpecificGuidanceBase(tool).source ?? "catalogue-fallback";
 }
 
 function engineLabel(tool: ToolMeta): string {

@@ -1,10 +1,19 @@
-import { tools as catalogTools } from "@/data/catalog";
+import { tools as rawCatalogTools } from "@/data/catalog";
+import { refineGeneratedToolDescription } from "@/lib/generated-tool-copy.mjs";
+import { applyGenericWorkflowPolicy } from "@/lib/generic-workflow-policy.mjs";
 import { CATEGORY_MAP } from "@/data/categories";
 import type { CategoryId, ToolMeta } from "@/types/tool";
 import { makeAccessibilityStudioTools, studioToolForLegacy } from "@/lib/accessibility-studios";
 import { makeDeveloperStudioTools } from "@/lib/developer-studios-catalog";
 import { presentGeneratedCalculator } from "@/lib/calc/generated-calculator-presentation";
 import { DATETIME_TOOL_EXTENSIONS } from "@/lib/datetime/catalog-tools";
+
+// Apply reviewed, task-specific descriptions to legacy generated catalogue rows
+// before they reach category pages, search, tool details or SEO metadata.
+const catalogTools: ToolMeta[] = applyGenericWorkflowPolicy(rawCatalogTools).map((tool) => {
+  const description = refineGeneratedToolDescription(tool);
+  return description === tool.description ? tool : { ...tool, description };
+});
 
 const musicDownloaderTool: ToolMeta = {
   id: "music-downloader",

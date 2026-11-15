@@ -5,7 +5,8 @@ import { CATEGORIES } from "../src/data/categories.ts";
 import { BLOG_ARTICLES } from "../src/data/blog-articles.ts";
 import { getSearchableTools, getToolsByCategory, toolPath } from "../src/lib/registry.ts";
 import { canonicalSeoTools, canonicalToolPath, isIndexableTool, toolSeoTitle, toolSeoDescription, toolGuideSeoTitle, toolSearchIntentTerms } from "../src/lib/seo-metadata.ts";
-import { toolDocumentationSummary } from "../src/lib/tool-documentation.ts";
+import { toolTaskGuidanceSource, toolDocumentationSummary, toolStatusLabel } from "../src/lib/tool-documentation.ts";
+import { buildIndexNowKeyArtifact } from "./indexnow-utils.mjs";
 
 const SITE_ORIGIN = "https://envtools.store";
 const SITEMAP_MAX_URLS = 40_000;
@@ -25,6 +26,21 @@ function escapeXml(value) {
 
 function isPublicTool(tool) {
   return isIndexableTool(tool);
+}
+
+function inventoryEngine(tool) {
+  const details = Object.entries(tool.engine)
+    .filter(([key]) => key !== "type")
+    .map(([key, value]) => key + "=" + String(value));
+  return tool.engine.type + (details.length ? " (" + details.join(", ") + ")" : "");
+}
+
+function inventoryCatalogueFlags(tool) {
+  return [
+    tool.clientSide ? "client-side flagged" : "not marked client-side",
+    tool.requiresBackend ? "backend required" : "backend not required",
+    tool.requiresAuth ? "sign-in required" : "sign-in not required",
+  ].join("; ");
 }
 
 function buildUrlSet(paths) {
@@ -80,7 +96,8 @@ export function buildSitemapArtifacts(inputPaths) {
   return { sitemap: sitemapIndex, files, totalUrls: sortedPaths.length };
 }
 
-export function buildSeoArtifacts() {
+export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "production" ? process.env.INDEXNOW_KEY : "") } = {}) {
+  const indexNowKeyFile = buildIndexNowKeyArtifact(indexNowKey);
   const toolMap = new Map(getSearchableTools().map((tool) => [tool.id, tool]));
   for (const tool of getToolsByCategory("accessibility")) toolMap.set(tool.id, tool);
   const eligibleToolRecords = [...toolMap.values()].filter(isPublicTool);
@@ -178,8 +195,13 @@ export function buildSeoArtifacts() {
     const canonical = SITE_ORIGIN + toolPath(tool);
     const guide = SITE_ORIGIN + "/blog/tool-" + tool.id;
     return [
-      "| [" + tableCell(tool.name) + "](" + canonical + ")",
+      "| " + tableCell(tool.id),
+      "[" + tableCell(tool.name) + "](" + canonical + ")",
       tableCell(CATEGORIES.find((category) => category.id === tool.category)?.name ?? tool.category),
+      tableCell(toolStatusLabel(tool)),
+      tableCell(inventoryEngine(tool)),
+      tableCell(inventoryCatalogueFlags(tool)),
+      tableCell(toolTaskGuidanceSource(tool)),
       tableCell(toolSeoTitle(tool, tools)),
       tableCell(toolSeoDescription(tool)),
       tableCell(toolSearchIntentTerms(tool).join(", ")),
@@ -187,17 +209,37 @@ export function buildSeoArtifacts() {
     ].join(" | ");
   });
   const guideInventoryRows = guideTools.map((tool) => [
-    "| [" + tableCell(tool.name) + " guide](" + SITE_ORIGIN + "/blog/tool-" + tool.id + ")",
+    "| " + tableCell(tool.id),
+    "[" + tableCell(tool.name) + " guide](" + SITE_ORIGIN + "/blog/tool-" + tool.id + ")",
     tableCell(CATEGORIES.find((category) => category.id === tool.category)?.name ?? tool.category),
+    tableCell(toolStatusLabel(tool)),
+    tableCell(inventoryEngine(tool)),
+    tableCell(inventoryCatalogueFlags(tool)),
+    tableCell(toolTaskGuidanceSource(tool)),
     tableCell(toolGuideSeoTitle(tool, guideTools)),
     tableCell(toolSeoDescription(tool)),
     "[Open tool](" + SITE_ORIGIN + canonicalToolPath(tool) + ") |",
   ].join(" | "));
+  const taskGuidanceSourceCounts = new Map();
+  for (const tool of guideTools) {
+    const source = toolTaskGuidanceSource(tool);
+    taskGuidanceSourceCounts.set(source, (taskGuidanceSourceCounts.get(source) ?? 0) + 1);
+  }
+  const taskGuidanceSourceSummary = [
+    "operation-specific",
+    "engine-specific",
+    "category-guidance",
+    "catalogue-fallback",
+  ].map((source) => source + ": " + (taskGuidanceSourceCounts.get(source) ?? 0)).join("; ");
+
   const inventory = [
     "# enV public tool SEO inventory",
     "",
     "This file is generated from the live tool registry during the production build. It is a review and coverage artifact, not a source of search-volume data or a ranking report.",
     "",
+    "- Task guidance source counts: " + taskGuidanceSourceSummary,
+    "- Task guidance source meanings: operation-specific = a narrow rule for a named tool or closely related task identified by its stable ID/name; engine-specific = shared task advice for an engine family; category-guidance = shared task advice for a category; catalogue-fallback = catalogue purpose plus generic usage advice.",
+    "- This classifies only the task-specific overview, example and validation in the guide's 'When to use this tool' section; it does not classify every guide section or prove control-level accuracy, source/runtime verification or human editorial review.",
     "- Eligible catalog records considered: " + eligibleToolRecords.length,
     "- Canonical public tool pages included: " + tools.length,
     "- Canonical public tool guides included: " + guideTools.length,
@@ -206,16 +248,18 @@ export function buildSeoArtifacts() {
     "- Tool categories included: " + categories.length,
     "- Canonical host: " + SITE_ORIGIN,
     "- Each row links to the canonical tool page and its detailed usage guide.",
+    "- Engine operation, status, client-side/backend and account columns are copied from the current registry. These catalogue flags are review leads, not proof of the live runtime data path, actual local execution, platform parity or successful behavior.",
+    "- This generated inventory does not claim that a human has completed the source/runtime audit for every tool. A build or inventory row is not an individual verification result.",
     "- Search-intent terms are seeded from each tool's name, category, keywords, and tags in the product catalogue. They are not keyword-volume estimates or claims that every phrase has search demand.",
     "",
-    "| Tool | Category | SEO title | Meta description | Catalogue search-intent seeds | Usage guide |",
-    "|---|---|---|---|---|---|",
+    "| Tool ID | Tool | Category | Catalogue status | Engine operation | Catalogue execution/account flags | Task guidance source | SEO title | Meta description | Catalogue search-intent seeds | Usage guide |",
+    "|---|---|---|---|---|---|---|---|---|---|---|",
     ...inventoryRows,
     "",
     "## Individual usage guide coverage",
     "",
-    "| Usage guide | Category | SEO title | Meta description | Related tool |",
-    "|---|---|---|---|---|",
+    "| Tool ID | Usage guide | Category | Catalogue status | Engine operation | Catalogue execution/account flags | Task guidance source | SEO title | Meta description | Related tool |",
+    "|---|---|---|---|---|---|---|---|---|---|",
     ...guideInventoryRows,
     "",
   ].join("\n");
@@ -223,7 +267,7 @@ export function buildSeoArtifacts() {
   const llms = [
     "# enV",
     "",
-    "> enV is a cross-device digital toolkit with browser-based utilities, calculators, converters, creative and media tools, developer workspaces, and practical productivity tools.",
+    "> enV brings together practical tools for calculations, conversions, creative work, development, media, files, business tasks and everyday planning across Web, Android and iOS.",
     "",
     "## Primary pages",
     "- [Home](" + SITE_ORIGIN + "/): Platform overview and tool discovery.",
@@ -279,6 +323,7 @@ export function buildSeoArtifacts() {
     guideTools,
     categories,
     articles: BLOG_ARTICLES,
+    indexNowKeyFile,
   };
 }
 
@@ -286,8 +331,10 @@ async function run() {
   const artifacts = buildSeoArtifacts();
   const check = process.argv.includes("--check");
   const mismatches = [];
-  for (const [path, key] of OUTPUTS) {
-    const expected = artifacts[key];
+  const outputs = [...OUTPUTS];
+  if (artifacts.indexNowKeyFile) outputs.push([artifacts.indexNowKeyFile.path, "indexNowKeyFile"]);
+  for (const [path, key] of outputs) {
+    const expected = key === "indexNowKeyFile" ? artifacts.indexNowKeyFile.content : artifacts[key];
     const absolutePath = resolve(process.cwd(), path);
     if (check) {
       let actual = "";

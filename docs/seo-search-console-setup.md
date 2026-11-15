@@ -23,6 +23,19 @@ A URL listed in the sitemap is only a discovery hint. Google decides independent
 3. Submit https://envtools.store/sitemap.xml.
 4. Review crawl errors, indexed URLs, canonical selection, search performance, and Copilot-related citation/grounding reports where the account exposes them.
 
+## IndexNow URL notifications
+
+The production build now supports IndexNow notifications for participating search engines. Microsoft recommends IndexNow for automated URL changes; the protocol requires a domain-owned UTF-8 key file and accepts up to 10,000 URLs per POST.
+
+- The production Vercel project stores `INDEXNOW_KEY` as a sensitive, production-only environment variable. Do not commit the key or put it in a browser-visible variable.
+- The SEO build publishes the matching verification file at `https://envtools.store/<INDEXNOW_KEY>.txt`.
+- After the key file is live, subsequent production builds compare the deployed source revision with its predecessor, select affected canonical public URLs, include URLs removed from the previous sitemap where that sitemap is available, and send batches to `https://api.indexnow.org/indexnow`.
+- Notifications are not sent from preview or development builds. A failed or not-yet-live key-file check defers submission; an IndexNow notification failure does not block the website deployment.
+- For the first full-site synchronization, first confirm the public key file is live, set the Vercel Production environment variable `INDEXNOW_SUBMIT_ALL=true`, trigger one production deployment, verify the IndexNow response, and then remove that temporary variable. Do not leave it enabled for routine deployments because unchanged URLs should not be resubmitted repeatedly.
+- HTTP 200 means IndexNow received the URL list; HTTP 202 means it was accepted while key validation is pending. The notifier retries transient network, HTTP 429 and HTTP 5xx failures with bounded backoff, but does not retry permanent client errors. Neither accepted response proves that a search engine crawled, indexed, ranked or displayed those pages. Google does not participate in IndexNow; keep Google Search Console sitemap submission and URL Inspection as separate steps.
+
+The build does not generate sitemap `lastmod` values from build time. Google says `lastmod` should reflect the last significant page update and should be consistently verifiable; a deployment timestamp is not a substitute. Add per-route timestamps only when the content system can provide trustworthy values.
+
 ## 4. Optional HTML verification meta tags
 
 For URL-prefix verification, the root route and all SEO-managed page heads can emit provider verification tags at build time.
@@ -33,6 +46,18 @@ Set these Vercel project environment variables for the appropriate deployment en
 - VITE_BING_SITE_VERIFICATION — the exact Bing Webmaster Tools msvalidate.01 value.
 
 Use only the token value supplied by the relevant provider, not a complete HTML tag. Save the variables in Vercel, then trigger a new deployment. The values are public verification markers and are intentionally not committed to Git.
+
+### Vercel configuration audit snapshot — 14 November 2026
+
+The connected `env` Vercel project was checked without decrypting or displaying secret values:
+
+- `INDEXNOW_KEY`: present as a sensitive Production-only variable.
+- The matching public key file has not yet been verified on the canonical production domain from this PR branch; a configured Vercel secret is not evidence that the deployment published it or that IndexNow accepted a notification.
+- `INDEXNOW_SUBMIT_ALL`: absent, which is correct for routine deployments; add it temporarily only for the documented first full-site synchronization after the key file is live.
+- `VITE_GOOGLE_SITE_VERIFICATION`: not configured.
+- `VITE_BING_SITE_VERIFICATION`: not configured.
+
+Therefore the IndexNow key is provisioned, but the Google and Bing HTML verification meta tags will not be emitted until the owner adds the corresponding values after completing provider ownership setup. A variable record alone does not prove Search Console or Bing ownership, sitemap processing, or indexing.
 
 DNS verification is often preferable because it is independent of application deployments.
 
@@ -47,8 +72,12 @@ The crawler tokens have different purposes:
 - PerplexityBot supports Perplexity search discovery; Perplexity-User is for user-directed requests.
 - Applebot supports Apple search discovery. Applebot-Extended is a separate extended/model-related control and remains disallowed.
 - Google-Extended is disallowed. It is not a Google Search crawler and does not affect Google Search indexing or rankings. Googlebot remains allowed, so this does not block ordinary Search crawling or eligibility for Search-based AI features. Blocking Google-Extended avoids granting separate permission for Gemini Apps grounding and future model use.
+- The PR branch contains a proposed separate `__usage_ai-training` group to express enV's broad preference against generative-AI model training. **This is not yet an approved production policy change; do not merge or deploy this group until the product owner explicitly approves it.** Anthropic says it began recognizing this signal on 30 October 2026 and is rolling it out across its services. Google has announced plans to recognize it in 2027. The token comes from an active IETF individual Internet-Draft, not a published RFC or universally implemented standard. If approved, keep the explicit GPTBot, ClaudeBot, Applebot-Extended and Google-Extended rules as well; the shared preference supplements rather than replaces vendor-specific controls. Anthropic explicitly says a rule naming ClaudeBot takes precedence over the general signal. Google-Extended remains explicitly disallowed rather than relying on Google's planned inference from the shared token.
+- The token describes a use preference, not a crawl restriction. The IETF draft says consumers continue evaluating their own crawler product-token rules independently. It does not stop requests, authenticate visitors, guarantee compliance, or replace server-side access controls.
 
 ChatGPT-User is intentionally not listed as a search crawler: OpenAI documents it as a user-triggered fetcher, not the agent that determines ChatGPT Search inclusion. Allowing OAI-SearchBot is the relevant Search setting.
+
+A practical monitoring caveat: Cloudflare published its own observations in August 2025 of traffic it attributed to undeclared Perplexity crawlers changing user-agent strings and source networks after network blocks. This is a third-party traffic observation, not a universal statement of Perplexity's published crawler policy. Keep the declared PerplexityBot search-access rule, but use verified bot identification, server logs, rate limits and WAF controls when traffic management or abuse prevention is needed; do not treat a User-Agent string or robots.txt alone as proof of crawler identity.
 
 Private account, wallet, settings, and interaction-only routes receive page-level noindex. A robots disallow rule is not a replacement for noindex; crawlers need to be able to fetch a page to see its indexing directive.
 

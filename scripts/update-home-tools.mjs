@@ -2,11 +2,13 @@ import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 import { parseGeneratedCatalog } from "./catalog-reader.mjs";
+import { applyGenericWorkflowPolicy } from "../src/lib/generic-workflow-policy.mjs";
 
 const catalogSource = readFileSync(new URL("../src/data/catalog.ts", import.meta.url), "utf8");
 const tools = parseGeneratedCatalog(catalogSource);
 const version = createHash("sha256").update(catalogSource).digest("hex").slice(0, 12);
-const activeTools = tools.filter((tool) => tool.status === "active" || tool.status === "beta");
+const publishedTools = applyGenericWorkflowPolicy(tools);
+const activeTools = publishedTools.filter((tool) => tool.status === "active" || tool.status === "beta");
 const byPopularity = (a, b) => b.popularity - a.popularity;
 const selectHomeSummary = (items, limit) =>
   items.slice(0, limit).map(({ id, name, description, category, slug }) => ({
@@ -21,8 +23,8 @@ const homeTools = {
   version,
   counts: {
     active: activeTools.length,
-    planned: tools.length - activeTools.length,
-    total: tools.length,
+    planned: publishedTools.length - activeTools.length,
+    total: publishedTools.length,
   },
   featured: selectHomeSummary(activeTools.filter((tool) => tool.featured).sort(byPopularity), 8),
   popular: selectHomeSummary([...activeTools].sort(byPopularity), 12),

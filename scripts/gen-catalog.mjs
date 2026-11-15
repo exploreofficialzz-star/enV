@@ -4,6 +4,8 @@
  */
 import { writeFileSync, readFileSync } from "node:fs";
 import { IMAGE_DESCRIPTIONS } from "./image-descriptions.mjs";
+import { refineGeneratedToolDescription } from "../src/lib/generated-tool-copy.mjs";
+import { applyGenericWorkflowPolicy } from "../src/lib/generic-workflow-policy.mjs";
 import mathExpansion from "../src/data/math-expansion.json" with { type: "json" };
 import { describeExpansion, expansionCalculatorName, expansionCalculatorDescription, expansionCalculatorKeywords } from "../src/lib/calc/expansion-rows.mjs";
 import { parseMathExerciseCatalog, mathExercisePresentation } from "./math-exercise-catalog.mjs";
@@ -850,10 +852,12 @@ function addFamily(category, prefix, items, engineType = "custom", enginePrefix 
   for (const item of items) {
     const name = typeof item === "string" ? item : item.name;
     const key = typeof item === "string" ? slugify(item) : item.key;
-    const description = typeof item === "string" ? `${name} utility for the enV toolkit.` : item.description;
+    const id = `${slugify(prefix)}-${key}`;
+    const rawDescription = typeof item === "string" ? `Generated catalogue placeholder for ${name}.` : item.description;
+    const description = refineGeneratedToolDescription({ id, name, category, description: rawDescription });
     const keywords = typeof item === "string" ? `${prefix} ${name}` : `${prefix} ${item.keywords || name}`;
     add([[
-      `${slugify(prefix)}-${key}`,
+      id,
       name,
       category,
       description,
@@ -872,11 +876,13 @@ function addCross(category, prefixes, operations, descriptionTemplate, engineTyp
     for (const operation of operations) {
       const name = `${prefix} ${operation}`;
       const id = slugify(name);
+      const rawDescription = descriptionTemplate.replace(/\{platform\}/g, prefix).replace(/\{operation\}/g, operation);
+      const description = refineGeneratedToolDescription({ id, name, category, description: rawDescription });
       add([[
         id,
         name,
         category,
-        descriptionTemplate.replace(/\{platform\}/g, prefix).replace(/\{operation\}/g, operation),
+        description,
         engineType,
         id,
         `${prefix} ${operation}`.toLowerCase(),
@@ -1476,8 +1482,13 @@ for (const row of RAW) {
   const isMockupsTool = cat === "mockups";
   const effectiveEngineType = isCalculatorFamily ? "calculator" : isDeveloperFamily ? "developer" : isTextCustom ? "text" : isCreatorCustom ? "creator" : isBusinessTool ? "business" : engineType;
   const effectiveEngineKey = isCalculatorFamily ? engineKey.toLowerCase() : isDeveloperFamily ? id : isBusinessTool ? id.replace(/-(calculator|generator|template|estimator|planner)$/, "") : engineKey;
+  // Flashcards are a supported document operation with a real browser renderer,
+  // unlike the remaining generic document catalogue entries.
+  const isImplementedFlashcardDocument = id === "flashcard-generator"
+    && effectiveEngineType === "document"
+    && effectiveEngineKey === "flashcards";
   const unsupportedEngineType = ["custom", "ai", "document", "pdf"].includes(effectiveEngineType);
-  const status = isMockupsTool || isCalculatorFamily || isTextCustom || isImageEngine || isCreatorCustom || isBusinessTool || isImplementedDeveloper ? "active" : (isDeveloperFamily || extra.includes("p") || unsupportedEngineType ? "planned" : extra.includes("b") ? "beta" : "active");
+  const status = isMockupsTool || isCalculatorFamily || isTextCustom || isImageEngine || isCreatorCustom || isBusinessTool || isImplementedDeveloper || isImplementedFlashcardDocument ? "active" : (isDeveloperFamily || extra.includes("p") || unsupportedEngineType ? "planned" : extra.includes("b") ? "beta" : "active");
   let disclaimer;
   if (extra.includes("h")) disclaimer = "health";
   else if (extra.includes("f")) disclaimer = "finance";
@@ -2126,19 +2137,6 @@ for (const tool of tools) {
   else tool.engine = { type: "custom", id: tool.id };
 }
 
-// Event/celebration/food/travel/photography workflows use the real typed
-// workflow engine. It performs calculations, planners, guides, checklists,
-// generators, RSVP/check-in pages and event payload generation from the tool id.
-for (const tool of tools) {
-  if (tool.status !== "planned") continue;
-  if (!["events", "celebrations", "food", "travel", "photography"].includes(tool.category)) continue;
-  tool.status = "active";
-  tool.clientSide = true;
-  tool.requiresBackend = false;
-  tool.requiresAuth = false;
-  tool.engine = { type: "custom", id: tool.id };
-}
-
 // Audio tools are bound to the real AudioEngine. Pure calculators/guides are
 // computed locally; file operations use Web Audio or the verified FFmpeg bridge.
 for (const tool of tools) {
@@ -2325,7 +2323,8 @@ for (const tool of tools) {
   tool.description = screenshotRegistry.describeTool(config);
 }
 
-tools.sort((a, b) =>
+const normalizedTools = applyGenericWorkflowPolicy(tools);
+normalizedTools.sort((a, b) =>
   compareAlphabetically(
     alphabeticalKey(CATEGORY_LABELS[a.category] ?? a.category),
     alphabeticalKey(CATEGORY_LABELS[b.category] ?? b.category),
@@ -2334,7 +2333,7 @@ tools.sort((a, b) =>
   compareAlphabetically(a.id, b.id),
 );
 
-const serializedCatalog = js(tools);
+const serializedCatalog = js(normalizedTools);
 const chunkSize = 60_000;
 const catalogChunks = [];
 for (let start = 0; start < serializedCatalog.length; start += chunkSize) {
@@ -2351,6 +2350,6 @@ export const tools: ToolMeta[] = JSON.parse(catalogJson) as ToolMeta[];
 `;
 
 writeFileSync(new URL("../src/data/catalog.ts", import.meta.url), body);
-const active = tools.filter((t) => t.status !== "planned").length;
-const planned = tools.length - active;
-console.log(`Wrote ${tools.length} tools (${active} active, ${planned} planned)`);
+const active = normalizedTools.filter((t) => t.status !== "planned").length;
+const planned = normalizedTools.length - active;
+console.log(`Wrote ${normalizedTools.length} tools (${active} active, ${planned} planned)`);

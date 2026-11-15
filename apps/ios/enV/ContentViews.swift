@@ -2961,8 +2961,8 @@ private struct NativeAboutInformationPage: View {
                 .background(Color.white, in: RoundedRectangle(cornerRadius: 16))
                 .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
 
-            NativeInfoSectionView(title: "Tools for everyday digital work", paragraphs: [
-                "enV brings practical calculators, converters, generators, and creator and developer utilities into one searchable workspace. Browse by category or search for the task you need to complete.",
+            NativeInfoSectionView(title: "Tools for everyday work", paragraphs: [
+                "enV brings together tools for calculations, conversions, design, development, media, files and everyday tasks. Browse by category or search for the task you need to complete.",
                 "Use enV on the web, Android, or iOS. Many tools run directly on your device; for connected features, review the tool-specific guidance and our Privacy page before proceeding.",
             ], titleSize: 20)
 

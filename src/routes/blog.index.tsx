@@ -7,7 +7,6 @@ import { getSearchableTools, categoryLabel, toolPath } from "@/lib/registry";
 import { searchTools } from "@/lib/search";
 import {
   toolCategoryLabel,
-  toolDocumentationPath,
   toolDocumentationSummary,
   toolExecutionLabel,
   toolStatusLabel,
@@ -187,24 +186,26 @@ function BlogIndex() {
                       </span>
                     </div>
                     <h4 className="mt-4 text-base font-semibold leading-snug text-fg">
-                      <a
-                        href={toolDocumentationPath(tool)}
+                      <Link
+                        to="/blog/$slug"
+                        params={{ slug: "tool-" + tool.id }}
                         className="hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                       >
                         {tool.name}
-                      </a>
+                      </Link>
                     </h4>
                     <p className="mt-2 flex-1 text-sm leading-6 text-muted">{toolDocumentationSummary(tool)}</p>
                     <p className="mt-3 text-xs leading-5 text-subtle">
                       Processing: {toolExecutionLabel(tool)}
                     </p>
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
-                      <a
-                        href={toolDocumentationPath(tool)}
+                      <Link
+                        to="/blog/$slug"
+                        params={{ slug: "tool-" + tool.id }}
                         className="inline-flex items-center gap-1.5 text-sm font-semibold text-accent"
                       >
                         Read the full guide <ArrowRight size={14} aria-hidden="true" />
-                      </a>
+                      </Link>
                       <Link to={toolPath(tool)} className="text-sm font-medium text-muted hover:text-fg">
                         Open tool
                       </Link>
