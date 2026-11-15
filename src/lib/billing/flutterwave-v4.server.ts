@@ -619,6 +619,211 @@ export async function initializeFlutterwaveCheckout(input: {
   }
 }
 
+
+export async function initializeFlutterwaveBankTransfer(input: {
+  userId: string;
+  tokenPack: number;
+  idempotencyKey: unknown;
+  countryCode: string | null;
+  pricingQuote: CurrencyPackQuote;
+  customerName: string;
+  customerPhone: string;
+  customerAddress: {
+    city: string;
+    state: string;
+    line1: string;
+    line2?: string;
+    postalCode: string;
+  };
+}) {
+  if (!Number.isSafeInteger(input.tokenPack) || input.tokenPack < 100 ||
+      input.tokenPack > 9_000_000_000 || !validIdempotencyKey(input.idempotencyKey)) {
+    fail("Choose a supported token amount and retry checkout.", "INVALID_PURCHASE", 400);
+  }
+  const configuration = resolveConfiguration(input.countryCode);
+  if (!configuration?.ready || !configuration.paymentMethods.includes("bank_transfer")) {
+    fail("Flutterwave bank transfer is not enabled for the detected country and currency.", "PAYMENT_METHOD_NOT_AVAILABLE_FOR_COUNTRY", 422);
+  }
+  const { currency, profile } = configuration;
+  if (currency !== "NGN" && currency !== "GHS") {
+    fail("Flutterwave virtual-account transfers are not available for this currency.", "PAYMENT_METHOD_NOT_AVAILABLE_FOR_COUNTRY", 422);
+  }
+  const amountMinor = input.pricingQuote.amountMinor;
+  const amountMajor = toMajorAmount(amountMinor, currency);
+  const creditsSubunits = input.tokenPack * 1_000;
+  if (input.pricingQuote.tokens !== input.tokenPack || input.pricingQuote.currency !== currency ||
+      input.pricingQuote.usdAmountCents !== input.tokenPack || !Number.isFinite(input.pricingQuote.fxRate) ||
+      !input.pricingQuote.fxUpdatedAt || !input.pricingQuote.quotedAt ||
+      !Number.isSafeInteger(amountMinor) || amountMinor <= 0 || amountMajor === null ||
+      !Number.isSafeInteger(creditsSubunits)) {
+    fail("The server-side price quote is invalid for this Flutterwave transfer.", "INVALID_PRICE_CONFIGURATION", 503);
+  }
+
+  const sql = await getSql();
+  await readWallet(input.userId);
+  const existing = await sql.query<{
+    id: string; product_id: string; amount_minor: number | string; currency: string;
+    status: string; provider_metadata: JsonRecord | string | null;
+  }>(
+    "select id, product_id, amount_minor, currency, status, provider_metadata " +
+    "from billing_purchase_intents where user_id = $1 and provider = 'flutterwave' and idempotency_key = $2 limit 1",
+    [input.userId, input.idempotencyKey],
+  );
+  if (existing[0]) {
+    const prior = existing[0];
+    if (prior.product_id !== "tokens-" + input.tokenPack ||
+        Number(prior.amount_minor) !== amountMinor || prior.currency.toUpperCase() !== currency) {
+      fail("This checkout key was already used for a different purchase. Start a new checkout.", "IDEMPOTENCY_CONFLICT", 409);
+    }
+    if (prior.status === "pending") {
+      const metadata = providerMetadata(prior.provider_metadata);
+      const transfer = asRecord(metadata.bankTransfer);
+      if (typeof transfer.accountNumber === "string" && typeof transfer.bankName === "string") {
+        return {
+          reference: prior.id,
+          tokens: input.tokenPack,
+          status: "pending",
+          bankTransfer: transfer,
+        };
+      }
+    }
+    fail("This checkout attempt has already been used. Start a new attempt.", "CHECKOUT_ALREADY_USED", 409);
+  }
+
+  const users = await sql.query<{ email: string; name: string | null }>(
+    'select email, name from "user" where id = $1 limit 1', [input.userId],
+  );
+  const email = users[0]?.email?.trim() ?? "";
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    fail("Add a valid email address to your enV account before funding the wallet.", "ACCOUNT_EMAIL_REQUIRED", 400);
+  }
+  const name = customerNameParts(input.customerName || users[0]?.name || "");
+  const rawPhone = input.customerPhone.replace(/\D/g, "");
+  const phone = rawPhone.startsWith("0") ? rawPhone.slice(1) : rawPhone;
+  const dialCode = countryCallingCode(profile.countryCode);
+  if (!dialCode || !/^\d{7,10}$/.test(phone)) {
+    fail("Enter a valid 7–10 digit phone number to continue with Flutterwave.", "ACCOUNT_PHONE_REQUIRED", 400);
+  }
+  const address = {
+    city: input.customerAddress.city.trim(),
+    country: profile.countryCode,
+    line1: input.customerAddress.line1.trim(),
+    ...(input.customerAddress.line2?.trim() ? { line2: input.customerAddress.line2.trim() } : {}),
+    postal_code: input.customerAddress.postalCode.trim(),
+    state: input.customerAddress.state.trim(),
+  };
+  if (!address.city || address.city.length > 100 || !address.line1 || address.line1.length > 160 ||
+      !address.postal_code || address.postal_code.length > 24 || !address.state || address.state.length > 100 ||
+      (address.line2 && address.line2.length > 160)) {
+    fail("Enter a complete billing address to continue with Flutterwave.", "INVALID_CUSTOMER_ADDRESS", 400);
+  }
+
+  const intentId = randomUUID();
+  const creditsMetadata = {
+    reference: intentId,
+    tokenPack: input.tokenPack,
+    countryCode: profile.countryCode,
+    currency,
+    baseCurrency: "USD",
+    usdAmountCents: input.pricingQuote.usdAmountCents,
+    fxRate: input.pricingQuote.fxRate,
+    fxSource: input.pricingQuote.fxSource,
+    fxUpdatedAt: input.pricingQuote.fxUpdatedAt,
+    fxNextUpdateAt: input.pricingQuote.fxNextUpdateAt,
+    fxFetchedAt: input.pricingQuote.fxFetchedAt,
+    quotedAt: input.pricingQuote.quotedAt,
+    paymentMethod: "bank_transfer",
+  };
+  await sql.query(
+    "insert into billing_purchase_intents " +
+    "(id, user_id, provider, platform, product_id, amount_minor, currency, credits_subunits, status, idempotency_key, provider_metadata) " +
+    "values ($1, $2, 'flutterwave', 'web', $3, $4, $5, $6, 'created', $7, $8::jsonb)",
+    [intentId, input.userId, "tokens-" + input.tokenPack, amountMinor, currency, creditsSubunits,
+      input.idempotencyKey, JSON.stringify(creditsMetadata)],
+  );
+
+  try {
+    const customer = await flutterwaveRequest("/customers", {
+      method: "POST",
+      body: JSON.stringify({
+        address,
+        email,
+        name,
+        phone: { country_code: dialCode, number: phone },
+        meta: { enVPurchaseReference: intentId },
+      }),
+    }, createHash("sha256").update(String(input.idempotencyKey) + ":customer").digest("hex"));
+    const customerId = typeof customer.id === "string" ? customer.id : "";
+    if (!/^cus_[A-Za-z0-9_-]{4,120}$/.test(customerId)) {
+      throw new Error("Flutterwave did not return a valid customer ID for the virtual account.");
+    }
+
+    const virtualAccount = await flutterwaveRequest("/virtual-accounts", {
+      method: "POST",
+      body: JSON.stringify({
+        reference: intentId,
+        customer_id: customerId,
+        amount: amountMajor,
+        expiry: 3_600,
+        currency,
+        account_type: "dynamic",
+        narration: "enV wallet funding",
+        ...(currency === "NGN" ? { bank_code: "090567" } : { bank_code: "GH200100" }),
+      }),
+    }, createHash("sha256").update(String(input.idempotencyKey) + ":virtual-account").digest("hex"));
+    const accountNumber = typeof virtualAccount.account_number === "string"
+      ? virtualAccount.account_number : "";
+    const bankName = typeof virtualAccount.account_bank_name === "string"
+      ? virtualAccount.account_bank_name
+      : typeof virtualAccount.bank_name === "string" ? virtualAccount.bank_name : "";
+    const returnedReference = typeof virtualAccount.reference === "string"
+      ? virtualAccount.reference : "";
+    const expiresAt = typeof virtualAccount.account_expiration_datetime === "string"
+      ? virtualAccount.account_expiration_datetime
+      : typeof virtualAccount.expiry_date === "string" ? virtualAccount.expiry_date : "";
+    const note = typeof virtualAccount.note === "string" ? virtualAccount.note.slice(0, 500) : "";
+    if (!/^\d{8,20}$/.test(accountNumber) || !bankName || returnedReference !== intentId || !expiresAt) {
+      throw new Error("Flutterwave returned incomplete virtual-account details.");
+    }
+    const bankTransfer = {
+      accountNumber,
+      bankName,
+      currency,
+      amount: amountMajor,
+      reference: intentId,
+      expiresAt,
+      note,
+    };
+    await sql.query(
+      "update billing_purchase_intents set status = 'pending', provider_metadata = $2::jsonb, updated_at = now() " +
+      "where id = $1 and status = 'created'",
+      [intentId, JSON.stringify({
+        ...creditsMetadata,
+        customerId,
+        virtualAccountId: typeof virtualAccount.id === "string" ? virtualAccount.id : null,
+        bankTransfer,
+      })],
+    );
+    return {
+      reference: intentId,
+      tokens: input.tokenPack,
+      status: "pending",
+      bankTransfer,
+    };
+  } catch (error) {
+    await sql.query(
+      "update billing_purchase_intents set status = 'failed', updated_at = now() where id = $1 and status = 'created'",
+      [intentId],
+    ).catch(() => undefined);
+    const candidate = error as { code?: unknown };
+    if (typeof candidate.code === "string" &&
+        ["FLUTTERWAVE_AUTH_FAILED", "FLUTTERWAVE_API_ERROR"].includes(candidate.code)) throw error;
+    const wrapped = new Error("Flutterwave could not create the bank-transfer account. No wallet tokens were added.");
+    Object.assign(wrapped, { code: "FLUTTERWAVE_INITIALIZATION_FAILED", status: 502 });
+    throw wrapped;
+  }
+}
+
 async function getPurchaseIntent(reference: string) {
   const sql = await getSql();
   const rows = await sql.query<{
