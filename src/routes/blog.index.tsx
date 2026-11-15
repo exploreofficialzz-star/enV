@@ -12,6 +12,7 @@ import {
   toolStatusLabel,
 } from "@/lib/tool-documentation";
 import { seoPageHead, pageSchema } from "@/lib/seo-metadata";
+import { blogIndexSocialCard } from "@/lib/seo-social-cards";
 
 export const Route = createFileRoute("/blog/")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -21,6 +22,7 @@ export const Route = createFileRoute("/blog/")({
     title: "enV Blogs & Guides | Tool Documentation and Product Articles",
     description: "Read practical guides for enV tools, understand how individual utilities work, and explore product notes about privacy, usage, and the platform.",
     path: "/blog",
+    ...blogIndexSocialCard(),
     structuredData: pageSchema("enV Blogs and Guides", "Practical tool documentation and product articles from enV.", "/blog", "CollectionPage")
   }),
   component: BlogIndex,
