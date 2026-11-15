@@ -506,6 +506,8 @@ function Account() {
         ok?: boolean;
         data?: { authorizationUrl?: string; paymentMethod?: string };
         error?: string;
+        message?: string;
+        requestId?: string;
       } | null;
       let checkout: URL | null = null;
       try { if (payload?.data?.authorizationUrl) checkout = new URL(payload.data.authorizationUrl); } catch { checkout = null; }
@@ -516,18 +518,25 @@ function Account() {
       );
       if (!response.ok || !payload?.ok || payload.data?.paymentMethod !== method || !checkout || !allowedCheckoutHost) {
         const code = payload?.error;
-        throw new Error(code === "AUTH_REQUIRED" ? "SIGN_IN_REQUIRED"
-          : code === "INVALID_PURCHASE" ? "INVALID_AMOUNT" : "CHECKOUT_START_FAILED");
+        throw Object.assign(new Error(code === "AUTH_REQUIRED" ? "SIGN_IN_REQUIRED"
+          : code === "INVALID_PURCHASE" ? "INVALID_AMOUNT" : "CHECKOUT_START_FAILED"), {
+          safeMessage: typeof payload?.message === "string" ? payload.message : "",
+          requestId: typeof payload?.requestId === "string" ? payload.requestId : "",
+        });
       }
       window.location.assign(checkout.href);
     } catch (error) {
       const code = error instanceof Error ? error.message : "";
-      // Keep provider, database, and deployment diagnostics in server logs; the checkout UI only shows an actionable status.
+      const failure = error as { safeMessage?: unknown; requestId?: unknown };
+      const safeMessage = typeof failure.safeMessage === "string" ? failure.safeMessage.trim() : "";
+      const requestId = typeof failure.requestId === "string" ? failure.requestId : "";
       setFundingFeedback({
         kind: "error",
         message: code === "SIGN_IN_REQUIRED" ? "Sign in to continue."
           : code === "INVALID_AMOUNT" ? "Enter a valid amount."
-          : "Couldn't start payment. Try again.",
+          : safeMessage
+            ? safeMessage + (requestId ? " Reference: " + requestId : "")
+            : "Couldn't start payment. Try again.",
       });
     } finally {
       setFundingBusy(false);
