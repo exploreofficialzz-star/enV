@@ -80,6 +80,10 @@ for (const card of result.socialCards) {
   assert.ok(card.url.startsWith("https://envtools.store/og/cards/"), "Social image URL must use the canonical host: " + card.path);
   assert.ok(card.alt && card.alt.length > 12, "Social card must have descriptive alternative text: " + card.path);
 }
+assert.equal(result.runtimeInventory.length, new Set(result.runtimeInventory.map((row) => row.id)).size, "Full runtime reconciliation must contain one row per stable tool ID.");
+assert.ok(result.inventory.includes("Android native coverage manifest lists " + 7902 + " unique tool IDs; iOS lists " + 7902 + " unique tool IDs."), "Native coverage manifest totals must be included in the reconciled report.");
+assert.match(result.inventory, /Android native manifest \| iOS native manifest/);
+assert.match(result.inventory, /base catalogue fingerprint/);
 assert.ok(result.tools.length > 0);
 assert.ok(result.guideTools.length >= result.tools.length);
 assert.ok(result.eligibleToolCount > result.guideTools.length, "Duplicate generated equations must be consolidated from SEO discovery while remaining in the app catalog.");
