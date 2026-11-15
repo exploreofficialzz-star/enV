@@ -1,38 +1,8 @@
 import fs from 'node:fs';
-import { parseGeneratedCatalog } from './catalog-reader.mjs';
-import { applyGenericWorkflowPolicy } from '../src/lib/generic-workflow-policy.mjs';
+import { getAllTools } from '../src/lib/registry.ts';
 
-const root = new URL('../', import.meta.url);
-const catalogSource = fs.readFileSync(new URL('../src/data/catalog.ts', import.meta.url), 'utf8');
-const catalog = applyGenericWorkflowPolicy(parseGeneratedCatalog(catalogSource));
-// The generated JSON contains the 10,000-tool legacy base; additive Audio Studios live in a separate typed array.
-// Include those runtime additions when validating native coverage so implemented new tools can be classified locally.
-const audioStudioBlock = catalogSource.match(/const audioStudioTools: ToolMeta\[\] = \[([\s\S]*?)\n\];\n\n\/\/ Studios are additive/);
-if (audioStudioBlock) {
-  for (const match of audioStudioBlock[1].matchAll(/\"id\"\s*:\s*\"([^\"]+)\"[\s\S]*?\"status\"\s*:\s*\"([^\"]+)\"/g)) {
-    if (!catalog.some((tool) => tool.id === match[1])) catalog.push({ id: match[1], status: match[2], category: 'audio', engine: { type: 'audio' } });
-  }
-}
-// Platform-specific runtime extensions do not have to live in the generated 10,000-tool base catalog.
-const platformRuntimeExtensions = [
-  { id: 'song-metadata-analyzer', status: 'active', category: 'audio', engine: { type: 'audio' } },
-  { id: 'a-book', status: 'active', category: 'productivity', engine: { type: 'custom' } },
-  { id: 'zip-any-file', status: 'active', category: 'productivity', engine: { type: 'custom' } },
-  { id: 'camera-studio', status: 'active', category: 'photography', engine: { type: 'custom' } },
-];
-for (const tool of platformRuntimeExtensions) {
-  if (!catalog.some((item) => item.id === tool.id)) catalog.push(tool);
-}
-
-const dateTimeRuntimeExtensions = [
-  { id: "age-calculator", status: "active", category: "datetime", engine: { type: "datetime" } },
-  { id: "date-calculator", status: "active", category: "datetime", engine: { type: "datetime" } },
-  { id: "duration-calculator", status: "active", category: "datetime", engine: { type: "datetime" } },
-  { id: "meeting-time-planner", status: "active", category: "datetime", engine: { type: "datetime" } },
-];
-for (const tool of dateTimeRuntimeExtensions) {
-  if (!catalog.some((item) => item.id === tool.id)) catalog.push(tool);
-}
+// Read the same 10,013-ID runtime inventory used by Web discovery and the audit ledger.
+const catalog = getAllTools().slice();
 const nativeAnalyzerRoute = fs.readFileSync(new URL('../apps/android/app/src/main/java/com/chastech/env/MainActivity.kt', import.meta.url), 'utf8');
 const nativeAnalyzerEngine = fs.readFileSync(new URL('../apps/android/app/src/main/java/com/chastech/env/engine/NativeAudioEngine.kt', import.meta.url), 'utf8');
 const iosAnalyzerRoutes = fs.readFileSync(new URL('../apps/ios/enV/ToolViews.swift', import.meta.url), 'utf8');
@@ -69,6 +39,20 @@ const validate = (label, ids) => {
   if (invalid.length) throw new Error(`${label} contains unknown/planned IDs: ${invalid.join(', ')}`);
 };
 validate('Android', android); validate('iOS', ios);
+const fileWorkspaceIds = [
+  'file-to-txt', 'file-organizer', 'batch-file-renamer', 'duplicate-file-finder',
+  'folder-size-analyzer', 'file-search', 'file-compare',
+];
+for (const id of fileWorkspaceIds) {
+  if (!android.has(id) || !ios.has(id)) {
+    throw new Error(`File workspace coverage is missing native implementation evidence for ${id}.`);
+  }
+}
+const explicitWebOnlyIds = ['music-downloader', 'smartphone-prototype-lab'];
+for (const id of explicitWebOnlyIds) {
+  if (!byId.has(id)) throw new Error(`Expected Web-only runtime tool is absent from registry: ${id}`);
+  if (android.has(id) || ios.has(id)) throw new Error(`Web-only runtime tool was incorrectly marked native: ${id}`);
+}
 const parityA = [...android].filter((id) => !ios.has(id));
 const parityI = [...ios].filter((id) => !android.has(id));
 if (parityA.length || parityI.length) throw new Error(`Android/iOS native coverage diverged. Android-only=${parityA.join(', ')} iOS-only=${parityI.join(', ')}`);
