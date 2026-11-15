@@ -12,6 +12,7 @@ import { UnderProductionDialog } from "@/components/tools/under-production";
 import { isToolUnderProduction } from "@/lib/production-notice";
 import { loadHomeTrendingTools } from "@/lib/analytics/trending.functions";
 import { seoPageHead, pageSchema } from "@/lib/seo-metadata";
+import { homepageSocialCard } from "@/lib/seo-social-cards";
 import { getToolById, toolPath } from "@/lib/registry";
 import { rankMostUsedToolIds, usePrefs } from "@/lib/storage";
 import type { ToolMeta } from "@/types/tool";
