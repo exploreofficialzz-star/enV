@@ -11,7 +11,7 @@ export default defineHandler(async (event) => {
   if (auth.response || !auth.userId) return auth.response ?? jsonResponse({ ok: false, error: "AUTH_REQUIRED" }, 401);
   const body = await readJsonObject(request, 4_096);
   if (!body || typeof body.reference !== "string" ||
-      (body.authorizationType !== "otp" && body.authorizationType !== "pin")) {
+      (body.authorizationType !== "otp" && body.authorizationType !== "pin" && body.authorizationType !== "avs")) {
     return jsonResponse({ ok: false, error: "INVALID_AUTHORIZATION" }, 400);
   }
   try {
@@ -22,6 +22,14 @@ export default defineHandler(async (event) => {
       otp: typeof body.otp === "string" ? body.otp : undefined,
       encryptedPin: typeof body.encryptedPin === "string" ? body.encryptedPin : undefined,
       nonce: typeof body.nonce === "string" ? body.nonce : undefined,
+      customerAddress: body.customerAddress && typeof body.customerAddress === "object" &&
+        !Array.isArray(body.customerAddress) ? {
+          city: typeof (body.customerAddress as Record<string, unknown>).city === "string" ? String((body.customerAddress as Record<string, unknown>).city) : "",
+          state: typeof (body.customerAddress as Record<string, unknown>).state === "string" ? String((body.customerAddress as Record<string, unknown>).state) : "",
+          line1: typeof (body.customerAddress as Record<string, unknown>).line1 === "string" ? String((body.customerAddress as Record<string, unknown>).line1) : "",
+          line2: typeof (body.customerAddress as Record<string, unknown>).line2 === "string" ? String((body.customerAddress as Record<string, unknown>).line2) : undefined,
+          postalCode: typeof (body.customerAddress as Record<string, unknown>).postalCode === "string" ? String((body.customerAddress as Record<string, unknown>).postalCode) : "",
+        } : undefined,
     });
     return jsonResponse({ ok: true, data: result });
   } catch (error) {
