@@ -36,7 +36,7 @@ type WalletActivity = {
 
 type WalletState = { status: "loading" | "ready" | "unavailable"; message?: string; wallet?: WalletData; activity?: WalletActivity[] };
 type WalletFundingChoice = CustomerPaymentMethod | "flutterwave";
-type FlutterwaveMethod = "card" | "mobile_money" | "opay" | "ussd" | "bank_account" | "bank_transfer";
+type FlutterwaveMethod = "card" | "mobile_money" | "bank_transfer";
 type FlutterwaveBankTransferDetails = {
   accountNumber: string;
   bankName: string;
@@ -228,7 +228,6 @@ function Account() {
   const [flutterwaveCustomerName, setFlutterwaveCustomerName] = useState("");
   const [flutterwavePhoneNumber, setFlutterwavePhoneNumber] = useState("");
   const [flutterwaveNetwork, setFlutterwaveNetwork] = useState("");
-  const [flutterwaveBankCode, setFlutterwaveBankCode] = useState("044");
   const [flutterwaveAddressLine1, setFlutterwaveAddressLine1] = useState("");
   const [flutterwaveAddressLine2, setFlutterwaveAddressLine2] = useState("");
   const [flutterwaveCity, setFlutterwaveCity] = useState("");
@@ -280,7 +279,7 @@ function Account() {
         }
         const flutterwaveMethods = Array.isArray(payload.data?.flutterwave?.paymentMethods)
           ? payload.data.flutterwave.paymentMethods.filter((item): item is FlutterwaveMethod =>
-              item === "card" || item === "mobile_money" || item === "opay" || item === "ussd" || item === "bank_account" || item === "bank_transfer")
+              item === "card" || item === "mobile_money" || item === "bank_transfer")
           : [];
         const mobileNetworks = Array.isArray(payload.data?.flutterwave?.mobileNetworks)
           ? payload.data.flutterwave.mobileNetworks.filter((entry): entry is { network: string; name: string } =>
@@ -627,14 +626,6 @@ function Account() {
             phoneNumber,
             mobile_money: { network: flutterwaveNetwork, phone_number: phoneNumber },
           };
-        } else if (flutterwaveMethod === "ussd") {
-          flutterwaveDetails = {
-            type: "ussd",
-            phoneNumber,
-            ussd: { account_bank: flutterwaveBankCode },
-          };
-        } else if (flutterwaveMethod === "bank_account") {
-          flutterwaveDetails = { type: "bank_account", phoneNumber };
         } else if (flutterwaveMethod === "bank_transfer") {
           flutterwaveDetails = { type: "bank_transfer", phoneNumber };
         } else {
@@ -1272,7 +1263,7 @@ function Account() {
                     >
                       {(fundingOptionsState.flutterwave?.paymentMethods ?? ["card"]).map((method) => (
                         <option key={method} value={method}>
-                          {method === "card" ? "Card" : method === "mobile_money" ? "Mobile Money" : method === "opay" ? "OPay" : method === "bank_account" ? "Pay with Bank" : method === "bank_transfer" ? "Bank Transfer" : "USSD"}
+                          {method === "card" ? "Card" : method === "mobile_money" ? "Mobile Money" : "Bank Transfer"}
                         </option>
                       ))}
                     </select>
@@ -1360,23 +1351,6 @@ function Account() {
                     </div>
                   ) : null}
 
-                  {flutterwaveMethod === "ussd" ? (
-                    <div>
-                      <label htmlFor="flutterwave-bank-code" className="mb-1 block text-xs font-semibold">Bank</label>
-                      <select id="flutterwave-bank-code" value={flutterwaveBankCode}
-                        onChange={(event) => setFlutterwaveBankCode(event.target.value)}
-                        className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg">
-                        {[
-                          ["044", "Access Bank"], ["050", "Ecobank"], ["070", "Fidelity Bank"],
-                          ["011", "First Bank"], ["214", "FCMB"], ["058", "GTBank"],
-                          ["030", "Heritage Bank"], ["082", "Keystone Bank"], ["303", "Lotus Bank"],
-                          ["105", "PremiumTrust Bank"], ["221", "Stanbic IBTC"], ["232", "Sterling Bank"],
-                          ["032", "Union Bank"], ["033", "UBA"], ["215", "Unity Bank"], ["035", "Wema Bank"],
-                          ["057", "Zenith Bank"], ["090110", "VFD Microfinance Bank"],
-                        ].map(([code, name]) => <option key={code} value={code}>{name}</option>)}
-                      </select>
-                    </div>
-                  ) : null}
                 </div>
               ) : null}
 
