@@ -82,6 +82,7 @@ const CATEGORY_RENDERERS: Record<string, string> = {
   screenshots: "ScreenshotEngine",
   ecommerce: "EcommerceEngine",
   accessibility: "AccessibilityEngine",
+  celebrations: "CelebrationEngine",
 };
 
 const CUSTOM_ENGINE_ID_RENDERERS: Record<string, string> = {
