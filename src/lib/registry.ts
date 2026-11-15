@@ -319,6 +319,9 @@ const virtualStudios = [...accessibilityStudios, ...developerStudios];
 // Keep every former category/slug URL as an alias to the one canonical Studio
 // record. Aliases are routes, not additional tool identities or search records.
 const legacyAccessibilityRoutes = catalogRuntimeTools.filter((tool) => accessibilityStudioById.has(tool.id));
+const legacyAccessibilityCategoryTools = legacyAccessibilityRoutes.filter(
+  (tool) => accessibilityStudioById.get(tool.id)?.category !== tool.category,
+);
 const byPath = new Map<string, ToolMeta>([
   ...allTools.map((t) => [`${t.category}/${t.slug}`, t] as const),
   ...legacyAccessibilityRoutes.map((tool) => [`${tool.category}/${tool.slug}`, accessibilityStudioById.get(tool.id)!] as const),
@@ -372,7 +375,10 @@ export function getToolsByCategory(category: CategoryId): ToolMeta[] {
     ? accessibilityStudios
     : category === "developer"
       ? developerStudios
-      : allTools.filter((t) => t.category === category && isDiscoverable(t));
+      : [
+          ...allTools.filter((t) => t.category === category && isDiscoverable(t)),
+          ...legacyAccessibilityCategoryTools.filter((t) => t.category === category && isDiscoverable(t)),
+        ];
   return items.slice().sort((a, b) => {
     // Keep the thirteen workspace entry points first. The original long-tail list
     // follows alphabetically, so every existing catalog URL remains discoverable.
