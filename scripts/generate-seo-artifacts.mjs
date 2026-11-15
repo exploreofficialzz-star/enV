@@ -275,7 +275,9 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
     const registryRoutes = [...entry.routes].sort();
     let canonicalTarget = canonical ? canonicalToolPath(canonical) : "";
     let disposition = canonical
-      ? (canonical.id === id ? "Canonical public tool page" : "Consolidated generated variant; canonical tool ID: " + canonical.id)
+      ? (tool.category === "developer" && !tool.tags.includes("developer-studio") && canonicalTarget !== toolPath(tool)
+        ? "Legacy Developer alias; resolved to canonical Studio page"
+        : canonical.id === id ? "Canonical public tool page" : "Consolidated generated variant; canonical tool ID: " + canonical.id)
       : "";
     if (!canonical) {
       if (tool.id === "artboard-studio" || tool.slug === "artboard-studio") {
