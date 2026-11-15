@@ -123,8 +123,8 @@ function virtualAccountCurrencies(): Set<string> {
     .filter((value) => value === "GHS"));
 }
 
-function methodsForCountry(countryCode: string, currency: string): FlutterwaveFundingMethod[] {
-  const methods: FlutterwaveFundingMethod[] = ["card"];
+function methodsForCountry(countryCode: string, currency: string): FlutterwaveV4Method[] {
+  const methods: FlutterwaveV4Method[] = ["card"];
   if (MOBILE_MONEY_COUNTRIES.has(countryCode)) methods.push("mobile_money");
   if (virtualAccountCurrencies().has(currency)) methods.push("bank_transfer");
   return methods;
@@ -352,7 +352,7 @@ function countryCallingCode(countryCode: string): string | null {
     TG: "228", TZ: "255", BJ: "229", BF: "226", CI: "225", GW: "245", ML: "223",
     NE: "227", SN: "221", CM: "237", TD: "235", CF: "236", CG: "242", GQ: "240",
     GA: "241", ZM: "260", EG: "20", GB: "44", US: "1", CA: "1", CO: "57",
-    IN: "91", SL: "232",
+    IN: "91", SL: "232", ET: "251",
     AT: "43", BE: "32", BG: "359", CY: "357", DE: "49", EE: "372",
     ES: "34", FI: "358", FR: "33", GR: "30", HR: "385", IE: "353",
     IT: "39", LT: "370", LU: "352", LV: "371", MT: "356", NL: "31",
