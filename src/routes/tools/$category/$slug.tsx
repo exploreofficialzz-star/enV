@@ -14,6 +14,7 @@ import { isToolUnderProduction } from "@/lib/production-notice";
 import { UnderProductionPage } from "@/components/tools/under-production";
 import { CATEGORY_MAP } from "@/data/categories";
 import { SITE_ORIGIN, seoPageHead, toolSchema, toolSeoTitle, toolSeoDescription, isIndexableTool, canonicalSeoTools, canonicalSeoToolFor, canonicalToolPath } from "@/lib/seo-metadata";
+import { toolSocialCard } from "@/lib/seo-social-cards";
 
 const seoToolCandidateMap = new Map(getSearchableTools().map((tool) => [tool.id, tool]));
 for (const tool of getToolsByCategory("accessibility")) seoToolCandidateMap.set(tool.id, tool);
@@ -111,6 +112,7 @@ export const Route = createFileRoute("/tools/$category/$slug")({
       title: toolSeoTitle(tool, CANONICAL_SEO_TOOL_PAGES),
       description: toolSeoDescription(tool),
       path: canonicalPath,
+      ...toolSocialCard(tool, CANONICAL_SEO_TOOL_PAGES, "tools"),
       structuredData: toolSchema(tool)
     });
   },
