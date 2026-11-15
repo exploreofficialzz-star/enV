@@ -15,7 +15,7 @@ const SANDBOX_API = "https://developersandbox-api.flutterwave.com";
 const LIVE_API = "https://f4bexperience.flutterwave.com";
 
 type JsonRecord = Record<string, unknown>;
-type FlutterwaveV4Method = "card" | "mobile_money" | "opay" | "ussd";
+type FlutterwaveV4Method = "card" | "mobile_money" | "opay" | "ussd" | "bank_account";
 type FlutterwaveFundingMethod = FlutterwaveV4Method | "bank_transfer";
 type FlutterwaveV4PaymentDetails = {
   type: FlutterwaveV4Method;
@@ -28,6 +28,7 @@ type FlutterwaveV4PaymentDetails = {
   };
   mobile_money?: { country_code: string; network: string; phone_number: string };
   ussd?: { account_bank: string };
+  bank_account?: Record<string, never>;
 };
 type FlutterwaveV4NextAction = {
   type?: string;
@@ -107,7 +108,7 @@ function virtualAccountCurrencies(): Set<string> {
 function methodsForCountry(countryCode: string, currency: string): FlutterwaveFundingMethod[] {
   const methods: FlutterwaveFundingMethod[] = ["card"];
   if (MOBILE_MONEY_NETWORKS[countryCode]) methods.push("mobile_money");
-  if (countryCode === "NG") methods.push("opay", "ussd");
+  if (countryCode === "NG") methods.push("opay", "ussd", "bank_account");
   if (virtualAccountCurrencies().has(currency)) methods.push("bank_transfer");
   return methods;
 }
@@ -376,6 +377,12 @@ function validatePaymentDetails(
       type: "mobile_money",
       mobile_money: { country_code: dialCode, network, phone_number: phoneNumber },
     };
+  }
+  if (method === "bank_account") {
+    if (countryCode !== "NG") {
+      fail("Pay with Bank is available for NGN collections only.", "PAYMENT_METHOD_NOT_AVAILABLE_FOR_COUNTRY", 422);
+    }
+    return { type: "bank_account", bank_account: {} };
   }
   if (method === "ussd") {
     const bankCode = typeof asRecord(input.ussd).account_bank === "string"
