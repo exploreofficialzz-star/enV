@@ -684,6 +684,94 @@ function toolSpecificGuidanceBase(tool: ToolMeta): ToolSpecificGuidance {
     };
   }
 
+  if (id === "qr-payload-inspector" || /qr & barcode reader/.test(name)) {
+    return {
+      source: "operation-specific",
+      overview: "The QR & Barcode Reader decodes QR codes and supported 1D/2D barcode formats from a live camera stream or an image you select. Decoding runs in the browser on this device; it does not submit the decoded value to a remote recognition service.",
+      example: "Choose Start camera on a secure page, grant camera permission, and hold a complete code inside the preview. To scan a still image instead, upload an image with the full symbol visible, then inspect the decoded format and payload before opening a link or copying the result.",
+      validation: "The image-upload path rejects non-image files and images larger than 15 MB. Camera access requires HTTPS or localhost and browser permission. A camera may not expose torch or zoom controls, and a blurred, cropped or low-contrast symbol may not decode. Check the actual URL, Wi-Fi, contact or other payload before acting on it.",
+    };
+  }
+  if (id === "zip-any-file") {
+    return {
+      source: "operation-specific",
+      overview: "Zip any file has two separate workflows: create a ZIP from selected files or folders, and extract a ZIP into a destination folder. It streams archive data when the browser exposes file-system save and directory pickers, and otherwise uses bounded browser-memory downloads.",
+      example: "For compression, add the files or folder, choose a ZIP name and compression level, then create the archive and verify the downloaded or saved ZIP. For extraction, select the archive, choose a destination folder when the browser offers one, and check the resulting file paths and names.",
+      validation: "The archive path validator rejects absolute paths, drive-prefixed paths, parent-directory traversal and unsafe names. Extraction is limited to 100,000 entries and 100 GB of declared expanded data, and blocks very high compression ratios for entries of at least 1 GB. Without direct file saving, browser buffering is limited to 256 MB; without a directory picker, browser extraction is limited to one file within that buffer. These are browser limits, not universal ZIP-format limits.",
+    };
+  }
+  if (id === "file-organizer") {
+    return {
+      source: "operation-specific",
+      overview: "File Organizer classifies the selected file set into folders such as Images, Audio, Video, Documents, Archives, Code and Other, based on each filename extension. It creates an organized ZIP copy; it does not move, rename or delete the originals on the device.",
+      example: "Select several files or a folder, review the selected paths and sizes, then choose Organize copies into ZIP. Open the downloaded archive to confirm the generated type folders and file names before using it as an organized copy.",
+      validation: "Grouping is based on the extension list in the current engine, not file-content inspection. Files with unknown extensions go to Other. Unsafe filename characters are replaced, and duplicate output paths receive a numbered name. The originals remain unchanged; the result is an exported ZIP rather than a reorganization of the source folder.",
+    };
+  }
+  if (id === "batch-file-renamer") {
+    return {
+      source: "operation-specific",
+      overview: "Batch File Renamer previews a numbered name for each selected file using a prefix, suffix, literal find-and-replace text and a starting number. It exports the renamed copies in a ZIP instead of modifying the original files in place.",
+      example: "Select a group of files, set a prefix or suffix, enter exact text to find and its replacement, then set the first sequence number. Review the before-and-after list, resolve any duplicate output names, and export the renamed ZIP.",
+      validation: "The replacement is a literal string operation on the filename stem, not a regular expression. The current preview adds a three-digit sequence before each resulting name. The export is disabled when two planned output names collide. Invalid filename characters and trailing dots or spaces are sanitized, and the original selected files are not changed.",
+    };
+  }
+  if (id === "duplicate-file-finder") {
+    return {
+      source: "operation-specific",
+      overview: "Duplicate File Finder first groups selected files by byte size, then calculates SHA-256 digests for the same-size candidates. It reports a duplicate only when the content digests match; matching filenames alone are not considered proof.",
+      example: "Select at least two files or a folder, run Find identical files, and inspect each reported group with its relative path, byte size and SHA-256 digest. Confirm that the files are safe to remove using your own backup and retention rules; the tool does not delete them.",
+      validation: "Each candidate file must be no larger than 64 MB for browser SHA-256 verification. Files above that per-file limit cause verification to stop with an explicit error rather than being labelled duplicates. Different-size files are excluded before hashing, which is safe for byte-identical duplicates because identical files have the same size.",
+    };
+  }
+  if (id === "folder-size-analyzer") {
+    return {
+      source: "operation-specific",
+      overview: "Folder Size Analyzer reads a selected file set and reports its file count, combined byte size, extension/type breakdown and the ten largest files. It analyses only the folder or files you explicitly select; it is not a background scan of the entire device storage.",
+      example: "Choose a folder when the browser supports a directory picker, or select a folder through the file input fallback. Run Analyze storage, compare the per-type totals, and use the largest-file list to identify which selected items account for the most space.",
+      validation: "The report uses the browser-provided File objects and their sizes. It does not infer compressed disk usage, hidden files, system folders or data outside the selected set. The tool only reads the selected files and does not delete or move them.",
+    };
+  }
+  if (id === "file-search") {
+    return {
+      source: "operation-specific",
+      overview: "File Search looks for a case-insensitive phrase in selected filenames and in the contents of supported text-like files. Text hits include the relative file path and one-based line number so you can locate the matching line in the original file.",
+      example: "Select files or a folder, enter a distinctive non-sensitive word or phrase, and run Search. Check whether each result is a filename match or a path-and-line match, then open the source file to review the full surrounding context.",
+      validation: "Content search is limited to recognized text-like extensions or files whose MIME type starts with text/. Files over 8 MB are skipped for content scanning, although their filenames can still match. Each displayed matching line is trimmed to 240 characters; the report is a locator, not a full-text export.",
+    };
+  }
+  if (id === "file-compare") {
+    return {
+      source: "operation-specific",
+      overview: "File & Folder Compare compares two selected file sets by relative path. It reports paths present only on one side as added or removed, identifies different-size files as changed, and uses SHA-256 to distinguish same-size files with identical or different content.",
+      example: "Choose the first folder and the second folder, check that their relative paths represent the two versions you intend to compare, then select Compare sets. Review the added, removed, changed, same and unverified rows before deciding which version should be retained.",
+      validation: "Files with the same relative path but different sizes are classified as changed without hashing. Same-size files are compared by SHA-256 only up to 64 MB per file; larger same-size files are reported as unverified, not as identical. The comparison is read-only and does not synchronize or overwrite either folder.",
+    };
+  }
+  if (id === "a-book") {
+    return {
+      source: "operation-specific",
+      overview: "A book is a private on-device notes and document workspace. It stores notes, attachments and revision history in a browser IndexedDB database, with a separate local database name for the guest library and each signed-in profile. The tool also provides local PDF reading and page operations.",
+      example: "Create a notebook note, add tags and attachments, then reopen the tool to confirm the local library persists. Use the archive export or import controls when you need to move a library deliberately, and test PDF extraction or page operations with a non-sensitive sample document first.",
+      validation: "The local database requires IndexedDB support and available device storage. The source enforces limits on note text, local records and attachments, so an import can be rejected when it exceeds a quota. Clearing browser site data, using a different browser profile or changing devices can make the local library unavailable; the local database is not a cloud-sync guarantee.",
+    };
+  }
+  if (id === "song-metadata-analyzer" || id === "audio-analyze-studio" || /ai music data sandbox/.test(name)) {
+    return {
+      source: "operation-specific",
+      overview: "AI Music Data Sandbox is a local music-record workspace for organizing audio files with human-reviewed genre, language, mood, vocal, instrument, license and descriptive tags. Its audio-analysis step uses browser audio decoding and a worker to estimate tempo and key and report signal measurements; the inspected implementation does not call a hosted AI model for this analysis.",
+      example: "Create a collection, import a ZIP containing supported audio records and any paired .lyrics.txt or .tags.json files, then review each track and its license status. Run analysis on a short, non-sensitive track, compare measured signal information with your own listening, and edit or confirm tags before exporting a master or training package.",
+      validation: "The current sandbox limits an import batch to 50 songs, 600 ZIP entries, 80 MB per package and 160 MB expanded content; individual audio files are limited to 40 MB. Local audio analysis needs at least three seconds of readable audio, samples up to 45 seconds, and can reject a decode budget above 80 MB. Estimated tempo or key must not overwrite reviewed manual values, and an analysis marked unavailable is not evidence that a musical property is absent.",
+    };
+  }
+  if (id === "camera-studio") {
+    return {
+      source: "operation-specific",
+      overview: "Camera Studio is a browser capture workspace for taking photos and recording video from the device camera. Its controls include front/rear camera selection, supported capture quality and frame-rate settings, timer and grid options, and hardware-dependent torch, zoom and exposure controls; dual-camera mode is available only when the device exposes a usable second camera.",
+      example: "Open the tool in a secure browser context, grant camera permission, choose the front or rear camera, and take a test photo before recording. Check the captured item in the in-tool gallery and save or recover the recording using the controls the current browser exposes.",
+      validation: "Camera and microphone access require browser permission and a secure context such as HTTPS. Hardware controls are conditional on the camera capabilities reported by the device, and supported video MIME types vary by browser. If another app holds the camera, permissions are denied or the device cannot provide the requested settings, follow the displayed error instead of assuming a capture was saved.",
+    };
+  }
   const engine = tool.engine;
   if (engine.type === "calculator") {
     return {
