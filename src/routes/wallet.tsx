@@ -700,6 +700,14 @@ function Account() {
           window.location.assign(checkout.href);
           return;
         }
+        if (payload.data.nextAction === "unsupported_additional_fields") {
+          setFundingFeedback({
+            kind: "error",
+            message: "Flutterwave's bank requested extra details this wallet flow cannot collect. Check with your bank for a pending authorization before retrying. enV will credit tokens only after the complete payment is verified.",
+          });
+          setShowFundingOptions(false);
+          return;
+        }
         if (payload.data.nextAction === "requires_pin" ||
             payload.data.nextAction === "requires_otp" ||
             payload.data.nextAction === "requires_additional_fields") {
@@ -865,6 +873,14 @@ function Account() {
         return;
       }
       const nextAction = payload.data.nextAction;
+      if (nextAction === "unsupported_additional_fields") {
+        setFlutterwaveChallenge(null);
+        setFundingFeedback({
+          kind: "error",
+          message: "Flutterwave's bank requested extra details this wallet flow cannot collect. Check with your bank for a pending authorization before retrying. enV will credit tokens only after the complete payment is verified.",
+        });
+        return;
+      }
       if (nextAction === "requires_pin" || nextAction === "requires_otp" || nextAction === "requires_additional_fields") {
         setFlutterwaveChallenge({
           reference: flutterwaveChallenge.reference,
