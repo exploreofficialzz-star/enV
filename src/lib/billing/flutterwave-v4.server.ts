@@ -310,6 +310,10 @@ function countryCallingCode(countryCode: string): string | null {
     NE: "227", SN: "221", CM: "237", TD: "235", CF: "236", CG: "242", GQ: "240",
     GA: "241", ZM: "260", EG: "20", GB: "44", US: "1", CA: "1", CO: "57",
     IN: "91", SL: "232",
+    AT: "43", BE: "32", BG: "359", CY: "357", DE: "49", EE: "372",
+    ES: "34", FI: "358", FR: "33", GR: "30", HR: "385", IE: "353",
+    IT: "39", LT: "370", LU: "352", LV: "371", MT: "356", NL: "31",
+    PT: "351", SI: "386", SK: "421",
   };
   return codes[countryCode] ?? null;
 }
@@ -377,10 +381,14 @@ function validatePaymentDetails(
 
 function customerNameParts(value: string) {
   const parts = value.trim().replace(/\s+/g, " ").split(" ").filter(Boolean);
-  if (parts.length < 2 || value.length > 160) {
-    fail("Enter your first and last name to continue with Flutterwave.", "ACCOUNT_NAME_REQUIRED", 400);
+  const first = parts[0] ?? "";
+  const last = parts.slice(1).join(" ");
+  const validNamePart = (part: string) => part.length >= 2 && part.length <= 50 &&
+    /^[A-Za-z ,.'-]+$/.test(part) && /[A-Za-z]/.test(part);
+  if (value.length > 160 || !validNamePart(first) || !validNamePart(last)) {
+    fail("Enter a valid first and last name to continue with Flutterwave.", "ACCOUNT_NAME_REQUIRED", 400);
   }
-  return { first: parts[0]!, last: parts.slice(1).join(" ") };
+  return { first, last };
 }
 
 export async function initializeFlutterwaveCheckout(input: {
