@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "evidenceSetId": "pr154-current-head-browser-evidence",
+  "observedCommit": "c9008abccb59487f89fd3a4c1d435edfcbd5e023",
+  "note": "These are exact per-tool browser audits observed on the stated commit. Evidence remains attached to that tested commit; the ledger records the current source commit separately and never upgrades untested checks to VERIFIED.",
+  "audits": [
+    {
+      "id": "celebrations-93-mobile-browser",
+      "kind": "browser",
+      "script": "scripts/browser-celebrations-audit.mjs",
+      "workflow": "Production Check",
+      "workflowRunId": 43727567173,
+      "jobId": 132852806558,
+      "step": "Verify all 93 Celebrations tools on a mobile browser",
+      "result": "passed",
+      "selector": {
+        "category": "celebrations"
+      },
+      "expectedToolCount": 93,
+      "checks": [
+        "routeRendering",
+        "interactionExecution",
+        "outputValidation",
+        "runtimeErrorCheck"
+      ],
+      "notes": "The script iterates all 93 catalogue IDs and checks each tool's rendered experience at a 390x844 viewport. It does not establish every input, boundary case, permissions, token, backend, offline or native check."
+    },
+    {
+      "id": "file-workspace-six-browser",
+      "kind": "browser",
+      "script": "scripts/audit-file-workspace-browser.mjs",
+      "workflow": "Production Check",
+      "workflowRunId": 43727567173,
+      "jobId": 132852806558,
+      "step": "Verify local File workspace workflows in the browser",
+      "result": "passed",
+      "toolIds": [
+        "file-organizer",
+        "batch-file-renamer",
+        "duplicate-file-finder",
+        "folder-size-analyzer",
+        "file-search",
+        "file-compare"
+      ],
+      "checks": [
+        "routeRendering",
+        "interactionExecution",
+        "outputValidation",
+        "fileImportExport",
+        "runtimeErrorCheck"
+      ],
+      "notes": "Six explicit routes are opened and their representative local file/folder workflows and output are checked; this is not exhaustive input/control coverage."
+    },
+    {
+      "id": "zip-any-file-browser",
+      "kind": "browser",
+      "script": "scripts/audit-zip-any-file-browser.mjs",
+      "workflow": "Production Check",
+      "workflowRunId": 43727567173,
+      "jobId": 132852806558,
+      "step": "Verify Zip any file compression and extraction in the browser",
+      "result": "passed",
+      "toolIds": [
+        "zip-any-file"
+      ],
+      "checks": [
+        "routeRendering",
+        "interactionExecution",
+        "outputValidation",
+        "fileImportExport",
+        "runtimeErrorCheck"
+      ],
+      "notes": "Browser test verifies multi-file and single-file ZIP creation, CRC-checked reads, extraction round-trip and no application API writes."
+    },
+    {
+      "id": "qr-reader-three-route-browser",
+      "kind": "browser",
+      "script": "scripts/browser-qr-barcode-reader-audit.mjs",
+      "workflow": "Production Check",
+      "workflowRunId": 43727567173,
+      "jobId": 132852806558,
+      "step": "Verify production (nested verify command: npm run audit:qr-barcode:browser)",
+      "result": "passed",
+      "toolIds": [
+        "qr-generator",
+        "code128-barcode",
+        "qr-payload-inspector"
+      ],
+      "checks": [
+        "routeRendering",
+        "interactionExecution",
+        "outputValidation",
+        "fileImportExport",
+        "persistenceSample"
+      ],
+      "notes": "The script generates QR and Code 128 fixtures, scans them through the reader, checks multi-code decoding and verifies local history after reload. It covers three exact tool IDs, not all 52 QR-category records."
+    },
+    {
+      "id": "ai-music-data-sandbox-browser",
+      "kind": "browser",
+      "script": "scripts/audit-ai-music-data-sandbox-browser.mjs",
+      "workflow": "AI Music Data Sandbox",
+      "workflowRunId": 43727567365,
+      "jobId": 132852729541,
+      "step": "Verify sandbox workflow and accessibility",
+      "result": "passed",
+      "toolIds": [
+        "song-metadata-analyzer"
+      ],
+      "checks": [
+        "routeRendering",
+        "interactionExecution",
+        "outputValidation",
+        "fileImportExport",
+        "persistenceSample",
+        "responsiveLayoutSample",
+        "runtimeErrorCheck"
+      ],
+      "notes": "The dedicated sandbox route is tested with local audio/tag fixtures and responsive browser viewports. This does not establish all music/audio tools or native implementations."
+    }
+  ]
+}
