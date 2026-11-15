@@ -43,6 +43,7 @@ type FlutterwaveBankTransferDetails = {
   currency: string;
   amount: number;
   reference: string;
+  customerReference?: string;
   expiresAt: string;
   note: string;
 };
@@ -1378,8 +1379,14 @@ function Account() {
                         <Copy size={13} aria-hidden="true"/> Copy
                       </button>
                     </div>
-                    <p className="mt-3 text-xs text-muted">Payment reference</p>
+                    <p className="mt-3 text-xs text-muted">enV payment reference</p>
                     <p className="mt-0.5 break-all text-xs font-medium">{flutterwaveBankTransfer.reference}</p>
+                    {flutterwaveBankTransfer.customerReference ? (
+                      <>
+                        <p className="mt-3 text-xs text-muted">Transfer narration (enter this in your bank app)</p>
+                        <p className="mt-0.5 break-all text-sm font-semibold">{flutterwaveBankTransfer.customerReference}</p>
+                      </>
+                    ) : null}
                     <p className="mt-3 text-xs text-muted">Account expires</p>
                     <p className="mt-0.5 text-sm font-medium">{new Date(flutterwaveBankTransfer.expiresAt).toLocaleString()}</p>
                     {flutterwaveBankTransfer.note ? <p className="mt-3 text-xs leading-5 text-muted">{flutterwaveBankTransfer.note}</p> : null}
