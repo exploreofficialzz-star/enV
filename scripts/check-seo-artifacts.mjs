@@ -258,8 +258,7 @@ for (const disposition of [
   "Not included in public search discovery", "Non-public catalogue status:",
 ]) assert.ok(inventoryGeneratorSource.includes(disposition), "The inventory generator must define disposition: " + disposition);
 assert.doesNotMatch(result.inventory, /No canonical SEO record; inspect production or alias policy/, "Every non-canonical record must have a specific disposition reason.");
-assert.match(result.inventory, /Generic workflow fallback; not indexable until a dedicated operation replaces it|Planned catalogue record|Under-production tool; excluded from public indexing|Generic Input A\\/Input B equation template; excluded from public indexing|Retired legacy route|Legacy Developer alias; resolved to canonical Studio page|Consolidated generated variant/);
-assert.doesNotMatch(result.inventory, /No canonical SEO record; inspect production or alias policy/, "Every non-canonical record must have a specific disposition reason.");
+assert.ok(result.inventory.includes("Canonical public tool page") || result.inventory.includes("Consolidated generated variant; canonical tool ID:"), "Inventory must emit at least one explicit canonical disposition.");
 assert.match(result.inventory, /\| Tool ID \| Tool \| Category \| Catalogue status \| Engine operation \| Catalogue execution\/account flags \| Task guidance source \|/);
 assert.match(result.inventory, /\| Tool ID \| Usage guide \| Category \| Catalogue status \| Engine operation \| Catalogue execution\/account flags \| Task guidance source \|/);
 assert.match(result.inventory, /not proof of the live runtime data path, actual local execution, platform parity or successful behavior/);
