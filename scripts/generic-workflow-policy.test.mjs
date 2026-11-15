@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   applyGenericWorkflowPolicy,
+  isDedicatedCelebrationTool,
   isDedicatedEventTemplateTool,
   isGenericWorkflowPlaceholder,
   normalizeGenericWorkflowTool,
@@ -43,6 +44,38 @@ test("generic cross-category workflow placeholders are planned and non-indexable
   }
 });
 
+
+test("all 93 implemented Celebrations operations remain active and outside generic fallback policy", () => {
+  const occasions = [
+    "birthday", "anniversary", "graduation", "valentine", "christmas", "new-year",
+    "congratulations", "thank-you", "appreciation", "farewell", "achievement", "party",
+  ];
+  const experiences = [
+    "page-generator", "interactive-card", "invitation-generator", "countdown",
+    "memory-page", "reveal-page", "quiz-generator", "surprise-page",
+  ];
+  const unavailable = new Set([
+    "birthday-countdown", "valentine-reveal-page", "appreciation-reveal-page",
+  ]);
+  const ids = occasions.flatMap((occasion) =>
+    experiences.map((experience) => occasion + "-" + experience).filter((id) => !unavailable.has(id)),
+  );
+  assert.equal(ids.length, 93);
+  assert.equal(new Set(ids).size, 93);
+
+  for (const id of ids) {
+    const candidate = tool(id, "celebrations", { engine: { type: "custom", id } });
+    assert.equal(isDedicatedCelebrationTool(candidate), true, id);
+    assert.equal(isGenericWorkflowPlaceholder(candidate), false, id);
+    assert.equal(normalizeGenericWorkflowTool(candidate).status, "active", id);
+  }
+
+  const unsupported = tool("birthday-video-generator", "celebrations");
+  assert.equal(isDedicatedCelebrationTool(unsupported), false);
+  assert.equal(isGenericWorkflowPlaceholder(unsupported), true);
+  assert.equal(normalizeGenericWorkflowTool(unsupported).status, "planned");
+});
+
 test("dedicated event templates remain active and are excluded from generic-placeholder checks", () => {
   const ids = [
     "birthday-agenda-generator",
@@ -63,7 +96,7 @@ test("similarly named but unsupported event variants are not promoted", () => {
   const unsupported = [
     tool("meeting-agenda-generator", "events"),
     tool("birthday-ticket-mockup", "events"),
-    tool("birthday-page-generator", "celebrations"),
+    tool("birthday-video-generator", "celebrations"),
     tool("meal-planner", "food"),
     tool("trip-itinerary-planner", "travel"),
     tool("passport-photo-cropper", "photography"),
