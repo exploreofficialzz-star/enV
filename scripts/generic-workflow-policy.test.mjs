@@ -131,23 +131,26 @@ test("compact runtime summaries are normalized without engine metadata", () => {
   assert.equal(normalizeGenericWorkflowTool(cameraStudio).status, "active");
 });
 
-test("native catalog and execution-matrix exporters share the publication policy", async () => {
+test("native catalog exporter applies publication policy while matrix uses the canonical runtime registry", async () => {
   const { readFile } = await import("node:fs/promises");
   const [nativeExporter, matrixExporter] = await Promise.all([
     readFile(new URL("./export-native-catalog.mjs", import.meta.url), "utf8"),
     readFile(new URL("./export-native-execution-matrix.mjs", import.meta.url), "utf8"),
   ]);
   assert.match(nativeExporter, /applyGenericWorkflowPolicy\(tools\)/);
-  assert.match(matrixExporter, /applyGenericWorkflowPolicy\(baseCatalog\)/);
+  assert.match(nativeExporter, /const canonicalRuntimeTools = getAllTools\(\)/);
+  assert.match(matrixExporter, /const catalog = getAllTools\(\)\.slice\(\)/);
+  assert.match(matrixExporter, /Runtime registry contains duplicate IDs/);
 });
 
-test("native coverage and related-catalog audits normalize availability before comparing platforms", async () => {
+test("native coverage and related-catalog audits use canonical availability sources", async () => {
   const { readFile } = await import("node:fs/promises");
   const [coverage, related] = await Promise.all([
     readFile(new URL("./check-native-coverage.mjs", import.meta.url), "utf8"),
     readFile(new URL("./check-native-related.mjs", import.meta.url), "utf8"),
   ]);
-  assert.match(coverage, /applyGenericWorkflowPolicy\(parseGeneratedCatalog\(catalogSource\)\)/);
+  assert.match(coverage, /const catalog = getAllTools\(\)\.slice\(\)/);
+  assert.match(coverage, /File & Folder Compare default native workflow/);
   assert.match(related, /applyGenericWorkflowPolicy\(baseWebTools\)/);
 });
 
