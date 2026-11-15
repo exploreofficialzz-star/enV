@@ -1165,6 +1165,126 @@ function Account() {
                 )}
               </div>
 
+              {selectedPaymentMethod === "flutterwave" ? (
+                <div className="mt-4 space-y-3 rounded-xl border border-border bg-surface-2 p-3">
+                  <div>
+                    <label htmlFor="flutterwave-method" className="mb-1 block text-xs font-semibold">Flutterwave payment method</label>
+                    <select
+                      id="flutterwave-method"
+                      value={flutterwaveMethod}
+                      onChange={(event) => setFlutterwaveMethod(event.target.value as FlutterwaveMethod)}
+                      className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg"
+                    >
+                      {(fundingOptionsState.flutterwave?.paymentMethods ?? ["card"]).map((method) => (
+                        <option key={method} value={method}>
+                          {method === "card" ? "Card" : method === "mobile_money" ? "Mobile Money" : method === "opay" ? "OPay" : "USSD"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2">
+                    <div>
+                      <label htmlFor="flutterwave-customer-name" className="mb-1 block text-xs font-semibold">Full name</label>
+                      <input id="flutterwave-customer-name" autoComplete="name" value={flutterwaveCustomerName}
+                        onChange={(event) => setFlutterwaveCustomerName(event.target.value)}
+                        placeholder="First and last name"
+                        className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
+                    </div>
+                    <div>
+                      <label htmlFor="flutterwave-phone" className="mb-1 block text-xs font-semibold">Phone number</label>
+                      <input id="flutterwave-phone" type="tel" inputMode="numeric" autoComplete="tel-national"
+                        value={flutterwavePhoneNumber} onChange={(event) => setFlutterwavePhoneNumber(event.target.value)}
+                        placeholder="7–10 digits, including no country code"
+                        className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold">Billing address</p>
+                    <input value={flutterwaveAddressLine1} onChange={(event) => setFlutterwaveAddressLine1(event.target.value)}
+                      autoComplete="address-line1" placeholder="Street address"
+                      className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
+                    <input value={flutterwaveAddressLine2} onChange={(event) => setFlutterwaveAddressLine2(event.target.value)}
+                      autoComplete="address-line2" placeholder="Apartment, suite, unit (optional)"
+                      className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input value={flutterwaveCity} onChange={(event) => setFlutterwaveCity(event.target.value)}
+                        autoComplete="address-level2" placeholder="City"
+                        className="min-h-11 min-w-0 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
+                      <input value={flutterwaveState} onChange={(event) => setFlutterwaveState(event.target.value)}
+                        autoComplete="address-level1" placeholder="State / region"
+                        className="min-h-11 min-w-0 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
+                    </div>
+                    <input value={flutterwavePostalCode} onChange={(event) => setFlutterwavePostalCode(event.target.value)}
+                      autoComplete="postal-code" placeholder="Postal code"
+                      className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
+                    <p className="text-[11px] leading-4 text-muted">
+                      Country is matched to your detected checkout country.
+                    </p>
+                  </div>
+
+                  {flutterwaveMethod === "card" ? (
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold">Card details</p>
+                      <input id="flutterwave-card-number" type="text" inputMode="numeric" autoComplete="cc-number"
+                        value={flutterwaveCardNumber} onChange={(event) => setFlutterwaveCardNumber(event.target.value)}
+                        placeholder="Card number"
+                        className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
+                      <div className="grid grid-cols-3 gap-2">
+                        <input aria-label="Card expiry month" inputMode="numeric" autoComplete="cc-exp-month"
+                          value={flutterwaveExpiryMonth} onChange={(event) => setFlutterwaveExpiryMonth(event.target.value)}
+                          placeholder="MM" maxLength={2}
+                          className="min-h-11 min-w-0 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
+                        <input aria-label="Card expiry year" inputMode="numeric" autoComplete="cc-exp-year"
+                          value={flutterwaveExpiryYear} onChange={(event) => setFlutterwaveExpiryYear(event.target.value)}
+                          placeholder="YY / YYYY" maxLength={4}
+                          className="min-h-11 min-w-0 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
+                        <input aria-label="Card security code" type="password" inputMode="numeric" autoComplete="cc-csc"
+                          value={flutterwaveCvv} onChange={(event) => setFlutterwaveCvv(event.target.value)}
+                          placeholder="CVV" maxLength={4}
+                          className="min-h-11 min-w-0 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
+                      </div>
+                      <p className="text-[11px] leading-4 text-muted">
+                        Card fields are encrypted in your browser before the charge request is sent to enV.
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {flutterwaveMethod === "mobile_money" ? (
+                    <div>
+                      <label htmlFor="flutterwave-network" className="mb-1 block text-xs font-semibold">Mobile-money network</label>
+                      <select id="flutterwave-network" value={flutterwaveNetwork}
+                        onChange={(event) => setFlutterwaveNetwork(event.target.value)}
+                        className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg">
+                        <option value="">Choose a network</option>
+                        {flutterwaveNetworks(fundingOptionsState.countryCode).map((network) => (
+                          <option key={network} value={network}>{network.replaceAll("_", " ")}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : null}
+
+                  {flutterwaveMethod === "ussd" ? (
+                    <div>
+                      <label htmlFor="flutterwave-bank-code" className="mb-1 block text-xs font-semibold">Bank</label>
+                      <select id="flutterwave-bank-code" value={flutterwaveBankCode}
+                        onChange={(event) => setFlutterwaveBankCode(event.target.value)}
+                        className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg">
+                        {[
+                          ["044", "Access Bank"], ["050", "Ecobank"], ["070", "Fidelity Bank"],
+                          ["011", "First Bank"], ["214", "FCMB"], ["058", "GTBank"],
+                          ["030", "Heritage Bank"], ["082", "Keystone Bank"], ["303", "Lotus Bank"],
+                          ["105", "PremiumTrust Bank"], ["221", "Stanbic IBTC"], ["232", "Sterling Bank"],
+                          ["032", "Union Bank"], ["033", "UBA"], ["215", "Unity Bank"], ["035", "Wema Bank"],
+                          ["057", "Zenith Bank"], ["090110", "VFD Microfinance Bank"],
+                        ].map(([code, name]) => <option key={code} value={code}>{name}</option>)}
+                      </select>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
               {fundingFeedback?.kind === "error" ? (
                 <p className="mt-3 text-sm text-rose-600" role="status" aria-live="polite">{fundingFeedback.message}</p>
               ) : null}
