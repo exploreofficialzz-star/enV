@@ -79,7 +79,6 @@ export async function getFundingOptions(countryCode: string | null = null) {
     },
   ];
   const firstEnabled = providers.find((provider) => provider.enabled);
-  const country = normalizeCountryCode(countryCode);
 
   return {
     countryCode: country,
