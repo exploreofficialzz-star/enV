@@ -1,24 +1,11 @@
 import fs from "node:fs";
-import { applyGenericWorkflowPolicy } from "../src/lib/generic-workflow-policy.mjs";
+import { getAllTools } from "../src/lib/registry.ts";
 
-const root = new URL("../", import.meta.url);
-const [{ tools: baseCatalog }, { DATETIME_TOOL_EXTENSIONS }] = await Promise.all([
-  import("../src/data/catalog.ts"),
-  import("../src/lib/datetime/catalog-tools.ts"),
-]);
-const platformRuntimeExtensions = [
-  { id: "song-metadata-analyzer", status: "active", category: "audio", engine: { type: "audio" } },
-  { id: "a-book", status: "active", category: "productivity", engine: { type: "custom" } },
-  // Keep every platform runtime extension in the matrix as well as the shared
-  // native inventory. Both IDs are covered by the Android and iOS local manifests.
-  { id: "zip-any-file", name: "Zip any file", status: "active", category: "files", engine: { type: "custom" } },
-  { id: "camera-studio", name: "Camera Studio", status: "active", category: "photography", engine: { type: "custom" } },
-];
-const catalog = [
-  ...applyGenericWorkflowPolicy(baseCatalog),
-  ...DATETIME_TOOL_EXTENSIONS.filter((extension) => !baseCatalog.some((tool) => tool.id === extension.id)),
-  ...platformRuntimeExtensions.filter((extension) => !baseCatalog.some((tool) => tool.id === extension.id)),
-];
+// The discovery registry is the canonical cross-platform inventory. It includes
+// generated base tools, virtual Studio records and all platform runtime extensions.
+const catalog = getAllTools().slice();
+const duplicateIds = catalog.filter((tool, index) => catalog.findIndex((candidate) => candidate.id === tool.id) !== index).map((tool) => tool.id);
+if (duplicateIds.length) throw new Error("Runtime registry contains duplicate IDs: " + [...new Set(duplicateIds)].join(", "));
 const readIds = (platform, kind) => {
   const files = kind === "local"
     ? [new URL(`../apps/${platform}/native-tool-coverage.txt`, import.meta.url), new URL(`../apps/${platform}/native-family-coverage/`, import.meta.url)]
@@ -47,13 +34,18 @@ for (const tool of catalog) {
   if (tool.status !== "active" && tool.status !== "beta") continue;
   if (tool.engine.type === "document-backend" || backendCategories.has(tool.category) || backendTypes.has(tool.engine.type) || explicitBackendIds.has(tool.id)) { androidBackend.add(tool.id); iosBackend.add(tool.id); }
 }
+const intentionalWebOnlyReasons = {
+  "music-downloader": "No matching Android/iOS native execution evidence is registered for this active runtime ID; keep it Web-only until both native products expose and verify the same workflow.",
+  "smartphone-prototype-lab": "The current experience is a Web scene and does not have an independent Kotlin or Swift implementation; do not wrap the Web experience in a native WebView.",
+};
 const active = new Set(catalog.filter((tool) => tool.status === "active" || tool.status === "beta").map((tool) => tool.id));
 const rows = catalog.map((tool) => {
   const localA = androidLocal.has(tool.id), localI = iosLocal.has(tool.id);
   const backendA = androidBackend.has(tool.id), backendI = iosBackend.has(tool.id);
   const a = localA ? "offline-native" : backendA ? "backend-native" : "web-only";
   const i = localI ? "offline-native" : backendI ? "backend-native" : "web-only";
-  return { id: tool.id, name: tool.name, status: tool.status, category: tool.category, engine: tool.engine.type, android: a, ios: i };
+  const dispositionReason = intentionalWebOnlyReasons[tool.id] ?? null;
+  return { id: tool.id, name: tool.name, status: tool.status, category: tool.category, engine: tool.engine.type, android: a, ios: i, ...(dispositionReason ? { dispositionReason } : {}) };
 });
 const activeRows = rows.filter((row) => active.has(row.id));
 const stats = {
