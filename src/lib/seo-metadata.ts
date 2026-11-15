@@ -3,6 +3,7 @@ import { CATEGORY_MAP } from "@/data/categories";
 import { isToolUnderProduction } from "@/lib/production-notice";
 import { toolDocumentationSummary } from "@/lib/tool-documentation";
 import { developerStudioForLegacySlug } from "@/lib/developer-studios-catalog";
+import { ACCESSIBILITY_STUDIOS } from "@/lib/accessibility-studios";
 import { isGenericWorkflowPlaceholder } from "@/lib/generic-workflow-policy.mjs";
 
 export const SITE_ORIGIN = "https://envtools.store";
@@ -247,6 +248,10 @@ export function toolGuideSeoTitle(tool: ToolMeta, peers: readonly ToolMeta[] = [
 }
 
 export function canonicalToolPath(tool: ToolMeta): string {
+  const accessibilityStudio = ACCESSIBILITY_STUDIOS.find((studio) => studio.id === tool.id);
+  if (accessibilityStudio && (tool.category !== "accessibility" || tool.slug !== accessibilityStudio.slug)) {
+    return "/tools/accessibility/" + accessibilityStudio.slug;
+  }
   if (tool.category === "developer" && !tool.tags.includes("developer-studio")) {
     const studio = developerStudioForLegacySlug(tool.slug);
     return "/tools/developer/" + studio.slug;
@@ -255,6 +260,10 @@ export function canonicalToolPath(tool: ToolMeta): string {
 }
 
 export function canonicalToolName(tool: ToolMeta): string {
+  const accessibilityStudio = ACCESSIBILITY_STUDIOS.find((studio) => studio.id === tool.id);
+  if (accessibilityStudio && (tool.category !== "accessibility" || tool.slug !== accessibilityStudio.slug)) {
+    return accessibilityStudio.name;
+  }
   if (tool.category === "developer" && !tool.tags.includes("developer-studio")) {
     return developerStudioForLegacySlug(tool.slug).name;
   }
