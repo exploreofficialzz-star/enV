@@ -838,10 +838,10 @@ export async function initializeFlutterwaveBankTransfer(input: {
 async function getPurchaseIntent(reference: string) {
   const sql = await getSql();
   const rows = await sql.query<{
-    id: string; provider: string; amount_minor: number | string; currency: string;
+    id: string; user_id: string; provider: string; amount_minor: number | string; currency: string;
     status: string; provider_transaction_id: string | null; provider_metadata: JsonRecord | string | null;
   }>(
-    "select id, provider, amount_minor, currency, status, provider_transaction_id, provider_metadata " +
+    "select id, user_id, provider, amount_minor, currency, status, provider_transaction_id, provider_metadata " +
     "from billing_purchase_intents where id = $1 limit 1", [reference],
   );
   return rows[0] ?? null;
@@ -858,14 +858,16 @@ export async function verifyAndCreditFlutterwaveReference(
   reference: string,
   expectedTransactionId?: string,
   providerEventId?: string,
+  expectedUserId?: string,
 ) {
   if (!/^[a-f0-9-]{36}$/i.test(reference) ||
       (expectedTransactionId !== undefined && !/^[A-Za-z0-9_-]{1,160}$/.test(expectedTransactionId))) {
     fail("The Flutterwave payment reference is invalid.", "INVALID_PAYMENT_REFERENCE", 400);
   }
   const intent = await getPurchaseIntent(reference);
-  if (!intent || intent.provider !== "flutterwave") {
-    fail("The Flutterwave payment reference was not found.", "PAYMENT_NOT_FOUND", 404);
+  if (!intent || intent.provider !== "flutterwave" ||
+      (expectedUserId !== undefined && intent.user_id !== expectedUserId)) {
+    fail("The Flutterwave payment reference was not found for this account.", "PAYMENT_NOT_FOUND", 404);
   }
   let chargeId = intent.provider_transaction_id;
   if (!chargeId) {
