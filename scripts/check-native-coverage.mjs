@@ -14,6 +14,30 @@ for (const [label, source, marker] of [
 ]) {
   if (!source.includes(marker)) throw new Error(`Music data sandbox missing ${label}.`);
 }
+
+// A file-workspace manifest entry is accepted only when its platform has a real
+// screen/engine dispatch, not merely because the ID exists in a catalogue.
+const androidFileDispatch = nativeAnalyzerRoute.includes('NativeFileWorkspaceScreen(tool.id)');
+const androidFileWorkspace = fs.readFileSync(new URL('../apps/android/app/src/main/java/com/chastech/env/NativeFileWorkspace.kt', import.meta.url), 'utf8');
+const androidFileConverter = fs.readFileSync(new URL('../apps/android/app/src/main/java/com/chastech/env/engine/NativeFileConverterEngine.kt', import.meta.url), 'utf8');
+const iosFileDispatcher = fs.readFileSync(new URL('../apps/ios/enV/NativeZipArchiveView.swift', import.meta.url), 'utf8');
+const iosFileConverter = fs.readFileSync(new URL('../apps/ios/enV/NativeFileConverterEngine.swift', import.meta.url), 'utf8');
+const fileWorkspaceScreenIds = [
+  'file-organizer', 'batch-file-renamer', 'duplicate-file-finder',
+  'folder-size-analyzer', 'file-search', 'file-compare',
+];
+if (!androidFileDispatch || !iosFileDispatcher.includes('NativeFileWorkspaceScreen(toolID: tool.id)')) {
+  throw new Error('File workspace native screen dispatch is missing on Android or iOS.');
+}
+for (const id of fileWorkspaceScreenIds) {
+  if (!androidFileWorkspace.includes(id) || !iosFileDispatcher.includes(id)) {
+    throw new Error(`File workspace screen implementation is missing for ${id}.`);
+  }
+}
+if (!androidFileConverter.includes('"file-to-txt"') || !iosFileConverter.includes('"file-to-txt"') ||
+    !iosFileDispatcher.includes('tool.id == "file-to-txt"')) {
+  throw new Error('File-to-TXT native converter dispatch is missing on Android or iOS.');
+}
 const active = catalog.filter((tool) => tool.status === 'active' || tool.status === 'beta');
 const byId = new Map(catalog.map((tool) => [tool.id, tool]));
 const readIds = (platform) => {
