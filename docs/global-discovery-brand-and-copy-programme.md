@@ -329,9 +329,11 @@ The source has dedicated examples and validation notes, and the hand-written gui
 - Create a baseline before reporting improvement; do not present impressions, indexed pages, citations or traffic as complete until measured.
 
 ### WS-09 — Native store discovery and cross-surface consistency
-- Audit Google Play and Apple App Store product names, short/long descriptions, screenshots, category/keyword fields, support links and privacy links.
-- Keep the name enV consistent while writing store descriptions that accurately distinguish native Android/iOS capabilities from the web version.
-- Verify web-to-app links and canonical website references without presenting native apps as web wrappers.
+- The branch now has a checked draft in `docs/native-store-listing.json` for Google Play and App Store copy. It keeps the product name enV, matches the Android application ID and iOS bundle identifier, and stays within the platforms' text-field limits.
+- The draft describes the Android/iOS apps as native products and says Web-only tools open in the system browser. It does not promise that the whole app works offline.
+- Support and privacy URLs point to the canonical enV host. Public Google Play and App Store URLs remain unset until the actual product pages can be verified.
+- Store screenshots and feature assets still need capture from real Android/iPhone release builds; do not use Web screenshots or synthetic mockups as evidence of native functionality.
+- The identity audit checks the app labels, package/bundle IDs, native inventory fingerprint, and shared Android/iOS native coverage manifest. It does not claim store-account ownership, listing publication, review approval or public availability.
 - Store listing changes require the appropriate store account release and review; a web deployment cannot publish them automatically.
 
 ## 5. Copy quality standard and example structure
