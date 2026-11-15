@@ -2,11 +2,33 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildSeoArtifacts, buildSitemapArtifacts } from "./generate-seo-artifacts.mjs";
 import { buildIndexNowKeyArtifact } from "./indexnow-utils.mjs";
+import { getToolByPath, getToolsByCategory } from "../src/lib/registry.ts";
 import { toolTaskGuidanceSource } from "../src/lib/tool-documentation.ts";
 import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema, toolSchema, organizationSchema, websiteSchema, boundedToolSeoTitle } from "@/lib/seo-metadata";
 
 const nativeInventory = JSON.parse(readFileSync(new URL("../apps/shared/native-engine-inventory.json", import.meta.url), "utf8"));
 const result = buildSeoArtifacts();
+
+// Accessibility Studio routing keeps legacy Design discovery aliases visible while
+// retaining one stable runtime/search identity and one canonical Accessibility URL.
+const designAccessibilityTools = getToolsByCategory("design").filter((tool) =>
+  ["contrast-checker", "wcag-checker", "color-blindness-simulator"].includes(tool.id)
+);
+assert.deepEqual(
+  designAccessibilityTools.map((tool) => tool.id).sort(),
+  ["color-blindness-simulator", "contrast-checker", "wcag-checker"],
+  "Design must retain its three curated Accessibility links after canonical Studio routing."
+);
+const legacyContrastTool = designAccessibilityTools.find((tool) => tool.id === "contrast-checker");
+assert.ok(legacyContrastTool, "The legacy Contrast Checker card must remain available in Design.");
+assert.equal(getToolByPath("design", "contrast-checker")?.category, "accessibility");
+assert.equal(getToolByPath("design", "contrast-checker")?.slug, "color-contrast-studio");
+assert.equal(canonicalToolPath(legacyContrastTool), "/tools/accessibility/color-contrast-studio");
+assert.equal(canonicalToolName(legacyContrastTool), "Color Contrast Studio");
+const contrastInventoryRows = result.runtimeInventory.filter((row) => row.id === "contrast-checker");
+assert.equal(contrastInventoryRows.length, 1, "Legacy Design routing must not duplicate the runtime tool ID.");
+assert.ok(contrastInventoryRows[0].routes.includes("/tools/design/contrast-checker"));
+assert.equal(contrastInventoryRows[0].canonicalTarget, "/tools/accessibility/color-contrast-studio");
 assert.equal(buildIndexNowKeyArtifact(""), null, "An unset IndexNow key must not produce a public key file.");
 assert.deepEqual(buildIndexNowKeyArtifact("a1b2c3d4-e5f6"), {
   path: "public/a1b2c3d4-e5f6.txt",
