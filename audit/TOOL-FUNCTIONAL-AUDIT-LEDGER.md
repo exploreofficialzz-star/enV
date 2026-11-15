@@ -31,14 +31,14 @@ The `checks` object is more granular than `auditStatus`. An individual browser p
 
 ## Evidence policy
 
-The checked-in `tool-functional-audit-evidence.json` contains exact browser, unit and native test scopes with workflow/job references. The generator resolves selectors to actual runtime IDs, checks expected record counts, and rejects evidence that refers to unknown IDs. The QR/barcode browser audit also writes a dynamic per-tool report during CI; the ledger consumes both its passed checks and its blocked checks. Evidence carries the commit on which tests were observed and is never silently rewritten as a test of a later commit.
+The checked-in `tool-functional-audit-evidence.json` contains exact browser, unit and native test scopes with workflow/job references. The generator resolves selectors to actual runtime IDs, checks expected record counts, and rejects evidence that refers to unknown IDs. The QR/barcode and 93-tool Celebration browser audits write dynamic per-tool reports during CI; the ledger consumes each report's passed checks and records failed tool runs as blocked. Dynamic reports carry the commit and workflow identity on which tests were observed; a report for a different commit, incomplete ID set, duplicate ID or unknown tool is rejected rather than silently rewritten as a test of the current source.
 
 Native tool lists are recorded as manifest membership only. The native execution matrix is a classification artifact, not proof that each native tool was individually executed. A native test promotes only the exact IDs in its evidence selector, and its notes state whether it checked operation dispatch, representative output or fuller device acceptance. Android and iOS evidence are stored separately.
 
 ## Current known limits
 
 - `STATIC_CHECKED` validates registry metadata and route-resolver lookup, not rendered pages.
-- Browser coverage is limited to the exact tool IDs in the evidence manifest. The 93 Celebrations browser records, six file-workspace records, ZIP workflow, QR/barcode records and AI Music Data Sandbox record are not proxies for their entire categories. QR/barcode records are sourced from the current run's per-tool result file rather than a hard-coded historical pass.
+- Browser coverage is limited to the exact tool IDs in the evidence manifest or validated dynamic report. The 93 Celebrations browser records, six file-workspace records, ZIP workflow, QR/barcode records and AI Music Data Sandbox record are not proxies for their entire categories. QR/barcode and Celebration records are sourced from the current run's per-tool result files when those reports are available and validated.
 - No tool is marked `VERIFIED` by the ledger generator. A browser, unit or native test result advances only the corresponding evidence dimension; it does not clear blocked or untested checks.
 - Checks for all visible controls, malformed/boundary input coverage, errors/recovery, loading/disabled/success states, enV token enforcement, authorization, backend failure modes, offline behavior, privacy/security and independent native execution remain open unless the row contains direct evidence.
 
