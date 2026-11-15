@@ -634,6 +634,8 @@ function Account() {
             phoneNumber,
             ussd: { account_bank: flutterwaveBankCode },
           };
+        } else if (flutterwaveMethod === "bank_transfer") {
+          flutterwaveDetails = { type: "bank_transfer", phoneNumber };
         } else {
           flutterwaveDetails = { type: "opay", phoneNumber };
         }
@@ -646,6 +648,7 @@ function Account() {
           provider: "flutterwave",
           flutterwaveDetails,
           customerName: flutterwaveCustomerName.trim(),
+          customerPhone: flutterwavePhoneNumber.trim(),
           customerAddress: {
             line1: flutterwaveAddressLine1.trim(),
             line2: flutterwaveAddressLine2.trim(),
@@ -672,6 +675,7 @@ function Account() {
           status?: string;
           nextAction?: string | null;
           paymentInstruction?: string | null;
+          bankTransfer?: FlutterwaveBankTransferDetails;
         };
         error?: string;
         message?: string;
@@ -681,6 +685,15 @@ function Account() {
       }
 
       if (method === "flutterwave") {
+        if (payload.data.bankTransfer) {
+          setFlutterwaveBankTransfer(payload.data.bankTransfer);
+          setFlutterwaveChallenge(null);
+          setFundingFeedback({
+            kind: "info",
+            message: "Transfer the exact amount shown to this temporary Flutterwave account before it expires. enV will credit your wallet only after the bank transfer is verified.",
+          });
+          return;
+        }
         const checkoutUrl = payload.data.authorizationUrl;
         if (checkoutUrl) {
           let checkout: URL | null = null;
