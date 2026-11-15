@@ -319,6 +319,7 @@ assert.match(
 assert.match(result.robots, /User-agent: Applebot\nAllow: \/\nDisallow: \/api\//);
 assert.match(result.robots, /User-agent: ClaudeBot\nDisallow: \//);
 assert.match(result.robots, /User-agent: GPTBot\nDisallow: \//);
+assert.doesNotMatch(result.robots, /User-agent: __usage_ai-training/, "Unapproved shared AI-training preferences must not be emitted.");
 assert.match(result.robots, /Sitemap: https:\/\/envtools\.store\/sitemap\.xml/);
 
 assert.match(result.llms, /^# enV/m);
