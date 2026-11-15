@@ -209,6 +209,6 @@ const report = {
   error: failure,
   ok: !failure && outcomes.length === 4,
 };
-fs.writeFileSync(reportPath, JSON.stringify(report, null, 2) + "\\n");
+fs.writeFileSync(reportPath, JSON.stringify(report, null, 2) + "\n");
 console.log(JSON.stringify({ ok: report.ok, passed: report.passed, failed: report.failed, reportPath, error: report.error }, null, 2));
 if (!report.ok) process.exitCode = 1;
