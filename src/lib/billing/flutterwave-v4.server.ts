@@ -788,6 +788,7 @@ export async function initializeFlutterwaveBankTransfer(input: {
         account_type: "dynamic",
         narration: "enV wallet funding",
         bank_code: "GH200100",
+        bank_code: "GH200100",
       }),
     }, idempotencyBase);
     const accountNumber = typeof virtualAccount.account_number === "string" ? virtualAccount.account_number : "";
@@ -796,6 +797,8 @@ export async function initializeFlutterwaveBankTransfer(input: {
     const expiresAt = typeof virtualAccount.account_expiration_datetime === "string"
       ? virtualAccount.account_expiration_datetime : "";
     const note = typeof virtualAccount.note === "string" ? virtualAccount.note.slice(0, 500) : "";
+    const customerReference = typeof asRecord(virtualAccount.meta).customer_reference === "string"
+      ? String(asRecord(virtualAccount.meta).customer_reference).slice(0, 80) : "";
     if (!/^\d{8,20}$/.test(accountNumber) || !bankName || returnedReference !== intentId || !expiresAt) {
       throw new Error("Flutterwave returned incomplete virtual-account details.");
     }
@@ -805,6 +808,7 @@ export async function initializeFlutterwaveBankTransfer(input: {
       currency,
       amount: amountMajor,
       reference: intentId,
+      customerReference,
       expiresAt,
       note,
     };
