@@ -40,6 +40,10 @@ export default defineHandler(async (event) => {
   const auth = await requireBillingUser(request);
   if (auth.response || !auth.userId) return auth.response ?? jsonResponse({ ok: false, error: "AUTH_REQUIRED" }, 401);
   const body = await readJsonObject(request, 12_000);
+  const customerAddress = body?.customerAddress && typeof body.customerAddress === "object" &&
+    !Array.isArray(body.customerAddress)
+    ? body.customerAddress as Record<string, unknown>
+    : {};
   const methodValue = body?.paymentMethod;
   const flutterwaveDirect = methodValue === "flutterwave" || body?.provider === "flutterwave";
   const paymentMethod = methodValue === "card" || methodValue === "local" || methodValue === "more"
@@ -116,11 +120,11 @@ export default defineHandler(async (event) => {
             paymentDetails: body.flutterwaveDetails,
             customerName: typeof body.customerName === "string" ? body.customerName : "",
             customerAddress: {
-              city: typeof body.customerAddress?.city === "string" ? body.customerAddress.city : "",
-              state: typeof body.customerAddress?.state === "string" ? body.customerAddress.state : "",
-              line1: typeof body.customerAddress?.line1 === "string" ? body.customerAddress.line1 : "",
-              line2: typeof body.customerAddress?.line2 === "string" ? body.customerAddress.line2 : undefined,
-              postalCode: typeof body.customerAddress?.postalCode === "string" ? body.customerAddress.postalCode : "",
+              city: typeof customerAddress.city === "string" ? body.customerAddress.city : "",
+              state: typeof customerAddress.state === "string" ? body.customerAddress.state : "",
+              line1: typeof customerAddress.line1 === "string" ? body.customerAddress.line1 : "",
+              line2: typeof customerAddress.line2 === "string" ? body.customerAddress.line2 : undefined,
+              postalCode: typeof customerAddress.postalCode === "string" ? body.customerAddress.postalCode : "",
             },
           })
         : await initializePaystackCheckout({ ...input, pricingQuote: pricingQuote!, paymentMethod: providerMethod }, countryCode);
