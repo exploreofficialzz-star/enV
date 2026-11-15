@@ -35,6 +35,7 @@ type FlutterwaveV4NextAction = {
   requires_pin?: unknown;
   requires_otp?: unknown;
   requires_additional_fields?: { fields?: unknown };
+  requires_additional_fields?: { fields?: unknown };
   [key: string]: unknown;
 };
 
@@ -237,6 +238,19 @@ async function flutterwaveRequest(
 
 function asRecord(value: unknown): JsonRecord {
   return value && typeof value === "object" && !Array.isArray(value) ? value as JsonRecord : {};
+}
+
+function isSupportedAvsAdditionalFields(nextAction: JsonRecord): boolean {
+  const fields = asRecord(nextAction.requires_additional_fields).fields;
+  const expected = [
+    "authorization.avs.address.city",
+    "authorization.avs.address.country",
+    "authorization.avs.address.line1",
+    "authorization.avs.address.postal_code",
+    "authorization.avs.address.state",
+  ];
+  return Array.isArray(fields) && fields.length === expected.length &&
+    expected.every((field) => fields.includes(field));
 }
 
 function safeProviderRedirect(value: unknown): string | null {
@@ -578,18 +592,8 @@ export async function initializeFlutterwaveCheckout(input: {
     }
     const nextAction = asRecord(data.next_action) as FlutterwaveV4NextAction;
     const nextActionType = typeof nextAction.type === "string" ? nextAction.type.toLowerCase() : "";
-    const requiredFields = asRecord(nextAction.requires_additional_fields).fields;
-    const avsFieldNames = [
-      "authorization.avs.address.city",
-      "authorization.avs.address.country",
-      "authorization.avs.address.line1",
-      "authorization.avs.address.postal_code",
-      "authorization.avs.address.state",
-    ];
     const isSupportedAvsRequest = nextActionType === "requires_additional_fields" &&
-      Array.isArray(requiredFields) &&
-      requiredFields.length === avsFieldNames.length &&
-      avsFieldNames.every((field) => requiredFields.includes(field));
+      isSupportedAvsAdditionalFields(nextAction);
     const normalizedNextAction = nextActionType === "requires_additional_fields"
       ? isSupportedAvsRequest ? "requires_additional_fields" : "unsupported_additional_fields"
       : nextActionType || null;
@@ -1036,7 +1040,11 @@ export async function authorizeFlutterwaveCharge(input: {
     body: JSON.stringify({ authorization }),
   }, createHash("sha256").update(input.reference + ":" + input.authorizationType + ":" + randomUUID()).digest("hex"));
   const nextAction = asRecord(updated.next_action) as FlutterwaveV4NextAction;
-  const normalizedNextAction = typeof nextAction.type === "string" ? nextAction.type : null;
+  const updatedActionType = typeof nextAction.type === "string" ? nextAction.type.toLowerCase() : "";
+  const normalizedNextAction = updatedActionType === "requires_additional_fields" &&
+    !isSupportedAvsAdditionalFields(nextAction)
+      ? "unsupported_additional_fields"
+      : typeof nextAction.type === "string" ? nextAction.type : null;
   const redirect = safeProviderRedirect(asRecord(nextAction.redirect_url).url);
   const instruction = typeof asRecord(nextAction.payment_instruction).note === "string"
     ? String(asRecord(nextAction.payment_instruction).note).slice(0, 500) : null;
