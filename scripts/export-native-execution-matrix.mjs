@@ -55,7 +55,6 @@ const stats = {
   offlineNative: activeRows.filter((row) => row.android === "offline-native" && row.ios === "offline-native").length,
   backendNative: activeRows.filter((row) => row.android === "backend-native" && row.ios === "backend-native").length,
   webOnly: activeRows.filter((row) => row.android === "web-only" && row.ios === "web-only").length,
-  missingActive: activeRows.filter((row) => row.android === "web-only" || row.ios === "web-only").length,
   divergentActive: activeRows.filter((row) => row.android !== row.ios).length,
   fullyExecutable: activeRows.filter((row) => row.android !== "web-only" && row.ios !== "web-only" && row.android === row.ios).length,
 };
