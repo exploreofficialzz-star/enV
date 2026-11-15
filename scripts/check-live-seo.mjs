@@ -262,7 +262,7 @@ async function checkRenderedRoute(path, schema) {
   assert(imageBytes.readUInt32BE(16) === 1200 && imageBytes.readUInt32BE(20) === 630, path + " social image bytes do not match the declared 1200x630 dimensions");
   assert(jsonLd.some((json) => json.includes('"@type":"' + schema + '"') || json.includes('"@type": "' + schema + '"')),
     path + " is missing JSON-LD schema type " + schema);
-  if (path === "/tools/productivity/zip-any-file") {
+  if (path === "/tools/files/zip-any-file") {
     assert(html.includes("Zip any file"), "Zip any file route does not render its tool name");
     assert(html.includes("Compress") && html.includes("Extract"), "Zip any file route is missing compression or extraction controls");
     assert(html.includes("Private and on-device"), "Zip any file route is missing its local privacy notice");
@@ -283,7 +283,7 @@ async function main() {
       ["/tools/developer/json-studio", "SoftwareApplication"],
       ["/blog", "CollectionPage"],
       ["/blog/tool-json-studio", "TechArticle"],
-      ["/tools/productivity/zip-any-file", "SoftwareApplication"],
+      ["/tools/files/zip-any-file", "SoftwareApplication"],
     ]) await checkRenderedRoute(path, schema);
   } catch (error) {
     failures.push(String(error));
