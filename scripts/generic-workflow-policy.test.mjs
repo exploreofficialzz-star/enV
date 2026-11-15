@@ -141,6 +141,7 @@ test("native catalog exporter applies publication policy while matrix uses the c
   assert.match(nativeExporter, /const canonicalRuntimeTools = getAllTools\(\)/);
   assert.match(matrixExporter, /const catalog = getAllTools\(\)\.slice\(\)/);
   assert.match(matrixExporter, /Runtime registry contains duplicate IDs/);
+  assert.match(matrixExporter, /No matching native Android\/iOS execution row is currently registered/);
 });
 
 test("native coverage and related-catalog audits use canonical availability sources", async () => {
