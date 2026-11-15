@@ -100,17 +100,28 @@ export function getCurrencyMinorUnitExponent(currency: string): number | null {
 }
 
 /**
- * Flutterwave Standard documents amount as int32 in major currency units.
- * A pack is purchasable only when the USD FX result is an exact whole major
- * unit; this avoids sending fractional values that the provider schema rejects.
+ * Flutterwave Standard requires an int32 amount in major currency units.
+ * Normalize the FX quote to the nearest whole major unit using half-up
+ * rounding. Return both representations so the ledger stores exactly the
+ * amount submitted to Flutterwave and later verified by enV.
  */
-export function toFlutterwaveMajorAmount(amountMinor: number, currency: string): number | null {
+export function normalizeFlutterwaveAmount(
+  amountMinor: number,
+  currency: string,
+): { amountMajor: number; amountMinor: number } | null {
   const exponent = getCurrencyMinorUnitExponent(currency);
   if (exponent === null || !Number.isSafeInteger(amountMinor) || amountMinor <= 0) return null;
-  const factor = 10 ** exponent;
-  if (amountMinor % factor !== 0) return null;
-  const amount = amountMinor / factor;
-  return Number.isInteger(amount) && amount > 0 && amount <= 2_147_483_647 ? amount : null;
+  const factor = 10n ** BigInt(exponent);
+  const amountMajor = (BigInt(amountMinor) + factor / 2n) / factor;
+  const normalizedMinor = amountMajor * factor;
+  if (amountMajor <= 0n || amountMajor > 2_147_483_647n ||
+      normalizedMinor > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+  return { amountMajor: Number(amountMajor), amountMinor: Number(normalizedMinor) };
+}
+
+/** Compatibility helper for call sites that only need Flutterwave's major-unit amount. */
+export function toFlutterwaveMajorAmount(amountMinor: number, currency: string): number | null {
+  return normalizeFlutterwaveAmount(amountMinor, currency)?.amountMajor ?? null;
 }
 
 /** Convert a provider major-unit amount into exact integer minor units without floating-point rounding. */
