@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { usdCentsForTokenPack, usdCentsToMinorAmount, formatUsdReferenceForTokenPack } from "./fx.server.ts";
+import {
+  findNearbyFlutterwaveAmountSuggestions,
+  usdCentsForTokenPack,
+  usdCentsToMinorAmount,
+  formatUsdReferenceForTokenPack,
+} from "./fx.server.ts";
 
 test("enV token reference pricing is fixed at one US cent per token", () => {
   assert.equal(usdCentsForTokenPack(100), 100);
@@ -11,6 +16,17 @@ test("enV token reference pricing is fixed at one US cent per token", () => {
   assert.equal(formatUsdReferenceForTokenPack(250), "$2.50");
   assert.throws(() => usdCentsForTokenPack(0), RangeError);
   assert.throws(() => usdCentsForTokenPack(100.5), RangeError);
+});
+
+test("Flutterwave V3 suggestions preserve exact USD-cent pricing and produce whole major-unit charges", () => {
+  const suggestions = findNearbyFlutterwaveAmountSuggestions("GBP", 1_000, 0.78);
+  assert.equal(suggestions.length, 2);
+  assert.ok(suggestions[0]!.usdAmountCents < 1_000);
+  assert.ok(suggestions[1]!.usdAmountCents > 1_000);
+  assert.ok(suggestions.every((item) => item.amountMinor % 100 === 0));
+  assert.ok(suggestions.every((item) => item.amountMajor === item.amountMinor / 100));
+  assert.equal(findNearbyFlutterwaveAmountSuggestions("XOF", 100, 655.957).length, 0);
+  assert.deepEqual(findNearbyFlutterwaveAmountSuggestions("GBP", 1_000, 0), []);
 });
 
 test("FX conversion uses currency minor units and rounds half up with integer arithmetic", () => {
