@@ -85,10 +85,72 @@ const matrix = fs.existsSync(matrixPath) ? JSON.parse(fs.readFileSync(matrixPath
 const matrixById = new Map((matrix?.tools ?? []).map((row) => [row.id, row]));
 
 const browserEvidenceById = new Map();
+const unitEvidenceById = new Map();
+const nativeEvidenceByPlatform = { android: new Map(), ios: new Map() };
+const blockedEvidenceById = new Map();
 const validEvidence = [];
 const invalidEvidence = [];
-for (const audit of observedEvidence.audits ?? []) {
-  if (audit.result !== "passed" || audit.kind !== "browser") continue;
+const evidenceAudits = [...(observedEvidence.audits ?? [])];
+
+// The QR browser script writes exact per-tool progress to this report. The
+// ledger reads it after the verify step, including when the browser audit fails.
+const qrReportPath = path.join(root, "qa-results/qr-barcode-reader-audit.json");
+if (fs.existsSync(qrReportPath)) {
+  try {
+    const qrReport = JSON.parse(fs.readFileSync(qrReportPath, "utf8"));
+    for (const item of qrReport.toolResults ?? []) {
+      if (!byId.has(item.toolId)) {
+        invalidEvidence.push({ auditId: "qr-browser-" + item.toolId, missingIds: [item.toolId], reason: "dynamic-qr-report-references-unknown-tool-id" });
+        continue;
+      }
+      const common = {
+        script: "scripts/browser-qr-barcode-reader-audit.mjs",
+        workflow: "Production Check",
+        workflowRunId: qrReport.workflowRunId ?? null,
+        jobId: "verify",
+        step: "Verify production: QR/barcode browser audit",
+        toolIds: [item.toolId],
+        testedCommit: qrReport.observedCommit ?? currentCommit,
+      };
+      if ((item.checks ?? []).length) {
+        evidenceAudits.push({
+          id: "qr-browser-" + item.toolId + "-passed",
+          kind: "browser",
+          result: "passed",
+          checks: item.checks,
+          notes: (item.notes ?? []).join(" "),
+          ...common,
+        });
+      }
+      if ((item.blockedChecks ?? []).length) {
+        evidenceAudits.push({
+          id: "qr-browser-" + item.toolId + "-blocked",
+          kind: "browser",
+          result: "blocked",
+          checks: item.blockedChecks,
+          notes: (item.notes ?? []).join(" "),
+          ...common,
+        });
+      }
+    }
+  } catch (error) {
+    invalidEvidence.push({
+      auditId: "qr-browser-runtime-report",
+      reason: "dynamic-report-invalid",
+      detail: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+function appendEvidence(target, id, evidence) {
+  target.set(id, [...(target.get(id) ?? []), evidence]);
+}
+
+for (const audit of evidenceAudits) {
+  const blocked = audit.result === "blocked" || audit.status === "BLOCKED";
+  const supportedKind = ["browser", "unit", "native"].includes(audit.kind);
+  if (!blocked && (!supportedKind || audit.result !== "passed")) continue;
+
   let selected = [];
   if (audit.selector?.category) {
     selected = runtimeTools.filter((tool) => tool.category === audit.selector.category);
@@ -106,21 +168,46 @@ for (const audit of observedEvidence.audits ?? []) {
     invalidEvidence.push({ auditId: audit.id, missingIds, reason: "evidence-references-unknown-tool-ids" });
     continue;
   }
+  if (!ids.length) {
+    invalidEvidence.push({ auditId: audit.id, reason: "evidence-selected-no-runtime-tools" });
+    continue;
+  }
+  if (audit.kind === "native" && !["android", "ios"].includes(audit.platform)) {
+    invalidEvidence.push({ auditId: audit.id, reason: "native-evidence-platform-must-be-android-or-ios" });
+    continue;
+  }
+
   const evidence = {
     auditId: audit.id,
-    kind: audit.kind,
-    script: audit.script,
-    workflow: audit.workflow,
-    workflowRunId: audit.workflowRunId,
-    jobId: audit.jobId,
-    step: audit.step,
+    kind: blocked ? "blocked" : audit.kind,
+    platform: audit.platform ?? null,
+    script: audit.script ?? null,
+    tests: audit.tests ?? [],
+    workflow: audit.workflow ?? null,
+    workflowRunId: audit.workflowRunId ?? null,
+    jobId: audit.jobId ?? null,
+    step: audit.step ?? null,
     result: audit.result,
-    testedCommit: observedEvidence.observedCommit,
+    testedCommit: audit.testedCommit ?? observedEvidence.observedCommit ?? null,
     checks: audit.checks ?? [],
     notes: audit.notes ?? "",
   };
-  for (const id of ids) browserEvidenceById.set(id, [...(browserEvidenceById.get(id) ?? []), evidence]);
-  validEvidence.push({ auditId: audit.id, toolCount: ids.length, testedCommit: observedEvidence.observedCommit, workflowRunId: audit.workflowRunId, jobId: audit.jobId });
+
+  for (const id of ids) {
+    if (blocked) appendEvidence(blockedEvidenceById, id, evidence);
+    else if (audit.kind === "browser") appendEvidence(browserEvidenceById, id, evidence);
+    else if (audit.kind === "unit") appendEvidence(unitEvidenceById, id, evidence);
+    else if (audit.kind === "native") appendEvidence(nativeEvidenceByPlatform[audit.platform], id, evidence);
+  }
+  validEvidence.push({
+    auditId: audit.id,
+    kind: blocked ? "blocked" : audit.kind,
+    platform: audit.platform ?? null,
+    toolCount: ids.length,
+    testedCommit: evidence.testedCommit,
+    workflowRunId: evidence.workflowRunId,
+    jobId: evidence.jobId,
+  });
 }
 
 const allTools = runtimeTools.map((tool) => {
@@ -141,6 +228,11 @@ const allTools = runtimeTools.map((tool) => {
   if (!routeResolved) structuralDefects.push("route-resolver-mismatch");
 
   const browserEvidence = browserEvidenceById.get(tool.id) ?? [];
+  const unitEvidence = unitEvidenceById.get(tool.id) ?? [];
+  const androidNativeEvidence = nativeEvidenceByPlatform.android.get(tool.id) ?? [];
+  const iosNativeEvidence = nativeEvidenceByPlatform.ios.get(tool.id) ?? [];
+  const blockedEvidence = blockedEvidenceById.get(tool.id) ?? [];
+  const allEvidence = [...browserEvidence, ...unitEvidence, ...androidNativeEvidence, ...iosNativeEvidence, ...blockedEvidence];
   const checks = {
     sourceInspection: { status: "NOT_INSPECTED", evidence: [] },
     identityUniqueness: { status: duplicateIds.has(tool.id) ? "DEFECT_FOUND" : "STATIC_CHECKED", evidence: ["getAllTools(): stable IDs checked for uniqueness at ledger generation"] },
@@ -164,14 +256,22 @@ const allTools = runtimeTools.map((tool) => {
     networkRestrictions: { status: "NOT_INSPECTED", evidence: [] },
     responsiveAndAccessibility: { status: browserEvidence.some((item) => item.checks.includes("responsiveLayoutSample")) ? "BROWSER_TESTED" : "NOT_INSPECTED", evidence: browserEvidence.filter((item) => item.checks.includes("responsiveLayoutSample")) },
     securityAndPrivacy: { status: "NOT_INSPECTED", evidence: [] },
-    androidNativeExecution: { status: "NOT_INSPECTED", evidence: [] },
-    iosNativeExecution: { status: "NOT_INSPECTED", evidence: [] },
+    unitExecution: { status: unitEvidence.length ? "UNIT_TESTED" : "NOT_INSPECTED", evidence: unitEvidence },
+    androidNativeExecution: { status: androidNativeEvidence.length ? "NATIVE_TESTED" : "NOT_INSPECTED", evidence: androidNativeEvidence },
+    iosNativeExecution: { status: iosNativeEvidence.length ? "NATIVE_TESTED" : "NOT_INSPECTED", evidence: iosNativeEvidence },
+    blockedChecks: { status: blockedEvidence.length ? "BLOCKED" : "NOT_INSPECTED", evidence: blockedEvidence },
   };
   const auditStatus = structuralDefects.length
     ? "DEFECT_FOUND"
-    : browserEvidence.length
-      ? "BROWSER_TESTED"
-      : "STATIC_CHECKED";
+    : blockedEvidence.length
+      ? "BLOCKED"
+      : androidNativeEvidence.length || iosNativeEvidence.length
+        ? "NATIVE_TESTED"
+        : browserEvidence.length
+          ? "BROWSER_TESTED"
+          : unitEvidence.length
+            ? "UNIT_TESTED"
+            : "STATIC_CHECKED";
   const matrixRow = matrixById.get(tool.id) ?? null;
   return {
     id: tool.id,
@@ -188,21 +288,21 @@ const allTools = runtimeTools.map((tool) => {
     auditStatus,
     structuralDefects,
     checks,
-    evidence: browserEvidence,
+    evidence: allEvidence,
     native: {
       android: {
         localManifest: native.android.local.has(tool.id),
         backendManifest: native.android.backend.has(tool.id),
         anyCoverageManifest: native.android.all.has(tool.id),
         executionMatrixClass: matrixRow?.android ?? null,
-        functionalTestStatus: matrixRow?.android === "web-only" ? "NOT_APPLICABLE" : "NOT_INSPECTED",
+        functionalTestStatus: androidNativeEvidence.length ? "NATIVE_TESTED" : matrixRow?.android === "web-only" ? "NOT_APPLICABLE" : "NOT_INSPECTED",
       },
       ios: {
         localManifest: native.ios.local.has(tool.id),
         backendManifest: native.ios.backend.has(tool.id),
         anyCoverageManifest: native.ios.all.has(tool.id),
         executionMatrixClass: matrixRow?.ios ?? null,
-        functionalTestStatus: matrixRow?.ios === "web-only" ? "NOT_APPLICABLE" : "NOT_INSPECTED",
+        functionalTestStatus: iosNativeEvidence.length ? "NATIVE_TESTED" : matrixRow?.ios === "web-only" ? "NOT_APPLICABLE" : "NOT_INSPECTED",
       },
     },
     nativeExecutionMatrixRecordPresent: Boolean(matrixRow),
@@ -256,7 +356,7 @@ const report = {
     sourceInspected: allTools.filter((tool) => tool.checks.sourceInspection.status === "SOURCE_INSPECTED").length,
     staticChecked: allTools.filter((tool) => tool.checks.identityUniqueness.status === "STATIC_CHECKED" && tool.checks.catalogueRegistration.status === "STATIC_CHECKED" && tool.checks.categoryAssignment.status === "STATIC_CHECKED" && tool.checks.declaredEngineMapping.status === "STATIC_CHECKED").length,
     unitTested: allTools.filter((tool) => Object.values(tool.checks).some((check) => check.status === "UNIT_TESTED")).length,
-    browserTested: allTools.filter((tool) => tool.auditStatus === "BROWSER_TESTED").length,
+    browserTested: allTools.filter((tool) => tool.checks.pageRendering.status === "BROWSER_TESTED" || tool.checks.functionalExecution.status === "BROWSER_TESTED").length,
     nativeTested: allTools.filter((tool) => tool.checks.androidNativeExecution.status === "NATIVE_TESTED" || tool.checks.iosNativeExecution.status === "NATIVE_TESTED").length,
     fullyVerified: statusCounts.VERIFIED,
     blocked: statusCounts.BLOCKED,
@@ -272,12 +372,15 @@ const report = {
       androidBackendManifestIds: native.android.backend.size,
       iosBackendManifestIds: native.ios.backend.size,
       nativeExecutionMatrixRecords: matrixById.size,
-      nativeMatrixMissingRuntimeIds,
-      nativeMatrixExtraIds,
-      androidNativeFunctionalTestsPerTool: 0,
-      iosNativeFunctionalTestsPerTool: 0,
+      nativeMatrixMissingRuntimeIds: matrixMissingRuntimeIds,
+      nativeMatrixExtraIds: matrixExtraIds,
+      androidNativeFunctionalTestsPerTool: nativeEvidenceByPlatform.android.size,
+      iosNativeFunctionalTestsPerTool: nativeEvidenceByPlatform.ios.size,
     },
-    browserEvidence: validEvidence,
+    browserEvidence: validEvidence.filter((item) => item.kind === "browser"),
+    unitEvidence: validEvidence.filter((item) => item.kind === "unit"),
+    nativeEvidence: validEvidence.filter((item) => item.kind === "native"),
+    blockedEvidence: validEvidence.filter((item) => item.kind === "blocked"),
     invalidEvidence,
   },
   tools: allTools,

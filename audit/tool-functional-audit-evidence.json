@@ -1,16 +1,16 @@
 {
   "schemaVersion": 1,
-  "evidenceSetId": "pr154-current-head-browser-evidence",
-  "observedCommit": "c9008abccb59487f89fd3a4c1d435edfcbd5e023",
-  "note": "These are exact per-tool browser audits observed on the stated commit. Evidence remains attached to that tested commit; the ledger records the current source commit separately and never upgrades untested checks to VERIFIED.",
+  "evidenceSetId": "pr154-head-3a507b27-individual-tool-evidence",
+  "observedCommit": "3a507b27a0b14b66ea9c9cd08f1b1fa8c863409e",
+  "note": "Evidence is attached to the exact tested commit and workflow/job. Browser, unit and native records are scoped to the explicit stable IDs shown. Dynamic QR/barcode browser evidence is read from qa-results/qr-barcode-reader-audit.json after the live audit; blocked checks are preserved rather than counted as passes. Manifest membership and execution-matrix classification are never treated as per-tool native test evidence.",
   "audits": [
     {
       "id": "celebrations-93-mobile-browser",
       "kind": "browser",
       "script": "scripts/browser-celebrations-audit.mjs",
       "workflow": "Production Check",
-      "workflowRunId": 43727567173,
-      "jobId": 132852806558,
+      "workflowRunId": 43732911229,
+      "jobId": 132869193064,
       "step": "Verify all 93 Celebrations tools on a mobile browser",
       "result": "passed",
       "selector": {
@@ -23,15 +23,15 @@
         "outputValidation",
         "runtimeErrorCheck"
       ],
-      "notes": "The script iterates all 93 catalogue IDs and checks each tool's rendered experience at a 390x844 viewport. It does not establish every input, boundary case, permissions, token, backend, offline or native check."
+      "notes": "All 93 exact catalogue IDs were routed through the mobile browser audit. This does not establish every visible control, boundary case, token, backend, offline or native check."
     },
     {
       "id": "file-workspace-six-browser",
       "kind": "browser",
       "script": "scripts/audit-file-workspace-browser.mjs",
       "workflow": "Production Check",
-      "workflowRunId": 43727567173,
-      "jobId": 132852806558,
+      "workflowRunId": 43732911229,
+      "jobId": 132869193064,
       "step": "Verify local File workspace workflows in the browser",
       "result": "passed",
       "toolIds": [
@@ -49,15 +49,15 @@
         "fileImportExport",
         "runtimeErrorCheck"
       ],
-      "notes": "Six explicit routes are opened and their representative local file/folder workflows and output are checked; this is not exhaustive input/control coverage."
+      "notes": "Six explicit routes and representative local file/folder workflows were exercised. This is not exhaustive control or boundary-input coverage."
     },
     {
       "id": "zip-any-file-browser",
       "kind": "browser",
       "script": "scripts/audit-zip-any-file-browser.mjs",
       "workflow": "Production Check",
-      "workflowRunId": 43727567173,
-      "jobId": 132852806558,
+      "workflowRunId": 43732911229,
+      "jobId": 132869193064,
       "step": "Verify Zip any file compression and extraction in the browser",
       "result": "passed",
       "toolIds": [
@@ -70,38 +70,15 @@
         "fileImportExport",
         "runtimeErrorCheck"
       ],
-      "notes": "Browser test verifies multi-file and single-file ZIP creation, CRC-checked reads, extraction round-trip and no application API writes."
-    },
-    {
-      "id": "qr-reader-three-route-browser",
-      "kind": "browser",
-      "script": "scripts/browser-qr-barcode-reader-audit.mjs",
-      "workflow": "Production Check",
-      "workflowRunId": 43727567173,
-      "jobId": 132852806558,
-      "step": "Verify production (nested verify command: npm run audit:qr-barcode:browser)",
-      "result": "passed",
-      "toolIds": [
-        "qr-generator",
-        "code128-barcode",
-        "qr-payload-inspector"
-      ],
-      "checks": [
-        "routeRendering",
-        "interactionExecution",
-        "outputValidation",
-        "fileImportExport",
-        "persistenceSample"
-      ],
-      "notes": "The script generates QR and Code 128 fixtures, scans them through the reader, checks multi-code decoding and verifies local history after reload. It covers three exact tool IDs, not all 52 QR-category records."
+      "notes": "The browser test verified multi-file and single-file archive creation, CRC-checked reads, extraction round-trip and no application API writes."
     },
     {
       "id": "ai-music-data-sandbox-browser",
       "kind": "browser",
       "script": "scripts/audit-ai-music-data-sandbox-browser.mjs",
       "workflow": "AI Music Data Sandbox",
-      "workflowRunId": 43727567365,
-      "jobId": 132852729541,
+      "workflowRunId": 43732911320,
+      "jobId": 132869131579,
       "step": "Verify sandbox workflow and accessibility",
       "result": "passed",
       "toolIds": [
@@ -116,7 +93,50 @@
         "responsiveLayoutSample",
         "runtimeErrorCheck"
       ],
-      "notes": "The dedicated sandbox route is tested with local audio/tag fixtures and responsive browser viewports. This does not establish all music/audio tools or native implementations."
+      "notes": "Dedicated sandbox browser route tested with local audio/tag fixtures and responsive viewports. It does not cover the rest of the Audio category or native implementations."
+    },
+    {
+      "id": "ai-music-data-sandbox-unit",
+      "kind": "unit",
+      "script": "src/lib/engines/music-sandbox.test.ts; src/lib/engines/music-sandbox-analysis.test.ts; src/lib/registry-music-sandbox.test.ts",
+      "tests": [
+        "training-readiness",
+        "local audio-analysis limits and provenance",
+        "sandbox route and compatibility aliases"
+      ],
+      "workflow": "AI Music Data Sandbox",
+      "workflowRunId": 43732911320,
+      "jobId": 132869131579,
+      "step": "Run npm run test:music-data-sandbox",
+      "result": "passed",
+      "toolIds": [
+        "song-metadata-analyzer"
+      ],
+      "checks": [
+        "unitExecution",
+        "outputValidation"
+      ],
+      "notes": "Unit tests cover sandbox rights/review gates, metadata preservation, decoded-audio limits and the exact Web route/legacy aliases. No broader Audio-family claim is made."
+    },
+    {
+      "id": "celebrations-93-android-native-dispatch",
+      "kind": "native",
+      "platform": "android",
+      "script": "apps/android/app/src/test/java/com/chastech/env/NativeCelebrationEngineTest.kt",
+      "workflow": "Web and Android CI — authoritative",
+      "workflowRunId": 43732911157,
+      "jobId": 132869195732,
+      "step": "Run Kotlin unit tests and Android lint",
+      "result": "passed",
+      "selector": {
+        "category": "celebrations"
+      },
+      "expectedToolCount": 93,
+      "checks": [
+        "nativeDispatch",
+        "outputValidation"
+      ],
+      "notes": "The Android test enumerates all 93 expected IDs and verifies independent Kotlin operation parsing, then exercises representative invitation, page, quiz, memory and countdown outputs. This is not 93 separate full UI/device acceptance tests."
     }
   ]
 }
