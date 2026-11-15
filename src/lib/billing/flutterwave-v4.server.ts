@@ -856,13 +856,36 @@ export async function verifyAndCreditFlutterwaveReference(
   if (!intent || intent.provider !== "flutterwave") {
     fail("The Flutterwave payment reference was not found.", "PAYMENT_NOT_FOUND", 404);
   }
-  const chargeId = intent.provider_transaction_id;
-  if (!chargeId || (expectedTransactionId && expectedTransactionId !== chargeId)) {
+  let chargeId = intent.provider_transaction_id;
+  if (!chargeId) {
+    // Virtual-account transfers can complete asynchronously, so the charge ID
+    // is learned from the charge list/webhook rather than the account creation response.
+    const listed = await flutterwaveRequest("/charges?reference=" + encodeURIComponent(reference) + "&size=10");
+    const rows = Array.isArray(listed.items) ? listed.items.map(asRecord)
+      : Array.isArray(listed.data) ? listed.data.map(asRecord)
+      : Object.keys(listed).length ? [listed] : [];
+    const matched = rows.find((row) => row.reference === reference || row.tx_ref === reference);
+    const discoveredId = asProviderId(matched?.id);
+    if (!discoveredId) {
+      fail("Flutterwave has not reported a completed charge for this reference yet.", "PAYMENT_NOT_CONFIRMED", 409);
+    }
+    const sql = await getSql();
+    const updated = await sql.query<{ provider_transaction_id: string }>(
+      "update billing_purchase_intents set provider_transaction_id = $2, updated_at = now() " +
+      "where id = $1 and provider = 'flutterwave' and (provider_transaction_id is null or provider_transaction_id = $2) " +
+      "returning provider_transaction_id",
+      [reference, discoveredId],
+    );
+    if (!updated[0]) fail("The Flutterwave charge ID conflicts with the saved purchase.", "PURCHASE_MISMATCH", 409);
+    chargeId = updated[0].provider_transaction_id;
+  }
+  if (expectedTransactionId && expectedTransactionId !== chargeId) {
     fail("The Flutterwave charge does not match this purchase reference.", "PAYMENT_NOT_CONFIRMED", 409);
   }
   const charge = await flutterwaveRequest("/charges/" + encodeURIComponent(chargeId));
-  const returnedId = typeof charge.id === "string" ? charge.id : "";
-  const returnedReference = typeof charge.reference === "string" ? charge.reference : "";
+  const returnedId = asProviderId(charge.id) ?? "";
+  const returnedReference = typeof charge.reference === "string"
+    ? charge.reference : typeof charge.tx_ref === "string" ? charge.tx_ref : "";
   const status = typeof charge.status === "string" ? charge.status.toLowerCase() : "";
   const paidAmountMinor = parseMajorUnitsToMinor(charge.amount as string | number | undefined, intent.currency);
   if (returnedId !== chargeId || returnedReference !== reference ||
@@ -1141,18 +1164,23 @@ export async function handleFlutterwaveWebhook(request: Request) {
     fail("The Flutterwave webhook payload is invalid.", "INVALID_WEBHOOK", 400);
   }
   const data = asRecord(body.data);
-  const eventName = typeof body.type === "string" ? body.type.toLowerCase() : "";
+  const eventName = typeof body.type === "string" ? body.type.toLowerCase()
+    : typeof body.event === "string" ? body.event.toLowerCase() : "";
   const eventId = asProviderId(body.id);
   if (eventName === "charge.completed") {
-    const reference = typeof data.reference === "string" ? data.reference : "";
+    const reference = typeof data.reference === "string" ? data.reference
+      : typeof data.tx_ref === "string" ? data.tx_ref : "";
     const chargeId = asProviderId(data.id);
-    if (!reference || !chargeId) fail("The Flutterwave charge event is incomplete.", "INVALID_WEBHOOK", 400);
-    if (String(data.status).toLowerCase() === "failed" || String(data.status).toLowerCase() === "voided") {
+    if (!reference || !/^[a-f0-9-]{36}$/i.test(reference)) {
+      fail("The Flutterwave charge event is missing its enV purchase reference.", "INVALID_WEBHOOK", 400);
+    }
+    const status = String(data.status).toLowerCase();
+    if (status === "failed" || status === "voided") {
       await updateFlutterwaveIntentStatus(reference, "failed");
       return { status: "failed" as const };
     }
-    if (String(data.status).toLowerCase() !== "succeeded") return { status: "pending" as const };
-    return verifyAndCreditFlutterwaveReference(reference, chargeId, eventId ?? undefined);
+    if (status !== "succeeded" && status !== "successful") return { status: "pending" as const };
+    return verifyAndCreditFlutterwaveReference(reference, chargeId ?? undefined, eventId ?? undefined);
   }
   if (eventName === "refund.completed") return handleFlutterwaveRefundWebhook(data);
   if (eventName.startsWith("chargeback.")) return handleFlutterwaveChargebackWebhook(data);
