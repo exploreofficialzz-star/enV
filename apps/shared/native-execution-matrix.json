@@ -2,15 +2,15 @@
   "schemaVersion": 4,
   "generatedBy": "scripts/export-native-execution-matrix.mjs",
   "stats": {
-    "total": 10002,
-    "active": 9742,
+    "total": 10004,
+    "active": 9744,
     "planned": 260,
-    "offlineNative": 7900,
+    "offlineNative": 7902,
     "backendNative": 1565,
     "webOnly": 277,
     "missingActive": 277,
     "divergentActive": 0,
-    "fullyExecutable": 9465
+    "fullyExecutable": 9467
   },
   "tools": [
     {
@@ -90026,6 +90026,24 @@
       "id": "a-book",
       "status": "active",
       "category": "productivity",
+      "engine": "custom",
+      "android": "offline-native",
+      "ios": "offline-native"
+    },
+    {
+      "id": "zip-any-file",
+      "name": "Zip any file",
+      "status": "active",
+      "category": "files",
+      "engine": "custom",
+      "android": "offline-native",
+      "ios": "offline-native"
+    },
+    {
+      "id": "camera-studio",
+      "name": "Camera Studio",
+      "status": "active",
+      "category": "photography",
       "engine": "custom",
       "android": "offline-native",
       "ios": "offline-native"
