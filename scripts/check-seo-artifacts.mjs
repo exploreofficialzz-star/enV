@@ -88,6 +88,11 @@ assert.ok(result.inventory.includes("Android native coverage manifest lists " + 
 assert.deepEqual([...nativeInventory.androidToolIds].sort(), [...nativeInventory.iosToolIds].sort(), "Android and iOS native coverage manifests must list the same stable tool IDs.");
 assert.match(result.inventory, /Android native manifest \| iOS native manifest/);
 assert.match(result.inventory, /base catalogue fingerprint/);
+const birthdayPageTool = result.tools.find((tool) => tool.id === "birthday-page-generator");
+assert.ok(birthdayPageTool, "The source-verified Celebration Page Generator must be an indexable canonical Web tool.");
+assert.ok(result.urls.includes("/tools/celebrations/birthday-page-generator"), "The Celebration Page Generator must be present in the sitemap URL inventory.");
+assert.ok(result.urls.includes("/blog/tool-birthday-page-generator"), "The Celebration Page Generator usage guide must be present in the sitemap URL inventory.");
+assert.ok(result.urls.includes("/tools/creators") && result.urls.includes("/tools/celebrations"), "Creator and Celebration category pages must remain discoverable.");
 assert.ok(result.tools.length > 0);
 assert.ok(result.guideTools.length >= result.tools.length);
 assert.ok(result.eligibleToolCount > result.guideTools.length, "Duplicate generated equations must be consolidated from SEO discovery while remaining in the app catalog.");
