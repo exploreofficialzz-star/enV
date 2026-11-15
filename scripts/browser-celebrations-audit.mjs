@@ -181,9 +181,16 @@ try {
   await browser.close();
 }
 const report = {
-  baseUrl, viewport: { width: 390, height: 844 }, total: results.length,
+  schemaVersion: 1,
+  observedCommit: process.env.GITHUB_SHA ?? null,
+  workflowRunId: process.env.GITHUB_RUN_ID ? Number(process.env.GITHUB_RUN_ID) : null,
+  jobId: process.env.GITHUB_JOB ?? null,
+  baseUrl,
+  viewport: { width: 390, height: 844 },
+  total: results.length,
   passed: results.filter((result) => result.status === "passed").length,
-  failed: results.filter((result) => result.status === "failed").length, results,
+  failed: results.filter((result) => result.status === "failed").length,
+  results,
 };
 if (reportPath) {
   await fs.mkdir(path.dirname(reportPath), { recursive: true });
