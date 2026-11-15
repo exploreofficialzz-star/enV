@@ -5,7 +5,7 @@ import { initializePaystackCheckout, minimumPaystackAmountMinor } from "../../..
 import { initializeCryptomusCheckout } from "../../../../src/lib/billing/cryptomus.server";
 import { initializeFlutterwaveCheckout } from "../../../../src/lib/billing/flutterwave.server";
 import { getCustomerCountry } from "../../../../src/lib/billing/country-routing";
-import { getFundingOptions } from "../../../../src/lib/billing/paystack.server";
+import { getFundingOptions } from "../../../../src/lib/billing/funding.server";
 import { quoteTokenPacks, type CurrencyPackQuote } from "../../../../src/lib/billing/fx.server";
 import { getFundingCandidates, type CustomerPaymentMethod } from "../../../../src/lib/billing/payment-methods";
 
@@ -26,6 +26,7 @@ const SAFE_CHECKOUT_FAILURES: Record<string, { status: number; message: string }
   FLUTTERWAVE_API_ERROR: { status: 502, message: "Flutterwave could not process this request. No wallet tokens were added." },
   ACCOUNT_NAME_REQUIRED: { status: 400, message: "Add your first and last name to your enV account before funding the wallet." },
   ACCOUNT_PHONE_REQUIRED: { status: 400, message: "Enter a valid phone number to continue with Flutterwave." },
+  INVALID_CUSTOMER_ADDRESS: { status: 400, message: "Enter a complete billing address to continue with Flutterwave." },
   INVALID_PAYMENT_DETAILS: { status: 400, message: "Check the payment details and try again." },
   INVALID_AUTHORIZATION: { status: 400, message: "The bank authorization details are invalid." },
   PAYMENT_METHOD_NOT_AVAILABLE_FOR_COUNTRY: { status: 422, message: "That payment method is not available for your detected country." },
@@ -114,6 +115,13 @@ export default defineHandler(async (event) => {
             pricingQuote: pricingQuote!,
             paymentDetails: body.flutterwaveDetails,
             customerName: typeof body.customerName === "string" ? body.customerName : "",
+            customerAddress: {
+              city: typeof body.customerAddress?.city === "string" ? body.customerAddress.city : "",
+              state: typeof body.customerAddress?.state === "string" ? body.customerAddress.state : "",
+              line1: typeof body.customerAddress?.line1 === "string" ? body.customerAddress.line1 : "",
+              line2: typeof body.customerAddress?.line2 === "string" ? body.customerAddress.line2 : undefined,
+              postalCode: typeof body.customerAddress?.postalCode === "string" ? body.customerAddress.postalCode : "",
+            },
           })
         : await initializePaystackCheckout({ ...input, pricingQuote: pricingQuote!, paymentMethod: providerMethod }, countryCode);
     const checkoutData = {
