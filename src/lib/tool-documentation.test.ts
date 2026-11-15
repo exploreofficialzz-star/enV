@@ -387,8 +387,8 @@ test("generic engine guide branches preserve each tool's catalogue task statemen
     };
     assert.equal(
       toolTaskGuidanceSource(tool),
-      "operation-specific",
-      sample.id + ": this narrowly matched task rule must be classified as operation-specific",
+      "engine-specific",
+      sample.id + ": shared engine-family guidance must be classified as engine-specific",
     );
     const whenToUse = getToolDocumentation(tool).find((section) => section.id === "when-to-use");
     assert.ok(whenToUse, sample.id + ": guide must include a when-to-use section");
