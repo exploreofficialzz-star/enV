@@ -3,7 +3,9 @@ import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { CATEGORIES } from "../src/data/categories.ts";
 import { BLOG_ARTICLES } from "../src/data/blog-articles.ts";
-import { getSearchableTools, getToolsByCategory, toolPath } from "../src/lib/registry.ts";
+import { getAllTools, getSearchableTools, getToolsByCategory, toolPath } from "../src/lib/registry.ts";
+import { tools as sourceCatalogTools } from "../src/data/catalog.ts";
+import { createSocialCardArtifacts } from "./social-card-images.mjs";
 import { canonicalSeoTools, canonicalToolPath, isIndexableTool, toolSeoTitle, toolSeoDescription, toolGuideSeoTitle, toolSearchIntentTerms } from "../src/lib/seo-metadata.ts";
 import { toolTaskGuidanceSource, toolDocumentationSummary, toolStatusLabel } from "../src/lib/tool-documentation.ts";
 import { buildIndexNowKeyArtifact } from "./indexnow-utils.mjs";
@@ -220,6 +222,67 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
     tableCell(toolSeoDescription(tool)),
     "[Open tool](" + SITE_ORIGIN + canonicalToolPath(tool) + ") |",
   ].join(" | "));
+  // Inventory every source/runtime/search/category surface, not only canonical SEO pages.
+  const runtimeRegistryTools = getAllTools();
+  const searchableRegistryTools = getSearchableTools();
+  const categoryRouteTools = CATEGORIES.flatMap((category) => getToolsByCategory(category.id));
+  const inventoryById = new Map();
+  const addInventoryRecord = (tool, source, includeRoute = true) => {
+    const entry = inventoryById.get(tool.id) ?? { sourceTool: null, runtimeTool: null, sources: new Set(), routes: new Set() };
+    if (source === "source-catalog" && !entry.sourceTool) entry.sourceTool = tool;
+    if (source !== "source-catalog") entry.runtimeTool = tool;
+    entry.sources.add(source);
+    if (includeRoute && source !== "source-catalog") entry.routes.add(toolPath(tool));
+    inventoryById.set(tool.id, entry);
+  };
+  for (const tool of sourceCatalogTools) addInventoryRecord(tool, "source-catalog", false);
+  for (const tool of runtimeRegistryTools) addInventoryRecord(tool, "runtime-registry");
+  for (const tool of searchableRegistryTools) addInventoryRecord(tool, "public-search");
+  for (const category of CATEGORIES) {
+    for (const tool of getToolsByCategory(category.id)) addInventoryRecord(tool, "category-route:" + category.id);
+  }
+  for (const tool of eligibleToolRecords) addInventoryRecord(tool, "canonical-seo-candidate");
+  const countBy = (records, keyFor) => {
+    const counts = new Map();
+    for (const record of records) { const key = keyFor(record) || "(missing)"; counts.set(key, (counts.get(key) ?? 0) + 1); }
+    return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  };
+  const runtimeInventoryRows = [...inventoryById.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([id, entry]) => {
+    const tool = entry.runtimeTool ?? entry.sourceTool;
+    const canonical = canonicalSeoToolFor(tool, guideTools);
+    let canonicalTarget = canonical ? canonicalToolPath(canonical) : "";
+    let disposition = canonical ? (canonical.id === id ? "Canonical public route" : "Consolidated to " + canonical.id) : "";
+    if (!canonical) {
+      if (tool.status === "planned") disposition = "Planned catalogue record";
+      else if (tool.id === "artboard-studio" || tool.slug === "artboard-studio") disposition = "Retired legacy route";
+      else if (!entry.sources.has("public-search")) disposition = "Not included in public search discovery";
+      else disposition = "No canonical SEO record; inspect production or alias policy";
+      canonicalTarget = "—";
+    }
+    return { id, tool, routes: [...entry.routes].sort(), canonicalTarget, disposition, sources: [...entry.sources].sort() };
+  });
+  const sourceDuplicateCount = sourceCatalogTools.length - new Set(sourceCatalogTools.map((tool) => tool.id)).size;
+  const runtimeDuplicateCount = runtimeRegistryTools.length - new Set(runtimeRegistryTools.map((tool) => tool.id)).size;
+  const inventoryCell = (value) => String(value ?? "").replace(/\s+/g, " ").replaceAll("|", "\\|").trim();
+  const sourceStatusCounts = countBy(sourceCatalogTools, (tool) => tool.status);
+  const runtimeStatusCounts = countBy(runtimeInventoryRows, (row) => row.tool.status);
+  const runtimeCategoryCounts = countBy(runtimeInventoryRows, (row) => row.tool.category);
+  const runtimeEngineCounts = countBy(runtimeInventoryRows, (row) => row.tool.engine?.type);
+  const sourceEngineCounts = countBy(sourceCatalogTools, (tool) => tool.engine?.type);
+  const categoryCounts = CATEGORIES.map((category) => [category.id, getToolsByCategory(category.id).length]);
+  const reconciledRows = runtimeInventoryRows.map((row) => {
+    const tool = row.tool;
+    const target = row.canonicalTarget && row.canonicalTarget !== "—" ? "[" + inventoryCell(row.canonicalTarget) + "](" + SITE_ORIGIN + row.canonicalTarget + ")" : inventoryCell(row.disposition);
+    return [
+      "| " + inventoryCell(row.id), inventoryCell(tool.name), inventoryCell(tool.category),
+      inventoryCell(tool.subcategory ?? "—"), inventoryCell(tool.status), inventoryCell(tool.slug),
+      inventoryCell(row.routes.join(", ") || "—"), target, inventoryCell(inventoryEngine(tool)),
+      inventoryCell(inventoryCatalogueFlags(tool)), inventoryCell(toolTaskGuidanceSource(tool)),
+      inventoryCell((tool.keywords ?? []).join(", ")), inventoryCell((tool.tags ?? []).join(", ")),
+      inventoryCell((tool.related ?? []).join(", ")), inventoryCell(row.sources.join(", ")),
+    ].join(" | ");
+  });
+  const socialCards = createSocialCardArtifacts({ categories: CATEGORIES, toolPages: tools, guideTools, siteOrigin: SITE_ORIGIN });
   const taskGuidanceSourceCounts = new Map();
   for (const tool of guideTools) {
     const source = toolTaskGuidanceSource(tool);
@@ -236,6 +299,31 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
     "# enV public tool SEO inventory",
     "",
     "This file is generated from the live tool registry during the production build. It is a review and coverage artifact, not a source of search-volume data or a ranking report.",
+    "## Full catalogue and runtime reconciliation",
+    "",
+    "- Raw shared source catalogue records: " + sourceCatalogTools.length,
+    "- Unique source catalogue IDs: " + new Set(sourceCatalogTools.map((tool) => tool.id)).size,
+    "- Duplicate source catalogue IDs: " + sourceDuplicateCount,
+    "- Web runtime registry records: " + runtimeRegistryTools.length,
+    "- Unique web runtime registry IDs: " + new Set(runtimeRegistryTools.map((tool) => tool.id)).size,
+    "- Duplicate web runtime registry IDs: " + runtimeDuplicateCount,
+    "- Public searchable records including virtual studio entries: " + searchableRegistryTools.length,
+    "- Unique records across source, runtime and discovery surfaces: " + runtimeInventoryRows.length,
+    "- Category route records across " + CATEGORIES.length + " categories: " + categoryRouteTools.length,
+    "- Category route counts: " + categoryCounts.map(([id, count]) => id + "=" + count).join("; "),
+    "- Source catalogue status counts: " + sourceStatusCounts.map(([status, count]) => status + "=" + count).join("; "),
+    "- Runtime status counts: " + runtimeStatusCounts.map(([status, count]) => status + "=" + count).join("; "),
+    "- Runtime category counts: " + runtimeCategoryCounts.map(([category, count]) => category + "=" + count).join("; "),
+    "- Runtime engine-family counts: " + runtimeEngineCounts.map(([engine, count]) => engine + "=" + count).join("; "),
+    "- Source engine-family counts: " + sourceEngineCounts.map(([engine, count]) => engine + "=" + count).join("; "),
+    "- This table includes planned, legacy, virtual, hidden and consolidated rows so count differences are visible instead of silently discarded.",
+    "- Registry engine configuration and account flags are metadata, not proof that remote services, credentials or native capabilities work.",
+    "- Canonical public targets come from the SEO registry; other records show the reason they are not currently canonical public tool pages.",
+    "",
+    "| Tool ID | Name | Category | Subcategory | Status | Slug | Registry and category routes | Canonical public route or disposition | Engine operation/configuration | Catalogue execution/account flags | Task guidance source | Keywords | Tags | Related IDs | Source surfaces |",
+    "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
+    ...reconciledRows,
+    "",
     "",
     "- Task guidance source counts: " + taskGuidanceSourceSummary,
     "- Task guidance source meanings: operation-specific = a narrow rule for a named tool or closely related task identified by its stable ID/name; engine-specific = shared task advice for an engine family; category-guidance = shared task advice for a category; catalogue-fallback = catalogue purpose plus generic usage advice.",
@@ -312,6 +400,8 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
 
   return {
     eligibleToolCount: eligibleToolRecords.length,
+    runtimeInventory: runtimeInventoryRows,
+    socialCards,
     sitemap,
     sitemapFiles: sitemapArtifacts.files,
     sitemapUrlCount: sitemapArtifacts.totalUrls,
@@ -343,6 +433,16 @@ async function run() {
     } else {
       await mkdir(dirname(absolutePath), { recursive: true });
       await writeFile(absolutePath, expected, "utf8");
+    }
+  }
+  for (const artifact of artifacts.socialCards) {
+    const absolutePath = resolve(process.cwd(), artifact.path);
+    if (check) {
+      const actual = await readFile(absolutePath).catch(() => null);
+      if (!actual || !actual.equals(artifact.content)) mismatches.push(artifact.path);
+    } else {
+      await mkdir(dirname(absolutePath), { recursive: true });
+      await writeFile(absolutePath, artifact.content);
     }
   }
   // The internal inventory is a convenience report, not a crawlable deployment artifact.
