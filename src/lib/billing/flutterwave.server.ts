@@ -7,7 +7,6 @@ export {
   getFlutterwaveFundingOption,
   getFlutterwaveCardEncryptionKey,
   initializeFlutterwaveCheckout,
-  initializeFlutterwaveBankTransfer,
   verifyAndCreditFlutterwaveReference,
   authorizeFlutterwaveCharge,
   handleFlutterwaveWebhook,
