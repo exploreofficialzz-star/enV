@@ -24,7 +24,7 @@ const iosFileDispatcher = fs.readFileSync(new URL('../apps/ios/enV/NativeZipArch
 const iosFileConverter = fs.readFileSync(new URL('../apps/ios/enV/NativeFileConverterEngine.swift', import.meta.url), 'utf8');
 const fileWorkspaceScreenIds = [
   'file-organizer', 'batch-file-renamer', 'duplicate-file-finder',
-  'folder-size-analyzer', 'file-search', 'file-compare',
+  'folder-size-analyzer', 'file-search',
 ];
 if (!androidFileDispatch || !iosFileDispatcher.includes('NativeFileWorkspaceScreen(toolID: tool.id)')) {
   throw new Error('File workspace native screen dispatch is missing on Android or iOS.');
@@ -33,6 +33,11 @@ for (const id of fileWorkspaceScreenIds) {
   if (!androidFileWorkspace.includes(id) || !iosFileDispatcher.includes(id)) {
     throw new Error(`File workspace screen implementation is missing for ${id}.`);
   }
+}
+// File & Folder Compare deliberately uses the file-workspace dispatcher's default
+// branch on both platforms; verify its concrete compare action rather than a switch ID.
+if (!androidFileWorkspace.includes('Compare folders') || !iosFileDispatcher.includes('Compare folders')) {
+  throw new Error('File & Folder Compare default native workflow is missing on Android or iOS.');
 }
 if (!androidFileConverter.includes('"file-to-txt"') || !iosFileConverter.includes('"file-to-txt"') ||
     !iosFileDispatcher.includes('tool.id == "file-to-txt"')) {
