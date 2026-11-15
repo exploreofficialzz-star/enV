@@ -507,6 +507,70 @@ function toolSpecificGuidanceBase(tool: ToolMeta): ToolSpecificGuidance {
   const name = tool.name.toLowerCase();
   const category = tool.category;
 
+  if (category === "celebrations" && id.endsWith("-page-generator")) {
+    return {
+      source: "operation-specific",
+      overview: "This Celebration Page Generator creates a standalone HTML programme page for the selected occasion. It combines the title, honoree, host, message, optional event date and venue, details and a line-by-line schedule into a themed page with a responsive layout. It does not host the page or publish it to a public URL.",
+      example: "Choose the occasion-specific Page Generator, enter the title and recipient, add the date, time zone and venue where relevant, then write the main message. Add one programme item per line when there is a schedule. Inspect the in-tool HTML preview on a narrow and wide screen, then download the HTML page or copy the text version.",
+      validation: "The title is limited to 120 characters, honoree and host to 100 each, location to 180, and the main message and extra details to 3,000 each. The exported HTML escapes user-provided text. A downloaded HTML file is a local deliverable; hosting, a shareable public link, guest responses and calendar invitations are not provided by this generator.",
+    };
+  }
+  if (category === "celebrations" && id.endsWith("-interactive-card")) {
+    return {
+      source: "operation-specific",
+      overview: "This Interactive Celebration Card exports a themed greeting card with a front message and a second message panel that the recipient opens with an in-page button. It is a self-contained HTML card, not a hosted card or a messaging service.",
+      example: "Enter the card title, the person being celebrated and your greeting, then write the text that should appear inside the card. Choose one of the available visual themes, use the preview to test the Open your card button, and download the HTML file before sharing it through a channel you control.",
+      validation: "The reveal button only changes the hidden message panel in the exported page. The main message is limited to 3,000 characters. User text is HTML-escaped before it is inserted into the document. The export does not send a message, track whether it was opened, host the card online or collect a response.",
+    };
+  }
+  if (category === "celebrations" && id.endsWith("-invitation-generator")) {
+    return {
+      source: "operation-specific",
+      overview: "This Invitation Generator prepares a themed HTML invitation and a copyable text version. The invitation can include the event date and local time, venue, host, honoree, RSVP contact or link, reply deadline and dress code. It prepares the invitation only; it does not deliver invitations or manage guest responses.",
+      example: "Enter the event details, select the correct IANA time zone for the date and time, then add either a usable RSVP contact or a complete HTTP/HTTPS RSVP link. Set a reply-by date and check the rendered invitation and destination link before downloading the HTML or copying its text.",
+      validation: "The event date/time must be a real local time in the chosen IANA time zone; clock-change times that do not exist or occur twice are rejected. An RSVP link must use HTTP or HTTPS and cannot include embedded credentials. At least an RSVP link or contact method and a reply-by value are required for the invitation workflow. The tool does not send email/SMS, verify that a link is still live, track responses or maintain a guest list.",
+    };
+  }
+  if (category === "celebrations" && id.endsWith("-countdown")) {
+    return {
+      source: "operation-specific",
+      overview: "This Celebration Countdown calculates the time remaining until the event date and time using the selected time zone. The tool updates the days, hours, minutes and seconds while the countdown screen is open, and the exported HTML page contains its own local countdown script.",
+      example: "Enter the occasion title, event date and local time, then confirm the IANA time-zone value. Compare the displayed countdown with a trusted clock in the same zone. Preview and download the HTML when you want a countdown page that can be opened separately.",
+      validation: "A valid date, time and IANA time zone are required. Nonexistent or repeated local times around daylight-saving transitions are rejected instead of being guessed. The countdown reaches zero when the target instant passes; it does not send reminders, run in the background after the page is closed, create calendar events or notify guests.",
+    };
+  }
+  if (category === "celebrations" && id.endsWith("-memory-page")) {
+    return {
+      source: "operation-specific",
+      overview: "This Memory Page creates a themed, standalone HTML page for written memories and an optional photo gallery. It embeds supported photos into the exported document so they can appear without a separate remote image host.",
+      example: "Write the title and memory note, select up to eight JPG, PNG, WebP or AVIF images, and inspect the gallery in the preview. Check the images and text before downloading the HTML page or copying the text-only version.",
+      validation: "The photo picker accepts JPG, PNG, WebP and AVIF files, with a 2 MB per-image limit and an 8 MB total selection limit. The export includes at most eight safe image data URLs; SVG and other formats are not accepted. Keep a separate copy of the original photos because the HTML export is a new file, not a backup or photo-library upload.",
+    };
+  }
+  if (category === "celebrations" && id.endsWith("-reveal-page")) {
+    return {
+      source: "operation-specific",
+      overview: "This Reveal Page builds a themed HTML page where a visitor selects Reveal the message to display a hidden note. It is suitable for a planned announcement, personal message or occasion reveal; it does not deliver the reveal at a scheduled time or notify a recipient.",
+      example: "Add a title and introductory message, write the exact content to keep hidden, and use the preview to press Reveal the message. Download the HTML page only after confirming that the hidden text and opening text are correct.",
+      validation: "The revealed content is included in the exported HTML and becomes visible when the page button is activated; it is not encrypted or access-controlled. User-provided text is escaped before HTML generation. Do not put passwords, private credentials or information that must remain secret into a reveal page.",
+    };
+  }
+  if (category === "celebrations" && id.endsWith("-quiz-generator")) {
+    return {
+      source: "operation-specific",
+      overview: "This Celebration Quiz Generator creates a small multiple-choice quiz in a standalone HTML page. It uses the question and answer choices you supply, marks one exact choice as correct, and gives immediate Correct or Try again feedback when a visitor selects an answer.",
+      example: "Enter a title and short introduction, write one question, then add between two and six choices with one choice per line. Enter the correct answer so it matches one of those choices, and test both a correct and incorrect selection in the preview before exporting the HTML.",
+      validation: "The quiz requires a non-empty question, two to six non-empty choices and a correct answer that matches one choice (case-insensitive). The generated page grades only that single question locally; it does not store scores, identify participants, collect submissions, randomize questions or provide a multi-question quiz engine.",
+    };
+  }
+  if (category === "celebrations" && id.endsWith("-surprise-page")) {
+    return {
+      source: "operation-specific",
+      overview: "This Surprise Page creates a themed HTML page with an introductory message and a button that opens the surprise content. The exported page contains the surprise text and reveals it when the visitor activates the button; it is not a scheduled delivery or private messaging service.",
+      example: "Enter the occasion title, a short introduction and the exact surprise message. Test Open your surprise in the preview, confirm that the correct text appears, and download the HTML page for sharing through a channel you choose.",
+      validation: "A missing reveal message is reported as a quality check. The surprise text is present in the generated HTML even while its panel is hidden, so the file should not be treated as confidential or encrypted. Review the final exported page before sending it to the intended recipient.",
+    };
+  }
   if (category === "creators" && id.endsWith("-content-calendar")) {
     return {
       source: "operation-specific",
