@@ -20,6 +20,7 @@ export const Route = createFileRoute("/tools/")({
       title: "All Online Tools | Calculators, Converters and Utilities | enV",
       description: "Browse enV's collection of practical online tools by category. Find calculators, converters, developer utilities, image and audio tools, productivity helpers, and more.",
       path: "/tools",
+      ...homepageSocialCard(),
       structuredData: categorySchema("All enV tools", "Browse practical online tools across supported enV categories.", "/tools", visibleTools)
     });
   },
