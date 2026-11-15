@@ -8,6 +8,7 @@ import { readBoundedBytes } from "./bounded-json.server";
 import {
   getCountryPaymentProfile,
   getCurrencyMinorUnitExponent,
+  normalizeCountryCode,
   parseMajorUnitsToMinor,
   toFlutterwaveMajorAmount,
 } from "./country-routing";
@@ -26,6 +27,14 @@ function publicOrigin(): string | null {
   } catch { return null; }
 }
 
+function safeFlutterwaveMessage(value: unknown): string | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  return value.trim()
+    .replace(/[\\w.+-]+@[\\w.-]+\\.[A-Za-z]{2,}/g, "[redacted-email]")
+    .replace(/[\\r\\n\\t]+/g, " ")
+    .slice(0, 180);
+}
+
 function enabledCurrencies(): Set<string> {
   return new Set((process.env.FLUTTERWAVE_ENABLED_CURRENCIES ?? "")
     .split(",").map((value) => value.trim().toUpperCase()).filter(Boolean));
@@ -40,6 +49,7 @@ function launchChecksPassed(): boolean {
 }
 
 function resolveConfiguration(countryCode: string | null | undefined) {
+  if (normalizeCountryCode(countryCode) === "NG") return null;
   const profile = getCountryPaymentProfile(countryCode);
   if (!profile) return null;
   const currency = profile.currency;
@@ -240,6 +250,11 @@ export async function initializeFlutterwaveCheckout(input: {
       })],
   );
 
+  let providerHttpStatus: number | null = null;
+  let providerStatus: string | null = null;
+  let providerCode: string | null = null;
+  let providerMessage: string | null = null;
+  let failureStage = "provider_request";
   try {
     const response = await fetch("https://api.flutterwave.com/v3/payments", {
       method: "POST",
@@ -274,15 +289,23 @@ export async function initializeFlutterwaveCheckout(input: {
       }),
       signal: AbortSignal.timeout(12_000),
     });
-    const payload = await response.json() as {
-      status?: string; data?: { link?: string };
-    };
+    providerHttpStatus = response.status;
+    const payload = await response.json().catch(() => null) as {
+      status?: string; message?: string; code?: string; error_id?: string;
+      data?: { link?: string };
+    } | null;
+    providerStatus = typeof payload?.status === "string" ? payload.status : null;
+    providerCode = typeof payload?.code === "string" ? payload.code
+      : typeof payload?.error_id === "string" ? payload.error_id : null;
+    providerMessage = safeFlutterwaveMessage(payload?.message);
+    failureStage = "validate_provider_response";
     let checkout: URL | null = null;
-    try { if (payload.data?.link) checkout = new URL(payload.data.link); } catch { checkout = null; }
-    if (!response.ok || payload.status !== "success" || !checkout ||
+    try { if (payload?.data?.link) checkout = new URL(payload.data.link); } catch { checkout = null; }
+    if (!response.ok || payload?.status !== "success" || !checkout ||
         checkout.protocol !== "https:" || checkout.hostname !== "checkout.flutterwave.com") {
       throw new Error("Flutterwave did not return a valid hosted checkout URL.");
     }
+    failureStage = "persist_checkout";
     await sql.query(
       "update billing_purchase_intents set status = 'pending', checkout_url = $2, " +
       "provider_metadata = $3::jsonb, updated_at = now() where id = $1 and status = 'created'",
@@ -302,7 +325,20 @@ export async function initializeFlutterwaveCheckout(input: {
       })],
     );
     return { authorizationUrl: checkout.href, reference: intentId, tokens: input.tokenPack };
-  } catch {
+  } catch (error) {
+    console.error("[billing-flutterwave-checkout] " + JSON.stringify({
+      purchaseIntentId: intentId,
+      countryCode: profile.countryCode,
+      currency,
+      amountMajor,
+      paymentOptions: selectedPaymentOptions,
+      stage: failureStage,
+      httpStatus: providerHttpStatus,
+      providerStatus,
+      providerCode,
+      providerMessage,
+      causeType: error instanceof Error ? error.name : "UnknownError",
+    }));
     await sql.query(
       "update billing_purchase_intents set status = 'failed', updated_at = now() where id = $1 and status = 'created'",
       [intentId],
