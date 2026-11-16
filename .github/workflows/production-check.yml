@@ -158,6 +158,10 @@ jobs:
           BROWSER_AUDIT_SAMPLE: 250
         run: npm run verify
 
+      - name: Reconcile native execution matrix for per-tool audit
+        if: always()
+        run: npm run export:native-execution-matrix && npm run check:native-executability
+
       - name: Generate per-tool functional audit ledger
         if: always()
         run: npm run audit:tool-ledger -- --output=audit/tool-functional-audit-ledger.json

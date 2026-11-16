@@ -4,12 +4,14 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { getAllTools, getSearchableTools, getToolByPath } from "../src/lib/registry.ts";
 import { CATEGORIES } from "../src/data/categories.ts";
+import { classifyAuditEvidenceCommit } from "./audit-evidence-provenance.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const args = process.argv.slice(2);
 const option = (name, fallback) => args.find((arg) => arg.startsWith("--" + name + "="))?.slice(name.length + 3) ?? fallback;
 const outputPath = path.resolve(root, option("output", "audit/tool-functional-audit-ledger.json"));
-const currentCommit = process.env.GITHUB_SHA ?? process.env.GIT_COMMIT ?? null;
+const currentCommit = [process.env.GITHUB_SHA, process.env.VERCEL_GIT_COMMIT_SHA, process.env.GIT_COMMIT]
+  .find((value) => typeof value === "string" && value.trim())?.trim() ?? null;
 const observedEvidence = JSON.parse(fs.readFileSync(path.join(root, "audit/tool-functional-audit-evidence.json"), "utf8"));
 
 const runtimeTools = getAllTools().slice();
@@ -88,6 +90,8 @@ const browserEvidenceById = new Map();
 const unitEvidenceById = new Map();
 const nativeEvidenceByPlatform = { android: new Map(), ios: new Map() };
 const blockedEvidenceById = new Map();
+const nonCurrentEvidenceById = new Map();
+const nonCurrentEvidence = [];
 const validEvidence = [];
 const invalidEvidence = [];
 const evidenceAudits = [...(observedEvidence.audits ?? [])];
@@ -110,7 +114,7 @@ if (fs.existsSync(qrReportPath)) {
         jobId: "verify",
         step: "Verify production: QR/barcode browser audit",
         toolIds: [item.toolId],
-        testedCommit: qrReport.observedCommit ?? currentCommit,
+        testedCommit: qrReport.observedCommit ?? null,
       };
       if ((item.checks ?? []).length) {
         evidenceAudits.push({
@@ -209,7 +213,7 @@ if (fs.existsSync(celebrationsReportPath)) {
           jobId: report.jobId ?? "verify",
           step: "Verify all 93 Celebrations tools on a mobile browser",
           toolIds: [item.tool],
-          testedCommit: report.observedCommit ?? currentCommit,
+          testedCommit: report.observedCommit ?? null,
         };
         if (item.status === "passed") {
           evidenceAudits.push({
@@ -254,6 +258,37 @@ function appendEvidence(target, id, evidence) {
 }
 
 for (const audit of evidenceAudits) {
+  const provenance = classifyAuditEvidenceCommit({
+    testedCommit: audit.testedCommit,
+    fallbackCommit: observedEvidence.observedCommit,
+    currentCommit,
+  });
+  if (provenance.classification !== "current") {
+    const selectedIds = audit.selector?.category
+      ? runtimeTools.filter((tool) => tool.category === audit.selector.category).map((tool) => tool.id)
+      : (audit.toolIds ?? []);
+    const nonCurrent = {
+      auditId: audit.id,
+      kind: audit.kind ?? null,
+      classification: provenance.classification,
+      reason: provenance.reason,
+      testedCommit: provenance.testedCommit,
+      currentCommit: provenance.currentCommit,
+      toolIds: selectedIds,
+      selector: audit.selector ?? null,
+      expectedToolCount: audit.expectedToolCount ?? null,
+      notes: audit.notes ?? "",
+    };
+    nonCurrentEvidence.push(nonCurrent);
+    for (const id of selectedIds) {
+      if (byId.has(id)) appendEvidence(nonCurrentEvidenceById, id, nonCurrent);
+    }
+    if (provenance.classification === "invalid") {
+      invalidEvidence.push({ auditId: audit.id, reason: provenance.reason, testedCommit: provenance.testedCommit, currentCommit });
+    }
+    continue;
+  }
+
   const blocked = audit.result === "blocked" || audit.status === "BLOCKED";
   const supportedKind = ["browser", "unit", "native"].includes(audit.kind);
   if (!blocked && (!supportedKind || audit.result !== "passed")) continue;
@@ -339,6 +374,7 @@ const allTools = runtimeTools.map((tool) => {
   const androidNativeEvidence = nativeEvidenceByPlatform.android.get(tool.id) ?? [];
   const iosNativeEvidence = nativeEvidenceByPlatform.ios.get(tool.id) ?? [];
   const blockedEvidence = blockedEvidenceById.get(tool.id) ?? [];
+  const toolNonCurrentEvidence = nonCurrentEvidenceById.get(tool.id) ?? [];
   const allEvidence = [...browserEvidence, ...unitEvidence, ...androidNativeEvidence, ...iosNativeEvidence, ...blockedEvidence];
   const checks = {
     sourceInspection: { status: "NOT_INSPECTED", evidence: [] },
@@ -396,6 +432,7 @@ const allTools = runtimeTools.map((tool) => {
     structuralDefects,
     checks,
     evidence: allEvidence,
+    nonCurrentEvidence: toolNonCurrentEvidence,
     native: {
       android: {
         localManifest: native.android.local.has(tool.id),
@@ -438,6 +475,7 @@ const report = {
     categoriesSource: "src/data/categories.ts",
     nativeManifestSources: ["apps/{android,ios}/native-tool-coverage.txt", "apps/{android,ios}/native-family-coverage/*.txt", "apps/{android,ios}/backend-tool-coverage.txt"],
     nativeMatrixSource: "apps/shared/native-execution-matrix.json",
+    evidenceCommitPolicy: "Only audit evidence tested against the exact current sourceCommit SHA contributes to current per-tool test status. Historical or unverified evidence is retained separately.",
     observedBrowserEvidenceSet: observedEvidence.evidenceSetId,
     observedBrowserEvidenceCommit: observedEvidence.observedCommit,
   },
@@ -488,6 +526,13 @@ const report = {
     unitEvidence: validEvidence.filter((item) => item.kind === "unit"),
     nativeEvidence: validEvidence.filter((item) => item.kind === "native"),
     blockedEvidence: validEvidence.filter((item) => item.kind === "blocked"),
+    nonCurrentEvidence: {
+      auditCount: nonCurrentEvidence.length,
+      historicalAuditCount: nonCurrentEvidence.filter((item) => item.classification === "historical").length,
+      unverifiedAuditCount: nonCurrentEvidence.filter((item) => item.classification === "unverified").length,
+      affectedToolCount: nonCurrentEvidenceById.size,
+      records: nonCurrentEvidence,
+    },
     invalidEvidence,
   },
   tools: allTools,
@@ -518,6 +563,10 @@ console.log(JSON.stringify({
     nativeTested: report.summary.nativeTested,
     fullyVerified: report.summary.fullyVerified,
     blocked: report.summary.blocked,
+    nonCurrentEvidenceAudits: report.summary.nonCurrentEvidence.auditCount,
+    historicalEvidenceAudits: report.summary.nonCurrentEvidence.historicalAuditCount,
+    unverifiedEvidenceAudits: report.summary.nonCurrentEvidence.unverifiedAuditCount,
+    toolsWithNonCurrentEvidence: report.summary.nonCurrentEvidence.affectedToolCount,
     toolsWithDefects: report.summary.toolsWithDefects,
     remainingNotFullyVerified: report.summary.remainingNotFullyVerified,
   },
