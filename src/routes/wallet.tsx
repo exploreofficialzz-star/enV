@@ -220,7 +220,7 @@ function paymentAmountLabel(entry: WalletActivity): string | null {
   if ((entry.source !== "purchase" && entry.entry_type !== "purchase") || !entry.currency || entry.payment_amount_minor == null) return null;
   try {
     const formatter = new Intl.NumberFormat(undefined, { style: "currency", currency: entry.currency });
-    const fractionDigits = formatter.resolvedOptions().maximumFractionDigits;
+    const fractionDigits = formatter.resolvedOptions().maximumFractionDigits ?? 2;
     return formatter.format(entry.payment_amount_minor / (10 ** fractionDigits));
   } catch {
     return `${entry.payment_amount_minor} ${entry.currency}`;
