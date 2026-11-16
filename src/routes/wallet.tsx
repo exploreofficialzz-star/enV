@@ -506,7 +506,7 @@ function Account() {
 
   useEffect(() => {
     const controller = new AbortController();
-    setState({ status: "loading" });
+    setState((current) => current.status === "ready" ? current : { status: "loading" });
     void fetch("/api/billing/wallet", { credentials: "same-origin", cache: "no-store", signal: controller.signal })
       .then(async (response) => {
         const payload = await response.json() as { ok?: boolean; data?: { wallet?: WalletData; activity?: WalletActivity[] }; message?: string; error?: string };
