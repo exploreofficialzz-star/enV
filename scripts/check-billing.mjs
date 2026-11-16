@@ -219,6 +219,12 @@ assert.match(paymentMethods, /provider\.paymentMethods \?\? provider\.paymentOpt
 assert.match(paymentMethods, /resolveFlutterwaveFundingMethod/, "generic Card and Local payment choices must resolve through supported V4 channels");
 assert.match(walletDashboard, /resolveFlutterwaveFundingMethod\([\s\S]{0,80}method,/, "wallet checkout must not fall back to a generic provider request when a V4 channel is available");
 assert.match(walletDashboard, /resolveFlutterwaveFundingMethod\([\s\S]{0,100}selectedPaymentMethod,/, "the first Continue step must use the same supported V4 channel resolver");
+assert.match(walletDashboard, /Phone number \(optional\)/, "card and bank checkout must not require customer contact phone");
+assert.match(walletDashboard, /Mobile-money number \(required\)/, "mobile-money must still collect the wallet's routing number");
+assert.match(walletDashboard, /aria-label="Card expiry date \(MM\/YY\)"/, "card expiry must be one MM/YY input");
+assert.doesNotMatch(walletDashboard, /flutterwaveExpiryMonth|flutterwaveExpiryYear/, "expiry month and year must not occupy separate inputs");
+assert.match(flutterwaveService, /normalizeOptionalPhoneNumber/, "V4 customer phone handling must be optional and validated separately");
+assert.match(flutterwaveService, /billing-flutterwave-charge-failed/, "failed charges must log safe processor diagnostics");
 assert.doesNotMatch(walletDashboard, /fundingOptionsState\.flutterwave\?\.enabled === true\s*\?\s*method === "card"/, "V4 channel routing must not depend on a duplicate ready flag after generic availability has been approved");
 assert.match(fxPricingTests, /1\.00 US checkout quote round-trips/, "the $1.00 US checkout minimum must have an explicit USD round-trip regression test");
 assert.match(countryRouting, /countryCode: "US", currency: "USD"/, "the US country profile must remain mapped to USD card checkout");
