@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { ArrowDownToLine, Coins, RefreshCw, Wallet, Clock3, Copy, Gift, Users, Video, CreditCard, TrendingUp, Share2, ArrowUpRight, Link2, Eye, EyeOff, X } from "lucide-react";
-import { parseUsdAmountToCents, type CustomerPaymentMethod } from "@/lib/billing/payment-methods";
+import {
+  parseUsdAmountToCents,
+  resolveFlutterwaveFundingMethod,
+  type CustomerPaymentMethod,
+  type FlutterwaveFundingMethod,
+} from "@/lib/billing/payment-methods";
 import { AppShell } from "@/components/layout/app-shell";
 import {
   clearWebOfflineIssueKey,
@@ -36,7 +41,7 @@ type WalletActivity = {
 
 type WalletState = { status: "loading" | "ready" | "unavailable"; message?: string; wallet?: WalletData; activity?: WalletActivity[] };
 type WalletFundingChoice = CustomerPaymentMethod;
-type FlutterwaveMethod = "card" | "mobile_money" | "bank_transfer";
+type FlutterwaveMethod = FlutterwaveFundingMethod;
 type FlutterwaveBankTransferDetails = {
   accountNumber: string;
   bankName: string;
@@ -570,17 +575,11 @@ function Account() {
     setFundingFeedback(null);
     try {
       const availableFlutterwaveMethods = fundingOptionsState.flutterwave?.paymentMethods ?? [];
-      const firstLocalFlutterwaveMethod = availableFlutterwaveMethods.find((entry) => entry !== "card") ?? null;
-      const checkoutFlutterwaveMethod: FlutterwaveMethod | null =
-        fundingOptionsState.flutterwave?.enabled === true
-          ? method === "card" && availableFlutterwaveMethods.includes("card")
-            ? "card"
-            : method === "local"
-              ? flutterwaveMethod !== "card" && availableFlutterwaveMethods.includes(flutterwaveMethod)
-                ? flutterwaveMethod
-                : firstLocalFlutterwaveMethod
-              : null
-          : null;
+      const checkoutFlutterwaveMethod = resolveFlutterwaveFundingMethod(
+        method,
+        availableFlutterwaveMethods,
+        flutterwaveMethod,
+      );
       let flutterwaveDetails: Record<string, unknown> | undefined;
       if (checkoutFlutterwaveMethod !== null) {
         const rawPhoneNumber = flutterwavePhoneNumber.replace(/\D/g, "");
@@ -1490,16 +1489,13 @@ function Account() {
                 onClick={() => {
                   if (fundingStep === "methods") {
                     const channels = fundingOptionsState.flutterwave?.paymentMethods ?? [];
-                    const cardAvailable = fundingOptionsState.flutterwave?.enabled === true && channels.includes("card");
-                    const localMethod = channels.find((entry) => entry !== "card");
-                    if (selectedPaymentMethod === "card" && cardAvailable) {
-                      setFlutterwaveMethod("card");
-                      setFundingStep("details");
-                      setFundingFeedback(null);
-                      return;
-                    }
-                    if (selectedPaymentMethod === "local" && fundingOptionsState.flutterwave?.enabled === true && localMethod) {
-                      setFlutterwaveMethod(localMethod);
+                    const checkoutMethod = resolveFlutterwaveFundingMethod(
+                      selectedPaymentMethod,
+                      channels,
+                      flutterwaveMethod,
+                    );
+                    if (checkoutMethod !== null) {
+                      setFlutterwaveMethod(checkoutMethod);
                       setFundingStep("details");
                       setFundingFeedback(null);
                       return;
