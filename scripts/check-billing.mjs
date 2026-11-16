@@ -141,7 +141,12 @@ assert.match(ledger, /from billing_purchase_intents p/,
 assert.match(ledger, /l\.reference_id = p\.id or l\.idempotency_key = 'purchase:' \|\| p\.id/,
   "purchase-intent history must not duplicate a payment already represented by a ledger credit");
 assert.match(ledger, /order by created_at desc, id desc/);
-assert.match(ledger, /nextCursor: hasMore && last/);
+assert.match(ledger, /cursor_created_at/);
+assert.match(ledger, /id::text/);
+assert.match(ledger, /HH24:MI:SS\.US/);
+assert.match(androidPricing, /"wallet" -> NativeWalletDashboard\(onOpenHistory\)/);
+assert.match(androidPricing, /fun NativeInformationScreen\([\s\S]*?onOpenHistory: \(\) -> Unit/);
+assert.match(ledger, /nextCursor: hasMore && lastRow/);
 assert.match(walletDashboard, /wallet-activity\?/);
 assert.match(walletDashboard, /Load more transactions/);
 assert.match(walletDashboard, /paymentAmountLabel\(entry\)/);

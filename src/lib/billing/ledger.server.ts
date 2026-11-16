@@ -522,7 +522,7 @@ function parseWalletActivityCursor(value?: string | null): WalletActivityCursor 
   if (!Number.isFinite(timestamp) || !id || id.length > 200 || /[\u0000-\u001f]/.test(id)) {
     throw new Error("The transaction history cursor is invalid. Refresh the history and try again.");
   }
-  return { createdAt: new Date(timestamp).toISOString(), id };
+  return { createdAt, id };
 }
 
 function signedAmount(value: unknown): number {
@@ -546,6 +546,7 @@ export async function getWalletActivity(userId: string, limit = 20, cursor?: str
     description: string;
     reference_id: string | null;
     created_at: string | Date;
+    cursor_created_at: string;
     status: string;
     currency: string | null;
     payment_amount_minor: number | string | null;
@@ -562,6 +563,7 @@ export async function getWalletActivity(userId: string, limit = 20, cursor?: str
               l.description,
               l.reference_id,
               l.created_at,
+              to_char(l.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as cursor_created_at,
               case when l.entry_type = 'purchase' then 'credited' else 'completed' end as status,
               l.currency,
               l.payment_amount_minor,
@@ -591,6 +593,7 @@ export async function getWalletActivity(userId: string, limit = 20, cursor?: str
               end as description,
               p.id as reference_id,
               coalesce(p.credited_at, p.updated_at, p.created_at) as created_at,
+              to_char(coalesce(p.credited_at, p.updated_at, p.created_at) at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as cursor_created_at,
               p.status,
               p.currency,
               p.amount_minor as payment_amount_minor,
@@ -607,10 +610,10 @@ export async function getWalletActivity(userId: string, limit = 20, cursor?: str
           )
      )
      select id, entry_type, delta_available_subunits, delta_reserved_subunits,
-            consumed_subunits, description, reference_id, created_at, status,
+            consumed_subunits, description, reference_id, created_at, cursor_created_at, status,
             currency, payment_amount_minor, provider, provider_transaction_id, source
        from wallet_activity
-      where ($2::timestamptz is null or (created_at, id) < ($2::timestamptz, $3::text))
+      where ($2::timestamptz is null or (created_at, id::text) < ($2::timestamptz, $3::text))
       order by created_at desc, id desc
       limit $4`,
     [userId, decodedCursor?.createdAt ?? null, decodedCursor?.id ?? null, boundedLimit + 1],
@@ -636,10 +639,10 @@ export async function getWalletActivity(userId: string, limit = 20, cursor?: str
     provider_transaction_id: row.provider_transaction_id,
     source: row.source,
   }));
-  const last = items.at(-1);
+  const lastRow = pageRows.at(-1);
   return {
     items,
-    nextCursor: hasMore && last ? `${last.created_at}|${last.id}` : null,
+    nextCursor: hasMore && lastRow ? `${lastRow.cursor_created_at}|${lastRow.id}` : null,
     hasMore,
   };
 }

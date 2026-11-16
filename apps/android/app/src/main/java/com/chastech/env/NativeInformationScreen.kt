@@ -339,7 +339,7 @@ fun NativeInformationScreen(pageId: String, catalog: com.chastech.env.data.Catal
                     InformationSection("Welcome back to enV", listOf("Sign in or create an account from the enV sign-in page."))
                     Button(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/account"))) }, modifier = Modifier.fillMaxWidth()) { Text("Continue to sign in") }
                 }
-                "wallet" -> NativeWalletDashboard()
+                "wallet" -> NativeWalletDashboard(onOpenHistory)
                 "history" -> NativeWalletHistory()
                 "privacy" -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     PrivacyInformation()
