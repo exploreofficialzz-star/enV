@@ -217,7 +217,7 @@ function activityIcon(entry: WalletActivity): React.ReactNode {
 }
 
 function paymentAmountLabel(entry: WalletActivity): string | null {
-  if (entry.source !== "purchase" || !entry.currency || entry.payment_amount_minor == null) return null;
+  if ((entry.source !== "purchase" && entry.entry_type !== "purchase") || !entry.currency || entry.payment_amount_minor == null) return null;
   try {
     const formatter = new Intl.NumberFormat(undefined, { style: "currency", currency: entry.currency });
     const fractionDigits = formatter.resolvedOptions().maximumFractionDigits;
