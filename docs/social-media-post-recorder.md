@@ -16,7 +16,7 @@ The input is a public social-media post URL. The intended output is one MP4 that
 1. The user pastes a post URL.
 2. enV validates the URL and identifies a supported provider.
 3. The capture worker loads the publicly accessible post using a mobile browser viewport and waits for the real post content to render.
-4. The user chooses a capture duration and starts the capture. The worker records the rendered page and its playback audio where the platform/browser exposes it.
+4. The user approves screen capture and records the real display. Recording audio depends on the operating system and source app.
 5. The worker verifies the output and returns a playable MP4.
 6. The user can preview and save the MP4.
 
@@ -54,4 +54,4 @@ TikTok is the first reference provider because the supplied target example is a 
 
 ## Current status
 
-The tool is not released. Platform capture behavior and device-version support must be verified before the tool is marked production-ready.
+The standalone tool is wired into the Web, Android, and iOS catalogues. The Web implementation records a user-selected browser surface; Android records screen video to MP4 without source-app audio; iOS launches the post and guides the user to the system Screen Recording controls. Provider/device acceptance testing is still required before calling the entire feature production-ready.
