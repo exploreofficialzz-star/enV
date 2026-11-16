@@ -26,7 +26,7 @@ page.on("request", (request) => {
   }
 });
 
-async function runTool(toolId, title, operation, notes, category = "files") {
+async function runTool(toolId, title, operation, notes, category = "files", options = {}) {
   let check = "routeRendering";
   const completedChecks = [];
   const errorsBefore = pageErrors.length;
@@ -34,10 +34,10 @@ async function runTool(toolId, title, operation, notes, category = "files") {
   try {
     const response = await page.goto(baseUrl + "/tools/" + category + "/" + toolId, { waitUntil: "networkidle" });
     assert.equal(response?.status(), 200, toolId + " route returns HTTP 200");
-    await page.getByRole("heading", { name: title }).first().waitFor();
+    await page.getByRole("heading", { name: options.heading ?? title }).first().waitFor();
     await page.waitForFunction(
       (id) => document.documentElement.dataset.envToolHydrated === id,
-      toolId,
+      options.hydratedToolId ?? toolId,
       { timeout: 12000 },
     );
     completedChecks.push("routeRendering");
@@ -108,16 +108,16 @@ async function runFileTransform({
   }, notes, category);
 }
 
-async function runTextTransform({ id, title, category = "files", input, validate, notes }) {
+async function runTextTransform({ id, title, category = "files", input, validate, notes, heading = title, hydratedToolId = id, inputSelector = "#text-in", buttonName = "Run" }) {
   await runTool(id, title, async () => {
-    await page.locator("#text-in").fill(input);
-    await page.getByRole("button", { name: "Run", exact: true }).click();
+    await page.locator(inputSelector).fill(input);
+    await page.getByRole("button", { name: buttonName, exact: true }).click();
     const output = page.locator('pre[aria-label="Formatted output"]');
     await output.waitFor({ timeout: 10000 });
     const value = await output.innerText();
     validate(value);
     await page.getByRole("button", { name: "Download", exact: true }).waitFor();
-  }, notes, category);
+  }, notes, category, { heading, hydratedToolId });
 }
 
 try {
@@ -161,6 +161,10 @@ try {
     id: "css-minifier-advanced",
     title: "Advanced CSS Minifier",
     category: "developer",
+    heading: "Markup & Style Studio",
+    hydratedToolId: "markup-studio",
+    inputSelector: "#dev-input",
+    buttonName: "Minify",
     input: "/* remove this comment */ .card { color: red; margin: 0; }",
     validate(value) {
       assert.equal(value, ".card{color:red;margin:0}");

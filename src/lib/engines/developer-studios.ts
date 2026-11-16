@@ -1982,7 +1982,7 @@ export async function runDeveloperStudio(op: string, input: string, secondary = 
     if (suffix === "encoder") return cssEscapeContent(input);
     if (suffix === "decoder") return cssUnescapeContent(input);
     if (suffix === "generator") return `:root {\n  --primary: #0d9f8a;\n}\n\n.example {\n  color: var(--primary);\n  padding: 1rem;\n}\n`;
-    if (suffix === "minifier") return minifySafe(input,"css");
+    if (suffix === "minifier" || lower === "css-minify") return minifySafe(input,"css");
     if (suffix === "formatter" || suffix === "beautifier" || suffix === "preview") return formatWithGrammar(input, "css");
     if (suffix === "inspector" || suffix === "parser") return JSON.stringify({ rules:(input.match(/[^{}]+\{[^{}]*\}/g)||[]).map(rule=>({selector:rule.slice(0,rule.indexOf("{")).trim(),declarations:(rule.match(/:[^;{}]+/g)||[]).length})), atRules:(input.match(/@[-\w]+/g)||[]).length, braceCounts:{open:(input.match(/\{/g)||[]).length,close:(input.match(/\}/g)||[]).length}, note:"Rule inspection is lightweight and does not cover the complete CSS grammar."},null,2);
     if (suffix === "validator" || suffix === "tester") { if(!value) throw new Error("Paste CSS input first."); const opens=(input.match(/\{/g)||[]).length, closes=(input.match(/\}/g)||[]).length; if(opens!==closes) throw new Error(`CSS braces do not balance (${opens} opening, ${closes} closing).`); if(/(^|;)\s*:[^:]/m.test(input)) throw new Error("Found a declaration with no property name."); return "Basic CSS structure checks passed. This is not full CSS grammar or browser compatibility validation."; }

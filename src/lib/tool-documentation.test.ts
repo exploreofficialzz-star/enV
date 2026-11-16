@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 import { CATEGORIES } from "@/data/categories";
 import type { ToolMeta } from "@/types/tool";
 import { getSearchableTools, getToolsByCategory, getToolById, getToolByPath } from "@/lib/registry";
+import { developerModeForLegacySlug, developerStudioForLegacySlug } from "@/lib/developer-studios-catalog";
+import { runDeveloperStudio } from "@/lib/engines/developer-studios";
 import { canonicalSeoTools, isIndexableTool } from "@/lib/seo-metadata";
 import { getToolDocumentation, toolTaskGuidanceSource, toolDocumentationSummary } from "@/lib/tool-documentation";
 import { groupToolsBySubcategory } from "@/lib/category-tool-groups";
@@ -884,4 +886,24 @@ test("keeps Advanced CSS Minifier and JSON-to-CSV as separate stable tool identi
   assert.equal(getToolByPath("files", "json-to-csv")?.id, "json-to-csv");
   assert.equal(searchable.filter((tool) => tool.id === "css-minifier-advanced").length, 1);
   assert.equal(searchable.filter((tool) => tool.id === "json-to-csv").length, 1);
+});
+
+
+test("preserves Advanced CSS Minifier identity and operation through Markup & Style Studio", async () => {
+  const css = getToolById("css-minifier-advanced");
+  assert.ok(css);
+  const studio = developerStudioForLegacySlug(css.slug);
+  assert.equal(studio.id, "markup-studio");
+  assert.equal(developerModeForLegacySlug(studio, css.slug), "css");
+  assert.equal(css.engine.type === "text" ? css.engine.op : null, "css-minify");
+
+  const output = await runDeveloperStudio(
+    "css-minify",
+    "/* remove this comment */ .card { color: red; margin: 0; }",
+  );
+  assert.equal(output, ".card{color:red;margin:0}");
+
+  const routeSource = readFileSync(new URL("../routes/tools/$category/$slug.tsx", import.meta.url), "utf8");
+  assert.ok(routeSource.includes('const legacyEngineOp = "op" in tool.engine ? tool.engine.op : undefined;'));
+  assert.ok(routeSource.includes("op: legacyEngineOp"), "Legacy redirect must forward the original engine operation to its Studio");
 });

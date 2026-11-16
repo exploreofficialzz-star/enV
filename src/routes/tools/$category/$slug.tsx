@@ -135,7 +135,8 @@ function Tool() {
     const studio = developerStudioForLegacySlug(slug);
     const mode = developerModeForLegacySlug(studio, slug);
     const action = developerActionForLegacySlug(studio, slug);
-    return <Navigate to="/tools/$category/$slug" params={{ category: "developer", slug: studio.slug }} search={{ mode, action: action === "decode" ? "decode" : undefined, op: undefined }} replace />;
+    const legacyEngineOp = "op" in tool.engine ? tool.engine.op : undefined;
+    return <Navigate to="/tools/$category/$slug" params={{ category: "developer", slug: studio.slug }} search={{ mode, action: action === "decode" ? "decode" : undefined, op: legacyEngineOp }} replace />;
   }
   if (isToolUnderProduction(tool)) return <AppShell><UnderProductionPage toolName={tool.name} /></AppShell>;
   const studioDefaultMode = category === "business" ? businessStudioDefaultMode(slug) : undefined;
