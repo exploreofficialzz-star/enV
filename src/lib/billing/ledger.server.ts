@@ -487,25 +487,161 @@ export async function readWallet(userId: string): Promise<WalletSnapshot> {
   };
 }
 
-export async function getWalletActivity(userId: string, limit = 20) {
+export type WalletActivityItem = {
+  id: string;
+  entry_type: string;
+  delta_available_subunits: number;
+  delta_reserved_subunits: number;
+  consumed_subunits: number;
+  description: string;
+  reference_id: string | null;
+  created_at: string;
+  status: string;
+  currency: string | null;
+  payment_amount_minor: number | null;
+  provider: string | null;
+  provider_transaction_id: string | null;
+  source: "ledger" | "purchase";
+};
+
+export type WalletActivityPage = {
+  items: WalletActivityItem[];
+  nextCursor: string | null;
+  hasMore: boolean;
+};
+
+type WalletActivityCursor = { createdAt: string; id: string };
+
+function parseWalletActivityCursor(value?: string | null): WalletActivityCursor | null {
+  if (!value || value.length > 512) return null;
+  const separator = value.indexOf("|");
+  if (separator < 1 || separator === value.length - 1) return null;
+  const createdAt = value.slice(0, separator);
+  const id = value.slice(separator + 1);
+  const timestamp = Date.parse(createdAt);
+  if (!Number.isFinite(timestamp) || !id || id.length > 200 || /[\u0000-\u001f]/.test(id)) {
+    throw new Error("The transaction history cursor is invalid. Refresh the history and try again.");
+  }
+  return { createdAt: new Date(timestamp).toISOString(), id };
+}
+
+function signedAmount(value: unknown): number {
+  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+  if (!Number.isSafeInteger(parsed) || Math.abs(parsed) > MAX_TOKEN_SUBUNITS) {
+    throw new BillingError("INVALID_AMOUNT", "A stored wallet activity amount is outside the supported safe range.");
+  }
+  return parsed;
+}
+
+export async function getWalletActivity(userId: string, limit = 20, cursor?: string | null): Promise<WalletActivityPage> {
   const sql = await getSql();
   const boundedLimit = Math.max(1, Math.min(50, Math.trunc(limit) || 20));
-  return sql.query<{
+  const decodedCursor = parseWalletActivityCursor(cursor);
+  const rows = await sql.query<{
     id: string;
     entry_type: string;
-    delta_available_subunits: number;
-    delta_reserved_subunits: number;
-    consumed_subunits: number;
+    delta_available_subunits: number | string;
+    delta_reserved_subunits: number | string;
+    consumed_subunits: number | string;
     description: string;
     reference_id: string | null;
     created_at: string | Date;
+    status: string;
+    currency: string | null;
+    payment_amount_minor: number | string | null;
+    provider: string | null;
+    provider_transaction_id: string | null;
+    source: "ledger" | "purchase";
   }>(
-    `select id, entry_type, delta_available_subunits, delta_reserved_subunits,
-            consumed_subunits, description, reference_id, created_at
-       from billing_credit_ledger where user_id = $1
-       order by created_at desc limit $2`,
-    [userId, boundedLimit],
+    `with wallet_activity as (
+       select l.id,
+              l.entry_type,
+              l.delta_available_subunits,
+              l.delta_reserved_subunits,
+              l.consumed_subunits,
+              l.description,
+              l.reference_id,
+              l.created_at,
+              case when l.entry_type = 'purchase' then 'credited' else 'completed' end as status,
+              l.currency,
+              l.payment_amount_minor,
+              nullif(l.metadata->>'provider', '') as provider,
+              nullif(l.metadata->>'transactionId', '') as provider_transaction_id,
+              'ledger'::text as source
+         from billing_credit_ledger l
+        where l.user_id = $1
+
+       union all
+
+       select p.id,
+              'purchase_attempt'::text as entry_type,
+              0::bigint as delta_available_subunits,
+              0::bigint as delta_reserved_subunits,
+              0::bigint as consumed_subunits,
+              case p.status
+                when 'created' then 'Payment checkout created'
+                when 'pending' then 'Payment awaiting confirmation'
+                when 'verified' then 'Payment verified; wallet credit is being reconciled'
+                when 'credited' then 'Payment marked credited; awaiting ledger verification'
+                when 'failed' then 'Payment failed'
+                when 'cancelled' then 'Payment cancelled'
+                when 'refunded' then 'Payment refunded'
+                when 'disputed' then 'Payment under dispute'
+                else 'Payment activity'
+              end as description,
+              p.id as reference_id,
+              coalesce(p.credited_at, p.updated_at, p.created_at) as created_at,
+              p.status,
+              p.currency,
+              p.amount_minor as payment_amount_minor,
+              p.provider,
+              p.provider_transaction_id,
+              'purchase'::text as source
+         from billing_purchase_intents p
+        where p.user_id = $1
+          and not exists (
+            select 1
+              from billing_credit_ledger l
+             where l.user_id = p.user_id
+               and (l.reference_id = p.id or l.idempotency_key = 'purchase:' || p.id)
+          )
+     )
+     select id, entry_type, delta_available_subunits, delta_reserved_subunits,
+            consumed_subunits, description, reference_id, created_at, status,
+            currency, payment_amount_minor, provider, provider_transaction_id, source
+       from wallet_activity
+      where ($2::timestamptz is null or (created_at, id) < ($2::timestamptz, $3::text))
+      order by created_at desc, id desc
+      limit $4`,
+    [userId, decodedCursor?.createdAt ?? null, decodedCursor?.id ?? null, boundedLimit + 1],
   );
+
+  const hasMore = rows.length > boundedLimit;
+  const pageRows = hasMore ? rows.slice(0, boundedLimit) : rows;
+  const items: WalletActivityItem[] = pageRows.map((row) => ({
+    id: row.id,
+    entry_type: row.entry_type,
+    delta_available_subunits: signedAmount(row.delta_available_subunits),
+    delta_reserved_subunits: signedAmount(row.delta_reserved_subunits),
+    consumed_subunits: amount(row.consumed_subunits),
+    description: row.description,
+    reference_id: row.reference_id,
+    created_at: row.created_at instanceof Date
+      ? row.created_at.toISOString()
+      : new Date(row.created_at).toISOString(),
+    status: row.status,
+    currency: row.currency?.trim() || null,
+    payment_amount_minor: row.payment_amount_minor == null ? null : amount(row.payment_amount_minor),
+    provider: row.provider,
+    provider_transaction_id: row.provider_transaction_id,
+    source: row.source,
+  }));
+  const last = items.at(-1);
+  return {
+    items,
+    nextCursor: hasMore && last ? `${last.created_at}|${last.id}` : null,
+    hasMore,
+  };
 }
 
 export interface ReserveCreditsInput {

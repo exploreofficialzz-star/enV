@@ -142,6 +142,22 @@ enum OfflineWalletNativeAPI {
         return try responseData(await makeRequest(path: "api/billing/native-wallet", method: "GET", bearer: bearer, queryItems: [URLQueryItem(name: "timezone", value: TimeZone.current.identifier)]))
     }
 
+    static func fetchWalletHistoryPage(cursor: String? = nil, limit: Int = 50) async throws -> [String: Any] {
+        guard let bearer = loadSessionToken() else {
+            throw OfflineWalletNativeAPIError.unavailable("Pair this iOS device from your signed-in enV web Wallet first.")
+        }
+        var queryItems = [URLQueryItem(name: "limit", value: String(min(max(limit, 1), 50)))]
+        if let cursor, !cursor.isEmpty {
+            queryItems.append(URLQueryItem(name: "cursor", value: cursor))
+        }
+        return try responseData(await makeRequest(
+            path: "api/billing/native-wallet-activity",
+            method: "GET",
+            bearer: bearer,
+            queryItems: queryItems
+        ))
+    }
+
     static func checkAvailability() async -> (enabled: Bool, code: String, message: String) {
         do {
             let data = try responseData(await makeRequest(path: "api/billing/offline/status", method: "GET"))

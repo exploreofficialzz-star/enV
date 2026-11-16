@@ -444,6 +444,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                                 informationPage, catalog,
                                 onBack = { showInformation = false; tab = informationReturnTab },
                                 onOpenWallet = { informationPage = "wallet" },
+                                onOpenHistory = { informationPage = "history" },
                             )
                             else -> AccountScreen(
                                 catalog = catalog,

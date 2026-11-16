@@ -40,9 +40,22 @@ type WalletActivity = {
   description: string;
   reference_id: string | null;
   created_at: string;
+  status: string;
+  currency: string | null;
+  payment_amount_minor: number | null;
+  provider: string | null;
+  provider_transaction_id: string | null;
+  source: "ledger" | "purchase";
 };
 
-type WalletState = { status: "loading" | "ready" | "unavailable"; message?: string; wallet?: WalletData; activity?: WalletActivity[] };
+type WalletState = {
+  status: "loading" | "ready" | "unavailable";
+  message?: string;
+  wallet?: WalletData;
+  activity?: WalletActivity[];
+  activityNextCursor?: string | null;
+  activityHasMore?: boolean;
+};
 type WalletFundingChoice = CustomerPaymentMethod;
 type FlutterwaveMethod = FlutterwaveFundingMethod;
 type FlutterwaveBankTransferDetails = {
@@ -163,6 +176,10 @@ function tokenUnitDisplay(label: string): React.ReactNode {
 }
 
 function activitySummary(entry: WalletActivity): string {
+  if (entry.entry_type === "purchase_attempt") {
+    if (entry.status === "credited") return "Payment marked credited";
+    return `Payment ${entry.status.replaceAll("_", " ")}`;
+  }
   if (entry.entry_type === "reservation") return `Reserved ${tokenAmount(Math.abs(entry.delta_reserved_subunits))} tokens`;
   if (entry.consumed_subunits > 0) return `Used ${tokenAmount(entry.consumed_subunits)} tokens`;
   if (entry.entry_type === "release") return `Released ${tokenAmount(Math.abs(entry.delta_available_subunits))} tokens`;
@@ -174,6 +191,7 @@ function activitySummary(entry: WalletActivity): string {
 
 function activityTypeLabel(entry: WalletActivity): string {
   const type = entry.entry_type.toLowerCase();
+  if (type === "purchase_attempt") return entry.status.replaceAll("_", " ").replace(/\b\w/g, character => character.toUpperCase());
   if (type.includes("referral")) return "Referral reward";
   if (type.includes("affiliate") || type.includes("video")) return "Affiliate reward";
   if (type.includes("bonus") || type.includes("reward") || type.includes("grant")) return "Bonus reward";
@@ -187,6 +205,7 @@ function activityTypeLabel(entry: WalletActivity): string {
 
 function activityIcon(entry: WalletActivity): React.ReactNode {
   const type = entry.entry_type.toLowerCase();
+  if (type === "purchase_attempt") return <CreditCard size={16} aria-hidden="true" />;
   if (type.includes("referral") || type.includes("affiliate") || type.includes("bonus") || type.includes("reward") || type.includes("grant")) return <Gift size={16} aria-hidden="true" />;
   if (type === "reservation") return <Clock3 size={16} aria-hidden="true" />;
   if (type === "release" || type.includes("refund")) return <RefreshCw size={16} aria-hidden="true" />;
@@ -195,6 +214,17 @@ function activityIcon(entry: WalletActivity): React.ReactNode {
   return entry.delta_available_subunits >= 0
     ? <ArrowDownToLine size={16} aria-hidden="true" />
     : <TrendingUp size={16} aria-hidden="true" />;
+}
+
+function paymentAmountLabel(entry: WalletActivity): string | null {
+  if ((entry.source !== "purchase" && entry.entry_type !== "purchase") || !entry.currency || entry.payment_amount_minor == null) return null;
+  try {
+    const formatter = new Intl.NumberFormat(undefined, { style: "currency", currency: entry.currency });
+    const fractionDigits = formatter.resolvedOptions().maximumFractionDigits ?? 2;
+    return formatter.format(entry.payment_amount_minor / (10 ** fractionDigits));
+  } catch {
+    return `${entry.payment_amount_minor} ${entry.currency}`;
+  }
 }
 
 function MetricCard({ title, value, description, icon, className = "" }: { title: string; value: string; description: string; icon: React.ReactNode; className?: string }) {
@@ -251,6 +281,8 @@ function Account() {
   });
   const [fundingFeedback, setFundingFeedback] = useState<{ kind: "success" | "error" | "info"; message: string } | null>(null);
   const [showAllTransactions, setShowAllTransactions] = useState(false);
+  const [loadingMoreTransactions, setLoadingMoreTransactions] = useState(false);
+  const [transactionHistoryError, setTransactionHistoryError] = useState("");
   const [showBalance, setShowBalance] = useState(true);
   const [showVideoDetails, setShowVideoDetails] = useState(false);
 
@@ -509,7 +541,12 @@ function Account() {
     setState((current) => current.status === "ready" ? current : { status: "loading" });
     void fetch("/api/billing/wallet", { credentials: "same-origin", cache: "no-store", signal: controller.signal })
       .then(async (response) => {
-        const payload = await response.json() as { ok?: boolean; data?: { wallet?: WalletData; activity?: WalletActivity[] }; message?: string; error?: string };
+        const payload = await response.json() as { ok?: boolean; data?: {
+          wallet?: WalletData;
+          activity?: WalletActivity[];
+          activityNextCursor?: string | null;
+          activityHasMore?: boolean;
+        }; message?: string; error?: string };
         if (!response.ok || !payload.ok || !payload.data?.wallet) {
           throw new Error(payload.message ?? (payload.error === "AUTH_REQUIRED"
             ? "Sign in is required to access a personal wallet."
@@ -517,7 +554,32 @@ function Account() {
               ? "Wallet information is currently unavailable. No balance or payment was changed."
               : "Wallet information is unavailable. Please retry."));
         }
-        setState({ status: "ready", wallet: payload.data.wallet, activity: payload.data.activity ?? [] });
+        setState((current) => {
+          const refreshedActivity = payload.data?.activity ?? [];
+          if (current.status !== "ready" || !current.activity?.length) {
+            return {
+              status: "ready",
+              wallet: payload.data!.wallet,
+              activity: refreshedActivity,
+              activityNextCursor: payload.data!.activityNextCursor ?? null,
+              activityHasMore: payload.data!.activityHasMore === true,
+            };
+          }
+          const refreshedIds = new Set(refreshedActivity.map((entry) => entry.id));
+          const refreshedReferences = new Set(refreshedActivity.map((entry) => entry.reference_id).filter((value): value is string => Boolean(value)));
+          const olderActivity = current.activity.filter((entry) =>
+            !refreshedIds.has(entry.id) &&
+            !(entry.source === "purchase" && refreshedReferences.has(entry.id)),
+          );
+          return {
+            status: "ready",
+            wallet: payload.data!.wallet,
+            activity: [...refreshedActivity, ...olderActivity],
+            activityNextCursor: payload.data!.activityNextCursor ?? null,
+            activityHasMore: payload.data!.activityHasMore === true,
+          };
+        });
+        setTransactionHistoryError("");
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
@@ -525,6 +587,42 @@ function Account() {
       });
     return () => controller.abort();
   }, [reloadKey, walletRefreshKey]);
+
+  async function loadMoreTransactions() {
+    if (state.status !== "ready" || !state.activityNextCursor || loadingMoreTransactions) return;
+    setLoadingMoreTransactions(true);
+    setTransactionHistoryError("");
+    try {
+      const query = new URLSearchParams({ limit: "20", cursor: state.activityNextCursor });
+      const response = await fetch(`/api/billing/wallet-activity?${query.toString()}`, {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      const payload = await response.json() as {
+        ok?: boolean;
+        data?: { activity?: WalletActivity[]; activityNextCursor?: string | null; activityHasMore?: boolean };
+        message?: string;
+      };
+      if (!response.ok || !payload.ok || !payload.data || !Array.isArray(payload.data.activity)) {
+        throw new Error(payload.message ?? "More transactions could not be loaded. Try again.");
+      }
+      setState((current) => {
+        if (current.status !== "ready") return current;
+        const existingIds = new Set((current.activity ?? []).map((item) => item.id));
+        const additions = payload.data!.activity!.filter((item) => !existingIds.has(item.id));
+        return {
+          ...current,
+          activity: [...(current.activity ?? []), ...additions],
+          activityNextCursor: payload.data!.activityNextCursor ?? null,
+          activityHasMore: payload.data!.activityHasMore === true,
+        };
+      });
+    } catch (error) {
+      setTransactionHistoryError(error instanceof Error ? error.message : "More transactions could not be loaded. Try again.");
+    } finally {
+      setLoadingMoreTransactions(false);
+    }
+  }
 
   useEffect(() => {
     const refreshWallet = () => { if (document.visibilityState === "visible") setWalletRefreshKey((value) => value + 1); };
@@ -1602,13 +1700,22 @@ function Account() {
             <div className="flex items-center gap-2"><Clock3 size={18} className="text-accent" aria-hidden="true"/><h2 id="recent-transactions-title" className="font-semibold text-fg">Recent transactions</h2></div>
             <button type="button" onClick={() => setReloadKey(value => value + 1)} aria-label="Refresh transactions" className="inline-flex size-9 items-center justify-center rounded-full border border-border text-muted hover:bg-surface-2"><RefreshCw size={15} aria-hidden="true"/></button>
           </div>
+          {state.status === "loading" ? <p className="py-5 text-sm text-muted">Loading transaction history…</p> : null}
+          {state.status === "unavailable" ? <p className="py-5 text-sm text-muted" role="alert">{state.message ?? "Transaction history is temporarily unavailable."}</p> : null}
           {state.status === "ready" && state.activity?.length ? <ul className="mt-3 divide-y divide-border">
             {state.activity.slice(0, showAllTransactions ? state.activity.length : 4).map(entry => <li key={entry.id} className="flex items-start justify-between gap-3 py-3">
               <div className="flex min-w-0 items-start gap-3"><span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-surface-2 text-fg">{activityIcon(entry)}</span><div className="min-w-0"><p className="text-sm font-medium text-fg">{activitySummary(entry)}</p><p className="mt-0.5 truncate text-xs text-muted">{entry.description}</p><p className="mt-1 text-[11px] text-subtle">{new Date(entry.created_at).toLocaleString()}</p></div></div>
-              <span className="shrink-0 rounded-full bg-accent/10 px-2 py-1 text-[11px] font-medium text-accent">{activityTypeLabel(entry)}</span>
+              <div className="shrink-0 text-right">
+                <span className="inline-flex rounded-full bg-accent/10 px-2 py-1 text-[11px] font-medium text-accent">{activityTypeLabel(entry)}</span>
+                {paymentAmountLabel(entry) ? <p className="mt-1 text-[11px] font-medium text-fg">{paymentAmountLabel(entry)}</p> : null}
+                {entry.provider ? <p className="mt-0.5 text-[10px] text-muted">{entry.provider}</p> : null}
+              </div>
             </li>)}
-          </ul> : <div className="flex items-center gap-3 py-5"><span className="grid size-10 place-items-center rounded-full bg-surface-2 text-muted"><Clock3 size={19} aria-hidden="true"/></span><div><p className="text-sm font-medium text-fg">No transactions yet</p><p className="mt-0.5 text-xs text-muted">Your deposits, token usage and rewards will appear here.</p></div></div>}
-          {state.status === "ready" && (state.activity?.length ?? 0) > 4 ? <button type="button" onClick={() => setShowAllTransactions(value => !value)} className="mt-2 text-sm font-semibold text-accent">{showAllTransactions ? "Show less" : "View all transactions"}</button> : null}
+          </ul> : null}
+          {state.status === "ready" && !state.activity?.length ? <div className="flex items-center gap-3 py-5"><span className="grid size-10 place-items-center rounded-full bg-surface-2 text-muted"><Clock3 size={19} aria-hidden="true"/></span><div><p className="text-sm font-medium text-fg">No transactions yet</p><p className="mt-0.5 text-xs text-muted">Your deposits, token usage and rewards will appear here.</p></div></div> : null}
+          {transactionHistoryError ? <p className="mt-2 text-xs text-rose-600" role="alert">{transactionHistoryError}</p> : null}
+          {state.status === "ready" && ((state.activity?.length ?? 0) > 4 || state.activityHasMore) ? <button type="button" onClick={() => setShowAllTransactions(value => !value)} className="mt-2 text-sm font-semibold text-accent">{showAllTransactions ? "Show less" : "View all transactions"}</button> : null}
+          {state.status === "ready" && showAllTransactions && state.activityHasMore ? <button type="button" onClick={() => void loadMoreTransactions()} disabled={loadingMoreTransactions} className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-border text-sm font-semibold text-fg disabled:opacity-60"><RefreshCw size={14} className={loadingMoreTransactions ? "animate-spin" : ""} aria-hidden="true"/>{loadingMoreTransactions ? "Loading transactions…" : "Load more transactions"}</button> : null}
         </section>
 
 

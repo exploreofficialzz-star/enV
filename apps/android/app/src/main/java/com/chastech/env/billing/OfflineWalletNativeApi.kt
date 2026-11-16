@@ -38,6 +38,16 @@ object OfflineWalletNativeApi {
         val deltaAvailableSubunits: Double,
         val consumedSubunits: Double,
         val createdAt: String,
+        val status: String,
+        val currency: String?,
+        val paymentAmountMinor: Long?,
+        val provider: String?,
+        val source: String,
+    )
+    data class ActivityPage(
+        val items: List<ActivityItem>,
+        val nextCursor: String?,
+        val hasMore: Boolean,
     )
     data class TokenCharge(
         val id: String,
@@ -203,6 +213,47 @@ object OfflineWalletNativeApi {
         return response.body.optJSONObject("data") ?: throw IllegalStateException("The offline wallet response was incomplete.")
     }
 
+    private fun parseActivityPage(data: JSONObject): ActivityPage {
+        val rows = data.optJSONArray("activity")
+        val items = (0 until (rows?.length() ?: 0)).mapNotNull { index ->
+            val row = rows?.optJSONObject(index) ?: return@mapNotNull null
+            val currency = row.optString("currency").takeIf { it.isNotBlank() && it != "null" }
+            val provider = row.optString("provider").takeIf { it.isNotBlank() && it != "null" }
+            val paymentAmountMinor = if (row.isNull("payment_amount_minor")) null else row.optLong("payment_amount_minor")
+            ActivityItem(
+                id = row.optString("id"),
+                type = row.optString("entry_type", "activity").replace('_', ' '),
+                description = row.optString("description", "Wallet activity"),
+                deltaAvailableSubunits = row.optDouble("delta_available_subunits", 0.0),
+                consumedSubunits = row.optDouble("consumed_subunits", 0.0),
+                createdAt = row.optString("created_at"),
+                status = row.optString("status", "completed"),
+                currency = currency,
+                paymentAmountMinor = paymentAmountMinor,
+                provider = provider,
+                source = row.optString("source", "ledger"),
+            )
+        }
+        return ActivityPage(
+            items = items,
+            nextCursor = data.optString("activityNextCursor").takeIf { it.isNotBlank() && it != "null" },
+            hasMore = data.optBoolean("activityHasMore", false),
+        )
+    }
+
+    suspend fun fetchWalletHistoryPage(context: Context, cursor: String? = null, limit: Int = 50): ActivityPage = withContext(Dispatchers.IO) {
+        val bearer = sessionToken(context)
+            ?: throw IllegalStateException("Pair this device from your signed-in enV web Wallet first.")
+        val boundedLimit = limit.coerceIn(1, 50)
+        val query = buildString {
+            append("?limit=").append(boundedLimit)
+            if (!cursor.isNullOrBlank()) {
+                append("&cursor=").append(java.net.URLEncoder.encode(cursor, StandardCharsets.UTF_8.name()))
+            }
+        }
+        parseActivityPage(requireData(request("/api/billing/native-wallet-activity$query", "GET", bearer = bearer)))
+    }
+
     suspend fun fetchWalletDashboard(context: Context): WalletDashboard = withContext(Dispatchers.IO) {
         val bearer = sessionToken(context)
             ?: throw IllegalStateException("Pair this device from your signed-in enV web Wallet first.")
@@ -212,18 +263,7 @@ object OfflineWalletNativeApi {
             ?: throw IllegalStateException("The shared wallet response was incomplete.")
         val rewards = data.optJSONObject("rewards")
             ?: throw IllegalStateException("The wallet rewards response was incomplete.")
-        val activityJson = data.optJSONArray("activity")
-        val activity = (0 until (activityJson?.length() ?: 0)).mapNotNull { index ->
-            val row = activityJson?.optJSONObject(index) ?: return@mapNotNull null
-            ActivityItem(
-                id = row.optString("id"),
-                type = row.optString("entry_type", "activity").replace('_', ' '),
-                description = row.optString("description", "Wallet activity"),
-                deltaAvailableSubunits = row.optDouble("delta_available_subunits", 0.0),
-                consumedSubunits = row.optDouble("consumed_subunits", 0.0),
-                createdAt = row.optString("created_at"),
-            )
-        }
+        val activity = parseActivityPage(data).items
         val usageJson = data.optJSONObject("tokenUsage") ?: JSONObject()
         val summaryJson = usageJson.optJSONObject("summary") ?: JSONObject()
         val dailyJson = usageJson.optJSONArray("weeklyUsage")

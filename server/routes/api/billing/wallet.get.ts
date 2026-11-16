@@ -8,8 +8,16 @@ export default defineHandler(async (event) => {
   if (auth.response || !auth.userId) return auth.response ?? jsonResponse({ ok: false, error: "AUTH_REQUIRED" }, 401);
   try {
     await reconcilePendingPurchasesForUser(auth.userId);
-    const [wallet, activity] = await Promise.all([readWallet(auth.userId), getWalletActivity(auth.userId, 20)]);
-    return jsonResponse({ ok: true, data: { wallet, activity } });
+    const requestUrl = new URL(event.req.url);
+    const requestedLimit = Number(requestUrl.searchParams.get("limit") ?? 20);
+    const activityPage = await getWalletActivity(auth.userId, requestedLimit, requestUrl.searchParams.get("cursor"));
+    const wallet = await readWallet(auth.userId);
+    return jsonResponse({ ok: true, data: {
+      wallet,
+      activity: activityPage.items,
+      activityNextCursor: activityPage.nextCursor,
+      activityHasMore: activityPage.hasMore,
+    } });
   } catch {
     return jsonResponse({
       ok: false,
