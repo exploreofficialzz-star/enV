@@ -19,6 +19,7 @@ const flutterwaveVerify = await read("server/routes/api/billing/flutterwave/veri
 const paystackWebhookRoute = await read("server/routes/api/billing/paystack/webhook.post.ts");
 const paystackProviderConfig = await read("src/lib/billing/provider-config.ts");
 const paymentMethods = await read("src/lib/billing/payment-methods.ts");
+const flutterwaveErrors = await read("src/lib/billing/flutterwave-errors.ts");
 const cryptomusService = await read("src/lib/billing/cryptomus.server.ts");
 const cryptomusWebhook = await read("server/routes/api/billing/cryptomus/webhook.post.ts");
 const cryptomusVerifyRoute = await read("server/routes/api/billing/cryptomus/verify.post.ts");
@@ -225,6 +226,10 @@ assert.match(walletDashboard, /aria-label="Card expiry date \(MM\/YY\)"/, "card 
 assert.doesNotMatch(walletDashboard, /flutterwaveExpiryMonth|flutterwaveExpiryYear/, "expiry month and year must not occupy separate inputs");
 assert.match(flutterwaveService, /normalizeOptionalPhoneNumber/, "V4 customer phone handling must be optional and validated separately");
 assert.match(flutterwaveService, /billing-flutterwave-charge-failed/, "failed charges must log safe processor diagnostics");
+assert.match(flutterwaveService, /classifyFlutterwaveApiFailure/, "V4 upstream errors must be classified rather than hidden behind generic initialization failures");
+assert.match(flutterwaveService, /countryCode: profile.countryCode[\\s\\S]{0,120}paymentType: method.type/, "provider errors must retain country, currency, amount, and payment rail context without cardholder data");
+assert.match(flutterwaveErrors, /FLUTTERWAVE_CARD_RESTRICTED/, "card velocity restrictions must receive a dedicated safe error");
+assert.match(flutterwaveErrors, /failed attempt limit/, "restricted-card classification must require the provider's specific reason");
 assert.doesNotMatch(walletDashboard, /fundingOptionsState\.flutterwave\?\.enabled === true\s*\?\s*method === "card"/, "V4 channel routing must not depend on a duplicate ready flag after generic availability has been approved");
 assert.match(fxPricingTests, /1\.00 US checkout quote round-trips/, "the $1.00 US checkout minimum must have an explicit USD round-trip regression test");
 assert.match(countryRouting, /countryCode: "US", currency: "USD"/, "the US country profile must remain mapped to USD card checkout");
