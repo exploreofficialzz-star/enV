@@ -4,6 +4,7 @@ import {
   getFundingCandidates,
   isCustomerPaymentMethodAvailable,
   parseUsdAmountToCents,
+  resolveFlutterwaveFundingMethod,
 } from "./payment-methods.ts";
 
 const providers = [
@@ -42,6 +43,33 @@ test("local payments stay unavailable for international-card-only Paystack accou
   const international = [{ id: "paystack" as const, enabled: true, currency: "USD", localPayments: false }];
   assert.equal(isCustomerPaymentMethodAvailable(international, "local"), false);
   assert.deepEqual(getFundingCandidates(international, "local"), []);
+});
+
+test("US USD Card checkout remains eligible for Flutterwave V4 and resolves card directly", () => {
+  const usFlutterwave = [{
+    id: "flutterwave" as const,
+    enabled: true,
+    currency: "USD",
+    paymentMethods: ["card"],
+  }];
+  assert.equal(isCustomerPaymentMethodAvailable(usFlutterwave, "card"), true);
+  assert.deepEqual(getFundingCandidates(usFlutterwave, "card").map((provider) => provider.id), ["flutterwave"]);
+  assert.equal(resolveFlutterwaveFundingMethod("card", usFlutterwave[0]!.paymentMethods), "card");
+  assert.equal(isCustomerPaymentMethodAvailable(usFlutterwave, "local"), false);
+});
+
+test("US Card choice resolves directly to the V4 card channel without relying on a second ready flag", () => {
+  const usCardChannels = ["card"];
+  assert.equal(resolveFlutterwaveFundingMethod("card", usCardChannels), "card");
+  assert.equal(resolveFlutterwaveFundingMethod("local", usCardChannels), null);
+});
+
+test("generic Local payment resolves to a supported V4 local channel and preserves the customer's choice", () => {
+  const localChannels = ["card", "mobile_money", "bank_transfer"];
+  assert.equal(resolveFlutterwaveFundingMethod("local", localChannels), "mobile_money");
+  assert.equal(resolveFlutterwaveFundingMethod("local", localChannels, "bank_transfer"), "bank_transfer");
+  assert.equal(resolveFlutterwaveFundingMethod("card", localChannels, "bank_transfer"), "card");
+  assert.equal(resolveFlutterwaveFundingMethod("more", localChannels), null);
 });
 
 test("custom USD input converts cents to matching enV token units and enforces the $1 minimum", () => {

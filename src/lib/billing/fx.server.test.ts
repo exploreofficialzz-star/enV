@@ -13,6 +13,12 @@ test("enV token reference pricing is fixed at one US cent per token", () => {
   assert.throws(() => usdCentsForTokenPack(100.5), RangeError);
 });
 
+test("the $1.00 US checkout quote round-trips as 100 USD minor units and a 1.00 V4 charge", () => {
+  const usdAmountMinor = usdCentsToMinorAmount(100, "USD", 1);
+  assert.equal(usdAmountMinor, 100);
+  assert.equal(formatUsdReferenceForTokenPack(100), "$1.00");
+});
+
 test("FX conversion uses currency minor units and rounds half up with integer arithmetic", () => {
   assert.equal(usdCentsToMinorAmount(100, "USD", 1), 100);
   assert.equal(usdCentsToMinorAmount(100, "NGN", 1_500), 150_000);
