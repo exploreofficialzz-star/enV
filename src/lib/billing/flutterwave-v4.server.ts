@@ -192,6 +192,16 @@ async function getAccessToken(): Promise<string> {
   return pendingTokenRequest;
 }
 
+function safeProviderDiagnostic(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[email]")
+    .replace(/\b(?:\+?\d[\d\s().-]{6,}\d)\b/g, "[number]")
+    .replace(/\b(?:\d[ -]?){12,19}\b/g, "[card]")
+    .replace(/[\r\n\t]+/g, " ")
+    .slice(0, 180);
+}
+
 async function flutterwaveRequest(
   path: string,
   init: RequestInit = {},
@@ -218,11 +228,35 @@ async function flutterwaveRequest(
     accessTokenExpiresAt = 0;
   }
   if (!response.ok || !payload || payload.data === undefined || payload.data === null) {
-    const upstream = typeof payload?.message === "string" ? payload.message.slice(0, 180) : "";
-    const error = new Error("Flutterwave v4 request failed" + (upstream ? ": " + upstream : "."));
+    const providerError = asRecord(payload?.error);
+    const providerErrorCode = typeof providerError.code === "string"
+      ? providerError.code.slice(0, 80)
+      : typeof providerError.type === "string" ? providerError.type.slice(0, 80) : "";
+    const upstreamMessage = safeProviderDiagnostic(providerError.message ?? payload?.message);
+    const validationErrors = Array.isArray(providerError.validation_errors)
+      ? providerError.validation_errors.slice(0, 4).map((entry) => {
+          const validation = asRecord(entry);
+          return {
+            field: typeof validation.field_name === "string" ? validation.field_name.slice(0, 80) : "",
+            message: safeProviderDiagnostic(validation.message),
+          };
+        })
+      : [];
+    console.error("[billing-flutterwave-api] " + JSON.stringify({
+      traceId,
+      path,
+      httpStatus: response.status,
+      providerErrorCode: providerErrorCode || null,
+      providerMessage: upstreamMessage || null,
+      validationErrors,
+    }));
+    const error = new Error("Flutterwave v4 request failed.");
     Object.assign(error, {
       code: response.status === 401 ? "FLUTTERWAVE_AUTH_FAILED" : "FLUTTERWAVE_API_ERROR",
       status: response.status >= 500 ? 503 : 502,
+      providerHttpStatus: response.status,
+      providerErrorCode,
+      traceId,
     });
     throw error;
   }
