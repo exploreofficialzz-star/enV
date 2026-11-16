@@ -27,6 +27,12 @@ test("V4 mobile-money and bank-transfer methods expose the generic Local payment
   assert.deepEqual(getFundingCandidates(v4, "local").map((provider) => provider.id), ["flutterwave"]);
 });
 
+test("a mobile-money-only market does not advertise Card", () => {
+  const mobileMoneyOnly = [{ id: "flutterwave" as const, enabled: true, currency: "KES", paymentMethods: ["mobile_money"] }];
+  assert.equal(isCustomerPaymentMethodAvailable(mobileMoneyOnly, "card"), false);
+  assert.equal(isCustomerPaymentMethodAvailable(mobileMoneyOnly, "local"), true);
+});
+
 test("legacy paymentOptions remain compatible while V4 uses paymentMethods", () => {
   const legacy = [{ id: "flutterwave" as const, enabled: true, currency: "GHS", paymentOptions: ["card", "banktransfer"] }];
   assert.deepEqual(getFundingCandidates(legacy, "local").map((provider) => provider.id), ["flutterwave"]);
