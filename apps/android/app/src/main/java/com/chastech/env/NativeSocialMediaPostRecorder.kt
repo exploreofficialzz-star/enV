@@ -309,6 +309,15 @@ class SocialPostCaptureService : Service() {
             }
             videoRecorder.prepare()
 
+            val callback = object : MediaProjection.Callback() {
+                override fun onStop() {
+                    if (!stopping) stopCapture()
+                }
+            }
+            projectionCallback = callback
+            // Android 14+ requires a registered callback before creating the virtual display.
+            activeProjection.registerCallback(callback, mainHandler)
+
             val surface: Surface = videoRecorder.surface
             virtualDisplay = activeProjection.createVirtualDisplay(
                 "enV Social Post Capture",
@@ -321,13 +330,6 @@ class SocialPostCaptureService : Service() {
                 mainHandler
             ) ?: throw IllegalStateException("Android could not create a display for screen recording.")
 
-            val callback = object : MediaProjection.Callback() {
-                override fun onStop() {
-                    if (!stopping) stopCapture()
-                }
-            }
-            projectionCallback = callback
-            activeProjection.registerCallback(callback, mainHandler)
             videoRecorder.start()
             updateNotification("Recording screen · use Stop to finish")
         } catch (error: Exception) {
