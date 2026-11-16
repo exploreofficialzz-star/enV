@@ -49,9 +49,9 @@ TikTok is the first reference provider because the supplied target example is a 
 - Fixture-based browser tests that verify a public test page is rendered and the resulting MP4 has valid video and audio streams.
 - Provider acceptance tests for each named platform, with a test record whose visible counts can be compared to the captured frames.
 - Negative tests for private URLs, login walls, unavailable posts, protected playback, expired/deleted links, timeout, cancellation, oversized output, and missing audio.
-- Browser build, backend processor checks, Android Gradle tests/build, iOS build/XCTest, and physical-device checks for the web-to-native handoff.
+- Browser build and desktop Chromium/Firefox/WebKit capability/recording tests.\n- Android Gradle tests/build plus physical-device tests for display/app capture, app switching, playback audio policy, interruption, rotation, storage, and finalization.\n- iOS build/XCTest plus iOS 27 physical-device tests for full-display selection, app switching, system audio, background behavior, interruptions, and MP4 finalization.
 - Do not mark the tool production-ready until each advertised provider passes its own acceptance suite.
 
 ## Current status
 
-Design and repository integration are in progress. No provider is yet certified by this specification, and no production-ready capture capability is claimed by adding this document.
+The tool is not released. Platform capture behavior and device-version support must be verified before the tool is marked production-ready.
