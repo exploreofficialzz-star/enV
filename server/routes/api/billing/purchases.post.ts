@@ -24,6 +24,14 @@ const SAFE_CHECKOUT_FAILURES: Record<string, { status: number; message: string }
   FLUTTERWAVE_INITIALIZATION_FAILED: { status: 502, message: "Payment could not be initialized. No wallet tokens were added." },
   FLUTTERWAVE_AUTH_FAILED: { status: 503, message: "Secure payment authentication is unavailable. Please try again shortly." },
   FLUTTERWAVE_API_ERROR: { status: 502, message: "The payment provider could not process this request. No wallet tokens were added." },
+  FLUTTERWAVE_CARD_RESTRICTED: {
+    status: 422,
+    message: "This card has been temporarily restricted after repeated failed attempts. Do not retry this card now. Use a different card, or contact your card issuer and wait at least 24 hours before trying this card again.",
+  },
+  FLUTTERWAVE_BANKING_PARTNER_ERROR: {
+    status: 422,
+    message: "The banking partner could not process this card payment. Contact your card issuer or try a different card. No wallet tokens were added.",
+  },
   ACCOUNT_NAME_REQUIRED: { status: 400, message: "Add your first and last name to your account before funding the wallet." },
   INVALID_CUSTOMER_ADDRESS: { status: 400, message: "Enter a complete billing address to continue." },
   INVALID_PAYMENT_DETAILS: { status: 400, message: "Check the payment details and try again." },
