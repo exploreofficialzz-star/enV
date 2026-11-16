@@ -951,6 +951,8 @@ function minifySafe(input: string, language: string): string {
     if (pendingSpace && /[\w$]/.test(output.at(-1) ?? "") && /[\w$]/.test(ch)) output += " ";
     pendingSpace = false;
     if (["{", "}", ";", ",", ":"].includes(ch)) output = output.trimEnd();
+    // Match the native CSS minifiers: a final declaration semicolon before } is optional.
+    if (language === "css" && ch === "}" && output.endsWith(";")) output = output.slice(0, -1);
     output += ch; i += 1;
   }
   if (quote) throw new Error("Unterminated string literal; input was not minified.");
