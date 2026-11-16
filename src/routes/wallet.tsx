@@ -9,6 +9,7 @@ import {
   type CustomerPaymentMethod,
   type FlutterwaveFundingMethod,
 } from "@/lib/billing/payment-methods";
+import { formatEnVTokenBalance } from "@/lib/billing/token-display";
 import { AppShell } from "@/components/layout/app-shell";
 import {
   clearWebOfflineIssueKey,
@@ -141,10 +142,6 @@ function tokenAmount(subunits: number): string {
   return (subunits / 1_000).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 }
 
-function tokenValueAmount(tokens: number): string {
-  return "$" + (tokens * 0.01).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
-}
-
 function tokenReferenceValue(tokens: number): string {
   const amount = new Intl.NumberFormat(undefined, {
     style: "currency", currency: "USD", minimumFractionDigits: 3, maximumFractionDigits: 3,
@@ -216,6 +213,7 @@ function Account() {
   const [state, setState] = useState<WalletState>({ status: "loading" });
   const [offlineState, setOfflineState] = useState<OfflineWalletState>({ status: "loading" });
   const [reloadKey, setReloadKey] = useState(0);
+  const [walletRefreshKey, setWalletRefreshKey] = useState(0);
   const [recoveringAllowanceId, setRecoveringAllowanceId] = useState<string | null>(null);
   const [recoveryFeedback, setRecoveryFeedback] = useState<{ kind: "success" | "error"; message: string } | null>(null);
   const [localAllowances, setLocalAllowances] = useState<LocalOfflineAllowance[]>([]);
@@ -509,7 +507,7 @@ function Account() {
   useEffect(() => {
     const controller = new AbortController();
     setState({ status: "loading" });
-    void fetch("/api/billing/wallet", { credentials: "same-origin", signal: controller.signal })
+    void fetch("/api/billing/wallet", { credentials: "same-origin", cache: "no-store", signal: controller.signal })
       .then(async (response) => {
         const payload = await response.json() as { ok?: boolean; data?: { wallet?: WalletData; activity?: WalletActivity[] }; message?: string; error?: string };
         if (!response.ok || !payload.ok || !payload.data?.wallet) {
@@ -526,7 +524,21 @@ function Account() {
         setState({ status: "unavailable", message: error instanceof Error ? error.message : "Wallet information is unavailable. Please retry." });
       });
     return () => controller.abort();
-  }, [reloadKey]);
+  }, [reloadKey, walletRefreshKey]);
+
+  useEffect(() => {
+    const refreshWallet = () => { if (document.visibilityState === "visible") setWalletRefreshKey((value) => value + 1); };
+    const timer = window.setInterval(refreshWallet, 20_000);
+    window.addEventListener("focus", refreshWallet);
+    window.addEventListener("online", refreshWallet);
+    document.addEventListener("visibilitychange", refreshWallet);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshWallet);
+      window.removeEventListener("online", refreshWallet);
+      document.removeEventListener("visibilitychange", refreshWallet);
+    };
+  }, []);
 
   async function copyReferralLink(code: string, source: "referral" | "video", signature?: string) {
     if (source === "video" && !signature) {
@@ -1124,14 +1136,21 @@ function Account() {
               <span className="grid size-13 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10 text-white shadow-inner sm:size-16"><Wallet size={28} aria-hidden="true"/></span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 text-xs font-medium text-white/90 sm:text-sm">
-                  <span>Total balance</span>
+                  <span>Total enV balance</span>
                   <button type="button" onClick={() => setShowBalance(value => !value)} aria-label={showBalance ? "Hide balance" : "Show balance"} title={showBalance ? "Hide balance" : "Show balance"} className="inline-flex size-8 items-center justify-center rounded-full text-white/90 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
                     {showBalance ? <Eye size={16} aria-hidden="true"/> : <EyeOff size={16} aria-hidden="true"/>}
                   </button>
                 </div>
-                <p className="mt-1 text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">{showBalance ? tokenValueAmount(visibleWallet?.availableTokens ?? 0) : "••••••"}</p>
-                <p className="mt-1 flex items-center gap-1 text-xs font-medium text-emerald-50/90 sm:text-sm"><Coins size={14} aria-hidden="true"/><span>{tokenUnitDisplay(showBalance ? "≈ " + (visibleWallet?.availableTokens ?? 0).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + " enV" : "•••• enV")}</span></p>
-                <p className="mt-0.5 text-[10px] text-white/75 sm:text-xs">{showBalance ? "Estimated token value " + ((visibleWallet?.availableTokens ?? 0) * 0.01).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 }) : "Estimated token value ••••••"}</p>
+                {state.status === "loading" ? (
+                  <span className="env-shimmer mt-2 block h-11 w-48 max-w-full rounded-lg" role="status" aria-label="Loading token balance" />
+                ) : state.status === "ready" && visibleWallet ? (
+                  <>
+                    <p className="mt-1 text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">{showBalance ? tokenUnitDisplay(formatEnVTokenBalance(visibleWallet.availableTokens) + " enV") : "••••••"}</p>
+                    <p className="mt-1 flex items-center gap-1 text-xs font-medium text-emerald-50/90 sm:text-sm"><Coins size={14} aria-hidden="true" /><span>{showBalance ? tokenReferenceValue(visibleWallet.availableTokens) : "Estimated USD reference value ••••••"}</span></p>
+                  </>
+                ) : (
+                  <p className="mt-2 text-sm font-medium text-white/90">Balance unavailable</p>
+                )}
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1.5">
                 <svg viewBox="0 0 120 64" className="h-10 w-20 sm:h-12 sm:w-28" fill="none" aria-label="Upward token trend">
@@ -1145,9 +1164,9 @@ function Account() {
           </div>
 
           <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
-            <MetricCard title="Total deposited" value={visibleWallet ? `${tokenAmount(visibleWallet.lifetimePurchasedSubunits)} enV` : "0.000 enV"} description={tokenReferenceValue((visibleWallet?.lifetimePurchasedSubunits ?? 0) / 1_000)} icon={<ArrowDownToLine size={15} aria-hidden="true"/>} />
-            <MetricCard title="Total remaining" value={`${(visibleWallet?.availableTokens ?? 0).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} enV`} description={tokenReferenceValue(visibleWallet?.availableTokens ?? 0)} icon={<RefreshCw size={15} aria-hidden="true"/>} />
-            <MetricCard title="Total used" value={visibleWallet ? `${tokenAmount(visibleWallet.lifetimeConsumedSubunits)} enV` : "0.000 enV"} description={tokenReferenceValue((visibleWallet?.lifetimeConsumedSubunits ?? 0) / 1_000)} icon={<TrendingUp size={15} aria-hidden="true"/>} />
+            <MetricCard title="Total deposited" value={visibleWallet ? `${formatEnVTokenBalance(visibleWallet.lifetimePurchasedSubunits / 1_000)} enV` : "—"} description={visibleWallet ? tokenReferenceValue(visibleWallet.lifetimePurchasedSubunits / 1_000) : "Wallet data unavailable"} icon={<ArrowDownToLine size={15} aria-hidden="true"/>} />
+            <MetricCard title="Total remaining" value={visibleWallet ? `${formatEnVTokenBalance(visibleWallet.availableTokens)} enV` : "—"} description={visibleWallet ? tokenReferenceValue(visibleWallet.availableTokens) : "Wallet data unavailable"} icon={<RefreshCw size={15} aria-hidden="true"/>} />
+            <MetricCard title="Total used" value={visibleWallet ? `${formatEnVTokenBalance(visibleWallet.lifetimeConsumedSubunits / 1_000)} enV` : "—"} description={visibleWallet ? tokenReferenceValue(visibleWallet.lifetimeConsumedSubunits / 1_000) : "Wallet data unavailable"} icon={<TrendingUp size={15} aria-hidden="true"/>} />
           </div>
         </section>
 
