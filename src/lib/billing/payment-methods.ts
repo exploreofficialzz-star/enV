@@ -32,15 +32,15 @@ export function resolveFlutterwaveFundingMethod(
 
 /** Optional customer contact phone. Returns null when blank and undefined when malformed. */
 export function normalizeOptionalPhoneNumber(value: string | null | undefined): string | null | undefined {
-  const digits = (value ?? "").replace(/\\D/g, "");
+  const digits = (value ?? "").replace(/\D/g, "");
   if (!digits) return null;
   const normalized = digits.startsWith("0") ? digits.slice(1) : digits;
-  return /^\\d{7,10}$/.test(normalized) ? normalized : undefined;
+  return /^\d{7,10}$/.test(normalized) ? normalized : undefined;
 }
 
 /** Format card expiry input as MM/YY while accepting a 4-digit year too. */
 export function formatCardExpiryInput(value: string): string {
-  const digits = value.replace(/\\D/g, "").slice(0, 6);
+  const digits = value.replace(/\D/g, "").slice(0, 6);
   return digits.length > 2 ? digits.slice(0, 2) + "/" + digits.slice(2) : digits;
 }
 
@@ -49,7 +49,7 @@ export function parseCardExpiry(
   value: string,
   currentDate: Date = new Date(),
 ): { month: string; year: string } | null {
-  const digits = value.replace(/\\D/g, "");
+  const digits = value.replace(/\D/g, "");
   if (digits.length !== 4 && digits.length !== 6) return null;
   const month = digits.slice(0, 2);
   const year = digits.slice(2);
