@@ -134,7 +134,7 @@ jobs:
       - name: Verify File to TXT local extraction and download in the browser
         run: npm run audit:file-to-txt:browser -- --report=artifacts/tool-functional-audit/file-to-txt.json
 
-      - name: Verify remaining Files converters and MIME utilities in the browser
+      - name: Verify remaining Files converters, MIME utilities and Advanced CSS Minifier in the browser
         run: npm run audit:files-remaining:browser -- --report=artifacts/tool-functional-audit/files-remaining.json
 
       - name: Verify QR and barcode reader in the browser

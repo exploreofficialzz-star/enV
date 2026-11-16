@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { chromium } from "playwright";
 import { writeToolAuditReport } from "./write-tool-audit-report.mjs";
 
@@ -10,7 +11,7 @@ const browser = await chromium.launch({
     : {}),
   args: ["--no-sandbox", "--disable-dev-shm-usage"],
 });
-const context = await browser.newContext();
+const context = await browser.newContext({ acceptDownloads: true });
 const page = await context.newPage({ viewport: { width: 390, height: 844 } });
 const pageErrors = [];
 const applicationWrites = [];
@@ -25,13 +26,13 @@ page.on("request", (request) => {
   }
 });
 
-async function runTool(toolId, title, operation, notes) {
+async function runTool(toolId, title, operation, notes, category = "files") {
   let check = "routeRendering";
   const completedChecks = [];
   const errorsBefore = pageErrors.length;
   const writesBefore = applicationWrites.length;
   try {
-    const response = await page.goto(baseUrl + "/tools/files/" + toolId, { waitUntil: "networkidle" });
+    const response = await page.goto(baseUrl + "/tools/" + category + "/" + toolId, { waitUntil: "networkidle" });
     assert.equal(response?.status(), 200, toolId + " route returns HTTP 200");
     await page.getByRole("heading", { name: title }).first().waitFor();
     await page.waitForFunction(
@@ -67,7 +68,47 @@ async function runTool(toolId, title, operation, notes) {
   }
 }
 
-async function runTextTransform({ id, title, input, validate, notes }) {
+async function runFileTransform({
+  id,
+  title,
+  category = "files",
+  inputName,
+  inputMimeType,
+  inputText,
+  outputName,
+  validatePreview,
+  validateDownload,
+  notes,
+}) {
+  await runTool(id, title, async () => {
+    const fileInput = page.locator('input[type="file"]');
+    assert.equal(await fileInput.count(), 1, id + " exposes exactly one local file input");
+    const convert = page.getByRole("button", { name: "Convert", exact: true });
+    assert.equal(await convert.isDisabled(), true, id + " disables conversion until a file is selected");
+    await fileInput.setInputFiles({
+      name: inputName,
+      mimeType: inputMimeType,
+      buffer: Buffer.from(inputText),
+    });
+    await convert.click();
+
+    const downloadButton = page.getByRole("button", { name: /^Download / });
+    await downloadButton.waitFor({ state: "visible", timeout: 10000 });
+    const preview = await page.locator("pre").first().innerText();
+    validatePreview(preview);
+
+    const downloadPromise = page.waitForEvent("download");
+    await downloadButton.click();
+    const download = await downloadPromise;
+    assert.equal(download.suggestedFilename(), outputName, id + " downloads with the correct extension");
+    const downloadPath = await download.path();
+    assert.ok(downloadPath, id + " produces a readable local download");
+    const downloaded = await readFile(downloadPath);
+    validateDownload(downloaded.toString("utf8"));
+  }, notes, category);
+}
+
+async function runTextTransform({ id, title, category = "files", input, validate, notes }) {
   await runTool(id, title, async () => {
     await page.locator("#text-in").fill(input);
     await page.getByRole("button", { name: "Run", exact: true }).click();
@@ -76,60 +117,56 @@ async function runTextTransform({ id, title, input, validate, notes }) {
     const value = await output.innerText();
     validate(value);
     await page.getByRole("button", { name: "Download", exact: true }).waitFor();
-  }, notes);
+  }, notes, category);
 }
 
 try {
-  await runTextTransform({
+  await runFileTransform({
     id: "csv-to-json",
     title: "CSV to JSON Converter",
-    input: 'name,note\n"Ada","needs, commas"',
-    validate(value) {
+    inputName: "people.csv",
+    inputMimeType: "text/csv",
+    inputText: 'name,note\\n"Ada","needs, commas"',
+    outputName: "people.json",
+    validatePreview(value) {
       assert.deepEqual(JSON.parse(value), [{ name: "Ada", note: "needs, commas" }]);
     },
-    notes: "Converted quoted CSV fields, including an embedded comma, to a JSON object and validated the parsed output.",
+    validateDownload(value) {
+      assert.deepEqual(JSON.parse(value), [{ name: "Ada", note: "needs, commas" }]);
+    },
+    notes: "Imported a local CSV file containing a quoted comma, validated the JSON preview, and verified the downloaded JSON file.",
   });
 
-  await runTextTransform({
+  await runFileTransform({
     id: "json-to-csv",
     title: "JSON to CSV Converter",
-    input: '[{"name":"Ada","age":36},{"name":"Lin","age":29}]',
-    validate(value) {
+    inputName: "people.json",
+    inputMimeType: "application/json",
+    inputText: '[{"name":"Ada","age":36},{"name":"Lin","age":29}]',
+    outputName: "people.csv",
+    validatePreview(value) {
       assert.match(value, /name,age/);
       assert.match(value, /Ada,36/);
       assert.match(value, /Lin,29/);
     },
-    notes: "Converted a two-record JSON array to CSV and verified the header and both data rows.",
+    validateDownload(value) {
+      assert.match(value, /name,age/);
+      assert.match(value, /Ada,36/);
+      assert.match(value, /Lin,29/);
+    },
+    notes: "Imported a local JSON array, validated the CSV preview, and verified the downloaded CSV file.",
   });
 
-  {
-    const toolId = "css-minifier-advanced";
-    const response = await page.goto(baseUrl + "/tools/files/" + toolId, { waitUntil: "networkidle" });
-    assert.equal(response?.status(), 200, toolId + " route returns HTTP 200");
-    await page.waitForFunction(
-      (id) => document.documentElement.dataset.envToolHydrated === id,
-      toolId,
-      { timeout: 12000 },
-    );
-    const actualTitle = await page.locator("h1").first().innerText();
-    if (/^Advanced CSS Minifier$/i.test(actualTitle)) {
-      toolResults.push({
-        toolId,
-        status: "passed",
-        checks: ["routeRendering", "interactionExecution", "outputValidation", "runtimeErrorCheck"],
-        notes: "Route renders with the expected Advanced CSS Minifier identity.",
-      });
-    } else {
-      toolResults.push({
-        toolId,
-        status: "blocked",
-        checks: [],
-        blockedChecks: ["routeRendering"],
-        notes: "Stable ID/slug css-minifier-advanced currently renders the unrelated page title \"" + actualTitle + "\" instead of Advanced CSS Minifier. The tool identity/route mapping requires correction before this is counted as an independent Files tool.",
-      });
-      console.error("BLOCKED css-minifier-advanced: expected Advanced CSS Minifier, got " + actualTitle);
-    }
-  }
+  await runTextTransform({
+    id: "css-minifier-advanced",
+    title: "Advanced CSS Minifier",
+    category: "developer",
+    input: "/* remove this comment */ .card { color: red; margin: 0; }",
+    validate(value) {
+      assert.equal(value, ".card{color:red;margin:0}");
+    },
+    notes: "Rendered the canonical Advanced CSS Minifier route and verified local CSS comment/whitespace minification.",
+  });
 
   await runTextTransform({
     id: "json-to-xml",
@@ -186,7 +223,7 @@ try {
 
   await runTool("mime-type-lookup", "MIME Type Lookup", async () => {
     await page.getByPlaceholder("e.g. .webp, image/png, pdf").fill(".pdf");
-    await page.getByText("application/pdf", { exact: true }).first().waitFor();
+    await page.getByText(/application\\/pdf/).first().waitFor();
     await page.locator('input[type="file"]').first().setInputFiles({
       name: "mislabeled.txt",
       mimeType: "text/plain",
@@ -200,16 +237,14 @@ try {
   const reportPath = process.argv.find((value) => value.startsWith("--report="))?.slice("--report=".length);
   assert.equal(toolResults.length, 9, "The report includes all nine remaining Files tool IDs");
   writeToolAuditReport({
-    auditId: "files-nine-remaining-browser",
+    auditId: "files-eight-and-css-advanced-browser",
     toolResults,
     reportPath,
   });
-  console.log(JSON.stringify({
-    passed: toolResults.filter((item) => item.status === "passed").length,
-    blocked: toolResults.filter((item) => item.status === "blocked").length,
-    expected: 9,
-    reportPath: reportPath ?? null,
-  }, null, 2));
+  const passed = toolResults.filter((item) => item.status === "passed").length;
+  const blocked = toolResults.filter((item) => item.status === "blocked").length;
+  console.log(JSON.stringify({ passed, blocked, expected: 9, reportPath: reportPath ?? null }, null, 2));
+  assert.equal(blocked, 0, "All nine expected tool routes must pass; blocked IDs fail this CI audit.");
 } finally {
   await context.close();
   await browser.close();

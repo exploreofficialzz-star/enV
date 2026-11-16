@@ -450,7 +450,7 @@ ingestCommitBoundBrowserReport({
 });
 ingestCommitBoundBrowserReport({
   reportPath: path.join(root, "artifacts/tool-functional-audit/files-remaining.json"),
-  auditId: "files-nine-remaining-browser",
+  auditId: "files-eight-and-css-advanced-browser"
   expectedToolIds: [
     "csv-to-json",
     "file-size-converter",
@@ -462,7 +462,7 @@ ingestCommitBoundBrowserReport({
     "xml-to-json",
     "yaml-to-json",
   ],
-  step: "Verify remaining Files converters and MIME utilities in the browser",
+  step: "Verify remaining Files converters, MIME utilities and Advanced CSS Minifier in the browser"
   script: "scripts/audit-files-remaining-browser.mjs",
 });
 

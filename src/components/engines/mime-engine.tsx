@@ -14,7 +14,7 @@ function matches(bytes: Uint8Array, sig?: number[]) { return !!sig && sig.every(
 
 export function MimeEngine(_props: { op: string }) {
   const [query,setQuery]=useState(""); const [file,setFile]=useState<File|null>(null); const [inspection,setInspection]=useState<{entry?:MimeEntry; browser:string; ext:string; bytes:string; mismatch:boolean}|null>(null); const [error,setError]=useState<string|null>(null);
-  const results=useMemo(()=>{ const q=query.trim().toLowerCase(); return TYPES.filter(x=>!q||x.ext.includes(q)||x.mime.includes(q)||x.name.toLowerCase().includes(q)||x.group.includes(q)).slice(0,80); },[query]);
+  const results=useMemo(()=>{ const q=query.trim().toLowerCase().replace(/^\\.+/, ""); return TYPES.filter(x=>!q||x.ext.includes(q)||x.mime.includes(q)||x.name.toLowerCase().includes(q)||x.group.includes(q)).slice(0,80); },[query]);
   async function inspect(f:File){ setFile(f); setError(null); const bytes=new Uint8Array(await f.slice(0,64).arrayBuffer()); const ext=(f.name.split(".").pop()||"").toLowerCase(); const candidates=TYPES.filter(x=>matches(bytes,x.magic)); const entry=candidates[0]; setInspection({entry,browser:f.type||"unknown",ext,bytes:hex(bytes),mismatch:!!entry&&!!ext&&entry.ext!==ext&&!(entry.ext==="jpg"&&ext==="jpeg")}); }
   async function copy(v:string){ try{await navigator.clipboard.writeText(v);}catch{setError("Clipboard access is unavailable; select and copy the value instead.");} }
   return <div className="space-y-5">
