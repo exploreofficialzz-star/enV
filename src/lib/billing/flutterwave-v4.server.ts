@@ -9,6 +9,7 @@ import {
 } from "./country-routing";
 import { quoteTokenPacks, type CurrencyPackQuote } from "./fx.server";
 import { normalizeOptionalPhoneNumber } from "./payment-methods";
+import { classifyFlutterwaveApiFailure } from "./flutterwave-errors";
 
 const TOKEN_PACKS = [100, 250, 500, 1_000] as const;
 const TOKEN_ENDPOINT = "https://idp.flutterwave.com/realms/flutterwave/protocol/openid-connect/token";
@@ -207,6 +208,12 @@ async function flutterwaveRequest(
   path: string,
   init: RequestInit = {},
   idempotencyKey?: string,
+  diagnosticContext?: {
+    countryCode: string;
+    currency: string;
+    amount: number;
+    paymentType: string;
+  },
 ): Promise<JsonRecord> {
   const token = await getAccessToken();
   const traceId = randomUUID().replaceAll("-", "");
@@ -243,18 +250,31 @@ async function flutterwaveRequest(
           };
         })
       : [];
+    const classification = classifyFlutterwaveApiFailure({
+      httpStatus: response.status,
+      providerErrorCode,
+      providerMessage: upstreamMessage,
+      paymentType: diagnosticContext?.paymentType,
+    });
     console.error("[billing-flutterwave-api] " + JSON.stringify({
       traceId,
+      environment: apiBaseUrl() === SANDBOX_API ? "sandbox" : "production",
       path,
       httpStatus: response.status,
       providerErrorCode: providerErrorCode || null,
       providerMessage: upstreamMessage || null,
+      ...(diagnosticContext ? {
+        countryCode: diagnosticContext.countryCode,
+        currency: diagnosticContext.currency,
+        amount: diagnosticContext.amount,
+        paymentType: diagnosticContext.paymentType,
+      } : {}),
       validationErrors,
     }));
     const error = new Error("Flutterwave v4 request failed.");
     Object.assign(error, {
-      code: response.status === 401 ? "FLUTTERWAVE_AUTH_FAILED" : "FLUTTERWAVE_API_ERROR",
-      status: response.status >= 500 ? 503 : 502,
+      code: classification.code,
+      status: classification.status,
       providerHttpStatus: response.status,
       providerErrorCode,
       traceId,
@@ -634,7 +654,12 @@ export async function initializeFlutterwaveCheckout(input: {
         payment_method: method,
         meta: { purchaseIntentId: intentId, tokenPack: input.tokenPack, countryCode: profile.countryCode },
       }),
-    }, v4IdempotencyKey);
+    }, v4IdempotencyKey, {
+      countryCode: profile.countryCode,
+      currency,
+      amount: amountMajor,
+      paymentType: method.type,
+    });
     const chargeId = typeof data.id === "string" ? data.id : "";
     const returnedReference = typeof data.reference === "string" ? data.reference : "";
     const providerStatus = typeof data.status === "string" ? data.status.toLowerCase() : "";
@@ -717,7 +742,8 @@ export async function initializeFlutterwaveCheckout(input: {
   } catch (error) {
     const candidate = error as { code?: unknown };
     if (typeof candidate.code === "string" &&
-        ["FLUTTERWAVE_AUTH_FAILED", "FLUTTERWAVE_API_ERROR", "PAYMENT_METHOD_NOT_AVAILABLE_FOR_COUNTRY",
+        ["FLUTTERWAVE_AUTH_FAILED", "FLUTTERWAVE_API_ERROR", "FLUTTERWAVE_CARD_RESTRICTED",
+          "FLUTTERWAVE_BANKING_PARTNER_ERROR", "PAYMENT_METHOD_NOT_AVAILABLE_FOR_COUNTRY",
           "FLUTTERWAVE_INITIALIZATION_FAILED", "ACCOUNT_NAME_REQUIRED", "INVALID_PAYMENT_DETAILS",
           "INVALID_CUSTOMER_ADDRESS"].includes(candidate.code)) {
       await sql.query(
