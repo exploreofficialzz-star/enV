@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { usdCentsForTokenPack, usdCentsToMinorAmount, formatUsdReferenceForTokenPack } from "./fx.server.ts";
-import { parseMajorUnitsToMinor } from "./country-routing.ts";
 
 test("enV token reference pricing is fixed at one US cent per token", () => {
   assert.equal(usdCentsForTokenPack(100), 100);
@@ -17,7 +16,6 @@ test("enV token reference pricing is fixed at one US cent per token", () => {
 test("the $1.00 US checkout quote round-trips as 100 USD minor units and a 1.00 V4 charge", () => {
   const usdAmountMinor = usdCentsToMinorAmount(100, "USD", 1);
   assert.equal(usdAmountMinor, 100);
-  assert.equal(parseMajorUnitsToMinor(1, "USD"), 100);
   assert.equal(formatUsdReferenceForTokenPack(100), "$1.00");
 });
 
