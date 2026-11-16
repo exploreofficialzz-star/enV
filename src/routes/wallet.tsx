@@ -177,7 +177,7 @@ function tokenUnitDisplay(label: string): React.ReactNode {
 
 function activitySummary(entry: WalletActivity): string {
   if (entry.entry_type === "purchase_attempt") {
-    if (entry.status === "credited") return "Payment credited";
+    if (entry.status === "credited") return "Payment marked credited";
     return `Payment ${entry.status.replaceAll("_", " ")}`;
   }
   if (entry.entry_type === "reservation") return `Reserved ${tokenAmount(Math.abs(entry.delta_reserved_subunits))} tokens`;
@@ -554,12 +554,30 @@ function Account() {
               ? "Wallet information is currently unavailable. No balance or payment was changed."
               : "Wallet information is unavailable. Please retry."));
         }
-        setState({
-          status: "ready",
-          wallet: payload.data.wallet,
-          activity: payload.data.activity ?? [],
-          activityNextCursor: payload.data.activityNextCursor ?? null,
-          activityHasMore: payload.data.activityHasMore === true,
+        setState((current) => {
+          const refreshedActivity = payload.data?.activity ?? [];
+          if (current.status !== "ready" || !current.activity?.length) {
+            return {
+              status: "ready",
+              wallet: payload.data!.wallet,
+              activity: refreshedActivity,
+              activityNextCursor: payload.data!.activityNextCursor ?? null,
+              activityHasMore: payload.data!.activityHasMore === true,
+            };
+          }
+          const refreshedIds = new Set(refreshedActivity.map((entry) => entry.id));
+          const refreshedReferences = new Set(refreshedActivity.map((entry) => entry.reference_id).filter((value): value is string => Boolean(value)));
+          const olderActivity = current.activity.filter((entry) =>
+            !refreshedIds.has(entry.id) &&
+            !(entry.source === "purchase" && refreshedReferences.has(entry.id)),
+          );
+          return {
+            status: "ready",
+            wallet: payload.data!.wallet,
+            activity: [...refreshedActivity, ...olderActivity],
+            activityNextCursor: payload.data!.activityNextCursor ?? null,
+            activityHasMore: payload.data!.activityHasMore === true,
+          };
         });
         setTransactionHistoryError("");
       })
@@ -1682,6 +1700,8 @@ function Account() {
             <div className="flex items-center gap-2"><Clock3 size={18} className="text-accent" aria-hidden="true"/><h2 id="recent-transactions-title" className="font-semibold text-fg">Recent transactions</h2></div>
             <button type="button" onClick={() => setReloadKey(value => value + 1)} aria-label="Refresh transactions" className="inline-flex size-9 items-center justify-center rounded-full border border-border text-muted hover:bg-surface-2"><RefreshCw size={15} aria-hidden="true"/></button>
           </div>
+          {state.status === "loading" ? <p className="py-5 text-sm text-muted">Loading transaction history…</p> : null}
+          {state.status === "unavailable" ? <p className="py-5 text-sm text-muted" role="alert">{state.message ?? "Transaction history is temporarily unavailable."}</p> : null}
           {state.status === "ready" && state.activity?.length ? <ul className="mt-3 divide-y divide-border">
             {state.activity.slice(0, showAllTransactions ? state.activity.length : 4).map(entry => <li key={entry.id} className="flex items-start justify-between gap-3 py-3">
               <div className="flex min-w-0 items-start gap-3"><span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-surface-2 text-fg">{activityIcon(entry)}</span><div className="min-w-0"><p className="text-sm font-medium text-fg">{activitySummary(entry)}</p><p className="mt-0.5 truncate text-xs text-muted">{entry.description}</p><p className="mt-1 text-[11px] text-subtle">{new Date(entry.created_at).toLocaleString()}</p></div></div>
@@ -1691,7 +1711,8 @@ function Account() {
                 {entry.provider ? <p className="mt-0.5 text-[10px] text-muted">{entry.provider}</p> : null}
               </div>
             </li>)}
-          </ul> : <div className="flex items-center gap-3 py-5"><span className="grid size-10 place-items-center rounded-full bg-surface-2 text-muted"><Clock3 size={19} aria-hidden="true"/></span><div><p className="text-sm font-medium text-fg">No transactions yet</p><p className="mt-0.5 text-xs text-muted">Your deposits, token usage and rewards will appear here.</p></div></div>}
+          </ul> : null}
+          {state.status === "ready" && !state.activity?.length ? <div className="flex items-center gap-3 py-5"><span className="grid size-10 place-items-center rounded-full bg-surface-2 text-muted"><Clock3 size={19} aria-hidden="true"/></span><div><p className="text-sm font-medium text-fg">No transactions yet</p><p className="mt-0.5 text-xs text-muted">Your deposits, token usage and rewards will appear here.</p></div></div> : null}
           {transactionHistoryError ? <p className="mt-2 text-xs text-rose-600" role="alert">{transactionHistoryError}</p> : null}
           {state.status === "ready" && ((state.activity?.length ?? 0) > 4 || state.activityHasMore) ? <button type="button" onClick={() => setShowAllTransactions(value => !value)} className="mt-2 text-sm font-semibold text-accent">{showAllTransactions ? "Show less" : "View all transactions"}</button> : null}
           {state.status === "ready" && showAllTransactions && state.activityHasMore ? <button type="button" onClick={() => void loadMoreTransactions()} disabled={loadingMoreTransactions} className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-border text-sm font-semibold text-fg disabled:opacity-60"><RefreshCw size={14} className={loadingMoreTransactions ? "animate-spin" : ""} aria-hidden="true"/>{loadingMoreTransactions ? "Loading transactions…" : "Load more transactions"}</button> : null}
