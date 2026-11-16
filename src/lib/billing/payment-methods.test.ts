@@ -45,6 +45,19 @@ test("local payments stay unavailable for international-card-only Paystack accou
   assert.deepEqual(getFundingCandidates(international, "local"), []);
 });
 
+test("US USD Card checkout remains eligible for Flutterwave V4 and resolves card directly", () => {
+  const usFlutterwave = [{
+    id: "flutterwave" as const,
+    enabled: true,
+    currency: "USD",
+    paymentMethods: ["card"],
+  }];
+  assert.equal(isCustomerPaymentMethodAvailable(usFlutterwave, "card"), true);
+  assert.deepEqual(getFundingCandidates(usFlutterwave, "card").map((provider) => provider.id), ["flutterwave"]);
+  assert.equal(resolveFlutterwaveFundingMethod("card", usFlutterwave[0]!.paymentMethods), "card");
+  assert.equal(isCustomerPaymentMethodAvailable(usFlutterwave, "local"), false);
+});
+
 test("US Card choice resolves directly to the V4 card channel without relying on a second ready flag", () => {
   const usCardChannels = ["card"];
   assert.equal(resolveFlutterwaveFundingMethod("card", usCardChannels), "card");
