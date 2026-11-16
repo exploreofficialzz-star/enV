@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import { getAllTools, getSearchableTools, getToolByPath } from "../src/lib/registry.ts";
 import { CATEGORIES } from "../src/data/categories.ts";
 import { classifyAuditEvidenceCommit } from "./audit-evidence-provenance.mjs";
+import { tools as sourceCatalogTools } from "../src/data/catalog.ts";
+import { reconcileToolInventories } from "./reconcile-tool-inventories.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const args = process.argv.slice(2);
@@ -18,6 +20,12 @@ const runtimeTools = getAllTools().slice();
 const searchableTools = getSearchableTools().slice();
 const categoryIds = CATEGORIES.map((category) => category.id);
 const validCategories = new Set(categoryIds);
+const toolInventoryReconciliation = reconcileToolInventories({
+  sourceTools: sourceCatalogTools,
+  runtimeTools,
+  searchableTools,
+  categoryIds,
+});
 const statusNames = ["NOT_INSPECTED", "SOURCE_INSPECTED", "STATIC_CHECKED", "UNIT_TESTED", "BROWSER_TESTED", "NATIVE_TESTED", "VERIFIED", "BLOCKED", "DEFECT_FOUND", "NOT_APPLICABLE"];
 const evidenceCheckNames = [
   "routeRendering", "interactionExecution", "outputValidation", "runtimeErrorCheck",
@@ -577,6 +585,7 @@ const report = {
     runtimeGetter: "getAllTools() from src/lib/registry.ts",
     discoveryGetter: "getSearchableTools() from src/lib/registry.ts",
     categoriesSource: "src/data/categories.ts",
+    rawSourceCatalogue: "src/data/catalog.ts",
     nativeManifestSources: ["apps/{android,ios}/native-tool-coverage.txt", "apps/{android,ios}/native-family-coverage/*.txt", "apps/{android,ios}/backend-tool-coverage.txt"],
     nativeMatrixSource: "apps/shared/native-execution-matrix.json",
     evidenceCommitPolicy: "Only audit evidence tested against the exact current sourceCommit SHA contributes to current per-tool test status. Historical or unverified evidence is retained separately.",
@@ -588,12 +597,19 @@ const report = {
     uniqueRuntimeIds: runtimeIds.size,
     searchableTools: searchableTools.length,
     searchableUniqueIds: searchableIds.size,
+    sourceCatalogRecords: toolInventoryReconciliation.source.recordCount,
+    sourceCatalogUniqueIds: toolInventoryReconciliation.source.uniqueIdCount,
+    runtimeOnlyExtensionRecords: toolInventoryReconciliation.runtimeOnlyToolIds.length,
+    sourceOnlyRecordsMissingFromRuntime: toolInventoryReconciliation.sourceOnlyToolIds.length,
+    runtimeRecordsExcludedFromSearch: toolInventoryReconciliation.runtimeNotSearchableToolIds.length,
     categoryRoutes: categoryIds.length,
     categoryCountInRuntime: new Set(allTools.map((tool) => tool.category)).size,
+    emptyCategoryIds: toolInventoryReconciliation.emptyCategoryIds,
     inventorySha256: hash(JSON.stringify(inventoryDescriptor)),
     duplicateStableIds: [...duplicateIds],
     duplicateCategorySlugRoutes: [...duplicateRouteKeys].map(([route, ids]) => ({ route, ids })),
   },
+  sourceRuntimeSearchReconciliation: toolInventoryReconciliation,
   statusDefinitions: {
     auditStatus: "Highest evidence stage reached for the specific tool. STATIC_CHECKED means only runtime identity, category, declared engine metadata and registry route-resolver checks were completed. It does not mean the tool's rendered page or functionality was tested.",
     VERIFIED: "Reserved for completion of every applicable per-tool check with evidence. No tool is promoted to VERIFIED by this generator.",

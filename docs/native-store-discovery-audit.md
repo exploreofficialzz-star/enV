@@ -1,6 +1,6 @@
 # enV native store and external discovery audit
 
-**Audit date:** 15 November 2026  
+**Audit date:** 16 November 2026  
 **Canonical product name:** enV  
 **Publisher / parent company:** chAs Technologies LLC  
 **Canonical website:** https://envtools.store  
@@ -25,21 +25,33 @@ The web platform handoff page states that the native app remains native, that to
 - https://envtools.store/platform/android
 - https://envtools.store/platform/ios
 
-## 2. Shared native catalogue reconciliation
+## 2. Shared catalogue and native execution reconciliation
 
-The generated native inventory currently records:
+The completed discovery export and native-matrix workflow at PR #154 audit head 5190a486788ee1a9ec6ac25db4aa1fed8df3da86 reconciled the shared base catalogue, the Web runtime registry, searchable discovery and the Android/iOS execution matrix by stable tool ID.
 
-- Expanded native catalogue records: **10,004**
-- Engine families: **27**
-- Android native coverage manifest: **7,902 unique tool IDs**
-- iOS native coverage manifest: **7,902 unique tool IDs**
-- Android/iOS manifest ID sets: **identical**
+| Inventory surface | Records | Active / beta | Planned | Meaning |
+|---|---:|---:|---:|---|
+| Shared source catalogue export | 10,001 | 9,741 | 260 | Base records emitted to apps/shared/catalog.json |
+| Web runtime registry | 10,013 | 9,753 | 260 | Base records plus 12 runtime-only extension records |
+| Searchable discovery registry | 9,978 | — | — | Search-facing records; not a substitute for the full runtime count |
+| Category definitions | 43 | 42 populated | 1 empty | generators has no current runtime tool records |
+| Native execution matrix | 10,013 | 9,753 | 260 | One matrix row for every runtime ID |
 
-The matching ID sets are enforced by scripts/check-native-store-discovery.mjs and scripts/generate-seo-artifacts.mjs. Both applications consume the shared native catalogue export.
+The reconciled native execution matrix classifies the active runtime records as:
 
-**Important interpretation:** these are generated catalogue and coverage-manifest counts. A listed tool ID is a declared native coverage entry; it does not prove a successful workflow on every Android/iOS version or physical device. Families with zero manifest entries remain visible in native-engine-inventory.json. Device-level acceptance still depends on the Android and iOS native test suites and representative real-device checks.
+- **7,909 offline-native** on both Android and iOS.
+- **1,566 backend-native** on both Android and iOS.
+- **278 Web-only** on both native products, with explicit disposition reasons.
+- **0 active Android/iOS classification divergences.**
+- **9,475 of 9,753 active records** have a matching native or backend execution path in both native products.
 
-The SEO inventory now carries Android and iOS manifest membership per tool ID alongside the web runtime engine, status, route, canonical target/disposition, and guide-source classification. This makes catalogue differences visible without equating a manifest declaration with implementation proof.
+The per-platform combined explicit native coverage-manifest sets contain **7,933 unique IDs**. The matrix classifications are not a simple count of manifest lines: backend execution is also inferred from the registered backend engine/category policy in scripts/export-native-execution-matrix.mjs. The matrix checker verifies that all 10,013 runtime IDs appear exactly once and that the 278 Web-only records remain explicitly classified rather than silently omitted.
+
+The catalogue source count and runtime count intentionally differ: the runtime registry adds 12 separately registered extensions. The audit ledger preserves and reports those IDs instead of treating a 10,001-row base catalogue as the total tool count. The searchable registry also excludes 35 runtime records; excluded aliases and Studio records must be traced to their canonical discovery targets rather than counted twice.
+
+**Important interpretation:** a coverage manifest or matrix classification is source-level execution routing evidence, not proof that every tool was independently accepted on a real Android/iOS device. The current per-tool ledger reports zero full tool verifications and zero per-tool native execution attestations. Platform CI passing does not turn 9,475 matrix rows into 9,475 independent native acceptance tests. Device-level acceptance still needs tool-specific operation evidence and representative real-device checks.
+
+The per-tool ledger also records source/runtime/search count reconciliation, category population, stable IDs, route identity, engine declaration, native-manifest membership, current-commit browser evidence and historical evidence separately. The current browser evidence set contains 103 per-tool records from the current test commit (93 Celebrations, 3 QR/barcode and 7 File Workspace/ZIP records); this is not full verification of those tools' every control or boundary case.
 
 ## 3. Store listing metadata prepared for review
 

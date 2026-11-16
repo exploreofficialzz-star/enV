@@ -98,6 +98,34 @@ The earlier rendered guide index displayed **9,979 searchable guide entries**. A
 
 The PR remains open and draft, with `mergeable=false`. No current-head CI, current-head Vercel deployment, production release, Search Console/Bing verification, indexing result, AI citation or live social-preview validation is claimed.
 
+## 2.3 Current inventory and verification snapshot — 16 November 2026
+
+This snapshot supersedes the 14 November historical notes above. The tested source revision for the latest generated per-tool ledger was merge ref 5190a486788ee1a9ec6ac25db4aa1fed8df3da86, built from the PR #154 branch. The branch itself was at b7fa5879d2b2fabdf91932b7d6a28b3c26aa8dc0 when the ledger was generated.
+
+| Gate | Current evidence | Disposition |
+|---|---|---|
+| Base source catalogue | 10,001 records: 9,741 active/beta and 260 planned | Source catalogue count verified |
+| Web runtime registry | 10,013 unique IDs: 9,753 active/beta and 260 planned | Includes 12 runtime-only extension records that must be counted separately from the base catalogue |
+| Searchable registry | 9,978 unique IDs | 35 runtime records do not appear in the searchable set; aliases and Studio destinations must remain reconciled |
+| Categories | 43 definitions, 42 populated runtime categories | generators is currently empty and needs a product/taxonomy decision |
+| Identity and routes | 10,013 unique runtime IDs; zero duplicate stable IDs; zero duplicate category/slug routes | Structural reconciliation passed |
+| Native execution matrix | 10,013 rows; zero missing IDs; zero extra IDs; 9,753 active and 260 planned | Native execution inventory reconciliation passed |
+| Native matrix classification | 7,909 offline-native; 1,566 backend-native; 278 explicitly Web-only; zero platform divergences | 9,475 active records have a matching native/backend classification; this is not 9,475 independent device tests |
+| Current-commit browser evidence | 103 tool records: 93 Celebrations, 3 QR/barcode, 6 File Workspace, 1 ZIP | Evidence is commit-bound and per-tool; it covers only the checks explicitly named in each record |
+| Full per-tool verification | 0 of 10,013 | Not complete; no tool is promoted to VERIFIED without every applicable check |
+| Historical evidence | Six evidence groups tested at an older source commit | Retained separately and excluded from current browser/unit/native pass counts |
+
+The new File Workspace and ZIP browser scripts write a structured report per tool with the full tested commit SHA, workflow run ID and job ID. The ledger validates IDs, statuses, check names, workflow provenance and commit equality before counting a test. Missing or historical evidence is not promoted to a current pass. The ledger currently reports 10,013 tools at STATIC_CHECKED or a higher browser-evidence stage, but STATIC_CHECKED means only stable identity, runtime registration, category, declared engine and route-resolver checks. It does not mean that source code for every individual engine has been traced or that the page and all controls have been exercised.
+
+### CI and merge blockers observed on the current PR run
+
+- Production Check passed its PDF/DOCX safety browser check, ZIP browser suite, six-tool File Workspace browser suite, 93 Celebrations mobile browser audit and UI/UX Studio responsive browser audit. Its later full verification stage failed at scripts/check-audio-studio-usability.mjs:38 because the Audio Studio utility visual treatment assertion could not find “Tool notes & format”. The workflow still completed native-matrix reconciliation and generated/uploaded the per-tool ledger successfully.
+- Web build, TypeScript typecheck and ESLint passed. The Web test step failed in scripts/check-business-studios.mjs:47 because the source no longer matched the expected “Optional logo (stays on this device)” marker.
+- Developer Studios quality gates failed in scripts/check-developer.mjs:57 because the expected “On-device processing” marker was absent.
+- Android Kotlin tests/lint and native emulator launch/accessibility tests passed; the release APK/AAB signing/package step was still running when this snapshot was written. The iOS simulator build/XCTest job was also still running at snapshot time.
+
+The Audio, Business and Developer assertions are outside the discovery changes in this PR. They remain merge blockers until the owning workstreams correct or formally resolve their gates. They were not patched from this discovery branch. The PR remains a draft; do not mark the programme complete or merge it while required checks remain red.
+
 ## 3. Competitor and platform research
 
 The research compares patterns, not wording to copy. enV should use its own language and only claim capabilities demonstrated by its implementation.
