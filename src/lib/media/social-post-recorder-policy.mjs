@@ -13,6 +13,7 @@ const SOCIAL_POST_HOSTS = Object.freeze({
   dailymotion: ["dailymotion.com"],
 });
 
+/** @param {string} host @param {string} domain */
 function hostMatches(host, domain) {
   return host === domain || host.endsWith(`.${domain}`);
 }
@@ -21,6 +22,7 @@ function hostMatches(host, domain) {
  * Accept only public-link URLs from supported social/video providers.
  * This is an input guard, not proof that a post is public or recordable.
  */
+/** @param {string} rawValue */
 export function resolveSocialPostUrl(rawValue) {
   const raw = String(rawValue ?? "").trim();
   if (!raw || raw.length > 4096) {
@@ -40,7 +42,7 @@ export function resolveSocialPostUrl(rawValue) {
   if (url.username || url.password) {
     throw new Error("Links containing embedded login credentials are not accepted.");
   }
-  if (url.port && !((url.protocol === "https:" && url.port === "443") || (url.protocol === "http:" && url.port === "80"))) {
+  if (url.port && url.port !== "443") {
     throw new Error("Custom ports are not supported for post links.");
   }
 
