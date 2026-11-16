@@ -113,7 +113,7 @@ type LocalOfflineAllowance = {
 
 async function encryptFlutterwaveField(value: string, encodedKey: string, nonce: string): Promise<string> {
   const keyBytes = Uint8Array.from(atob(encodedKey), (character) => character.charCodeAt(0));
-  if (keyBytes.byteLength !== 32) throw new Error("The Flutterwave encryption key is not a valid AES-256 key.");
+  if (keyBytes.byteLength !== 32) throw new Error("The secure encryption key is not a valid AES-256 key.");
   const key = await window.crypto.subtle.importKey("raw", keyBytes, { name: "AES-GCM" }, false, ["encrypt"]);
   const encrypted = await window.crypto.subtle.encrypt(
     { name: "AES-GCM", iv: new TextEncoder().encode(nonce) },
@@ -1435,7 +1435,7 @@ function Account() {
                     {fundingBusy ? "Checking…" : "I've made the transfer"}
                   </button>
                   <p className="text-[11px] leading-4 text-muted">
-                    enV adds tokens only after Flutterwave confirms the matching transfer. Do not send a different amount.
+                    enV adds tokens only after the transfer is confirmed. Do not send a different amount.
                   </p>
                 </div>
               ) : null}
