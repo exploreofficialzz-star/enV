@@ -340,7 +340,7 @@ fun NativeInformationScreen(pageId: String, catalog: com.chastech.env.data.Catal
                     Button(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/account"))) }, modifier = Modifier.fillMaxWidth()) { Text("Continue to sign in") }
                 }
                 "wallet" -> NativeWalletDashboard()
-                "history" -> InformationSection("", listOf("Recently used tools will appear here."))
+                "history" -> NativeWalletHistory()
                 "privacy" -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     PrivacyInformation()
                     NativeAdsPrivacyDisclosure()
@@ -888,6 +888,110 @@ private fun NativeWalletMetric(
                 Text(title, style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
                 androidx.compose.material3.Text(walletTokenUnitDisplay(value), style = MaterialTheme.typography.labelMedium, fontSize = 10.sp, fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, softWrap = false)
                 Text(subtitle, style = MaterialTheme.typography.labelSmall, fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, softWrap = false)
+            }
+        }
+    }
+}
+
+@Composable
+private fun NativeWalletHistory() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var items by remember { mutableStateOf<List<OfflineWalletNativeApi.ActivityItem>>(emptyList()) }
+    var nextCursor by remember { mutableStateOf<String?>(null) }
+    var hasMore by remember { mutableStateOf(false) }
+    var loading by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf("") }
+    val paired = OfflineWalletNativeApi.isPaired(context)
+
+    fun loadPage(cursor: String?, replace: Boolean) {
+        if (loading) return
+        scope.launch {
+            loading = true
+            error = ""
+            try {
+                val page = OfflineWalletNativeApi.fetchWalletHistoryPage(context, cursor, 50)
+                items = if (replace) page.items else (items + page.items).distinctBy { it.id }
+                nextCursor = page.nextCursor
+                hasMore = page.hasMore
+            } catch (failure: Exception) {
+                error = failure.message ?: "Transaction history could not be loaded."
+            } finally {
+                loading = false
+            }
+        }
+    }
+
+    LaunchedEffect(paired) {
+        if (paired) loadPage(null, true)
+    }
+
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("Payments, wallet credits, rewards, reservations and token usage recorded for your account.",
+            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (!paired) {
+            Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Connect your enV wallet", style = MaterialTheme.typography.titleMedium)
+                    Text("Sign in to your enV web Wallet and pair this device to load private transaction history.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Button(onClick = {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/wallet")))
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Open enV Wallet") }
+                }
+            }
+        } else {
+            if (error.isNotBlank()) {
+                Text(error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                TextButton(onClick = { loadPage(null, true) }, enabled = !loading) { Text("Try again") }
+            }
+            if (loading && items.isEmpty()) {
+                Text("Loading transactions…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else if (items.isEmpty() && error.isBlank()) {
+                Text("No wallet transactions have been recorded for this account yet.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            items.forEachIndexed { index, row ->
+                Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+                    Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Box(Modifier.size(32.dp).background(MaterialTheme.colorScheme.surfaceVariant, CircleShape), contentAlignment = Alignment.Center) {
+                                EnVIcon(walletActivityGlyph(row.type, row.deltaAvailableSubunits, row.consumedSubunits),
+                                    Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurface)
+                            }
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                val heading = if (row.type == "purchase attempt") {
+                                    "Payment " + row.status.replace('_', ' ')
+                                } else walletActivityLabel(row.type, row.consumedSubunits)
+                                Text(heading.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                                Text(row.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            if (row.paymentAmountMinor != null && !row.currency.isNullOrBlank()) {
+                                val currency = runCatching { java.util.Currency.getInstance(row.currency) }.getOrNull()
+                                if (currency != null) {
+                                    val digits = currency.defaultFractionDigits.coerceAtLeast(0)
+                                    val value = row.paymentAmountMinor.toDouble() / Math.pow(10.0, digits.toDouble())
+                                    Text(java.text.NumberFormat.getCurrencyInstance().apply { this.currency = currency }.format(value),
+                                        style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
+                                }
+                            }
+                        }
+                        Text(row.createdAt, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (row.provider != null) Text(row.provider, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (row.type == "purchase attempt") Text("Status: " + row.status.replace('_', ' '),
+                            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+            if (hasMore) {
+                Button(onClick = { nextCursor?.let { loadPage(it, false) } }, enabled = !loading && nextCursor != null,
+                    modifier = Modifier.fillMaxWidth()) {
+                    Text(if (loading) "Loading transactions…" else "Load older transactions")
+                }
+            }
+            if (!loading && items.isNotEmpty()) {
+                TextButton(onClick = { loadPage(null, true) }, modifier = Modifier.fillMaxWidth()) { Text("Refresh history") }
             }
         }
     }
