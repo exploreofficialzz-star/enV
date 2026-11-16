@@ -29,6 +29,7 @@ struct NativeSocialMediaPostRecorderView: View {
               components.scheme?.lowercased() == "https",
               components.user == nil,
               components.password == nil,
+              (components.port == nil || components.port == 443),
               let host = components.host?.lowercased() else {
             failure = "Paste a valid HTTPS social-media post link."
             return nil
