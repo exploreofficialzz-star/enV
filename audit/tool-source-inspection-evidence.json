@@ -1,0 +1,239 @@
+{
+  "schemaVersion": 1,
+  "evidenceSetId": "pr154-files-17-source-review-fb57fb49",
+  "inspectedAgainstCommit": "fb57fb4946d6b668c467e63baeeeac75f0870361",
+  "note": "Content-pinned source review for the 17 Files/CSS tool IDs with current browser evidence. Each listed source path is checked against its Git blob SHA-1 before it contributes. Source inspection does not imply full functional, token, offline, backend, accessibility, or native verification.",
+  "records": [
+    {
+      "id": "files-workspace-six-source-review",
+      "toolIds": [
+        "file-organizer",
+        "batch-file-renamer",
+        "duplicate-file-finder",
+        "folder-size-analyzer",
+        "file-search",
+        "file-compare"
+      ],
+      "files": [
+        {
+          "path": "src/components/engines/file-workspace-engine.tsx",
+          "gitBlobSha1": "bf31c179bd0c1a1c09bc35551a9f318b2321f9cc"
+        },
+        {
+          "path": "src/lib/registry.ts",
+          "gitBlobSha1": "12a01cdd19c84badd4da198cbae98531a89e8c55"
+        },
+        {
+          "path": "src/components/tools/tool-engine.tsx",
+          "gitBlobSha1": "5d36829b9ab065319646e399c55e2d52365266d1"
+        }
+      ],
+      "reviewedAreas": [
+        "Safe path and filename handling; bounded directory traversal",
+        "Organization, collision-safe batch rename, SHA-256 duplicate checks, folder inventory, bounded text search, and file-set comparison",
+        "Runtime registration and Web engine dispatch"
+      ],
+      "notes": "Reviewed the six exact File Workspace tool routes and their shared local implementation. Not a substitute for every edge case, permission, token, offline, or native test."
+    },
+    {
+      "id": "zip-any-file-source-review",
+      "toolIds": [
+        "zip-any-file"
+      ],
+      "files": [
+        {
+          "path": "src/components/engines/zip-archive-engine.tsx",
+          "gitBlobSha1": "11e1585cc9bd3f1cdeb5cee95d2f4a98bba28580"
+        },
+        {
+          "path": "src/lib/zip/archive-utils.ts",
+          "gitBlobSha1": "1870f6a1a0d215293fa209c97bcd06eef55b6498"
+        },
+        {
+          "path": "src/components/tools/tool-engine.tsx",
+          "gitBlobSha1": "5d36829b9ab065319646e399c55e2d52365266d1"
+        }
+      ],
+      "reviewedAreas": [
+        "ZIP creation and extraction workflows",
+        "Archive path traversal guards, entry and expanded-size limits, compression-ratio protection, CRC checks, and destination collision handling",
+        "Runtime dispatch"
+      ],
+      "notes": "Reviewed the archive implementation and shared safety helpers. The browser audit separately tests representative create/extract round trips."
+    },
+    {
+      "id": "file-to-txt-source-review",
+      "toolIds": [
+        "file-to-txt"
+      ],
+      "files": [
+        {
+          "path": "src/components/engines/file-converter-engine.tsx",
+          "gitBlobSha1": "8f69612a0cb4d940ed3ff2bd708e15943afb7a06"
+        },
+        {
+          "path": "src/lib/documents/local-document.ts",
+          "gitBlobSha1": "ac3687a1e30579d1f6c66f8a7d65fd1b3c2a0c37"
+        },
+        {
+          "path": "src/lib/a-book/pdf-reader.ts",
+          "gitBlobSha1": "0068d391aaaa0d86f7332143bac5dad51305781b"
+        },
+        {
+          "path": "src/components/tools/tool-engine.tsx",
+          "gitBlobSha1": "5d36829b9ab065319646e399c55e2d52365266d1"
+        }
+      ],
+      "reviewedAreas": [
+        "Manual text and local text-file conversion flows",
+        "DOCX extraction size and entry bounds",
+        "PDF.js selectable-text extraction limits, cancellation and timeout behavior",
+        "Scanned PDF no-OCR behavior, output-size limits, and download/dispatch"
+      ],
+      "notes": "Reviewed local extraction code and explicit limits. OCR is not included and is not claimed."
+    },
+    {
+      "id": "file-size-converter-source-review",
+      "toolIds": [
+        "file-size-converter"
+      ],
+      "files": [
+        {
+          "path": "src/components/engines/converter-engine.tsx",
+          "gitBlobSha1": "0fa142ed6dce3350a46acdace0ad0491c3a0c704"
+        },
+        {
+          "path": "src/lib/engines/units.ts",
+          "gitBlobSha1": "870609eeb59a3697a6df075ed5db2ae8c79dcd36"
+        },
+        {
+          "path": "scripts/gen-catalog.mjs",
+          "gitBlobSha1": "33b8d5952086c4f1df6a17c104008a125fb2039c"
+        },
+        {
+          "path": "src/components/tools/tool-engine.tsx",
+          "gitBlobSha1": "5d36829b9ab065319646e399c55e2d52365266d1"
+        }
+      ],
+      "reviewedAreas": [
+        "Decimal SI byte factors and binary IEC byte factors",
+        "Conversion lookup, finite-number validation, formatting, and storage-system dispatch",
+        "Catalogue definition and generic converter UI"
+      ],
+      "notes": "Reviewed storage-unit definitions and converter dispatch. This does not claim exhaustive numerical tests for every pair."
+    },
+    {
+      "id": "mime-type-lookup-source-review",
+      "toolIds": [
+        "mime-type-lookup"
+      ],
+      "files": [
+        {
+          "path": "src/components/engines/mime-engine.tsx",
+          "gitBlobSha1": "25784d513b7cbc5f7991d425e953ac879c1048e6"
+        },
+        {
+          "path": "src/lib/registry.ts",
+          "gitBlobSha1": "12a01cdd19c84badd4da198cbae98531a89e8c55"
+        },
+        {
+          "path": "scripts/gen-catalog.mjs",
+          "gitBlobSha1": "33b8d5952086c4f1df6a17c104008a125fb2039c"
+        },
+        {
+          "path": "src/components/tools/tool-engine.tsx",
+          "gitBlobSha1": "5d36829b9ab065319646e399c55e2d52365266d1"
+        }
+      ],
+      "reviewedAreas": [
+        "Local MIME reference list and query filtering",
+        "First-64-byte local signature inspection and extension mismatch reporting",
+        "Catalogue record and MIME engine dispatch"
+      ],
+      "notes": "Reviewed local lookup and signature matching. Shared container signatures can be ambiguous; no network lookup is performed."
+    },
+    {
+      "id": "files-six-converters-source-review",
+      "toolIds": [
+        "csv-to-json",
+        "json-to-csv",
+        "json-to-xml",
+        "json-to-yaml",
+        "xml-to-json",
+        "yaml-to-json"
+      ],
+      "files": [
+        {
+          "path": "src/components/engines/file-converter-engine.tsx",
+          "gitBlobSha1": "8f69612a0cb4d940ed3ff2bd708e15943afb7a06"
+        },
+        {
+          "path": "src/lib/engines/transforms.ts",
+          "gitBlobSha1": "8aab3a5a36b33842ee37b82dc141fa0e7def16f8"
+        },
+        {
+          "path": "scripts/gen-catalog.mjs",
+          "gitBlobSha1": "33b8d5952086c4f1df6a17c104008a125fb2039c"
+        },
+        {
+          "path": "src/components/tools/tool-engine.tsx",
+          "gitBlobSha1": "5d36829b9ab065319646e399c55e2d52365266d1"
+        }
+      ],
+      "reviewedAreas": [
+        "CSV quote handling, row/header mapping, and JSON-to-CSV projection",
+        "JSON/XML escaping and XML parse error handling",
+        "YAML conversion implementation and its deliberately limited parser scope",
+        "Local file import, output blob creation, filename mapping, and dispatcher wiring"
+      ],
+      "notes": "Reviewed six exact conversion operations. YAML and regex-based XML support are not described as complete standards implementations."
+    },
+    {
+      "id": "advanced-css-minifier-source-review",
+      "toolIds": [
+        "css-minifier-advanced"
+      ],
+      "files": [
+        {
+          "path": "src/lib/registry.ts",
+          "gitBlobSha1": "12a01cdd19c84badd4da198cbae98531a89e8c55"
+        },
+        {
+          "path": "src/routes/tools/$category/$slug.tsx",
+          "gitBlobSha1": "c3171ec815d322b8cd863dba3d90204ae986f779"
+        },
+        {
+          "path": "src/components/tools/tool-engine.tsx",
+          "gitBlobSha1": "5d36829b9ab065319646e399c55e2d52365266d1"
+        },
+        {
+          "path": "src/components/engines/developer-engine.tsx",
+          "gitBlobSha1": "cf33ae761992afb864e0c2eadc1de2c9d84539e8"
+        },
+        {
+          "path": "src/components/engines/developer-studio-engine.tsx",
+          "gitBlobSha1": "7106d237c6904a3a0b9347afba3c94612ec8f21e"
+        },
+        {
+          "path": "src/lib/developer-studios-catalog.ts",
+          "gitBlobSha1": "3c29a3b2ed7354b06e37a9b31fdcec37fd41b21f"
+        },
+        {
+          "path": "src/lib/engines/developer-studios.ts",
+          "gitBlobSha1": "ef919794d29825451b890f5b2811ae2ab84fc515"
+        },
+        {
+          "path": "src/lib/engines/transforms.ts",
+          "gitBlobSha1": "8aab3a5a36b33842ee37b82dc141fa0e7def16f8"
+        }
+      ],
+      "reviewedAreas": [
+        "Legacy tool route preserving css-minify while redirecting into Markup & Style Studio",
+        "Canonical runtime metadata and Studio operation resolution",
+        "CSS comment, whitespace and trailing-semicolon handling",
+        "Web execution dispatch"
+      ],
+      "notes": "Reviewed the current Web source path. Separate browser evidence verifies representative execution and output; source review alone is not native or full functional acceptance."
+    }
+  ]
+}

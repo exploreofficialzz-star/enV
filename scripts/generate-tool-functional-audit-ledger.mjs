@@ -7,6 +7,7 @@ import { CATEGORIES } from "../src/data/categories.ts";
 import { classifyAuditEvidenceCommit } from "./audit-evidence-provenance.mjs";
 import { tools as sourceCatalogTools } from "../src/data/catalog.ts";
 import { reconcileToolInventories } from "./reconcile-tool-inventories.mjs";
+import { validateSourceInspectionEvidence } from "./source-inspection-evidence.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const args = process.argv.slice(2);
@@ -15,6 +16,7 @@ const outputPath = path.resolve(root, option("output", "audit/tool-functional-au
 const currentCommit = [process.env.GITHUB_SHA, process.env.VERCEL_GIT_COMMIT_SHA, process.env.GIT_COMMIT]
   .find((value) => typeof value === "string" && value.trim())?.trim() ?? null;
 const observedEvidence = JSON.parse(fs.readFileSync(path.join(root, "audit/tool-functional-audit-evidence.json"), "utf8"));
+const observedSourceInspection = JSON.parse(fs.readFileSync(path.join(root, "audit/tool-source-inspection-evidence.json"), "utf8"));
 
 const runtimeTools = getAllTools().slice();
 const searchableTools = getSearchableTools().slice();
@@ -101,8 +103,10 @@ const blockedEvidenceById = new Map();
 const nonCurrentEvidenceById = new Map();
 const nonCurrentEvidence = [];
 const validEvidence = [];
-const invalidEvidence = [];
+const invalidEvidence = sourceInspectionValidation.invalidRecords.map((record) => ({ auditId: record.id, kind: "source-inspection", reasons: record.reasons }));
 const evidenceAudits = [...(observedEvidence.audits ?? [])];
+const sourceInspectionValidation = validateSourceInspectionEvidence({ evidenceSet: observedSourceInspection, runtimeToolIds: runtimeTools.map((tool) => tool.id), rootDir: root });
+const sourceInspectionById = sourceInspectionValidation.byToolId;
 
 // The QR browser script writes exact per-tool progress to this report. The
 // ledger reads it after the verify step, including when the browser audit fails.
@@ -587,10 +591,11 @@ const allTools = runtimeTools.map((tool) => {
   const androidNativeEvidence = nativeEvidenceByPlatform.android.get(tool.id) ?? [];
   const iosNativeEvidence = nativeEvidenceByPlatform.ios.get(tool.id) ?? [];
   const blockedEvidence = blockedEvidenceById.get(tool.id) ?? [];
+  const sourceInspectionEvidence = sourceInspectionById.get(tool.id) ?? [];
   const toolNonCurrentEvidence = nonCurrentEvidenceById.get(tool.id) ?? [];
   const allEvidence = [...browserEvidence, ...unitEvidence, ...androidNativeEvidence, ...iosNativeEvidence, ...blockedEvidence];
   const checks = {
-    sourceInspection: { status: "NOT_INSPECTED", evidence: [] },
+    sourceInspection: { status: sourceInspectionEvidence.length ? "SOURCE_INSPECTED" : "NOT_INSPECTED", evidence: sourceInspectionEvidence },
     identityUniqueness: { status: duplicateIds.has(tool.id) ? "DEFECT_FOUND" : "STATIC_CHECKED", evidence: ["getAllTools(): stable IDs checked for uniqueness at ledger generation"] },
     catalogueRegistration: { status: "STATIC_CHECKED", evidence: ["getAllTools(): record is present in the final Web runtime registry"] },
     categoryAssignment: { status: categoryExists ? "STATIC_CHECKED" : "DEFECT_FOUND", evidence: ["category is checked against src/data/categories.ts"] },
@@ -627,7 +632,9 @@ const allTools = runtimeTools.map((tool) => {
           ? "BROWSER_TESTED"
           : unitEvidence.length
             ? "UNIT_TESTED"
-            : "STATIC_CHECKED";
+            : sourceInspectionEvidence.length
+              ? "SOURCE_INSPECTED"
+              : "STATIC_CHECKED";
   const matrixRow = matrixById.get(tool.id) ?? null;
   return {
     id: tool.id,
@@ -688,6 +695,7 @@ const report = {
     categoriesSource: "src/data/categories.ts",
     rawSourceCatalogue: "src/data/catalog.ts",
     nativeManifestSources: ["apps/{android,ios}/native-tool-coverage.txt", "apps/{android,ios}/native-family-coverage/*.txt", "apps/{android,ios}/backend-tool-coverage.txt"],
+    sourceInspectionEvidenceSource: "audit/tool-source-inspection-evidence.json (Git blob SHA-1 pinned per reviewed source file)",
     nativeMatrixSource: "apps/shared/native-execution-matrix.json",
     evidenceCommitPolicy: "Only audit evidence tested against the exact current sourceCommit SHA contributes to current per-tool test status. Historical or unverified evidence is retained separately.",
     observedBrowserEvidenceSet: observedEvidence.evidenceSetId,
@@ -717,11 +725,14 @@ const report = {
     auditStatus: "Highest evidence stage reached for the specific tool. STATIC_CHECKED means only runtime identity, category, declared engine metadata and registry route-resolver checks were completed. It does not mean the tool's rendered page or functionality was tested.",
     VERIFIED: "Reserved for completion of every applicable per-tool check with evidence. No tool is promoted to VERIFIED by this generator.",
     NOT_APPLICABLE: "Used only for native functional testing where the execution matrix explicitly classifies the tool as web-only; missing matrix rows are NOT_INSPECTED, not NOT_APPLICABLE.",
+    SOURCE_INSPECTED: "Named implementation and dispatch files were reviewed and match the pinned Git blob SHA-1 values; this does not imply functional, unit, token, offline, backend, accessibility, or native acceptance.",
   },
   summary: {
     totalUniqueTools: allTools.length,
     statusCounts,
     sourceInspected: allTools.filter((tool) => tool.checks.sourceInspection.status === "SOURCE_INSPECTED").length,
+    sourceInspectionEvidenceRecords: sourceInspectionValidation.validRecords.length,
+    sourceInspectionFilesReviewed: new Set(sourceInspectionValidation.validRecords.flatMap((record) => record.files.map((file) => file.path))).size,
     staticChecked: allTools.filter((tool) => tool.checks.identityUniqueness.status === "STATIC_CHECKED" && tool.checks.catalogueRegistration.status === "STATIC_CHECKED" && tool.checks.categoryAssignment.status === "STATIC_CHECKED" && tool.checks.declaredEngineMapping.status === "STATIC_CHECKED").length,
     unitTested: allTools.filter((tool) => Object.values(tool.checks).some((check) => check.status === "UNIT_TESTED")).length,
     browserTested: allTools.filter((tool) => tool.checks.pageRendering.status === "BROWSER_TESTED" || tool.checks.functionalExecution.status === "BROWSER_TESTED").length,
@@ -756,6 +767,7 @@ const report = {
       affectedToolCount: nonCurrentEvidenceById.size,
       records: nonCurrentEvidence,
     },
+    sourceInspectionEvidence: sourceInspectionValidation.validRecords,
     invalidEvidence,
   },
   tools: allTools,
