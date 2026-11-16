@@ -12,7 +12,7 @@ test("accepts supported public post links and normalizes the provider", () => {
 });
 
 test("rejects unsupported, malformed and credential-bearing URLs", () => {
-  for (const url of ["", "not a URL", "javascript:alert(1)", "https://example.com/post", "https://user:pass@tiktok.com/video/1", "https://tiktok.com:8443/video/1"]) {
+  for (const url of ["", "not a URL", "http://tiktok.com/@creator/video/1", "javascript:alert(1)", "https://example.com/post", "https://user:pass@tiktok.com/video/1", "https://tiktok.com:8443/video/1"]) {
     assert.throws(() => resolveSocialPostUrl(url));
   }
 });
