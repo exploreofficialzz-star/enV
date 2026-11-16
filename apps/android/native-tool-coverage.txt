@@ -7065,3 +7065,4 @@ youtube-shorts-calculator
 z-score-calculator
 zip-any-file
 camera-studio
+social-media-post-recorder
