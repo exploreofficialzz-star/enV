@@ -1,4 +1,5 @@
 export type CustomerPaymentMethod = "card" | "local" | "more";
+export type FlutterwaveFundingMethod = "card" | "mobile_money" | "bank_transfer";
 export type FundingProvider = {
   id: "paystack" | "flutterwave" | "cryptomus";
   enabled: boolean;
@@ -7,6 +8,27 @@ export type FundingProvider = {
   paymentOptions?: readonly string[];
   paymentMethods?: readonly string[];
 };
+
+/** Resolve generic customer choices to an enabled V4 channel without exposing the gateway.
+ * The caller must first confirm the matching generic method is available from the server.
+ */
+export function resolveFlutterwaveFundingMethod(
+  customerMethod: CustomerPaymentMethod,
+  supportedMethods: readonly string[],
+  preferredLocalMethod?: string,
+): FlutterwaveFundingMethod | null {
+  if (customerMethod === "card") {
+    return supportedMethods.includes("card") ? "card" : null;
+  }
+  if (customerMethod !== "local") return null;
+  const localMethods = supportedMethods.filter((value): value is FlutterwaveFundingMethod =>
+    value === "mobile_money" || value === "bank_transfer",
+  );
+  if (preferredLocalMethod && localMethods.includes(preferredLocalMethod as FlutterwaveFundingMethod)) {
+    return preferredLocalMethod as FlutterwaveFundingMethod;
+  }
+  return localMethods[0] ?? null;
+}
 
 /** A customer sees payment methods, never gateway brands. */
 export function isCustomerPaymentMethodAvailable(
