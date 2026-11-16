@@ -2,15 +2,15 @@
   "schemaVersion": 4,
   "generatedBy": "scripts/export-native-execution-matrix.mjs",
   "stats": {
-    "total": 10002,
-    "active": 10002,
-    "planned": 0,
-    "offlineNative": 7900,
+    "total": 10004,
+    "active": 9744,
+    "planned": 260,
+    "offlineNative": 7902,
     "backendNative": 1565,
-    "webOnly": 537,
-    "missingActive": 537,
+    "webOnly": 277,
+    "missingActive": 277,
     "divergentActive": 0,
-    "fullyExecutable": 9465
+    "fullyExecutable": 9467
   },
   "tools": [
     {
@@ -70198,7 +70198,7 @@
     {
       "id": "birthday-event-qr-generator",
       "name": "Birthday Event QR Generator",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70225,7 +70225,7 @@
     {
       "id": "birthday-ticket-mockup",
       "name": "Birthday Ticket Mockup",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70252,7 +70252,7 @@
     {
       "id": "concert-countdown",
       "name": "Concert Countdown",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70261,7 +70261,7 @@
     {
       "id": "concert-event-qr-generator",
       "name": "Concert Event QR Generator",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70270,7 +70270,7 @@
     {
       "id": "concert-invitation-generator",
       "name": "Concert Invitation Generator",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70297,7 +70297,7 @@
     {
       "id": "concert-ticket-mockup",
       "name": "Concert Ticket Mockup",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70324,7 +70324,7 @@
     {
       "id": "conference-countdown",
       "name": "Conference Countdown",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70333,7 +70333,7 @@
     {
       "id": "conference-event-qr-generator",
       "name": "Conference Event QR Generator",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70342,7 +70342,7 @@
     {
       "id": "conference-invitation-generator",
       "name": "Conference Invitation Generator",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70369,7 +70369,7 @@
     {
       "id": "conference-ticket-mockup",
       "name": "Conference Ticket Mockup",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70396,7 +70396,7 @@
     {
       "id": "dinner-countdown",
       "name": "Dinner Countdown",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70405,7 +70405,7 @@
     {
       "id": "dinner-event-qr-generator",
       "name": "Dinner Event QR Generator",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70414,7 +70414,7 @@
     {
       "id": "dinner-invitation-generator",
       "name": "Dinner Invitation Generator",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70441,7 +70441,7 @@
     {
       "id": "dinner-ticket-mockup",
       "name": "Dinner Ticket Mockup",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70468,7 +70468,7 @@
     {
       "id": "fundraiser-countdown",
       "name": "Fundraiser Countdown",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70477,7 +70477,7 @@
     {
       "id": "fundraiser-event-qr-generator",
       "name": "Fundraiser Event QR Generator",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70486,7 +70486,7 @@
     {
       "id": "fundraiser-invitation-generator",
       "name": "Fundraiser Invitation Generator",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70513,7 +70513,7 @@
     {
       "id": "fundraiser-ticket-mockup",
       "name": "Fundraiser Ticket Mockup",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70540,7 +70540,7 @@
     {
       "id": "graduation-event-qr-generator",
       "name": "Graduation Event QR Generator",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70567,7 +70567,7 @@
     {
       "id": "graduation-ticket-mockup",
       "name": "Graduation Ticket Mockup",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70594,7 +70594,7 @@
     {
       "id": "launch-countdown",
       "name": "Launch Countdown",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70603,7 +70603,7 @@
     {
       "id": "launch-event-qr-generator",
       "name": "Launch Event QR Generator",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70612,7 +70612,7 @@
     {
       "id": "launch-invitation-generator",
       "name": "Launch Invitation Generator",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70639,7 +70639,7 @@
     {
       "id": "launch-ticket-mockup",
       "name": "Launch Ticket Mockup",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70657,7 +70657,7 @@
     {
       "id": "meeting-countdown",
       "name": "Meeting Countdown",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70666,7 +70666,7 @@
     {
       "id": "meeting-event-qr-generator",
       "name": "Meeting Event QR Generator",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70675,7 +70675,7 @@
     {
       "id": "meeting-invitation-generator",
       "name": "Meeting Invitation Generator",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70702,7 +70702,7 @@
     {
       "id": "meeting-ticket-mockup",
       "name": "Meeting Ticket Mockup",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70729,7 +70729,7 @@
     {
       "id": "party-event-qr-generator",
       "name": "Party Event QR Generator",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70756,7 +70756,7 @@
     {
       "id": "party-ticket-mockup",
       "name": "Party Ticket Mockup",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70783,7 +70783,7 @@
     {
       "id": "sports-event-countdown",
       "name": "Sports Event Countdown",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70792,7 +70792,7 @@
     {
       "id": "sports-event-event-qr-generator",
       "name": "Sports Event Event QR Generator",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70801,7 +70801,7 @@
     {
       "id": "sports-event-invitation-generator",
       "name": "Sports Event Invitation Generator",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70828,7 +70828,7 @@
     {
       "id": "sports-event-ticket-mockup",
       "name": "Sports Event Ticket Mockup",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70855,7 +70855,7 @@
     {
       "id": "webinar-countdown",
       "name": "Webinar Countdown",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70864,7 +70864,7 @@
     {
       "id": "webinar-event-qr-generator",
       "name": "Webinar Event QR Generator",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70873,7 +70873,7 @@
     {
       "id": "webinar-invitation-generator",
       "name": "Webinar Invitation Generator",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70900,7 +70900,7 @@
     {
       "id": "webinar-ticket-mockup",
       "name": "Webinar Ticket Mockup",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70927,7 +70927,7 @@
     {
       "id": "wedding-countdown",
       "name": "Wedding Countdown",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70936,7 +70936,7 @@
     {
       "id": "wedding-event-qr-generator",
       "name": "Wedding Event QR Generator",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70945,7 +70945,7 @@
     {
       "id": "wedding-invitation-generator",
       "name": "Wedding Invitation Generator",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70972,7 +70972,7 @@
     {
       "id": "wedding-ticket-mockup",
       "name": "Wedding Ticket Mockup",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -70999,7 +70999,7 @@
     {
       "id": "workshop-countdown",
       "name": "Workshop Countdown",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -71008,7 +71008,7 @@
     {
       "id": "workshop-event-qr-generator",
       "name": "Workshop Event QR Generator",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -71017,7 +71017,7 @@
     {
       "id": "workshop-invitation-generator",
       "name": "Workshop Invitation Generator",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -71044,7 +71044,7 @@
     {
       "id": "workshop-ticket-mockup",
       "name": "Workshop Ticket Mockup",
-      "status": "active",
+      "status": "planned",
       "category": "events",
       "engine": "custom",
       "android": "web-only",
@@ -71242,7 +71242,7 @@
     {
       "id": "baking-calculator",
       "name": "Baking Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71251,7 +71251,7 @@
     {
       "id": "baking-checklist",
       "name": "Baking Checklist",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71260,7 +71260,7 @@
     {
       "id": "baking-converter",
       "name": "Baking Converter",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71269,7 +71269,7 @@
     {
       "id": "baking-generator",
       "name": "Baking Generator",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71278,7 +71278,7 @@
     {
       "id": "baking-planner",
       "name": "Baking Planner",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71287,7 +71287,7 @@
     {
       "id": "baking-scaler",
       "name": "Baking Scaler",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71296,7 +71296,7 @@
     {
       "id": "cooking-time-calculator",
       "name": "Cooking Time Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71305,7 +71305,7 @@
     {
       "id": "cooking-time-checklist",
       "name": "Cooking Time Checklist",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71314,7 +71314,7 @@
     {
       "id": "cooking-time-converter",
       "name": "Cooking Time Converter",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71323,7 +71323,7 @@
     {
       "id": "cooking-time-generator",
       "name": "Cooking Time Generator",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71332,7 +71332,7 @@
     {
       "id": "cooking-time-planner",
       "name": "Cooking Time Planner",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71341,7 +71341,7 @@
     {
       "id": "cooking-time-scaler",
       "name": "Cooking Time Scaler",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71350,7 +71350,7 @@
     {
       "id": "food-cost-calculator",
       "name": "Food Cost Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71359,7 +71359,7 @@
     {
       "id": "food-cost-checklist",
       "name": "Food Cost Checklist",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71368,7 +71368,7 @@
     {
       "id": "food-cost-converter",
       "name": "Food Cost Converter",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71377,7 +71377,7 @@
     {
       "id": "food-cost-generator",
       "name": "Food Cost Generator",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71386,7 +71386,7 @@
     {
       "id": "food-cost-planner",
       "name": "Food Cost Planner",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71395,7 +71395,7 @@
     {
       "id": "food-cost-scaler",
       "name": "Food Cost Scaler",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71404,7 +71404,7 @@
     {
       "id": "grocery-calculator",
       "name": "Grocery Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71413,7 +71413,7 @@
     {
       "id": "grocery-checklist",
       "name": "Grocery Checklist",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71422,7 +71422,7 @@
     {
       "id": "grocery-converter",
       "name": "Grocery Converter",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71431,7 +71431,7 @@
     {
       "id": "grocery-generator",
       "name": "Grocery Generator",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71440,7 +71440,7 @@
     {
       "id": "grocery-planner",
       "name": "Grocery Planner",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71449,7 +71449,7 @@
     {
       "id": "grocery-scaler",
       "name": "Grocery Scaler",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71458,7 +71458,7 @@
     {
       "id": "ingredient-calculator",
       "name": "Ingredient Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71467,7 +71467,7 @@
     {
       "id": "ingredient-checklist",
       "name": "Ingredient Checklist",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71476,7 +71476,7 @@
     {
       "id": "ingredient-converter",
       "name": "Ingredient Converter",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71485,7 +71485,7 @@
     {
       "id": "ingredient-generator",
       "name": "Ingredient Generator",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71494,7 +71494,7 @@
     {
       "id": "ingredient-planner",
       "name": "Ingredient Planner",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71503,7 +71503,7 @@
     {
       "id": "ingredient-scaler",
       "name": "Ingredient Scaler",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71512,7 +71512,7 @@
     {
       "id": "kitchen-unit-calculator",
       "name": "Kitchen Unit Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71521,7 +71521,7 @@
     {
       "id": "kitchen-unit-checklist",
       "name": "Kitchen Unit Checklist",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71530,7 +71530,7 @@
     {
       "id": "kitchen-unit-converter",
       "name": "Kitchen Unit Converter",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71539,7 +71539,7 @@
     {
       "id": "kitchen-unit-generator",
       "name": "Kitchen Unit Generator",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71548,7 +71548,7 @@
     {
       "id": "kitchen-unit-planner",
       "name": "Kitchen Unit Planner",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71557,7 +71557,7 @@
     {
       "id": "kitchen-unit-scaler",
       "name": "Kitchen Unit Scaler",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71566,7 +71566,7 @@
     {
       "id": "meal-calculator",
       "name": "Meal Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71575,7 +71575,7 @@
     {
       "id": "meal-checklist",
       "name": "Meal Checklist",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71584,7 +71584,7 @@
     {
       "id": "meal-converter",
       "name": "Meal Converter",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71593,7 +71593,7 @@
     {
       "id": "meal-generator",
       "name": "Meal Generator",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71602,7 +71602,7 @@
     {
       "id": "meal-planner",
       "name": "Meal Planner",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71611,7 +71611,7 @@
     {
       "id": "meal-scaler",
       "name": "Meal Scaler",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71620,7 +71620,7 @@
     {
       "id": "nutrition-calculator",
       "name": "Nutrition Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71629,7 +71629,7 @@
     {
       "id": "nutrition-checklist",
       "name": "Nutrition Checklist",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71638,7 +71638,7 @@
     {
       "id": "nutrition-converter",
       "name": "Nutrition Converter",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71647,7 +71647,7 @@
     {
       "id": "nutrition-generator",
       "name": "Nutrition Generator",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71656,7 +71656,7 @@
     {
       "id": "nutrition-planner",
       "name": "Nutrition Planner",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71665,7 +71665,7 @@
     {
       "id": "nutrition-scaler",
       "name": "Nutrition Scaler",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71674,7 +71674,7 @@
     {
       "id": "oven-temperature-calculator",
       "name": "Oven Temperature Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71683,7 +71683,7 @@
     {
       "id": "oven-temperature-checklist",
       "name": "Oven Temperature Checklist",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71692,7 +71692,7 @@
     {
       "id": "oven-temperature-converter",
       "name": "Oven Temperature Converter",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71701,7 +71701,7 @@
     {
       "id": "oven-temperature-generator",
       "name": "Oven Temperature Generator",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71710,7 +71710,7 @@
     {
       "id": "oven-temperature-planner",
       "name": "Oven Temperature Planner",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71719,7 +71719,7 @@
     {
       "id": "oven-temperature-scaler",
       "name": "Oven Temperature Scaler",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71728,7 +71728,7 @@
     {
       "id": "portion-calculator",
       "name": "Portion Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71737,7 +71737,7 @@
     {
       "id": "portion-checklist",
       "name": "Portion Checklist",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71746,7 +71746,7 @@
     {
       "id": "portion-converter",
       "name": "Portion Converter",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71755,7 +71755,7 @@
     {
       "id": "portion-generator",
       "name": "Portion Generator",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71764,7 +71764,7 @@
     {
       "id": "portion-planner",
       "name": "Portion Planner",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71773,7 +71773,7 @@
     {
       "id": "portion-scaler",
       "name": "Portion Scaler",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71782,7 +71782,7 @@
     {
       "id": "recipe-calculator",
       "name": "Recipe Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71791,7 +71791,7 @@
     {
       "id": "recipe-checklist",
       "name": "Recipe Checklist",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71800,7 +71800,7 @@
     {
       "id": "recipe-converter",
       "name": "Recipe Converter",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71809,7 +71809,7 @@
     {
       "id": "recipe-generator",
       "name": "Recipe Generator",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71818,7 +71818,7 @@
     {
       "id": "recipe-planner",
       "name": "Recipe Planner",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71827,7 +71827,7 @@
     {
       "id": "recipe-scaler",
       "name": "Recipe Scaler",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71836,7 +71836,7 @@
     {
       "id": "serving-calculator",
       "name": "Serving Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71845,7 +71845,7 @@
     {
       "id": "serving-checklist",
       "name": "Serving Checklist",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71854,7 +71854,7 @@
     {
       "id": "serving-converter",
       "name": "Serving Converter",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71863,7 +71863,7 @@
     {
       "id": "serving-generator",
       "name": "Serving Generator",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71872,7 +71872,7 @@
     {
       "id": "serving-planner",
       "name": "Serving Planner",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -71881,7 +71881,7 @@
     {
       "id": "serving-scaler",
       "name": "Serving Scaler",
-      "status": "active",
+      "status": "planned",
       "category": "food",
       "engine": "custom",
       "android": "web-only",
@@ -79351,7 +79351,7 @@
     {
       "id": "aspect-ratio-calculator",
       "name": "Aspect Ratio Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79360,7 +79360,7 @@
     {
       "id": "aspect-ratio-checker",
       "name": "Aspect Ratio Checker",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79369,7 +79369,7 @@
     {
       "id": "aspect-ratio-generator",
       "name": "Aspect Ratio Generator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79378,7 +79378,7 @@
     {
       "id": "aspect-ratio-guide",
       "name": "Aspect Ratio Guide",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79387,7 +79387,7 @@
     {
       "id": "aspect-ratio-planner",
       "name": "Aspect Ratio Planner",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79396,7 +79396,7 @@
     {
       "id": "crop-calculator",
       "name": "Crop Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79405,7 +79405,7 @@
     {
       "id": "crop-checker",
       "name": "Crop Checker",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79414,7 +79414,7 @@
     {
       "id": "crop-generator",
       "name": "Crop Generator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79423,7 +79423,7 @@
     {
       "id": "crop-guide",
       "name": "Crop Guide",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79432,7 +79432,7 @@
     {
       "id": "crop-planner",
       "name": "Crop Planner",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79441,7 +79441,7 @@
     {
       "id": "depth-of-field-calculator",
       "name": "Depth of Field Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79450,7 +79450,7 @@
     {
       "id": "depth-of-field-checker",
       "name": "Depth of Field Checker",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79459,7 +79459,7 @@
     {
       "id": "depth-of-field-generator",
       "name": "Depth of Field Generator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79468,7 +79468,7 @@
     {
       "id": "depth-of-field-guide",
       "name": "Depth of Field Guide",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79477,7 +79477,7 @@
     {
       "id": "depth-of-field-planner",
       "name": "Depth of Field Planner",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79486,7 +79486,7 @@
     {
       "id": "dpi-calculator",
       "name": "DPI Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79495,7 +79495,7 @@
     {
       "id": "dpi-checker",
       "name": "DPI Checker",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79504,7 +79504,7 @@
     {
       "id": "dpi-generator",
       "name": "DPI Generator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79513,7 +79513,7 @@
     {
       "id": "dpi-guide",
       "name": "DPI Guide",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79522,7 +79522,7 @@
     {
       "id": "dpi-planner",
       "name": "DPI Planner",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79531,7 +79531,7 @@
     {
       "id": "exposure-calculator",
       "name": "Exposure Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79540,7 +79540,7 @@
     {
       "id": "exposure-checker",
       "name": "Exposure Checker",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79549,7 +79549,7 @@
     {
       "id": "exposure-generator",
       "name": "Exposure Generator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79558,7 +79558,7 @@
     {
       "id": "exposure-guide",
       "name": "Exposure Guide",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79567,7 +79567,7 @@
     {
       "id": "exposure-planner",
       "name": "Exposure Planner",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79576,7 +79576,7 @@
     {
       "id": "fov-calculator",
       "name": "FOV Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79585,7 +79585,7 @@
     {
       "id": "fov-checker",
       "name": "FOV Checker",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79594,7 +79594,7 @@
     {
       "id": "fov-generator",
       "name": "FOV Generator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79603,7 +79603,7 @@
     {
       "id": "fov-guide",
       "name": "FOV Guide",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79612,7 +79612,7 @@
     {
       "id": "fov-planner",
       "name": "FOV Planner",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79621,7 +79621,7 @@
     {
       "id": "id-photo-calculator",
       "name": "ID Photo Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79630,7 +79630,7 @@
     {
       "id": "id-photo-checker",
       "name": "ID Photo Checker",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79639,7 +79639,7 @@
     {
       "id": "id-photo-generator",
       "name": "ID Photo Generator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79648,7 +79648,7 @@
     {
       "id": "id-photo-guide",
       "name": "ID Photo Guide",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79657,7 +79657,7 @@
     {
       "id": "id-photo-planner",
       "name": "ID Photo Planner",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79666,7 +79666,7 @@
     {
       "id": "lens-calculator",
       "name": "Lens Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79675,7 +79675,7 @@
     {
       "id": "lens-checker",
       "name": "Lens Checker",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79684,7 +79684,7 @@
     {
       "id": "lens-generator",
       "name": "Lens Generator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79693,7 +79693,7 @@
     {
       "id": "lens-guide",
       "name": "Lens Guide",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79702,7 +79702,7 @@
     {
       "id": "lens-planner",
       "name": "Lens Planner",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79711,7 +79711,7 @@
     {
       "id": "passport-photo-calculator",
       "name": "Passport Photo Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79720,7 +79720,7 @@
     {
       "id": "passport-photo-checker",
       "name": "Passport Photo Checker",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79729,7 +79729,7 @@
     {
       "id": "passport-photo-generator",
       "name": "Passport Photo Generator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79738,7 +79738,7 @@
     {
       "id": "passport-photo-guide",
       "name": "Passport Photo Guide",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79747,7 +79747,7 @@
     {
       "id": "passport-photo-planner",
       "name": "Passport Photo Planner",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79756,7 +79756,7 @@
     {
       "id": "photo-calculator",
       "name": "Photo Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79765,7 +79765,7 @@
     {
       "id": "photo-checker",
       "name": "Photo Checker",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79774,7 +79774,7 @@
     {
       "id": "photo-generator",
       "name": "Photo Generator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79783,7 +79783,7 @@
     {
       "id": "photo-guide",
       "name": "Photo Guide",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79792,7 +79792,7 @@
     {
       "id": "photo-planner",
       "name": "Photo Planner",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79801,7 +79801,7 @@
     {
       "id": "ppi-calculator",
       "name": "PPI Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79810,7 +79810,7 @@
     {
       "id": "ppi-checker",
       "name": "PPI Checker",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79819,7 +79819,7 @@
     {
       "id": "ppi-generator",
       "name": "PPI Generator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79828,7 +79828,7 @@
     {
       "id": "ppi-guide",
       "name": "PPI Guide",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79837,7 +79837,7 @@
     {
       "id": "ppi-planner",
       "name": "PPI Planner",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79846,7 +79846,7 @@
     {
       "id": "print-size-calculator",
       "name": "Print Size Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79855,7 +79855,7 @@
     {
       "id": "print-size-checker",
       "name": "Print Size Checker",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79864,7 +79864,7 @@
     {
       "id": "print-size-generator",
       "name": "Print Size Generator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79873,7 +79873,7 @@
     {
       "id": "print-size-guide",
       "name": "Print Size Guide",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79882,7 +79882,7 @@
     {
       "id": "print-size-planner",
       "name": "Print Size Planner",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79891,7 +79891,7 @@
     {
       "id": "resolution-calculator",
       "name": "Resolution Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79900,7 +79900,7 @@
     {
       "id": "resolution-checker",
       "name": "Resolution Checker",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79909,7 +79909,7 @@
     {
       "id": "resolution-generator",
       "name": "Resolution Generator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79918,7 +79918,7 @@
     {
       "id": "resolution-guide",
       "name": "Resolution Guide",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79927,7 +79927,7 @@
     {
       "id": "resolution-planner",
       "name": "Resolution Planner",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79936,7 +79936,7 @@
     {
       "id": "sensor-calculator",
       "name": "Sensor Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79945,7 +79945,7 @@
     {
       "id": "sensor-checker",
       "name": "Sensor Checker",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79954,7 +79954,7 @@
     {
       "id": "sensor-generator",
       "name": "Sensor Generator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79963,7 +79963,7 @@
     {
       "id": "sensor-guide",
       "name": "Sensor Guide",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79972,7 +79972,7 @@
     {
       "id": "sensor-planner",
       "name": "Sensor Planner",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79981,7 +79981,7 @@
     {
       "id": "social-photo-calculator",
       "name": "Social Photo Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79990,7 +79990,7 @@
     {
       "id": "social-photo-checker",
       "name": "Social Photo Checker",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -79999,7 +79999,7 @@
     {
       "id": "social-photo-generator",
       "name": "Social Photo Generator",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -80008,7 +80008,7 @@
     {
       "id": "social-photo-guide",
       "name": "Social Photo Guide",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -80017,7 +80017,7 @@
     {
       "id": "social-photo-planner",
       "name": "Social Photo Planner",
-      "status": "active",
+      "status": "planned",
       "category": "photography",
       "engine": "custom",
       "android": "web-only",
@@ -85462,7 +85462,7 @@
     {
       "id": "currency-calculator",
       "name": "Currency Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85471,7 +85471,7 @@
     {
       "id": "currency-checklist",
       "name": "Currency Checklist",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85480,7 +85480,7 @@
     {
       "id": "currency-converter",
       "name": "Currency Converter",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85489,7 +85489,7 @@
     {
       "id": "currency-generator",
       "name": "Currency Generator",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85498,7 +85498,7 @@
     {
       "id": "currency-planner",
       "name": "Currency Planner",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85507,7 +85507,7 @@
     {
       "id": "daily-budget-calculator",
       "name": "Daily Budget Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85516,7 +85516,7 @@
     {
       "id": "daily-budget-checklist",
       "name": "Daily Budget Checklist",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85525,7 +85525,7 @@
     {
       "id": "daily-budget-converter",
       "name": "Daily Budget Converter",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85534,7 +85534,7 @@
     {
       "id": "daily-budget-generator",
       "name": "Daily Budget Generator",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85543,7 +85543,7 @@
     {
       "id": "daily-budget-planner",
       "name": "Daily Budget Planner",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85552,7 +85552,7 @@
     {
       "id": "distance-checklist",
       "name": "Distance Checklist",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85561,7 +85561,7 @@
     {
       "id": "distance-converter",
       "name": "Distance Converter",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85570,7 +85570,7 @@
     {
       "id": "distance-generator",
       "name": "Distance Generator",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85579,7 +85579,7 @@
     {
       "id": "distance-planner",
       "name": "Distance Planner",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85588,7 +85588,7 @@
     {
       "id": "flight-time-calculator",
       "name": "Flight Time Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85597,7 +85597,7 @@
     {
       "id": "flight-time-checklist",
       "name": "Flight Time Checklist",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85606,7 +85606,7 @@
     {
       "id": "flight-time-converter",
       "name": "Flight Time Converter",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85615,7 +85615,7 @@
     {
       "id": "flight-time-generator",
       "name": "Flight Time Generator",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85624,7 +85624,7 @@
     {
       "id": "flight-time-planner",
       "name": "Flight Time Planner",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85633,7 +85633,7 @@
     {
       "id": "fuel-calculator",
       "name": "Fuel Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85642,7 +85642,7 @@
     {
       "id": "fuel-checklist",
       "name": "Fuel Checklist",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85651,7 +85651,7 @@
     {
       "id": "fuel-generator",
       "name": "Fuel Generator",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85660,7 +85660,7 @@
     {
       "id": "fuel-planner",
       "name": "Fuel Planner",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85669,7 +85669,7 @@
     {
       "id": "hotel-budget-calculator",
       "name": "Hotel Budget Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85678,7 +85678,7 @@
     {
       "id": "hotel-budget-checklist",
       "name": "Hotel Budget Checklist",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85687,7 +85687,7 @@
     {
       "id": "hotel-budget-converter",
       "name": "Hotel Budget Converter",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85696,7 +85696,7 @@
     {
       "id": "hotel-budget-generator",
       "name": "Hotel Budget Generator",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85705,7 +85705,7 @@
     {
       "id": "hotel-budget-planner",
       "name": "Hotel Budget Planner",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85714,7 +85714,7 @@
     {
       "id": "itinerary-calculator",
       "name": "Itinerary Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85723,7 +85723,7 @@
     {
       "id": "itinerary-checklist",
       "name": "Itinerary Checklist",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85732,7 +85732,7 @@
     {
       "id": "itinerary-converter",
       "name": "Itinerary Converter",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85741,7 +85741,7 @@
     {
       "id": "itinerary-generator",
       "name": "Itinerary Generator",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85750,7 +85750,7 @@
     {
       "id": "itinerary-planner",
       "name": "Itinerary Planner",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85759,7 +85759,7 @@
     {
       "id": "jet-lag-calculator",
       "name": "Jet Lag Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85768,7 +85768,7 @@
     {
       "id": "jet-lag-checklist",
       "name": "Jet Lag Checklist",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85777,7 +85777,7 @@
     {
       "id": "jet-lag-converter",
       "name": "Jet Lag Converter",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85786,7 +85786,7 @@
     {
       "id": "jet-lag-generator",
       "name": "Jet Lag Generator",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85795,7 +85795,7 @@
     {
       "id": "jet-lag-planner",
       "name": "Jet Lag Planner",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85804,7 +85804,7 @@
     {
       "id": "packing-calculator",
       "name": "Packing Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85813,7 +85813,7 @@
     {
       "id": "packing-checklist",
       "name": "Packing Checklist",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85822,7 +85822,7 @@
     {
       "id": "packing-converter",
       "name": "Packing Converter",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85831,7 +85831,7 @@
     {
       "id": "packing-generator",
       "name": "Packing Generator",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85840,7 +85840,7 @@
     {
       "id": "packing-planner",
       "name": "Packing Planner",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85849,7 +85849,7 @@
     {
       "id": "road-trip-calculator",
       "name": "Road Trip Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85858,7 +85858,7 @@
     {
       "id": "road-trip-checklist",
       "name": "Road Trip Checklist",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85867,7 +85867,7 @@
     {
       "id": "road-trip-converter",
       "name": "Road Trip Converter",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85876,7 +85876,7 @@
     {
       "id": "road-trip-generator",
       "name": "Road Trip Generator",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85885,7 +85885,7 @@
     {
       "id": "road-trip-planner",
       "name": "Road Trip Planner",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85894,7 +85894,7 @@
     {
       "id": "timezone-calculator",
       "name": "Timezone Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85903,7 +85903,7 @@
     {
       "id": "timezone-checklist",
       "name": "Timezone Checklist",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85912,7 +85912,7 @@
     {
       "id": "timezone-generator",
       "name": "Timezone Generator",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85921,7 +85921,7 @@
     {
       "id": "timezone-planner",
       "name": "Timezone Planner",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85930,7 +85930,7 @@
     {
       "id": "travel-checklist-calculator",
       "name": "Travel Checklist Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85939,7 +85939,7 @@
     {
       "id": "travel-checklist-checklist",
       "name": "Travel Checklist Checklist",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85948,7 +85948,7 @@
     {
       "id": "travel-checklist-converter",
       "name": "Travel Checklist Converter",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85957,7 +85957,7 @@
     {
       "id": "travel-checklist-generator",
       "name": "Travel Checklist Generator",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85966,7 +85966,7 @@
     {
       "id": "travel-checklist-planner",
       "name": "Travel Checklist Planner",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85975,7 +85975,7 @@
     {
       "id": "travel-time-calculator",
       "name": "Travel Time Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85984,7 +85984,7 @@
     {
       "id": "travel-time-checklist",
       "name": "Travel Time Checklist",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -85993,7 +85993,7 @@
     {
       "id": "travel-time-converter",
       "name": "Travel Time Converter",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -86002,7 +86002,7 @@
     {
       "id": "travel-time-generator",
       "name": "Travel Time Generator",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -86011,7 +86011,7 @@
     {
       "id": "travel-time-planner",
       "name": "Travel Time Planner",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -86020,7 +86020,7 @@
     {
       "id": "trip-budget-calculator",
       "name": "Trip Budget Calculator",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -86029,7 +86029,7 @@
     {
       "id": "trip-budget-checklist",
       "name": "Trip Budget Checklist",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -86038,7 +86038,7 @@
     {
       "id": "trip-budget-converter",
       "name": "Trip Budget Converter",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -86047,7 +86047,7 @@
     {
       "id": "trip-budget-generator",
       "name": "Trip Budget Generator",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -86056,7 +86056,7 @@
     {
       "id": "trip-budget-planner",
       "name": "Trip Budget Planner",
-      "status": "active",
+      "status": "planned",
       "category": "travel",
       "engine": "custom",
       "android": "web-only",
@@ -90026,6 +90026,24 @@
       "id": "a-book",
       "status": "active",
       "category": "productivity",
+      "engine": "custom",
+      "android": "offline-native",
+      "ios": "offline-native"
+    },
+    {
+      "id": "zip-any-file",
+      "name": "Zip any file",
+      "status": "active",
+      "category": "files",
+      "engine": "custom",
+      "android": "offline-native",
+      "ios": "offline-native"
+    },
+    {
+      "id": "camera-studio",
+      "name": "Camera Studio",
+      "status": "active",
+      "category": "photography",
       "engine": "custom",
       "android": "offline-native",
       "ios": "offline-native"

@@ -15,31 +15,53 @@ else if (fs.existsSync(browserPath)) launchOptions.executablePath = browserPath;
 const browser = await chromium.launch(launchOptions);
 const page = await browser.newPage({ viewport: { width: 412, height: 915 }, permissions: [] });
 const pageErrors = [];
+const toolResults = new Map();
+let activeToolId = null;
+let activeFailureCheck = "routeRendering";
+
+function recordToolCheck(toolId, check, status, note = "") {
+  const item = toolResults.get(toolId) ?? { toolId, checks: [], blockedChecks: [], notes: [] };
+  const target = status === "passed" ? item.checks : item.blockedChecks;
+  if (!target.includes(check)) target.push(check);
+  if (note) item.notes.push(note);
+  toolResults.set(toolId, item);
+}
 page.on("pageerror", (error) => pageErrors.push(error.message));
 
 async function openTool(id) {
+  activeToolId = id;
+  activeFailureCheck = "routeRendering";
   const response = await page.goto(`${baseUrl}/tools/qr/${id}`, { waitUntil: "domcontentloaded", timeout: 20000 });
   if (!response || response.status() >= 400) throw new Error(`${id} returned HTTP ${response?.status() ?? "no response"}`);
   await page.waitForFunction((toolId) => document.documentElement.dataset.envToolHydrated === toolId, id, { timeout: 12000 });
+  recordToolCheck(id, "routeRendering", "passed", "Tool route returned a successful response and hydrated with the expected stable tool ID.");
 }
 
 async function makeQrImage(payload) {
   await openTool("qr-generator");
+  activeFailureCheck = "interactionExecution";
   await page.getByLabel("Text or URL", { exact: true }).fill(payload);
   await page.getByRole("button", { name: "Generate QR", exact: true }).click();
+  recordToolCheck("qr-generator", "interactionExecution", "passed", "Entered a payload and executed Generate QR.");
+  activeFailureCheck = "outputValidation";
   const image = page.getByRole("img", { name: "Generated QR code" });
   await image.waitFor({ state: "visible", timeout: 12000 });
   const bytes = await image.evaluate(async (element) => {
     const response = await fetch(element.src);
     return Array.from(new Uint8Array(await response.arrayBuffer()));
   });
+  if (!bytes.length) throw new Error("QR Generator produced an empty image.");
+  recordToolCheck("qr-generator", "outputValidation", "passed", "Generated QR image bytes were retrieved from the rendered output.");
   return Buffer.from(bytes);
 }
 
 async function makeCode128Image(value) {
   await openTool("code128-barcode");
+  activeFailureCheck = "interactionExecution";
   await page.getByLabel("Value", { exact: true }).fill(value);
   await page.getByRole("button", { name: "Generate barcode", exact: true }).click();
+  recordToolCheck("code128-barcode", "interactionExecution", "passed", "Entered a Code 128 value and executed Generate barcode.");
+  activeFailureCheck = "outputValidation";
   const barcode = page.locator("div.overflow-x-auto svg").first();
   await barcode.waitFor({ state: "visible", timeout: 12000 });
   const svg = await barcode.evaluate((element) => {
@@ -51,12 +73,20 @@ async function makeCode128Image(value) {
     clone.insertBefore(background, clone.firstChild);
     return new XMLSerializer().serializeToString(clone);
   });
+  if (!svg.includes("<svg")) throw new Error("Code 128 generator did not return an SVG image.");
+  recordToolCheck("code128-barcode", "outputValidation", "passed", "Generated Code 128 SVG output is present.");
   return Buffer.from(svg, "utf8");
 }
 
 async function scanFile(name, mimeType, buffer, expectedItems) {
   await openTool("qr-payload-inspector");
-  await page.locator('input[aria-label="Upload QR or barcode image"]').setInputFiles({ name, mimeType, buffer });
+  activeFailureCheck = "fileImportExport";
+  const uploadInput = page.locator('section[aria-labelledby="reader-upload-heading"] input[type="file"]');
+  if (await uploadInput.count() !== 1) throw new Error("The reader image upload control was not available.");
+  await uploadInput.setInputFiles({ name, mimeType, buffer });
+  recordToolCheck("qr-payload-inspector", "interactionExecution", "passed", "Selected a local image through the reader's labelled upload section.");
+  recordToolCheck("qr-payload-inspector", "fileImportExport", "passed", "Imported a local image fixture for on-device decoding.");
+  activeFailureCheck = "outputValidation";
 
   // Upload decoding is asynchronous. Waiting for the results section alone is
   // insufficient because earlier scans can leave that section visible before
@@ -72,6 +102,7 @@ async function scanFile(name, mimeType, buffer, expectedItems) {
     if (!content.includes(expected.text)) throw new Error(`${name}: decoded content did not contain ${expected.text}.`);
     if (!content.includes(expected.format)) throw new Error(`${name}: expected format ${expected.format}, received: ${content.slice(0, 200)}`);
   }
+  recordToolCheck("qr-payload-inspector", "outputValidation", "passed", "Decoded payload text and format matched the generated QR/barcode fixture.");
   return { file: name, expectedItems, passed: true };
 }
 
@@ -131,6 +162,8 @@ try {
     { text: batchBarcodeValue, format: "Code 128" },
   ]));
 
+  activeToolId = "qr-payload-inspector";
+  activeFailureCheck = "routeRendering";
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForFunction(
     () => document.documentElement.dataset.envToolHydrated === "qr-payload-inspector",
@@ -139,6 +172,8 @@ try {
   );
   await page.getByText(qrPayload, { exact: true }).waitFor({ state: "visible", timeout: 8000 });
   await page.getByText(barcodeValue, { exact: true }).waitFor({ state: "visible", timeout: 8000 });
+  activeFailureCheck = "persistenceSample";
+  recordToolCheck("qr-payload-inspector", "persistenceSample", "passed", "Previously scanned QR and Code 128 values were restored after a page reload.");
   outcomes.push({
     file: "browser-local-history",
     expectedText: [qrPayload, barcodeValue, batchQrPayload, batchBarcodeValue],
@@ -146,9 +181,16 @@ try {
     passed: true,
   });
 
-  if (pageErrors.length) throw new Error(`Browser runtime errors: ${pageErrors.join(" | ")}`);
+  if (pageErrors.length) {
+    activeFailureCheck = "runtimeErrorCheck";
+    throw new Error(`Browser runtime errors: ${pageErrors.join(" | ")}`);
+  }
+  for (const id of ["qr-generator", "code128-barcode", "qr-payload-inspector"]) {
+    recordToolCheck(id, "runtimeErrorCheck", "passed", "No uncaught browser page errors were observed during the completed audit.");
+  }
 } catch (error) {
   failure = error instanceof Error ? error.message : String(error);
+  if (activeToolId) recordToolCheck(activeToolId, activeFailureCheck, "blocked", failure);
 } finally {
   await browser.close();
 }
@@ -156,14 +198,18 @@ try {
 fs.mkdirSync(path.dirname(reportPath), { recursive: true });
 const report = {
   generatedAt: new Date().toISOString(),
+  observedCommit: process.env.GITHUB_SHA ?? null,
+  workflowRunId: process.env.GITHUB_RUN_ID ? Number(process.env.GITHUB_RUN_ID) : null,
+  jobId: process.env.GITHUB_JOB ?? null,
   baseUrl,
   tests: outcomes,
+  toolResults: [...toolResults.values()].map((item) => ({ ...item, status: item.blockedChecks.length ? "blocked" : "passed" })),
   passed: outcomes.filter((test) => test.passed).length,
   failed: failure ? 1 : 0,
   pageErrors,
   error: failure,
   ok: !failure && outcomes.length === 4,
 };
-fs.writeFileSync(reportPath, JSON.stringify(report, null, 2) + "\\n");
+fs.writeFileSync(reportPath, JSON.stringify(report, null, 2) + "\n");
 console.log(JSON.stringify({ ok: report.ok, passed: report.passed, failed: report.failed, reportPath, error: report.error }, null, 2));
 if (!report.ok) process.exitCode = 1;

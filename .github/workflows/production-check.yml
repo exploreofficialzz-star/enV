@@ -126,20 +126,29 @@ jobs:
         run: node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/documents/local-document.test.ts
 
       - name: Verify Zip any file compression and extraction in the browser
-        run: npm run audit:zip-any-file:browser
+        run: npm run audit:zip-any-file:browser -- --report=artifacts/tool-functional-audit/zip-any-file.json
 
       - name: Verify local File workspace workflows in the browser
-        run: npm run audit:file-workspace:browser
+        run: npm run audit:file-workspace:browser -- --report=artifacts/tool-functional-audit/file-workspace.json
+
+      - name: Verify File to TXT local extraction and download in the browser
+        run: npm run audit:file-to-txt:browser -- --report=artifacts/tool-functional-audit/file-to-txt.json
+
+      - name: Verify remaining Files converters, MIME utilities and Advanced CSS Minifier in the browser
+        run: npm run audit:files-remaining:browser -- --report=artifacts/tool-functional-audit/files-remaining.json
+
+      - name: Verify QR and barcode reader in the browser
+        run: npm run audit:qr-barcode:browser -- --report=qa-results/qr-barcode-reader-audit.json
 
       - name: Verify all 93 Celebrations tools on a mobile browser
-        run: npm run audit:celebrations:browser -- --report=/tmp/env-celebrations-browser-audit/report.json
+        run: npm run audit:celebrations:browser -- --report=artifacts/celebrations-browser-audit/report.json
 
       - name: Upload Celebrations browser audit evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: celebrations-browser-audit
-          path: /tmp/env-celebrations-browser-audit
+          path: artifacts/celebrations-browser-audit
           if-no-files-found: ignore
 
       - name: Check Studio in phone, landscape, tablet and desktop layouts
@@ -157,3 +166,20 @@ jobs:
         env:
           BROWSER_AUDIT_SAMPLE: 250
         run: npm run verify
+
+      - name: Reconcile native execution matrix for per-tool audit
+        if: always()
+        run: npm run export:native-execution-matrix && npm run check:native-executability
+
+      - name: Generate per-tool functional audit ledger
+        if: always()
+        run: npm run audit:tool-ledger -- --output=audit/tool-functional-audit-ledger.json
+
+      - name: Upload per-tool functional audit ledger
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tool-functional-audit-ledger
+          path: audit/tool-functional-audit-ledger.json
+          if-no-files-found: warn
+          retention-days: 30

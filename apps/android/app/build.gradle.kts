@@ -29,7 +29,7 @@ android {
         vectorDrawables { useSupportLibrary = true }
     }
 
-    // Keep the canonical catalog in apps/shared; do not duplicate the 10,001 records.
+    // Keep the canonical catalog in apps/shared; do not duplicate its records.
     sourceSets["main"].assets.srcDir(file("../../shared"))
     sourceSets["test"].resources.srcDir(file("../../shared"))
     sourceSets["test"].resources.srcDir(file("../../../tests/fixtures"))

@@ -1,20 +1,11 @@
 import fs from "node:fs";
-import { applyGenericWorkflowPolicy } from "../src/lib/generic-workflow-policy.mjs";
+import { getAllTools } from "../src/lib/registry.ts";
 
-const root = new URL("../", import.meta.url);
-const [{ tools: baseCatalog }, { DATETIME_TOOL_EXTENSIONS }] = await Promise.all([
-  import("../src/data/catalog.ts"),
-  import("../src/lib/datetime/catalog-tools.ts"),
-]);
-const platformRuntimeExtensions = [
-  { id: "song-metadata-analyzer", status: "active", category: "audio", engine: { type: "audio" } },
-  { id: "a-book", status: "active", category: "productivity", engine: { type: "custom" } },
-];
-const catalog = [
-  ...applyGenericWorkflowPolicy(baseCatalog),
-  ...DATETIME_TOOL_EXTENSIONS.filter((extension) => !baseCatalog.some((tool) => tool.id === extension.id)),
-  ...platformRuntimeExtensions.filter((extension) => !baseCatalog.some((tool) => tool.id === extension.id)),
-];
+// The discovery registry is the canonical cross-platform inventory. It includes
+// generated base tools, virtual Studio records and all platform runtime extensions.
+const catalog = getAllTools().slice();
+const duplicateIds = catalog.filter((tool, index) => catalog.findIndex((candidate) => candidate.id === tool.id) !== index).map((tool) => tool.id);
+if (duplicateIds.length) throw new Error("Runtime registry contains duplicate IDs: " + [...new Set(duplicateIds)].join(", "));
 const readIds = (platform, kind) => {
   const files = kind === "local"
     ? [new URL(`../apps/${platform}/native-tool-coverage.txt`, import.meta.url), new URL(`../apps/${platform}/native-family-coverage/`, import.meta.url)]
@@ -38,18 +29,25 @@ const androidBackend = readIds("android", "backend");
 const iosBackend = readIds("ios", "backend");
 const backendCategories = new Set(["personal","marketing","accessibility","career","ecommerce","relationships","interactive","gaming","social","streaming","webdesign","education","network","security","creator","creators"]);
 const backendTypes = new Set(["developer","image","audio","video","mockup","post","pdf","document-backend"]);
-const explicitBackendIds = new Set(["youtube-audio-extractor","facebook-video-downloader","instagram-video-downloader","video-mute","video-audio-replacer","tiktok-video-downloader","url-media-inspector","video-audio-volume","video-bitrate","video-crop","video-fps","video-merger","video-resize","video-resolution-presets","video-rotate","video-to-avi","video-to-gif","video-to-mov","video-to-mp3","video-to-mp4","video-to-webm","video-url-downloader","x-video-downloader","youtube-video-downloader","whois-lookup","dns-lookup","website-screenshot","audio-to-text","audio-to-subtitles","video-to-text","video-to-subtitles"]);
+const explicitBackendIds = new Set(["music-downloader","youtube-audio-extractor","facebook-video-downloader","instagram-video-downloader","video-mute","video-audio-replacer","tiktok-video-downloader","url-media-inspector","video-audio-volume","video-bitrate","video-crop","video-fps","video-merger","video-resize","video-resolution-presets","video-rotate","video-to-avi","video-to-gif","video-to-mov","video-to-mp3","video-to-mp4","video-to-webm","video-url-downloader","x-video-downloader","youtube-video-downloader","whois-lookup","dns-lookup","website-screenshot","audio-to-text","audio-to-subtitles","video-to-text","video-to-subtitles"]);
 for (const tool of catalog) {
   if (tool.status !== "active" && tool.status !== "beta") continue;
   if (tool.engine.type === "document-backend" || backendCategories.has(tool.category) || backendTypes.has(tool.engine.type) || explicitBackendIds.has(tool.id)) { androidBackend.add(tool.id); iosBackend.add(tool.id); }
 }
+const intentionalWebOnlyReasons = {
+  "smartphone-prototype-lab": "The current experience is a Web scene and does not have an independent Kotlin or Swift implementation; do not wrap the Web experience in a native WebView.",
+};
 const active = new Set(catalog.filter((tool) => tool.status === "active" || tool.status === "beta").map((tool) => tool.id));
 const rows = catalog.map((tool) => {
   const localA = androidLocal.has(tool.id), localI = iosLocal.has(tool.id);
   const backendA = androidBackend.has(tool.id), backendI = iosBackend.has(tool.id);
   const a = localA ? "offline-native" : backendA ? "backend-native" : "web-only";
   const i = localI ? "offline-native" : backendI ? "backend-native" : "web-only";
-  return { id: tool.id, name: tool.name, status: tool.status, category: tool.category, engine: tool.engine.type, android: a, ios: i };
+  const isWebOnly = a === "web-only" || i === "web-only";
+  const dispositionReason = intentionalWebOnlyReasons[tool.id] ?? (isWebOnly
+    ? "No matching native Android/iOS execution row is currently registered for this tool ID in the reconciled platform coverage sources. Keep it on Web until both native products have a verified dispatcher and acceptance evidence."
+    : null);
+  return { id: tool.id, name: tool.name, status: tool.status, category: tool.category, engine: tool.engine.type, android: a, ios: i, ...(dispositionReason ? { dispositionReason } : {}) };
 });
 const activeRows = rows.filter((row) => active.has(row.id));
 const stats = {
@@ -59,7 +57,6 @@ const stats = {
   offlineNative: activeRows.filter((row) => row.android === "offline-native" && row.ios === "offline-native").length,
   backendNative: activeRows.filter((row) => row.android === "backend-native" && row.ios === "backend-native").length,
   webOnly: activeRows.filter((row) => row.android === "web-only" && row.ios === "web-only").length,
-  missingActive: activeRows.filter((row) => row.android === "web-only" || row.ios === "web-only").length,
   divergentActive: activeRows.filter((row) => row.android !== row.ios).length,
   fullyExecutable: activeRows.filter((row) => row.android !== "web-only" && row.ios !== "web-only" && row.android === row.ios).length,
 };

@@ -9,6 +9,7 @@ import { getSearchableTools, getToolsByCategory } from "@/lib/registry";
 import { searchTools } from "@/lib/search";
 import { toolIcon } from "@/lib/icons";
 import { isIndexableTool, seoPageHead, categorySchema, canonicalSeoTools } from "@/lib/seo-metadata";
+import { toolsIndexSocialCard } from "@/lib/seo-social-cards";
 
 export const Route = createFileRoute("/tools/")({
   validateSearch: (search: Record<string, unknown>) => ({ q: typeof search.q === "string" ? search.q : "" }),
@@ -20,6 +21,7 @@ export const Route = createFileRoute("/tools/")({
       title: "All Online Tools | Calculators, Converters and Utilities | enV",
       description: "Browse enV's collection of practical online tools by category. Find calculators, converters, developer utilities, image and audio tools, productivity helpers, and more.",
       path: "/tools",
+      ...toolsIndexSocialCard(),
       structuredData: categorySchema("All enV tools", "Browse practical online tools across supported enV categories.", "/tools", visibleTools)
     });
   },

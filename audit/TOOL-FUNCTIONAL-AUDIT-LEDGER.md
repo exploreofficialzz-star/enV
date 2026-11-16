@@ -1,0 +1,49 @@
+# Individual Web Tool Functional Audit Ledger
+
+## Purpose
+
+The ledger is generated from the final Web runtime registry, not from the SEO sitemap, the shared native catalogue, or a hand-maintained count. It creates one row per stable tool ID from `getAllTools()` in `src/lib/registry.ts`. The searchable/discovery count is recorded separately from the runtime denominator.
+
+Run locally:
+
+```sh
+npm run audit:tool-ledger
+```
+
+The script writes `audit/tool-functional-audit-ledger.json`. The Production Check workflow generates and uploads the same machine-readable file as the `tool-functional-audit-ledger` Actions artifact, including when its later verification step fails.
+
+## Status semantics
+
+The row-level `auditStatus` is the highest evidence stage reached for that individual ID.
+
+- `NOT_INSPECTED`: no evidence yet.
+- `SOURCE_INSPECTED`: the implementation source for this tool was manually inspected.
+- `STATIC_CHECKED`: stable identity, registry membership, category declaration, engine metadata declaration and route resolver lookup were checked. This does **not** mean a page rendered or its functionality was tested.
+- `UNIT_TESTED`: a passing unit test explicitly covers this tool ID.
+- `BROWSER_TESTED`: a passing browser audit explicitly covers this tool ID.
+- `NATIVE_TESTED`: a passing native test explicitly covers this tool ID on the stated native platform.
+- `VERIFIED`: all applicable checks have per-tool evidence; never inferred from a build, a category count, a route listing or a manifest.
+- `BLOCKED`: a required audit is blocked and the reason is recorded.
+- `DEFECT_FOUND`: a concrete tool-specific defect is evidenced.
+- `NOT_APPLICABLE`: a check is genuinely inapplicable and the reason is explicit.
+
+The `checks` object is more granular than `auditStatus`. An individual browser pass does not promote unrelated security, token, backend, offline or native checks.
+
+## Evidence policy
+
+The checked-in `tool-functional-audit-evidence.json` contains exact browser, unit and native test scopes with workflow/job references. The generator resolves selectors to actual runtime IDs, checks expected record counts, and rejects evidence that refers to unknown IDs. The QR/barcode and 93-tool Celebration browser audits write dynamic per-tool reports during CI; the ledger consumes each report's passed checks and records failed tool runs as blocked. Dynamic reports carry the commit and workflow identity on which tests were observed; a report for a different commit, incomplete ID set, duplicate ID or unknown tool is rejected rather than silently rewritten as a test of the current source.
+
+Native tool lists are recorded as manifest membership only. The native execution matrix is a classification artifact, not proof that each native tool was individually executed. A native test promotes only the exact IDs in its evidence selector, and its notes state whether it checked operation dispatch, representative output or fuller device acceptance. Android and iOS evidence are stored separately.
+
+The inventory and native execution matrix both consume `getAllTools()` from `src/lib/registry.ts`, the same unique-ID source used by the individual-tool ledger. The generated matrix must contain every runtime ID exactly once, including runtime extensions and Studio tools; the check fails on missing IDs, extra IDs, duplicates or count drift. Seven file-workspace IDs are classified as local-native only because both platform coverage manifests and both native dispatch paths are present. `music-downloader` is classified backend-native on both apps: Android and iOS each have a dedicated native UI that resolves/downloads supported public URLs through the configured enV URL-media processor. `smartphone-prototype-lab` remains explicitly Web-only because it has a Web scene rather than an independent Kotlin/Swift implementation. These dispositions are classification facts, not functional-test passes.
+
+## Current known limits
+
+- `STATIC_CHECKED` validates registry metadata and route-resolver lookup, not rendered pages.
+- Browser coverage is limited to the exact tool IDs in the evidence manifest or validated dynamic report. The 93 Celebrations browser records, six file-workspace records, ZIP workflow, QR/barcode records and AI Music Data Sandbox record are not proxies for their entire categories. QR/barcode and Celebration records are sourced from the current run's per-tool result files when those reports are available and validated.
+- No tool is marked `VERIFIED` by the ledger generator. A browser, unit or native test result advances only the corresponding evidence dimension; it does not clear blocked or untested checks.
+- Checks for all visible controls, malformed/boundary input coverage, errors/recovery, loading/disabled/success states, enV token enforcement, authorization, backend failure modes, offline behavior, privacy/security and independent native execution remain open unless the row contains direct evidence.
+
+## Required continuation
+
+Audit each category using stable IDs. For each tool, inspect its component and engine dispatch, execute the real browser/native path, cover representative and boundary inputs, verify all visible controls and outputs, and attach test evidence to that exact ID. Upgrade the row only after those checks pass. Keep Web, Android and iOS evidence separate.

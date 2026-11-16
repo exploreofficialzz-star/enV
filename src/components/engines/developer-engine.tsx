@@ -246,7 +246,7 @@ function legacyGeneric(op: string, input: string, secondary: string, flags = "g"
 function actionLabel(op: string): string {
   const lower = op.toLowerCase();
   if (lower.includes("formatter") || lower.includes("beautifier")) return "Format";
-  if (lower.includes("minifier")) return "Minify";
+  if (lower.includes("minifier") || lower === "css-minify") return "Minify";
   if (lower.includes("validator") || lower.includes("tester")) return lower.includes("regex") ? "Test pattern" : "Validate";
   if (lower.includes("encoder")) return "Encode";
   if (lower.includes("decoder")) return "Decode";

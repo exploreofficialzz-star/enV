@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "status": "draft-not-submitted",
+  "reviewedAt": "2026-11-15",
+  "productName": "enV",
+  "publisher": "chAs Technologies LLC",
+  "canonicalWebsite": "https://envtools.store",
+  "android": {
+    "appName": "enV",
+    "applicationId": "com.chastech.env",
+    "category": "Tools",
+    "shortDescription": "Native tools for everyday tasks, with web-only tools opening in your browser.",
+    "fullDescription": "enV brings native tools for everyday tasks together in one app.\n\nUse supported native utilities for calculations, conversions, date and time tasks, QR and barcode scanning, file workflows, business tasks and developer utilities. Each tool has its own inputs, options and result checks.\n\nenV is a native Android app, not a WebView wrapper. When you select a tool that is only available in enV Web, the app opens that tool separately in your system browser. The native app keeps its own screens and navigation.\n\nProcessing depends on the selected tool. Some operations run on your device; tools that use connected services need an internet connection. Review the notice and options on the individual tool before submitting information.\n\nUse enV to complete supported tasks, inspect results and decide how to save or share the output.",
+    "supportUrl": "https://envtools.store/help",
+    "privacyPolicyUrl": "https://envtools.store/privacy",
+    "listingUrl": null,
+    "assetReadiness": "Not verified. Capture screenshots from the actual release build on supported Android devices before submission."
+  },
+  "ios": {
+    "appName": "enV",
+    "bundleIdentifier": "com.chastech.env",
+    "subtitle": "Tools for everyday tasks",
+    "promotionalText": "Use native enV tools for everyday tasks. Web-only tools open separately in your system browser.",
+    "description": "enV brings native tools for everyday tasks together in one app.\n\nUse supported native utilities for calculations, conversions, date and time tasks, QR and barcode scanning, file workflows, business tasks and developer utilities. Each tool provides its own inputs, options and result checks.\n\nenV is a native iOS app, not a WebView wrapper. When you choose a tool available only in enV Web, it opens separately in your system browser. The native app retains its own screens and navigation.\n\nProcessing depends on the selected tool. Some operations run on your device; tools that use connected services require an internet connection. Read the notice on each tool before submitting information.\n\nUse enV to complete supported tasks, inspect the result and choose how to save or share the output.",
+    "keywords": "calculator,converter,qr,barcode,files,notes,documents,utilities,productivity",
+    "primaryCategory": "Utilities",
+    "secondaryCategory": "Productivity",
+    "supportUrl": "https://envtools.store/help",
+    "privacyPolicyUrl": "https://envtools.store/privacy",
+    "listingUrl": null,
+    "assetReadiness": "Not verified. Capture screenshots from the actual release build on supported iPhone sizes before submission."
+  },
+  "crossSurface": {
+    "nativeAppPolicy": "Native Android and iOS screens execute native-ready tools. Web-only tools are opened as separate pages in the system browser.",
+    "networkDisclosure": "Do not claim that the whole app works offline. Network and local-processing requirements vary by tool.",
+    "screenshotsRequired": [
+      "Native home and tool discovery",
+      "A native calculator input and result",
+      "Native QR or barcode scanning with permission granted",
+      "A native file workflow and its exported result",
+      "The Web-only handoff shown without embedding the Web application"
+    ],
+    "publication": "No Google Play or Apple App Store listing URL is recorded until the live product page and store account release are verified."
+  }
+}

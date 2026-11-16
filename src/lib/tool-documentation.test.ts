@@ -3,7 +3,9 @@ import { test } from "node:test";
 import { readFileSync } from "node:fs";
 import { CATEGORIES } from "@/data/categories";
 import type { ToolMeta } from "@/types/tool";
-import { getSearchableTools, getToolsByCategory } from "@/lib/registry";
+import { getSearchableTools, getToolsByCategory, getToolById, getToolByPath } from "@/lib/registry";
+import { developerModeForLegacySlug, developerStudioForLegacySlug } from "@/lib/developer-studios-catalog";
+import { runDeveloperStudio } from "@/lib/engines/developer-studios";
 import { canonicalSeoTools, isIndexableTool } from "@/lib/seo-metadata";
 import { getToolDocumentation, toolTaskGuidanceSource, toolDocumentationSummary } from "@/lib/tool-documentation";
 import { groupToolsBySubcategory } from "@/lib/category-tool-groups";
@@ -82,6 +84,7 @@ const CATEGORY_RENDERERS: Record<string, string> = {
   screenshots: "ScreenshotEngine",
   ecommerce: "EcommerceEngine",
   accessibility: "AccessibilityEngine",
+  celebrations: "CelebrationEngine",
 };
 
 const CUSTOM_ENGINE_ID_RENDERERS: Record<string, string> = {
@@ -386,8 +389,8 @@ test("generic engine guide branches preserve each tool's catalogue task statemen
     };
     assert.equal(
       toolTaskGuidanceSource(tool),
-      "operation-specific",
-      sample.id + ": this narrowly matched task rule must be classified as operation-specific",
+      "engine-specific",
+      sample.id + ": shared engine-family guidance must be classified as engine-specific",
     );
     const whenToUse = getToolDocumentation(tool).find((section) => section.id === "when-to-use");
     assert.ok(whenToUse, sample.id + ": guide must include a when-to-use section");
@@ -471,6 +474,86 @@ test("hand-written tool guidance is wrapped with catalogue identity without repe
       engine: { type: "creator", op: "youtube-content-planner" },
       expectedGuidance: "generates a set of content ideas",
     },
+    {
+      id: "qr-payload-inspector", name: "QR & Barcode Reader",
+      description: "Scan QR codes and 1D/2D barcodes using your camera or an image file.",
+      category: "qr", engine: { type: "custom", id: "qr-payload-inspector" },
+      expectedGuidance: "decodes QR codes and supported 1D/2D barcode formats",
+    },
+    {
+      id: "zip-any-file", name: "Zip any file",
+      description: "Create ZIP archives from files or folders, or extract an archive.",
+      category: "files", engine: { type: "custom", id: "zip-any-file" },
+      expectedGuidance: "two separate workflows: create a ZIP",
+    },
+    {
+      id: "file-to-txt", name: "File to TXT Converter",
+      description: "Type or paste plain text, or extract readable text from supported files and save it as a TXT file.",
+      category: "files", engine: { type: "file-converter", op: "file-to-txt" },
+      expectedGuidance: "extract readable text locally from supported text files, DOCX documents and selectable-text PDFs",
+    },
+    {
+      id: "file-organizer", name: "File Organizer",
+      description: "Sort selected files into clear folders by type and export an organized copy.",
+      category: "files", engine: { type: "custom", id: "file-organizer" },
+      expectedGuidance: "classifies the selected file set into folders",
+    },
+    {
+      id: "batch-file-renamer", name: "Batch File Renamer",
+      description: "Preview and apply consistent prefixes, suffixes, numbering and literal replacements.",
+      category: "files", engine: { type: "custom", id: "batch-file-renamer" },
+      expectedGuidance: "previews a numbered name for each selected file",
+    },
+    {
+      id: "duplicate-file-finder", name: "Duplicate File Finder",
+      description: "Find identical files using SHA-256 content verification after size filtering.",
+      category: "files", engine: { type: "custom", id: "duplicate-file-finder" },
+      expectedGuidance: "calculates SHA-256 digests for the same-size candidates",
+    },
+    {
+      id: "folder-size-analyzer", name: "Folder Size Analyzer",
+      description: "Inspect folder contents, total storage, file-type breakdowns and the largest files.",
+      category: "files", engine: { type: "custom", id: "folder-size-analyzer" },
+      expectedGuidance: "reports its file count, combined byte size",
+    },
+    {
+      id: "file-search", name: "File Search",
+      description: "Find files by name and search inside supported text files with clear file and line references.",
+      category: "files", engine: { type: "custom", id: "file-search" },
+      expectedGuidance: "looks for a case-insensitive phrase in selected filenames",
+    },
+    {
+      id: "file-compare", name: "File & Folder Compare",
+      description: "Compare two selected file sets to identify added, missing, changed and identical files.",
+      category: "files", engine: { type: "custom", id: "file-compare" },
+      expectedGuidance: "compares two selected file sets by relative path",
+    },
+    {
+      id: "a-book", name: "A book",
+      description: "A private local notes and document workspace. Create notes, attach files, organize and search your writing, and process PDFs on this device.",
+      category: "productivity", engine: { type: "custom", id: "a-book" },
+      expectedGuidance: "private on-device notes and document workspace",
+    },
+    {
+      id: "song-metadata-analyzer", name: "AI Music Data Sandbox",
+      description: "Organize, tag and prepare music for training, right on your device.",
+      category: "audio", engine: { type: "custom", id: "song-metadata-analyzer" },
+      expectedGuidance: "local music-record workspace",
+    },
+    {
+      id: "camera-studio", name: "Camera Studio",
+      description: "Take photos and record videos. Switch between the front and back cameras, zoom in or out, adjust brightness, apply color filters, and save your captures to your device.",
+      category: "photography", engine: { type: "custom", id: "camera-studio" },
+      expectedGuidance: "browser capture workspace",
+    },
+    { id: "birthday-page-generator", name: "Birthday Page Generator", description: "Create a celebration page with event details, a message and an optional schedule.", category: "celebrations", engine: { type: "custom", id: "birthday-page-generator" }, expectedGuidance: "standalone HTML programme page" },
+    { id: "anniversary-interactive-card", name: "Anniversary Interactive Card", description: "Create a card with a message that the recipient can reveal.", category: "celebrations", engine: { type: "custom", id: "anniversary-interactive-card" }, expectedGuidance: "second message panel that the recipient opens" },
+    { id: "graduation-invitation-generator", name: "Graduation Invitation Generator", description: "Prepare a celebration invitation with event details and an RSVP option.", category: "celebrations", engine: { type: "custom", id: "graduation-invitation-generator" }, expectedGuidance: "themed HTML invitation and a copyable text version" },
+    { id: "party-countdown", name: "Party Countdown", description: "Calculate the time remaining until a party using the event time zone.", category: "celebrations", engine: { type: "custom", id: "party-countdown" }, expectedGuidance: "updates the days, hours, minutes and seconds" },
+    { id: "thank-you-memory-page", name: "Thank You Memory Page", description: "Create a page of written memories and a photo gallery.", category: "celebrations", engine: { type: "custom", id: "thank-you-memory-page" }, expectedGuidance: "written memories and an optional photo gallery" },
+    { id: "farewell-reveal-page", name: "Farewell Reveal Page", description: "Create a page with a message that visitors reveal when they are ready.", category: "celebrations", engine: { type: "custom", id: "farewell-reveal-page" }, expectedGuidance: "visitor selects Reveal the message" },
+    { id: "achievement-quiz-generator", name: "Achievement Quiz Generator", description: "Create a multiple-choice quiz and identify the correct answer.", category: "celebrations", engine: { type: "custom", id: "achievement-quiz-generator" }, expectedGuidance: "small multiple-choice quiz" },
+    { id: "christmas-surprise-page", name: "Christmas Surprise Page", description: "Create a page with an introductory message and hidden surprise content.", category: "celebrations", engine: { type: "custom", id: "christmas-surprise-page" }, expectedGuidance: "button that opens the surprise content" },
     {
       id: "youtube-posting-time-helper",
       name: "YouTube Posting Time Helper",
@@ -689,3 +772,138 @@ test("every canonical public tool has a complete guide structure tied to its cat
   );
 });
 
+
+test("all registered categories have distinct, task-oriented descriptions and blurbs", () => {
+  assert.equal(CATEGORIES.length, 43, "The category registry should contain the current 43 category records.");
+  const ids = CATEGORIES.map((category) => category.id);
+  const descriptions = CATEGORIES.map((category) => category.description.trim());
+  const blurbs = CATEGORIES.map((category) => category.blurb.trim());
+  assert.equal(new Set(ids).size, CATEGORIES.length, "Category IDs must be unique.");
+  assert.equal(new Set(descriptions).size, CATEGORIES.length, "Every category needs a distinct explanation.");
+  assert.equal(new Set(blurbs).size, CATEGORIES.length, "Every category needs a distinct short task blurb.");
+  for (const category of CATEGORIES) {
+    assert.ok(category.description.trim().length >= 60, category.id + ": category description must explain a real task scope.");
+    assert.ok(category.blurb.trim().length >= 18, category.id + ": category blurb must communicate a distinct task.");
+  }
+});
+
+test("category grouping uses only repeated subcategory metadata and preserves every visible tool", () => {
+  const tool = (id: string, subcategory?: string): ToolMeta => ({
+    id, name: id, slug: id, description: "A category grouping fixture for a concrete tool task.",
+    category: "files", ...(subcategory ? { subcategory } : {}), keywords: [], tags: [], icon: "FileText",
+    popularity: 0, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false,
+    status: "active", related: [], engine: { type: "custom", id },
+  });
+  const input = [tool("rename-a", "Organization"), tool("rename-b", "Organization"),
+    tool("compare-a", "Verification"), tool("compare-b", "Verification"),
+    tool("single", "Sparse"), tool("unlabelled")];
+  const groups = groupToolsBySubcategory(input);
+  assert.ok(groups, "Two repeated subcategories should create groups.");
+  assert.deepEqual(groups.map((group) => group.label), ["Organization", "Verification", "Other tools"]);
+  assert.deepEqual(groups.flatMap((group) => group.tools.map((item) => item.id)).sort(), input.map((item) => item.id).sort(),
+    "Every visible tool must appear exactly once after grouping.");
+  assert.equal(groupToolsBySubcategory([tool("a", "One"), tool("b", "One")]), null,
+    "A single repeated subcategory does not justify fabricated group structure.");
+});
+
+
+test("all 93 supported Celebration IDs receive operation-specific documentation", () => {
+  const occasions = [
+    "birthday", "anniversary", "graduation", "valentine", "christmas", "new-year",
+    "congratulations", "thank-you", "appreciation", "farewell", "achievement", "party",
+  ];
+  const experiences = [
+    "page-generator", "interactive-card", "invitation-generator", "countdown",
+    "memory-page", "reveal-page", "quiz-generator", "surprise-page",
+  ];
+  const unavailable = new Set([
+    "birthday-countdown", "valentine-reveal-page", "appreciation-reveal-page",
+  ]);
+  const expectedGuidance = new Map([
+    ["page-generator", "standalone HTML programme page"],
+    ["interactive-card", "second message panel that the recipient opens"],
+    ["invitation-generator", "themed HTML invitation and a copyable text version"],
+    ["countdown", "updates the days, hours, minutes and seconds"],
+    ["memory-page", "written memories and an optional photo gallery"],
+    ["reveal-page", "visitor selects Reveal the message"],
+    ["quiz-generator", "small multiple-choice quiz"],
+    ["surprise-page", "button that opens the surprise content"],
+  ]);
+  let count = 0;
+  for (const occasion of occasions) {
+    for (const experience of experiences) {
+      const id = occasion + "-" + experience;
+      if (unavailable.has(id)) continue;
+      const tool: ToolMeta = {
+        id,
+        name: id,
+        slug: id,
+        description: "Create a celebration page for the selected occasion using the fields provided.",
+        category: "celebrations",
+        keywords: [],
+        tags: [],
+        icon: "PartyPopper",
+        popularity: 0,
+        featured: false,
+        clientSide: true,
+        requiresBackend: false,
+        requiresAuth: false,
+        status: "active",
+        related: [],
+        engine: { type: "custom", id },
+      };
+      assert.equal(toolTaskGuidanceSource(tool), "operation-specific", id);
+      const whenToUse = getToolDocumentation(tool).find((section) => section.id === "when-to-use");
+      assert.ok(whenToUse, id + ": missing its individual 'when to use' guide section");
+      assert.ok(whenToUse.paragraphs[0].includes(expectedGuidance.get(experience) ?? ""), id + ": wrong or missing operation guidance");
+      assert.ok(whenToUse.paragraphs[0].startsWith("This guide is specific to " + id + "."), id + ": guide identity is missing");
+      count += 1;
+    }
+  }
+  assert.equal(count, 93, "Every supported Celebration operation must receive the source-specific guide rule.");
+});
+
+
+test("keeps Advanced CSS Minifier and JSON-to-CSV as separate stable tool identities", () => {
+  const searchable = getSearchableTools();
+  const css = searchable.find((tool) => tool.id === "css-minifier-advanced");
+  const jsonToCsv = searchable.find((tool) => tool.id === "json-to-csv");
+
+  assert.ok(css, "Advanced CSS Minifier remains searchable");
+  assert.equal(css.name, "Advanced CSS Minifier");
+  assert.equal(css.category, "developer");
+  assert.equal(css.slug, "css-minifier-advanced");
+  assert.equal(css.engine.type, "text");
+  assert.equal(css.engine.type === "text" ? css.engine.op : null, "css-minify");
+  assert.equal(getToolById("css-minifier-advanced")?.id, "css-minifier-advanced");
+  assert.equal(getToolByPath("developer", "css-minifier-advanced")?.id, "css-minifier-advanced");
+
+  assert.ok(jsonToCsv, "JSON-to-CSV remains a separate Files tool");
+  assert.equal(jsonToCsv.name, "JSON to CSV Converter");
+  assert.equal(jsonToCsv.category, "files");
+  assert.equal(jsonToCsv.engine.type, "file-converter");
+  assert.equal(jsonToCsv.engine.type === "file-converter" ? jsonToCsv.engine.op : null, "json-to-csv");
+  assert.equal(getToolByPath("files", "json-to-csv")?.id, "json-to-csv");
+  assert.equal(searchable.filter((tool) => tool.id === "css-minifier-advanced").length, 1);
+  assert.equal(searchable.filter((tool) => tool.id === "json-to-csv").length, 1);
+});
+
+
+test("preserves Advanced CSS Minifier identity and operation through Markup & Style Studio", async () => {
+  const css = getToolById("css-minifier-advanced");
+  assert.ok(css);
+  const studio = developerStudioForLegacySlug(css.slug);
+  assert.equal(studio.id, "markup-studio");
+  assert.equal(developerModeForLegacySlug(studio, css.slug), "css");
+  assert.equal(css.engine.type === "text" ? css.engine.op : null, "css-minify");
+
+  const output = await runDeveloperStudio(
+    "css-minify",
+    "/* remove this comment */ .card { color: red; margin: 0; }",
+  );
+  assert.equal(output, ".card{color:red;margin:0}");
+
+  const routeSource = readFileSync(new URL("../routes/tools/$category/$slug.tsx", import.meta.url), "utf8");
+  assert.ok(routeSource.includes('const legacyEngineOp = "op" in tool.engine ? tool.engine.op : undefined;'));
+  assert.ok(routeSource.includes("op: legacyEngineOp"), "Legacy redirect must forward the original engine operation to its Studio");
+});

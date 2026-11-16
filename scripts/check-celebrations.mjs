@@ -26,7 +26,10 @@ assert.match(preload, /celebration-engine/);
 console.log("Celebrations check PASS: 93 active exact-ID workflows, Web engine dispatch, account-free local execution.");
 
 const categorySource = read("src/data/categories.ts");
-assert.match(categorySource, /id: "celebrations", name: "Celebrations", description: "Birthday, anniversary, graduation, appreciation, and celebration generators\."/);
+assert.ok(categorySource.includes('id: "celebrations", name: "Celebrations", description: "Create invitations, cards, countdowns and shareable pages for birthdays, anniversaries, graduations and other occasions."'),
+  "Celebrations category must retain the current task-first description.");
+assert.ok(categorySource.includes('blurb: "Make cards, invitations and celebration pages."'),
+  "Celebrations category must retain its task-first blurb.");
 const allToolsPage = read("src/routes/tools/index.tsx");
 assert.match(allToolsPage, /category\.id === "celebrations" \? category\.description : category\.blurb/,
   "the All tools directory must show the full Celebrations category description");

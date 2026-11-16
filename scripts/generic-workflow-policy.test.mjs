@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   applyGenericWorkflowPolicy,
+  isDedicatedCelebrationTool,
   isDedicatedEventTemplateTool,
   isGenericWorkflowPlaceholder,
   normalizeGenericWorkflowTool,
@@ -43,6 +44,38 @@ test("generic cross-category workflow placeholders are planned and non-indexable
   }
 });
 
+
+test("all 93 implemented Celebrations operations remain active and outside generic fallback policy", () => {
+  const occasions = [
+    "birthday", "anniversary", "graduation", "valentine", "christmas", "new-year",
+    "congratulations", "thank-you", "appreciation", "farewell", "achievement", "party",
+  ];
+  const experiences = [
+    "page-generator", "interactive-card", "invitation-generator", "countdown",
+    "memory-page", "reveal-page", "quiz-generator", "surprise-page",
+  ];
+  const unavailable = new Set([
+    "birthday-countdown", "valentine-reveal-page", "appreciation-reveal-page",
+  ]);
+  const ids = occasions.flatMap((occasion) =>
+    experiences.map((experience) => occasion + "-" + experience).filter((id) => !unavailable.has(id)),
+  );
+  assert.equal(ids.length, 93);
+  assert.equal(new Set(ids).size, 93);
+
+  for (const id of ids) {
+    const candidate = tool(id, "celebrations", { engine: { type: "custom", id } });
+    assert.equal(isDedicatedCelebrationTool(candidate), true, id);
+    assert.equal(isGenericWorkflowPlaceholder(candidate), false, id);
+    assert.equal(normalizeGenericWorkflowTool(candidate).status, "active", id);
+  }
+
+  const unsupported = tool("birthday-video-generator", "celebrations");
+  assert.equal(isDedicatedCelebrationTool(unsupported), false);
+  assert.equal(isGenericWorkflowPlaceholder(unsupported), true);
+  assert.equal(normalizeGenericWorkflowTool(unsupported).status, "planned");
+});
+
 test("dedicated event templates remain active and are excluded from generic-placeholder checks", () => {
   const ids = [
     "birthday-agenda-generator",
@@ -63,7 +96,7 @@ test("similarly named but unsupported event variants are not promoted", () => {
   const unsupported = [
     tool("meeting-agenda-generator", "events"),
     tool("birthday-ticket-mockup", "events"),
-    tool("birthday-page-generator", "celebrations"),
+    tool("birthday-video-generator", "celebrations"),
     tool("meal-planner", "food"),
     tool("trip-itinerary-planner", "travel"),
     tool("passport-photo-cropper", "photography"),
@@ -98,23 +131,27 @@ test("compact runtime summaries are normalized without engine metadata", () => {
   assert.equal(normalizeGenericWorkflowTool(cameraStudio).status, "active");
 });
 
-test("native catalog and execution-matrix exporters share the publication policy", async () => {
+test("native catalog exporter applies publication policy while matrix uses the canonical runtime registry", async () => {
   const { readFile } = await import("node:fs/promises");
   const [nativeExporter, matrixExporter] = await Promise.all([
     readFile(new URL("./export-native-catalog.mjs", import.meta.url), "utf8"),
     readFile(new URL("./export-native-execution-matrix.mjs", import.meta.url), "utf8"),
   ]);
   assert.match(nativeExporter, /applyGenericWorkflowPolicy\(tools\)/);
-  assert.match(matrixExporter, /applyGenericWorkflowPolicy\(baseCatalog\)/);
+  assert.match(nativeExporter, /const canonicalRuntimeTools = getAllTools\(\)/);
+  assert.match(matrixExporter, /const catalog = getAllTools\(\)\.slice\(\)/);
+  assert.match(matrixExporter, /Runtime registry contains duplicate IDs/);
+  assert.match(matrixExporter, /No matching native Android\/iOS execution row is currently registered/);
 });
 
-test("native coverage and related-catalog audits normalize availability before comparing platforms", async () => {
+test("native coverage and related-catalog audits use canonical availability sources", async () => {
   const { readFile } = await import("node:fs/promises");
   const [coverage, related] = await Promise.all([
     readFile(new URL("./check-native-coverage.mjs", import.meta.url), "utf8"),
     readFile(new URL("./check-native-related.mjs", import.meta.url), "utf8"),
   ]);
-  assert.match(coverage, /applyGenericWorkflowPolicy\(parseGeneratedCatalog\(catalogSource\)\)/);
+  assert.match(coverage, /const catalog = getAllTools\(\)\.slice\(\)/);
+  assert.match(coverage, /File & Folder Compare default native workflow/);
   assert.match(related, /applyGenericWorkflowPolicy\(baseWebTools\)/);
 });
 

@@ -2,10 +2,35 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildSeoArtifacts, buildSitemapArtifacts } from "./generate-seo-artifacts.mjs";
 import { buildIndexNowKeyArtifact } from "./indexnow-utils.mjs";
+import { getToolByPath, getToolsByCategory } from "../src/lib/registry.ts";
 import { toolTaskGuidanceSource } from "../src/lib/tool-documentation.ts";
 import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema, toolSchema, organizationSchema, websiteSchema, boundedToolSeoTitle } from "@/lib/seo-metadata";
 
+const nativeInventory = JSON.parse(readFileSync(new URL("../apps/shared/native-engine-inventory.json", import.meta.url), "utf8"));
 const result = buildSeoArtifacts();
+
+// Accessibility Studio routing keeps legacy Design discovery aliases visible while
+// retaining one stable runtime/search identity and one canonical Accessibility URL.
+const designAccessibilityTools = getToolsByCategory("design").filter((tool) =>
+  ["contrast-checker", "wcag-checker", "color-blindness-simulator"].includes(tool.id)
+);
+assert.deepEqual(
+  designAccessibilityTools.map((tool) => tool.id).sort(),
+  ["color-blindness-simulator", "contrast-checker", "wcag-checker"],
+  "Design must retain its three curated Accessibility links after canonical Studio routing."
+);
+const legacyContrastTool = designAccessibilityTools.find((tool) => tool.id === "contrast-checker");
+assert.ok(legacyContrastTool, "The legacy Contrast Checker card must remain available in Design.");
+assert.equal(getToolByPath("design", "contrast-checker")?.category, "accessibility");
+assert.equal(getToolByPath("design", "contrast-checker")?.slug, "color-contrast-studio");
+assert.equal(canonicalToolPath(legacyContrastTool), "/tools/accessibility/color-contrast-studio");
+assert.equal(canonicalToolName(legacyContrastTool), "Color Contrast Studio");
+const contrastInventoryRows = result.runtimeInventory.filter((row) => row.id === "contrast-checker");
+assert.equal(contrastInventoryRows.length, 1, "Legacy Design routing must not duplicate the runtime tool ID.");
+assert.equal(contrastInventoryRows[0].tool.category, "accessibility", "The runtime inventory must retain the canonical Accessibility Studio record.");
+assert.equal(contrastInventoryRows[0].tool.slug, "color-contrast-studio");
+assert.ok(contrastInventoryRows[0].routes.includes("/tools/design/contrast-checker"));
+assert.equal(contrastInventoryRows[0].canonicalTarget, "/tools/accessibility/color-contrast-studio");
 assert.equal(buildIndexNowKeyArtifact(""), null, "An unset IndexNow key must not produce a public key file.");
 assert.deepEqual(buildIndexNowKeyArtifact("a1b2c3d4-e5f6"), {
   path: "public/a1b2c3d4-e5f6.txt",
@@ -66,6 +91,32 @@ for (const path of [
   "/contact", "/help", "/privacy", "/terms", "/disclaimer",
   "/responsible-use", "/platform/android", "/platform/ios", "/token-guide"
 ]) assert.ok(result.urls.includes(path), "Missing public informational route " + path);
+const socialCardSource = readFileSync(new URL("../src/lib/seo-social-cards.ts", import.meta.url), "utf8");
+const socialCardGeneratorSource = readFileSync(new URL("./social-card-images.mjs", import.meta.url), "utf8");
+assert.ok(socialCardSource.includes("toolsIndexSocialCard"), "Tools index must have a distinct social card selector.");
+assert.ok(socialCardSource.includes("articleSocialCard"), "Product articles must have route-specific social card selectors.");
+assert.ok(socialCardSource.includes("blogIndexSocialCard"), "Blogs & Guides index must have a dedicated social card selector.");
+assert.ok(socialCardGeneratorSource.includes("public/og/cards/tools-index.png"), "Tools index social image must be generated.");
+assert.ok(socialCardGeneratorSource.includes("public/og/cards/articles/"), "Article social images must be generated.");
+assert.ok(socialCardGeneratorSource.includes("public/og/cards/blog-index.png"), "Blogs & Guides index social image must be generated.");
+assert.ok(result.socialCards.length > result.categories.length, "Social-card artifacts must include homepage, tools index and representative routes in addition to category cards.");
+for (const card of result.socialCards) {
+  assert.equal(card.content.readUInt32BE(16), 1200, "Social card width must be 1200px: " + card.path);
+  assert.equal(card.content.readUInt32BE(20), 630, "Social card height must be 630px: " + card.path);
+  assert.equal(card.content.subarray(0, 8).toString("hex"), "89504e470d0a1a0a", "Social card must be a valid PNG: " + card.path);
+  assert.ok(card.url.startsWith("https://envtools.store/og/cards/"), "Social image URL must use the canonical host: " + card.path);
+  assert.ok(card.alt && card.alt.length > 12, "Social card must have descriptive alternative text: " + card.path);
+}
+assert.equal(result.runtimeInventory.length, new Set(result.runtimeInventory.map((row) => row.id)).size, "Full runtime reconciliation must contain one row per stable tool ID.");
+assert.ok(result.inventory.includes("Android native coverage manifest lists " + nativeInventory.androidToolIds.length + " unique tool IDs; iOS lists " + nativeInventory.iosToolIds.length + " unique tool IDs."), "Native coverage manifest totals must be included in the reconciled report.");
+assert.deepEqual([...nativeInventory.androidToolIds].sort(), [...nativeInventory.iosToolIds].sort(), "Android and iOS native coverage manifests must list the same stable tool IDs.");
+assert.match(result.inventory, /Android native manifest \| iOS native manifest/);
+assert.match(result.inventory, /base catalogue fingerprint/);
+const birthdayPageTool = result.tools.find((tool) => tool.id === "birthday-page-generator");
+assert.ok(birthdayPageTool, "The source-verified Celebration Page Generator must be an indexable canonical Web tool.");
+assert.ok(result.urls.includes("/tools/celebrations/birthday-page-generator"), "The Celebration Page Generator must be present in the sitemap URL inventory.");
+assert.ok(result.urls.includes("/blog/tool-birthday-page-generator"), "The Celebration Page Generator usage guide must be present in the sitemap URL inventory.");
+assert.ok(result.urls.includes("/tools/creators") && result.urls.includes("/tools/celebrations"), "Creator and Celebration category pages must remain discoverable.");
 assert.ok(result.tools.length > 0);
 assert.ok(result.guideTools.length >= result.tools.length);
 assert.ok(result.eligibleToolCount > result.guideTools.length, "Duplicate generated equations must be consolidated from SEO discovery while remaining in the app catalog.");
@@ -225,6 +276,18 @@ assert.equal(largeSitemap.files.length, 3);
 assert.deepEqual(largeSitemap.files.map((file) => file.count), [40_000, 40_000, 1]);
 assert.ok(largeSitemap.files.every((file) => file.content.includes("<urlset")));
 assert.match(result.inventory, /^# enV public tool SEO inventory/m);
+assert.ok(result.inventory.includes("Canonical public target | Disposition / exclusion reason"), "Full reconciliation rows must separate canonical targets from exclusion reasons.");
+const inventoryGeneratorSource = readFileSync(new URL("./generate-seo-artifacts.mjs", import.meta.url), "utf8");
+for (const disposition of [
+  "Canonical public tool page", "Consolidated generated variant; canonical tool ID:",
+  "Retired legacy route", "Generic workflow fallback; not indexable until a dedicated operation replaces it",
+  "Planned catalogue record", "Under-production tool; excluded from public indexing",
+  "Generic Input A/Input B equation template; excluded from public indexing",
+  "Legacy Developer alias; resolved to canonical Studio page", "Present in source catalogue only; not registered by Web runtime",
+  "Not included in public search discovery", "Non-public catalogue status:",
+]) assert.ok(inventoryGeneratorSource.includes(disposition), "The inventory generator must define disposition: " + disposition);
+assert.doesNotMatch(result.inventory, /No canonical SEO record; inspect production or alias policy/, "Every non-canonical record must have a specific disposition reason.");
+assert.ok(result.inventory.includes("Canonical public tool page") || result.inventory.includes("Consolidated generated variant; canonical tool ID:"), "Inventory must emit at least one explicit canonical disposition.");
 assert.match(result.inventory, /\| Tool ID \| Tool \| Category \| Catalogue status \| Engine operation \| Catalogue execution\/account flags \| Task guidance source \|/);
 assert.match(result.inventory, /\| Tool ID \| Usage guide \| Category \| Catalogue status \| Engine operation \| Catalogue execution\/account flags \| Task guidance source \|/);
 assert.match(result.inventory, /not proof of the live runtime data path, actual local execution, platform parity or successful behavior/);
@@ -232,6 +295,16 @@ assert.match(result.inventory, /does not claim that a human has completed the so
 assert.match(result.inventory, /Search-intent terms are seeded from each tool's name/m);
 assert.match(result.inventory, /This classifies only the task-specific overview, example and validation in the guide's 'When to use this tool' section/);
 assert.match(result.inventory, /does not classify every guide section or prove control-level accuracy, source\/runtime verification or human editorial review/);
+for (const row of result.runtimeInventory) {
+  if (row.tool.category === "developer"
+    && !row.tool.tags.includes("developer-studio")
+    && row.canonicalTarget
+    && row.routes.includes("/tools/developer/" + row.tool.slug)
+    && row.canonicalTarget !== "/tools/developer/" + row.tool.slug) {
+    assert.equal(row.disposition, "Legacy Developer alias; resolved to canonical Studio page",
+      "Legacy Developer routes must carry an explicit canonical Studio disposition: " + row.id);
+  }
+}
 assert.equal(result.sitemap.includes("https://envtools.store/sitemap.xml"), false);
 
 assert.match(result.robots, /User-agent: OAI-SearchBot\nAllow: \/\nDisallow: \/api\//);
@@ -248,6 +321,7 @@ assert.match(
 assert.match(result.robots, /User-agent: Applebot\nAllow: \/\nDisallow: \/api\//);
 assert.match(result.robots, /User-agent: ClaudeBot\nDisallow: \//);
 assert.match(result.robots, /User-agent: GPTBot\nDisallow: \//);
+assert.doesNotMatch(result.robots, /User-agent: __usage_ai-training/, "Unapproved shared AI-training preferences must not be emitted.");
 assert.match(result.robots, /Sitemap: https:\/\/envtools\.store\/sitemap\.xml/);
 
 assert.match(result.llms, /^# enV/m);

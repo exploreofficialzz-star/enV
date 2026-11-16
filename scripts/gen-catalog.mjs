@@ -361,7 +361,7 @@ add([
   ["data-uri-generator","Data URI Generator","developer","Turn text into a data: URI locally in your browser.","custom","data-uri","data uri base64",0,74],
   ["lorem-ipsum-generator","Lorem Ipsum Generator","developer","Generate placeholder paragraphs, sentences, or words.","generator","lorem","lorem ipsum placeholder",1,90],
   ["dummy-json-generator","Dummy JSON Generator","developer","Generate sample JSON objects for API mocking.","generator","dummy-json","dummy json fake api",1,86],
-  ["css-minifier-advanced","JSON to CSV","files","Convert a JSON array of objects to CSV.","text","json-to-csv","json csv convert",0,80],
+  ["css-minifier-advanced","Advanced CSS Minifier","developer","Minify CSS by removing comments and unnecessary whitespace while preserving CSS declarations and selector structure.","text","css-minify","advanced css minifier css stylesheet compress",1,84],
 ]);
 
 add([

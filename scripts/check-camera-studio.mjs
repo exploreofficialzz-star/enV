@@ -272,7 +272,7 @@ assert.match(iosCatalogTests, /testCameraStudioRuntimeExtensionIsUniqueAndSearch
 assert.match(iosInfo, /NSPhotoLibraryAddUsageDescription/);
 assert.match(iosProject, /NativeCameraStudio\.swift in Sources/);
 
-assert.match(nativeCoverage, /id: 'camera-studio'/);
+assert.match(nativeCoverage, /const catalog = getAllTools\(\)\.slice\(\)/, "Native coverage must reconcile Camera Studio from the canonical runtime registry.");
 assert.ok(androidCoverage.split(/\r?\n/).includes("camera-studio"), "Android native tool coverage includes Camera Studio");
 assert.ok(iosCoverage.split(/\r?\n/).includes("camera-studio"), "iOS native tool coverage includes Camera Studio");
 assert.ok(inventory.runtimeExtensionIds.includes("camera-studio"), "native runtime inventory includes Camera Studio");

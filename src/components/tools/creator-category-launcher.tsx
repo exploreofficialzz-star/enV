@@ -29,7 +29,7 @@ function familyFor(tool: ToolMeta) {
   return "other";
 }
 
-export function CreatorCategoryLauncher({ tools }: { tools: ToolMeta[] }) {
+export function CreatorCategoryLauncher({ tools, description, blurb }: { tools: ToolMeta[]; description: string; blurb?: string }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<(typeof FILTERS)[number][1]>("all");
   const results = useMemo(() => {
@@ -49,6 +49,11 @@ export function CreatorCategoryLauncher({ tools }: { tools: ToolMeta[] }) {
         <h1>Creators &amp; music</h1>
         <span className="env-creator-launcher__count">{results.length}</span>
       </header>
+
+      <section className="env-creator-launcher__intro" aria-label="About this category">
+        <p>{description}</p>
+        {blurb ? <p className="env-creator-launcher__blurb">{blurb}</p> : null}
+      </section>
 
       <label className="env-creator-launcher__search">
         <Search aria-hidden="true" />

@@ -7,19 +7,57 @@ import { applyGenericWorkflowPolicy } from "../src/lib/generic-workflow-policy.m
 
 const root = new URL("../", import.meta.url);
 const catalogSource = readFileSync(new URL("../src/data/catalog.ts", import.meta.url), "utf8");
-const [{ tools }, { CATEGORIES: categories }, { DATETIME_TOOL_EXTENSIONS }] = await Promise.all([
+const [{ tools }, { CATEGORIES: categories }, { DATETIME_TOOL_EXTENSIONS }, { getAllTools }] = await Promise.all([
   import("../src/data/catalog.ts"),
   import("../src/data/categories.ts"),
   import("../src/lib/datetime/catalog-tools.ts"),
+  import("../src/lib/registry.ts"),
 ]);
-// Import the public runtime catalog rather than parsing only catalogJson. Platform-owned
-// runtime extensions are validated below but are not duplicated into the generated base export.
+// The native engine inventory and manifest validation must reconcile every Web runtime
+// identity, including tools that the native products expose through dedicated local screens.
+// The shipped native catalog remains separately assembled below with its intentional extensions.
+const canonicalRuntimeTools = getAllTools();
 
 const publishedCatalogTools = applyGenericWorkflowPolicy(tools);
+const canonicalRuntimeById = new Map(canonicalRuntimeTools.map((tool) => [tool.id, tool]));
 const refinedCatalogTools = publishedCatalogTools.map((tool) => {
+  // The browser registry owns this stable ID's canonical presentation and operation.
+  // Keep Android/iOS catalogue exports aligned even when the checked-in generated
+  // source catalogue still contains the legacy JSON-to-CSV presentation.
+  if (tool.id === "css-minifier-advanced") {
+    const runtimeTool = canonicalRuntimeById.get(tool.id);
+    if (!runtimeTool) throw new Error("Canonical runtime record is missing for css-minifier-advanced.");
+    return {
+      ...tool,
+      name: runtimeTool.name,
+      description: runtimeTool.description,
+      category: runtimeTool.category,
+      slug: runtimeTool.slug,
+      keywords: runtimeTool.keywords,
+      tags: runtimeTool.tags,
+      engine: runtimeTool.engine,
+      clientSide: runtimeTool.clientSide,
+      requiresBackend: runtimeTool.requiresBackend,
+      requiresAuth: runtimeTool.requiresAuth,
+      status: runtimeTool.status,
+      related: runtimeTool.related,
+    };
+  }
   const description = refineGeneratedToolDescription(tool);
   return description === tool.description ? tool : { ...tool, description };
 });
+
+const exportedCssMinifier = refinedCatalogTools.find((tool) => tool.id === "css-minifier-advanced");
+if (
+  !exportedCssMinifier ||
+  exportedCssMinifier.name !== "Advanced CSS Minifier" ||
+  exportedCssMinifier.category !== "developer" ||
+  exportedCssMinifier.slug !== "css-minifier-advanced" ||
+  exportedCssMinifier.engine?.type !== "text" ||
+  exportedCssMinifier.engine?.op !== "css-minify"
+) {
+  throw new Error("Shared native catalogue must export css-minifier-advanced as the Advanced CSS Minifier CSS operation.");
+}
 
 // A book is a local-only native/web tool; keep this extension exported to every platform.
 const runtimeCatalogExtensions = [
@@ -134,7 +172,9 @@ const active = exportedTools.filter((tool) => tool.status === "active" || tool.s
 const planned = exportedTools.length - active;
 const catalogVersion = createHash("sha256").update(catalogSource).digest("hex").slice(0, 12);
 const runtimeInventoryVersion = createHash("sha256")
-  .update(catalogSource + JSON.stringify(runtimeCatalogExtensions.map(({ platformRuntimeExtension, ...tool }) => tool)))
+  .update(catalogSource + JSON.stringify(canonicalRuntimeTools.map((tool) => ({
+    id: tool.id, name: tool.name, status: tool.status, category: tool.category, engine: tool.engine,
+  }))))
   .digest("hex").slice(0, 12);
 const readImplementedIds = (...relativePaths) => {
   const paths = relativePaths.flatMap((relativePath) => {
@@ -163,7 +203,7 @@ const iosToolIds = readImplementedIds(
   "apps/ios/native-tool-coverage.txt",
   "apps/ios/native-family-coverage",
 );
-const toolsById = new Map(expandedTools.map((tool) => [tool.id, tool]));
+const toolsById = new Map(canonicalRuntimeTools.map((tool) => [tool.id, tool]));
 for (const [platform, ids] of [["Android", androidToolIds], ["iOS", iosToolIds]]) {
   const invalid = [...ids].filter((id) => !toolsById.has(id) || toolsById.get(id).status === "planned");
   if (invalid.length) {
@@ -181,7 +221,7 @@ const output = new URL("../apps/shared/catalog.json", import.meta.url);
 mkdirSync(dirname(fileURLToPath(output)), { recursive: true });
 writeFileSync(output, `${JSON.stringify(payload)}\n`);
 const familyMap = new Map();
-for (const tool of expandedTools) {
+for (const tool of canonicalRuntimeTools) {
   const family = tool.engine.type;
   const entry = familyMap.get(family) ?? {
     family,
@@ -202,8 +242,8 @@ for (const tool of expandedTools) {
 const inventory = {
   catalogVersion: runtimeInventoryVersion,
   baseCatalogVersion: catalogVersion,
-  runtimeExtensionIds: runtimeCatalogExtensions.filter((extension) => extension.platformRuntimeExtension === true && !tools.some((tool) => tool.id === extension.id)).map((extension) => extension.id),
-  source: "src/data/catalog.ts",
+  runtimeExtensionIds: canonicalRuntimeTools.filter((tool) => !tools.some((baseTool) => baseTool.id === tool.id)).map((tool) => tool.id),
+  source: "src/lib/registry.ts (generated base catalogue plus runtime extensions)",
   platforms: { android: "Kotlin", ios: "Swift" },
   families: [...familyMap.values()]
     .sort((left, right) => left.family.localeCompare(right.family))
@@ -214,9 +254,9 @@ const inventory = {
   androidToolIds: [...androidToolIds].sort(),
   iosToolIds: [...iosToolIds].sort(),
   summary: {
-    totalTools: expandedTools.length,
-    activeTools: expandedTools.filter((tool) => tool.status === "active" || tool.status === "beta").length,
-    plannedTools: expandedTools.filter((tool) => tool.status !== "active" && tool.status !== "beta").length,
+    totalTools: canonicalRuntimeTools.length,
+    activeTools: canonicalRuntimeTools.filter((tool) => tool.status === "active" || tool.status === "beta").length,
+    plannedTools: canonicalRuntimeTools.filter((tool) => tool.status !== "active" && tool.status !== "beta").length,
     engineFamilies: familyMap.size,
     androidImplemented: androidToolIds.size,
     iosImplemented: iosToolIds.size,

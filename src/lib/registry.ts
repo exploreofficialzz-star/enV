@@ -269,7 +269,7 @@ const fileWorkspaceTools: ToolMeta[] = [
   },
 ];
 
-const allTools: ToolMeta[] = [
+const catalogRuntimeTools: ToolMeta[] = [
   // The browser has real dispatchers for both families. The generated catalogue is
   // shared with native clients, so expose these web-ready records as active here
   // without changing the independent Android/iOS catalogues in this browser task.
@@ -279,6 +279,21 @@ const allTools: ToolMeta[] = [
       && presentedTool.status === "planned"
       ? { ...presentedTool, status: "active" }
       : presentedTool;
+    if (webTool.id === "css-minifier-advanced") {
+      return {
+        ...webTool,
+        name: "Advanced CSS Minifier",
+        description: "Minify CSS by removing comments and unnecessary whitespace while preserving CSS declarations and selector structure.",
+        category: "developer" as const,
+        slug: "css-minifier-advanced",
+        keywords: ["css", "minifier", "advanced", "stylesheet", "compress", "minify", "whitespace", "comments"],
+        tags: ["css", "minifier", "advanced", "stylesheet", "local"],
+        engine: { type: "text" as const, op: "css-minify" },
+        clientSide: true,
+        requiresBackend: false,
+        requiresAuth: false,
+      };
+    }
     if (webTool.id === aBookTool.id) return aBookTool;
     if (webTool.id === songMetadataAnalyzerTool.id) return songMetadataAnalyzerTool;
     if (webTool.id === "qr-payload-inspector") {
@@ -306,12 +321,25 @@ const allTools: ToolMeta[] = [
   ...fileWorkspaceTools.filter((tool) => !catalogTools.some((catalogTool) => catalogTool.id === tool.id)),
 ];
 
+// Create the Accessibility Studio records from the unchanged source catalogue, then
+// use those records as the canonical runtime entries for their stable IDs. This
+// matters for contrast-checker, whose legacy source record is in Design even though
+// its single canonical discovery destination is the Accessibility Studio.
+const accessibilityStudios = makeAccessibilityStudioTools(catalogRuntimeTools);
+const accessibilityStudioById = new Map(accessibilityStudios.map((tool) => [tool.id, tool] as const));
+const allTools: ToolMeta[] = catalogRuntimeTools.map((tool) => accessibilityStudioById.get(tool.id) ?? tool);
 const byId = new Map(allTools.map((t) => [t.id, t]));
-const accessibilityStudios = makeAccessibilityStudioTools(allTools);
 const developerStudios = makeDeveloperStudioTools(allTools);
 const virtualStudios = [...accessibilityStudios, ...developerStudios];
+// Keep every former category/slug URL as an alias to the one canonical Studio
+// record. Aliases are routes, not additional tool identities or search records.
+const legacyAccessibilityRoutes = catalogRuntimeTools.filter((tool) => accessibilityStudioById.has(tool.id));
+const legacyAccessibilityCategoryTools = legacyAccessibilityRoutes.filter(
+  (tool) => accessibilityStudioById.get(tool.id)?.category !== tool.category,
+);
 const byPath = new Map<string, ToolMeta>([
   ...allTools.map((t) => [`${t.category}/${t.slug}`, t] as const),
+  ...legacyAccessibilityRoutes.map((tool) => [`${tool.category}/${tool.slug}`, accessibilityStudioById.get(tool.id)!] as const),
   ...virtualStudios.map((t) => [`${t.category}/${t.slug}`, t] as const),
 ]);
 const byVirtualId = new Map(virtualStudios.map((tool) => [tool.id, tool] as const));
@@ -362,7 +390,10 @@ export function getToolsByCategory(category: CategoryId): ToolMeta[] {
     ? accessibilityStudios
     : category === "developer"
       ? developerStudios
-      : allTools.filter((t) => t.category === category && isDiscoverable(t));
+      : [
+          ...allTools.filter((t) => t.category === category && isDiscoverable(t)),
+          ...legacyAccessibilityCategoryTools.filter((t) => t.category === category && isDiscoverable(t)),
+        ];
   return items.slice().sort((a, b) => {
     // Keep the thirteen workspace entry points first. The original long-tail list
     // follows alphabetically, so every existing catalog URL remains discoverable.

@@ -226,6 +226,12 @@ async function checkRenderedRoute(path, schema) {
   const canonical = canonicalTags[0] ? attribute(canonicalTags[0], "href") : "";
   const ogTitle = metaContent(head, "property", "og:title");
   const ogUrl = metaContent(head, "property", "og:url");
+  const ogImage = metaContent(head, "property", "og:image");
+  const ogImageAlt = metaContent(head, "property", "og:image:alt");
+  const ogImageWidth = metaContent(head, "property", "og:image:width");
+  const ogImageHeight = metaContent(head, "property", "og:image:height");
+  const twitterImage = metaContent(head, "name", "twitter:image");
+  const twitterImageAlt = metaContent(head, "name", "twitter:image:alt");
   const twitterTitle = metaContent(head, "name", "twitter:title");
   const jsonLd = [...head.matchAll(/<script\b[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)]
     .map((match) => match[1]);
@@ -242,15 +248,27 @@ async function checkRenderedRoute(path, schema) {
   assert(ogTitle === title, path + " Open Graph title does not match its page title");
   assert(ogUrl === canonical, path + " Open Graph URL does not match its canonical URL");
   assert(twitterTitle === title, path + " Twitter title does not match its page title");
+  assert(ogImage.startsWith(ORIGIN + "/og/cards/"), path + " social image must use a generated canonical-host card: " + ogImage);
+  assert(twitterImage === ogImage, path + " Twitter image does not match the Open Graph image");
+  assert(Boolean(ogImageAlt) && ogImageAlt.length >= 12, path + " is missing descriptive Open Graph image alternative text");
+  assert(twitterImageAlt === ogImageAlt, path + " Twitter image alternative text does not match Open Graph");
+  assert(ogImageWidth === "1200" && ogImageHeight === "630", path + " social image dimensions must be 1200 by 630");
+  const imageResponse = await get(ogImage, path + " social image");
+  const imageBytes = Buffer.from(await imageResponse.arrayBuffer());
+  const imageContentType = imageResponse.headers.get("content-type")?.toLowerCase() ?? "";
+  assert(imageResponse.status === 200, path + " social image returned HTTP " + imageResponse.status);
+  assert(imageContentType.includes("image/png"), path + " social image has unexpected content type " + imageContentType);
+  assert(imageBytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])), path + " social image is not a valid PNG");
+  assert(imageBytes.readUInt32BE(16) === 1200 && imageBytes.readUInt32BE(20) === 630, path + " social image bytes do not match the declared 1200x630 dimensions");
   assert(jsonLd.some((json) => json.includes('"@type":"' + schema + '"') || json.includes('"@type": "' + schema + '"')),
     path + " is missing JSON-LD schema type " + schema);
-  if (path === "/tools/productivity/zip-any-file") {
+  if (path === "/tools/files/zip-any-file") {
     assert(html.includes("Zip any file"), "Zip any file route does not render its tool name");
     assert(html.includes("Compress") && html.includes("Extract"), "Zip any file route is missing compression or extraction controls");
     assert(html.includes("Private and on-device"), "Zip any file route is missing its local privacy notice");
     assert(!html.includes('id="under-production-title"') && !html.includes('id="under-production-direct-title"'), "Zip any file is incorrectly blocked by the production notice");
   }
-  checked.push({ path, status: response.status, title, canonical, schema, buildSha });
+  checked.push({ path, status: response.status, title, canonical, schema, buildSha, socialImage: ogImage, socialImageBytes: imageBytes.length });
 }
 
 async function main() {
@@ -262,10 +280,14 @@ async function main() {
       ["/", "WebSite"],
       ["/tools", "CollectionPage"],
       ["/tools/calculators", "CollectionPage"],
+      ["/tools/creators", "CollectionPage"],
+      ["/tools/celebrations", "CollectionPage"],
+      ["/tools/celebrations/birthday-page-generator", "SoftwareApplication"],
+      ["/blog/tool-birthday-page-generator", "TechArticle"],
       ["/tools/developer/json-studio", "SoftwareApplication"],
       ["/blog", "CollectionPage"],
       ["/blog/tool-json-studio", "TechArticle"],
-      ["/tools/productivity/zip-any-file", "SoftwareApplication"],
+      ["/tools/files/zip-any-file", "SoftwareApplication"],
     ]) await checkRenderedRoute(path, schema);
   } catch (error) {
     failures.push(String(error));

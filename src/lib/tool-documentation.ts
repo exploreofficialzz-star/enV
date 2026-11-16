@@ -507,6 +507,70 @@ function toolSpecificGuidanceBase(tool: ToolMeta): ToolSpecificGuidance {
   const name = tool.name.toLowerCase();
   const category = tool.category;
 
+  if (category === "celebrations" && id.endsWith("-page-generator")) {
+    return {
+      source: "operation-specific",
+      overview: "This Celebration Page Generator creates a standalone HTML programme page for the selected occasion. It combines the title, honoree, host, message, optional event date and venue, details and a line-by-line schedule into a themed page with a responsive layout. It does not host the page or publish it to a public URL.",
+      example: "Choose the occasion-specific Page Generator, enter the title and recipient, add the date, time zone and venue where relevant, then write the main message. Add one programme item per line when there is a schedule. Inspect the in-tool HTML preview on a narrow and wide screen, then download the HTML page or copy the text version.",
+      validation: "The title is limited to 120 characters, honoree and host to 100 each, location to 180, and the main message and extra details to 3,000 each. The exported HTML escapes user-provided text. A downloaded HTML file is a local deliverable; hosting, a shareable public link, guest responses and calendar invitations are not provided by this generator.",
+    };
+  }
+  if (category === "celebrations" && id.endsWith("-interactive-card")) {
+    return {
+      source: "operation-specific",
+      overview: "This Interactive Celebration Card exports a themed greeting card with a front message and a second message panel that the recipient opens with an in-page button. It is a self-contained HTML card, not a hosted card or a messaging service.",
+      example: "Enter the card title, the person being celebrated and your greeting, then write the text that should appear inside the card. Choose one of the available visual themes, use the preview to test the Open your card button, and download the HTML file before sharing it through a channel you control.",
+      validation: "The reveal button only changes the hidden message panel in the exported page. The main message is limited to 3,000 characters. User text is HTML-escaped before it is inserted into the document. The export does not send a message, track whether it was opened, host the card online or collect a response.",
+    };
+  }
+  if (category === "celebrations" && id.endsWith("-invitation-generator")) {
+    return {
+      source: "operation-specific",
+      overview: "This Invitation Generator prepares a themed HTML invitation and a copyable text version. The invitation can include the event date and local time, venue, host, honoree, RSVP contact or link, reply deadline and dress code. It prepares the invitation only; it does not deliver invitations or manage guest responses.",
+      example: "Enter the event details, select the correct IANA time zone for the date and time, then add either a usable RSVP contact or a complete HTTP/HTTPS RSVP link. Set a reply-by date and check the rendered invitation and destination link before downloading the HTML or copying its text.",
+      validation: "The event date/time must be a real local time in the chosen IANA time zone; clock-change times that do not exist or occur twice are rejected. An RSVP link must use HTTP or HTTPS and cannot include embedded credentials. At least an RSVP link or contact method and a reply-by value are required for the invitation workflow. The tool does not send email/SMS, verify that a link is still live, track responses or maintain a guest list.",
+    };
+  }
+  if (category === "celebrations" && id.endsWith("-countdown")) {
+    return {
+      source: "operation-specific",
+      overview: "This Celebration Countdown calculates the time remaining until the event date and time using the selected time zone. The tool updates the days, hours, minutes and seconds while the countdown screen is open, and the exported HTML page contains its own local countdown script.",
+      example: "Enter the occasion title, event date and local time, then confirm the IANA time-zone value. Compare the displayed countdown with a trusted clock in the same zone. Preview and download the HTML when you want a countdown page that can be opened separately.",
+      validation: "A valid date, time and IANA time zone are required. Nonexistent or repeated local times around daylight-saving transitions are rejected instead of being guessed. The countdown reaches zero when the target instant passes; it does not send reminders, run in the background after the page is closed, create calendar events or notify guests.",
+    };
+  }
+  if (category === "celebrations" && id.endsWith("-memory-page")) {
+    return {
+      source: "operation-specific",
+      overview: "This Memory Page creates a themed, standalone HTML page for written memories and an optional photo gallery. It embeds supported photos into the exported document so they can appear without a separate remote image host.",
+      example: "Write the title and memory note, select up to eight JPG, PNG, WebP or AVIF images, and inspect the gallery in the preview. Check the images and text before downloading the HTML page or copying the text-only version.",
+      validation: "The photo picker accepts JPG, PNG, WebP and AVIF files, with a 2 MB per-image limit and an 8 MB total selection limit. The export includes at most eight safe image data URLs; SVG and other formats are not accepted. Keep a separate copy of the original photos because the HTML export is a new file, not a backup or photo-library upload.",
+    };
+  }
+  if (category === "celebrations" && id.endsWith("-reveal-page")) {
+    return {
+      source: "operation-specific",
+      overview: "This Reveal Page builds a themed HTML page where a visitor selects Reveal the message to display a hidden note. It is suitable for a planned announcement, personal message or occasion reveal; it does not deliver the reveal at a scheduled time or notify a recipient.",
+      example: "Add a title and introductory message, write the exact content to keep hidden, and use the preview to press Reveal the message. Download the HTML page only after confirming that the hidden text and opening text are correct.",
+      validation: "The revealed content is included in the exported HTML and becomes visible when the page button is activated; it is not encrypted or access-controlled. User-provided text is escaped before HTML generation. Do not put passwords, private credentials or information that must remain secret into a reveal page.",
+    };
+  }
+  if (category === "celebrations" && id.endsWith("-quiz-generator")) {
+    return {
+      source: "operation-specific",
+      overview: "This Celebration Quiz Generator creates a small multiple-choice quiz in a standalone HTML page. It uses the question and answer choices you supply, marks one exact choice as correct, and gives immediate Correct or Try again feedback when a visitor selects an answer.",
+      example: "Enter a title and short introduction, write one question, then add between two and six choices with one choice per line. Enter the correct answer so it matches one of those choices, and test both a correct and incorrect selection in the preview before exporting the HTML.",
+      validation: "The quiz requires a non-empty question, two to six non-empty choices and a correct answer that matches one choice (case-insensitive). The generated page grades only that single question locally; it does not store scores, identify participants, collect submissions, randomize questions or provide a multi-question quiz engine.",
+    };
+  }
+  if (category === "celebrations" && id.endsWith("-surprise-page")) {
+    return {
+      source: "operation-specific",
+      overview: "This Surprise Page creates a themed HTML page with an introductory message and a button that opens the surprise content. The exported page contains the surprise text and reveals it when the visitor activates the button; it is not a scheduled delivery or private messaging service.",
+      example: "Enter the occasion title, a short introduction and the exact surprise message. Test Open your surprise in the preview, confirm that the correct text appears, and download the HTML page for sharing through a channel you choose.",
+      validation: "A missing reveal message is reported as a quality check. The surprise text is present in the generated HTML even while its panel is hidden, so the file should not be treated as confidential or encrypted. Review the final exported page before sending it to the intended recipient.",
+    };
+  }
   if (category === "creators" && id.endsWith("-content-calendar")) {
     return {
       source: "operation-specific",
@@ -684,6 +748,102 @@ function toolSpecificGuidanceBase(tool: ToolMeta): ToolSpecificGuidance {
     };
   }
 
+  if (id === "qr-payload-inspector" || /qr & barcode reader/.test(name)) {
+    return {
+      source: "operation-specific",
+      overview: "The QR & Barcode Reader decodes QR codes and supported 1D/2D barcode formats from a live camera stream or an image you select. Decoding runs in the browser on this device; it does not submit the decoded value to a remote recognition service.",
+      example: "Choose Start camera on a secure page, grant camera permission, and hold a complete code inside the preview. To scan a still image instead, upload an image with the full symbol visible, then inspect the decoded format and payload before opening a link or copying the result.",
+      validation: "The image-upload path rejects non-image files and images larger than 15 MB. Camera access requires HTTPS or localhost and browser permission. A camera may not expose torch or zoom controls, and a blurred, cropped or low-contrast symbol may not decode. Check the actual URL, Wi-Fi, contact or other payload before acting on it.",
+    };
+  }
+  if (id === "zip-any-file") {
+    return {
+      source: "operation-specific",
+      overview: "Zip any file has two separate workflows: create a ZIP from selected files or folders, and extract a ZIP into a destination folder. It streams archive data when the browser exposes file-system save and directory pickers, and otherwise uses bounded browser-memory downloads.",
+      example: "For compression, add the files or folder, choose a ZIP name and compression level, then create the archive and verify the downloaded or saved ZIP. For extraction, select the archive, choose a destination folder when the browser offers one, and check the resulting file paths and names.",
+      validation: "The archive path validator rejects absolute paths, drive-prefixed paths, parent-directory traversal and unsafe names. Extraction is limited to 100,000 entries and 100 GB of declared expanded data, and blocks very high compression ratios for entries of at least 1 GB. Without direct file saving, browser buffering is limited to 256 MB; without a directory picker, browser extraction is limited to one file within that buffer. These are browser limits, not universal ZIP-format limits.",
+    };
+  }
+  if (id === "file-to-txt") {
+    return {
+      source: "operation-specific",
+      overview: "File to TXT Converter lets you enter plain text or extract readable text locally from supported text files, DOCX documents and selectable-text PDFs, then download a UTF-8 TXT file. The PDF extraction path does not perform OCR.",
+      example: "Type or paste text into Enter plain text and choose Convert, or select a supported text, Markdown, CSV, TSV, JSON, XML, YAML, HTML, DOCX or PDF file. Review the extracted preview, then download the TXT file. Use a non-sensitive sample first when the source format is unfamiliar.",
+      validation: "Selected files are limited to 200 MB and extracted TXT output to 32 MB. HTML extraction removes script, style, noscript and template elements before collecting visible body text. DOCX and PDF extraction run locally; PDFs must contain selectable text, so scanned pages are not OCRed. Invalid UTF-8, empty readable content, unsupported formats and size-limit violations return an error. The preview is limited to the first 4,000 characters; download the TXT file for the complete result.",
+    };
+  }
+  if (id === "file-organizer") {
+    return {
+      source: "operation-specific",
+      overview: "File Organizer classifies the selected file set into folders such as Images, Audio, Video, Documents, Archives, Code and Other, based on each filename extension. It creates an organized ZIP copy; it does not move, rename or delete the originals on the device.",
+      example: "Select several files or a folder, review the selected paths and sizes, then choose Organize copies into ZIP. Open the downloaded archive to confirm the generated type folders and file names before using it as an organized copy.",
+      validation: "Grouping is based on the extension list in the current engine, not file-content inspection. Files with unknown extensions go to Other. Unsafe filename characters are replaced, and duplicate output paths receive a numbered name. The originals remain unchanged; the result is an exported ZIP rather than a reorganization of the source folder.",
+    };
+  }
+  if (id === "batch-file-renamer") {
+    return {
+      source: "operation-specific",
+      overview: "Batch File Renamer previews a numbered name for each selected file using a prefix, suffix, literal find-and-replace text and a starting number. It exports the renamed copies in a ZIP instead of modifying the original files in place.",
+      example: "Select a group of files, set a prefix or suffix, enter exact text to find and its replacement, then set the first sequence number. Review the before-and-after list, resolve any duplicate output names, and export the renamed ZIP.",
+      validation: "The replacement is a literal string operation on the filename stem, not a regular expression. The current preview adds a three-digit sequence before each resulting name. The export is disabled when two planned output names collide. Invalid filename characters and trailing dots or spaces are sanitized, and the original selected files are not changed.",
+    };
+  }
+  if (id === "duplicate-file-finder") {
+    return {
+      source: "operation-specific",
+      overview: "Duplicate File Finder first groups selected files by byte size, then calculates SHA-256 digests for the same-size candidates. It reports a duplicate only when the content digests match; matching filenames alone are not considered proof.",
+      example: "Select at least two files or a folder, run Find identical files, and inspect each reported group with its relative path, byte size and SHA-256 digest. Confirm that the files are safe to remove using your own backup and retention rules; the tool does not delete them.",
+      validation: "Each candidate file must be no larger than 64 MB for browser SHA-256 verification. Files above that per-file limit cause verification to stop with an explicit error rather than being labelled duplicates. Different-size files are excluded before hashing, which is safe for byte-identical duplicates because identical files have the same size.",
+    };
+  }
+  if (id === "folder-size-analyzer") {
+    return {
+      source: "operation-specific",
+      overview: "Folder Size Analyzer reads a selected file set and reports its file count, combined byte size, extension/type breakdown and the ten largest files. It analyses only the folder or files you explicitly select; it is not a background scan of the entire device storage.",
+      example: "Choose a folder when the browser supports a directory picker, or select a folder through the file input fallback. Run Analyze storage, compare the per-type totals, and use the largest-file list to identify which selected items account for the most space.",
+      validation: "The report uses the browser-provided File objects and their sizes. It does not infer compressed disk usage, hidden files, system folders or data outside the selected set. The tool only reads the selected files and does not delete or move them.",
+    };
+  }
+  if (id === "file-search") {
+    return {
+      source: "operation-specific",
+      overview: "File Search looks for a case-insensitive phrase in selected filenames and in the contents of supported text-like files. Text hits include the relative file path and one-based line number so you can locate the matching line in the original file.",
+      example: "Select files or a folder, enter a distinctive non-sensitive word or phrase, and run Search. Check whether each result is a filename match or a path-and-line match, then open the source file to review the full surrounding context.",
+      validation: "Content search is limited to recognized text-like extensions or files whose MIME type starts with text/. Files over 8 MB are skipped for content scanning, although their filenames can still match. Each displayed matching line is trimmed to 240 characters; the report is a locator, not a full-text export.",
+    };
+  }
+  if (id === "file-compare") {
+    return {
+      source: "operation-specific",
+      overview: "File & Folder Compare compares two selected file sets by relative path. It reports paths present only on one side as added or removed, identifies different-size files as changed, and uses SHA-256 to distinguish same-size files with identical or different content.",
+      example: "Choose the first folder and the second folder, check that their relative paths represent the two versions you intend to compare, then select Compare sets. Review the added, removed, changed, same and unverified rows before deciding which version should be retained.",
+      validation: "Files with the same relative path but different sizes are classified as changed without hashing. Same-size files are compared by SHA-256 only up to 64 MB per file; larger same-size files are reported as unverified, not as identical. The comparison is read-only and does not synchronize or overwrite either folder.",
+    };
+  }
+  if (id === "a-book") {
+    return {
+      source: "operation-specific",
+      overview: "A book is a private on-device notes and document workspace. It stores notes, attachments and revision history in a browser IndexedDB database, with a separate local database name for the guest library and each signed-in profile. The tool also provides local PDF reading and page operations.",
+      example: "Create a notebook note, add tags and attachments, then reopen the tool to confirm the local library persists. Use the archive export or import controls when you need to move a library deliberately, and test PDF extraction or page operations with a non-sensitive sample document first.",
+      validation: "The local database requires IndexedDB support and available device storage. The source enforces limits on note text, local records and attachments, so an import can be rejected when it exceeds a quota. Clearing browser site data, using a different browser profile or changing devices can make the local library unavailable; the local database is not a cloud-sync guarantee.",
+    };
+  }
+  if (id === "song-metadata-analyzer" || id === "audio-analyze-studio" || /ai music data sandbox/.test(name)) {
+    return {
+      source: "operation-specific",
+      overview: "AI Music Data Sandbox is a local music-record workspace for organizing audio files with human-reviewed genre, language, mood, vocal, instrument, license and descriptive tags. Its audio-analysis step uses browser audio decoding and a worker to estimate tempo and key and report signal measurements; the inspected implementation does not call a hosted AI model for this analysis.",
+      example: "Create a collection, import a ZIP containing supported audio records and any paired .lyrics.txt or .tags.json files, then review each track and its license status. Run analysis on a short, non-sensitive track, compare measured signal information with your own listening, and edit or confirm tags before exporting a master or training package.",
+      validation: "The current sandbox limits an import batch to 50 songs, 600 ZIP entries, 80 MB per package and 160 MB expanded content; individual audio files are limited to 40 MB. Local audio analysis needs at least three seconds of readable audio, samples up to 45 seconds, and can reject a decode budget above 80 MB. Estimated tempo or key must not overwrite reviewed manual values, and an analysis marked unavailable is not evidence that a musical property is absent.",
+    };
+  }
+  if (id === "camera-studio") {
+    return {
+      source: "operation-specific",
+      overview: "Camera Studio is a browser capture workspace for taking photos and recording video from the device camera. Its controls include front/rear camera selection, supported capture quality and frame-rate settings, timer and grid options, and hardware-dependent torch, zoom and exposure controls; dual-camera mode is available only when the device exposes a usable second camera.",
+      example: "Open the tool in a secure browser context, grant camera permission, choose the front or rear camera, and take a test photo before recording. Check the captured item in the in-tool gallery and save or recover the recording using the controls the current browser exposes.",
+      validation: "Camera and microphone access require browser permission and a secure context such as HTTPS. Hardware controls are conditional on the camera capabilities reported by the device, and supported video MIME types vary by browser. If another app holds the camera, permissions are denied or the device cannot provide the requested settings, follow the displayed error instead of assuming a capture was saved.",
+    };
+  }
   const engine = tool.engine;
   if (engine.type === "calculator") {
     return {

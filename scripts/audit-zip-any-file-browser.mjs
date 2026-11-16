@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { chromium } from "playwright";
 import { BlobReader, TextWriter, ZipReader } from "@zip.js/zip.js";
+import { writeToolAuditReport } from "./write-tool-audit-report.mjs";
 
 const baseUrl = (process.env.EN_V_BROWSER_AUDIT_BASE_URL || "http://127.0.0.1:8080").replace(/\/$/, "");
 const browser = await chromium.launch({
@@ -98,6 +99,16 @@ try {
   await page.getByRole("status").filter({ hasText: "Extraction completed." }).waitFor();
 
   assert.deepEqual(localWriteRequests, [], "Compression and extraction do not send files to application APIs");
+  writeToolAuditReport({
+    auditId: "zip-any-file-browser",
+    toolResults: [{
+      toolId: "zip-any-file",
+      status: "passed",
+      checks: ["routeRendering", "interactionExecution", "outputValidation", "runtimeErrorCheck", "fileImportExport"],
+      notes: "Verified multi-file and single-file local ZIP creation, CRC-checked reads, extraction round-trip, byte preservation and zero application API write requests.",
+    }],
+    reportPath: process.argv.find((value) => value.startsWith("--report="))?.slice("--report=".length),
+  });
   console.log(JSON.stringify({
     status: "passed",
     route: baseUrl + "/tools/files/zip-any-file",
