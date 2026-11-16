@@ -2413,6 +2413,7 @@ private struct NativeWalletSparklineView: View {
 
 private struct NativeWalletDashboardView: View {
     @Environment(\.openURL) private var openURL
+    @EnvironmentObject private var informationRouter: NativeInformationRouter
     @State private var paired = OfflineWalletNativeAPI.isPaired
     @State private var dashboard: [String: Any]?
     @State private var pairingCode = ""
@@ -2450,6 +2451,14 @@ private struct NativeWalletDashboardView: View {
             rewardMetricsSection
             referralCard
             recentTransactionsSection
+            Button {
+                informationRouter.open("history")
+            } label: {
+                Label("View full transaction history", systemImage: "clock.arrow.circlepath")
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.bordered)
             connectionSection
             if loading { Text("Loading wallet…").font(.footnote).foregroundStyle(Color.envMuted) }
             if !message.isEmpty && (showConnection || dashboard != nil) {
