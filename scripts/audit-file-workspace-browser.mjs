@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { chromium } from "playwright";
 import { BlobReader, TextWriter, ZipReader } from "@zip.js/zip.js";
+import { writeToolAuditReport } from "./write-tool-audit-report.mjs";
 
 const baseUrl = (process.env.EN_V_BROWSER_AUDIT_BASE_URL || "http://127.0.0.1:8080").replace(/\/$/, "");
 const browser = await chromium.launch({
@@ -212,6 +213,19 @@ try {
   assert.match(comparison, /Case\.txt[\s\S]*added/);
 
   assert.deepEqual(applicationWrites, [], "File workspace operations do not send file content or writes to application APIs");
+  const toolResults = [
+    { toolId: "file-organizer", status: "passed", checks: ["routeRendering", "interactionExecution", "outputValidation", "runtimeErrorCheck", "fileImportExport"], notes: "Organized two locally selected files into a ZIP and verified their folders and original bytes." },
+    { toolId: "batch-file-renamer", status: "passed", checks: ["routeRendering", "interactionExecution", "outputValidation", "runtimeErrorCheck", "fileImportExport"], notes: "Renamed a two-file batch with prefix and suffix, exported a ZIP and verified deterministic names and preserved bytes." },
+    { toolId: "duplicate-file-finder", status: "passed", checks: ["routeRendering", "interactionExecution", "outputValidation", "runtimeErrorCheck"], notes: "Selected files, grouped identical content using SHA-256 and excluded a different file." },
+    { toolId: "folder-size-analyzer", status: "passed", checks: ["routeRendering", "interactionExecution", "outputValidation", "runtimeErrorCheck"], notes: "Selected a local folder containing two files and verified scanned count and type-grouped output." },
+    { toolId: "file-search", status: "passed", checks: ["routeRendering", "interactionExecution", "outputValidation", "runtimeErrorCheck"], notes: "Selected a local folder and verified an exact phrase match with file and line reference." },
+    { toolId: "file-compare", status: "passed", checks: ["routeRendering", "interactionExecution", "outputValidation", "runtimeErrorCheck"], notes: "Compared local folders and verified unchanged, changed, added, removed and case-distinct paths." },
+  ];
+  writeToolAuditReport({
+    auditId: "file-workspace-six-browser",
+    toolResults,
+    reportPath: process.argv.find((value) => value.startsWith("--report="))?.slice("--report=".length),
+  });
   console.log(JSON.stringify({
     status: "passed",
     checks: [

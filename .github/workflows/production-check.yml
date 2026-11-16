@@ -126,10 +126,10 @@ jobs:
         run: node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/documents/local-document.test.ts
 
       - name: Verify Zip any file compression and extraction in the browser
-        run: npm run audit:zip-any-file:browser
+        run: npm run audit:zip-any-file:browser -- --report=artifacts/tool-functional-audit/zip-any-file.json
 
       - name: Verify local File workspace workflows in the browser
-        run: npm run audit:file-workspace:browser
+        run: npm run audit:file-workspace:browser -- --report=artifacts/tool-functional-audit/file-workspace.json
 
       - name: Verify all 93 Celebrations tools on a mobile browser
         run: npm run audit:celebrations:browser -- --report=artifacts/celebrations-browser-audit/report.json

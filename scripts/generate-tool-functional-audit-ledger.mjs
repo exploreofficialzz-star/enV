@@ -253,6 +253,108 @@ if (fs.existsSync(celebrationsReportPath)) {
   });
 }
 
+
+function ingestCommitBoundBrowserReport({ reportPath, auditId, expectedToolIds, step }) {
+  if (!fs.existsSync(reportPath)) {
+    if (process.env.GITHUB_ACTIONS === "true") {
+      invalidEvidence.push({ auditId, reason: "dynamic-browser-report-missing-in-github-actions", path: path.relative(root, reportPath) });
+    }
+    return;
+  }
+  try {
+    const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+    const expected = [...expectedToolIds].sort();
+    const results = report.toolResults ?? [];
+    const ids = results.map((item) => item.toolId);
+    const uniqueIds = new Set(ids);
+    const unknownIds = ids.filter((id) => !byId.has(id));
+    const expectedSet = new Set(expected);
+    const missingIds = expected.filter((id) => !uniqueIds.has(id));
+    const unexpectedIds = [...uniqueIds].filter((id) => !expectedSet.has(id));
+    const statusesValid = results.every((item) =>
+      item.status === "passed" || item.status === "blocked"
+    );
+    const checksValid = results.every((item) =>
+      Array.isArray(item.checks) &&
+      Array.isArray(item.blockedChecks) &&
+      [...item.checks, ...item.blockedChecks].every((check) => evidenceCheckNames.includes(check)) &&
+      (item.status !== "passed" || (item.checks.length > 0 && item.blockedChecks.length === 0)) &&
+      (item.status !== "blocked" || item.blockedChecks.length > 0)
+    );
+    const commitValid = typeof report.observedCommit === "string" && /^[a-f0-9]{40}$/i.test(report.observedCommit);
+    const runValid = Number.isSafeInteger(report.workflowRunId) && report.workflowRunId > 0;
+    const jobValid = typeof report.jobId === "string" && report.jobId.trim().length > 0;
+    if (
+      report.schemaVersion !== 1 ||
+      report.auditId !== auditId ||
+      ids.length !== expected.length ||
+      uniqueIds.size !== ids.length ||
+      unknownIds.length ||
+      missingIds.length ||
+      unexpectedIds.length ||
+      !statusesValid ||
+      !checksValid ||
+      !commitValid ||
+      !runValid ||
+      !jobValid
+    ) {
+      invalidEvidence.push({
+        auditId,
+        reason: "dynamic-browser-report-invalid-or-does-not-match-current-runtime",
+        expectedToolIds: expected,
+        reportedToolIds: ids,
+        duplicateIds: ids.filter((id, index) => ids.indexOf(id) !== index),
+        unknownIds,
+        missingIds,
+        unexpectedIds,
+        reportCommit: report.observedCommit ?? null,
+        currentCommit,
+        statusesValid,
+        checksValid,
+        commitValid,
+        runValid,
+        jobValid,
+      });
+      return;
+    }
+    for (const item of results) {
+      evidenceAudits.push({
+        id: auditId + "-" + item.toolId + "-" + item.status,
+        kind: "browser",
+        result: item.status === "passed" ? "passed" : "blocked",
+        checks: item.status === "passed" ? item.checks : item.blockedChecks,
+        notes: item.notes ?? "",
+        script: path.relative(root, reportPath),
+        workflow: "Production Check",
+        workflowRunId: report.workflowRunId,
+        jobId: report.jobId,
+        step,
+        toolIds: [item.toolId],
+        testedCommit: report.observedCommit,
+      });
+    }
+  } catch (error) {
+    invalidEvidence.push({
+      auditId,
+      reason: "dynamic-browser-report-invalid",
+      detail: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+ingestCommitBoundBrowserReport({
+  reportPath: path.join(root, "artifacts/tool-functional-audit/zip-any-file.json"),
+  auditId: "zip-any-file-browser",
+  expectedToolIds: ["zip-any-file"],
+  step: "Verify Zip any file compression and extraction in the browser",
+});
+ingestCommitBoundBrowserReport({
+  reportPath: path.join(root, "artifacts/tool-functional-audit/file-workspace.json"),
+  auditId: "file-workspace-six-browser",
+  expectedToolIds: ["file-organizer", "batch-file-renamer", "duplicate-file-finder", "folder-size-analyzer", "file-search", "file-compare"],
+  step: "Verify local File workspace workflows in the browser",
+});
+
 function appendEvidence(target, id, evidence) {
   target.set(id, [...(target.get(id) ?? []), evidence]);
 }
