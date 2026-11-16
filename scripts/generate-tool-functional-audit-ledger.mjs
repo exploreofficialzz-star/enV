@@ -254,7 +254,7 @@ if (fs.existsSync(celebrationsReportPath)) {
 }
 
 
-function ingestCommitBoundBrowserReport({ reportPath, auditId, expectedToolIds, step }) {
+function ingestCommitBoundBrowserReport({ reportPath, auditId, expectedToolIds, step, script }) {
   if (!fs.existsSync(reportPath)) {
     if (process.env.GITHUB_ACTIONS === "true") {
       invalidEvidence.push({ auditId, reason: "dynamic-browser-report-missing-in-github-actions", path: path.relative(root, reportPath) });
@@ -324,7 +324,7 @@ function ingestCommitBoundBrowserReport({ reportPath, auditId, expectedToolIds, 
         result: item.status === "passed" ? "passed" : "blocked",
         checks: item.status === "passed" ? item.checks : item.blockedChecks,
         notes: item.notes ?? "",
-        script: path.relative(root, reportPath),
+        script,
         workflow: "Production Check",
         workflowRunId: report.workflowRunId,
         jobId: report.jobId,
@@ -347,12 +347,14 @@ ingestCommitBoundBrowserReport({
   auditId: "zip-any-file-browser",
   expectedToolIds: ["zip-any-file"],
   step: "Verify Zip any file compression and extraction in the browser",
+  script: "scripts/audit-zip-any-file-browser.mjs",
 });
 ingestCommitBoundBrowserReport({
   reportPath: path.join(root, "artifacts/tool-functional-audit/file-workspace.json"),
   auditId: "file-workspace-six-browser",
   expectedToolIds: ["file-organizer", "batch-file-renamer", "duplicate-file-finder", "folder-size-analyzer", "file-search", "file-compare"],
   step: "Verify local File workspace workflows in the browser",
+  script: "scripts/audit-file-workspace-browser.mjs",
 });
 
 function appendEvidence(target, id, evidence) {

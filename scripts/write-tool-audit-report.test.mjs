@@ -24,6 +24,14 @@ test("creates commit- and workflow-bound per-tool browser evidence", () => {
   assert.deepEqual(report.toolResults[0].checks, ["routeRendering", "interactionExecution", "outputValidation"]);
 });
 
+test("rejects abbreviated commit identifiers", () => {
+  assert.throws(() => createToolAuditReport({
+    auditId: "short-sha",
+    observedCommit: "abc123",
+    toolResults: [{ toolId: "sample-tool", status: "passed", checks: ["routeRendering"] }],
+  }), /full 40-character Git SHA/);
+});
+
 test("rejects duplicate tool IDs rather than double-counting evidence", () => {
   assert.throws(() => createToolAuditReport({
     auditId: "duplicate",

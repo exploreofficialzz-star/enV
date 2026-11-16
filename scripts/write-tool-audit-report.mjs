@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const FULL_SHA = /^[a-f0-9]{40}$/i;
 const VALID_CHECKS = new Set([
   "routeRendering",
   "interactionExecution",
@@ -22,6 +21,9 @@ export function createToolAuditReport({
 } = {}) {
   if (typeof auditId !== "string" || !auditId.trim()) throw new TypeError("auditId is required.");
   if (!Array.isArray(toolResults) || toolResults.length === 0) throw new TypeError("toolResults must be a non-empty array.");
+  if (observedCommit !== null && (typeof observedCommit !== "string" || !/^[a-f0-9]{40}$/i.test(observedCommit))) {
+    throw new TypeError("observedCommit must be a full 40-character Git SHA when supplied.");
+  }
   const ids = new Set();
   const normalized = toolResults.map((item) => {
     if (!item || typeof item.toolId !== "string" || !item.toolId.trim()) throw new TypeError("Every tool result requires a stable toolId.");
