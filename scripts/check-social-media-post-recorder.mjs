@@ -61,7 +61,7 @@ assert.match(iosRouter, /NativeSocialMediaPostRecorderView\(\)/);
 assert.match(iosProject, /NativeSocialMediaPostRecorder\.swift in Sources/);
 assert.match(nativeExporter, /id: "social-media-post-recorder"/);
 assert.match(executionMatrixExporter, /id: "social-media-post-recorder"/);
-assert.match(docs, /The tool is not released|still be required|acceptance testing is still required/i);
+assert.match(docs, /acceptance testing remains outstanding/i);
 
 // Android audio playback capture is explicitly not claimed by this initial
 // screen-video implementation. Keep the limitation present in its UI.
