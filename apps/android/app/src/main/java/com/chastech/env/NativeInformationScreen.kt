@@ -276,7 +276,7 @@ private fun NativeTokenGuide(catalog: com.chastech.env.data.Catalog) {
 }
 
 @Composable
-fun NativeInformationScreen(pageId: String, catalog: com.chastech.env.data.Catalog, onBack: () -> Unit, onOpenWallet: () -> Unit) {
+fun NativeInformationScreen(pageId: String, catalog: com.chastech.env.data.Catalog, onBack: () -> Unit, onOpenWallet: () -> Unit, onOpenHistory: () -> Unit) {
     val context = LocalContext.current
     val title = when (pageId) {
         "about" -> "About enV"
@@ -550,7 +550,7 @@ private fun NativeTokenDashboard(onOpenWallet: () -> Unit) {
 }
 
 @Composable
-private fun NativeWalletDashboard() {
+private fun NativeWalletDashboard(onOpenHistory: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var paired by remember { mutableStateOf(OfflineWalletNativeApi.isPaired(context)) }
@@ -730,6 +730,7 @@ private fun NativeWalletDashboard() {
                         }
                     }
                 }
+                TextButton(onClick = onOpenHistory, modifier = Modifier.fillMaxWidth()) { Text("View full transaction history") }
             }
         }
 
