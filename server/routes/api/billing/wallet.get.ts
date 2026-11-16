@@ -1,11 +1,13 @@
 import { defineHandler } from "nitro/h3";
 import { getWalletActivity, readWallet } from "../../../../src/lib/billing/ledger.server";
+import { reconcilePendingPurchasesForUser } from "../../../../src/lib/billing/purchase-reconciliation.server";
 import { jsonResponse, requireBillingUser } from "../../../../src/lib/billing/http.server";
 
 export default defineHandler(async (event) => {
   const auth = await requireBillingUser(event.req);
   if (auth.response || !auth.userId) return auth.response ?? jsonResponse({ ok: false, error: "AUTH_REQUIRED" }, 401);
   try {
+    await reconcilePendingPurchasesForUser(auth.userId);
     const [wallet, activity] = await Promise.all([readWallet(auth.userId), getWalletActivity(auth.userId, 20)]);
     return jsonResponse({ ok: true, data: { wallet, activity } });
   } catch {
