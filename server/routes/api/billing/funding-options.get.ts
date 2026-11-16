@@ -10,10 +10,9 @@ import { isCustomerPaymentMethodAvailable } from "../../../../src/lib/billing/pa
  * Checkout independently re-resolves and re-quotes before initializing a payment.
  */
 function publicFundingOptions(funding: Awaited<ReturnType<typeof getFundingOptions>>) {
-  // The browser receives customer-facing methods only. Gateway identity and
-  // provider fallback order stay entirely on the server.
+  // The browser receives customer-facing method availability only. Provider
+  // identities and routing remain server-side.
   const providers = funding.providers;
-  const customerVisibleProviders = providers.filter((provider) => provider.id !== "flutterwave");
   const flutterwave = providers.find((provider) => provider.id === "flutterwave") as
     | {
         enabled?: boolean;
@@ -28,10 +27,9 @@ function publicFundingOptions(funding: Awaited<ReturnType<typeof getFundingOptio
     currency: funding.currency,
     message: funding.message,
     methods: {
-      card: isCustomerPaymentMethodAvailable(customerVisibleProviders, "card"),
-      local: isCustomerPaymentMethodAvailable(customerVisibleProviders, "local"),
-      more: isCustomerPaymentMethodAvailable(customerVisibleProviders, "more"),
-      flutterwave: flutterwave?.enabled === true,
+      card: isCustomerPaymentMethodAvailable(providers, "card"),
+      local: isCustomerPaymentMethodAvailable(providers, "local"),
+      more: isCustomerPaymentMethodAvailable(providers, "more"),
     },
     flutterwave: {
       enabled: flutterwave?.enabled === true,
