@@ -8,6 +8,7 @@ import {
   getCountryPaymentProfile, getCurrencyMinorUnitExponent, parseMajorUnitsToMinor,
 } from "./country-routing";
 import { quoteTokenPacks, type CurrencyPackQuote } from "./fx.server";
+import { normalizeOptionalPhoneNumber } from "./payment-methods";
 
 const TOKEN_PACKS = [100, 250, 500, 1_000] as const;
 const TOKEN_ENDPOINT = "https://idp.flutterwave.com/realms/flutterwave/protocol/openid-connect/token";
@@ -569,11 +570,9 @@ export async function initializeFlutterwaveCheckout(input: {
   const rawPhone = method.type === "mobile_money" ? method.mobile_money!.phone_number
     : typeof asRecord(input.paymentDetails).phoneNumber === "string"
       ? String(asRecord(input.paymentDetails).phoneNumber).replace(/\D/g, "") : "";
-  const phone = rawPhone.startsWith("0") ? rawPhone.slice(1) : rawPhone;
+  const phone = normalizeOptionalPhoneNumber(rawPhone);
   const dialCode = countryCallingCode(profile.countryCode);
-  const phoneIsRequiredForMethod = method.type === "mobile_money";
-  if ((phoneIsRequiredForMethod && (!dialCode || !/^\d{7,10}$/.test(phone))) ||
-      (Boolean(phone) && (!dialCode || !/^\d{7,10}$/.test(phone)))) {
+  if (phone === undefined || (method.type === "mobile_money" && phone === null)) {
     fail("Enter a valid 7–10 digit number for this payment method, or leave the contact phone blank.", "INVALID_PAYMENT_DETAILS", 400);
   }
   const customerPhone = phone && dialCode ? { country_code: dialCode, number: phone } : null;
@@ -852,10 +851,9 @@ export async function initializeFlutterwaveBankTransfer(input: {
     fail("Add a valid email address to your enV account before funding the wallet.", "ACCOUNT_EMAIL_REQUIRED", 400);
   }
   const name = customerNameParts(input.customerName || users[0]?.name || "");
-  const rawPhone = (input.customerPhone ?? "").replace(/\D/g, "");
-  const phone = rawPhone.startsWith("0") ? rawPhone.slice(1) : rawPhone;
+  const phone = normalizeOptionalPhoneNumber(input.customerPhone);
   const dialCode = countryCallingCode(profile.countryCode);
-  if (phone && (!dialCode || !/^\d{7,10}$/.test(phone))) {
+  if (phone === undefined || (phone && !dialCode)) {
     fail("Enter a valid 7–10 digit phone number, or leave it blank.", "INVALID_PAYMENT_DETAILS", 400);
   }
   const address = {
