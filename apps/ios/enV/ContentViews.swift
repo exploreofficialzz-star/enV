@@ -2360,7 +2360,7 @@ private struct NativeWalletHistoryView: View {
     }
 
     private func transactionAmount(_ row: [String: Any]) -> String? {
-        if row["source"] as? String == "purchase",
+        if (row["source"] as? String == "purchase" || row["entry_type"] as? String == "purchase"),
            let minor = row["payment_amount_minor"] as? NSNumber,
            let currency = row["currency"] as? String {
             let formatter = NumberFormatter()
