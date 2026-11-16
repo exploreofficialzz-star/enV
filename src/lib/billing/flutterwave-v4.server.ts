@@ -552,9 +552,12 @@ export async function initializeFlutterwaveCheckout(input: {
       ? String(asRecord(input.paymentDetails).phoneNumber).replace(/\D/g, "") : "";
   const phone = rawPhone.startsWith("0") ? rawPhone.slice(1) : rawPhone;
   const dialCode = countryCallingCode(profile.countryCode);
-  if (!dialCode || !/^\d{7,10}$/.test(phone)) {
-    fail("Enter a valid 7–10 digit phone number to continue with Flutterwave.", "ACCOUNT_PHONE_REQUIRED", 400);
+  const phoneIsRequiredForMethod = method.type === "mobile_money";
+  if ((phoneIsRequiredForMethod && (!dialCode || !/^\d{7,10}$/.test(phone))) ||
+      (Boolean(phone) && (!dialCode || !/^\d{7,10}$/.test(phone)))) {
+    fail("Enter a valid 7–10 digit number for this payment method, or leave the contact phone blank.", "INVALID_PAYMENT_DETAILS", 400);
   }
+  const customerPhone = phone && dialCode ? { country_code: dialCode, number: phone } : null;
   const address = {
     city: input.customerAddress.city.trim(),
     country: profile.countryCode,
@@ -608,7 +611,7 @@ export async function initializeFlutterwaveCheckout(input: {
           address,
           email,
           name,
-          phone: { country_code: dialCode, number: phone },
+          ...(customerPhone ? { phone: customerPhone } : {}),
         },
         payment_method: method,
         meta: { purchaseIntentId: intentId, tokenPack: input.tokenPack, countryCode: profile.countryCode },
