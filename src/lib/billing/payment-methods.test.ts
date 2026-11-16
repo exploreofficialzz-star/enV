@@ -8,7 +8,7 @@ import {
 
 const providers = [
   { id: "paystack" as const, enabled: true, currency: "NGN", localPayments: true },
-  { id: "flutterwave" as const, enabled: true, currency: "NGN", paymentOptions: ["card", "ussd", "banktransfer"] },
+  { id: "flutterwave" as const, enabled: true, currency: "NGN", paymentMethods: ["card", "mobile_money", "bank_transfer"] },
   { id: "cryptomus" as const, enabled: false, currency: "USD" },
 ];
 
@@ -19,6 +19,17 @@ test("customer payment methods resolve to eligible providers without exposing pr
   assert.deepEqual(getFundingCandidates(providers, "card").map((provider) => provider.id), ["paystack", "flutterwave"]);
   assert.deepEqual(getFundingCandidates(providers, "local").map((provider) => provider.id), ["flutterwave", "paystack"]);
   assert.deepEqual(getFundingCandidates(providers, "more"), []);
+});
+
+test("V4 mobile-money and bank-transfer methods expose the generic Local payment choice", () => {
+  const v4 = [{ id: "flutterwave" as const, enabled: true, currency: "GHS", paymentMethods: ["card", "mobile_money", "bank_transfer"] }];
+  assert.equal(isCustomerPaymentMethodAvailable(v4, "local"), true);
+  assert.deepEqual(getFundingCandidates(v4, "local").map((provider) => provider.id), ["flutterwave"]);
+});
+
+test("legacy paymentOptions remain compatible while V4 uses paymentMethods", () => {
+  const legacy = [{ id: "flutterwave" as const, enabled: true, currency: "GHS", paymentOptions: ["card", "banktransfer"] }];
+  assert.deepEqual(getFundingCandidates(legacy, "local").map((provider) => provider.id), ["flutterwave"]);
 });
 
 test("local payments stay unavailable for international-card-only Paystack accounts", () => {
