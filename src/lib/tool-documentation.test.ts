@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { readFileSync } from "node:fs";
 import { CATEGORIES } from "@/data/categories";
 import type { ToolMeta } from "@/types/tool";
-import { getSearchableTools, getToolsByCategory } from "@/lib/registry";
+import { getSearchableTools, getToolsByCategory, getToolById, getToolByPath } from "@/lib/registry";
 import { canonicalSeoTools, isIndexableTool } from "@/lib/seo-metadata";
 import { getToolDocumentation, toolTaskGuidanceSource, toolDocumentationSummary } from "@/lib/tool-documentation";
 import { groupToolsBySubcategory } from "@/lib/category-tool-groups";
@@ -859,4 +859,29 @@ test("all 93 supported Celebration IDs receive operation-specific documentation"
     }
   }
   assert.equal(count, 93, "Every supported Celebration operation must receive the source-specific guide rule.");
+});
+
+
+test("keeps Advanced CSS Minifier and JSON-to-CSV as separate stable tool identities", () => {
+  const searchable = getSearchableTools();
+  const css = searchable.find((tool) => tool.id === "css-minifier-advanced");
+  const jsonToCsv = searchable.find((tool) => tool.id === "json-to-csv");
+
+  assert.ok(css, "Advanced CSS Minifier remains searchable");
+  assert.equal(css.name, "Advanced CSS Minifier");
+  assert.equal(css.category, "developer");
+  assert.equal(css.slug, "css-minifier-advanced");
+  assert.equal(css.engine.type, "text");
+  assert.equal(css.engine.type === "text" ? css.engine.op : null, "css-minify");
+  assert.equal(getToolById("css-minifier-advanced")?.id, "css-minifier-advanced");
+  assert.equal(getToolByPath("developer", "css-minifier-advanced")?.id, "css-minifier-advanced");
+
+  assert.ok(jsonToCsv, "JSON-to-CSV remains a separate Files tool");
+  assert.equal(jsonToCsv.name, "JSON to CSV Converter");
+  assert.equal(jsonToCsv.category, "files");
+  assert.equal(jsonToCsv.engine.type, "file-converter");
+  assert.equal(jsonToCsv.engine.type === "file-converter" ? jsonToCsv.engine.op : null, "json-to-csv");
+  assert.equal(getToolByPath("files", "json-to-csv")?.id, "json-to-csv");
+  assert.equal(searchable.filter((tool) => tool.id === "css-minifier-advanced").length, 1);
+  assert.equal(searchable.filter((tool) => tool.id === "json-to-csv").length, 1);
 });

@@ -279,6 +279,21 @@ const catalogRuntimeTools: ToolMeta[] = [
       && presentedTool.status === "planned"
       ? { ...presentedTool, status: "active" }
       : presentedTool;
+    if (webTool.id === "css-minifier-advanced") {
+      return {
+        ...webTool,
+        name: "Advanced CSS Minifier",
+        description: "Minify CSS by removing comments and unnecessary whitespace while preserving CSS declarations and selector structure.",
+        category: "developer",
+        slug: "css-minifier-advanced",
+        keywords: ["css", "minifier", "advanced", "stylesheet", "compress", "minify", "whitespace", "comments"],
+        tags: ["css", "minifier", "advanced", "stylesheet", "local"],
+        engine: { type: "text", op: "css-minify" },
+        clientSide: true,
+        requiresBackend: false,
+        requiresAuth: false,
+      };
+    }
     if (webTool.id === aBookTool.id) return aBookTool;
     if (webTool.id === songMetadataAnalyzerTool.id) return songMetadataAnalyzerTool;
     if (webTool.id === "qr-payload-inspector") {
