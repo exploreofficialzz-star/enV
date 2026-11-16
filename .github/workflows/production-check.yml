@@ -134,6 +134,9 @@ jobs:
       - name: Verify File to TXT local extraction and download in the browser
         run: npm run audit:file-to-txt:browser -- --report=artifacts/tool-functional-audit/file-to-txt.json
 
+      - name: Verify QR and barcode reader in the browser
+        run: npm run audit:qr-barcode:browser -- --report=qa-results/qr-barcode-reader-audit.json
+
       - name: Verify all 93 Celebrations tools on a mobile browser
         run: npm run audit:celebrations:browser -- --report=artifacts/celebrations-browser-audit/report.json
 

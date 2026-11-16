@@ -200,6 +200,7 @@ const report = {
   generatedAt: new Date().toISOString(),
   observedCommit: process.env.GITHUB_SHA ?? null,
   workflowRunId: process.env.GITHUB_RUN_ID ? Number(process.env.GITHUB_RUN_ID) : null,
+  jobId: process.env.GITHUB_JOB ?? null,
   baseUrl,
   tests: outcomes,
   toolResults: [...toolResults.values()].map((item) => ({ ...item, status: item.blockedChecks.length ? "blocked" : "passed" })),

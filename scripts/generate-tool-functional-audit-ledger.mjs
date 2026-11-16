@@ -107,40 +107,115 @@ const evidenceAudits = [...(observedEvidence.audits ?? [])];
 // The QR browser script writes exact per-tool progress to this report. The
 // ledger reads it after the verify step, including when the browser audit fails.
 const qrReportPath = path.join(root, "qa-results/qr-barcode-reader-audit.json");
-if (fs.existsSync(qrReportPath)) {
+const expectedQrToolIds = ["qr-generator", "code128-barcode", "qr-payload-inspector"];
+if (!fs.existsSync(qrReportPath)) {
+  if (process.env.GITHUB_ACTIONS === "true") {
+    invalidEvidence.push({
+      auditId: "qr-browser-runtime-report",
+      reason: "dynamic-qr-report-missing-in-github-actions",
+      expectedToolIds: expectedQrToolIds,
+      path: path.relative(root, qrReportPath),
+    });
+  }
+} else {
   try {
     const qrReport = JSON.parse(fs.readFileSync(qrReportPath, "utf8"));
-    for (const item of qrReport.toolResults ?? []) {
-      if (!byId.has(item.toolId)) {
-        invalidEvidence.push({ auditId: "qr-browser-" + item.toolId, missingIds: [item.toolId], reason: "dynamic-qr-report-references-unknown-tool-id" });
-        continue;
-      }
+    const results = Array.isArray(qrReport.toolResults) ? qrReport.toolResults : [];
+    const reportedIds = results.map((item) => item?.toolId);
+    const uniqueIds = new Set(reportedIds);
+    const expectedIds = new Set(expectedQrToolIds);
+    const duplicateIds = reportedIds.filter((id, index) => reportedIds.indexOf(id) !== index);
+    const unknownIds = reportedIds.filter((id) => !byId.has(id));
+    const missingIds = expectedQrToolIds.filter((id) => !uniqueIds.has(id));
+    const unexpectedIds = [...uniqueIds].filter((id) => !expectedIds.has(id));
+    const inGitHubActions = process.env.GITHUB_ACTIONS === "true";
+    const commitValid =
+      typeof qrReport.observedCommit === "string" &&
+      /^[a-f0-9]{40}$/i.test(qrReport.observedCommit) &&
+      (!inGitHubActions || qrReport.observedCommit === currentCommit);
+    const workflowRunValid = Number.isSafeInteger(qrReport.workflowRunId) && qrReport.workflowRunId > 0;
+    const jobValid =
+      typeof qrReport.jobId === "string" &&
+      qrReport.jobId.trim().length > 0 &&
+      (!inGitHubActions || qrReport.jobId === process.env.GITHUB_JOB);
+    const checksValid = results.every((item) => {
+      const checks = Array.isArray(item?.checks) ? item.checks : [];
+      const blockedChecks = Array.isArray(item?.blockedChecks) ? item.blockedChecks : [];
+      return (
+        ["passed", "blocked"].includes(item?.status) &&
+        [...checks, ...blockedChecks].every((check) => evidenceCheckNames.includes(check)) &&
+        (item.status !== "passed" || (checks.length > 0 && blockedChecks.length === 0)) &&
+        (item.status !== "blocked" || blockedChecks.length > 0) &&
+        (Array.isArray(item.notes) || typeof item.notes === "string")
+      );
+    });
+    const reportValid =
+      Number.isInteger(qrReport.passed) &&
+      Number.isInteger(qrReport.failed) &&
+      qrReport.passed >= 0 &&
+      qrReport.failed >= 0 &&
+      Array.isArray(qrReport.tests) &&
+      typeof qrReport.ok === "boolean" &&
+      qrReport.ok === (qrReport.failed === 0 && qrReport.error == null && missingIds.length === 0 && results.every((item) => item.status === "passed"));
+    if (
+      results.length !== expectedQrToolIds.length ||
+      uniqueIds.size !== reportedIds.length ||
+      duplicateIds.length ||
+      unknownIds.length ||
+      missingIds.length ||
+      unexpectedIds.length ||
+      !commitValid ||
+      !workflowRunValid ||
+      !jobValid ||
+      !checksValid ||
+      !reportValid
+    ) {
+      invalidEvidence.push({
+        auditId: "qr-browser-runtime-report",
+        reason: "dynamic-qr-report-invalid-or-does-not-match-current-runtime",
+        expectedToolIds: expectedQrToolIds,
+        reportedToolIds: reportedIds,
+        duplicateIds,
+        unknownIds,
+        missingIds,
+        unexpectedIds,
+        reportCommit: qrReport.observedCommit ?? null,
+        currentCommit,
+        commitValid,
+        workflowRunValid,
+        jobValid,
+        checksValid,
+        reportValid,
+      });
+    }
+
+    for (const item of results) {
+      if (!byId.has(item.toolId) || !["passed", "blocked"].includes(item.status)) continue;
       const common = {
         script: "scripts/browser-qr-barcode-reader-audit.mjs",
         workflow: "Production Check",
         workflowRunId: qrReport.workflowRunId ?? null,
-        jobId: "verify",
-        step: "Verify production: QR/barcode browser audit",
+        jobId: qrReport.jobId ?? "verify",
+        step: "Verify QR and barcode reader in the browser",
         toolIds: [item.toolId],
         testedCommit: qrReport.observedCommit ?? null,
       };
-      if ((item.checks ?? []).length) {
+      if (item.status === "passed") {
         evidenceAudits.push({
           id: "qr-browser-" + item.toolId + "-passed",
           kind: "browser",
           result: "passed",
           checks: item.checks,
-          notes: (item.notes ?? []).join(" "),
+          notes: Array.isArray(item.notes) ? item.notes.join(" ") : (item.notes ?? ""),
           ...common,
         });
-      }
-      if ((item.blockedChecks ?? []).length) {
+      } else {
         evidenceAudits.push({
           id: "qr-browser-" + item.toolId + "-blocked",
           kind: "browser",
           result: "blocked",
           checks: item.blockedChecks,
-          notes: (item.notes ?? []).join(" "),
+          notes: Array.isArray(item.notes) ? item.notes.join(" ") : (item.notes ?? ""),
           ...common,
         });
       }
@@ -154,6 +229,8 @@ if (fs.existsSync(qrReportPath)) {
   }
 }
 
+// QR evidence is collected as an independent browser job before responsive Studio checks.
+// The ledger validates exact tool identity, test commit, workflow run, job and exercised checks.
 // The Celebration audit runs against all 93 exact tool IDs on the current
 // mobile browser build. Ingest its per-tool pass/fail evidence rather than relying
 // on the historical checked-in sample when a live workflow report is available.
