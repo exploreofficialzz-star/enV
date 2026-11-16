@@ -3,7 +3,7 @@
  */
 export function formatEnVTokenBalance(tokens: number, locale?: string): string {
   if (!Number.isFinite(tokens) || tokens < 0) return "0.00";
-  return new Intl.NumberFormat(locale, {
+  return new Intl.NumberFormat(locale ?? "en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 3,
     useGrouping: true,
