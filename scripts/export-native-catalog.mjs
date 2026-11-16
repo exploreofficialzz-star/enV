@@ -1,17 +1,26 @@
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { refineGeneratedToolDescription } from "../src/lib/generated-tool-copy.mjs";
 import { applyGenericWorkflowPolicy } from "../src/lib/generic-workflow-policy.mjs";
-import { getAllTools } from "../src/lib/registry.ts";
 
 const root = new URL("../", import.meta.url);
+const repositoryRoot = fileURLToPath(root);
+// The compact tuples are the catalogue source of truth. Regenerate before loading
+// src/data/catalog.ts or registry.ts so every export consumes the same current records.
+execFileSync(
+  process.execPath,
+  [fileURLToPath(new URL("../scripts/gen-catalog.mjs", import.meta.url))],
+  { cwd: repositoryRoot, stdio: "inherit" },
+);
 const catalogSource = readFileSync(new URL("../src/data/catalog.ts", import.meta.url), "utf8");
-const [{ tools }, { CATEGORIES: categories }, { DATETIME_TOOL_EXTENSIONS }] = await Promise.all([
+const [{ tools }, { CATEGORIES: categories }, { DATETIME_TOOL_EXTENSIONS }, { getAllTools }] = await Promise.all([
   import("../src/data/catalog.ts"),
   import("../src/data/categories.ts"),
   import("../src/lib/datetime/catalog-tools.ts"),
+  import("../src/lib/registry.ts"),
 ]);
 // The native engine inventory and manifest validation must reconcile every Web runtime
 // identity, including tools that the native products expose through dedicated local screens.
