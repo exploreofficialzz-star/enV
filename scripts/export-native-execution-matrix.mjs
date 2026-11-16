@@ -9,6 +9,7 @@ const [{ tools: baseCatalog }, { DATETIME_TOOL_EXTENSIONS }] = await Promise.all
 const platformRuntimeExtensions = [
   { id: "song-metadata-analyzer", status: "active", category: "audio", engine: { type: "audio" } },
   { id: "a-book", status: "active", category: "productivity", engine: { type: "custom" } },
+  { id: "social-media-post-recorder", status: "active", category: "video", engine: { type: "custom" } },
 ];
 const catalog = [
   ...applyGenericWorkflowPolicy(baseCatalog),
