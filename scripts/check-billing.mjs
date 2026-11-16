@@ -40,6 +40,10 @@ const fundingOptionsRoute = await read("server/routes/api/billing/funding-option
 const rewardsSummaryRoute = await read("server/routes/api/billing/rewards/summary.get.ts");
 const catalog = await read("src/lib/billing/catalog.ts");
 const walletRoute = await read("server/routes/api/billing/wallet.get.ts");
+const walletActivityRoute = await read("server/routes/api/billing/wallet-activity.get.ts");
+const nativeWalletActivityRoute = await read("server/routes/api/billing/native-wallet-activity.get.ts");
+const androidWalletApi = await read("apps/android/app/src/main/java/com/chastech/env/billing/OfflineWalletNativeApi.kt");
+const iosWalletApi = await read("apps/ios/enV/OfflineWalletNativeAPI.swift");
 const purchasesRoute = await read("server/routes/api/billing/purchases.post.ts");
 const pricingPage = await read("src/routes/pricing.tsx");
 const androidPricing = await read("apps/android/app/src/main/java/com/chastech/env/NativeInformationScreen.kt");
@@ -125,6 +129,29 @@ assert.match(quoteRoute, /hasActiveEntitlement\(userId, "premium"\)/, "premium a
 assert.match(catalog, /TOKEN_SUBUNITS_PER_TOKEN = 1_000/);
 assert.match(catalog, /realPaymentsEnabled: false/);
 assert.match(walletRoute, /requireBillingUser/);
+assert.match(walletRoute, /activityNextCursor/);
+assert.match(walletRoute, /activityHasMore/);
+assert.match(walletActivityRoute, /requireBillingUser/);
+assert.match(walletActivityRoute, /getWalletActivity\(auth\.userId/);
+assert.match(nativeWalletActivityRoute, /requireOfflineBillingUser/);
+assert.match(nativeWalletActivityRoute, /NATIVE_PAIRING_REQUIRED/);
+assert.match(nativeWalletActivityRoute, /getWalletActivity\(auth\.userId/);
+assert.match(ledger, /from billing_purchase_intents p/,
+  "wallet history must include persisted payment intents that have not yet produced a ledger credit");
+assert.match(ledger, /l\.reference_id = p\.id or l\.idempotency_key = 'purchase:' \|\| p\.id/,
+  "purchase-intent history must not duplicate a payment already represented by a ledger credit");
+assert.match(ledger, /order by created_at desc, id desc/);
+assert.match(ledger, /nextCursor: hasMore && last/);
+assert.match(walletDashboard, /wallet-activity\?/);
+assert.match(walletDashboard, /Load more transactions/);
+assert.match(walletDashboard, /paymentAmountLabel\(entry\)/);
+assert.match(androidWalletApi, /fetchWalletHistoryPage/);
+assert.match(androidPricing, /"history" -> NativeWalletHistory\(\)/);
+assert.match(androidPricing, /View full transaction history/);
+assert.match(androidToolScreens, /onOpenHistory = \{ informationPage = "history" \}/);
+assert.match(iosWalletApi, /fetchWalletHistoryPage/);
+assert.match(iosPricing, /case "history": NativeWalletHistoryView\(\)/);
+assert.match(iosPricing, /View full transaction history/);
 assert.match(quoteRoute, /getToolBillingProfile/);
 assert.match(quoteRoute, /billingActive: false/);
 assert.doesNotMatch(toolShell, /ToolTokenEstimate|draft token estimate|Checking this tool/, "tool detail screens must not show a token-estimate card");
