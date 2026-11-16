@@ -170,10 +170,7 @@ if (missingCategories.length) {
 }
 const active = exportedTools.filter((tool) => tool.status === "active" || tool.status === "beta").length;
 const planned = exportedTools.length - active;
-// Version the emitted catalogue payload, including canonical runtime metadata overrides.
-const catalogVersion = createHash("sha256")
-  .update(catalogSource + JSON.stringify({ categories, tools: exportedTools }))
-  .digest("hex").slice(0, 12);
+const catalogVersion = createHash("sha256").update(catalogSource).digest("hex").slice(0, 12);
 const runtimeInventoryVersion = createHash("sha256")
   .update(catalogSource + JSON.stringify(canonicalRuntimeTools.map((tool) => ({
     id: tool.id, name: tool.name, status: tool.status, category: tool.category, engine: tool.engine,
