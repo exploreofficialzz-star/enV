@@ -1484,7 +1484,7 @@ struct AccountView: View {
                         Button { informationRouter.open("account") } label: { settingsRow("Info", "Account", "No account is required for the browser toolkit.") }
                             .buttonStyle(.plain)
                         Divider().overlay(Color.envBorder)
-                        Button { informationRouter.open("history") } label: { settingsRow("Info", "History", "Recently used tools will appear here.") }
+                        Button { informationRouter.open("history") } label: { settingsRow("Info", "History", "Payments, wallet credits and recorded account activity.") }
                             .buttonStyle(.plain)
                         Divider().overlay(Color.envBorder)
                         settingsRow("Hammer", "Native migration status", "More tool families are being moved to local Kotlin and Swift engines.")
@@ -1689,7 +1689,7 @@ struct NativeInformationPageView: View {
                  .buttonStyle(.borderedProminent)
          }
         case "wallet": NativeWalletDashboardView()
-        case "history": NativeInfoSectionView(title: nil, paragraphs: ["Recently used tools will appear here."])
+        case "history": NativeWalletHistoryView()
         case "privacy": NativePrivacyInformationPage()
         case "terms": NativeTermsInformationPage()
         case "disclaimer": NativeDisclaimerInformationPage()
@@ -2202,6 +2202,187 @@ private struct NativeTokenDashboardView: View {
         } catch {
             dashboard = nil
         }
+    }
+}
+
+private struct NativeWalletHistoryView: View {
+    @State private var paired = OfflineWalletNativeAPI.isPaired
+    @State private var items: [[String: Any]] = []
+    @State private var nextCursor: String?
+    @State private var hasMore = false
+    @State private var loading = false
+    @State private var message = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Payments, wallet credits, rewards, reservations and token usage recorded for your account.")
+                .font(.subheadline)
+                .foregroundStyle(Color.envMuted)
+            if !paired {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Connect your enV wallet")
+                        .font(.headline)
+                        .foregroundStyle(Color.envInk)
+                    Text("Sign in to your enV web Wallet and pair this device to load private transaction history.")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.envMuted)
+                    Link(destination: URL(string: "https://envtools.store/wallet")!) {
+                        Label("Open enV Wallet", systemImage: "wallet.bifold")
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .padding(14)
+                .background(Color.envCard, in: RoundedRectangle(cornerRadius: 16))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorder, lineWidth: 1))
+            } else {
+                if !message.isEmpty {
+                    Text(message)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                    Button("Try again") {
+                        Task { await loadPage(nil, replace: true) }
+                    }
+                    .disabled(loading)
+                }
+                if items.isEmpty && loading {
+                    Text("Loading transactions…")
+                        .font(.footnote)
+                        .foregroundStyle(Color.envMuted)
+                } else if items.isEmpty && message.isEmpty {
+                    Text("No wallet transactions have been recorded for this account yet.")
+                        .font(.footnote)
+                        .foregroundStyle(Color.envMuted)
+                }
+                ForEach(Array(items.enumerated()), id: \.offset) { element in
+                    let row = element.element
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(alignment: .top, spacing: 9) {
+                            Image(systemName: row["source"] as? String == "purchase" ? "creditcard.fill" : "arrow.left.arrow.right.circle")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(Color.envInk)
+                                .frame(width: 32, height: 32)
+                                .background(Color.envSurface2, in: Circle())
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(transactionTitle(row))
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(Color.envInk)
+                                Text(row["description"] as? String ?? "Wallet activity")
+                                    .font(.caption)
+                                    .foregroundStyle(Color.envMuted)
+                                    .lineLimit(2)
+                            }
+                            Spacer(minLength: 4)
+                            if let amount = transactionAmount(row) {
+                                Text(amount)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(Color.envInk)
+                                    .multilineTextAlignment(.trailing)
+                            }
+                        }
+                        Text(row["created_at"] as? String ?? "Time unavailable")
+                            .font(.caption2)
+                            .foregroundStyle(Color.envMuted)
+                        if let provider = row["provider"] as? String, !provider.isEmpty {
+                            Text(provider)
+                                .font(.caption2)
+                                .foregroundStyle(Color.envMuted)
+                        }
+                        if row["entry_type"] as? String == "purchase_attempt" {
+                            Text("Status: \((row["status"] as? String ?? "pending").replacingOccurrences(of: "_", with: " "))")
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(Color.envMuted)
+                        }
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.envCard, in: RoundedRectangle(cornerRadius: 14))
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.envBorder, lineWidth: 1))
+                }
+                if hasMore {
+                    Button {
+                        guard let nextCursor else { return }
+                        Task { await loadPage(nextCursor, replace: false) }
+                    } label: {
+                        Label(loading ? "Loading transactions…" : "Load older transactions", systemImage: "arrow.down")
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(loading || nextCursor == nil)
+                }
+                if !items.isEmpty {
+                    Button("Refresh history") {
+                        Task { await loadPage(nil, replace: true) }
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .disabled(loading)
+                }
+            }
+        }
+        .task {
+            if paired { await loadPage(nil, replace: true) }
+        }
+    }
+
+    @MainActor
+    private func loadPage(_ cursor: String?, replace: Bool) async {
+        guard paired, !loading else { return }
+        loading = true
+        message = ""
+        defer { loading = false }
+        do {
+            let data = try await OfflineWalletNativeAPI.fetchWalletHistoryPage(cursor: cursor, limit: 50)
+            let page = data["activity"] as? [[String: Any]] ?? []
+            if replace {
+                items = page
+            } else {
+                let existing = Set(items.compactMap { $0["id"] as? String })
+                items.append(contentsOf: page.filter { !(existing.contains($0["id"] as? String ?? "")) })
+            }
+            nextCursor = (data["activityNextCursor"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            hasMore = data["activityHasMore"] as? Bool == true
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
+    private func transactionTitle(_ row: [String: Any]) -> String {
+        let type = row["entry_type"] as? String ?? "activity"
+        if type == "purchase_attempt" {
+            return "Payment " + (row["status"] as? String ?? "pending").replacingOccurrences(of: "_", with: " ")
+        }
+        if type == "purchase" { return "Wallet funded" }
+        if type == "settlement" { return "Tool usage" }
+        if type == "reservation" { return "Tokens reserved" }
+        if type == "release" { return "Reservation released" }
+        if type == "refund" { return "Refund" }
+        return type.replacingOccurrences(of: "_", with: " ").capitalized
+    }
+
+    private func transactionAmount(_ row: [String: Any]) -> String? {
+        if row["source"] as? String == "purchase",
+           let minor = row["payment_amount_minor"] as? NSNumber,
+           let currency = row["currency"] as? String {
+            let formatter = NumberFormatter()
+            formatter.numberStyle = .currency
+            formatter.currencyCode = currency
+            let digits = max(0, formatter.maximumFractionDigits)
+            let value = minor.doubleValue / pow(10.0, Double(digits))
+            return formatter.string(from: NSNumber(value: value))
+        }
+        let delta = (row["delta_available_subunits"] as? NSNumber)?.doubleValue ?? 0
+        let consumed = (row["consumed_subunits"] as? NSNumber)?.doubleValue ?? 0
+        if consumed > 0 { return tokenAmount(consumed / 1_000) + " enV" }
+        if delta != 0 { return (delta > 0 ? "+" : "−") + tokenAmount(abs(delta) / 1_000) + " enV" }
+        return nil
+    }
+
+    private func tokenAmount(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 3
+        formatter.maximumFractionDigits = 3
+        return formatter.string(from: NSNumber(value: value)) ?? "0.000"
     }
 }
 
