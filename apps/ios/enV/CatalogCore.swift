@@ -394,6 +394,43 @@ extension Catalog {
         )
     }
 
+    /// Registers the standalone Social Media Post Recorder as a native tool.
+    func includingSocialMediaPostRecorder() -> Catalog {
+        guard !tools.contains(where: { $0.id == "social-media-post-recorder" }) else { return self }
+        let tool = Tool(
+            id: "social-media-post-recorder",
+            name: "Social Media Post Recorder",
+            slug: "social-media-post-recorder",
+            description: "Open a social-media post link and use iOS Screen Recording to save the real on-screen post, video and visible engagement details to Photos.",
+            category: "video",
+            subcategory: "Social media capture",
+            keywords: ["social media", "post", "screen recorder", "screen capture", "video", "tiktok", "instagram", "facebook", "youtube", "x", "snapchat", "likes", "comments", "shares"],
+            tags: ["video", "social-media", "screen-recording", "capture"],
+            icon: "Video",
+            popularity: 1300,
+            featured: true,
+            clientSide: true,
+            requiresBackend: false,
+            requiresAuth: false,
+            status: "active",
+            disclaimer: "iOS uses its system Screen Recording controls. Protected content and source-app audio restrictions remain controlled by iOS and the source app.",
+            related: [],
+            engine: ToolEngine(type: "custom", id: "social-media-post-recorder", op: nil, configuration: [:])
+        )
+        return Catalog(
+            schemaVersion: schemaVersion,
+            catalogVersion: catalogVersion,
+            counts: CatalogCounts(total: counts.total + 1, active: counts.active + 1, planned: counts.planned, categories: counts.categories),
+            categories: categories,
+            tools: (tools + [tool]).sorted {
+                let leftCategory = $0.category.lowercased()
+                let rightCategory = $1.category.lowercased()
+                return leftCategory == rightCategory ? ($0.name.lowercased() < $1.name.lowercased()) : leftCategory < rightCategory
+            },
+            relatedReferenceTools: relatedReferenceTools
+        )
+    }
+
     /// Registers local ZIP64 compression and extraction as a native tool.
     func includingZipArchive() -> Catalog {
         guard !tools.contains(where: { $0.id == "zip-any-file" }) else { return self }
@@ -612,7 +649,7 @@ enum CatalogLoader {
         let data = try Data(contentsOf: url)
         let catalog = try JSONDecoder().decode(Catalog.self, from: data)
         guard !catalog.tools.isEmpty else { throw CocoaError(.fileReadCorruptFile) }
-        return catalog.nativeFacing().includingMusicDownloader().includingSongMetadataAnalyzer().includingABook().includingZipArchive().includingFileWorkspaceTools().includingCameraStudio().includingDateTimeExtensions()
+        return catalog.nativeFacing().includingMusicDownloader().includingSongMetadataAnalyzer().includingABook().includingZipArchive().includingFileWorkspaceTools().includingCameraStudio().includingSocialMediaPostRecorder().includingDateTimeExtensions()
     }
 }
 
