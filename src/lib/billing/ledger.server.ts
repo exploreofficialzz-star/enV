@@ -942,7 +942,12 @@ export async function creditVerifiedPurchase(input: {
       );
       return { status: "already-processed" as const, creditedSubunits: 0 };
     }
-    if (!(intent.status === "created" || intent.status === "pending" || intent.status === "verified")) {
+    // A local checkout/redirect failure is not proof that the provider charge
+    // failed. This function is reached only after the provider has independently
+    // confirmed the exact reference, transaction ID, amount and currency, so a
+    // verified successful charge may safely settle an intent previously marked failed.
+    if (!(intent.status === "created" || intent.status === "pending" ||
+          intent.status === "verified" || intent.status === "failed")) {
       throw new BillingError("PURCHASE_NOT_VERIFIED", "The purchase intent is not in a creditable state.");
     }
     if (intent.provider_transaction_id && intent.provider_transaction_id !== input.providerTransactionId) {

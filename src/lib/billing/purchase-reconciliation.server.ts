@@ -11,9 +11,11 @@ type PendingPurchase = {
 
 /**
  * Recover provider-confirmed purchases if the customer returned before a webhook
- * was delivered or the first verification attempt could complete. Only intents
- * owned by the authenticated user are selected; each provider is re-queried
- * before the existing atomic ledger-credit transaction is allowed to run.
+ * was delivered or the first verification attempt could complete. Include older
+ * and locally failed checkout intents: a provider timeout or redirect failure
+ * must not permanently hide a charge that the provider later confirms as paid.
+ * Only intents owned by the authenticated user are selected; every candidate is
+ * re-queried with its provider before the atomic ledger-credit transaction runs.
  */
 export async function reconcilePendingPurchasesForUser(userId: string): Promise<void> {
   if (!userId || userId.length > 256) return;
@@ -24,8 +26,7 @@ export async function reconcilePendingPurchasesForUser(userId: string): Promise<
          from billing_purchase_intents
         where user_id = $1
           and provider in ('paystack', 'flutterwave', 'cryptomus')
-          and status in ('created', 'pending', 'verified')
-          and created_at >= now() - interval '30 days'
+          and status in ('created', 'pending', 'verified', 'failed')
           and updated_at <= now() - interval '15 seconds'
         order by updated_at asc
         limit 10

@@ -261,6 +261,9 @@ assert.match(walletRoute, /reconcilePendingPurchasesForUser\(auth\.userId\)/, "w
 assert.match(tokenUsageRoute, /reconcilePendingPurchasesForUser\(auth\.userId\)/, "token API must reconcile recent pending purchases before reading balance");
 assert.match(nativeWalletRoute, /reconcilePendingPurchasesForUser\(auth\.userId\)/, "paired native wallet must share pending-purchase recovery");
 assert.match(purchaseReconciliation, /user_id = \$1/, "purchase reconciliation must only select intents belonging to the signed-in user");
+assert.match(purchaseReconciliation, /status in \('created', 'pending', 'verified', 'failed'\)/, "reconciliation must re-verify failed checkout intents so late provider-confirmed payments can settle");
+assert.doesNotMatch(purchaseReconciliation, /created_at >= now\(\) - interval '30 days'/, "historical intents must not be silently excluded by a 30-day age cutoff");
+assert.match(ledger, /intent\.status === "failed"/, "atomic ledger credit must accept a previously failed intent only after provider verification");
 assert.match(purchaseReconciliation, /verifyAndCreditFlutterwaveReference/, "pending Flutterwave charges must be re-verified with the provider before credit");
 assert.match(purchaseReconciliation, /verifyAndCreditPaystackReference/, "pending Paystack charges must be re-verified with the provider before credit");
 assert.match(purchaseReconciliation, /verifyAndCreditCryptomusReference/, "pending Cryptomus invoices must be re-verified with the provider before credit");
