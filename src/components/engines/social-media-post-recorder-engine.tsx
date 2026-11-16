@@ -39,6 +39,7 @@ export function SocialMediaPostRecorderEngine() {
   const [notice, setNotice] = useState<string | null>(null);
   const [output, setOutput] = useState<CaptureOutput | null>(null);
 
+  const startingRef = useRef(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -97,12 +98,13 @@ export function SocialMediaPostRecorderEngine() {
     if (!resolved) return;
     setOutput(null);
     setNotice(null);
-    const opened = window.open(resolved.url, "_blank", "noopener,noreferrer");
+    const opened = window.open(resolved.url, "_blank");
     if (!opened) {
       setError("Your browser blocked the new tab. Allow pop-ups for enV, then open the post again.");
       return;
     }
-    setNotice("Post opened in a new tab. Keep that tab available, return here, and start capture when you're ready.");
+    try { opened.opener = null; } catch { /* Browser-controlled cross-origin opener isolation. */ }
+    setNotice("Post opened. Keep the original app or tab available, return here, and start capture when you are ready.");
   }
 
   function releaseCapture() {
@@ -123,21 +125,25 @@ export function SocialMediaPostRecorderEngine() {
       recorder.stop();
     } catch {
       releaseCapture();
+      startingRef.current = false;
       setIsRecording(false);
       setError("The browser could not finalize this recording. Try another capture.");
     }
   }
 
   async function startCapture() {
-    if (isRecording) return;
+    if (isRecording || startingRef.current) return;
+    startingRef.current = true;
     const resolved = parseLink();
     if (!resolved) return;
     if (!window.isSecureContext) {
       setError("Screen capture requires a secure HTTPS connection. Open enV over HTTPS and try again.");
+      startingRef.current = false;
       return;
     }
     if (!navigator.mediaDevices?.getDisplayMedia || typeof MediaRecorder === "undefined") {
       setError("Screen recording is not available in this browser. Use the enV Android app, or a desktop browser with screen-capture support.");
+      startingRef.current = false;
       return;
     }
 
@@ -163,6 +169,7 @@ export function SocialMediaPostRecorderEngine() {
       } else {
         setError(reason instanceof Error ? reason.message : "The browser could not start screen capture.");
       }
+      startingRef.current = false;
       return;
     }
 
@@ -170,6 +177,7 @@ export function SocialMediaPostRecorderEngine() {
     if (!videoTrack) {
       stream.getTracks().forEach((track) => track.stop());
       setError("The selected screen source did not provide a video track.");
+      startingRef.current = false;
       return;
     }
 
@@ -182,6 +190,7 @@ export function SocialMediaPostRecorderEngine() {
     } catch (reason) {
       stream.getTracks().forEach((track) => track.stop());
       setError(reason instanceof Error ? reason.message : "This browser cannot encode the selected screen source.");
+      startingRef.current = false;
       return;
     }
 
@@ -227,10 +236,11 @@ export function SocialMediaPostRecorderEngine() {
     try {
       recorder.start(1000);
       setIsRecording(true);
-      setNotice("Recording started. Play the post and scroll through the details you want included. Return to enV and stop capture when finished.");
+      setNotice("Recording started. Switch to the post, play it, and scroll through the details you want included. Return to enV and stop capture when finished.");
       stopTimerRef.current = window.setTimeout(stopCapture, MAX_CAPTURE_MS);
     } catch (reason) {
       releaseCapture();
+      startingRef.current = false;
       setError(reason instanceof Error ? reason.message : "The browser could not start recording.");
     }
   }
@@ -247,6 +257,7 @@ export function SocialMediaPostRecorderEngine() {
         <p className="mt-1 text-muted">
           Open the original post, then record the real screen. The saved video includes the interface and details visible during capture.
         </p>
+        <p className="mt-2 text-xs text-muted">For an installed social app, select the entire screen or app window in the browser capture picker. Browser recording format depends on the browser; MP4 is used when supported, otherwise the browser may provide WebM.</p>
       </div>
 
       <div className="space-y-2">
