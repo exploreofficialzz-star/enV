@@ -45,7 +45,7 @@ export default defineHandler(async (event) => {
       error: typeof candidate.code === "string" ? candidate.code : "FLUTTERWAVE_AUTHORIZATION_FAILED",
       message: status < 500 && typeof candidate.message === "string"
         ? candidate.message
-        : "The Flutterwave authorization could not be completed. No wallet tokens were added.",
+        : "The bank authorization could not be completed. No wallet tokens were added.",
       requestId,
     }, status);
   }
