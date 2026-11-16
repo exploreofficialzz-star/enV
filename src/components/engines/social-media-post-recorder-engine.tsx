@@ -282,7 +282,7 @@ export function SocialMediaPostRecorderEngine() {
         <Button type="button" onClick={() => void startCapture()} disabled={isRecording || !postLink.trim() || !captureSupported || !secureContext}>
           Start screen capture
         </Button>
-        {isRecording ? <Button type="button" variant="destructive" onClick={stopCapture}>Stop and save</Button> : null}
+        {isRecording ? <Button type="button" variant="danger" onClick={stopCapture}>Stop and save</Button> : null}
       </div>
 
       {!secureContext ? <ErrorBanner message="Screen capture requires HTTPS. Open enV over a secure connection." /> : null}
