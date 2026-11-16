@@ -227,7 +227,11 @@ assert.doesNotMatch(walletDashboard, /flutterwaveExpiryMonth|flutterwaveExpiryYe
 assert.match(flutterwaveService, /normalizeOptionalPhoneNumber/, "V4 customer phone handling must be optional and validated separately");
 assert.match(flutterwaveService, /billing-flutterwave-charge-failed/, "failed charges must log safe processor diagnostics");
 assert.match(flutterwaveService, /classifyFlutterwaveApiFailure/, "V4 upstream errors must be classified rather than hidden behind generic initialization failures");
-assert.match(flutterwaveService, /countryCode: profile.countryCode[\\s\\S]{0,120}paymentType: method.type/, "provider errors must retain country, currency, amount, and payment rail context without cardholder data");
+assert.match(flutterwaveService, /countryCode: diagnosticContext\.countryCode/, "provider-error logs must retain the checkout country");
+assert.match(flutterwaveService, /currency: diagnosticContext\.currency/, "provider-error logs must retain the checkout currency");
+assert.match(flutterwaveService, /amount: diagnosticContext\.amount/, "provider-error logs must retain the quoted amount");
+assert.match(flutterwaveService, /paymentType: diagnosticContext\.paymentType/, "provider-error logs must retain the payment rail");
+assert.match(flutterwaveService, /paymentType: method\.type/, "direct-charge diagnostics must receive the selected payment rail");
 assert.match(flutterwaveErrors, /FLUTTERWAVE_CARD_RESTRICTED/, "card velocity restrictions must receive a dedicated safe error");
 assert.match(flutterwaveErrors, /failed attempt limit/, "restricted-card classification must require the provider's specific reason");
 assert.doesNotMatch(walletDashboard, /fundingOptionsState\.flutterwave\?\.enabled === true\s*\?\s*method === "card"/, "V4 channel routing must not depend on a duplicate ready flag after generic availability has been approved");
