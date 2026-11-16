@@ -25,7 +25,6 @@ const SAFE_CHECKOUT_FAILURES: Record<string, { status: number; message: string }
   FLUTTERWAVE_AUTH_FAILED: { status: 503, message: "Secure payment authentication is unavailable. Please try again shortly." },
   FLUTTERWAVE_API_ERROR: { status: 502, message: "The payment provider could not process this request. No wallet tokens were added." },
   ACCOUNT_NAME_REQUIRED: { status: 400, message: "Add your first and last name to your account before funding the wallet." },
-  ACCOUNT_PHONE_REQUIRED: { status: 400, message: "Enter a valid phone number to continue." },
   INVALID_CUSTOMER_ADDRESS: { status: 400, message: "Enter a complete billing address to continue." },
   INVALID_PAYMENT_DETAILS: { status: 400, message: "Check the payment details and try again." },
   INVALID_AUTHORIZATION: { status: 400, message: "The bank authorization details are invalid." },
@@ -152,9 +151,13 @@ export default defineHandler(async (event) => {
     };
     return jsonResponse({ ok: true, data: checkoutData }, 201);
   } catch (error) {
-    const candidate = error as { code?: unknown };
+    const candidate = error as { code?: unknown; safeMessage?: unknown };
     const candidateCode = typeof candidate.code === "string" ? candidate.code : "";
     const knownFailure = SAFE_CHECKOUT_FAILURES[candidateCode];
+    const providerFailureMessage = candidateCode === "FLUTTERWAVE_INITIALIZATION_FAILED" &&
+      typeof candidate.safeMessage === "string" && candidate.safeMessage.length <= 220
+      ? candidate.safeMessage
+      : null;
     const requestId = randomUUID();
     if (!knownFailure) {
       console.error(`[billing-purchase] PAYMENTS_UNAVAILABLE requestId=${requestId} causeType=${error instanceof Error ? error.name : "UnknownError"}`);
@@ -162,7 +165,7 @@ export default defineHandler(async (event) => {
     return jsonResponse({
       ok: false,
       error: knownFailure ? candidateCode : "PAYMENTS_UNAVAILABLE",
-      message: knownFailure?.message ?? "Checkout is temporarily unavailable. No payment was recorded. Please try again shortly.",
+      message: providerFailureMessage ?? knownFailure?.message ?? "Checkout is temporarily unavailable. No payment was recorded. Please try again shortly.",
       requestId,
     }, knownFailure?.status ?? 503);
   }

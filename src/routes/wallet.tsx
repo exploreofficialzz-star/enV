@@ -4,6 +4,8 @@ import { ArrowDownToLine, Coins, RefreshCw, Wallet, Clock3, Copy, Gift, Users, V
 import {
   parseUsdAmountToCents,
   resolveFlutterwaveFundingMethod,
+  formatCardExpiryInput,
+  parseCardExpiry,
   type CustomerPaymentMethod,
   type FlutterwaveFundingMethod,
 } from "@/lib/billing/payment-methods";
@@ -241,8 +243,7 @@ function Account() {
   const [flutterwaveState, setFlutterwaveState] = useState("");
   const [flutterwavePostalCode, setFlutterwavePostalCode] = useState("");
   const [flutterwaveCardNumber, setFlutterwaveCardNumber] = useState("");
-  const [flutterwaveExpiryMonth, setFlutterwaveExpiryMonth] = useState("");
-  const [flutterwaveExpiryYear, setFlutterwaveExpiryYear] = useState("");
+  const [flutterwaveExpiry, setFlutterwaveExpiry] = useState("");
   const [flutterwaveCvv, setFlutterwaveCvv] = useState("");
   const [flutterwaveChallenge, setFlutterwaveChallenge] = useState<{ reference: string; type: "otp" | "pin" | "avs" } | null>(null);
   const [flutterwaveAuthorizationValue, setFlutterwaveAuthorizationValue] = useState("");
@@ -584,23 +585,30 @@ function Account() {
       if (checkoutFlutterwaveMethod !== null) {
         const rawPhoneNumber = flutterwavePhoneNumber.replace(/\D/g, "");
         const phoneNumber = rawPhoneNumber.startsWith("0") ? rawPhoneNumber.slice(1) : rawPhoneNumber;
-        if (!/^\d{7,10}$/.test(phoneNumber)) {
-          throw new Error("Enter a valid phone number to continue.");
+        const phoneIsValid = /^\d{7,10}$/.test(phoneNumber);
+        if (checkoutFlutterwaveMethod === "mobile_money" && !phoneIsValid) {
+          throw new Error("Enter the 7–10 digit number registered with your mobile-money wallet.");
+        }
+        if (phoneNumber && !phoneIsValid) {
+          throw new Error("Enter a valid 7–10 digit phone number, or leave it blank.");
         }
         if (!flutterwaveCustomerName.trim()) {
           throw new Error("Enter your first and last name to continue.");
         }
         if (checkoutFlutterwaveMethod === "card") {
           const cardNumber = flutterwaveCardNumber.replace(/\D/g, "");
-          const month = flutterwaveExpiryMonth.trim().padStart(2, "0");
-          const year = flutterwaveExpiryYear.trim();
+          const expiry = parseCardExpiry(flutterwaveExpiry);
           const cvv = flutterwaveCvv.trim();
-          if (cardNumber.length < 12 || cardNumber.length > 19 ||
-              !/^(?:0[1-9]|1[0-2])$/.test(month) ||
-              !/^(?:\d{2}|\d{4})$/.test(year) ||
-              !/^\d{3,4}$/.test(cvv)) {
-            throw new Error("Check the card number, expiry date and security code.");
+          if (cardNumber.length < 12 || cardNumber.length > 19) {
+            throw new Error("Check the card number.");
           }
+          if (!expiry) {
+            throw new Error("Enter a valid card expiry date in MM/YY format.");
+          }
+          if (!/^\d{3,4}$/.test(cvv)) {
+            throw new Error("Check the card security code.");
+          }
+          const { month, year } = expiry;
           const keyResponse = await fetch("/api/billing/flutterwave/encryption-key", {
             credentials: "same-origin",
             headers: { accept: "application/json" },
@@ -622,7 +630,7 @@ function Account() {
           ]);
           flutterwaveDetails = {
             type: "card",
-            phoneNumber,
+            ...(phoneNumber ? { phoneNumber } : {}),
             card: {
               encrypted_card_number: encryptedCardNumber,
               encrypted_expiry_month: encryptedExpiryMonth,
@@ -639,7 +647,10 @@ function Account() {
             mobile_money: { network: flutterwaveNetwork, phone_number: phoneNumber },
           };
         } else if (checkoutFlutterwaveMethod === "bank_transfer") {
-          flutterwaveDetails = { type: "bank_transfer", phoneNumber };
+          flutterwaveDetails = {
+            type: "bank_transfer",
+            ...(phoneNumber ? { phoneNumber } : {}),
+          };
         } else {
           throw new Error("Choose a local payment type supported in your country.");
         }
@@ -1317,10 +1328,12 @@ function Account() {
                         className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
                     </div>
                     <div>
-                      <label htmlFor="flutterwave-phone" className="mb-1 block text-xs font-semibold">Phone number</label>
+                      <label htmlFor="flutterwave-phone" className="mb-1 block text-xs font-semibold">
+                        {flutterwaveMethod === "mobile_money" ? "Mobile-money number (required)" : "Phone number (optional)"}
+                      </label>
                       <input id="flutterwave-phone" type="tel" inputMode="numeric" autoComplete="tel-national"
                         value={flutterwavePhoneNumber} onChange={(event) => setFlutterwavePhoneNumber(event.target.value)}
-                        placeholder="7–10 digits, including no country code"
+                        placeholder={flutterwaveMethod === "mobile_money" ? "Number registered with your mobile-money wallet" : "Phone number (optional)"}
                         className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
                     </div>
                   </div>
@@ -1356,14 +1369,11 @@ function Account() {
                         value={flutterwaveCardNumber} onChange={(event) => setFlutterwaveCardNumber(event.target.value)}
                         placeholder="Card number"
                         className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
-                      <div className="grid grid-cols-3 gap-2">
-                        <input aria-label="Card expiry month" inputMode="numeric" autoComplete="cc-exp-month"
-                          value={flutterwaveExpiryMonth} onChange={(event) => setFlutterwaveExpiryMonth(event.target.value)}
-                          placeholder="MM" maxLength={2}
-                          className="min-h-11 min-w-0 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
-                        <input aria-label="Card expiry year" inputMode="numeric" autoComplete="cc-exp-year"
-                          value={flutterwaveExpiryYear} onChange={(event) => setFlutterwaveExpiryYear(event.target.value)}
-                          placeholder="YY / YYYY" maxLength={4}
+                      <div className="grid grid-cols-2 gap-2">
+                        <input aria-label="Card expiry date (MM/YY)" type="text" inputMode="numeric" autoComplete="cc-exp"
+                          value={flutterwaveExpiry}
+                          onChange={(event) => setFlutterwaveExpiry(formatCardExpiryInput(event.target.value))}
+                          placeholder="MM/YY" maxLength={7}
                           className="min-h-11 min-w-0 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg" />
                         <input aria-label="Card security code" type="password" inputMode="numeric" autoComplete="cc-csc"
                           value={flutterwaveCvv} onChange={(event) => setFlutterwaveCvv(event.target.value)}

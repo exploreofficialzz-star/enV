@@ -8,6 +8,7 @@ import {
   getCountryPaymentProfile, getCurrencyMinorUnitExponent, parseMajorUnitsToMinor,
 } from "./country-routing";
 import { quoteTokenPacks, type CurrencyPackQuote } from "./fx.server";
+import { normalizeOptionalPhoneNumber } from "./payment-methods";
 
 const TOKEN_PACKS = [100, 250, 500, 1_000] as const;
 const TOKEN_ENDPOINT = "https://idp.flutterwave.com/realms/flutterwave/protocol/openid-connect/token";
@@ -192,6 +193,16 @@ async function getAccessToken(): Promise<string> {
   return pendingTokenRequest;
 }
 
+function safeProviderDiagnostic(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[email]")
+    .replace(/\b(?:\+?\d[\d\s().-]{6,}\d)\b/g, "[number]")
+    .replace(/\b(?:\d[ -]?){12,19}\b/g, "[card]")
+    .replace(/[\r\n\t]+/g, " ")
+    .slice(0, 180);
+}
+
 async function flutterwaveRequest(
   path: string,
   init: RequestInit = {},
@@ -218,11 +229,35 @@ async function flutterwaveRequest(
     accessTokenExpiresAt = 0;
   }
   if (!response.ok || !payload || payload.data === undefined || payload.data === null) {
-    const upstream = typeof payload?.message === "string" ? payload.message.slice(0, 180) : "";
-    const error = new Error("Flutterwave v4 request failed" + (upstream ? ": " + upstream : "."));
+    const providerError = asRecord(payload?.error);
+    const providerErrorCode = typeof providerError.code === "string"
+      ? providerError.code.slice(0, 80)
+      : typeof providerError.type === "string" ? providerError.type.slice(0, 80) : "";
+    const upstreamMessage = safeProviderDiagnostic(providerError.message ?? payload?.message);
+    const validationErrors = Array.isArray(providerError.validation_errors)
+      ? providerError.validation_errors.slice(0, 4).map((entry) => {
+          const validation = asRecord(entry);
+          return {
+            field: typeof validation.field_name === "string" ? validation.field_name.slice(0, 80) : "",
+            message: safeProviderDiagnostic(validation.message),
+          };
+        })
+      : [];
+    console.error("[billing-flutterwave-api] " + JSON.stringify({
+      traceId,
+      path,
+      httpStatus: response.status,
+      providerErrorCode: providerErrorCode || null,
+      providerMessage: upstreamMessage || null,
+      validationErrors,
+    }));
+    const error = new Error("Flutterwave v4 request failed.");
     Object.assign(error, {
       code: response.status === 401 ? "FLUTTERWAVE_AUTH_FAILED" : "FLUTTERWAVE_API_ERROR",
       status: response.status >= 500 ? 503 : 502,
+      providerHttpStatus: response.status,
+      providerErrorCode,
+      traceId,
     });
     throw error;
   }
@@ -431,6 +466,25 @@ function customerNameParts(value: string) {
   return { first, last };
 }
 
+function flutterwaveChargeFailureMessage(processorCode: string, paymentType: string): string {
+  if (paymentType !== "card") {
+    return "The payment was declined by the payment provider. Check the payment details or try another method.";
+  }
+  const messages: Record<string, string> = {
+    "51": "Your card issuer declined this payment because of insufficient funds. Try another card.",
+    "54": "This card has expired. Check the expiry date or use another card.",
+    "55": "The card PIN was not accepted. Check with your bank or try another card.",
+    "57": "Your card issuer does not allow this transaction. Try another card or contact your bank.",
+    "59": "Your card issuer declined this payment for security reasons. Contact your bank or try another card.",
+    "61": "This card has reached its transaction limit. Try a lower amount or another card.",
+    "82": "The card security check failed. Check the CVV and try again.",
+    "91": "Your card issuer is temporarily unavailable. Try again later.",
+    "96": "The card processor encountered a temporary error. Try again later.",
+    "97": "The CVV is incorrect. Check it and try again.",
+  };
+  return messages[processorCode] ?? "Your bank or card processor declined this payment. Check the card details or use another card.";
+}
+
 export async function initializeFlutterwaveCheckout(input: {
   userId: string;
   tokenPack: number;
@@ -516,11 +570,12 @@ export async function initializeFlutterwaveCheckout(input: {
   const rawPhone = method.type === "mobile_money" ? method.mobile_money!.phone_number
     : typeof asRecord(input.paymentDetails).phoneNumber === "string"
       ? String(asRecord(input.paymentDetails).phoneNumber).replace(/\D/g, "") : "";
-  const phone = rawPhone.startsWith("0") ? rawPhone.slice(1) : rawPhone;
+  const phone = normalizeOptionalPhoneNumber(rawPhone);
   const dialCode = countryCallingCode(profile.countryCode);
-  if (!dialCode || !/^\d{7,10}$/.test(phone)) {
-    fail("Enter a valid 7–10 digit phone number to continue with Flutterwave.", "ACCOUNT_PHONE_REQUIRED", 400);
+  if (phone === undefined || (method.type === "mobile_money" && phone === null)) {
+    fail("Enter a valid 7–10 digit number for this payment method, or leave the contact phone blank.", "INVALID_PAYMENT_DETAILS", 400);
   }
+  const customerPhone = phone && dialCode ? { country_code: dialCode, number: phone } : null;
   const address = {
     city: input.customerAddress.city.trim(),
     country: profile.countryCode,
@@ -574,7 +629,7 @@ export async function initializeFlutterwaveCheckout(input: {
           address,
           email,
           name,
-          phone: { country_code: dialCode, number: phone },
+          ...(customerPhone ? { phone: customerPhone } : {}),
         },
         payment_method: method,
         meta: { purchaseIntentId: intentId, tokenPack: input.tokenPack, countryCode: profile.countryCode },
@@ -597,11 +652,42 @@ export async function initializeFlutterwaveCheckout(input: {
     const paymentInstruction = typeof asRecord(nextAction.payment_instruction).note === "string"
       ? String(asRecord(nextAction.payment_instruction).note).slice(0, 500) : null;
     if (providerStatus === "failed" || providerStatus === "voided") {
+      const processorResponse = asRecord(data.processor_response);
+      const processorCode = typeof processorResponse.code === "string" ? processorResponse.code.slice(0, 8) : "";
+      const processorType = typeof processorResponse.type === "string" ? processorResponse.type.slice(0, 80) : "";
+      const processorMessage = safeProviderDiagnostic(processorResponse.message);
+      const safeMessage = flutterwaveChargeFailureMessage(processorCode, method.type);
+      console.error("[billing-flutterwave-charge-failed] " + JSON.stringify({
+        reference: intentId,
+        country: profile.countryCode,
+        currency,
+        amount: amountMajor,
+        paymentType: method.type,
+        providerStatus,
+        processorCode: processorCode || null,
+        processorType: processorType || null,
+        processorMessage: processorMessage || null,
+      }));
       await sql.query(
-        "update billing_purchase_intents set status = 'failed', provider_transaction_id = $2, updated_at = now() where id = $1",
-        [intentId, chargeId],
+        "update billing_purchase_intents set status = 'failed', provider_transaction_id = $2, " +
+        "provider_metadata = coalesce(provider_metadata, '{}'::jsonb) || $3::jsonb, updated_at = now() where id = $1",
+        [intentId, chargeId, JSON.stringify({
+          providerStatus,
+          processorResponse: {
+            code: processorCode || null,
+            type: processorType || null,
+            message: processorMessage || null,
+          },
+        })],
       );
-      fail("Flutterwave could not authorize this payment method. No wallet tokens were added.", "FLUTTERWAVE_INITIALIZATION_FAILED", 502);
+      const declined = new Error(safeMessage);
+      Object.assign(declined, {
+        code: "FLUTTERWAVE_INITIALIZATION_FAILED",
+        status: 502,
+        safeMessage,
+        providerCode: processorCode,
+      });
+      throw declined;
     }
     const metadata = {
       ...baseMetadata,
@@ -632,7 +718,7 @@ export async function initializeFlutterwaveCheckout(input: {
     const candidate = error as { code?: unknown };
     if (typeof candidate.code === "string" &&
         ["FLUTTERWAVE_AUTH_FAILED", "FLUTTERWAVE_API_ERROR", "PAYMENT_METHOD_NOT_AVAILABLE_FOR_COUNTRY",
-          "ACCOUNT_PHONE_REQUIRED", "ACCOUNT_NAME_REQUIRED", "INVALID_PAYMENT_DETAILS",
+          "FLUTTERWAVE_INITIALIZATION_FAILED", "ACCOUNT_NAME_REQUIRED", "INVALID_PAYMENT_DETAILS",
           "INVALID_CUSTOMER_ADDRESS"].includes(candidate.code)) {
       await sql.query(
         "update billing_purchase_intents set status = 'failed', updated_at = now() where id = $1 and status = 'created'",
@@ -644,6 +730,14 @@ export async function initializeFlutterwaveCheckout(input: {
       "update billing_purchase_intents set status = 'failed', updated_at = now() where id = $1 and status = 'created'",
       [intentId],
     ).catch(() => undefined);
+    console.error("[billing-flutterwave-initialize] " + JSON.stringify({
+      reference: intentId,
+      country: profile.countryCode,
+      currency,
+      paymentType: method.type,
+      causeType: error instanceof Error ? error.name : "UnknownError",
+      cause: safeProviderDiagnostic(error instanceof Error ? error.message : ""),
+    }));
     const wrapped = new Error("Flutterwave v4 could not initialize this charge. No wallet tokens were added.");
     Object.assign(wrapped, { code: "FLUTTERWAVE_INITIALIZATION_FAILED", status: 502 });
     throw wrapped;
@@ -658,7 +752,7 @@ export async function initializeFlutterwaveBankTransfer(input: {
   countryCode: string | null;
   pricingQuote: CurrencyPackQuote;
   customerName: string;
-  customerPhone: string;
+  customerPhone?: string;
   customerAddress: {
     city: string;
     state: string;
@@ -757,11 +851,10 @@ export async function initializeFlutterwaveBankTransfer(input: {
     fail("Add a valid email address to your enV account before funding the wallet.", "ACCOUNT_EMAIL_REQUIRED", 400);
   }
   const name = customerNameParts(input.customerName || users[0]?.name || "");
-  const rawPhone = input.customerPhone.replace(/\D/g, "");
-  const phone = rawPhone.startsWith("0") ? rawPhone.slice(1) : rawPhone;
+  const phone = normalizeOptionalPhoneNumber(input.customerPhone);
   const dialCode = countryCallingCode(profile.countryCode);
-  if (!dialCode || !/^\d{7,10}$/.test(phone)) {
-    fail("Enter a valid 7–10 digit phone number to continue with Flutterwave.", "ACCOUNT_PHONE_REQUIRED", 400);
+  if (phone === undefined || (phone && !dialCode)) {
+    fail("Enter a valid 7–10 digit phone number, or leave it blank.", "INVALID_PAYMENT_DETAILS", 400);
   }
   const address = {
     city: input.customerAddress.city.trim(),
@@ -785,7 +878,7 @@ export async function initializeFlutterwaveBankTransfer(input: {
         address,
         email,
         name,
-        phone: { country_code: dialCode, number: phone },
+        ...(phone && dialCode ? { phone: { country_code: dialCode, number: phone } } : {}),
         meta: { enVPurchaseReference: intentId },
       }),
     }, createHash("sha256").update(String(input.idempotencyKey) + ":customer").digest("hex"));

@@ -5,6 +5,9 @@ import {
   isCustomerPaymentMethodAvailable,
   parseUsdAmountToCents,
   resolveFlutterwaveFundingMethod,
+  formatCardExpiryInput,
+  parseCardExpiry,
+  normalizeOptionalPhoneNumber,
 } from "./payment-methods.ts";
 
 const providers = [
@@ -70,6 +73,30 @@ test("generic Local payment resolves to a supported V4 local channel and preserv
   assert.equal(resolveFlutterwaveFundingMethod("local", localChannels, "bank_transfer"), "bank_transfer");
   assert.equal(resolveFlutterwaveFundingMethod("card", localChannels, "bank_transfer"), "card");
   assert.equal(resolveFlutterwaveFundingMethod("more", localChannels), null);
+});
+
+test("customer contact phone is optional unless a payment rail needs its own wallet number", () => {
+  assert.equal(normalizeOptionalPhoneNumber(""), null);
+  assert.equal(normalizeOptionalPhoneNumber("   "), null);
+  assert.equal(normalizeOptionalPhoneNumber("123-456-7890"), "1234567890");
+  assert.equal(normalizeOptionalPhoneNumber("08012345678"), "8012345678");
+  assert.equal(normalizeOptionalPhoneNumber("1234"), undefined);
+});
+
+test("card expiry is captured in one MM/YY field and parsed into V4 month/year values", () => {
+  assert.equal(formatCardExpiryInput("0428"), "04/28");
+  assert.equal(formatCardExpiryInput("042028"), "04/2028");
+  assert.equal(formatCardExpiryInput("04/28"), "04/28");
+  assert.deepEqual(parseCardExpiry("04/28", new Date("2026-11-16T12:00:00Z")), {
+    month: "04", year: "28",
+  });
+  assert.deepEqual(parseCardExpiry("04/2028", new Date("2026-11-16T12:00:00Z")), {
+    month: "04", year: "2028",
+  });
+  assert.equal(parseCardExpiry("13/28", new Date("2026-11-16T12:00:00Z")), null);
+  assert.equal(parseCardExpiry("00/28", new Date("2026-11-16T12:00:00Z")), null);
+  assert.equal(parseCardExpiry("10/26", new Date("2026-11-16T12:00:00Z")), null);
+  assert.equal(parseCardExpiry("04/2", new Date("2026-11-16T12:00:00Z")), null);
 });
 
 test("custom USD input converts cents to matching enV token units and enforces the $1 minimum", () => {
