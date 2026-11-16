@@ -14,11 +14,13 @@ function summarizeRecords(records) {
     seen.add(id);
   }
   return {
-    recordCount: records.length,
-    uniqueIdCount: seen.size,
-    duplicateIds: [...duplicates].sort(),
-    missingIdIndexes,
-    ids: [...seen].sort(),
+    summary: {
+      recordCount: records.length,
+      uniqueIdCount: seen.size,
+      duplicateIds: [...duplicates].sort(),
+      missingIdIndexes,
+    },
+    ids: seen,
   };
 }
 
@@ -32,12 +34,10 @@ export function reconcileToolInventories({
       !Array.isArray(searchableTools) || !Array.isArray(categoryIds)) {
     throw new TypeError("Inventory reconciliation requires source, runtime, searchable and category arrays.");
   }
-  const source = summarizeRecords(sourceTools);
-  const runtime = summarizeRecords(runtimeTools);
-  const searchable = summarizeRecords(searchableTools);
-  const sourceIds = new Set(source.ids);
-  const runtimeIds = new Set(runtime.ids);
-  const searchableIds = new Set(searchable.ids);
+  const { summary: source, ids: sourceIds } = summarizeRecords(sourceTools);
+  const { summary: runtime, ids: runtimeIds } = summarizeRecords(runtimeTools);
+  const { summary: searchable, ids: searchableIds } = summarizeRecords(searchableTools);
+  const runtimeSearchableOverlapCount = [...runtimeIds].filter((id) => searchableIds.has(id)).length;
   const categoryIdSet = new Set(categoryIds);
   const categoryToolCounts = Object.fromEntries(
     [...categoryIds].sort().map((categoryId) => [
@@ -54,6 +54,7 @@ export function reconcileToolInventories({
     runtimeOnlyToolIds: [...runtimeIds].filter((id) => !sourceIds.has(id)).sort(),
     searchableOnlyToolIds: [...searchableIds].filter((id) => !runtimeIds.has(id)).sort(),
     runtimeNotSearchableToolIds: [...runtimeIds].filter((id) => !searchableIds.has(id)).sort(),
+    runtimeSearchableOverlapCount,
     categoryRouteCount: categoryIds.length,
     duplicateCategoryIds: categoryIds.filter((id, index) => categoryIds.indexOf(id) !== index),
     populatedCategoryCount: runtimeCategories.length,

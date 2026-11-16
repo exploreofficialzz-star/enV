@@ -764,6 +764,14 @@ function toolSpecificGuidanceBase(tool: ToolMeta): ToolSpecificGuidance {
       validation: "The archive path validator rejects absolute paths, drive-prefixed paths, parent-directory traversal and unsafe names. Extraction is limited to 100,000 entries and 100 GB of declared expanded data, and blocks very high compression ratios for entries of at least 1 GB. Without direct file saving, browser buffering is limited to 256 MB; without a directory picker, browser extraction is limited to one file within that buffer. These are browser limits, not universal ZIP-format limits.",
     };
   }
+  if (id === "file-to-txt") {
+    return {
+      source: "operation-specific",
+      overview: "File to TXT Converter lets you enter plain text or extract readable text locally from supported text files, DOCX documents and selectable-text PDFs, then download a UTF-8 TXT file. The PDF extraction path does not perform OCR.",
+      example: "Type or paste text into Enter plain text and choose Convert, or select a supported text, Markdown, CSV, TSV, JSON, XML, YAML, HTML, DOCX or PDF file. Review the extracted preview, then download the TXT file. Use a non-sensitive sample first when the source format is unfamiliar.",
+      validation: "Selected files are limited to 200 MB and extracted TXT output to 32 MB. HTML extraction removes script, style, noscript and template elements before collecting visible body text. DOCX and PDF extraction run locally; PDFs must contain selectable text, so scanned pages are not OCRed. Invalid UTF-8, empty readable content, unsupported formats and size-limit violations return an error. The preview is limited to the first 4,000 characters; download the TXT file for the complete result.",
+    };
+  }
   if (id === "file-organizer") {
     return {
       source: "operation-specific",

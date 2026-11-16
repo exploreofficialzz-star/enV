@@ -485,6 +485,12 @@ test("hand-written tool guidance is wrapped with catalogue identity without repe
       expectedGuidance: "two separate workflows: create a ZIP",
     },
     {
+      id: "file-to-txt", name: "File to TXT Converter",
+      description: "Type or paste plain text, or extract readable text from supported files and save it as a TXT file.",
+      category: "files", engine: { type: "file-converter", op: "file-to-txt" },
+      expectedGuidance: "extract readable text locally from supported text files, DOCX documents and selectable-text PDFs",
+    },
+    {
       id: "file-organizer", name: "File Organizer",
       description: "Sort selected files into clear folders by type and export an organized copy.",
       category: "files", engine: { type: "custom", id: "file-organizer" },

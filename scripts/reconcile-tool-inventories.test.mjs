@@ -18,6 +18,8 @@ test("reconciles base catalogue, runtime extensions and searchable exclusions by
   assert.deepEqual(result.sourceOnlyToolIds, []);
   assert.deepEqual(result.runtimeOnlyToolIds, ["runtime-extension"]);
   assert.deepEqual(result.runtimeNotSearchableToolIds, ["runtime-extension", "two"]);
+  assert.equal(result.runtimeSearchableOverlapCount, 1);
+  assert.equal(result.searchableOnlyToolIds.length, 0);
   assert.deepEqual(result.emptyCategoryIds, ["empty"]);
   assert.equal(result.populatedCategoryCount, 2);
   assert.deepEqual(result.categoryToolCounts, { audio: 1, empty: 0, files: 2 });
@@ -44,6 +46,8 @@ test("reports missing IDs and category references not represented by category de
   });
   assert.deepEqual(result.source.missingIdIndexes, [0]);
   assert.deepEqual(result.searchableOnlyToolIds, ["unknown-search-id"]);
+  assert.equal(result.runtimeSearchableOverlapCount, 0);
+  assert.deepEqual(result.runtimeNotSearchableToolIds, ["unknown-category"]);
   assert.deepEqual(result.runtimeCategoriesMissingDefinitions, ["unlisted"]);
   assert.deepEqual(result.duplicateCategoryIds, ["files"]);
 });

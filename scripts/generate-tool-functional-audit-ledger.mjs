@@ -364,6 +364,13 @@ ingestCommitBoundBrowserReport({
   step: "Verify local File workspace workflows in the browser",
   script: "scripts/audit-file-workspace-browser.mjs",
 });
+ingestCommitBoundBrowserReport({
+  reportPath: path.join(root, "artifacts/tool-functional-audit/file-to-txt.json"),
+  auditId: "file-to-txt-browser",
+  expectedToolIds: ["file-to-txt"],
+  step: "Verify File to TXT local extraction and download in the browser",
+  script: "scripts/audit-file-to-txt-browser.mjs",
+});
 
 function appendEvidence(target, id, evidence) {
   target.set(id, [...(target.get(id) ?? []), evidence]);
@@ -602,6 +609,8 @@ const report = {
     runtimeOnlyExtensionRecords: toolInventoryReconciliation.runtimeOnlyToolIds.length,
     sourceOnlyRecordsMissingFromRuntime: toolInventoryReconciliation.sourceOnlyToolIds.length,
     runtimeRecordsExcludedFromSearch: toolInventoryReconciliation.runtimeNotSearchableToolIds.length,
+    runtimeSearchableOverlapRecords: toolInventoryReconciliation.runtimeSearchableOverlapCount,
+    searchableOnlyRegistryRecords: toolInventoryReconciliation.searchableOnlyToolIds.length,
     categoryRoutes: categoryIds.length,
     categoryCountInRuntime: new Set(allTools.map((tool) => tool.category)).size,
     emptyCategoryIds: toolInventoryReconciliation.emptyCategoryIds,
