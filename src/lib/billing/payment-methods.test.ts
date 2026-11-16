@@ -7,6 +7,7 @@ import {
   resolveFlutterwaveFundingMethod,
   formatCardExpiryInput,
   parseCardExpiry,
+  normalizeOptionalPhoneNumber,
 } from "./payment-methods.ts";
 
 const providers = [
@@ -72,6 +73,14 @@ test("generic Local payment resolves to a supported V4 local channel and preserv
   assert.equal(resolveFlutterwaveFundingMethod("local", localChannels, "bank_transfer"), "bank_transfer");
   assert.equal(resolveFlutterwaveFundingMethod("card", localChannels, "bank_transfer"), "card");
   assert.equal(resolveFlutterwaveFundingMethod("more", localChannels), null);
+});
+
+test("customer contact phone is optional unless a payment rail needs its own wallet number", () => {
+  assert.equal(normalizeOptionalPhoneNumber(""), null);
+  assert.equal(normalizeOptionalPhoneNumber("   "), null);
+  assert.equal(normalizeOptionalPhoneNumber("123-456-7890"), "1234567890");
+  assert.equal(normalizeOptionalPhoneNumber("08012345678"), "8012345678");
+  assert.equal(normalizeOptionalPhoneNumber("1234"), undefined);
 });
 
 test("card expiry is captured in one MM/YY field and parsed into V4 month/year values", () => {
