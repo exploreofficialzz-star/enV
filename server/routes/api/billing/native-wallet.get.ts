@@ -20,16 +20,25 @@ export default defineHandler(async (event) => {
     }, 403);
   }
   try {
-    const timeZone = new URL(event.req.url).searchParams.get("timezone");
+    const requestUrl = new URL(event.req.url);
+    const timeZone = requestUrl.searchParams.get("timezone");
+    const requestedLimit = Number(requestUrl.searchParams.get("limit") ?? 20);
     await reconcilePendingPurchasesForUser(auth.userId);
-    const [wallet, activity, rewards, tokenUsage] = await Promise.all([
+    const [wallet, activityPage, rewards, tokenUsage] = await Promise.all([
       readWallet(auth.userId),
-      getWalletActivity(auth.userId, 20),
+      getWalletActivity(auth.userId, requestedLimit, requestUrl.searchParams.get("cursor")),
       getRewardsSummary(auth.userId),
       getTokenUsageDashboard(auth.userId, timeZone),
     ]);
     const { userId: _userId, ...walletSnapshot } = wallet;
-    return jsonResponse({ ok: true, data: { wallet: walletSnapshot, activity, rewards, tokenUsage } });
+    return jsonResponse({ ok: true, data: {
+      wallet: walletSnapshot,
+      activity: activityPage.items,
+      activityNextCursor: activityPage.nextCursor,
+      activityHasMore: activityPage.hasMore,
+      rewards,
+      tokenUsage,
+    } });
   } catch {
     return jsonResponse({
       ok: false,
