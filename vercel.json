@@ -13,6 +13,10 @@
     {
       "path": "/api/community/retention",
       "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/billing/reconcile",
+      "schedule": "45 3 * * *"
     }
   ],
   "headers": [
@@ -173,6 +177,11 @@
     "deploymentEnabled": {
       "main": true,
       "research/global-discovery-brand-and-copy-20261114": false
+    }
+  },
+  "functions": {
+    "server/routes/api/billing/reconcile.get.ts": {
+      "maxDuration": 240
     }
   }
 }
