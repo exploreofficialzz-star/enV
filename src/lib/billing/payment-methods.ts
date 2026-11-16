@@ -22,9 +22,12 @@ export function getFundingCandidates<T extends FundingProvider>(
   method: CustomerPaymentMethod,
 ): T[] {
   if (method === "card") {
-    return providers.filter((provider) =>
-      provider.enabled && (provider.id === "paystack" || provider.id === "flutterwave"),
-    );
+    return providers.filter((provider) => {
+      if (!provider.enabled) return false;
+      if (provider.id === "paystack") return true;
+      const flutterwaveMethods = provider.paymentMethods ?? provider.paymentOptions;
+      return provider.id === "flutterwave" && flutterwaveMethods?.includes("card") === true;
+    });
   }
   if (method === "local") {
     return providers.filter((provider) => {
