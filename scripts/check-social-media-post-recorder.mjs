@@ -32,4 +32,40 @@ assert.doesNotMatch(engine, /url-media-engine|downloadUrlMedia|inspectUrlMedia|y
 assert.doesNotMatch(engine, /fetch\s*\(/);
 assert.doesNotMatch(engine, /document\.cookie|localStorage\.getItem\(["']cookie/i);
 
+const android = read("apps/android/app/src/main/java/com/chastech/env/NativeSocialMediaPostRecorder.kt");
+const androidMain = read("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt");
+const androidCatalog = read("apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt");
+const androidManifest = read("apps/android/app/src/main/AndroidManifest.xml");
+const ios = read("apps/ios/enV/NativeSocialMediaPostRecorder.swift");
+const iosCatalog = read("apps/ios/enV/CatalogCore.swift");
+const iosRouter = read("apps/ios/enV/NativeZipArchiveView.swift");
+const iosProject = read("apps/ios/enV.xcodeproj/project.pbxproj");
+const nativeExporter = read("scripts/export-native-catalog.mjs");
+const executionMatrixExporter = read("scripts/export-native-execution-matrix.mjs");
+const docs = read("docs/social-media-post-recorder.md");
+
+assert.match(android, /MediaProjectionManager/);
+assert.match(android, /createScreenCaptureIntent\(\)/);
+assert.match(android, /MediaRecorder\.OutputFormat\.MPEG_4/);
+assert.match(android, /FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION|foregroundServiceType/);
+assert.match(androidMain, /tool\.id == "social-media-post-recorder"/);
+assert.match(androidCatalog, /fun Catalog\.withSocialMediaPostRecorder\(\)/);
+assert.match(androidManifest, /android\.permission\.FOREGROUND_SERVICE_MEDIA_PROJECTION/);
+assert.match(androidManifest, /android:name="\.SocialPostCaptureService"/);
+assert.match(ios, /Control Center/);
+assert.match(ios, /Screen Recording/);
+assert.match(ios, /Photos/);
+assert.match(iosCatalog, /func includingSocialMediaPostRecorder\(\)/);
+assert.match(iosCatalog, /\.includingSocialMediaPostRecorder\(\)/);
+assert.match(iosRouter, /NativeSocialMediaPostRecorderView\(\)/);
+assert.match(iosProject, /NativeSocialMediaPostRecorder\.swift in Sources/);
+assert.match(nativeExporter, /id: "social-media-post-recorder"/);
+assert.match(executionMatrixExporter, /id: "social-media-post-recorder"/);
+assert.match(docs, /The tool is not released|still be required|acceptance testing is still required/i);
+
+// Android audio playback capture is explicitly not claimed by this initial
+// screen-video implementation. Keep the limitation present in its UI.
+assert.match(android, /does not include app playback audio/);
+assert.match(ios, /source-app audio restrictions/);
+
 console.log("Social Media Post Recorder audit PASS.");
