@@ -29,7 +29,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Button
@@ -85,6 +84,7 @@ fun NativeSocialMediaPostRecorderScreen() {
     val context = LocalContext.current
     var postUrl by rememberSaveable { mutableStateOf("") }
     var provider by rememberSaveable { mutableStateOf("") }
+    var postUri by remember { mutableStateOf<Uri?>(null) }
     var status by rememberSaveable { mutableStateOf("Paste a public post link to begin.") }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     var isRecording by rememberSaveable { mutableStateOf(false) }
@@ -102,8 +102,12 @@ fun NativeSocialMediaPostRecorderScreen() {
             runCatching { ContextCompat.startForegroundService(context, serviceIntent) }
                 .onSuccess {
                     isRecording = true
-                    status = "Screen capture started. Switch to the social-media post and play it. Use the enV screen or recording notification to stop."
+                    status = "Screen capture started. The original post is opening. Play the video and scroll through the details you want to keep."
                     error = null
+                    postUri?.let { uri ->
+                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
+                            .onFailure { error = "Recording started, but the post link could not be opened. Switch to the post manually." }
+                    }
                 }
                 .onFailure {
                     error = it.message ?: "Unable to start screen recording."
@@ -167,14 +171,15 @@ fun NativeSocialMediaPostRecorderScreen() {
         }
         Button(
             onClick = {
-                if (validatedLink() == null) return@Button
+                val link = validatedLink() ?: return@Button
+                postUri = link.uri
                 val manager = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
                 projectionLauncher.launch(manager.createScreenCaptureIntent())
             },
             enabled = postUrl.isNotBlank() && !isRecording,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Start screen recording")
+            Text("Start recording and open post")
         }
         if (isRecording) {
             Button(
@@ -272,8 +277,11 @@ class SocialPostCaptureService : Service() {
             val metrics = DisplayMetrics()
             @Suppress("DEPRECATION")
             (getSystemService(Context.WINDOW_SERVICE) as WindowManager).defaultDisplay.getRealMetrics(metrics)
-            val width = (metrics.widthPixels - metrics.widthPixels % 2).coerceAtLeast(2)
-            val height = (metrics.heightPixels - metrics.heightPixels % 2).coerceAtLeast(2)
+            val sourceWidth = metrics.widthPixels.coerceAtLeast(16)
+            val sourceHeight = metrics.heightPixels.coerceAtLeast(16)
+            val scale = minOf(1.0, 1920.0 / maxOf(sourceWidth, sourceHeight))
+            val width = ((sourceWidth * scale).toInt() / 16 * 16).coerceAtLeast(16)
+            val height = ((sourceHeight * scale).toInt() / 16 * 16).coerceAtLeast(16)
 
             prepareOutput()
             val videoRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -288,7 +296,7 @@ class SocialPostCaptureService : Service() {
             videoRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264)
             videoRecorder.setVideoSize(width, height)
             videoRecorder.setVideoFrameRate(30)
-            videoRecorder.setVideoEncodingBitRate(8_000_000)
+            videoRecorder.setVideoEncodingBitRate((width.toLong() * height * 2L).toInt().coerceIn(2_000_000, 7_000_000))
             val descriptor = outputDescriptor
             if (descriptor != null) {
                 videoRecorder.setOutputFile(descriptor.fileDescriptor)
@@ -402,6 +410,8 @@ class SocialPostCaptureService : Service() {
     }
 
     private fun failCapture(message: String) {
+        virtualDisplay?.release()
+        virtualDisplay = null
         deletePartialOutput()
         updateNotification(message.take(100))
         val activeProjection = projection
