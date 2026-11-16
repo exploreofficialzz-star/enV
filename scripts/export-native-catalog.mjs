@@ -19,10 +19,45 @@ const [{ tools }, { CATEGORIES: categories }, { DATETIME_TOOL_EXTENSIONS }] = aw
 const canonicalRuntimeTools = getAllTools();
 
 const publishedCatalogTools = applyGenericWorkflowPolicy(tools);
+const canonicalRuntimeById = new Map(canonicalRuntimeTools.map((tool) => [tool.id, tool]));
 const refinedCatalogTools = publishedCatalogTools.map((tool) => {
+  // The browser registry owns this stable ID's canonical presentation and operation.
+  // Keep Android/iOS catalogue exports aligned even when the checked-in generated
+  // source catalogue still contains the legacy JSON-to-CSV presentation.
+  if (tool.id === "css-minifier-advanced") {
+    const runtimeTool = canonicalRuntimeById.get(tool.id);
+    if (!runtimeTool) throw new Error("Canonical runtime record is missing for css-minifier-advanced.");
+    return {
+      ...tool,
+      name: runtimeTool.name,
+      description: runtimeTool.description,
+      category: runtimeTool.category,
+      slug: runtimeTool.slug,
+      keywords: runtimeTool.keywords,
+      tags: runtimeTool.tags,
+      engine: runtimeTool.engine,
+      clientSide: runtimeTool.clientSide,
+      requiresBackend: runtimeTool.requiresBackend,
+      requiresAuth: runtimeTool.requiresAuth,
+      status: runtimeTool.status,
+      related: runtimeTool.related,
+    };
+  }
   const description = refineGeneratedToolDescription(tool);
   return description === tool.description ? tool : { ...tool, description };
 });
+
+const exportedCssMinifier = refinedCatalogTools.find((tool) => tool.id === "css-minifier-advanced");
+if (
+  !exportedCssMinifier ||
+  exportedCssMinifier.name !== "Advanced CSS Minifier" ||
+  exportedCssMinifier.category !== "developer" ||
+  exportedCssMinifier.slug !== "css-minifier-advanced" ||
+  exportedCssMinifier.engine?.type !== "text" ||
+  exportedCssMinifier.engine?.op !== "css-minify"
+) {
+  throw new Error("Shared native catalogue must export css-minifier-advanced as the Advanced CSS Minifier CSS operation.");
+}
 
 // A book is a local-only native/web tool; keep this extension exported to every platform.
 const runtimeCatalogExtensions = [
