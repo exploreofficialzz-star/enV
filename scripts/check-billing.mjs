@@ -215,6 +215,7 @@ assert.match(walletDashboard, /title: "Other"/);
 assert.match(walletDashboard, /fundingOptionsState\.methods\[method\]/);
 assert.match(walletDashboard, /fundingOptionsReloadKey/);
 assert.match(fundingOptionsRoute, /isCustomerPaymentMethodAvailable/);
+assert.match(paymentMethods, /provider\.paymentMethods \?\? provider\.paymentOptions/, "V4 local-payment routing must inspect the V4 paymentMethods field");
 assert.match(paymentMethods, /parseUsdAmountToCents/);
 assert.match(paymentMethods, /getFundingCandidates/);
 assert.match(walletDashboard, /const allowedCheckoutHost = checkout\?\.protocol === "https:"/);
