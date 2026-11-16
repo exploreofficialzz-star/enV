@@ -179,6 +179,30 @@ const cameraStudioTool: ToolMeta = {
   isNew: true,
 };
 
+
+const socialMediaPostRecorderTool: ToolMeta = {
+  id: "social-media-post-recorder",
+  name: "Social Media Post Recorder",
+  slug: "social-media-post-recorder",
+  description: "Record a social-media post from its link, preserving the real on-screen video, creator details, engagement counts, captions, and visible interface in one video file.",
+  category: "video",
+  subcategory: "Social media capture",
+  keywords: ["social media", "post", "screen recorder", "screen capture", "video", "tiktok", "instagram", "facebook", "youtube", "shorts", "reels", "x", "twitter", "snapchat", "likes", "comments", "shares", "link"],
+  tags: ["video", "social-media", "screen-recording", "capture"],
+  icon: "ScreenShare",
+  iconBackground: "#171b1e",
+  iconAccent: "#2ec4b6",
+  popularity: 1300,
+  featured: true,
+  clientSide: true,
+  requiresBackend: false,
+  requiresAuth: false,
+  status: "active",
+  related: ["video-url-downloader", "tiktok-video-downloader", "instagram-video-downloader"],
+  engine: { type: "custom", id: "social-media-post-recorder" },
+  isNew: true,
+};
+
 const smartphonePrototypeLabTool: ToolMeta = {
   id: "smartphone-prototype-lab",
   name: "Smartphone Prototype Lab",
@@ -302,6 +326,7 @@ const allTools: ToolMeta[] = [
   ...(!catalogTools.some((tool) => tool.id === aBookTool.id) ? [aBookTool] : []),
   ...(!catalogTools.some((tool) => tool.id === zipAnyFileTool.id) ? [zipAnyFileTool] : []),
   ...(!catalogTools.some((tool) => tool.id === cameraStudioTool.id) ? [cameraStudioTool] : []),
+  ...(!catalogTools.some((tool) => tool.id === socialMediaPostRecorderTool.id) ? [socialMediaPostRecorderTool] : []),
   ...(!catalogTools.some((tool) => tool.id === smartphonePrototypeLabTool.id) ? [smartphonePrototypeLabTool] : []),
   ...fileWorkspaceTools.filter((tool) => !catalogTools.some((catalogTool) => catalogTool.id === tool.id)),
 ];
