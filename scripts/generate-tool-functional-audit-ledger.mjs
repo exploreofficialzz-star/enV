@@ -103,10 +103,11 @@ const blockedEvidenceById = new Map();
 const nonCurrentEvidenceById = new Map();
 const nonCurrentEvidence = [];
 const validEvidence = [];
-const invalidEvidence = sourceInspectionValidation.invalidRecords.map((record) => ({ auditId: record.id, kind: "source-inspection", reasons: record.reasons }));
+const invalidEvidence = [];
 const evidenceAudits = [...(observedEvidence.audits ?? [])];
 const sourceInspectionValidation = validateSourceInspectionEvidence({ evidenceSet: observedSourceInspection, runtimeToolIds: runtimeTools.map((tool) => tool.id), rootDir: root });
 const sourceInspectionById = sourceInspectionValidation.byToolId;
+invalidEvidence.push(...sourceInspectionValidation.invalidRecords.map((record) => ({ auditId: record.id, kind: "source-inspection", reasons: record.reasons })));
 
 // The QR browser script writes exact per-tool progress to this report. The
 // ledger reads it after the verify step, including when the browser audit fails.
