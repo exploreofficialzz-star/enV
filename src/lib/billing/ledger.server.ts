@@ -629,7 +629,7 @@ export async function getWalletActivity(userId: string, limit = 20, cursor?: str
   const last = items.at(-1);
   return {
     items,
-    nextCursor: hasMore && last ? `\${last.created_at}|\${last.id}` : null,
+    nextCursor: hasMore && last ? `${last.created_at}|${last.id}` : null,
     hasMore,
   };
 }
