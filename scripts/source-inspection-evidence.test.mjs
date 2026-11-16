@@ -10,9 +10,9 @@ function fixture(rootDir, overrides = {}) {
   const bytes = fs.readFileSync(path.join(rootDir, "src/tool.ts"));
   return {
     schemaVersion: 1,
+    inspectedAgainstCommit: commit,
     records: [{
       id: "tool-source-review",
-      inspectedAgainstCommit: commit,
       toolIds: ["tool-one"],
       reviewedAreas: ["Implementation and dispatch"],
       files: [{ path: "src/tool.ts", gitBlobSha1: gitBlobSha1(bytes) }],
@@ -35,6 +35,14 @@ test("accepts exact current source blobs and known runtime IDs", () => withRoot(
   const result = validateSourceInspectionEvidence({ evidenceSet: fixture(rootDir), runtimeToolIds: ["tool-one"], rootDir });
   assert.equal(result.validRecords.length, 1);
   assert.deepEqual([...result.byToolId.keys()], ["tool-one"]);
+}));
+
+test("uses the evidence-set commit when an individual record omits it", () => withRoot((rootDir) => {
+  const evidenceSet = fixture(rootDir);
+  assert.equal(Object.hasOwn(evidenceSet.records[0], "inspectedAgainstCommit"), false);
+  const result = validateSourceInspectionEvidence({ evidenceSet, runtimeToolIds: ["tool-one"], rootDir });
+  assert.equal(result.validRecords.length, 1);
+  assert.equal(result.validRecords[0].inspectedAgainstCommit, commit);
 }));
 
 test("rejects a changed source file instead of accepting stale inspection evidence", () => withRoot((rootDir) => {

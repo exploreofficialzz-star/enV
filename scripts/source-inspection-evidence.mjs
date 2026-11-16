@@ -38,7 +38,8 @@ export function validateSourceInspectionEvidence({ evidenceSet, runtimeToolIds, 
     const id = record.id.trim();
     if (seenRecords.has(id)) reasons.push("duplicate-source-inspection-record-id");
     seenRecords.add(id);
-    if (!FULL_SHA.test(record.inspectedAgainstCommit ?? "")) reasons.push("inspected-against-commit-must-be-full-git-sha");
+    const inspectedAgainstCommit = record.inspectedAgainstCommit ?? evidenceSet.inspectedAgainstCommit ?? null;
+    if (!FULL_SHA.test(inspectedAgainstCommit ?? "")) reasons.push("inspected-against-commit-must-be-full-git-sha");
     if (!Array.isArray(record.toolIds) || !record.toolIds.length) reasons.push("source-inspection-tool-ids-empty");
     if (!Array.isArray(record.reviewedAreas) || !record.reviewedAreas.length || record.reviewedAreas.some(x => typeof x !== "string" || !x.trim())) reasons.push("source-inspection-reviewed-areas-missing");
     if (!Array.isArray(record.files) || !record.files.length) reasons.push("source-inspection-files-empty");
@@ -94,7 +95,7 @@ export function validateSourceInspectionEvidence({ evidenceSet, runtimeToolIds, 
 
     const validated = {
       id,
-      inspectedAgainstCommit: record.inspectedAgainstCommit,
+      inspectedAgainstCommit,
       toolIds: [...toolIds],
       reviewedAreas: [...record.reviewedAreas],
       files: verifiedFiles,
