@@ -603,7 +603,7 @@ export async function getWalletActivity(userId: string, limit = 20, cursor?: str
             select 1
               from billing_credit_ledger l
              where l.user_id = p.user_id
-               and l.reference_id = p.id
+               and (l.reference_id = p.id or l.idempotency_key = 'purchase:' || p.id)
           )
      )
      select id, entry_type, delta_available_subunits, delta_reserved_subunits,
