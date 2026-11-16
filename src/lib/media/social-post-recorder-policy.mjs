@@ -34,8 +34,8 @@ export function resolveSocialPostUrl(rawValue) {
     throw new Error("That link is not a valid URL.");
   }
 
-  if (url.protocol !== "https:" && url.protocol !== "http:") {
-    throw new Error("Only HTTP and HTTPS post links are supported.");
+  if (url.protocol !== "https:") {
+    throw new Error("Only secure HTTPS post links are supported.");
   }
   if (url.username || url.password) {
     throw new Error("Links containing embedded login credentials are not accepted.");
