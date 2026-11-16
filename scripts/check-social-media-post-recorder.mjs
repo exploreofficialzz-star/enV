@@ -65,7 +65,7 @@ assert.match(docs, /The tool is not released|still be required|acceptance testin
 
 // Android audio playback capture is explicitly not claimed by this initial
 // screen-video implementation. Keep the limitation present in its UI.
-assert.match(android, /does not include app playback audio/);
+assert.match(android, /without app playback audio/);
 assert.match(ios, /source-app audio restrictions/);
 
 console.log("Social Media Post Recorder audit PASS.");
