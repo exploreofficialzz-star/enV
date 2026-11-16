@@ -261,6 +261,35 @@ fun Catalog.withZipArchive(): Catalog {
     )
 }
 
+/** Registers the standalone Social Media Post Recorder as a native tool. */
+fun Catalog.withSocialMediaPostRecorder(): Catalog {
+    if (tools.any { it.id == "social-media-post-recorder" }) return this
+    val tool = ToolRecord(
+        id = "social-media-post-recorder",
+        name = "Social Media Post Recorder",
+        slug = "social-media-post-recorder",
+        description = "Open a social-media post link and record the real device screen to an MP4, preserving the visible post interface and engagement details.",
+        category = "video",
+        keywords = listOf("social media", "post", "screen recorder", "screen capture", "video", "tiktok", "instagram", "facebook", "youtube", "x", "snapchat", "likes", "comments", "shares"),
+        tags = listOf("video", "social-media", "screen-recording", "capture"),
+        icon = "Video",
+        popularity = 1300,
+        featured = true,
+        clientSide = true,
+        requiresBackend = false,
+        requiresAuth = false,
+        status = "active",
+        related = emptyList(),
+        engine = EngineInfo("custom", "social-media-post-recorder"),
+        subcategory = "Social media capture",
+    )
+    val updated = tools + tool
+    return copy(
+        counts = counts.copy(total = updated.size, active = updated.count { it.status == "active" || it.status == "beta" }),
+        tools = updated.sortedWith(compareBy<ToolRecord> { it.category }.thenBy { it.name.lowercase(Locale.ROOT) }.thenBy { it.id }),
+    )
+}
+
 /** Registers the native local File workspace tools without changing the generated base catalogue. */
 fun Catalog.withFileWorkspaceTools(): Catalog {
     val definitions = listOf(
