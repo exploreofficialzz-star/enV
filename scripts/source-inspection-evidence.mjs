@@ -76,7 +76,7 @@ export function validateSourceInspectionEvidence({ evidenceSet, runtimeToolIds, 
         continue;
       }
       try {
-        const actual = gitBlobSha1(read(absolute));
+        const actual = gitBlobSha1(readFile(absolute));
         if (actual.toLowerCase() !== file.gitBlobSha1.toLowerCase()) {
           reasons.push("source-inspection-file-hash-mismatch:" + relative);
           continue;

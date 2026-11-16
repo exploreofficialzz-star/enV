@@ -45,11 +45,19 @@ test("rejects a changed source file instead of accepting stale inspection eviden
   assert.ok(result.invalidRecords[0].reasons.includes("source-inspection-file-hash-mismatch:src/tool.ts"));
 }));
 
-test("rejects unknown runtime IDs and duplicate tool claims", () => withRoot((rootDir) => {
+test("rejects unknown runtime IDs", () => withRoot((rootDir) => {
   const evidenceSet = fixture(rootDir, { toolIds: ["not-in-runtime"] });
   const result = validateSourceInspectionEvidence({ evidenceSet, runtimeToolIds: ["tool-one"], rootDir });
   assert.equal(result.byToolId.size, 0);
   assert.ok(result.invalidRecords[0].reasons.includes("source-inspection-references-unknown-tool-id:not-in-runtime"));
+}));
+
+test("rejects duplicate tool claims across source-review records", () => withRoot((rootDir) => {
+  const evidenceSet = fixture(rootDir);
+  evidenceSet.records.push({ ...evidenceSet.records[0], id: "second-source-review" });
+  const result = validateSourceInspectionEvidence({ evidenceSet, runtimeToolIds: ["tool-one"], rootDir });
+  assert.equal(result.validRecords.length, 1);
+  assert.ok(result.invalidRecords[0].reasons.includes("duplicate-source-inspection-tool-id:tool-one"));
 }));
 
 test("rejects traversal paths and empty review details", () => withRoot((rootDir) => {
