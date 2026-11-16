@@ -47,6 +47,8 @@ test("country profiles expose the documented Flutterwave local currencies and me
     countryCode: "US", currency: "USD", paymentOptions: ["card", "account"],
   });
   assert.equal(getCurrencyMinorUnitExponent("USD"), 2);
+  assert.equal(toFlutterwaveMajorAmount(100, "USD"), 1);
+  assert.equal(parseMajorUnitsToMinor(1, "USD"), 100);
   assert.equal(getCountryPaymentProfile("GH")?.paymentOptions.includes("mobilemoneyghana"), true);
   assert.equal(getCountryPaymentProfile("KE")?.paymentOptions.includes("mpesa"), true);
   assert.equal(getCountryPaymentProfile("ZA")?.currency, "ZAR");
