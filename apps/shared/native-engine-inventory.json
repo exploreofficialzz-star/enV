@@ -4,7 +4,8 @@
   "runtimeExtensionIds": [
     "zip-any-file",
     "a-book",
-    "camera-studio"
+    "camera-studio",
+    "social-media-post-recorder"
   ],
   "source": "src/data/catalog.ts",
   "platforms": {
@@ -104,12 +105,12 @@
     },
     {
       "family": "custom",
-      "total": 1667,
-      "active": 1667,
+      "total": 1668,
+      "active": 1668,
       "planned": 0,
-      "androidImplemented": 205,
-      "iosImplemented": 205,
-      "uniqueConfigurations": 1664
+      "androidImplemented": 206,
+      "iosImplemented": 206,
+      "uniqueConfigurations": 1665
     },
     {
       "family": "datetime",
@@ -7809,6 +7810,7 @@
     "sms-template",
     "snake-case-converter",
     "social-hook-generator",
+    "social-media-post-recorder",
     "solar-panel-count-calculator",
     "solar-panel-energy-calculator",
     "song-metadata-analyzer",
@@ -15713,6 +15715,7 @@
     "sms-template",
     "snake-case-converter",
     "social-hook-generator",
+    "social-media-post-recorder",
     "solar-panel-count-calculator",
     "solar-panel-energy-calculator",
     "song-metadata-analyzer",
@@ -16065,11 +16068,11 @@
     "zip-any-file"
   ],
   "summary": {
-    "totalTools": 10004,
-    "activeTools": 10004,
+    "totalTools": 10005,
+    "activeTools": 10005,
     "plannedTools": 0,
     "engineFamilies": 27,
-    "androidImplemented": 7902,
-    "iosImplemented": 7902
+    "androidImplemented": 7903,
+    "iosImplemented": 7903
   }
 }
