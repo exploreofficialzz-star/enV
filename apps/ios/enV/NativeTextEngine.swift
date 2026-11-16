@@ -112,7 +112,7 @@ public enum NativeTextEngine {
         case "extract-emails": return uniqueMatches(input,"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"); case "extract-urls": return uniqueMatches(input,"https?://[^\\s<>\"'`]+",options:[.caseInsensitive]); case "list": return listify(input,o["style"] ?? "bullets")
         case "sql-format": return formatSQL(input, dialectRaw: o["dialect"] ?? "postgresql"); case "html-format": return markup(input); case "xml-format": return try xmlFormat(input); case "css-format": return cssFormat(input); case "js-format": return jsFormat(input); case "yaml-format": return yamlFormat(input)
         case "html-minify": return regexReplace(regexReplace(regexReplace(input,"<!--[\\s\\S]*?-->",""),">\\s+<"," ><"),"\\s+"," ").replacingOccurrences(of:" ><",with:"><").trimmingCharacters(in:.whitespacesAndNewlines)
-        case "css-minify": return regexReplace(regexReplace(regexReplace(regexReplace(input,"/\\*[\\s\\S]*?\\*/",""),"\\s+"," "),"\\s*([{};:,>~+])\\s*","$1"),";}","}").trimmingCharacters(in:.whitespacesAndNewlines)
+        case "css-minify": return regexReplace(regexReplace(regexReplace(input,"/\\*[\\s\\S]*?\\*/",""),"\\s+"," "),"\\s*([{};:,>~+])\\s*","$1").replacingOccurrences(of:";}",with:"}").trimmingCharacters(in:.whitespacesAndNewlines)
         case "js-minify": return jsMinify(input); case "json-to-csv": return try jsonToCSV(input); case "json-to-yaml": return try jsonToYAML(input); case "yaml-to-json": return try yamlToJSON(input); case "json-to-xml": return try jsonToXML(input); case "xml-to-json": return try xmlToJSON(input); case "keyword-density": return keywordDensity(input,o["keyword"] ?? "")
         default: throw NativeTextError.unknownOperation
         }
