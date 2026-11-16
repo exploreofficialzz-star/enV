@@ -448,6 +448,23 @@ ingestCommitBoundBrowserReport({
   step: "Verify File to TXT local extraction and download in the browser",
   script: "scripts/audit-file-to-txt-browser.mjs",
 });
+ingestCommitBoundBrowserReport({
+  reportPath: path.join(root, "artifacts/tool-functional-audit/files-remaining.json"),
+  auditId: "files-nine-remaining-browser",
+  expectedToolIds: [
+    "csv-to-json",
+    "file-size-converter",
+    "css-minifier-advanced",
+    "json-to-csv",
+    "json-to-xml",
+    "json-to-yaml",
+    "mime-type-lookup",
+    "xml-to-json",
+    "yaml-to-json",
+  ],
+  step: "Verify remaining Files converters and MIME utilities in the browser",
+  script: "scripts/audit-files-remaining-browser.mjs",
+});
 
 function appendEvidence(target, id, evidence) {
   target.set(id, [...(target.get(id) ?? []), evidence]);

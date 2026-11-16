@@ -126,6 +126,7 @@
     "check:ads": "node --experimental-strip-types --test src/lib/ads/policy.test.ts src/lib/ads/page-units.test.ts src/lib/ads/adsterra.test.ts && node scripts/check-ad-access.mjs",
     "audit:file-workspace:browser": "node scripts/audit-file-workspace-browser.mjs",
     "audit:file-to-txt:browser": "node scripts/audit-file-to-txt-browser.mjs",
+    "audit:files-remaining:browser": "node scripts/audit-files-remaining-browser.mjs",
     "check:file-upload-ui": "node scripts/check-file-upload-ui.mjs",
     "check:celebrations": "node scripts/check-celebrations.mjs && node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/components/engines/celebration-engine-utils.test.ts",
     "check:native-celebrations": "node scripts/check-native-celebrations.mjs",
