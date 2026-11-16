@@ -2,6 +2,7 @@ import { defineHandler } from "nitro/h3";
 import { getTokenUsageDashboard } from "../../../../src/lib/billing/token-usage.server";
 import { jsonResponse, requireOfflineBillingUser } from "../../../../src/lib/billing/http.server";
 import { readWallet } from "../../../../src/lib/billing/ledger.server";
+import { reconcilePendingPurchasesForUser } from "../../../../src/lib/billing/purchase-reconciliation.server";
 
 /** Shared, read-only token dashboard for a verified web session or paired native device. */
 export default defineHandler(async (event) => {
@@ -10,6 +11,7 @@ export default defineHandler(async (event) => {
   const requestUrl = new URL(event.req.url);
   const timeZone = requestUrl.searchParams.get("timezone");
   try {
+    await reconcilePendingPurchasesForUser(auth.userId);
     const [wallet, tokenUsage] = await Promise.all([
       readWallet(auth.userId),
       getTokenUsageDashboard(auth.userId, timeZone),
