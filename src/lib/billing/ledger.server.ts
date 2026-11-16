@@ -519,8 +519,18 @@ function parseWalletActivityCursor(value?: string | null): WalletActivityCursor 
   const createdAt = value.slice(0, separator);
   const id = value.slice(separator + 1);
   const timestamp = Date.parse(createdAt);
-  if (!Number.isFinite(timestamp) || !id || id.length > 200 || /[\u0000-\u001f]/.test(id)) return null;
+  if (!Number.isFinite(timestamp) || !id || id.length > 200 || /[\u0000-\u001f]/.test(id)) {
+    throw new Error("The transaction history cursor is invalid. Refresh the history and try again.");
+  }
   return { createdAt: new Date(timestamp).toISOString(), id };
+}
+
+function signedAmount(value: unknown): number {
+  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+  if (!Number.isSafeInteger(parsed) || Math.abs(parsed) > MAX_TOKEN_SUBUNITS) {
+    throw new BillingError("INVALID_AMOUNT", "A stored wallet activity amount is outside the supported safe range.");
+  }
+  return parsed;
 }
 
 export async function getWalletActivity(userId: string, limit = 20, cursor?: string | null): Promise<WalletActivityPage> {
@@ -572,7 +582,7 @@ export async function getWalletActivity(userId: string, limit = 20, cursor?: str
                 when 'created' then 'Payment checkout created'
                 when 'pending' then 'Payment awaiting confirmation'
                 when 'verified' then 'Payment verified; wallet credit is being reconciled'
-                when 'credited' then 'Payment marked credited'
+                when 'credited' then 'Payment marked credited; awaiting ledger verification'
                 when 'failed' then 'Payment failed'
                 when 'cancelled' then 'Payment cancelled'
                 when 'refunded' then 'Payment refunded'
@@ -611,8 +621,8 @@ export async function getWalletActivity(userId: string, limit = 20, cursor?: str
   const items: WalletActivityItem[] = pageRows.map((row) => ({
     id: row.id,
     entry_type: row.entry_type,
-    delta_available_subunits: amount(row.delta_available_subunits),
-    delta_reserved_subunits: amount(row.delta_reserved_subunits),
+    delta_available_subunits: signedAmount(row.delta_available_subunits),
+    delta_reserved_subunits: signedAmount(row.delta_reserved_subunits),
     consumed_subunits: amount(row.consumed_subunits),
     description: row.description,
     reference_id: row.reference_id,
