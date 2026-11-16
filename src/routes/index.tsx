@@ -15,6 +15,7 @@ import { seoPageHead, pageSchema } from "@/lib/seo-metadata";
 import { getToolById, toolPath } from "@/lib/registry";
 import { rankMostUsedToolIds, usePrefs } from "@/lib/storage";
 import type { ToolMeta } from "@/types/tool";
+import { formatEnVTokenBalance } from "@/lib/billing/token-display";
 
 export const Route = createFileRoute("/")({
   loader: () => loadHomeTrendingTools(),
@@ -150,7 +151,7 @@ function Home() {
         />
         <div className="mt-4 grid w-[84%] max-w-[40rem] grid-cols-2 gap-2 sm:gap-3">
           <Link to="/agent" aria-label="Open AI Agent" className="flex h-10 min-w-0 items-center justify-center rounded-[20px] border border-border-strong bg-surface-2 px-2 text-center text-[11.1px] font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:px-4 sm:text-sm">AI Agent</Link>
-          <Link to="/tokens" aria-label="Open token dashboard" className="flex h-10 min-w-0 items-center justify-center rounded-[20px] border border-border-strong bg-surface-2 px-2 text-center text-[11.1px] font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:px-4 sm:text-sm">Total token = 100</Link>
+          <HomeTokenBalance />
         </div>
 <MostUsedToolsTray tools={mostUsedTools} />
         <h1 className="mt-6 w-full max-w-3xl self-start text-left text-balance text-2xl font-semibold tracking-tight sm:mt-8 sm:text-4xl">Find the right tool for the task.</h1>
@@ -158,6 +159,54 @@ function Home() {
       <ToolSection title="Trending tools" tools={trendingTools} />
     </AppShell>
   );
+}
+
+type HomeBalanceState = { status: "loading" | "signed-out" | "unavailable" } | { status: "ready"; availableTokens: number };
+
+function HomeTokenBalance() {
+  const [balance, setBalance] = useState<HomeBalanceState>({ status: "loading" });
+  useEffect(() => {
+    let active = true;
+    let inFlight = false;
+    let controller: AbortController | null = null;
+    const refresh = async () => {
+      if (!active || inFlight || !navigator.onLine) return;
+      inFlight = true;
+      controller = new AbortController();
+      try {
+        const response = await fetch("/api/billing/wallet", { credentials: "same-origin", cache: "no-store", signal: controller.signal });
+        const payload = await response.json() as { ok?: boolean; data?: { wallet?: { availableTokens?: number } } };
+        if (!active || controller.signal.aborted) return;
+        if (response.status === 401) { setBalance({ status: "signed-out" }); return; }
+        const availableTokens = payload.data?.wallet?.availableTokens;
+        if (!response.ok || payload.ok !== true || typeof availableTokens !== "number" || !Number.isFinite(availableTokens) || availableTokens < 0) {
+          setBalance({ status: "unavailable" }); return;
+        }
+        setBalance({ status: "ready", availableTokens });
+      } catch {
+        if (active && !controller.signal.aborted) setBalance({ status: "unavailable" });
+      } finally { inFlight = false; }
+    };
+    const refreshWhenVisible = () => { if (document.visibilityState === "visible") void refresh(); };
+    void refresh();
+    const timer = window.setInterval(refreshWhenVisible, 20_000);
+    window.addEventListener("focus", refreshWhenVisible);
+    window.addEventListener("online", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      active = false;
+      controller?.abort();
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshWhenVisible);
+      window.removeEventListener("online", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, []);
+  const label = balance.status === "ready"
+    ? "Total token = " + formatEnVTokenBalance(balance.availableTokens) + " enV"
+    : balance.status === "signed-out" ? "Sign in for token balance"
+      : balance.status === "unavailable" ? "Token balance unavailable" : "Total token";
+  return <Link to="/tokens" aria-label="Open token dashboard" className="flex h-10 min-w-0 items-center justify-center rounded-[20px] border border-border-strong bg-surface-2 px-2 text-center text-[11.1px] font-medium text-muted transition-colors hover:border-accent/40 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:px-4 sm:text-sm">{label}</Link>;
 }
 
 function MostUsedToolsTray({ tools }: { tools: ToolMeta[] }) {

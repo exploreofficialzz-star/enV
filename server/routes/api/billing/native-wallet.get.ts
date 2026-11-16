@@ -1,6 +1,7 @@
 import { defineHandler } from "nitro/h3";
 import { jsonResponse, requireOfflineBillingUser } from "../../../../src/lib/billing/http.server";
 import { readWallet, getWalletActivity } from "../../../../src/lib/billing/ledger.server";
+import { reconcilePendingPurchasesForUser } from "../../../../src/lib/billing/purchase-reconciliation.server";
 import { getRewardsSummary } from "../../../../src/lib/billing/rewards.server";
 import { getTokenUsageDashboard } from "../../../../src/lib/billing/token-usage.server";
 
@@ -20,6 +21,7 @@ export default defineHandler(async (event) => {
   }
   try {
     const timeZone = new URL(event.req.url).searchParams.get("timezone");
+    await reconcilePendingPurchasesForUser(auth.userId);
     const [wallet, activity, rewards, tokenUsage] = await Promise.all([
       readWallet(auth.userId),
       getWalletActivity(auth.userId, 20),
