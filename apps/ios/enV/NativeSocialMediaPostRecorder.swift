@@ -69,7 +69,7 @@ struct NativeSocialMediaPostRecorderView: View {
                         .padding(12)
                         .background(Color.envCard, in: RoundedRectangle(cornerRadius: 10))
                         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
-                        .onChange(of: postLink) { _, _ in
+                        .onChange(of: postLink) { _ in
                             provider = ""
                             failure = nil
                         }
