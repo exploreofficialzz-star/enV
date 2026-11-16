@@ -848,7 +848,7 @@ function Account() {
           ok?: boolean; data?: { encryptionKey?: string };
         } | null;
         if (!keyResponse.ok || !keyPayload?.ok || !keyPayload.data?.encryptionKey) {
-          throw new Error("Flutterwave card encryption is not configured.");
+          throw new Error("Secure card entry is unavailable.");
         }
         const nonce = flutterwaveNonce();
         body.encryptedPin = await encryptFlutterwaveField(value, keyPayload.data.encryptionKey, nonce);
