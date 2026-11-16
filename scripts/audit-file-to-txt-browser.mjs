@@ -104,7 +104,7 @@ try {
   await page.getByRole("button", { name: "Download research.txt" }).click();
   const docxDownload = await docxDownloadPromise;
   assert.equal(docxDownload.suggestedFilename(), "research.txt");
-  assert.equal((await readDownload(docxDownload)).toString("utf8"), "DOCX local extraction marker\\n");
+  assert.equal((await readDownload(docxDownload)).toString("utf8"), "DOCX local extraction marker\n");
 
   const pdfBytes = await makePdf();
   await page.locator('input[type="file"]').first().setInputFiles({
