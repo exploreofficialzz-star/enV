@@ -71,6 +71,7 @@ private fun parseSocialPostLink(raw: String): SocialPostLink {
     val uri = Uri.parse(raw.trim())
     require(uri.scheme.equals("https", ignoreCase = true)) { "Paste a secure HTTPS social-media post link." }
     require(uri.encodedUserInfo.isNullOrEmpty()) { "Links containing embedded login credentials are not accepted." }
+    require(uri.port == -1 || uri.port == 443) { "Custom ports are not supported for post links." }
     val host = uri.host?.lowercase(Locale.ROOT)?.removePrefix("www.")
         ?: throw IllegalArgumentException("That link is not valid.")
     val provider = socialPostDomains.entries.firstOrNull { (_, domains) ->
