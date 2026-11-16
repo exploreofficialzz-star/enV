@@ -30,6 +30,14 @@ export function resolveFlutterwaveFundingMethod(
   return localMethods[0] ?? null;
 }
 
+/** Optional customer contact phone. Returns null when blank and undefined when malformed. */
+export function normalizeOptionalPhoneNumber(value: string | null | undefined): string | null | undefined {
+  const digits = (value ?? "").replace(/\\D/g, "");
+  if (!digits) return null;
+  const normalized = digits.startsWith("0") ? digits.slice(1) : digits;
+  return /^\\d{7,10}$/.test(normalized) ? normalized : undefined;
+}
+
 /** Format card expiry input as MM/YY while accepting a 4-digit year too. */
 export function formatCardExpiryInput(value: string): string {
   const digits = value.replace(/\\D/g, "").slice(0, 6);
