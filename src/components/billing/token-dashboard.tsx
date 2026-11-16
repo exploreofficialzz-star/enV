@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Activity, ArrowDownLeft, ArrowUpRight, CalendarDays, CheckCircle2, Clock3, Coins, ShieldCheck, Wallet } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { getToolById } from "@/lib/registry";
+import { formatEnVTokenBalance } from "@/lib/billing/token-display";
 
 type WalletSummary = {
   availableTokens: number;
@@ -57,7 +58,7 @@ function tokenAmount(subunits: number): string {
   return (subunits / 1_000).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 }
 function tokenLabel(tokens: number): string {
-  return `${tokens.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} enV`;
+  return `${formatEnVTokenBalance(tokens)} enV`;
 }
 function tokenUnitDisplay(label: string): React.ReactNode {
   const unitIndex = label.lastIndexOf(" enV");
@@ -133,6 +134,7 @@ export function TokenDashboard() {
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [filter, setFilter] = useState<"all" | "deductions" | "tool-activity">("all");
   const [showAll, setShowAll] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -159,6 +161,20 @@ export function TokenDashboard() {
       setLoadState("unavailable");
     });
     return () => controller.abort();
+  }, [refreshKey]);
+
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === "visible") setRefreshKey((value) => value + 1); };
+    const timer = window.setInterval(refresh, 20_000);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, []);
 
   const timeline = useMemo<TimelineItem[]>(() => {
