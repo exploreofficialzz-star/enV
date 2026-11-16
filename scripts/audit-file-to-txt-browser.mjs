@@ -95,7 +95,7 @@ try {
   await page.locator('input[type="file"]').first().setInputFiles({
     name: "research.docx",
     mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    buffer: docxBytes,
+    buffer: Buffer.from(docxBytes),
   });
   await page.getByText("research.docx", { exact: true }).first().waitFor();
   await convert.click();
