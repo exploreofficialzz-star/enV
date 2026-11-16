@@ -412,13 +412,20 @@ class SocialPostCaptureService : Service() {
     }
 
     private fun failCapture(message: String) {
+        if (stopping) return
+        stopping = true
         virtualDisplay?.release()
         virtualDisplay = null
         deletePartialOutput()
         updateNotification(message.take(100))
         val activeProjection = projection
         projection = null
+        projectionCallback?.let { callback ->
+            runCatching { activeProjection?.unregisterCallback(callback) }
+        }
+        projectionCallback = null
         runCatching { activeProjection?.stop() }
+        runCatching { recorder?.reset() }
         runCatching { recorder?.release() }
         recorder = null
         runCatching { outputDescriptor?.close() }
