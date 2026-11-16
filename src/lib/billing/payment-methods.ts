@@ -5,6 +5,7 @@ export type FundingProvider = {
   currency: string;
   localPayments?: boolean;
   paymentOptions?: readonly string[];
+  paymentMethods?: readonly string[];
 };
 
 /** A customer sees payment methods, never gateway brands. */
@@ -26,12 +27,13 @@ export function getFundingCandidates<T extends FundingProvider>(
     );
   }
   if (method === "local") {
-    return providers.filter((provider) =>
-      provider.enabled && (
+    return providers.filter((provider) => {
+      const flutterwaveMethods = provider.paymentMethods ?? provider.paymentOptions;
+      return provider.enabled && (
         (provider.id === "paystack" && provider.localPayments === true) ||
-        (provider.id === "flutterwave" && provider.paymentOptions?.some((option) => option !== "card") === true)
-      ),
-    ).sort((a, b) => Number(b.id === "flutterwave") - Number(a.id === "flutterwave"));
+        (provider.id === "flutterwave" && flutterwaveMethods?.some((option) => option !== "card") === true)
+      );
+    }).sort((a, b) => Number(b.id === "flutterwave") - Number(a.id === "flutterwave"));
   }
   return providers.filter((provider) => provider.id === "cryptomus" && provider.enabled);
 }
