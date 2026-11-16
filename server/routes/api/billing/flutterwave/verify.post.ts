@@ -27,7 +27,7 @@ export default defineHandler(async (event) => {
       error: typeof candidate.code === "string" ? candidate.code : "FLUTTERWAVE_VERIFICATION_FAILED",
       message: status < 500 && typeof candidate.message === "string"
         ? candidate.message
-        : "Flutterwave has not confirmed this payment yet. No wallet tokens were added.",
+        : "The payment has not been confirmed yet. No wallet tokens were added.",
     }, status);
   }
 });
