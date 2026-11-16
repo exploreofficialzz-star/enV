@@ -34,7 +34,7 @@ object NativeTextEngine {
         "css-formatter" to "css-format", "css-minifier" to "css-minify", "html-formatter" to "html-format",
         "html-minifier" to "html-minify", "javascript-formatter" to "js-format", "javascript-minifier" to "js-minify",
         "sql-formatter" to "sql-format", "xml-formatter" to "xml-format", "yaml-formatter" to "yaml-format",
-        "css-minifier-advanced" to "json-to-csv", "json-to-xml" to "json-to-xml", "json-to-yaml" to "json-to-yaml",
+        "css-minifier-advanced" to "css-minify", "json-to-xml" to "json-to-xml", "json-to-yaml" to "json-to-yaml",
         "xml-to-json" to "xml-to-json", "yaml-to-json" to "yaml-to-json", "keyword-density-calculator" to "keyword-density",
         "camel-case-converter" to "camel-case", "character-counter" to "character-counter", "extract-emails" to "extract-emails",
         "extract-urls" to "extract-urls", "find-and-replace" to "find-replace", "kebab-case-converter" to "kebab-case",

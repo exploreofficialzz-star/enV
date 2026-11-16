@@ -19,11 +19,12 @@ class NativeTextEngineTest {
         assertEquals(40, ids.size)
         assertEquals(ids.toSet(), NativeTextEngine.supportedToolIds)
         ids.forEach { assertTrue("missing operation for $it", NativeTextEngine.operationForTool(it) != null) }
-        assertEquals("json-to-csv", NativeTextEngine.operationForTool("css-minifier-advanced"))
+        assertEquals("css-minify", NativeTextEngine.operationForTool("css-minifier-advanced"))
     }
 
     @Test fun transformationsMatchCanonicalExamples() {
         assertEquals("HELLO", NativeTextEngine.run("uppercase-converter", "Hello"))
+        assertEquals(".card{color:red}", NativeTextEngine.run("css-minifier-advanced", "/* comment */ .card { color: red; }"))
         assertEquals("helloWorld", NativeTextEngine.run("camel-case-converter", "Hello, world"))
         assertEquals("hello-world", NativeTextEngine.run("slug-generator", " Héllo, world! "))
         assertEquals("one\ntwo\n", NativeTextEngine.run("sort-lines", "two\none\n"))
