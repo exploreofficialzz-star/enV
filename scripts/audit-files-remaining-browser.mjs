@@ -126,7 +126,7 @@ try {
     title: "CSV to JSON Converter",
     inputName: "people.csv",
     inputMimeType: "text/csv",
-    inputText: 'name,note\\n"Ada","needs, commas"',
+    inputText: 'name,note\n"Ada","needs, commas"',
     outputName: "people.json",
     validatePreview(value) {
       assert.deepEqual(JSON.parse(value), [{ name: "Ada", note: "needs, commas" }]);
@@ -223,7 +223,7 @@ try {
 
   await runTool("mime-type-lookup", "MIME Type Lookup", async () => {
     await page.getByPlaceholder("e.g. .webp, image/png, pdf").fill(".pdf");
-    await page.getByText(/application\\/pdf/).first().waitFor();
+    await page.getByText(/application\/pdf/).first().waitFor();
     await page.locator('input[type="file"]').first().setInputFiles({
       name: "mislabeled.txt",
       mimeType: "text/plain",
