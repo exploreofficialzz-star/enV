@@ -30,6 +30,31 @@ export function resolveFlutterwaveFundingMethod(
   return localMethods[0] ?? null;
 }
 
+/** Format card expiry input as MM/YY while accepting a 4-digit year too. */
+export function formatCardExpiryInput(value: string): string {
+  const digits = value.replace(/\\D/g, "").slice(0, 6);
+  return digits.length > 2 ? digits.slice(0, 2) + "/" + digits.slice(2) : digits;
+}
+
+/** Parse and validate a card expiry value entered as MM/YY or MM/YYYY. */
+export function parseCardExpiry(
+  value: string,
+  currentDate: Date = new Date(),
+): { month: string; year: string } | null {
+  const digits = value.replace(/\\D/g, "");
+  if (digits.length !== 4 && digits.length !== 6) return null;
+  const month = digits.slice(0, 2);
+  const year = digits.slice(2);
+  const monthNumber = Number(month);
+  if (!Number.isInteger(monthNumber) || monthNumber < 1 || monthNumber > 12) return null;
+  const fullYear = year.length === 2 ? 2000 + Number(year) : Number(year);
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = currentDate.getMonth() + 1;
+  if (!Number.isInteger(fullYear) || fullYear < currentYear ||
+      (fullYear === currentYear && monthNumber < currentMonth)) return null;
+  return { month, year };
+}
+
 /** A customer sees payment methods, never gateway brands. */
 export function isCustomerPaymentMethodAvailable(
   providers: readonly FundingProvider[],
