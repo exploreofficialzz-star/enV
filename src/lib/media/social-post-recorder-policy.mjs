@@ -13,7 +13,10 @@ const SOCIAL_POST_HOSTS = Object.freeze({
   dailymotion: ["dailymotion.com"],
 });
 
-/** @param {string} host @param {string} domain */
+/**
+ * @param {string} host
+ * @param {string} domain
+ */
 function hostMatches(host, domain) {
   return host === domain || host.endsWith(`.${domain}`);
 }
