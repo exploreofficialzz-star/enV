@@ -1,1 +1,0 @@
-Retry after aligning validation order with authoritative Android workflow: build first, then typecheck and lint.

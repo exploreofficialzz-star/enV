@@ -60,6 +60,7 @@ const MusicDownloaderEngine = lazy(() => import("@/components/engines/music-down
 const AiMusicDataSandbox = lazy(() => import("@/components/engines/ai-music-data-sandbox").then((m) => ({ default: m.AiMusicDataSandbox })));
 const ZipArchiveEngine = lazy(() => import("@/components/engines/zip-archive-engine").then((m) => ({ default: m.ZipArchiveEngine })));
 const CameraStudioEngine = lazy(() => import("@/components/engines/camera-studio-engine").then((m) => ({ default: m.CameraStudioEngine })));
+const VideoLinkRecorderEngine = lazy(() => import("@/components/engines/video-link-recorder-engine").then((m) => ({ default: m.VideoLinkRecorderEngine })));
 const SmartphonePrototypeLabEngine = lazy(() => import("@/components/engines/smartphone-prototype-lab-engine").then((m) => ({ default: m.SmartphonePrototypeLabEngine })));
 import { isEventTemplateTool } from "@/lib/events/event-templates";
 import { developerActionForLegacySlug, developerModeForLegacySlug, developerStudioForLegacySlug } from "@/lib/developer-studios-catalog";
@@ -79,6 +80,7 @@ function ToolEngineView({ tool, initialMode, initialAction, initialOp }: ToolEng
   // were previously marked planned. The catalog remains the compatibility index.
   if (tool.id === "smartphone-prototype-lab") return <SmartphonePrototypeLabEngine />;
   if (tool.id === "camera-studio") return <CameraStudioEngine />;
+  if (tool.id === "video-link-screen-recording") return <VideoLinkRecorderEngine />;
   // Flashcard Generator uses the implemented document/flashcards operation.
   if (tool.id === "flashcard-generator") return <DocumentEngine op="flashcards" />;
   // These legacy security records use the shared local password engine.

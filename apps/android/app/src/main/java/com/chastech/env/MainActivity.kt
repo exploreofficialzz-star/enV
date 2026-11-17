@@ -146,6 +146,7 @@ import com.chastech.env.data.withSongMetadataAnalyzer
 import com.chastech.env.data.withABook
 import com.chastech.env.data.withCameraStudio
 import com.chastech.env.data.withZipArchive
+import com.chastech.env.data.withVideoLinkScreenRecording
 import com.chastech.env.data.withFileWorkspaceTools
 import com.chastech.env.data.withDateTimeExtensions
 import com.chastech.env.data.search
@@ -227,7 +228,7 @@ private fun CatalogGate(favorites: FavoritesStore, darkMode: Boolean, themeMode:
         loadFailed = false
         val result = withContext(Dispatchers.IO) {
             runCatching {
-                context.assets.open("catalog.json").bufferedReader().use { Catalog.fromJson(it.readText()).withMusicDownloader().withSongMetadataAnalyzer().withABook().withZipArchive().withFileWorkspaceTools().withCameraStudio().withDateTimeExtensions() }
+                context.assets.open("catalog.json").bufferedReader().use { Catalog.fromJson(it.readText()).withMusicDownloader().withSongMetadataAnalyzer().withABook().withZipArchive().withFileWorkspaceTools().withCameraStudio().withVideoLinkScreenRecording().withDateTimeExtensions() }
                     .also { require(it.tools.isNotEmpty()) { "The bundled tool catalog is empty." } }
             }
         }
@@ -1065,7 +1066,7 @@ private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme:
     }
 }
 
-private fun nativeSupported(tool: ToolRecord): Boolean = !NativeCopy.isWebRuntimeOnly(tool.id) && when { tool.category == "communication" -> true; tool.id == "camera-studio" -> true; tool.id == "music-downloader" -> true; NativeBackendEngine.supports(tool) -> false; tool.status == "planned" -> false; NativeAudioEngine.supports(tool) -> true; else -> when (tool.engine.type) {
+private fun nativeSupported(tool: ToolRecord): Boolean = !NativeCopy.isWebRuntimeOnly(tool.id) && when { tool.category == "communication" -> true; tool.id == "camera-studio" -> true; tool.id == "music-downloader" -> true; tool.id == "video-link-screen-recording" -> true; NativeBackendEngine.supports(tool) -> false; tool.status == "planned" -> false; NativeAudioEngine.supports(tool) -> true; else -> when (tool.engine.type) {
     "business" -> NativeBusinessEngine.supports(tool)
     "custom" -> tool.category == "files" || tool.category == "celebrations" || NativeProductivityEngine.supports(tool.id) || NativeAccessibilityEngine.supports(tool.id, tool.category) || NativeEventEngine.supports(tool.id) || NativeEcommerceEngine.supports(tool)
     "ai" -> NativeAiEngine.supports(tool)
@@ -1088,7 +1089,7 @@ private fun nativeBackendSupported(tool: ToolRecord): Boolean = !NativeCopy.isWe
 
 internal fun ToolRecord.offlineDescription(): String {
     val canRunOffline = status.lowercase(Locale.ROOT) in setOf("active", "beta") &&
-        !isUnderProduction() && id != "music-downloader" && nativeSupported(this)
+        !isUnderProduction() && id != "music-downloader" && id != "video-link-screen-recording" && nativeSupported(this)
     if (!canRunOffline || description.startsWith("Works offline.", ignoreCase = true)) return description
     return "Works offline. $description"
 }
@@ -1422,6 +1423,7 @@ private fun NativeToolForm(tool: ToolRecord, onRelatedTool: (String) -> Unit, st
     if (tool.category == "files" && tool.engine.type == "custom") { NativeFileWorkspaceScreen(tool.id); return }
     if (tool.id == "camera-studio") { NativeCameraStudioScreen(); return }
     if (tool.id == "music-downloader") { NativeMusicDownloaderScreen(); return }
+    if (tool.id == "video-link-screen-recording") { NativeVideoLinkRecorderScreen(); return }
     if (tool.id == "song-metadata-analyzer" || tool.id == "audio-analyze-studio") { NativeMusicDataSandboxScreen(startInWorkspace); return }
     when (tool.engine.type) {
         "business" -> NativeBusinessToolForm(tool)

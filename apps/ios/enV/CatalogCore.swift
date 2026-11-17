@@ -144,7 +144,7 @@ struct Tool: Decodable, Identifiable, Hashable {
         let hasNativeDocumentEngine = nativeDocumentOperations.contains(id) && !requiresAuth
         let hasLocalToolEngine = clientSide && !requiresBackend && !requiresAuth
         return ["active", "beta"].contains(status.lowercased()) && !isUnderProduction &&
-            (hasNativeDocumentEngine || hasLocalToolEngine) && id != "music-downloader" &&
+            (hasNativeDocumentEngine || hasLocalToolEngine) && id != "music-downloader" && id != "video-link-screen-recording" &&
             !NativeCopy.isWebRuntimeOnly(id)
     }
     var offlineDescription: String {
@@ -434,6 +434,46 @@ extension Catalog {
         )
     }
 
+    /// Registers Video Link Screen Recording as a native tool.
+    func includingVideoLinkScreenRecording() -> Catalog {
+        guard !tools.contains(where: { $0.id == "video-link-screen-recording" }) else { return self }
+        let tool = Tool(
+            id: "video-link-screen-recording",
+            name: "Video Link Screen Recording",
+            slug: "video-link-screen-recording",
+            description: "Paste a video link, view it as it appears on its original platform, and record the screen with its likes, comments and controls. Recording stays on your device.",
+            category: "video",
+            subcategory: "Screen recording",
+            keywords: ["screen recording", "screen recorder", "record video link", "record screen", "video link", "capture", "likes", "comments", "youtube", "tiktok", "instagram", "facebook", "vimeo", "reel", "short"],
+            tags: ["video", "screen-recording", "capture", "link", "local"],
+            icon: "Video",
+            popularity: 1100,
+            featured: true,
+            clientSide: true,
+            requiresBackend: false,
+            requiresAuth: false,
+            status: "active",
+            disclaimer: nil,
+            related: ["video-url-downloader", "url-media-inspector", "video-trimmer", "video-file-inspector"],
+            engine: ToolEngine(type: "custom", id: "video-link-screen-recording", op: "video-link-screen-recording", configuration: [:])
+        )
+        let updated = tools + [tool]
+        return Catalog(
+            schemaVersion: schemaVersion,
+            catalogVersion: catalogVersion,
+            counts: CatalogCounts(total: updated.count, active: updated.filter { $0.status == "active" || $0.status == "beta" }.count, planned: counts.planned, categories: counts.categories),
+            categories: categories,
+            tools: updated.sorted {
+                let leftCategory = $0.category.lowercased()
+                let rightCategory = $1.category.lowercased()
+                return leftCategory == rightCategory
+                    ? ($0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending)
+                    : leftCategory < rightCategory
+            },
+            relatedReferenceTools: relatedReferenceTools
+        )
+    }
+
     /// Registers the native local File workspace tools alongside the shared catalogue.
     func includingFileWorkspaceTools() -> Catalog {
         let definitions: [(String, String, String, String, [String], String)] = [
@@ -612,7 +652,7 @@ enum CatalogLoader {
         let data = try Data(contentsOf: url)
         let catalog = try JSONDecoder().decode(Catalog.self, from: data)
         guard !catalog.tools.isEmpty else { throw CocoaError(.fileReadCorruptFile) }
-        return catalog.nativeFacing().includingMusicDownloader().includingSongMetadataAnalyzer().includingABook().includingZipArchive().includingFileWorkspaceTools().includingCameraStudio().includingDateTimeExtensions()
+        return catalog.nativeFacing().includingMusicDownloader().includingSongMetadataAnalyzer().includingABook().includingZipArchive().includingFileWorkspaceTools().includingCameraStudio().includingVideoLinkScreenRecording().includingDateTimeExtensions()
     }
 }
 

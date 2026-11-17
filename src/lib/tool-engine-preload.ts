@@ -26,6 +26,8 @@ export async function preloadToolEngine(tool: ToolMeta): Promise<void> {
     pending = import("@/components/engines/event-template-engine");
   } else if (tool.id === "a-book") {
     pending = import("@/components/engines/a-book-engine");
+  } else if (tool.id === "video-link-screen-recording") {
+    pending = import("@/components/engines/video-link-recorder-engine");
   } else if (tool.id === "zip-any-file") {
     pending = import("@/components/engines/zip-archive-engine");
   } else if (tool.id === "music-downloader") {
@@ -173,6 +175,7 @@ const ALL_TOOL_ENGINE_MODULES: Array<() => Promise<unknown>> = [
   () => import("@/components/engines/ai-music-data-sandbox"),
   () => import("@/components/engines/zip-archive-engine"),
   () => import("@/components/engines/camera-studio-engine"),
+  () => import("@/components/engines/video-link-recorder-engine"),
   () => import("@/components/engines/smartphone-prototype-lab-engine"),
   () => import("@/components/world-lab/world-lab"),
   () => import("@/components/game-studio/game-studio"),
