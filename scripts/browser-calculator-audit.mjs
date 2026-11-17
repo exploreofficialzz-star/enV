@@ -4,6 +4,8 @@ import { dirname, resolve } from "node:path";
 import { chromium } from "playwright";
 import { createServer } from "vite";
 import { parseGeneratedCatalog } from "./catalog-reader.mjs";
+import { REQUIRED_CALCULATOR_BROWSER_TOOL_IDS, selectCalculatorBrowserAuditToolIds } from "./calculator-browser-audit-scope.mjs";
+import { writeToolAuditReport } from "./write-tool-audit-report.mjs";
 
 function option(name) {
   const prefix = `--${name}=`;
@@ -161,16 +163,6 @@ const activeTools = activeCategoryTools.filter((tool) => tool.engine?.type === "
 const nonCalculatorTools = activeCategoryTools.filter((tool) => tool.engine?.type !== "calculator");
 const isAllowedBusinessRoute = (tool) => tool.id === "break-even-calculator" && tool.engine?.type === "business" && tool.engine?.op === "break-even";
 const unexpectedNonCalculatorTools = nonCalculatorTools.filter((tool) => !isAllowedBusinessRoute(tool));
-const requestedTools = activeTools.filter((tool) => !onlyIds || onlyIds.includes(tool.id));
-const mustAuditInBrowser = new Set(["science-gas-law-calculator", "science-molar-mass-calculator", "finance-irr-calculator"]);
-let browserTools = requestedTools;
-if (!onlyIds && Number.isFinite(sampleSize) && sampleSize < requestedTools.length) {
-  const selected = new Set();
-  for (let index = 0; index < sampleSize; index++) selected.add(requestedTools[Math.floor((index * requestedTools.length) / sampleSize)]);
-  for (const tool of requestedTools) if (mustAuditInBrowser.has(tool.id)) selected.add(tool);
-  browserTools = requestedTools.filter((tool) => selected.has(tool));
-}
-const tools = browserTools.slice(0, Number.isFinite(limit) ? limit : undefined);
 if (!tools.length) throw new Error(`No active tools found for category "${category}".`);
 if (category === "calculators" && unexpectedNonCalculatorTools.length) {
   throw new Error(`Unexpected non-calculator engines in the calculator category: ${unexpectedNonCalculatorTools.map((tool) => tool.id).join(", ")}`);
@@ -178,10 +170,16 @@ if (category === "calculators" && unexpectedNonCalculatorTools.length) {
 if (onlyIds) {
   const crossEngineIds = onlyIds.filter((id) => activeCategoryTools.some((tool) => tool.id === id && tool.engine?.type !== "calculator"));
   if (crossEngineIds.length) throw new Error(`These active routes use a non-calculator engine and are not part of this audit: ${crossEngineIds.join(", ")}`);
-  const found = new Set(tools.map((tool) => tool.id));
-  const missing = onlyIds.filter((id) => !found.has(id));
-  if (missing.length) throw new Error(`Unknown active tool IDs for category "${category}": ${missing.join(", ")}`);
 }
+const selectedToolIds = selectCalculatorBrowserAuditToolIds(activeTools.map((tool) => tool.id), {
+  sampleSize,
+  limit,
+  onlyIds,
+  mandatoryToolIds: category === "calculators" ? REQUIRED_CALCULATOR_BROWSER_TOOL_IDS : [],
+});
+const activeToolById = new Map(activeTools.map((tool) => [tool.id, tool]));
+const tools = selectedToolIds.map((id) => activeToolById.get(id));
+if (!tools.length) throw new Error(`No active tools found for category "${category}".`);
 
 const vite = await createServer({
   configFile: "vite.config.ts",
@@ -236,6 +234,7 @@ try {
   });
 
   const failures = [];
+  const toolResults = [];
   let tested = 0;
   const categoryPath = `/tools/${encodeURIComponent(category)}`;
   try {
@@ -253,9 +252,17 @@ try {
   let completed = 0;
   async function runWorker(page) {
     let currentTool = "unknown calculator";
-    page.on("pageerror", (error) => browserErrors.push({ tool: currentTool, type: "pageerror", message: error.message }));
+    let currentToolRuntimeErrors = [];
+    page.on("pageerror", (error) => {
+      browserErrors.push({ tool: currentTool, type: "pageerror", message: error.message });
+      currentToolRuntimeErrors.push(error.message);
+    });
     page.on("console", (message) => {
-      if (message.type() === "error") browserErrors.push({ tool: currentTool, type: "console", message: message.text(), url: message.location().url || null });
+      if (message.type() === "error") {
+        const detail = message.text();
+        browserErrors.push({ tool: currentTool, type: "console", message: detail, url: message.location().url || null });
+        currentToolRuntimeErrors.push(detail);
+      }
     });
     page.on("response", (response) => {
       if (response.status() === 406) browserErrors.push({ tool: currentTool, type: "http-response", status: 406, url: response.url(), resourceType: response.request().resourceType() });
@@ -265,6 +272,7 @@ try {
     if (i >= tools.length) break;
     const tool = tools[i];
     currentTool = tool.id;
+    currentToolRuntimeErrors = [];
     const formula = tool.engine?.formula;
     const definition = tool.engine?.type === "calculator" ? calculators[formula] : null;
     const url = new URL(`/tools/${encodeURIComponent(category)}/${encodeURIComponent(tool.slug)}`, base).href;
@@ -384,14 +392,29 @@ try {
         }
         result.invalidInputCasesPassed = 3;
       }
+      if (currentToolRuntimeErrors.length) {
+        throw new Error(`Browser runtime errors: ${currentToolRuntimeErrors.join(" | ")}`);
+      }
       result.ok = true;
       result.outputCount = alternateActual.length;
       result.validInputCases = 2;
       result.emptySubmissionRejected = true;
+      toolResults.push({
+        toolId: tool.id,
+        status: "passed",
+        checks: ["routeRendering", "interactionExecution", "outputValidation", "runtimeErrorCheck"],
+        notes: "The calculator route rendered and hydrated, rejected a blank submission, returned two validated results matching the engine definition, and produced no browser runtime errors.",
+      });
       tested++;
     } catch (error) {
       result.error = String(error?.message ?? error);
       failures.push(result);
+      toolResults.push({
+        toolId: tool.id,
+        status: "blocked",
+        blockedChecks: ["routeRendering", "interactionExecution", "outputValidation", "runtimeErrorCheck"],
+        notes: [result.error, ...currentToolRuntimeErrors].join(" "),
+      });
       console.error(`FAIL ${tool.id}: ${result.error}`);
     }
     completed++;
@@ -414,11 +437,13 @@ try {
     calculatorEngineTools: activeTools.length,
     nonCalculatorRoutesExcluded: nonCalculatorTools.map((tool) => tool.id),
     browserRoutesSelected: tools.length,
+    selectedToolIds,
     formulaCases,
     formulaFailures,
     tested,
     passed: tested,
     failures,
+    toolResults: tools.map((tool) => toolResults.find((result) => result.toolId === tool.id)).filter(Boolean),
     browserErrors,
     ok: failures.length === 0 && formulaFailures.length === 0 && browserErrors.length === 0,
   };
@@ -428,6 +453,12 @@ try {
     writeFileSync(destination, `${JSON.stringify(report, null, 2)}\n`);
     report.reportPath = destination;
   }
+  const orderedToolResults = tools.map((tool) => toolResults.find((result) => result.toolId === tool.id)).filter(Boolean);
+  writeToolAuditReport({
+    auditId: "calculators-browser",
+    reportPath: process.env.TOOL_AUDIT_REPORT_PATH ?? "",
+    toolResults: orderedToolResults,
+  });
   console.log(JSON.stringify(report, null, 2));
   if (!report.ok) process.exitCode = 1;
 } finally {
