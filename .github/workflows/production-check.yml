@@ -140,6 +140,12 @@ jobs:
       - name: Verify QR and barcode reader in the browser
         run: npm run audit:qr-barcode:browser -- --report=qa-results/qr-barcode-reader-audit.json
 
+      - name: Verify AI Music Data Sandbox in the browser
+        if: always()
+        env:
+          TOOL_AUDIT_REPORT_PATH: artifacts/tool-functional-audit/music-sandbox-browser.json
+        run: npm run audit:music-data-sandbox:browser
+
       - name: Verify all 93 Celebrations tools on a mobile browser
         run: npm run audit:celebrations:browser -- --report=artifacts/celebrations-browser-audit/report.json
 
