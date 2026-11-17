@@ -1,1 +1,1 @@
-Retry after adding focused video-link unit tests and keeping the unrelated Wallet audit warning non-blocking for build verification.
+Retry after aligning validation order with authoritative Android workflow: build first, then typecheck and lint.
