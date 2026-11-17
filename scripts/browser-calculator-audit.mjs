@@ -264,7 +264,11 @@ try {
       }
     });
     page.on("response", (response) => {
-      if (response.status() === 406) browserErrors.push({ tool: currentTool, type: "http-response", status: 406, url: response.url(), resourceType: response.request().resourceType() });
+      if (response.status() === 406) {
+        const detail = `HTTP 406 from ${response.url()} (${response.request().resourceType()})`;
+        browserErrors.push({ tool: currentTool, type: "http-response", status: 406, url: response.url(), resourceType: response.request().resourceType() });
+        currentToolRuntimeErrors.push(detail);
+      }
     });
     while (true) {
     const i = nextIndex++;
