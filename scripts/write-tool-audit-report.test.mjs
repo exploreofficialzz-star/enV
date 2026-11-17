@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createToolAuditReport } from "./write-tool-audit-report.mjs";
+import { createToolAuditReport, validateToolAuditReport } from "./write-tool-audit-report.mjs";
 
 const commit = "a".repeat(40);
 
@@ -73,4 +73,99 @@ test("normalizes duplicate check names without duplicating evidence", () => {
     }],
   });
   assert.deepEqual(report.toolResults[0].checks, ["routeRendering"]);
+});
+
+
+test("accepts an exact tool set tied to the current commit, workflow run and job", () => {
+  const report = createToolAuditReport({
+    auditId: "music-browser",
+    observedCommit: commit,
+    workflowRunId: 456,
+    jobId: "verify",
+    toolResults: [{
+      toolId: "song-metadata-analyzer",
+      status: "passed",
+      checks: ["routeRendering", "interactionExecution", "outputValidation"],
+      notes: "All required browser checks passed.",
+    }],
+  });
+  const result = validateToolAuditReport(report, {
+    auditId: "music-browser",
+    expectedToolIds: ["song-metadata-analyzer"],
+    currentCommit: commit,
+    githubActions: true,
+    workflowRunId: 456,
+    jobId: "verify",
+  });
+  assert.equal(result.valid, true);
+  assert.deepEqual(result.errors, []);
+});
+
+test("rejects stale commit, workflow run and job provenance", () => {
+  const report = createToolAuditReport({
+    auditId: "music-browser",
+    observedCommit: "b".repeat(40),
+    workflowRunId: 456,
+    jobId: "old-job",
+    toolResults: [{
+      toolId: "song-metadata-analyzer",
+      status: "passed",
+      checks: ["routeRendering"],
+    }],
+  });
+  const result = validateToolAuditReport(report, {
+    auditId: "music-browser",
+    expectedToolIds: ["song-metadata-analyzer"],
+    currentCommit: commit,
+    githubActions: true,
+    workflowRunId: 457,
+    jobId: "verify",
+  });
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.includes("report-commit-does-not-match-current-workflow-commit"));
+  assert.ok(result.errors.includes("workflow-run-id-mismatch"));
+  assert.ok(result.errors.includes("workflow-job-id-mismatch"));
+});
+
+test("rejects missing, duplicate and unexpected stable tool IDs", () => {
+  const report = {
+    schemaVersion: 1,
+    auditId: "music-browser",
+    observedCommit: commit,
+    workflowRunId: 456,
+    jobId: "verify",
+    toolResults: [
+      { toolId: "song-metadata-analyzer", status: "passed", checks: ["routeRendering"], blockedChecks: [] },
+      { toolId: "song-metadata-analyzer", status: "passed", checks: ["outputValidation"], blockedChecks: [] },
+    ],
+  };
+  const result = validateToolAuditReport(report, {
+    auditId: "music-browser",
+    expectedToolIds: ["song-metadata-analyzer", "camera-studio"],
+  });
+  assert.equal(result.valid, false);
+  assert.ok(result.errors.includes("duplicate-tool-id:song-metadata-analyzer"));
+  assert.ok(result.errors.includes("missing-tool-id:camera-studio"));
+});
+
+test("retains a failed browser acceptance as blocked evidence rather than a pass", () => {
+  const report = createToolAuditReport({
+    auditId: "music-browser",
+    observedCommit: commit,
+    workflowRunId: 456,
+    jobId: "verify",
+    toolResults: [{
+      toolId: "song-metadata-analyzer",
+      status: "blocked",
+      blockedChecks: ["interactionExecution", "outputValidation"],
+      notes: "A browser assertion did not pass.",
+    }],
+  });
+  const result = validateToolAuditReport(report, {
+    auditId: "music-browser",
+    expectedToolIds: ["song-metadata-analyzer"],
+  });
+  assert.equal(result.valid, true);
+  assert.equal(result.toolResults[0].status, "blocked");
+  assert.deepEqual(result.toolResults[0].blockedChecks, ["interactionExecution", "outputValidation"]);
 });

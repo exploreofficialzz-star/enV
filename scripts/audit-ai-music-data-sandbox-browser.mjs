@@ -6,8 +6,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright";
 import { zipSync, unzipSync, strToU8, strFromU8 } from "fflate";
+import { writeToolAuditReport } from "./write-tool-audit-report.mjs";
 
 const base = process.env.BROWSER_AUDIT_BASE_URL || "http://127.0.0.1:8080";
+const toolAuditReportPath = process.env.TOOL_AUDIT_REPORT_PATH || "";
 const output = await mkdtemp(join(tmpdir(), "env-music-sandbox-"));
 const require = createRequire(import.meta.url);
 const sampleRate = 16000,
@@ -485,6 +487,24 @@ try {
   await smallPhone.close();
   assert.deepEqual(unexpected, [], "Sandbox must never load inference models or upload audio");
   assert.deepEqual(errors, []);
+  writeToolAuditReport({
+    auditId: "ai-music-data-sandbox-browser",
+    reportPath: toolAuditReportPath,
+    toolResults: [{
+      toolId: "song-metadata-analyzer",
+      status: "passed",
+      checks: [
+        "routeRendering",
+        "interactionExecution",
+        "outputValidation",
+        "runtimeErrorCheck",
+        "fileImportExport",
+        "persistenceSample",
+        "responsiveLayoutSample",
+      ],
+      notes: "The current-commit browser audit exercised local ZIP import and sidecars, audio playback, measured signal analysis, human review, edited metadata, persistence, duplicate and capacity handling, privacy-safe exports, mobile/responsive layouts, accessibility, and no model requests or audio uploads.",
+    }],
+  });
   console.log(
     JSON.stringify(
       {
@@ -520,6 +540,28 @@ try {
     ),
   );
 } catch (e) {
+  try {
+    writeToolAuditReport({
+      auditId: "ai-music-data-sandbox-browser",
+      reportPath: toolAuditReportPath,
+      toolResults: [{
+        toolId: "song-metadata-analyzer",
+        status: "blocked",
+        blockedChecks: [
+          "routeRendering",
+          "interactionExecution",
+          "outputValidation",
+          "runtimeErrorCheck",
+          "fileImportExport",
+          "persistenceSample",
+          "responsiveLayoutSample",
+        ],
+        notes: "The complete browser acceptance did not pass: " + (e instanceof Error ? e.stack || e.message : String(e)),
+      }],
+    });
+  } catch (reportError) {
+    console.error("Could not write the per-tool audit report:", reportError);
+  }
   console.error(JSON.stringify({ visible: await scope.innerText().catch(() => ""), output }));
   await page.screenshot({ path: join(output, "failure.png"), fullPage: true }).catch(() => {});
   throw e;
