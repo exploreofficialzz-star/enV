@@ -1,10 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { chromium } from "playwright";
+import { writeToolAuditReport } from "./write-tool-audit-report.mjs";
 
 const argument = (name, fallback) => process.argv.find((arg) => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const baseUrl = argument("base-url", "http://127.0.0.1:8080").replace(/\/$/, "");
 const reportPath = argument("report", "");
+const toolAuditReportPath = process.env.TOOL_AUDIT_REPORT_PATH || "";
 const browser = await chromium.launch({
   headless: true,
   executablePath: process.env.CHROMIUM_PATH ?? "/usr/bin/chromium",
@@ -14,8 +16,11 @@ const results = [];
 
 async function audit(name, run) {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
   try {
     await run(page);
+    if (pageErrors.length) throw new Error("Browser runtime errors: " + pageErrors.join("; "));
     results.push({ tool: name, status: "passed" });
   } catch (error) {
     results.push({ tool: name, status: "failed", error: String(error?.stack ?? error) });
@@ -66,6 +71,24 @@ try {
 }
 
 const report = { baseUrl, viewport: { width: 390, height: 844 }, total: results.length, passed: results.filter((r) => r.status === "passed").length, failed: results.filter((r) => r.status === "failed").length, results };
+const expectedToolIds = ["focus-timer", "pomodoro-timer", "stopwatch"];
+const evidenceChecks = ["routeRendering", "interactionExecution", "outputValidation", "runtimeErrorCheck"];
+writeToolAuditReport({
+  auditId: "productivity-timers-browser",
+  reportPath: toolAuditReportPath,
+  toolResults: expectedToolIds.map((toolId) => {
+    const result = results.find((item) => item.tool === toolId);
+    const passed = result?.status === "passed";
+    return {
+      toolId,
+      status: passed ? "passed" : "blocked",
+      ...(passed ? { checks: evidenceChecks } : { blockedChecks: evidenceChecks }),
+      notes: passed
+        ? "The timer route rendered and hydrated, and its real Start/Pause/Resume/Reset or Skip/Lap interactions produced the expected displayed state."
+        : result?.error ?? "The timer browser acceptance did not complete this tool.",
+    };
+  }),
+});
 if (reportPath) {
   await fs.mkdir(path.dirname(reportPath), { recursive: true });
   await fs.writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
