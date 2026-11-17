@@ -48,8 +48,8 @@ jobs:
           test -s apps/android/app/src/main/java/com/chastech/env/NativeVideoLinkRecorder.kt
           test -s apps/android/app/src/main/java/com/chastech/env/VideoLinkRecordingService.kt
           test -s apps/ios/enV/NativeVideoLinkRecorder.swift
-          patch --dry-run -p1 < _integration/video-link-screen-recording-wiring.patch
-          patch -p1 < _integration/video-link-screen-recording-wiring.patch
+          patch --dry-run --verbose -p1 < _integration/video-link-screen-recording-wiring.patch 2>&1 || { echo 'Patch dry-run rejected one or more upstream hunks.'; exit 1; }
+          patch --verbose -p1 < _integration/video-link-screen-recording-wiring.patch
 
       - name: Install locked dependencies
         run: npm ci
