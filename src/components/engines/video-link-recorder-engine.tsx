@@ -113,6 +113,7 @@ export function VideoLinkRecorderEngine() {
     setStatus("");
     setProgress(null);
     if (!selected) return;
+    clearOutput();
     const extension = selected.name.split(".").pop()?.toLowerCase() ?? "";
     if (!selected.type.startsWith("video/") && !VIDEO_EXTENSIONS.has(extension)) {
       setError("Choose a video file such as MP4, MOV, WebM or MKV.");
