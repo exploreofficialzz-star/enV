@@ -37,6 +37,10 @@ assert.match(src.android, /VideoView\(/, "Android provides native video playback
 assert.match(src.android, /CreateDocument/, "Android provides a save destination");
 assert.match(src.android, /rightsConfirmed/, "Android requires permission confirmation for link processing");
 assert.doesNotMatch(src.android, /WebView|MediaProjection|MediaRecorder|getDisplayMedia/, "Android does not display provider pages or screen-record");
+const androidManifest = read("apps/android/app/src/main/AndroidManifest.xml");
+assert.doesNotMatch(androidManifest, /VideoLinkRecordingService|FOREGROUND_SERVICE_MEDIA_PROJECTION/, "Android manifest no longer registers the obsolete screen-capture service");
+assert.equal(existsSync(join(root, "apps/android/app/src/main/java/com/chastech/env/VideoLinkRecordingService.kt")), false, "obsolete Android screen-capture service is removed");
+assert.doesNotMatch(read("apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt"), /likes, comments and controls/, "Android catalog copy describes the new media workflow");
 
 assert.match(src.swift, /\/api\/backend\/url-media\/download/, "iOS uses the existing URL-media endpoint");
 assert.match(src.swift, /URLSession\.shared\.download/, "iOS retrieves the actual media response");
@@ -45,6 +49,7 @@ assert.match(src.swift, /VideoPlayer\(/, "iOS provides native video playback");
 assert.match(src.swift, /ShareLink\(/, "iOS provides file export");
 assert.match(src.swift, /rightsConfirmed/, "iOS requires permission confirmation for link processing");
 assert.doesNotMatch(src.swift, /WKWebView|RPScreenRecorder|ReplayKit|MediaRecorder/, "iOS does not embed provider pages or screen-record");
+assert.doesNotMatch(read("apps/ios/enV/CatalogCore.swift"), /likes, comments and controls/, "iOS catalog copy describes the new media workflow");
 
 const normalise = (list) => [...new Set(list)].sort().join(",");
 const tsDomains = [...src.lib
