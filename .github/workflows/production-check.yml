@@ -150,7 +150,7 @@ jobs:
         if: always()
         env:
           TOOL_AUDIT_REPORT_PATH: artifacts/tool-functional-audit/converters-browser.json
-        run: npm run audit:converters:browser -- --report=artifacts/tool-functional-audit/converters-detail.json
+        run: npm run check:converters && npm run audit:converters:browser -- --report=artifacts/tool-functional-audit/converters-detail.json
 
       - name: Upload converter browser audit details
         if: always()
