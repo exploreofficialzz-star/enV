@@ -1,4 +1,5 @@
 import AVKit
+import Foundation
 import Photos
 import SwiftUI
 import UniformTypeIdentifiers
@@ -113,8 +114,10 @@ private enum NativeVideoLinkService {
             let body = (try? Data(contentsOf: temporaryURL)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
             let payload = (try? JSONSerialization.jsonObject(with: Data(body.utf8))) as? [String: Any]
             let message = (payload?["error"] as? String) ?? (payload?["message"] as? String)
+            let displayMessage = message.flatMap { $0.isEmpty ? nil : $0 }
+                ?? ("The enV media service returned HTTP " + String(http.statusCode) + ". Please try again.")
             throw NSError(domain: "enVVideoLink", code: http.statusCode, userInfo: [
-                NSLocalizedDescriptionKey: message?.isEmpty == false ? message! : "The enV media service returned HTTP " + String(http.statusCode) + ". Please try again."
+                NSLocalizedDescriptionKey: displayMessage
             ])
         }
 
