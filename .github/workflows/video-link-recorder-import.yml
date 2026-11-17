@@ -1,0 +1,85 @@
+name: Import Video Link Screen Recording
+
+on:
+  push:
+    branches:
+      - feat/video-link-screen-recording-20261117
+    paths:
+      - ".task/video-link-recorder/READY"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: video-link-recorder-import
+  cancel-in-progress: false
+
+jobs:
+  import-and-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/video-link-screen-recording-20261117
+          persist-credentials: true
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Extract supplied tool package and apply integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f .task/video-link-recorder/READY
+          cat .task/video-link-recorder/archive.part* > /tmp/video-link-recorder.tar.xz.b64
+          base64 --decode /tmp/video-link-recorder.tar.xz.b64 > /tmp/video-link-recorder.tar.xz
+          tar -xJf /tmp/video-link-recorder.tar.xz -C .
+          test -s src/components/engines/video-link-recorder-engine.tsx
+          test -s apps/android/app/src/main/java/com/chastech/env/NativeVideoLinkRecorder.kt
+          test -s apps/android/app/src/main/java/com/chastech/env/VideoLinkRecordingService.kt
+          test -s apps/ios/enV/NativeVideoLinkRecorder.swift
+          patch --dry-run -p1 < _integration/video-link-screen-recording-wiring.patch
+          patch -p1 < _integration/video-link-screen-recording-wiring.patch
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Regenerate native catalog and billing/offline profiles
+        run: |
+          npm run export:native-catalog
+          npm run generate:billing-profiles
+          npm run generate:offline-capabilities
+          npm run generate:offline-eligibility
+
+      - name: Verify cross-platform tool wiring and recording policy
+        run: npm run check:video-link-recorder
+
+      - name: Run complete repository tests
+        run: npm test
+
+      - name: Typecheck, lint and production build
+        run: |
+          npm run typecheck
+          npm run lint
+          npm run build
+
+      - name: Commit verified integration to feature branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .task/video-link-recorder _integration
+          rm -f .github/workflows/video-link-recorder-import.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes were produced by the import."
+            exit 1
+          fi
+          git commit -m "Add standalone Video Link Screen Recording tool"
+          git push origin HEAD:feat/video-link-screen-recording-20261117
