@@ -47,7 +47,7 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>enV uses the microphone when you record audio or video with sound. Recording starts only when you choose to record.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>enV saves Camera Studio photos and videos to your Photos library when you capture media.</string>
+	<string>enV saves videos to your Photos library when you choose Save to Photos.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>enV uses your local network and nearby devices only while you activate Instant Contact Exchange.</string>
 	<key>NSBonjourServices</key>
