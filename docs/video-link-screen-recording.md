@@ -1,13 +1,13 @@
 # Video Link Screen Recording
 
-Tool id \`video-link-screen-recording\` · category \`video\`.
+Tool id `video-link-screen-recording` · category `video`.
 
 This tool prepares the actual video file rather than recording a platform page. A supported public link is sent to enV's existing URL-media processor and the resulting video is returned for playback and saving. A video selected from the device stays local and is shown as the output without being uploaded.
 
 ## User workflow
 
 1. Paste a supported public HTTPS video link and confirm that the user has permission to save it.
-2. Press **Process video** once. The web, Android and iOS clients send the URL to the existing \`/api/backend/url-media/download\` endpoint with MP4 output selected.
+2. Press **Process video** once. The web, Android and iOS clients send the URL to the existing `/api/backend/url-media/download` endpoint with MP4 output selected.
 3. enV retrieves the source media through its configured URL-media provider (yt-dlp/FFmpeg on the processor), validates the returned media response and displays the resulting video.
 4. The user can preview and save the output. No second tab, embedded social page, screen-share picker, countdown or manual stop action is required.
 5. A local video can instead be selected. That file is not uploaded; enV opens it locally and provides playback and a save/export action.
@@ -16,9 +16,9 @@ This tool prepares the actual video file rather than recording a platform page. 
 
 | | Web | Android | iOS |
 |---|---|---|---|
-| Link processing | \`downloadUrlMedia()\` through the same-origin Vercel API gateway | Kotlin \`HttpURLConnection\` to the configured enV API | Swift \`URLSession\` to the configured enV API |
+| Link processing | `downloadUrlMedia()` through the same-origin Vercel API gateway | Kotlin `HttpURLConnection` to the configured enV API | Swift `URLSession` to the configured enV API |
 | Local video | Browser file input and object URL | Android document picker and app cache | SwiftUI file importer and temporary app storage |
-| Output | HTML video player and browser save | Native \`VideoView\` and document save picker | \`VideoPlayer\`, Share, and Photos save |
+| Output | HTML video player and browser save | Native `VideoView` and document save picker | `VideoPlayer`, Share, and Photos save |
 
 ## Provider coverage and limits
 
@@ -40,11 +40,11 @@ This tool prepares the actual video file rather than recording a platform page. 
 
 ## Implementation files
 
-- \`src/components/engines/video-link-recorder-engine.tsx\`
-- \`src/lib/media/url-media.ts\` (existing shared API client)
-- \`src/lib/media/video-link-recording.ts\` (URL and protected-platform validation)
-- \`apps/android/app/src/main/java/com/chastech/env/NativeVideoLinkRecorder.kt\`
-- \`apps/ios/enV/NativeVideoLinkRecorder.swift\`
-- \`scripts/check-video-link-recorder.mjs\`
+- `src/components/engines/video-link-recorder-engine.tsx`
+- `src/lib/media/url-media.ts` (existing shared API client)
+- `src/lib/media/video-link-recording.ts` (URL and protected-platform validation)
+- `apps/android/app/src/main/java/com/chastech/env/NativeVideoLinkRecorder.kt`
+- `apps/ios/enV/NativeVideoLinkRecorder.swift`
+- `scripts/check-video-link-recorder.mjs`
 
 No additional backend endpoint or processor deployment is introduced by this change.
