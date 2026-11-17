@@ -36,7 +36,8 @@ jobs:
         run: |
           set -euo pipefail
           test -f .task/video-link-recorder/READY
-          cat .task/video-link-recorder/archive.part* > /tmp/video-link-recorder.tar.xz.b64
+          test "$(find .task/video-link-recorder -maxdepth 1 -name 'payload.part*' | wc -l)" -ge 8
+          cat .task/video-link-recorder/payload.part* > /tmp/video-link-recorder.tar.xz.b64
           base64 --decode /tmp/video-link-recorder.tar.xz.b64 > /tmp/video-link-recorder.tar.xz
           tar -xJf /tmp/video-link-recorder.tar.xz -C .
           test -s src/components/engines/video-link-recorder-engine.tsx
