@@ -8,6 +8,7 @@ import { classifyAuditEvidenceCommit } from "./audit-evidence-provenance.mjs";
 import { tools as sourceCatalogTools } from "../src/data/catalog.ts";
 import { reconcileToolInventories } from "./reconcile-tool-inventories.mjs";
 import { validateSourceInspectionEvidence } from "./source-inspection-evidence.mjs";
+import { validateToolAuditReport } from "./write-tool-audit-report.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const args = process.argv.slice(2);
@@ -473,6 +474,70 @@ ingestCommitBoundBrowserReport({
 
 function appendEvidence(target, id, evidence) {
   target.set(id, [...(target.get(id) ?? []), evidence]);
+}
+
+// The Music Data Sandbox browser acceptance is emitted by the same current-commit
+// Production Check job as this ledger. Never reuse the separate workflow's older
+// checked-in run record as evidence for the current source revision.
+const musicSandboxReportPath = path.join(root, "artifacts/tool-functional-audit/music-sandbox-browser.json");
+if (!fs.existsSync(musicSandboxReportPath)) {
+  if (process.env.GITHUB_ACTIONS === "true") {
+    invalidEvidence.push({
+      auditId: "ai-music-data-sandbox-browser",
+      reason: "dynamic-music-sandbox-report-missing-in-github-actions",
+      expectedToolIds: ["song-metadata-analyzer"],
+      path: path.relative(root, musicSandboxReportPath),
+    });
+  }
+} else {
+  try {
+    const musicReport = JSON.parse(fs.readFileSync(musicSandboxReportPath, "utf8"));
+    const validation = validateToolAuditReport(musicReport, {
+      auditId: "ai-music-data-sandbox-browser",
+      expectedToolIds: ["song-metadata-analyzer"],
+      currentCommit,
+      githubActions: process.env.GITHUB_ACTIONS === "true",
+      workflowRunId: process.env.GITHUB_RUN_ID ? Number(process.env.GITHUB_RUN_ID) : null,
+      jobId: process.env.GITHUB_JOB ?? null,
+    });
+    if (!validation.valid) {
+      invalidEvidence.push({
+        auditId: "ai-music-data-sandbox-browser",
+        reason: "dynamic-music-sandbox-report-invalid-or-not-current",
+        errors: validation.errors,
+        reportCommit: musicReport.observedCommit ?? null,
+        currentCommit,
+        reportWorkflowRunId: musicReport.workflowRunId ?? null,
+        currentWorkflowRunId: process.env.GITHUB_RUN_ID ? Number(process.env.GITHUB_RUN_ID) : null,
+        reportJobId: musicReport.jobId ?? null,
+        currentJobId: process.env.GITHUB_JOB ?? null,
+      });
+    } else {
+      for (const item of validation.toolResults) {
+        const blocked = item.status === "blocked";
+        evidenceAudits.push({
+          id: "ai-music-data-sandbox-browser-" + item.toolId + "-" + item.status,
+          kind: blocked ? "blocked" : "browser",
+          result: blocked ? "blocked" : "passed",
+          script: "scripts/audit-ai-music-data-sandbox-browser.mjs",
+          workflow: "Production Check",
+          workflowRunId: musicReport.workflowRunId,
+          jobId: musicReport.jobId,
+          step: "Verify AI Music Data Sandbox in the browser",
+          toolIds: [item.toolId],
+          testedCommit: musicReport.observedCommit,
+          checks: blocked ? item.blockedChecks : item.checks,
+          notes: item.notes ?? "",
+        });
+      }
+    }
+  } catch (error) {
+    invalidEvidence.push({
+      auditId: "ai-music-data-sandbox-browser",
+      reason: "dynamic-music-sandbox-report-could-not-be-read",
+      detail: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 for (const audit of evidenceAudits) {
