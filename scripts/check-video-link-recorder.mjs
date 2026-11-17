@@ -37,6 +37,9 @@ assert.match(src.android, /VideoView\(/, "Android provides native video playback
 assert.match(src.android, /CreateDocument/, "Android provides a save destination");
 assert.match(src.android, /rightsConfirmed/, "Android requires permission confirmation for link processing");
 assert.doesNotMatch(src.android, /WebView|MediaProjection|MediaRecorder|getDisplayMedia/, "Android does not display provider pages or screen-record");
+assert.match(read("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt"), /tool\.id ===? "video-link-screen-recording"[^\n]*NativeVideoLinkRecorderScreen\(\)/, "Android routes the catalog tool to its native screen");
+assert.match(read("apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt"), /withVideoLinkScreenRecording/, "Android catalog registers the tool");
+
 const androidManifest = read("apps/android/app/src/main/AndroidManifest.xml");
 assert.doesNotMatch(androidManifest, /VideoLinkRecordingService|FOREGROUND_SERVICE_MEDIA_PROJECTION/, "Android manifest no longer registers the obsolete screen-capture service");
 assert.equal(existsSync(join(root, "apps/android/app/src/main/java/com/chastech/env/VideoLinkRecordingService.kt")), false, "obsolete Android screen-capture service is removed");
@@ -49,6 +52,10 @@ assert.match(src.swift, /VideoPlayer\(/, "iOS provides native video playback");
 assert.match(src.swift, /ShareLink\(/, "iOS provides file export");
 assert.match(src.swift, /rightsConfirmed/, "iOS requires permission confirmation for link processing");
 assert.doesNotMatch(src.swift, /WKWebView|RPScreenRecorder|ReplayKit|MediaRecorder/, "iOS does not embed provider pages or screen-record");
+assert.match(read("apps/ios/enV/ToolViews.swift"), /tool\.id == "video-link-screen-recording"[^\n]*NativeVideoLinkRecorderView\(\)/, "iOS routes the catalog tool to its native screen");
+assert.match(read("apps/ios/enV/CatalogCore.swift"), /includingVideoLinkScreenRecording/, "iOS catalog registers the tool");
+assert.ok((read("apps/ios/enV.xcodeproj/project.pbxproj").match(/NativeVideoLinkRecorder\.swift/g) ?? []).length >= 4, "Xcode project includes the native Swift file");
+
 assert.doesNotMatch(read("apps/ios/enV/CatalogCore.swift"), /likes, comments and controls/, "iOS catalog copy describes the new media workflow");
 
 const normalise = (list) => [...new Set(list)].sort().join(",");
