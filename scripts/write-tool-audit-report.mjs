@@ -60,6 +60,75 @@ export function createToolAuditReport({
   };
 }
 
+export function validateToolAuditReport(report, {
+  auditId,
+  expectedToolIds,
+  currentCommit = null,
+  githubActions = false,
+  workflowRunId = null,
+  jobId = null,
+} = {}) {
+  const errors = [];
+  const expectedIds = Array.isArray(expectedToolIds) ? expectedToolIds : [];
+  const expectedSet = new Set(expectedIds);
+
+  if (!report || typeof report !== "object" || Array.isArray(report)) {
+    return { valid: false, errors: ["report-must-be-an-object"], toolResults: [] };
+  }
+  if (report.schemaVersion !== 1) errors.push("unsupported-schema-version");
+  if (report.auditId !== auditId) errors.push("audit-id-mismatch");
+  if (typeof report.observedCommit !== "string" || !/^[a-f0-9]{40}$/i.test(report.observedCommit)) {
+    errors.push("report-commit-missing-or-invalid");
+  } else if (githubActions && (!currentCommit || report.observedCommit !== currentCommit)) {
+    errors.push("report-commit-does-not-match-current-workflow-commit");
+  }
+  if (!Number.isSafeInteger(report.workflowRunId) || report.workflowRunId <= 0) {
+    errors.push("workflow-run-id-missing-or-invalid");
+  } else if (githubActions && report.workflowRunId !== workflowRunId) {
+    errors.push("workflow-run-id-mismatch");
+  }
+  if (typeof report.jobId !== "string" || !report.jobId.trim()) {
+    errors.push("workflow-job-id-missing");
+  } else if (githubActions && report.jobId !== jobId) {
+    errors.push("workflow-job-id-mismatch");
+  }
+  if (!Array.isArray(report.toolResults) || report.toolResults.length !== expectedIds.length) {
+    errors.push("tool-result-count-mismatch");
+    return { valid: false, errors, toolResults: [] };
+  }
+
+  const seen = new Set();
+  const normalized = [];
+  for (const item of report.toolResults) {
+    if (!item || typeof item.toolId !== "string" || !item.toolId.trim()) {
+      errors.push("tool-result-missing-stable-id");
+      continue;
+    }
+    if (seen.has(item.toolId)) errors.push("duplicate-tool-id:" + item.toolId);
+    seen.add(item.toolId);
+    if (!expectedSet.has(item.toolId)) errors.push("unexpected-tool-id:" + item.toolId);
+
+    const checks = Array.isArray(item.checks) ? item.checks : [];
+    const blockedChecks = Array.isArray(item.blockedChecks) ? item.blockedChecks : [];
+    if (!Array.isArray(item.checks) || !Array.isArray(item.blockedChecks)) errors.push("check-lists-must-be-arrays:" + item.toolId);
+    if (checks.some((check) => !VALID_CHECKS.has(check)) || blockedChecks.some((check) => !VALID_CHECKS.has(check))) {
+      errors.push("unsupported-check-name:" + item.toolId);
+    }
+    if (item.status === "passed" && (!checks.length || blockedChecks.length)) {
+      errors.push("invalid-passed-tool-result:" + item.toolId);
+    } else if (item.status === "blocked" && (!blockedChecks.length || checks.length)) {
+      errors.push("invalid-blocked-tool-result:" + item.toolId);
+    } else if (!["passed", "blocked"].includes(item.status)) {
+      errors.push("unsupported-tool-result-status:" + item.toolId);
+    }
+    normalized.push({ ...item, checks, blockedChecks });
+  }
+  for (const expectedId of expectedIds) {
+    if (!seen.has(expectedId)) errors.push("missing-tool-id:" + expectedId);
+  }
+  return { valid: errors.length === 0, errors, toolResults: normalized };
+}
+
 export function writeToolAuditReport({
   auditId,
   toolResults,
