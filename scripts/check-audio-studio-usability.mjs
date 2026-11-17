@@ -35,7 +35,7 @@ const checks = [
   ['Visual round uses compact instrument-console headers and optional help', () => {
     for (const token of ['bg-gradient-to-br from-slate-950', 'text-cyan-200', 'Safety & processing', 'rounded-2xl', 'studioWave']) assert.ok(music.includes(token), `Missing Music Studio visual treatment: ${token}`);
     for (const token of ['bg-gradient-to-br from-slate-950', 'Rights & privacy: local capture', 'grid grid-cols-3 gap-2']) assert.ok(liveWeb.includes(token), `Missing live studio visual treatment: ${token}`);
-    for (const token of ['ToolIcon', 'Tool notes & format', 'max-w-5xl']) assert.ok(read('src/components/engines/audio-extra-tools.tsx').includes(token), `Missing utility studio visual treatment: ${token}`);
+    for (const token of ['ToolIcon', 'Tool notes & format', '16-bit PCM WAV', '400 MB aggregate source files', 'browser microphone', 'max-w-5xl']) assert.ok(read('src/components/engines/audio-extra-tools.tsx').includes(token), `Missing utility studio visual treatment or format disclosure: ${token}`);
     for (const token of ['enV · PERFORMANCE', 'showRightsPrivacy', 'Live Video Studio']) assert.ok(android.includes(token), `Missing Android performance-console treatment: ${token}`);
     for (const token of ['enV · PERFORMANCE', 'showRightsPrivacy', 'Record · Monitor · Export WAV']) assert.ok(ios.includes(token), `Missing iOS performance-console treatment: ${token}`);
   }],
