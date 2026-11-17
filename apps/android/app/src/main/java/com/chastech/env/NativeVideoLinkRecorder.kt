@@ -230,6 +230,9 @@ fun NativeVideoLinkRecorderScreen() {
 
     val videoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
+            output?.delete()
+            output = null
+            link = ""
             scope.launch {
                 busy = true
                 error = ""
