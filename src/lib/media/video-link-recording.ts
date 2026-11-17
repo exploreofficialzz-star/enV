@@ -238,7 +238,7 @@ function buildEmbedUrl(platform: VideoPlatformId, url: URL, host: string, option
  */
 export function parseVideoLink(raw: string, options: VideoLinkOptions = {}): VideoLinkValidation {
   const trimmed = (raw ?? "").trim();
-  if (!trimmed) return { ok: false, reason: "Paste the link of the video you want to view and record." };
+  if (!trimmed) return { ok: false, reason: "Paste a video link to retrieve." };
 
   let parsed: URL;
   try {
@@ -260,7 +260,7 @@ export function parseVideoLink(raw: string, options: VideoLinkOptions = {}): Vid
     return {
       ok: false,
       platform: protectedPlatform.label,
-      reason: `${protectedPlatform.label} protects its video with DRM and does not allow screen recording, so the capture would be blank. Use the service's own offline or download feature instead.`,
+      reason: `${protectedPlatform.label} protects its video with DRM and does not allow export. Use the service's own offline or download feature instead.`,
     };
   }
   if (isPrivateOrLocalHost(host)) {
