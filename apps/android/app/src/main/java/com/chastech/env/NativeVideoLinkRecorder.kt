@@ -235,7 +235,7 @@ fun NativeVideoLinkRecorderScreen() {
                 error = ""
                 status = "Preparing your video…"
                 val result = withContext(Dispatchers.IO) { runCatching { copySelectedVideo(context, uri) } }
-                result.onSuccess { output = it; status = "Your video is ready." }
+                result.onSuccess { output?.delete(); output = it; link = ""; status = "Your video is ready." }
                     .onFailure { error = it.message ?: "The selected video could not be opened."; status = "" }
                 busy = false
             }
@@ -273,7 +273,7 @@ fun NativeVideoLinkRecorderScreen() {
 
         OutlinedTextField(
             value = link,
-            onValueChange = { link = it; error = ""; status = "" },
+            onValueChange = { link = it; error = ""; status = ""; output?.delete(); output = null },
             label = { Text("Video link") },
             placeholder = { Text("Paste a public video link") },
             singleLine = true,
@@ -295,6 +295,8 @@ fun NativeVideoLinkRecorderScreen() {
                     error = "Confirm that you own this video or have permission to save and use it."
                 } else {
                     val accepted = parsed as VideoLinkParse.Accepted
+                    output?.delete()
+                    output = null
                     busy = true
                     status = "Retrieving the original video…"
                     scope.launch {
