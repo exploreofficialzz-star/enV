@@ -334,6 +334,11 @@ export function DeveloperEngine({ op, tool, initialInput }: Props) {
   return <div className="space-y-4">
     {parentStudio ? <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-3 text-sm"><div><p className="font-medium">Part of {parentStudio.name}</p><p className="mt-0.5 text-xs text-muted">Open the grouped workspace to switch between related developer tasks.</p></div><a href={parentStudioUrl} className="inline-flex min-h-9 items-center rounded-md border border-border px-3 py-2 font-medium hover:bg-surface-2">Open Studio</a></div> : null}
 
+    <aside className="rounded-lg border border-border bg-surface px-3 py-2.5" aria-label="Processing information">
+      <p className="text-sm font-medium">On-device processing</p>
+      <p className="mt-1 text-xs text-muted">Text and selected files are processed in this browser. This Developer Studio does not upload your input to enV or an external service.</p>
+    </aside>
+
     <div className="flex flex-wrap items-center gap-2">
       <Button type="button" variant="outline" size="sm" onClick={loadExample}>Load example</Button>
       <span className="text-xs text-muted">Use Ctrl/⌘ + Enter to run.</span>
