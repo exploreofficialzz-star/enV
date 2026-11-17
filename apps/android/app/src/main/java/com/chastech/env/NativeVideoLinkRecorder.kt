@@ -3,7 +3,6 @@ package com.chastech.env
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
-import android.webkit.MimeTypeMap
 import android.widget.MediaController
 import android.widget.VideoView
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -46,18 +45,6 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 private const val VIDEO_LINK_MAX_BYTES = 500L * 1024L * 1024L
-
-// Kept for the legacy foreground service, which remains registered for safe migration.
-sealed interface VideoLinkRecordingState {
-    object Idle : VideoLinkRecordingState
-    data class Recording(val startedAtMillis: Long, val withAudio: Boolean) : VideoLinkRecordingState
-    object Finishing : VideoLinkRecordingState
-    data class Finished(val file: File, val durationMillis: Long) : VideoLinkRecordingState
-    data class Failed(val message: String) : VideoLinkRecordingState
-}
-object VideoLinkRecordingBus {
-    val state = kotlinx.coroutines.flow.MutableStateFlow<VideoLinkRecordingState>(VideoLinkRecordingState.Idle)
-}
 
 internal sealed interface VideoLinkParse {
     data class Accepted(val url: String, val host: String, val platformLabel: String) : VideoLinkParse
@@ -255,7 +242,7 @@ fun NativeVideoLinkRecorderScreen() {
         }
     }
 
-    val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("video/mp4")) { destination ->
+    val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { destination ->
         val source = pendingSave
         pendingSave = null
         if (destination != null && source != null) {
@@ -341,7 +328,7 @@ fun NativeVideoLinkRecorderScreen() {
                         factory = { viewContext ->
                             VideoView(viewContext).apply {
                                 tag = output!!.absolutePath
-                                setVideoURI(Uri.fromFile(output))
+                                setVideoURI(Uri.fromFile(output!!))
                                 setMediaController(MediaController(viewContext).also { it.setAnchorView(this) })
                             }
                         },
