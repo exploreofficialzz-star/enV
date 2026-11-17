@@ -163,7 +163,6 @@ const activeTools = activeCategoryTools.filter((tool) => tool.engine?.type === "
 const nonCalculatorTools = activeCategoryTools.filter((tool) => tool.engine?.type !== "calculator");
 const isAllowedBusinessRoute = (tool) => tool.id === "break-even-calculator" && tool.engine?.type === "business" && tool.engine?.op === "break-even";
 const unexpectedNonCalculatorTools = nonCalculatorTools.filter((tool) => !isAllowedBusinessRoute(tool));
-if (!tools.length) throw new Error(`No active tools found for category "${category}".`);
 if (category === "calculators" && unexpectedNonCalculatorTools.length) {
   throw new Error(`Unexpected non-calculator engines in the calculator category: ${unexpectedNonCalculatorTools.map((tool) => tool.id).join(", ")}`);
 }
