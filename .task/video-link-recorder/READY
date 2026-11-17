@@ -1,1 +1,1 @@
-Retry exact verified archive after enabling verbose patch diagnostics.
+Retry source import with checksum and patch output enabled.
