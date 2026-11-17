@@ -122,6 +122,13 @@ jobs:
             npx playwright install --with-deps chromium
           fi
 
+      - name: Validate calculator browser audit scope and syntax
+        run: |
+          node --check scripts/calculator-browser-audit-scope.mjs
+          node --check scripts/browser-calculator-audit.mjs
+          node --check scripts/generate-tool-functional-audit-ledger.mjs
+          node --test scripts/calculator-browser-audit-scope.test.mjs
+
       - name: Verify local DOCX and PDF extraction safety limits
         run: node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/documents/local-document.test.ts
 
