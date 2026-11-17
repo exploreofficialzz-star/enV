@@ -13,6 +13,7 @@ on:
       - "src/lib/registry.ts"
       - "src/lib/media/video-link-recording.ts"
       - "src/lib/media/video-link-recording.test.ts"
+      - "src/data/**"
       - "scripts/check-video-link-recorder.mjs"
       - "scripts/export-native-catalog.mjs"
       - "scripts/export-native-execution-matrix.mjs"
