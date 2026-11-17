@@ -76,6 +76,7 @@ export function VideoLinkRecorderEngine() {
     const parsed = parseVideoLink(link);
     if (!parsed.ok) { setError(parsed.reason); return; }
 
+    clearOutput();
     const controller = new AbortController();
     controllerRef.current = controller;
     setBusy(true);
@@ -121,6 +122,7 @@ export function VideoLinkRecorderEngine() {
       setError("Choose a video file smaller than 500 MB.");
       return;
     }
+    setLink("");
     setRightsConfirmed(true);
     publishOutput(selected, safeFileName(selected.name, "enV-video." + (extension || "mp4")), "file");
   }
@@ -160,7 +162,7 @@ export function VideoLinkRecorderEngine() {
           value={link}
           disabled={busy}
           placeholder="Paste a public video link"
-          onChange={(event) => { setLink(event.target.value); setError(""); setStatus(""); }}
+          onChange={(event) => { setLink(event.target.value); clearOutput(); setError(""); setStatus(""); }}
           onKeyDown={(event) => { if (event.key === "Enter") void processLink(); }}
           className="flex h-12 w-full rounded-md bg-surface px-3 text-sm text-fg shadow-[var(--shadow-border)] placeholder:text-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
         />
@@ -194,10 +196,10 @@ export function VideoLinkRecorderEngine() {
           type="file"
           accept="video/*,.mp4,.m4v,.mov,.webm,.ogv,.mkv,.avi,.3gp"
           disabled={busy}
-          onChange={(event) => useUploadedFile(event.target.files?.[0])}
+          onChange={(event) => { const selected = event.target.files?.[0]; event.target.value = ""; useUploadedFile(selected); }}
           className="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-surface-2 file:px-3 file:py-2 file:text-sm file:font-medium"
         />
-        <p className="text-xs text-muted">Your selected file stays on this device. It is not uploaded.</p>
+        <p className="text-xs text-muted"><span className="font-medium">On-device processing.</span> Your selected file stays on this device and is not uploaded.</p>
       </div>
 
       {busy ? (
