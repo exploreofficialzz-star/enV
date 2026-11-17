@@ -1,1 +1,1 @@
-Run source import using current-main-compatible patch filtering and native coverage updates.
+Retry after correcting workflow-generated newline characters in JSON and coverage files.
