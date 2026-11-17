@@ -335,7 +335,7 @@ fun NativeVideoLinkRecorderScreen() {
                         update = { view ->
                             if (view.tag != output!!.absolutePath) {
                                 view.tag = output!!.absolutePath
-                                view.setVideoURI(Uri.fromFile(output))
+                                view.setVideoURI(Uri.fromFile(output!!))
                                 view.setMediaController(MediaController(context).also { it.setAnchorView(view) })
                             }
                         },
