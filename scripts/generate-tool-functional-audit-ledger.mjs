@@ -614,6 +614,83 @@ if (!converterToolIds.length) {
   }
 }
 
+// These three Productivity routes have a dedicated browser acceptance suite.
+// Require all exact stable IDs to exist in the current active runtime registry.
+const productivityTimerToolIds = ["focus-timer", "pomodoro-timer", "stopwatch"];
+const activeProductivityTimerIds = productivityTimerToolIds.filter((id) => {
+  const tool = byId.get(id);
+  return Boolean(tool && tool.category === "productivity" && tool.status === "active");
+});
+const productivityTimerReportPath = path.join(root, "artifacts/tool-functional-audit/productivity-timers-browser.json");
+if (activeProductivityTimerIds.length !== productivityTimerToolIds.length) {
+  invalidEvidence.push({
+    auditId: "productivity-timers-browser",
+    reason: "expected-productivity-timer-ids-missing-or-not-active-in-runtime-registry",
+    expectedToolIds: productivityTimerToolIds,
+    activeToolIds: activeProductivityTimerIds,
+  });
+} else if (!fs.existsSync(productivityTimerReportPath)) {
+  if (process.env.GITHUB_ACTIONS === "true") {
+    invalidEvidence.push({
+      auditId: "productivity-timers-browser",
+      reason: "dynamic-productivity-timer-report-missing-in-github-actions",
+      expectedToolIds: productivityTimerToolIds,
+      path: path.relative(root, productivityTimerReportPath),
+    });
+  }
+} else {
+  try {
+    const productivityTimerReport = JSON.parse(fs.readFileSync(productivityTimerReportPath, "utf8"));
+    const validation = validateToolAuditReport(productivityTimerReport, {
+      auditId: "productivity-timers-browser",
+      expectedToolIds: productivityTimerToolIds,
+      currentCommit,
+      githubActions: process.env.GITHUB_ACTIONS === "true",
+      workflowRunId: process.env.GITHUB_RUN_ID ? Number(process.env.GITHUB_RUN_ID) : null,
+      jobId: process.env.GITHUB_JOB ?? null,
+    });
+    if (!validation.valid) {
+      invalidEvidence.push({
+        auditId: "productivity-timers-browser",
+        reason: "dynamic-productivity-timer-report-invalid-or-not-current",
+        errors: validation.errors,
+        expectedToolIds: productivityTimerToolIds,
+        reportToolCount: productivityTimerReport.toolResults?.length ?? null,
+        reportCommit: productivityTimerReport.observedCommit ?? null,
+        currentCommit,
+        reportWorkflowRunId: productivityTimerReport.workflowRunId ?? null,
+        currentWorkflowRunId: process.env.GITHUB_RUN_ID ? Number(process.env.GITHUB_RUN_ID) : null,
+        reportJobId: productivityTimerReport.jobId ?? null,
+        currentJobId: process.env.GITHUB_JOB ?? null,
+      });
+    } else {
+      for (const item of validation.toolResults) {
+        const blocked = item.status === "blocked";
+        evidenceAudits.push({
+          id: "productivity-timers-browser-" + item.toolId + "-" + item.status,
+          kind: blocked ? "blocked" : "browser",
+          result: blocked ? "blocked" : "passed",
+          script: "scripts/browser-productivity-timer-audit.mjs",
+          workflow: "Production Check",
+          workflowRunId: productivityTimerReport.workflowRunId,
+          jobId: productivityTimerReport.jobId,
+          step: "Verify Focus Timer, Pomodoro Timer and Stopwatch in the browser",
+          toolIds: [item.toolId],
+          testedCommit: productivityTimerReport.observedCommit,
+          checks: blocked ? item.blockedChecks : item.checks,
+          notes: item.notes ?? "",
+        });
+      }
+    }
+  } catch (error) {
+    invalidEvidence.push({
+      auditId: "productivity-timers-browser",
+      reason: "dynamic-productivity-timer-report-could-not-be-read",
+      detail: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 for (const audit of evidenceAudits) {
   const provenance = classifyAuditEvidenceCommit({
     testedCommit: audit.testedCommit,
