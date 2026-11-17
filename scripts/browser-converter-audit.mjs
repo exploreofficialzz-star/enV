@@ -348,9 +348,12 @@ async function testSharedToolUi(page, tool, result) {
   assert(await page.getByRole("heading", { name: "Frequently asked questions", exact: true }).count() === 0, "Tool page still shows a Frequently asked questions section.");
   assert(await page.getByRole("heading", { name: "What this tool does", exact: true }).count() === 1, "Tool description section is missing.");
   assert(await page.getByRole("navigation", { name: "Breadcrumb", exact: true }).count() === 1, "Tool breadcrumb navigation is missing.");
-  const saveControl = page.locator("article header button[aria-label]");
-  assert(await saveControl.count() === 1 && await saveControl.isVisible(), "Tool save control is missing or not visible.");
+  // The header also contains a separately labelled fullscreen button.
+  // The save/favourite control is the one exposing its pressed state.
+  const saveControl = page.locator("article header button[aria-pressed]");
+  assert(await saveControl.count() === 1 && await saveControl.isVisible(), "Tool save/favourite control is missing or not visible.");
   const saveLabel = await saveControl.getAttribute("aria-label");
+  assert(["true", "false"].includes(await saveControl.getAttribute("aria-pressed") ?? ""), "Tool save/favourite control is missing its pressed state.");
   assert(saveLabel === `Save ${tool.name}` || saveLabel === `Remove ${tool.name} from saved tools`, `Tool save control has an unexpected accessible name: ${saveLabel ?? "none"}.`);
   result.sharedToolUiPassed = true;
 }
