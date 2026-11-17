@@ -80,7 +80,7 @@ jobs:
             test = test.replace(mediaTests, 'src/lib/media/music-downloader.test.ts src/lib/media/video-link-recording.test.ts src/lib/media/song-metadata-analyzer.test.ts');
           }
           pkg.scripts.test = test;
-          fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + '\\n');
+          fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + '\n');
           NODE
 
           python3 - <<'PY'
@@ -91,7 +91,7 @@ jobs:
               data = path.read_text().splitlines()
               if tool_id not in data:
                   data.append(tool_id)
-                  path.write_text('\\n'.join(data) + '\\n')
+                  path.write_text('\n'.join(data) + '\n')
           PY
 
       - name: Install locked dependencies
