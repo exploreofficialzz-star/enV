@@ -168,7 +168,14 @@ struct NativeVideoLinkRecorderView: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .disabled(busy)
-                        .onChange(of: linkText) { _ in errorText = ""; statusText = "" }
+                        .onChange(of: linkText) { _ in
+                            errorText = ""
+                            statusText = ""
+                            outputPlayer?.pause()
+                            if let previous = outputURL { try? FileManager.default.removeItem(at: previous) }
+                            outputURL = nil
+                            outputPlayer = nil
+                        }
                         .onSubmit { Task { await processLink() } }
 
                     Toggle("I own this video or have permission to save and use it.", isOn: $rightsConfirmed)
@@ -203,7 +210,7 @@ struct NativeVideoLinkRecorderView: View {
                 }
                 .buttonStyle(.bordered)
                 .disabled(busy)
-                Text("Selected files stay on this device and are not uploaded.")
+                Text("On-device processing. Selected files stay on this device and are not uploaded.")
                     .font(.footnote).foregroundStyle(.secondary)
 
                 if busy {
@@ -282,6 +289,10 @@ struct NativeVideoLinkRecorderView: View {
         case .accepted(let url, let host, _): parsed = (url, host)
         case .rejected(let reason): errorText = reason; return
         }
+        outputPlayer?.pause()
+        if let previous = outputURL { try? FileManager.default.removeItem(at: previous) }
+        outputURL = nil
+        outputPlayer = nil
         busy = true
         statusText = "Retrieving the original video…"
         do {
