@@ -5,6 +5,7 @@ import { dirname, resolve } from "node:path";
 import { chromium } from "playwright";
 import { createServer } from "vite";
 import { parseGeneratedCatalog } from "./catalog-reader.mjs";
+import { writeToolAuditReport } from "./write-tool-audit-report.mjs";
 
 function option(name) {
   const prefix = `--${name}=`;
@@ -14,6 +15,7 @@ function option(name) {
 const category = "converters";
 const baseUrl = option("base-url") ?? process.env.BROWSER_AUDIT_BASE_URL ?? "http://127.0.0.1:8080";
 const reportPath = option("report");
+const toolAuditReportPath = process.env.TOOL_AUDIT_REPORT_PATH || "";
 const onlyIds = option("only")?.split(",").map((id) => id.trim()).filter(Boolean);
 const limit = Number(option("limit") ?? Infinity);
 const viewportWidth = Number(option("width") ?? 390);
@@ -346,9 +348,12 @@ async function testSharedToolUi(page, tool, result) {
   assert(await page.getByRole("heading", { name: "Frequently asked questions", exact: true }).count() === 0, "Tool page still shows a Frequently asked questions section.");
   assert(await page.getByRole("heading", { name: "What this tool does", exact: true }).count() === 1, "Tool description section is missing.");
   assert(await page.getByRole("navigation", { name: "Breadcrumb", exact: true }).count() === 1, "Tool breadcrumb navigation is missing.");
-  const saveControl = page.locator("article header button[aria-label]");
-  assert(await saveControl.count() === 1 && await saveControl.isVisible(), "Tool save control is missing or not visible.");
+  // The header also contains a separately labelled fullscreen button.
+  // The save/favourite control is the one exposing its pressed state.
+  const saveControl = page.locator("article header button[aria-pressed]");
+  assert(await saveControl.count() === 1 && await saveControl.isVisible(), "Tool save/favourite control is missing or not visible.");
   const saveLabel = await saveControl.getAttribute("aria-label");
+  assert(["true", "false"].includes(await saveControl.getAttribute("aria-pressed") ?? ""), "Tool save/favourite control is missing its pressed state.");
   assert(saveLabel === `Save ${tool.name}` || saveLabel === `Remove ${tool.name} from saved tools`, `Tool save control has an unexpected accessible name: ${saveLabel ?? "none"}.`);
   result.sharedToolUiPassed = true;
 }
@@ -452,6 +457,33 @@ try {
   }
 
   const report = persistReport(true);
+  writeToolAuditReport({
+    auditId: "converters-browser",
+    reportPath: toolAuditReportPath,
+    toolResults: tools.map((tool) => {
+      const result = results.find((item) => item.id === tool.id);
+      const toolErrors = browserErrors.filter((item) => item.tool === tool.id);
+      const checks = [
+        "routeRendering",
+        "interactionExecution",
+        "outputValidation",
+        "runtimeErrorCheck",
+        ...(tool.engine?.type === "file-converter" ? ["fileImportExport"] : []),
+      ];
+      const passed = Boolean(report.finished && result?.ok && toolErrors.length === 0);
+      return {
+        toolId: tool.id,
+        status: passed ? "passed" : "blocked",
+        ...(passed ? { checks } : { blockedChecks: checks }),
+        notes: passed
+          ? "The active converter route rendered and hydrated, the real engine workflow produced the expected output, and the tested route had no browser runtime errors."
+          : [
+              result?.error ?? "The converter browser audit did not complete this tool.",
+              ...toolErrors.map((item) => item.message),
+            ].filter(Boolean).join(" "),
+      };
+    }),
+  });
   console.log(JSON.stringify(report, null, 2));
   if (!report.ok) process.exitCode = 1;
 } finally {

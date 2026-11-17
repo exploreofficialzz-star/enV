@@ -540,6 +540,80 @@ if (!fs.existsSync(musicSandboxReportPath)) {
   }
 }
 
+// Converter browser audits exercise each active converter route individually.
+// The expected ID set comes from the Web runtime registry, not the report itself.
+const converterToolIds = runtimeTools
+  .filter((tool) => tool.category === "converters" && tool.status === "active")
+  .map((tool) => tool.id)
+  .sort();
+const converterReportPath = path.join(root, "artifacts/tool-functional-audit/converters-browser.json");
+if (!converterToolIds.length) {
+  invalidEvidence.push({
+    auditId: "converters-browser",
+    reason: "no-active-converter-tools-found-in-runtime-registry",
+  });
+} else if (!fs.existsSync(converterReportPath)) {
+  if (process.env.GITHUB_ACTIONS === "true") {
+    invalidEvidence.push({
+      auditId: "converters-browser",
+      reason: "dynamic-converter-report-missing-in-github-actions",
+      expectedToolCount: converterToolIds.length,
+      path: path.relative(root, converterReportPath),
+    });
+  }
+} else {
+  try {
+    const converterReport = JSON.parse(fs.readFileSync(converterReportPath, "utf8"));
+    const validation = validateToolAuditReport(converterReport, {
+      auditId: "converters-browser",
+      expectedToolIds: converterToolIds,
+      currentCommit,
+      githubActions: process.env.GITHUB_ACTIONS === "true",
+      workflowRunId: process.env.GITHUB_RUN_ID ? Number(process.env.GITHUB_RUN_ID) : null,
+      jobId: process.env.GITHUB_JOB ?? null,
+    });
+    if (!validation.valid) {
+      invalidEvidence.push({
+        auditId: "converters-browser",
+        reason: "dynamic-converter-report-invalid-or-not-current",
+        errors: validation.errors,
+        expectedToolCount: converterToolIds.length,
+        reportToolCount: converterReport.toolResults?.length ?? null,
+        reportCommit: converterReport.observedCommit ?? null,
+        currentCommit,
+        reportWorkflowRunId: converterReport.workflowRunId ?? null,
+        currentWorkflowRunId: process.env.GITHUB_RUN_ID ? Number(process.env.GITHUB_RUN_ID) : null,
+        reportJobId: converterReport.jobId ?? null,
+        currentJobId: process.env.GITHUB_JOB ?? null,
+      });
+    } else {
+      for (const item of validation.toolResults) {
+        const blocked = item.status === "blocked";
+        evidenceAudits.push({
+          id: "converters-browser-" + item.toolId + "-" + item.status,
+          kind: blocked ? "blocked" : "browser",
+          result: blocked ? "blocked" : "passed",
+          script: "scripts/browser-converter-audit.mjs",
+          workflow: "Production Check",
+          workflowRunId: converterReport.workflowRunId,
+          jobId: converterReport.jobId,
+          step: "Verify active converter tools in the browser",
+          toolIds: [item.toolId],
+          testedCommit: converterReport.observedCommit,
+          checks: blocked ? item.blockedChecks : item.checks,
+          notes: item.notes ?? "",
+        });
+      }
+    }
+  } catch (error) {
+    invalidEvidence.push({
+      auditId: "converters-browser",
+      reason: "dynamic-converter-report-could-not-be-read",
+      detail: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 for (const audit of evidenceAudits) {
   const provenance = classifyAuditEvidenceCommit({
     testedCommit: audit.testedCommit,
