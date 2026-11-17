@@ -5,6 +5,7 @@ import { dirname, resolve } from "node:path";
 import { chromium } from "playwright";
 import { createServer } from "vite";
 import { parseGeneratedCatalog } from "./catalog-reader.mjs";
+import { writeToolAuditReport } from "./write-tool-audit-report.mjs";
 
 function option(name) {
   const prefix = `--${name}=`;
@@ -14,6 +15,7 @@ function option(name) {
 const category = "converters";
 const baseUrl = option("base-url") ?? process.env.BROWSER_AUDIT_BASE_URL ?? "http://127.0.0.1:8080";
 const reportPath = option("report");
+const toolAuditReportPath = process.env.TOOL_AUDIT_REPORT_PATH || "";
 const onlyIds = option("only")?.split(",").map((id) => id.trim()).filter(Boolean);
 const limit = Number(option("limit") ?? Infinity);
 const viewportWidth = Number(option("width") ?? 390);
@@ -452,6 +454,33 @@ try {
   }
 
   const report = persistReport(true);
+  writeToolAuditReport({
+    auditId: "converters-browser",
+    reportPath: toolAuditReportPath,
+    toolResults: tools.map((tool) => {
+      const result = results.find((item) => item.id === tool.id);
+      const toolErrors = browserErrors.filter((item) => item.tool === tool.id);
+      const checks = [
+        "routeRendering",
+        "interactionExecution",
+        "outputValidation",
+        "runtimeErrorCheck",
+        ...(tool.engine?.type === "file-converter" ? ["fileImportExport"] : []),
+      ];
+      const passed = Boolean(report.finished && result?.ok && toolErrors.length === 0);
+      return {
+        toolId: tool.id,
+        status: passed ? "passed" : "blocked",
+        ...(passed ? { checks } : { blockedChecks: checks }),
+        notes: passed
+          ? "The active converter route rendered and hydrated, the real engine workflow produced the expected output, and the tested route had no browser runtime errors."
+          : [
+              result?.error ?? "The converter browser audit did not complete this tool.",
+              ...toolErrors.map((item) => item.message),
+            ].filter(Boolean).join(" "),
+      };
+    }),
+  });
   console.log(JSON.stringify(report, null, 2));
   if (!report.ok) process.exitCode = 1;
 } finally {
