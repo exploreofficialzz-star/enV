@@ -67,6 +67,7 @@ jobs:
           const pkg = JSON.parse(fs.readFileSync(file, 'utf8'));
           pkg.scripts ??= {};
           pkg.scripts['check:video-link-recorder'] = 'node scripts/check-video-link-recorder.mjs';
+          pkg.scripts['generate:offline-capabilities'] = 'node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/generate-offline-capabilities.mjs';
           let test = pkg.scripts.test ?? '';
           const check = 'node scripts/check-video-link-recorder.mjs';
           if (!test.includes(check)) {
