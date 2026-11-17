@@ -5,11 +5,11 @@
 Generated from the authoritative Web catalogue metadata. This is a first-pass classification, not a claim that each operation's real compute cost has been measured. Every profile is marked provisional and requires a manual cost/pricing audit before live charging.
 
 - Catalogue tools profiled: **10,001**
-- Local-device profiles: **9803**
-- Cloud/remote profiles: **198**
+- Local-device profiles: **9800**
+- Cloud/remote profiles: **201**
 - Profiles requiring manual audit: **10,001**
-- Android native tool IDs covered by this registry: **7,910 / 7,910**
-- iOS native tool IDs covered by this registry: **7,910 / 7,910**
+- Android native tool IDs covered by this registry: **7,758 / 7,758**
+- iOS native tool IDs covered by this registry: **7,758 / 7,758**
 - Advertising eligible in this monetization plan: **0**
 
 ## Count by billing rule
@@ -17,14 +17,14 @@ Generated from the authoritative Web catalogue metadata. This is a first-pass cl
 | Billing rule | Tools |
 |---|---:|
 | `cloud.audio_processing` | 7 |
-| `cloud.document_processing` | 75 |
-| `cloud.generic_processing` | 6 |
+| `cloud.document_processing` | 82 |
+| `cloud.generic_processing` | 3 |
 | `cloud.transcription` | 3 |
-| `cloud.video_processing` | 107 |
+| `cloud.video_processing` | 106 |
 | `local.audio_processing` | 107 |
 | `local.calculator` | 6516 |
 | `local.converter` | 145 |
-| `local.general` | 2611 |
+| `local.general` | 2608 |
 | `local.image_basic` | 235 |
 | `local.image_intensive` | 148 |
 | `local.text` | 38 |
