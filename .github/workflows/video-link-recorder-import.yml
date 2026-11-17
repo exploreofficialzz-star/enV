@@ -101,6 +101,7 @@ jobs:
       - name: Regenerate native catalog and billing/offline profiles
         run: |
           npm run export:native-catalog
+          npm run export:native-execution-matrix
           npm run generate:billing-profiles
           npm run generate:offline-capabilities
           npm run generate:offline-eligibility
