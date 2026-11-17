@@ -1,23 +1,9 @@
 package com.chastech.env
 
-import android.Manifest
-import android.annotation.SuppressLint
-import android.app.Activity
 import android.content.Context
-import android.content.ContextWrapper
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.media.projection.MediaProjectionManager
 import android.net.Uri
-import android.os.Build
-import android.view.View
-import android.view.ViewGroup
-import android.webkit.WebChromeClient
-import android.webkit.WebResourceRequest
-import android.webkit.WebSettings
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import android.widget.FrameLayout
+import android.provider.OpenableColumns
+import android.webkit.MimeTypeMap
 import android.widget.MediaController
 import android.widget.VideoView
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -25,10 +11,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
@@ -37,36 +24,40 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.core.content.ContextCompat
 import java.io.File
+import java.io.FileOutputStream
+import java.net.HttpURLConnection
 import java.net.URI
+import java.net.URL
 import java.util.Locale
+import java.util.UUID
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 
-// ---------------------------------------------------------------------------------------------
-// Link rules. These mirror src/lib/media/video-link-recording.ts; keep the protected-platform list
-// aligned with it (scripts/check-video-link-recorder.mjs verifies that).
-// ---------------------------------------------------------------------------------------------
+private const val VIDEO_LINK_MAX_BYTES = 500L * 1024L * 1024L
+
+// Kept for the legacy foreground service, which remains registered for safe migration.
+sealed interface VideoLinkRecordingState {
+    object Idle : VideoLinkRecordingState
+    data class Recording(val startedAtMillis: Long, val withAudio: Boolean) : VideoLinkRecordingState
+    object Finishing : VideoLinkRecordingState
+    data class Finished(val file: File, val durationMillis: Long) : VideoLinkRecordingState
+    data class Failed(val message: String) : VideoLinkRecordingState
+}
+object VideoLinkRecordingBus {
+    val state = kotlinx.coroutines.flow.MutableStateFlow<VideoLinkRecordingState>(VideoLinkRecordingState.Idle)
+}
 
 internal sealed interface VideoLinkParse {
     data class Accepted(val url: String, val host: String, val platformLabel: String) : VideoLinkParse
@@ -99,399 +90,279 @@ private val videoLinkKnownPlatforms = listOf(
 )
 
 private fun videoLinkHostMatches(host: String, domains: List<String>): Boolean =
-    domains.any { host == it || host.endsWith(".$it") }
+    domains.any { host == it || host.endsWith("." + it) }
 
 internal fun parseVideoLinkNative(raw: String): VideoLinkParse {
     val trimmed = raw.trim()
-    if (trimmed.isEmpty()) return VideoLinkParse.Rejected("Paste the link of the video you want to view and record.")
-    val candidate = if (Regex("^[A-Za-z][A-Za-z0-9+.-]*:").containsMatchIn(trimmed)) trimmed else "https://$trimmed"
-    val uri = try {
-        URI(candidate)
-    } catch (_: Exception) {
-        return VideoLinkParse.Rejected("That does not look like a complete web link.")
+    if (trimmed.isEmpty()) return VideoLinkParse.Rejected("Paste a video link first.")
+    val candidate = if (Regex("^[A-Za-z][A-Za-z0-9+.-]*:").containsMatchIn(trimmed)) trimmed else "https://" + trimmed
+    val uri = try { URI(candidate) } catch (_: Exception) {
+        return VideoLinkParse.Rejected("That does not look like a complete video link.")
     }
     if (!"https".equals(uri.scheme, ignoreCase = true)) {
-        return VideoLinkParse.Rejected("Use an HTTPS link. Insecure HTTP and app-specific links are not opened.")
+        return VideoLinkParse.Rejected("Use a secure HTTPS link.")
     }
     if (!uri.rawUserInfo.isNullOrEmpty()) {
         return VideoLinkParse.Rejected("Links containing a username or password are not accepted.")
     }
-    val host = (uri.host ?: "").lowercase(Locale.ROOT).removePrefix("[").removeSuffix("]").removePrefix("www.")
-    if (host.isEmpty()) return VideoLinkParse.Rejected("That does not look like a complete web link.")
-
-    videoLinkProtectedPlatforms.firstOrNull { videoLinkHostMatches(host, it.second) }?.let { protected ->
-        return VideoLinkParse.Rejected(
-            "${protected.first} protects its video with DRM and does not allow screen recording, so the capture would be blank. " +
-                "Use the service's own offline or download feature instead.",
-        )
+    val host = (uri.host ?: "").lowercase(Locale.ROOT).removePrefix("www.")
+    if (host.isBlank() || host.contains(":") || Regex("^\\d{1,3}(\\.\\d{1,3}){3}$").matches(host) ||
+        host == "localhost" || host.endsWith(".localhost") || host.endsWith(".local") ||
+        host.endsWith(".internal") || !host.contains(".")) {
+        return VideoLinkParse.Rejected("Local, private-network and IP-address links are not accepted.")
     }
-    val isLocal = host == "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal") ||
-        host == "0.0.0.0" || host.contains(':') || Regex("^\\d{1,3}(\\.\\d{1,3}){3}$").matches(host) || !host.contains('.')
-    if (isLocal) return VideoLinkParse.Rejected("Local, private-network and IP-address links are not accepted.")
-
+    videoLinkProtectedPlatforms.firstOrNull { videoLinkHostMatches(host, it.second) }?.let {
+        return VideoLinkParse.Rejected(it.first + " protects its video with DRM. enV cannot export protected streams.")
+    }
     val label = videoLinkKnownPlatforms.firstOrNull { videoLinkHostMatches(host, it.second) }?.first ?: host
     return VideoLinkParse.Accepted(uri.toString(), host, label)
 }
 
-private fun Context.findActivity(): Activity? {
-    var current: Context? = this
-    while (current is ContextWrapper) {
-        if (current is Activity) return current
-        current = current.baseContext
+private fun videoProviderFor(host: String): String = when {
+    videoLinkHostMatches(host, listOf("youtube.com", "youtu.be", "youtube-nocookie.com")) -> "youtube"
+    videoLinkHostMatches(host, listOf("tiktok.com")) -> "tiktok"
+    videoLinkHostMatches(host, listOf("facebook.com", "fb.watch", "fb.com")) -> "facebook"
+    videoLinkHostMatches(host, listOf("instagram.com")) -> "instagram"
+    videoLinkHostMatches(host, listOf("x.com", "twitter.com")) -> "x"
+    else -> "generic"
+}
+
+private fun videoApiBase(): String {
+    val base = BuildConfig.ENV_API_BASE_URL.trimEnd('/')
+    require(base.startsWith("https://", ignoreCase = true)) { "The enV API must use HTTPS in release builds." }
+    require(base.isNotBlank()) { "The enV media service is not configured in this app build." }
+    return base
+}
+
+private fun apiErrorMessage(status: Int, body: String): String {
+    val json = runCatching { JSONObject(body) }.getOrNull()
+    val message = sequenceOf(json?.opt("error"), json?.opt("message"))
+        .filterIsInstance<String>().map { it.trim() }
+        .firstOrNull { it.isNotEmpty() && it.lowercase(Locale.ROOT) !in setOf("true", "false", "null") }
+    return message ?: "The enV media service returned HTTP " + status + ". Please try again."
+}
+
+private fun fetchVideoLink(url: String, host: String, context: Context): File {
+    val connection = URL(videoApiBase() + "/api/backend/url-media/download").openConnection() as HttpURLConnection
+    connection.requestMethod = "POST"
+    connection.connectTimeout = 20_000
+    connection.readTimeout = 300_000
+    connection.doOutput = true
+    connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+    connection.setRequestProperty("Accept", "video/mp4, video/*, application/octet-stream")
+    val payload = JSONObject()
+        .put("url", url)
+        .put("provider", videoProviderFor(host))
+        .put("format", "mp4")
+        .put("audioOnly", false)
+        .put("maxBytes", VIDEO_LINK_MAX_BYTES)
+    var partial: File? = null
+    try {
+        connection.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
+        val status = connection.responseCode
+        if (status !in 200..299) {
+            val body = connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+            throw IllegalStateException(apiErrorMessage(status, body))
+        }
+        val mime = (connection.contentType ?: "").substringBefore(';').trim().lowercase(Locale.ROOT)
+        require(mime.startsWith("video/") || mime == "application/octet-stream" || mime == "binary/octet-stream") {
+            "The media service response was not a video file."
+        }
+        val destination = File(context.cacheDir, "enV-video-" + UUID.randomUUID() + ".mp4")
+        partial = destination
+        var count = 0L
+        connection.inputStream.buffered().use { input ->
+            FileOutputStream(destination).buffered().use { output ->
+                val buffer = ByteArray(64 * 1024)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    count += read
+                    require(count <= VIDEO_LINK_MAX_BYTES) { "The video is larger than the 500 MB limit." }
+                    output.write(buffer, 0, read)
+                }
+            }
+        }
+        require(destination.length() > 0L) { "The media service returned an empty video." }
+        return destination
+    } catch (failure: Throwable) {
+        partial?.delete()
+        throw failure
+    } finally {
+        connection.disconnect()
     }
-    return null
 }
 
-/** Full-screen size and density to record. Long side is capped at 1920 px and both sides are multiples of 8. */
-private fun captureGeometry(context: Context): Triple<Int, Int, Int> {
-    val metrics = context.resources.displayMetrics
-    var width = metrics.widthPixels
-    var height = metrics.heightPixels
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-        val manager = context.getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager
-        val bounds = manager.currentWindowMetrics.bounds
-        width = bounds.width()
-        height = bounds.height()
+private fun safeVideoName(raw: String): String =
+    raw.replace(Regex("[\\\\/:*?\"<>|\\u0000-\\u001f]"), "-").take(100).ifBlank { "video.mp4" }
+
+private fun copySelectedVideo(context: Context, uri: Uri): File {
+    val resolver = context.contentResolver
+    val name = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+        if (cursor.moveToFirst()) cursor.getString(0) else null
+    } ?: "video"
+    val mime = (resolver.getType(uri) ?: "").lowercase(Locale.ROOT)
+    val extension = name.substringAfterLast('.', "").lowercase(Locale.ROOT)
+    val knownExtension = extension in setOf("mp4", "m4v", "mov", "webm", "ogv", "mkv", "avi", "3gp")
+    require(mime.startsWith("video/") || knownExtension) { "Choose a video file such as MP4, MOV, WebM or MKV." }
+    val destination = File(context.cacheDir, "enV-local-" + UUID.randomUUID() + "-" + safeVideoName(name))
+    var count = 0L
+    try {
+        val input = resolver.openInputStream(uri) ?: throw IllegalStateException("The selected video could not be opened.")
+        input.use { source ->
+            FileOutputStream(destination).buffered().use { output ->
+                val buffer = ByteArray(64 * 1024)
+                while (true) {
+                    val read = source.read(buffer)
+                    if (read < 0) break
+                    count += read
+                    require(count <= VIDEO_LINK_MAX_BYTES) { "Choose a video file smaller than 500 MB." }
+                    output.write(buffer, 0, read)
+                }
+            }
+        }
+        require(count > 0L) { "The selected video file is empty." }
+        return destination
+    } catch (failure: Throwable) {
+        destination.delete()
+        throw failure
     }
-    val longSide = maxOf(width, height).toFloat()
-    val scale = if (longSide > 1920f) 1920f / longSide else 1f
-    fun align(value: Int) = maxOf(8, ((value * scale).toInt() / 8) * 8)
-    return Triple(align(width), align(height), metrics.densityDpi)
 }
 
-private fun formatClock(millis: Long): String {
-    val total = (millis / 1000).coerceAtLeast(0)
-    val hours = total / 3600
-    val minutes = (total % 3600) / 60
-    val seconds = total % 60
-    return if (hours > 0) String.format(Locale.US, "%d:%02d:%02d", hours, minutes, seconds)
-    else String.format(Locale.US, "%02d:%02d", minutes, seconds)
-}
-
-private fun formatSize(bytes: Long): String = when {
-    bytes >= 1024L * 1024L * 1024L -> String.format(Locale.US, "%.1f GB", bytes / 1073741824.0)
-    bytes >= 1024L * 1024L -> String.format(Locale.US, "%.1f MB", bytes / 1048576.0)
-    bytes >= 1024L -> String.format(Locale.US, "%.0f KB", bytes / 1024.0)
-    else -> "$bytes B"
-}
-
-private data class ProjectionGrant(val resultCode: Int, val data: Intent)
-
-// ---------------------------------------------------------------------------------------------
-// Screen
-// ---------------------------------------------------------------------------------------------
-
-/**
- * Video Link Screen Recording (Android). The link opens in an in-app WebView, which shows the page
- * the way the platform presents it (video, likes, comments, controls). The system screen-capture
- * prompt is shown before every recording; the MP4 is written to app storage and only leaves the
- * device if the person saves it.
- */
 @Composable
 fun NativeVideoLinkRecorderScreen() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val recorderState by VideoLinkRecordingBus.state.collectAsState()
-
-    var linkText by remember { mutableStateOf("") }
-    var loadedLink by remember { mutableStateOf<VideoLinkParse.Accepted?>(null) }
-    var error by remember { mutableStateOf("") }
-    var notice by remember { mutableStateOf("") }
+    var link by remember { mutableStateOf("") }
     var rightsConfirmed by remember { mutableStateOf(false) }
-    var includeAudio by remember { mutableStateOf(true) }
-    var countdown by remember { mutableStateOf<Int?>(null) }
-    var pendingGrant by remember { mutableStateOf<ProjectionGrant?>(null) }
-    var saving by remember { mutableStateOf(false) }
-    var nowMillis by remember { mutableStateOf(System.currentTimeMillis()) }
+    var busy by remember { mutableStateOf(false) }
+    var status by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf("") }
+    var output by remember { mutableStateOf<File?>(null) }
     var pendingSave by remember { mutableStateOf<File?>(null) }
 
-    // A previous session's result is not shown again when the person returns to the tool.
-    LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) { VideoLinkRecordingService.purgeOldRecordings(context) }
-        if (VideoLinkRecordingBus.state.value !is VideoLinkRecordingState.Recording) {
-            VideoLinkRecordingBus.state.value = VideoLinkRecordingState.Idle
-        }
-    }
-    DisposableEffect(Unit) {
-        onDispose {
-            if (VideoLinkRecordingBus.state.value is VideoLinkRecordingState.Recording) VideoLinkRecordingService.stop(context)
-        }
-    }
-
-    val current = recorderState
-    LaunchedEffect(current) {
-        while (current is VideoLinkRecordingState.Recording) {
-            nowMillis = System.currentTimeMillis()
-            delay(500)
+    val videoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                busy = true
+                error = ""
+                status = "Preparing your video…"
+                val result = withContext(Dispatchers.IO) { runCatching { copySelectedVideo(context, uri) } }
+                result.onSuccess { output = it; status = "Your video is ready." }
+                    .onFailure { error = it.message ?: "The selected video could not be opened."; status = "" }
+                busy = false
+            }
         }
     }
 
-    val projectionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val data = result.data
-        if (result.resultCode == Activity.RESULT_OK && data != null) {
-            pendingGrant = ProjectionGrant(result.resultCode, data)
-        } else {
-            error = "Screen recording was not allowed, so nothing was recorded."
-        }
-    }
-
-    fun requestProjection() {
-        val manager = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-        projectionLauncher.launch(manager.createScreenCaptureIntent())
-    }
-
-    val audioPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (!granted) {
-            includeAudio = false
-            notice = "Audio recording permission is needed to capture the video's sound. It was declined, so this recording will be video only."
-        }
-        requestProjection()
-    }
-
-    // The person gets a short countdown after approving the system prompt to settle on the video.
-    LaunchedEffect(pendingGrant) {
-        val grant = pendingGrant ?: return@LaunchedEffect
-        for (second in 3 downTo 1) {
-            countdown = second
-            delay(1000)
-        }
-        countdown = null
-        pendingGrant = null
-        val (width, height, dpi) = captureGeometry(context)
-        VideoLinkRecordingService.start(context, grant.resultCode, grant.data, width, height, dpi, includeAudio)
-    }
-
-    val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("video/mp4")) { destination: Uri? ->
+    val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("video/mp4")) { destination ->
         val source = pendingSave
         pendingSave = null
-        if (source == null) return@rememberLauncherForActivityResult
-        if (destination == null) {
-            notice = "Save cancelled. The recording is still available until you leave this tool."
-            return@rememberLauncherForActivityResult
-        }
-        saving = true
-        scope.launch {
-            val outcome = withContext(Dispatchers.IO) {
-                runCatching {
-                    context.contentResolver.openOutputStream(destination)?.use { output ->
-                        source.inputStream().buffered().use { it.copyTo(output) }
-                    } ?: throw IllegalStateException("Unable to write to the selected location.")
+        if (destination != null && source != null) {
+            scope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    runCatching {
+                        context.contentResolver.openOutputStream(destination)?.use { target ->
+                            source.inputStream().buffered().use { input -> input.copyTo(target) }
+                        } ?: throw IllegalStateException("The save location could not be opened.")
+                    }
                 }
+                result.onSuccess { status = "Video saved successfully." }
+                    .onFailure { error = it.message ?: "The video could not be saved." }
             }
-            outcome.onSuccess { notice = "Video saved to the location you chose." }
-                .onFailure { error = it.message ?: "The video could not be saved." }
-            saving = false
         }
     }
 
-    val screenHeightDp = LocalConfiguration.current.screenHeightDp
-    val recording = current is VideoLinkRecordingState.Recording
-    val finishing = current is VideoLinkRecordingState.Finishing
-    val starting = countdown != null || pendingGrant != null
-    val busy = recording || finishing || starting
-
     Column(
-        Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+        modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text("Video Link Screen Recording", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Open a video link as it appears on its platform, then record what you see, including likes, comments and controls.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+                Text("Submit a video link or select a video file. enV prepares the video and shows the result here.", style = MaterialTheme.typography.bodyMedium)
             }
         }
 
         OutlinedTextField(
-            value = linkText,
-            onValueChange = { linkText = it; error = "" },
-            enabled = !busy,
-            singleLine = true,
+            value = link,
+            onValueChange = { link = it; error = ""; status = "" },
             label = { Text("Video link") },
-            placeholder = { Text("https://www.youtube.com/watch?v=…") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+            placeholder = { Text("Paste a public video link") },
+            singleLine = true,
+            enabled = !busy,
             modifier = Modifier.fillMaxWidth(),
         )
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Checkbox(checked = rightsConfirmed, onCheckedChange = { rightsConfirmed = it }, enabled = !busy)
+            Text("I own this video or have permission to save and use it.", style = MaterialTheme.typography.bodySmall)
+        }
         Button(
             onClick = {
                 error = ""
-                notice = ""
-                when (val parsed = parseVideoLinkNative(linkText)) {
-                    is VideoLinkParse.Accepted -> {
-                        loadedLink = parsed
-                        linkText = parsed.url
-                    }
-                    is VideoLinkParse.Rejected -> {
-                        loadedLink = null
-                        error = parsed.reason
+                status = ""
+                val parsed = parseVideoLinkNative(link)
+                if (parsed is VideoLinkParse.Rejected) {
+                    error = parsed.reason
+                } else if (!rightsConfirmed) {
+                    error = "Confirm that you own this video or have permission to save and use it."
+                } else {
+                    val accepted = parsed as VideoLinkParse.Accepted
+                    busy = true
+                    status = "Retrieving the original video…"
+                    scope.launch {
+                        val result = withContext(Dispatchers.IO) {
+                            runCatching { fetchVideoLink(accepted.url, accepted.host, context) }
+                        }
+                        result.onSuccess { output = it; status = "Your video is ready." }
+                            .onFailure { error = it.message ?: "The video could not be retrieved."; status = "" }
+                        busy = false
                     }
                 }
             },
-            enabled = !busy && linkText.isNotBlank(),
+            enabled = !busy && link.isNotBlank(),
             modifier = Modifier.fillMaxWidth(),
-        ) { Text("Load link") }
-        Text(
-            "Public HTTPS pages only. Subscription services that use DRM cannot be recorded.",
-            style = MaterialTheme.typography.bodySmall,
-        )
+        ) { Text(if (busy) "Processing video…" else "Process video") }
 
-        val link = loadedLink
-        if (link != null) {
-            Text("${link.platformLabel} · ${link.host}", style = MaterialTheme.typography.labelLarge)
-            VideoLinkWebView(
-                url = link.url,
-                modifier = Modifier.fillMaxWidth().height((screenHeightDp * 0.62f).dp),
-            )
-            Text(
-                "Sign in inside this view if the platform requires it. Everything visible on screen, including names and comments, is recorded.",
-                style = MaterialTheme.typography.bodySmall,
-            )
+        OutlinedButton(
+            onClick = { videoPicker.launch(arrayOf("video/*")) },
+            enabled = !busy,
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("Choose a video from this device") }
+        Text("Selected files stay on this device and are not uploaded.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
+        if (busy) Text(status, style = MaterialTheme.typography.bodyMedium)
+        if (output != null) {
             Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Recording", style = MaterialTheme.typography.titleSmall)
-                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                        Checkbox(checked = includeAudio, onCheckedChange = { includeAudio = it }, enabled = !busy)
-                        Text(
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) "Include the video's sound"
-                            else "Video's sound needs Android 10 or newer",
-                        )
-                    }
-                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                        Checkbox(checked = rightsConfirmed, onCheckedChange = { rightsConfirmed = it }, enabled = !busy)
-                        Text("I own this video or have permission to record it, and will only use the recording as allowed.")
-                    }
-
-                    when {
-                        countdown != null -> Text("Recording starts in ${countdown}… Settle on the part you want to capture.", style = MaterialTheme.typography.titleSmall)
-                        recording -> {
-                            val state = current as VideoLinkRecordingState.Recording
-                            Text("● Recording ${formatClock(nowMillis - state.startedAtMillis)}", style = MaterialTheme.typography.titleSmall)
-                            if (includeAudio && !state.withAudio) {
-                                Text("Sound is not being captured on this device; the recording is video only.", style = MaterialTheme.typography.bodySmall)
-                            }
-                            Button(onClick = { VideoLinkRecordingService.stop(context) }, modifier = Modifier.fillMaxWidth()) { Text("Stop recording") }
-                        }
-                        finishing -> Text("Finishing your recording…", style = MaterialTheme.typography.titleSmall)
-                        else -> Button(
-                            onClick = {
-                                error = ""
-                                notice = ""
-                                VideoLinkRecordingBus.state.value = VideoLinkRecordingState.Idle
-                                val needsAudioPermission = includeAudio && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-                                    ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED
-                                if (needsAudioPermission) audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) else requestProjection()
-                            },
-                            enabled = rightsConfirmed,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text(if (current is VideoLinkRecordingState.Finished) "Record again" else "Start recording") }
-                    }
-                    Text(
-                        "Android asks for permission before every recording and shows a notification while it runs. Nothing is uploaded.",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            }
-        }
-
-        if (current is VideoLinkRecordingState.Finished) {
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Your recording", style = MaterialTheme.typography.titleSmall)
-                    Text("${formatClock(current.durationMillis)} · ${formatSize(current.file.length())} · MP4", style = MaterialTheme.typography.bodySmall)
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Your video", style = MaterialTheme.typography.titleSmall)
                     AndroidView(
-                        modifier = Modifier.fillMaxWidth().height((screenHeightDp * 0.45f).dp),
+                        modifier = Modifier.fillMaxWidth().height(230.dp),
                         factory = { viewContext ->
                             VideoView(viewContext).apply {
+                                tag = output!!.absolutePath
+                                setVideoURI(Uri.fromFile(output))
                                 setMediaController(MediaController(viewContext).also { it.setAnchorView(this) })
-                                setVideoURI(Uri.fromFile(current.file))
-                                setOnPreparedListener { it.isLooping = false; seekTo(1) }
                             }
                         },
-                        onRelease = { it.stopPlayback() },
-                    )
-                    Button(
-                        onClick = { pendingSave = current.file; saveLauncher.launch("enV-video-link-recording.mp4") },
-                        enabled = !saving,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text(if (saving) "Saving…" else "Save video") }
-                    OutlinedButton(
-                        onClick = {
-                            current.file.delete()
-                            VideoLinkRecordingBus.state.value = VideoLinkRecordingState.Idle
+                        update = { view ->
+                            if (view.tag != output!!.absolutePath) {
+                                view.tag = output!!.absolutePath
+                                view.setVideoURI(Uri.fromFile(output))
+                                view.setMediaController(MediaController(context).also { it.setAnchorView(view) })
+                            }
                         },
+                    )
+                    Text(output!!.name, style = MaterialTheme.typography.bodySmall)
+                    Button(
+                        onClick = { pendingSave = output; saveLauncher.launch(safeVideoName(output!!.name)) },
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Discard") }
+                    ) { Text("Save video") }
                 }
             }
         }
 
-        if (current is VideoLinkRecordingState.Failed) {
-            Text(current.message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
-        }
-        if (error.isNotEmpty()) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
-        if (notice.isNotEmpty()) Text(notice, style = MaterialTheme.typography.bodyMedium)
-        Spacer(Modifier.height(24.dp))
+        if (status.isNotBlank() && !busy) Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (error.isNotBlank()) Text(error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
     }
-}
-
-@SuppressLint("SetJavaScriptEnabled")
-@Composable
-private fun VideoLinkWebView(url: String, modifier: Modifier) {
-    val fullscreenState = remember { arrayOfNulls<View>(1) }
-    val fullscreenCallback = remember { arrayOfNulls<WebChromeClient.CustomViewCallback>(1) }
-
-    AndroidView(
-        modifier = modifier,
-        factory = { viewContext ->
-            WebView(viewContext).apply {
-                settings.javaScriptEnabled = true
-                settings.domStorageEnabled = true
-                settings.mediaPlaybackRequiresUserGesture = true
-                settings.allowFileAccess = false
-                settings.allowContentAccess = false
-                settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
-                settings.setSupportMultipleWindows(false)
-                webViewClient = object : WebViewClient() {
-                    // Only HTTPS pages are shown; app links, file: and intent: targets are ignored.
-                    override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean =
-                        !"https".equals(request.url.scheme, ignoreCase = true)
-                }
-                webChromeClient = object : WebChromeClient() {
-                    override fun onShowCustomView(view: View, callback: CustomViewCallback) {
-                        val activity = viewContext.findActivity() ?: run { callback.onCustomViewHidden(); return }
-                        fullscreenState[0]?.let { callback.onCustomViewHidden(); return }
-                        val decor = activity.window.decorView as FrameLayout
-                        decor.addView(view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-                        fullscreenState[0] = view
-                        fullscreenCallback[0] = callback
-                    }
-
-                    override fun onHideCustomView() {
-                        val activity = viewContext.findActivity()
-                        val view = fullscreenState[0]
-                        if (activity != null && view != null) (activity.window.decorView as FrameLayout).removeView(view)
-                        fullscreenState[0] = null
-                        fullscreenCallback[0]?.onCustomViewHidden()
-                        fullscreenCallback[0] = null
-                    }
-                }
-                loadUrl(url)
-                tag = url
-            }
-        },
-        update = { webView ->
-            if (webView.tag != url) {
-                webView.tag = url
-                webView.loadUrl(url)
-            }
-        },
-        onRelease = { webView ->
-            fullscreenCallback[0]?.onCustomViewHidden()
-            webView.stopLoading()
-            webView.destroy()
-        },
-    )
 }
