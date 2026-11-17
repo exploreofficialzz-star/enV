@@ -134,11 +134,6 @@ private enum NativeVideoLinkService {
     }
 }
 
-private func nativeSafeVideoName(_ raw: String) -> String {
-    let filtered = raw.replacingOccurrences(of: "[\\\\/:*?\"<>|\\u{0000}-\\u{001F}]", with: "-", options: .regularExpression)
-    return String(filtered.prefix(100)).isEmpty ? "video.mp4" : String(filtered.prefix(100))
-}
-
 struct NativeVideoLinkRecorderView: View {
     @State private var linkText = ""
     @State private var rightsConfirmed = false
