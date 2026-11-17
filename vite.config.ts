@@ -67,7 +67,15 @@ export default defineConfig(({ command, isPreview }) => ({
     tailwindcss(),
     tanstackStart(),
     ...(command === "build" || isPreview
-      ? [nitro({ preset: "vercel", serverDir: "./server", modules: [{
+      ? [nitro({
+          preset: "vercel",
+          serverDir: "./server",
+          vercel: {
+            functionRules: {
+              "/api/billing/reconcile": { maxDuration: 240 },
+            },
+          },
+          modules: [{
           name: "env:pglite-runtime-assets",
           setup(nitro) {
             // Register alongside the preset; a config-level compiled hook replaces it.
