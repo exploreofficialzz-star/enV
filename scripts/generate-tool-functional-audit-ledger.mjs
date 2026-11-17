@@ -614,6 +614,82 @@ if (!converterToolIds.length) {
   }
 }
 
+// The existing productivity browser suite exercises exactly these three timer
+// tools; Sleep Calculator and A book remain outside this evidence scope.
+const productivityTimerToolIds = ["focus-timer", "pomodoro-timer", "stopwatch"].sort();
+const activeProductivityToolIds = new Set(runtimeTools
+  .filter((tool) => tool.category === "productivity" && tool.status === "active")
+  .map((tool) => tool.id));
+const missingProductivityTimerIds = productivityTimerToolIds.filter((id) => !activeProductivityToolIds.has(id));
+const productivityTimerReportPath = path.join(root, "artifacts/tool-functional-audit/productivity-timers-browser.json");
+if (missingProductivityTimerIds.length) {
+  invalidEvidence.push({
+    auditId: "productivity-timers-browser",
+    reason: "expected-productivity-timer-tools-missing-from-active-runtime-registry",
+    missingToolIds: missingProductivityTimerIds,
+  });
+} else if (!fs.existsSync(productivityTimerReportPath)) {
+  if (process.env.GITHUB_ACTIONS === "true") {
+    invalidEvidence.push({
+      auditId: "productivity-timers-browser",
+      reason: "dynamic-productivity-timer-report-missing-in-github-actions",
+      expectedToolIds: productivityTimerToolIds,
+      path: path.relative(root, productivityTimerReportPath),
+    });
+  }
+} else {
+  try {
+    const productivityReport = JSON.parse(fs.readFileSync(productivityTimerReportPath, "utf8"));
+    const validation = validateToolAuditReport(productivityReport, {
+      auditId: "productivity-timers-browser",
+      expectedToolIds: productivityTimerToolIds,
+      currentCommit,
+      githubActions: process.env.GITHUB_ACTIONS === "true",
+      workflowRunId: process.env.GITHUB_RUN_ID ? Number(process.env.GITHUB_RUN_ID) : null,
+      jobId: process.env.GITHUB_JOB ?? null,
+    });
+    if (!validation.valid) {
+      invalidEvidence.push({
+        auditId: "productivity-timers-browser",
+        reason: "dynamic-productivity-timer-report-invalid-or-not-current",
+        errors: validation.errors,
+        expectedToolIds: productivityTimerToolIds,
+        reportToolCount: productivityReport.toolResults?.length ?? null,
+        reportCommit: productivityReport.observedCommit ?? null,
+        currentCommit,
+        reportWorkflowRunId: productivityReport.workflowRunId ?? null,
+        currentWorkflowRunId: process.env.GITHUB_RUN_ID ? Number(process.env.GITHUB_RUN_ID) : null,
+        reportJobId: productivityReport.jobId ?? null,
+        currentJobId: process.env.GITHUB_JOB ?? null,
+      });
+    } else {
+      for (const item of validation.toolResults) {
+        const blocked = item.status === "blocked";
+        evidenceAudits.push({
+          id: "productivity-timers-browser-" + item.toolId + "-" + item.status,
+          kind: blocked ? "blocked" : "browser",
+          result: blocked ? "blocked" : "passed",
+          script: "scripts/browser-productivity-timer-audit.mjs",
+          workflow: "Production Check",
+          workflowRunId: productivityReport.workflowRunId,
+          jobId: productivityReport.jobId,
+          step: "Verify productivity timer tools in the browser",
+          toolIds: [item.toolId],
+          testedCommit: productivityReport.observedCommit,
+          checks: blocked ? item.blockedChecks : item.checks,
+          notes: item.notes ?? "",
+        });
+      }
+    }
+  } catch (error) {
+    invalidEvidence.push({
+      auditId: "productivity-timers-browser",
+      reason: "dynamic-productivity-timer-report-could-not-be-read",
+      detail: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 for (const audit of evidenceAudits) {
   const provenance = classifyAuditEvidenceCommit({
     testedCommit: audit.testedCommit,

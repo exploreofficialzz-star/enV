@@ -160,6 +160,20 @@ jobs:
           path: artifacts/tool-functional-audit/converters-detail.json
           if-no-files-found: ignore
 
+      - name: Verify productivity timer tools in the browser
+        if: always()
+        env:
+          TOOL_AUDIT_REPORT_PATH: artifacts/tool-functional-audit/productivity-timers-browser.json
+        run: npm run audit:productivity:browser -- --report=artifacts/tool-functional-audit/productivity-timers-detail.json
+
+      - name: Upload productivity timer browser audit details
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: productivity-timer-browser-audit
+          path: artifacts/tool-functional-audit/productivity-timers-detail.json
+          if-no-files-found: ignore
+
       - name: Verify all 93 Celebrations tools on a mobile browser
         run: npm run audit:celebrations:browser -- --report=artifacts/celebrations-browser-audit/report.json
 
