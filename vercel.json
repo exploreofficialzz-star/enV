@@ -178,10 +178,5 @@
       "main": true,
       "research/global-discovery-brand-and-copy-20261114": false
     }
-  },
-  "functions": {
-    "server/routes/api/billing/reconcile.get.ts": {
-      "maxDuration": 240
-    }
   }
 }
