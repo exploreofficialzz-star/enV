@@ -1,1 +1,1 @@
-Retry after correcting workflow-generated newline characters in JSON and coverage files.
+Retry generator stage after making offline-capability generation load the repository TypeScript alias hook.
