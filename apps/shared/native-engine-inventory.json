@@ -1,22 +1,12 @@
 {
-  "catalogVersion": "20fe5f5fc825",
+  "catalogVersion": "e60f06b40882",
   "baseCatalogVersion": "58f9a538e469",
   "runtimeExtensionIds": [
-    "music-downloader",
-    "a-book",
     "zip-any-file",
-    "camera-studio",
-    "video-link-screen-recording",
-    "smartphone-prototype-lab",
-    "file-to-txt",
-    "file-organizer",
-    "batch-file-renamer",
-    "duplicate-file-finder",
-    "folder-size-analyzer",
-    "file-search",
-    "file-compare"
+    "a-book",
+    "camera-studio"
   ],
-  "source": "src/lib/registry.ts (generated base catalogue plus runtime extensions)",
+  "source": "src/data/catalog.ts",
   "platforms": {
     "android": "Kotlin",
     "ios": "Swift"
@@ -33,12 +23,12 @@
     },
     {
       "family": "audio",
-      "total": 109,
-      "active": 109,
+      "total": 110,
+      "active": 110,
       "planned": 0,
-      "androidImplemented": 24,
-      "iosImplemented": 24,
-      "uniqueConfigurations": 104
+      "androidImplemented": 25,
+      "iosImplemented": 25,
+      "uniqueConfigurations": 105
     },
     {
       "family": "barcode",
@@ -114,12 +104,12 @@
     },
     {
       "family": "custom",
-      "total": 1677,
-      "active": 1417,
-      "planned": 260,
-      "androidImplemented": 213,
-      "iosImplemented": 213,
-      "uniqueConfigurations": 1674
+      "total": 1667,
+      "active": 1667,
+      "planned": 0,
+      "androidImplemented": 205,
+      "iosImplemented": 205,
+      "uniqueConfigurations": 1664
     },
     {
       "family": "datetime",
@@ -150,12 +140,12 @@
     },
     {
       "family": "file-converter",
-      "total": 23,
-      "active": 23,
+      "total": 22,
+      "active": 22,
       "planned": 0,
-      "androidImplemented": 22,
-      "iosImplemented": 22,
-      "uniqueConfigurations": 21
+      "androidImplemented": 21,
+      "iosImplemented": 21,
+      "uniqueConfigurations": 20
     },
     {
       "family": "generator",
@@ -236,7 +226,7 @@
       "planned": 0,
       "androidImplemented": 38,
       "iosImplemented": 38,
-      "uniqueConfigurations": 33
+      "uniqueConfigurations": 34
     },
     {
       "family": "url-media",
@@ -406,7 +396,6 @@
     "base64-validator",
     "basic-auth-header",
     "basic-calculator",
-    "batch-file-renamer",
     "battery-energy-calculator",
     "battery-runtime-calculator",
     "beam-load-calculator",
@@ -818,7 +807,6 @@
     "dummy-products-generator",
     "dummy-sql-generator",
     "dummy-users-generator",
-    "duplicate-file-finder",
     "duration-calculator",
     "dynamic-pressure-calculator",
     "ean13-barcode",
@@ -917,7 +905,6 @@
     "farewell-reveal-page",
     "farewell-surprise-page",
     "feature-benefit-generator",
-    "file-compare",
     "file-csv-to-json-converter",
     "file-csv-to-tsv-converter",
     "file-csv-to-txt-converter",
@@ -929,13 +916,10 @@
     "file-json-to-xml-converter",
     "file-json-to-yaml-converter",
     "file-markdown-to-html-converter",
-    "file-organizer",
     "file-png-to-jpg-converter",
     "file-png-to-svg-helper",
     "file-png-to-webp-converter",
-    "file-search",
     "file-size-converter",
-    "file-to-txt",
     "file-tsv-to-csv-converter",
     "file-txt-to-csv-converter",
     "file-webp-to-jpg-converter",
@@ -1002,7 +986,6 @@
     "fluid-hydraulic-power",
     "fluid-reynolds-number",
     "focus-timer",
-    "folder-size-analyzer",
     "follow-up-builder",
     "follow-up-formatter",
     "follow-up-generator",
@@ -8080,7 +8063,6 @@
     "vcard-qr-generator",
     "video-bitrate-calculator",
     "video-file-size-calculator",
-    "video-link-screen-recording",
     "voice-noise-gate",
     "voice-noise-reducer",
     "voltage-calculator",
@@ -8318,7 +8300,6 @@
     "base64-validator",
     "basic-auth-header",
     "basic-calculator",
-    "batch-file-renamer",
     "battery-energy-calculator",
     "battery-runtime-calculator",
     "beam-load-calculator",
@@ -8730,7 +8711,6 @@
     "dummy-products-generator",
     "dummy-sql-generator",
     "dummy-users-generator",
-    "duplicate-file-finder",
     "duration-calculator",
     "dynamic-pressure-calculator",
     "ean13-barcode",
@@ -8829,7 +8809,6 @@
     "farewell-reveal-page",
     "farewell-surprise-page",
     "feature-benefit-generator",
-    "file-compare",
     "file-csv-to-json-converter",
     "file-csv-to-tsv-converter",
     "file-csv-to-txt-converter",
@@ -8841,13 +8820,10 @@
     "file-json-to-xml-converter",
     "file-json-to-yaml-converter",
     "file-markdown-to-html-converter",
-    "file-organizer",
     "file-png-to-jpg-converter",
     "file-png-to-svg-helper",
     "file-png-to-webp-converter",
-    "file-search",
     "file-size-converter",
-    "file-to-txt",
     "file-tsv-to-csv-converter",
     "file-txt-to-csv-converter",
     "file-webp-to-jpg-converter",
@@ -8914,7 +8890,6 @@
     "fluid-hydraulic-power",
     "fluid-reynolds-number",
     "focus-timer",
-    "folder-size-analyzer",
     "follow-up-builder",
     "follow-up-formatter",
     "follow-up-generator",
@@ -15992,7 +15967,6 @@
     "vcard-qr-generator",
     "video-bitrate-calculator",
     "video-file-size-calculator",
-    "video-link-screen-recording",
     "voice-noise-gate",
     "voice-noise-reducer",
     "voltage-calculator",
@@ -16091,11 +16065,11 @@
     "zip-any-file"
   ],
   "summary": {
-    "totalTools": 10014,
-    "activeTools": 9754,
-    "plannedTools": 260,
+    "totalTools": 10004,
+    "activeTools": 10004,
+    "plannedTools": 0,
     "engineFamilies": 27,
-    "androidImplemented": 7910,
-    "iosImplemented": 7910
+    "androidImplemented": 7902,
+    "iosImplemented": 7902
   }
 }

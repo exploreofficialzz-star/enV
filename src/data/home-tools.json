@@ -1,26 +1,12 @@
 {
-  "version": "58f9a538e469",
+  "version": "6da86b90a18d",
   "counts": {
-    "active": 9716,
-    "planned": 260,
-    "total": 9976
+    "active": 8789,
+    "planned": 1211,
+    "total": 10000
   },
   "featured": [
     {
-      "id": "audio-to-text",
-      "name": "Audio to Text",
-      "description": "Transcribe speech from an audio file using a real speech-to-text model when configured.",
-      "category": "audio",
-      "slug": "audio-to-text"
-    },
-    {
-      "id": "song-metadata-analyzer",
-      "name": "Song Metadata Analyzer",
-      "description": "Analyze song genre, style, language, tempo, key, mood, vocals, instruments, and technical metadata. Batch multiple tracks or ZIP collections and export JSON or CSV reports.",
-      "category": "audio",
-      "slug": "song-metadata-analyzer"
-    },
-    {
       "id": "percentage-calculator",
       "name": "Percentage Calculator",
       "description": "Find what percent one number is of another, plus increase and decrease.",
@@ -49,83 +35,11 @@
       "slug": "qr-generator"
     },
     {
-      "id": "password-generator",
-      "name": "Password Generator",
-      "description": "Generate strong random passwords with length and character options.",
-      "category": "security",
-      "slug": "password-generator"
-    },
-    {
       "id": "video-to-mp4",
       "name": "Video to MP4",
       "description": "Convert a local video to MP4 using the enV FFmpeg media processor when configured.",
       "category": "video",
       "slug": "video-to-mp4"
-    }
-  ],
-  "popular": [
-    {
-      "id": "audio-to-text",
-      "name": "Audio to Text",
-      "description": "Transcribe speech from an audio file using a real speech-to-text model when configured.",
-      "category": "audio",
-      "slug": "audio-to-text"
-    },
-    {
-      "id": "song-metadata-analyzer",
-      "name": "Song Metadata Analyzer",
-      "description": "Analyze song genre, style, language, tempo, key, mood, vocals, instruments, and technical metadata. Batch multiple tracks or ZIP collections and export JSON or CSV reports.",
-      "category": "audio",
-      "slug": "song-metadata-analyzer"
-    },
-    {
-      "id": "percentage-calculator",
-      "name": "Percentage Calculator",
-      "description": "Find what percent one number is of another, plus increase and decrease.",
-      "category": "calculators",
-      "slug": "percentage-calculator"
-    },
-    {
-      "id": "json-formatter",
-      "name": "JSON Formatter",
-      "description": "Pretty-print, validate, and minify JSON entirely in your browser.",
-      "category": "developer",
-      "slug": "json-formatter"
-    },
-    {
-      "id": "image-compressor",
-      "name": "Image Compressor",
-      "description": "Compress JPG, PNG or WebP with quality, resize, target size, metadata options and a zoomable before/after.",
-      "category": "image",
-      "slug": "image-compressor"
-    },
-    {
-      "id": "qr-generator",
-      "name": "QR Code Generator",
-      "description": "Generate a QR code from text or a URL and download it as PNG.",
-      "category": "qr",
-      "slug": "qr-generator"
-    },
-    {
-      "id": "password-generator",
-      "name": "Password Generator",
-      "description": "Generate strong random passwords with length and character options.",
-      "category": "security",
-      "slug": "password-generator"
-    },
-    {
-      "id": "video-to-mp4",
-      "name": "Video to MP4",
-      "description": "Convert a local video to MP4 using the enV FFmpeg media processor when configured.",
-      "category": "video",
-      "slug": "video-to-mp4"
-    },
-    {
-      "id": "video-to-text",
-      "name": "Video to Text",
-      "description": "Transcribe speech from a video using a real speech-to-text model when configured.",
-      "category": "video",
-      "slug": "video-to-text"
     },
     {
       "id": "youtube-video-downloader",
@@ -147,6 +61,92 @@
       "description": "Live word, character, sentence, and paragraph counts.",
       "category": "text",
       "slug": "word-counter"
+    }
+  ],
+  "popular": [
+    {
+      "id": "percentage-calculator",
+      "name": "Percentage Calculator",
+      "description": "Find what percent one number is of another, plus increase and decrease.",
+      "category": "calculators",
+      "slug": "percentage-calculator"
+    },
+    {
+      "id": "json-formatter",
+      "name": "JSON Formatter",
+      "description": "Pretty-print, validate, and minify JSON entirely in your browser.",
+      "category": "developer",
+      "slug": "json-formatter"
+    },
+    {
+      "id": "image-compressor",
+      "name": "Image Compressor",
+      "description": "Compress JPG, PNG or WebP with quality, resize, target size, metadata options and a zoomable before/after.",
+      "category": "image",
+      "slug": "image-compressor"
+    },
+    {
+      "id": "qr-generator",
+      "name": "QR Code Generator",
+      "description": "Generate a QR code from text or a URL and download it as PNG.",
+      "category": "qr",
+      "slug": "qr-generator"
+    },
+    {
+      "id": "video-to-mp4",
+      "name": "Video to MP4",
+      "description": "Convert a local video to MP4 using the enV FFmpeg media processor when configured.",
+      "category": "video",
+      "slug": "video-to-mp4"
+    },
+    {
+      "id": "youtube-video-downloader",
+      "name": "YouTube Video Downloader",
+      "description": "Download a video from a YouTube URL when a compliant media-processing service is available.",
+      "category": "video",
+      "slug": "youtube-video-downloader"
+    },
+    {
+      "id": "youtube-audio-extractor",
+      "name": "YouTube Audio Extractor",
+      "description": "Extract audio from a supported YouTube URL through the configured enV media service.",
+      "category": "audio",
+      "slug": "youtube-audio-extractor"
+    },
+    {
+      "id": "word-counter",
+      "name": "Word Counter",
+      "description": "Live word, character, sentence, and paragraph counts.",
+      "category": "text",
+      "slug": "word-counter"
+    },
+    {
+      "id": "video-to-mp3",
+      "name": "Video to MP3",
+      "description": "Convert a local video to MP3 using the enV FFmpeg media processor when configured.",
+      "category": "video",
+      "slug": "video-to-mp3"
+    },
+    {
+      "id": "audio-to-mp3-server",
+      "name": "Audio to MP3",
+      "description": "Convert a local audio file to MP3 using the enV FFmpeg media processor when configured.",
+      "category": "audio",
+      "slug": "audio-to-mp3-server"
+    },
+    {
+      "id": "tip-calculator",
+      "name": "Tip Calculator",
+      "description": "Split a bill with tip among any number of people.",
+      "category": "calculators",
+      "slug": "tip-calculator"
+    },
+    {
+      "id": "image-resizer",
+      "name": "Image Resizer",
+      "description": "Resize by exact size, percent, fit or fill in px/in/cm/mm, with resampling and sharpening choices.",
+      "category": "image",
+      "slug": "image-resizer"
     }
   ]
 }
