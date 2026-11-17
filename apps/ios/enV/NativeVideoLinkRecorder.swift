@@ -312,6 +312,11 @@ struct NativeVideoLinkRecorderView: View {
             errorText = error.localizedDescription
         case .success(let urls):
             guard let selected = urls.first else { return }
+            outputPlayer?.pause()
+            if let previous = outputURL { try? FileManager.default.removeItem(at: previous) }
+            outputURL = nil
+            outputPlayer = nil
+            linkText = ""
             let hasAccess = selected.startAccessingSecurityScopedResource()
             defer { if hasAccess { selected.stopAccessingSecurityScopedResource() } }
             do {
