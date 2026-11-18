@@ -120,7 +120,7 @@ function MetricCard({ title, value, detail, icon, loading = false }: { title: st
         <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-surface-2 text-accent">{icon}</span>
       </div>
       {loading ? (
-        <span className="env-shimmer mt-3 block h-8 w-36 max-w-full rounded-md" role="status" aria-label={`Loading ${title.toLowerCase()}`} />
+        <span className="env-billing-shimmer mt-3 block h-8 w-36" max-w-full rounded-md" role="status" aria-label={`Loading ${title.toLowerCase()}`} />
       ) : (
         <p className="mt-3 break-words text-2xl font-semibold tracking-tight text-fg tabular-nums">{tokenUnitDisplay(value)}</p>
       )}
@@ -243,7 +243,7 @@ export function TokenDashboard() {
                   <div>
                     <p className="text-sm font-medium text-white/75">Total token</p>
                     {loadState === "loading" ? (
-                      <span className="env-shimmer mt-3 block h-10 w-52 max-w-full rounded-lg" role="status" aria-label="Loading token balance" />
+                      <span className="env-billing-shimmer env-billing-shimmer--inverse mt-3 block h-10 w-52 max-w-full rounded-lg" role="status" aria-label="Loading token balance" />
                     ) : (
                       <p className="mt-2 break-words text-3xl font-semibold tracking-tight tabular-nums sm:text-4xl">{tokenUnitDisplay(wallet ? tokenLabel(wallet.availableTokens) : "—")}</p>
                     )}
@@ -257,8 +257,8 @@ export function TokenDashboard() {
                   <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-white/10"><Coins size={23} aria-hidden="true" /></span>
                 </div>
                 <div className="mt-5 grid grid-cols-2 gap-3 border-t border-white/15 pt-3">
-                  <div><p className="text-xs text-white/70">Reserved</p>{loadState === "loading" ? <span className="env-shimmer mt-2 block h-4 w-24 rounded" role="status" aria-label="Loading reserved tokens" /> : <p className="mt-1 text-sm font-semibold tabular-nums">{tokenUnitDisplay(wallet ? tokenLabel(wallet.reservedTokens) : "—")}</p>}</div>
-                  <div><p className="text-xs text-white/70">Total used ever</p>{loadState === "loading" ? <span className="env-shimmer mt-2 block h-4 w-24 rounded" role="status" aria-label="Loading lifetime token usage" /> : <p className="mt-1 text-sm font-semibold tabular-nums">{tokenUnitDisplay(wallet ? tokenLabel(wallet.lifetimeConsumedSubunits / 1_000) : "—")}</p>}</div>
+                  <div><p className="text-xs text-white/70">Reserved</p>{loadState === "loading" ? <span className="env-billing-shimmer env-billing-shimmer--inverse mt-2 block h-4 w-24 rounded" role="status" aria-label="Loading reserved tokens" /> : <p className="mt-1 text-sm font-semibold tabular-nums">{tokenUnitDisplay(wallet ? tokenLabel(wallet.reservedTokens) : "—")}</p>}</div>
+                  <div><p className="text-xs text-white/70">Total used ever</p>{loadState === "loading" ? <span className="env-billing-shimmer env-billing-shimmer--inverse mt-2 block h-4 w-24 rounded" role="status" aria-label="Loading lifetime token usage" /> : <p className="mt-1 text-sm font-semibold tabular-nums">{tokenUnitDisplay(wallet ? tokenLabel(wallet.lifetimeConsumedSubunits / 1_000) : "—")}</p>}</div>
                 </div>
               </article>
               <MetricCard title="Today's token spent" value={summary ? tokenLabel(summary.todaySpentSubunits / 1_000) : "—"} detail="Confirmed deductions since local midnight" icon={<Clock3 size={16} aria-hidden="true" />} loading={loadState === "loading"} />
