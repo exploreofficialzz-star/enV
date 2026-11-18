@@ -50,6 +50,9 @@ jobs:
       - name: Regenerate the authoritative native inventory
         run: npm run export:native-catalog
 
+      - name: Regenerate billing profiles from current catalogue and native extensions
+        run: npm run generate:billing-profiles
+
       - name: Run billing and payment integration checks
         run: npm run check:billing
 
