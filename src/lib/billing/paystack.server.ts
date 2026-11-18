@@ -6,6 +6,7 @@ import {
 import { getPaystackLocalChannels, requirePaystackVerificationSecret, resolvePaystackCountryConfiguration } from "./provider-config";
 import { readBoundedBytes } from "./bounded-json.server";
 import { quoteTokenPacks, type CurrencyPackQuote } from "./fx.server";
+import { resolvePaystackVerifiedAmount } from "./paystack-amount";
 
 export const TOKEN_PACKS = [100, 250, 500, 1_000] as const;
 
@@ -295,12 +296,24 @@ export async function verifyAndCreditPaystackReference(reference: string) {
   });
   const payload = await response.json() as {
     status?: boolean;
-    data?: { id?: string | number; status?: string; reference?: string; amount?: number; currency?: string };
+    data?: {
+      id?: string | number;
+      status?: string;
+      reference?: string;
+      amount?: number;
+      requested_amount?: number;
+      fees?: number | null;
+      currency?: string;
+      channel?: string;
+    };
   };
   const transaction = payload.data;
+  const verifiedAmounts = transaction
+    ? resolvePaystackVerifiedAmount(transaction, Number(intent.amount_minor))
+    : null;
   if (!response.ok || payload.status !== true || !transaction ||
       transaction.reference !== reference || transaction.status !== "success" ||
-      !Number.isSafeInteger(transaction.amount) || transaction.amount !== Number(intent.amount_minor) ||
+      !verifiedAmounts ||
       transaction.currency?.toUpperCase() !== intent.currency.toUpperCase() ||
       transaction.id === undefined || transaction.id === null) {
     throw Object.assign(new Error("Payment is not confirmed yet. Your wallet was not credited."), { code: "PAYMENT_NOT_CONFIRMED", status: 409 });
@@ -311,11 +324,22 @@ export async function verifyAndCreditPaystackReference(reference: string) {
   }
   const canonical = JSON.stringify({
     provider: "paystack", reference, transactionId,
-    amount: transaction.amount, currency: transaction.currency.toUpperCase(), status: "success",
+    grossAmountMinor: verifiedAmounts.grossAmountMinor,
+    requestedAmountMinor: verifiedAmounts.requestedAmountMinor,
+    providerFeesMinor: verifiedAmounts.providerFeesMinor,
+    currency: transaction.currency.toUpperCase(), status: "success",
   });
   return creditVerifiedPurchase({
     purchaseIntentId: intent.id, provider: "paystack", providerEventId: `charge-success-${transactionId}`,
-    providerTransactionId: transactionId, paidAmountMinor: transaction.amount, paidCurrency: transaction.currency,
+    providerTransactionId: transactionId, paidAmountMinor: verifiedAmounts.requestedAmountMinor,
+    paidCurrency: transaction.currency,
+    providerMetadata: {
+      grossAmountMinor: verifiedAmounts.grossAmountMinor,
+      requestedAmountMinor: verifiedAmounts.requestedAmountMinor,
+      providerFeesMinor: verifiedAmounts.providerFeesMinor,
+      customerSurchargeMinor: verifiedAmounts.customerSurchargeMinor,
+      channel: typeof transaction.channel === "string" ? transaction.channel.slice(0, 40) : null,
+    },
     payloadDigest: createHash("sha256").update(canonical).digest("hex"),
   });
 }

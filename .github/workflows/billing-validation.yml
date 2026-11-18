@@ -1,6 +1,14 @@
 name: Billing integration validation
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "src/lib/billing/**"
+      - "scripts/check-billing.mjs"
+      - "docs/billing-operations-runbook.md"
+      - "package.json"
+      - ".github/workflows/billing-validation.yml"
   pull_request:
     paths:
       - "src/lib/billing/**"

@@ -9,6 +9,7 @@ const refundMigration = await read("migrations/0009_billing_refund_dispute_recon
 const rewardsMigration = await read("migrations/0007_wallet_rewards.sql");
 const rewardsService = await read("src/lib/billing/rewards.server.ts");
 const paystackService = await read("src/lib/billing/paystack.server.ts");
+const paystackAmount = await read("src/lib/billing/paystack-amount.ts");
 const fundingService = await read("src/lib/billing/funding.server.ts");
 const fxPricing = await read("src/lib/billing/fx.server.ts");
 const fxPricingTests = await read("src/lib/billing/fx.server.test.ts");
@@ -505,6 +506,15 @@ assert.match(paystackSettlement, /requirePaystackVerificationSecret\(process\.en
   "existing Paystack payments must remain verifiable when new checkout is disabled");
 assert.doesNotMatch(paystackSettlement, /requireLiveFunding\(/,
   "existing transaction verification must not be blocked by the new-checkout launch gates");
+assert.match(paystackSettlement, /resolvePaystackVerifiedAmount\(transaction, Number\(intent\.amount_minor\)\)/,
+  "Paystack settlement must verify the merchant-requested price separately from the gross charge");
+assert.match(paystackSettlement, /paidAmountMinor: verifiedAmounts\.requestedAmountMinor/,
+  "the wallet ledger must record the requested product price, not the gross pass-fee charge");
+assert.match(paystackSettlement, /customerSurchargeMinor: verifiedAmounts\.customerSurchargeMinor/,
+  "Paystack fee pass-through must be recorded separately from the product price");
+assert.match(paystackAmount, /transaction\.requested_amount/);
+assert.match(paystackAmount, /customerSurchargeMinor > 0 && providerFeesMinor !== customerSurchargeMinor/,
+  "a gross charge is accepted only when Paystack's fee exactly explains the surcharge");
 const paystackWebhookSettlement = paystackService.slice(paystackService.indexOf("export async function handlePaystackWebhook"));
 assert.match(paystackWebhookSettlement, /requirePaystackVerificationSecret\(process\.env\)/,
   "Paystack webhook verification must remain available during checkout shutdown");
