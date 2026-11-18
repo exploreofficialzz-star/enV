@@ -1,5 +1,6 @@
 package com.chastech.env
 
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -14,7 +15,7 @@ class MainActivityLaunchTest {
         // CatalogGate reads the shared catalog on Dispatchers.IO; wait for its real
         // destination rather than racing the launch screen.
         composeRule.waitUntil(timeoutMillis = 15_000) {
-            composeRule.onAllNodesWithText("A focused toolkit for\neveryday work.")
+            composeRule.onAllNodesWithText("Search for a tool")
                 .fetchSemanticsNodes().isNotEmpty()
         }
     }
@@ -22,7 +23,7 @@ class MainActivityLaunchTest {
     @Test
     fun launchShowsNativeCatalogHome() {
         awaitHomeScreenReady()
-        composeRule.onNodeWithText("A focused toolkit for\neveryday work.").assertIsDisplayed()
+        composeRule.onNodeWithText("A focused toolkit for\neveryday work.").assertDoesNotExist()
         composeRule.onNodeWithText("Search for a tool").assertIsDisplayed()
         composeRule.onNodeWithText("AI Agent").assertIsDisplayed()
         composeRule.onNodeWithText("Total token = 100").assertIsDisplayed()
