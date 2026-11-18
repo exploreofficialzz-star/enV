@@ -602,7 +602,6 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
                     }
                 }
                 MostUsedToolsTray(mostUsed, onTool, homeSurface2, Modifier.fillMaxWidth())
-                Text("A focused toolkit for\neveryday work.", style = MaterialTheme.typography.headlineSmall.copy(fontSize = if (screenWidth >= 640) 36.sp else 24.sp), fontWeight = FontWeight.Normal, textAlign = androidx.compose.ui.text.style.TextAlign.Start, modifier = Modifier.fillMaxWidth().padding(top = if (screenWidth >= 640) 12.dp else 8.dp))
             }
             }
         }
