@@ -2828,42 +2828,45 @@ private struct NativeWalletDashboardView: View {
         onToggleVisibility: @escaping () -> Void,
         onAddFunds: @escaping () -> Void
     ) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: "wallet.pass.fill")
-                .font(.system(size: 30, weight: .medium))
-                .foregroundStyle(.white)
-                .frame(width: 52, height: 52)
-                .background(Color.white.opacity(0.13), in: Circle())
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(spacing: 5) {
-                    Text("Total balance").font(.subheadline.weight(.medium)).foregroundStyle(Color.white.opacity(0.9))
-                    Button(action: onToggleVisibility) {
-                        Image(systemName: showBalance ? "eye" : "eye.slash")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.9))
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                Image(systemName: "wallet.pass.fill")
+                    .font(.system(size: 30, weight: .medium))
+                    .foregroundStyle(.white)
+                    .frame(width: 52, height: 52)
+                    .background(Color.white.opacity(0.13), in: Circle())
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(spacing: 5) {
+                        Text("Total balance").font(.subheadline.weight(.medium)).foregroundStyle(Color.white.opacity(0.9))
+                        Button(action: onToggleVisibility) {
+                            Image(systemName: showBalance ? "eye" : "eye.slash")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.9))
+                        }
+                        .buttonStyle(.plain)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                        .accessibilityLabel(showBalance ? "Hide balance" : "Show balance")
                     }
-                    .buttonStyle(.plain)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-                    .accessibilityLabel(showBalance ? "Hide balance" : "Show balance")
+                    Text(showBalance ? available.map { tokenCurrency($0) } ?? "$0.000" : "••••••")
+                        .accessibilityLabel(showBalance
+                            ? "Available balance, \(tokenCurrency(available ?? 0).replacingOccurrences(of: "$", with: "")) US dollars"
+                            : "Balance hidden")
+                        .font(.system(size: 37, weight: .semibold, design: .rounded)).foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.7)
+                    HStack(spacing: 5) {
+                        Image(systemName: "circle.hexagongrid.fill")
+                            .foregroundStyle(Color(red: 0.74, green: 1.0, blue: 0.9))
+                            .accessibilityHidden(true)
+                        styledEnVUnit(showBalance ? "≈ \(token(available ?? 0)) enV" : "•••• enV", unitSize: 9)
+                            .font(.subheadline.weight(.medium)).foregroundStyle(Color(red: 0.74, green: 1.0, blue: 0.9)).lineLimit(1)
+                    }
+                    Text(showBalance ? tokenReferenceValue(available ?? 0) : "Estimated token value ••••••").font(.caption2).foregroundStyle(Color.white.opacity(0.72))
                 }
-                Text(showBalance ? available.map { tokenCurrency($0) } ?? "$0.000" : "••••••")
-                    .accessibilityLabel(showBalance
-                        ? "Available balance, \(tokenCurrency(available ?? 0).replacingOccurrences(of: "$", with: "")) US dollars"
-                        : "Balance hidden")
-                    .font(.system(size: 37, weight: .semibold, design: .rounded)).foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.7)
-                HStack(spacing: 5) {
-                    Image(systemName: "circle.hexagongrid.fill")
-                        .foregroundStyle(Color(red: 0.74, green: 1.0, blue: 0.9))
-                        .accessibilityHidden(true)
-                    styledEnVUnit(showBalance ? "≈ \(token(available ?? 0)) enV" : "•••• enV", unitSize: 9)
-                        .font(.subheadline.weight(.medium)).foregroundStyle(Color(red: 0.74, green: 1.0, blue: 0.9)).lineLimit(1)
-                }
-                Text(showBalance ? tokenReferenceValue(available ?? 0) : "Estimated token value ••••••").font(.caption2).foregroundStyle(Color.white.opacity(0.72))
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 0)
-            VStack(alignment: .trailing, spacing: 8) {
+            HStack(spacing: 12) {
+                Spacer(minLength: 0)
                 NativeWalletSparklineView(color: Color(red: 0.30, green: 1.0, blue: 0.80))
                     .frame(width: 78, height: 42)
                 Button(action: onAddFunds) {
