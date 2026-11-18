@@ -644,13 +644,6 @@ struct HomeView: View {
                         }
                         .frame(height: 40)
                         HomeMostUsedToolsTray(tools: mostUsedTools) { homePath.append($0) }
-                        enVCharacterSpacedText("A focused toolkit for\neveryday work.")
-                            .font(.envScaled(size: horizontalSizeClass == .regular ? 36 : 24, weight: .semibold))
-                            .tracking(-0.4)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .multilineTextAlignment(.leading)
-                            .foregroundStyle(Color.envInk)
-                            .padding(.top, horizontalSizeClass == .regular ? 12 : 8)
                     }
                     .frame(maxWidth: 768)
                     .frame(maxWidth: .infinity, alignment: .center)
