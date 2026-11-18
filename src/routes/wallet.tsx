@@ -1230,27 +1230,29 @@ function Account() {
 
         <section className="space-y-2.5" aria-label="Wallet overview">
           <div className="relative overflow-hidden rounded-[24px] border border-emerald-300/25 bg-gradient-to-br from-[#1747af] via-[#07394e] to-[#00a97b] p-6 text-white shadow-sm sm:p-7">
-            <div className="relative flex items-center gap-2.5 sm:gap-3">
-              <span className="grid size-13 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10 text-white shadow-inner sm:size-16"><Wallet size={28} aria-hidden="true"/></span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-white/90 sm:text-sm">
-                  <span>Total enV balance</span>
-                  <button type="button" onClick={() => setShowBalance(value => !value)} aria-label={showBalance ? "Hide balance" : "Show balance"} title={showBalance ? "Hide balance" : "Show balance"} className="inline-flex size-8 items-center justify-center rounded-full text-white/90 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
-                    {showBalance ? <Eye size={16} aria-hidden="true"/> : <EyeOff size={16} aria-hidden="true"/>}
-                  </button>
+            <div className="relative grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+              <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+                <span className="grid size-13 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10 text-white shadow-inner sm:size-16"><Wallet size={28} aria-hidden="true"/></span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-white/90 sm:text-sm">
+                    <span>Total enV balance</span>
+                    <button type="button" onClick={() => setShowBalance(value => !value)} aria-label={showBalance ? "Hide balance" : "Show balance"} title={showBalance ? "Hide balance" : "Show balance"} className="inline-flex size-8 items-center justify-center rounded-full text-white/90 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
+                      {showBalance ? <Eye size={16} aria-hidden="true"/> : <EyeOff size={16} aria-hidden="true"/>}
+                    </button>
+                  </div>
+                  {state.status === "loading" ? (
+                    <span className="env-billing-shimmer env-billing-shimmer--inverse mt-2 block h-11 w-48 max-w-full rounded-lg" role="status" aria-label="Loading token balance" />
+                  ) : state.status === "ready" && visibleWallet ? (
+                    <>
+                      <p className="mt-1 break-words text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">{showBalance ? tokenUnitDisplay(formatEnVTokenBalance(visibleWallet.availableTokens) + " enV") : "••••••"}</p>
+                      <p className="mt-1 flex flex-wrap items-center gap-1 text-xs font-medium text-emerald-50/90 sm:text-sm"><Coins size={14} aria-hidden="true" /><span>{showBalance ? tokenReferenceValue(visibleWallet.availableTokens) : "Estimated USD reference value ••••••"}</span></p>
+                    </>
+                  ) : (
+                    <p className="mt-2 text-sm font-medium text-white/90">Balance unavailable</p>
+                  )}
                 </div>
-                {state.status === "loading" ? (
-                  <span className="env-shimmer mt-2 block h-11 w-48 max-w-full rounded-lg" role="status" aria-label="Loading token balance" />
-                ) : state.status === "ready" && visibleWallet ? (
-                  <>
-                    <p className="mt-1 text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">{showBalance ? tokenUnitDisplay(formatEnVTokenBalance(visibleWallet.availableTokens) + " enV") : "••••••"}</p>
-                    <p className="mt-1 flex items-center gap-1 text-xs font-medium text-emerald-50/90 sm:text-sm"><Coins size={14} aria-hidden="true" /><span>{showBalance ? tokenReferenceValue(visibleWallet.availableTokens) : "Estimated USD reference value ••••••"}</span></p>
-                  </>
-                ) : (
-                  <p className="mt-2 text-sm font-medium text-white/90">Balance unavailable</p>
-                )}
               </div>
-              <div className="flex shrink-0 flex-col items-end gap-1.5">
+              <div className="flex items-center justify-between gap-4 sm:flex-col sm:items-end sm:justify-center">
                 <svg viewBox="0 0 120 64" className="h-10 w-20 sm:h-12 sm:w-28" fill="none" aria-label="Upward token trend">
                   <path d="M4 54 C15 51 19 37 29 41 S43 49 52 31 S68 23 77 27 S91 17 103 15 L113 5 M103 14 L113 5 L112 16" stroke="#52ffd0" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>

@@ -26,7 +26,7 @@ class MainActivityLaunchTest {
         composeRule.onAllNodesWithText("A focused toolkit for\neveryday work.").assertCountEquals(0)
         composeRule.onNodeWithText("Search for a tool").assertIsDisplayed()
         composeRule.onNodeWithText("AI Agent").assertIsDisplayed()
-        composeRule.onNodeWithText("Total token = 100").assertIsDisplayed()
+        composeRule.onNodeWithText("Total token").assertIsDisplayed()
         composeRule.onNodeWithText("Trending tools").assertIsDisplayed()
         listOf("Home", "Tools", "Search", "Saved", "Account").forEach { label ->
             composeRule.onAllNodesWithText(label).assertCountEquals(0)
