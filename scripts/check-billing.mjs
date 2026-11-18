@@ -26,6 +26,7 @@ const tokenDisplayTests = await read("src/lib/billing/token-display.test.ts");
 const purchaseReconciliation = await read("src/lib/billing/purchase-reconciliation.server.ts");
 const purchaseReconciliationRoute = await read("server/routes/api/billing/reconcile.get.ts");
 const vercelConfig = JSON.parse(await read("vercel.json"));
+const viteConfig = await read("vite.config.ts");
 const cryptomusService = await read("src/lib/billing/cryptomus.server.ts");
 const cryptomusWebhook = await read("server/routes/api/billing/cryptomus/webhook.post.ts");
 const cryptomusVerifyRoute = await read("server/routes/api/billing/cryptomus/verify.post.ts");
@@ -276,7 +277,7 @@ assert.match(purchaseReconciliationRoute, /CRON_SECRET/, "global payment reconci
 assert.match(purchaseReconciliationRoute, /timingSafeEqual/, "scheduled-job authentication must use a timing-safe comparison");
 assert.match(purchaseReconciliationRoute, /reconcilePendingPurchasesBatch\(\)/, "the scheduled route must run the shared provider-verification recovery worker");
 assert.ok(vercelConfig.crons.some((cron) => cron.path === "/api/billing/reconcile" && cron.schedule === "45 3 * * *"), "all-account transaction recovery must be scheduled daily");
-assert.equal(vercelConfig.functions?.["server/routes/api/billing/reconcile.get.ts"]?.maxDuration, 240, "the bounded recovery route must have enough execution time for its provider verification batch");
+assert.match(viteConfig, /functionRules:\s*\{[\s\S]*?["']\/api\/billing\/reconcile["']:\s*\{\s*maxDuration:\s*240\s*\}/, "the bounded billing recovery route must have a 240-second Nitro/Vercel function timeout");
 assert.match(walletDashboard, /title: "Other"/);
 assert.match(walletDashboard, /fundingOptionsState\.methods\[method\]/);
 assert.match(walletDashboard, /fundingOptionsReloadKey/);
