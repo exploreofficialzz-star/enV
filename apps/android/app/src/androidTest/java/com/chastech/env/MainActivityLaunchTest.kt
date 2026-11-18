@@ -1,6 +1,6 @@
 package com.chastech.env
 
-import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -23,13 +23,13 @@ class MainActivityLaunchTest {
     @Test
     fun launchShowsNativeCatalogHome() {
         awaitHomeScreenReady()
-        composeRule.onNodeWithText("A focused toolkit for\neveryday work.").assertDoesNotExist()
+        composeRule.onAllNodesWithText("A focused toolkit for\neveryday work.").assertCountEquals(0)
         composeRule.onNodeWithText("Search for a tool").assertIsDisplayed()
         composeRule.onNodeWithText("AI Agent").assertIsDisplayed()
         composeRule.onNodeWithText("Total token = 100").assertIsDisplayed()
         composeRule.onNodeWithText("Trending tools").assertIsDisplayed()
         listOf("Home", "Tools", "Search", "Saved", "Account").forEach { label ->
-            composeRule.onNodeWithText(label).assertDoesNotExist()
+            composeRule.onAllNodesWithText(label).assertCountEquals(0)
         }
     }
 
