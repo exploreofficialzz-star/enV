@@ -72,12 +72,12 @@ if (audit.error) {
         const lockedViteVersion = lock?.packages?.["node_modules/vite"]?.version;
         const declaredViteRange = packageManifest?.dependencies?.vite;
         const lockedMajor = typeof lockedViteVersion === "string"
-          ? Number(lockedViteVersion.match(/^(\\d+)\\./)?.[1])
+          ? Number(lockedViteVersion.match(/^(\d+)\./)?.[1])
           : NaN;
         const declaredMajor = typeof declaredViteRange === "string"
-          ? Number(declaredViteRange.match(/^\\^(\\d+)\\./)?.[1])
+          ? Number(declaredViteRange.match(/^\^(\d+)\./)?.[1])
           : NaN;
-        const suggestedMajor = Number(fixAvailable.version.match(/^(\\d+)\\./)?.[1]);
+        const suggestedMajor = Number(fixAvailable.version.match(/^(\d+)\./)?.[1]);
 
         return Number.isInteger(lockedMajor) &&
           Number.isInteger(declaredMajor) &&
