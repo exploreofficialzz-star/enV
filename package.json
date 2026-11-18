@@ -134,14 +134,15 @@
     "check:catalog-runtime": "node scripts/check-catalog-runtime.mjs",
     "postbuild": "node scripts/check-catalog-runtime.mjs",
     "check:native-discovery": "node scripts/check-native-store-discovery.mjs",
-    "test:discovery": "npm run check:seo && npm run check:discovery-inventory && npm run check:discovery-knowledge-index && node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/tool-documentation.test.ts src/components/engines/celebration-engine-utils.test.ts && node --test scripts/discovery-inventory.test.mjs scripts/discovery-knowledge-index.test.mjs scripts/generic-workflow-policy.test.mjs scripts/audit-evidence-provenance.test.mjs scripts/source-inspection-evidence.test.mjs scripts/write-tool-audit-report.test.mjs scripts/reconcile-tool-inventories.test.mjs",
+    "test:discovery": "npm run check:seo && npm run check:discovery-inventory && npm run check:discovery-knowledge-index && node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/tool-documentation.test.ts src/components/engines/celebration-engine-utils.test.ts && node --test scripts/discovery-inventory.test.mjs scripts/discovery-knowledge-index.test.mjs scripts/crawl-public-routes.test.mjs scripts/generic-workflow-policy.test.mjs scripts/audit-evidence-provenance.test.mjs scripts/source-inspection-evidence.test.mjs scripts/write-tool-audit-report.test.mjs scripts/reconcile-tool-inventories.test.mjs",
     "audit:tool-ledger": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/generate-tool-functional-audit-ledger.mjs",
     "check:video-link-recorder": "node scripts/check-video-link-recorder.mjs",
     "audit:dependencies": "node scripts/check-npm-audit.mjs",
     "generate:discovery-inventory": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/generate-discovery-inventory.mjs",
     "check:discovery-inventory": "npm run generate:discovery-inventory -- --check",
     "generate:discovery-knowledge-index": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/generate-discovery-knowledge-index.mjs",
-    "check:discovery-knowledge-index": "npm run generate:discovery-knowledge-index -- --check"
+    "check:discovery-knowledge-index": "npm run generate:discovery-knowledge-index -- --check",
+    "audit:crawl:public": "node scripts/crawl-public-routes.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
