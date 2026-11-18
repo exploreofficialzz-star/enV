@@ -156,7 +156,6 @@ function Home() {
           <HomeTokenBalance />
         </div>
 <MostUsedToolsTray tools={mostUsedTools} />
-        <h1 className="mt-6 w-full max-w-3xl self-start text-left text-balance text-2xl font-semibold tracking-tight sm:mt-8 sm:text-4xl">Find the right tool for the task.</h1>
       </section>
       <ToolSection title="Trending tools" tools={trendingTools} />
     </AppShell>
