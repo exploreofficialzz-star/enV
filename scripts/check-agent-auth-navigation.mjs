@@ -128,7 +128,7 @@ const authPage = requireText("src/components/auth/auth-page.tsx", ['type="email"
 if (authPage.includes("Authentication is disabled until production")) errors.push("Sign-in/sign-up UI still displays the configuration warning.");
 const tokenPage = requireText("src/routes/token-guide.tsx", ["Token guide", "Tool-by-tool token explanations", "Balance & history"], "Token guide");
 for (const removed of ["Preview only", "Prices are not charged in this preview", "All generated rates are provisional", "Purchases and automatic token deductions are disabled"]) if (tokenPage.includes(removed)) errors.push(`Token guide still contains placeholder wording: ${removed}`);
-const home = requireText("src/routes/index.tsx", ['to="/tokens" aria-label="Open token dashboard"', "AI Agent"], "Home token dashboard link");
+const home = requireText("src/routes/index.tsx", ['to="/tokens" aria-label="Open token dashboard"', "AI Agent", "Total token"], "Home token dashboard link");
 const auth = requireText("src/lib/auth/server.ts", ["DATABASE_URL", "BETTER_AUTH_SECRET", "BETTER_AUTH_URL", "sendVerificationEmail", "sendResetPassword", "socialProviders", "googleConfigured", "appleConfigured"], "Server auth wiring");
 requireText("src/lib/auth/client.ts", ["VITE_AUTH_ENABLED", "VITE_AUTH_EMAIL_ENABLED"], "Auth client gates");
 
