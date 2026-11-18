@@ -9,6 +9,8 @@ const refundMigration = await read("migrations/0009_billing_refund_dispute_recon
 const rewardsMigration = await read("migrations/0007_wallet_rewards.sql");
 const rewardsService = await read("src/lib/billing/rewards.server.ts");
 const paystackService = await read("src/lib/billing/paystack.server.ts");
+const paystackAmount = await read("src/lib/billing/paystack-amount.ts");
+const paystackAmountTests = await read("src/lib/billing/paystack-amount.test.ts");
 const fundingService = await read("src/lib/billing/funding.server.ts");
 const fxPricing = await read("src/lib/billing/fx.server.ts");
 const fxPricingTests = await read("src/lib/billing/fx.server.test.ts");
@@ -337,6 +339,13 @@ assert.match(paystackService, /readBoundedBytes\(request, 256_000\)/,
 assert.doesNotMatch(paystackService.slice(paystackService.indexOf("export async function handlePaystackWebhook")), /request\.text\(\)/,
   "Paystack webhook must not buffer an unbounded body before enforcing its byte limit");
 assert.match(paystackService, /verifyAndCreditPaystackReference/);
+assert.match(paystackService, /resolvePaystackVerifiedAmount/,
+  "Paystack settlement must normalize gross customer payment separately from requested product price");
+assert.match(paystackAmount, /requested_amount/);
+assert.match(paystackAmount, /providerFeesMinor/);
+assert.match(paystackAmountTests, /137_271/);
+assert.match(paystackAmountTests, /135_211/);
+assert.match(paystackAmountTests, /2_060/);
 assert.doesNotMatch(paystackService, /REFUND_DISPUTE_RECONCILIATION_REQUIRED/, "Paystack callbacks must not remain behind the old manual-reconciliation guard");
 assert.match(paystackService, /handlePaystackRefundWebhook/);
 assert.match(paystackService, /handlePaystackDisputeWebhook/);
