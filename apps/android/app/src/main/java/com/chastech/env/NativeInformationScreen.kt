@@ -802,36 +802,38 @@ private fun NativeWalletHero(
             .border(BorderStroke(1.dp, Color(0xFF3DEBC2).copy(alpha = 0.35f)), shape)
             .padding(20.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Box(Modifier.size(54.dp).background(Color.White.copy(alpha = 0.12f), CircleShape), contentAlignment = Alignment.Center) {
-                EnVIcon("Wallet", Modifier.size(30.dp), tint = Color.White)
-            }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Total balance", style = MaterialTheme.typography.titleSmall, color = Color(0xFFE3FFF6))
-                    IconButton(onClick = onToggleVisibility, modifier = Modifier.size(28.dp).semantics { contentDescription = if (showBalance) "Hide balance" else "Show balance" }) {
-                        Text(if (showBalance) "◉" else "⊘", color = Color.White, style = MaterialTheme.typography.labelMedium)
-                    }
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(Modifier.size(54.dp).background(Color.White.copy(alpha = 0.12f), CircleShape), contentAlignment = Alignment.Center) {
+                    EnVIcon("Wallet", Modifier.size(30.dp), tint = Color.White)
                 }
-                Text(
-                    if (!showBalance) "••••••" else availableTokens?.formatWalletCurrency() ?: "$0.000",
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Normal,
-                    color = Color.White,
-                    maxLines = 1,
-                )
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("🪙", style = MaterialTheme.typography.bodySmall, color = Color(0xFFBFFFE9))
-                    androidx.compose.material3.Text(
-                        walletTokenUnitDisplay(if (!showBalance) "•••• enV" else "≈ " + (availableTokens?.formatWalletTokens() ?: "0.000") + " enV"),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFFBFFFE9),
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Total balance", style = MaterialTheme.typography.titleSmall, color = Color(0xFFE3FFF6))
+                        IconButton(onClick = onToggleVisibility, modifier = Modifier.size(28.dp).semantics { contentDescription = if (showBalance) "Hide balance" else "Show balance" }) {
+                            Text(if (showBalance) "◉" else "⊘", color = Color.White, style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                    Text(
+                        if (!showBalance) "••••••" else availableTokens?.formatWalletCurrency() ?: "$0.000",
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Normal,
+                        color = Color.White,
                         maxLines = 1,
                     )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("🪙", style = MaterialTheme.typography.bodySmall, color = Color(0xFFBFFFE9))
+                        androidx.compose.material3.Text(
+                            walletTokenUnitDisplay(if (!showBalance) "•••• enV" else "≈ " + (availableTokens?.formatWalletTokens() ?: "0.000") + " enV"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFBFFFE9),
+                            maxLines = 1,
+                        )
+                    }
+                    Text("Estimated token value " + (availableTokens?.let { (it * 0.01).formatWalletTokens() } ?: "0.000"), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.72f))
                 }
-                Text("Estimated token value " + (availableTokens?.let { (it * 0.01).formatWalletTokens() } ?: "0.000"), style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.72f))
             }
-            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End) {
                 NativeWalletSparkline(Modifier.size(width = 92.dp, height = 48.dp), Color(0xFF52FFD0))
                 Button(onClick = onAddFunds, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 9.dp)) {
                     Text("Add funds", style = MaterialTheme.typography.labelMedium, maxLines = 1)
@@ -840,7 +842,6 @@ private fun NativeWalletHero(
         }
     }
 }
-
 @Composable
 private fun NativeWalletSparkline(modifier: Modifier = Modifier, tint: Color) {
     Canvas(modifier.padding(end = 2.dp, top = 2.dp)) {
