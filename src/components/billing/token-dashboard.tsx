@@ -120,7 +120,7 @@ function MetricCard({ title, value, detail, icon, loading = false }: { title: st
         <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-surface-2 text-accent">{icon}</span>
       </div>
       {loading ? (
-        <span className="env-billing-shimmer mt-3 block h-8 w-36" max-w-full rounded-md" role="status" aria-label={`Loading ${title.toLowerCase()}`} />
+        <span className="env-billing-shimmer mt-3 block h-8 w-36 max-w-full rounded-md" role="status" aria-label={`Loading ${title.toLowerCase()}`} />
       ) : (
         <p className="mt-3 break-words text-2xl font-semibold tracking-tight text-fg tabular-nums">{tokenUnitDisplay(value)}</p>
       )}
