@@ -59,3 +59,24 @@ test("a zero result limit still counts matches without returning entries", () =>
   assert.deepEqual(results.tools, []);
   assert.equal(results.matchCount, 2);
 });
+
+test("search tolerates a small spelling error without outranking an exact name", () => {
+  const results = searchTools(tools, "imge resize", 4);
+  assert.equal(results[0]?.id, "image-resize");
+});
+
+test("search applies eligibility filters before ranking", () => {
+  const results = searchToolResults(tools, "image", 4, { category: "calculators", clientSide: true });
+  assert.equal(results.matchCount, 2);
+  assert.ok(results.tools.every((item) => item.category === "calculators" && item.clientSide));
+});
+
+test("search ordering is deterministic for equal scores and exposes match fields", () => {
+  const result = searchToolResults([
+    tool("z-tool", "Same Utility", 1, ["shared"]),
+    tool("a-tool", "Same Utility", 999, ["shared"]),
+  ], "shared", 2);
+  assert.deepEqual(result.tools.map((item) => item.id), ["a-tool", "z-tool"]);
+  assert.deepEqual(result.explanations["a-tool"]?.matchedFields, ["capability"]);
+  assert.ok(result.explanations["a-tool"]?.matchedTerms.includes("shared"));
+});

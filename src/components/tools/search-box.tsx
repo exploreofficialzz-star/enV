@@ -2,7 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { ArrowRight, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { getAllTools, getSearchableTools, toolPath } from "@/lib/registry";
-import { searchTools } from "@/lib/search";
+import { searchToolResults } from "@/lib/search";
 import { cn } from "@/lib/utils";
 import type { ToolMeta } from "@/types/tool";
 import { isToolUnderProduction } from "@/lib/production-notice";
@@ -50,7 +50,11 @@ export function SearchBox({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const searchable = getSearchableTools();
-  const results = useMemo(() => (q.trim() ? searchTools(searchable, q, 8) : []), [q, searchable]);
+  const searchResult = useMemo(() => {
+    if (!q.trim()) return { tools: [], matchCount: 0, explanations: {} as Record<string, { matchedFields: string[] }> };
+    return searchToolResults(searchable, q, 8);
+  }, [q, searchable]);
+  const results = searchResult.tools;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -155,6 +159,7 @@ export function SearchBox({
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2 text-sm font-medium">{t.name}{isToolUnderProduction(t) ? <span className="text-[10px] font-semibold uppercase tracking-wide text-subtle">Under production</span> : t.status === "planned" ? <span className="text-[10px] font-semibold uppercase tracking-wide text-subtle">Coming soon</span> : null}</span>
                     <span className="line-clamp-1 text-xs text-muted">{t.description}</span>
+                    {searchResult.explanations[t.id]?.matchedFields.length ? <span className="line-clamp-1 text-[11px] text-subtle">Matched in {searchResult.explanations[t.id].matchedFields.join(", ")}</span> : null}
                   </span>
                   <ArrowRight className="size-4 shrink-0" aria-hidden="true" />
                 </button>
