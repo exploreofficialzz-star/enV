@@ -47,6 +47,9 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
 
+      - name: Regenerate the authoritative native inventory
+        run: npm run export:native-catalog
+
       - name: Run billing and payment integration checks
         run: npm run check:billing
 
