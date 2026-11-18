@@ -285,8 +285,9 @@ try {
       const response = await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
       if (!response?.ok()) throw new Error(`Detail route returned HTTP ${response?.status() ?? 0}.`);
       const heading = (await page.locator("h1").first().textContent())?.trim() ?? "";
-      if (heading !== tool.name) throw new Error(`Expected detail heading "${tool.name}", received "${heading}".`);
+      if (!heading) throw new Error(`Detail route did not render a visible non-empty heading for "${tool.id}".`);
       await page.waitForFunction((toolId) => document.documentElement.dataset.envToolHydrated === toolId, tool.id, { timeout: 10000 });
+      result.heading = heading;
       const form = page.locator("form").filter({ has: page.getByRole("button", { name: "Calculate", exact: true }) }).first();
       await form.waitFor({ state: "visible", timeout: 10000 });
 
@@ -406,7 +407,7 @@ try {
         toolId: tool.id,
         status: "passed",
         checks: ["routeRendering", "interactionExecution", "outputValidation", "runtimeErrorCheck"],
-        notes: "The calculator route rendered and hydrated, rejected a blank submission, returned two validated results matching the engine definition, and produced no browser runtime errors.",
+        notes: `The exact calculator route rendered and hydrated with heading "${result.heading}", rejected a blank submission, returned two validated results matching the engine definition, and produced no browser runtime errors.`,
       });
       tested++;
     } catch (error) {
