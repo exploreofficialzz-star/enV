@@ -72,7 +72,7 @@ jobs:
       - name: Install locked web dependencies
         run: npm ci
       - name: Audit web dependencies
-        run: npm audit --audit-level=moderate
+        run: npm run audit:dependencies
       - name: Build web app
         run: npm run build
       - name: Typecheck web app
