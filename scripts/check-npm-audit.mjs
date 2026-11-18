@@ -6,7 +6,8 @@
  * This does not disable npm audit. Every moderate/high/critical finding must
  * either resolve exclusively to the exact approved advisory below or the check
  * fails. The exception also requires the locked picomatch version, affected
- * range, and npm's "no fix available" signal to remain unchanged.
+ * range, and there being no viable Picomatch fix. npm may suggest downgrading a
+ * parent package across a major version; that is not treated as a safe remediation.
  *
  * Remove this exception and upgrade picomatch as soon as an upstream fix ships.
  */
@@ -52,10 +53,37 @@ if (audit.error) {
       }
     } else {
       let lock;
+      let packageManifest;
       try {
-        lock = JSON.parse(await readFile(new URL("../package-lock.json", import.meta.url), "utf8"));
+        [lock, packageManifest] = await Promise.all([
+          readFile(new URL("../package-lock.json", import.meta.url), "utf8").then(JSON.parse),
+          readFile(new URL("../package.json", import.meta.url), "utf8").then(JSON.parse),
+        ]);
       } catch (error) {
-        fail("Could not read package-lock.json: " + error.message);
+        fail("Could not read package.json or package-lock.json: " + error.message);
+      }
+
+      function hasNoViablePicomatchFix(fixAvailable) {
+        if (fixAvailable === false) return true;
+        if (!fixAvailable || typeof fixAvailable !== "object" ||
+            fixAvailable.name !== "vite" || fixAvailable.isSemVerMajor !== true ||
+            typeof fixAvailable.version !== "string") return false;
+
+        const lockedViteVersion = lock?.packages?.["node_modules/vite"]?.version;
+        const declaredViteRange = packageManifest?.dependencies?.vite;
+        const lockedMajor = typeof lockedViteVersion === "string"
+          ? Number(lockedViteVersion.match(/^(\\d+)\\./)?.[1])
+          : NaN;
+        const declaredMajor = typeof declaredViteRange === "string"
+          ? Number(declaredViteRange.match(/^\\^(\\d+)\\./)?.[1])
+          : NaN;
+        const suggestedMajor = Number(fixAvailable.version.match(/^(\\d+)\\./)?.[1]);
+
+        return Number.isInteger(lockedMajor) &&
+          Number.isInteger(declaredMajor) &&
+          Number.isInteger(suggestedMajor) &&
+          lockedMajor === declaredMajor &&
+          suggestedMajor < lockedMajor;
       }
 
       const picomatch = vulnerabilities.picomatch;
@@ -69,7 +97,7 @@ if (audit.error) {
         picomatch &&
         picomatch.severity === "high" &&
         picomatch.range === PICOMATCH_RANGE &&
-        picomatch.fixAvailable === false &&
+        hasNoViablePicomatchFix(picomatch.fixAvailable) &&
         lockedVersionsMatch &&
         Array.isArray(picomatch.via) &&
         picomatch.via.length === 1 &&
@@ -117,8 +145,8 @@ if (audit.error) {
           "[dependency-audit] npm reports one currently unpatched high-severity advisory (GHSA-fc5q-39xc-vjpf) in picomatch " +
           PICOMATCH_VERSION + "; " + inheritedCount +
           " affected dependency-path entr" + (inheritedCount === 1 ? "y is" : "ies are") +
-          " inherited only from that advisory. No patched version is published; the upstream fix PR is closed unmerged. " +
-          "All other moderate/high/critical findings remain blocking. Upgrade and remove this exception as soon as a fixed release is available."
+          " inherited only from that advisory. No patched Picomatch version is published. npm's suggested Vite remediation crosses the project's locked Vite major and is not applied. " +
+          "All other moderate/high/critical findings remain blocking. Upgrade Picomatch and remove this exception as soon as a fixed release is available."
         );
       }
     }
