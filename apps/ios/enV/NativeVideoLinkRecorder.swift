@@ -1,9 +1,11 @@
 import Foundation
 import SwiftUI
 import SafariServices
-import ScreenCaptureKit
+#if !targetEnvironment(simulator)
+@preconcurrency import ScreenCaptureKit
 import Photos
 import AVFoundation
+#endif
 
 private struct NativeVideoPostBrowserTarget: Identifiable {
     let id = UUID()
@@ -21,6 +23,7 @@ private struct NativeVideoPostBrowser: UIViewControllerRepresentable {
 }
 
 
+#if !targetEnvironment(simulator)
 /// iOS 27+ system screen capture. The system picker grants full-display access;
 /// enV does not attempt to capture another app without explicit user approval.
 @available(iOS 27.0, *)
@@ -50,10 +53,10 @@ private final class NativePostInterfaceCaptureController: NSObject, ObservableOb
         isPreparing = true
 
         var configuration = SCContentSharingPickerConfiguration()
-        configuration.allowedPickerModes = .singleDisplay
         configuration.showsMicrophoneControl = false
         picker.defaultConfiguration = configuration
         picker.add(self)
+        picker.isActive = true
         picker.present()
     }
 
@@ -66,6 +69,7 @@ private final class NativePostInterfaceCaptureController: NSObject, ObservableOb
     func contentSharingPicker(_ picker: SCContentSharingPicker, didCancelFor stream: SCStream?) {
         Task { @MainActor in
             picker.remove(self)
+            picker.isActive = false
             isPreparing = false
             message = ""
         }
@@ -81,6 +85,7 @@ private final class NativePostInterfaceCaptureController: NSObject, ObservableOb
 
     private func beginRecording(with filter: SCContentFilter) async {
         picker.remove(self)
+        picker.isActive = false
         guard stream == nil else {
             isPreparing = false
             failure = "A screen recording is already active."
@@ -104,8 +109,6 @@ private final class NativePostInterfaceCaptureController: NSObject, ObservableOb
                 .appendingPathComponent("enV-Post-Interface-\(UUID().uuidString).mp4")
             let outputConfiguration = SCRecordingOutputConfiguration()
             outputConfiguration.outputURL = outputURL
-            outputConfiguration.outputFileType = .mp4
-            outputConfiguration.videoCodecType = .h264
             let output = SCRecordingOutput(configuration: outputConfiguration, delegate: self)
             let newStream = SCStream(filter: filter, configuration: streamConfiguration, delegate: self)
             try newStream.addRecordingOutput(output)
@@ -294,6 +297,8 @@ private struct NativePostCaptureControls: View {
     }
 }
 
+#endif
+
 /// iOS uses the OS screen-sharing picker on iOS 27+; earlier versions retain manual Control Center capture.
 struct NativeVideoLinkRecorderView: View {
     @State private var postLink = ""
@@ -388,6 +393,7 @@ struct NativeVideoLinkRecorderView: View {
                 .foregroundStyle(Color.envSurface)
                 .disabled(postLink.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
+                #if !targetEnvironment(simulator)
                 if #available(iOS 27.0, *) {
                     NativePostCaptureControls {
                         guard let url = validatedPost() else { return }
@@ -401,8 +407,17 @@ struct NativeVideoLinkRecorderView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
-                    .disabled(postLink.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
+                #else
+                Button {
+                    failure = "Full-display recording is available on a physical device running iOS 27 or later."
+                } label: {
+                    Label("Start recording", systemImage: "record.circle")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(postLink.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                #endif
 
                 if let failure {
                     Text(failure)
