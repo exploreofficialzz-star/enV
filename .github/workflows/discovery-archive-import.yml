@@ -95,6 +95,14 @@ jobs:
           rm -f .github/workflows/discovery-archive-import.yml
           git show origin/main:vercel.json > vercel.json
           git reset --mixed origin/main
+          git restore --source=origin/main -- \
+            apps/shared/catalog.json \
+            apps/shared/native-engine-inventory.json \
+            docs/billing-tool-audit-2026-10-18.md \
+            src/data/billing-profile-index.json \
+            src/data/billing-profile-runtime-extensions.json \
+            src/data/billing-profiles.json \
+            src/data/home-tools.json
           python -c "from pathlib import Path; p=Path('audit/discovery/DISCOVERY-RECONCILIATION-REPORT.md'); s=p.read_text(); p.write_text(s.rstrip() + '\\n')"
           git add package.json \
             apps/shared/native-execution-matrix.json \
