@@ -17,8 +17,7 @@ private struct NativeVideoPostBrowser: UIViewControllerRepresentable {
     func updateUIViewController(_ controller: SFSafariViewController, context: Context) {}
 }
 
-/// iOS opens the original post and hands full-display recording to the system Control Center.
-/// This preserves the real source-app UI. iOS owns the recording permission and save destination.
+/// iOS presents the original post in an in-app browser. Screen recording remains OS-controlled.
 struct NativeVideoLinkRecorderView: View {
     @State private var postLink = ""
     @State private var provider = ""
