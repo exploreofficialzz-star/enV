@@ -35,12 +35,12 @@ jobs:
               exit 1
             }
             actual_paths="$(git diff --name-only "$expected_parent" "$current_main" | sort)"
-            expected_paths="$(printf '%s\\n' \
+            expected_paths="$(printf '%s\n' \
               'apps/android/app/src/main/java/com/chastech/env/MainActivity.kt' \
               'apps/android/app/src/main/java/com/chastech/env/NativeVideoLinkRecorder.kt' | sort)"
             if [[ "$actual_paths" != "$expected_paths" ]]; then
               echo "main advanced with files outside the reviewed Android recorder follow-up; refusing to continue."
-              printf '%s\\n' "$actual_paths"
+              printf '%s\n' "$actual_paths"
               exit 1
             fi
             git config user.name "github-actions[bot]"
@@ -145,6 +145,10 @@ jobs:
             src/lib/related-tools.ts \
             src/lib/search.test.ts \
             src/lib/search.ts
+          while IFS= read -r -d '' path; do
+            git restore --worktree -- "$path"
+          done < <(git diff --name-only -z)
+          git status --short
           git diff --cached --check
           git diff --cached --stat
           git config user.name "github-actions[bot]"
@@ -153,4 +157,16 @@ jobs:
           test -z "$(git status --porcelain)"
 
       - name: Push verified commit to main
-        run: git push origin HEAD:main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          expected_parent="$(git rev-parse HEAD^)"
+          current_main="$(git rev-parse origin/main)"
+          if [[ "$current_main" != "$expected_parent" ]]; then
+            echo "main moved while discovery validation ran; refusing to overwrite newer work."
+            echo "Commit parent: $expected_parent"
+            echo "Current main:  $current_main"
+            exit 1
+          fi
+          git push origin HEAD:main
