@@ -53,6 +53,7 @@ private final class NativePostInterfaceCaptureController: NSObject, ObservableOb
         isPreparing = true
 
         var configuration = SCContentSharingPickerConfiguration()
+        configuration.allowedPickerModes = .singleDisplay
         configuration.showsMicrophoneControl = false
         picker.defaultConfiguration = configuration
         picker.add(self)
@@ -78,6 +79,7 @@ private final class NativePostInterfaceCaptureController: NSObject, ObservableOb
     func contentSharingPickerStartDidFailWithError(_ error: Error) {
         Task { @MainActor in
             picker.remove(self)
+            picker.isActive = false
             isPreparing = false
             failure = error.localizedDescription
         }
@@ -114,9 +116,7 @@ private final class NativePostInterfaceCaptureController: NSObject, ObservableOb
             recordingOutput = output
             recordingURL = outputURL
             try await newStream.startCapture()
-            isPreparing = false
-            isRecording = true
-            message = "Recording the full display."
+            message = "Starting screen recording."
         } catch {
             isPreparing = false
             isRecording = false
@@ -201,7 +201,14 @@ private final class NativePostInterfaceCaptureController: NSObject, ObservableOb
         recordingURL = nil
     }
 
-    func recordingOutputDidStartRecording(_ recordingOutput: SCRecordingOutput) {}
+    func recordingOutputDidStartRecording(_ recordingOutput: SCRecordingOutput) {
+        Task { @MainActor in
+            isPreparing = false
+            isRecording = true
+            message = "Recording the full display."
+            failure = nil
+        }
+    }
 
     func recordingOutputDidFinishRecording(_ recordingOutput: SCRecordingOutput) {
         Task { @MainActor in
@@ -221,6 +228,7 @@ private final class NativePostInterfaceCaptureController: NSObject, ObservableOb
             isPreparing = false
             isRecording = false
             isStopping = false
+            await tearDownStream()
         }
     }
 
