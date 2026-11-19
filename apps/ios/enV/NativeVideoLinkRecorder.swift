@@ -43,6 +43,11 @@ struct NativeVideoLinkRecorderView: View {
             return nil
         }
         let host = hostValue.hasPrefix("www.") ? String(hostValue.dropFirst(4)) : hostValue
+        let fileExtension = url.pathExtension.lowercased()
+        guard !["mp4", "m4v", "mov", "webm", "ogv", "mkv", "avi", "3gp"].contains(fileExtension) else {
+            failure = "Paste the original platform post URL, not a direct video-file URL."
+            return nil
+        }
         guard let match = providerDomains.first(where: { _, domains in
             domains.contains(where: { hostMatches(host, $0) })
         }) else {
