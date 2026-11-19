@@ -52,7 +52,7 @@ assert.match(android, /MediaRecorder\.OutputFormat\.MPEG_4/);
 assert.match(android, /FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION/);
 assert.match(android, /Environment\.DIRECTORY_MOVIES/);
 assert.match(android, /"enV"/);
-assert.match(androidMain, /tool\.id === "video-link-screen-recording"[^\n]*NativeVideoLinkRecorderScreen\(\)/);
+assert.match(androidMain, /tool\.id == "video-link-screen-recording"[^\n]*NativeVideoLinkRecorderScreen\(\)/);
 assert.match(androidManifest, /FOREGROUND_SERVICE_MEDIA_PROJECTION/);
 assert.match(androidManifest, /android:name="\.VideoLinkCaptureService"/);
 assert.equal((androidManifest.match(/android:name="android\.permission\.FOREGROUND_SERVICE"/g) ?? []).length, 1);
