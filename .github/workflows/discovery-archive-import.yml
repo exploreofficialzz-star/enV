@@ -30,9 +30,22 @@ jobs:
           expected_parent='a0c526a98a5c224cffbffae7b71e944300d51e45'
           current_main="$(git rev-parse origin/main)"
           if [[ "$current_main" != "$expected_parent" ]]; then
-            echo "main moved after the import branch was prepared; refusing to overwrite unrelated work."
-            echo "Expected $expected_parent, found $current_main"
-            exit 1
+            git merge-base --is-ancestor "$expected_parent" "$current_main" || {
+              echo "main no longer descends from the reviewed import base; refusing to continue."
+              exit 1
+            }
+            actual_paths="$(git diff --name-only "$expected_parent" "$current_main" | sort)"
+            expected_paths="$(printf '%s\\n' \
+              'apps/android/app/src/main/java/com/chastech/env/MainActivity.kt' \
+              'apps/android/app/src/main/java/com/chastech/env/NativeVideoLinkRecorder.kt' | sort)"
+            if [[ "$actual_paths" != "$expected_paths" ]]; then
+              echo "main advanced with files outside the reviewed Android recorder follow-up; refusing to continue."
+              printf '%s\\n' "$actual_paths"
+              exit 1
+            fi
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git rebase origin/main
           fi
 
       - name: Extract authored archive and reviewed amendments
