@@ -74,7 +74,7 @@ for (const platform of ["TikTok", "Instagram", "Facebook", "YouTube", "X"]) {
     "native platform implementations recognize " + platform);
 }
 
-assert.match(docs, /real platform interface/i);
+assert.match(docs, /actual social-media post interface/i);
 assert.match(docs, /MediaProjection/i);
 assert.match(docs, /Control Center/i);
 assert.match(docs, /does \*\*not\*\* download/i);
