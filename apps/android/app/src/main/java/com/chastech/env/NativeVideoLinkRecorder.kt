@@ -15,6 +15,7 @@ import android.hardware.display.VirtualDisplay
 import android.media.MediaRecorder
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
+import android.media.projection.MediaProjectionConfig
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -93,24 +94,53 @@ private fun parseVideoPostLink(raw: String): VideoPostLink {
 @Composable
 fun NativeVideoLinkRecorderScreen() {
     val context = LocalContext.current
-    val initialPostUrl = remember { (context as? Activity)?.intent?.data?.getQueryParameter("postUrl").orEmpty() }
-    var postUrl by rememberSaveable { mutableStateOf(initialPostUrl) }
-    var provider by rememberSaveable { mutableStateOf("") }
-    var postUri by remember { mutableStateOf<Uri?>(null) }
+    val initialProvider = remember(initialPostUrl) {
+        initialPostUrl.takeIf { it.isNotBlank() }?.let { raw ->
+            runCatching { parseVideoPostLink(raw).provider }.getOrNull()
+        }.orEmpty()
+    }
+    var postUrl by rememberSaveable(initialPostUrl) { mutableStateOf(initialPostUrl) }
+    var provider by rememberSaveable(initialPostUrl) { mutableStateOf(initialProvider) }
+    var postUri by remember(initialPostUrl) {
+        mutableStateOf(initialPostUrl.takeIf { it.isNotBlank() }?.let { raw ->
+            runCatching { parseVideoPostLink(raw).uri }.getOrNull()
+        })
+    }
     var status by rememberSaveable { mutableStateOf("") }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
+    var isStarting by rememberSaveable { mutableStateOf(false) }
     var isRecording by rememberSaveable { mutableStateOf(false) }
+    var isStopping by rememberSaveable { mutableStateOf(false) }
 
     DisposableEffect(context) {
         val captureResultReceiver = object : BroadcastReceiver() {
             override fun onReceive(receiverContext: Context?, result: Intent?) {
-                if (result?.action != VideoLinkCaptureService.ACTION_RESULT) return
-                val saved = result.getBooleanExtra(VideoLinkCaptureService.EXTRA_SAVED, false)
-                val message = result.getStringExtra(VideoLinkCaptureService.EXTRA_MESSAGE)
-                    ?: if (saved) "Recording saved." else "Recording could not be saved."
-                isRecording = false
-                status = message
-                error = if (saved) null else message
+                when (result?.action) {
+                    VideoLinkCaptureService.ACTION_STARTED -> {
+                        isStarting = false
+                        isRecording = true
+                        isStopping = false
+                        status = "Recording."
+                        error = null
+                        postUri?.let { uri ->
+                            runCatching {
+                                CustomTabsIntent.Builder().setShowTitle(false).build().launchUrl(context, uri)
+                            }.onFailure {
+                                error = "Recording has started, but the post could not be opened."
+                            }
+                        }
+                    }
+                    VideoLinkCaptureService.ACTION_RESULT -> {
+                        val saved = result.getBooleanExtra(VideoLinkCaptureService.EXTRA_SAVED, false)
+                        val message = result.getStringExtra(VideoLinkCaptureService.EXTRA_MESSAGE)
+                            ?: if (saved) "Recording saved." else "Recording could not be saved."
+                        isStarting = false
+                        isRecording = false
+                        isStopping = false
+                        status = message
+                        error = if (saved) null else message
+                    }
+                }
             }
         }
         ContextCompat.registerReceiver(
@@ -134,19 +164,19 @@ fun NativeVideoLinkRecorderScreen() {
             }
             runCatching { ContextCompat.startForegroundService(context, serviceIntent) }
                 .onSuccess {
-                    isRecording = true
-                    status = "Recording."
+                    isStarting = true
+                    isStopping = false
+                    status = "Starting capture."
                     error = null
-                    postUri?.let { uri ->
-                        runCatching { CustomTabsIntent.Builder().setShowTitle(false).build().launchUrl(context, uri) }
-                            .onFailure { error = "Recording started, but the post link could not be opened. Switch to the post manually." }
-                    }
                 }
                 .onFailure {
                     error = it.message ?: "Unable to start screen recording."
                     status = "Capture did not start."
                 }
         } else {
+            isStarting = false
+            isRecording = false
+            isStopping = false
             status = "Screen capture permission was cancelled."
         }
     }
@@ -172,6 +202,7 @@ fun NativeVideoLinkRecorderScreen() {
             onValueChange = {
                 postUrl = it
                 provider = ""
+                postUri = null
                 error = null
             },
             modifier = Modifier.fillMaxWidth(),
@@ -188,27 +219,36 @@ fun NativeVideoLinkRecorderScreen() {
                 val link = validatedLink() ?: return@Button
                 postUri = link.uri
                 val manager = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-                projectionLauncher.launch(manager.createScreenCaptureIntent())
+                val captureIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    manager.createScreenCaptureIntent(MediaProjectionConfig.createConfigForDefaultDisplay())
+                } else {
+                    manager.createScreenCaptureIntent()
+                }
+                isStarting = true
+                status = "Waiting for screen-capture permission."
+                error = null
+                projectionLauncher.launch(captureIntent)
             },
-            enabled = postUrl.isNotBlank() && !isRecording,
+            enabled = postUrl.isNotBlank() && !isStarting && !isRecording && !isStopping,
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Start recording")
         }
-        if (isRecording) {
+        if (isRecording || isStarting) {
             Button(
                 onClick = {
+                    isStopping = true
+                    error = null
+                    status = "Saving recording."
                     context.startService(
                         Intent(context, VideoLinkCaptureService::class.java)
                             .setAction(VideoLinkCaptureService.ACTION_STOP)
                     )
-                    isRecording = false
-                    error = null
-                    status = "Finishing the MP4 recording…"
                 },
+                enabled = isRecording && !isStopping,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Stop and save recording")
+                Text(if (isStopping) "Saving…" else "Stop and save recording")
             }
         }
         if (error != null) {
@@ -226,6 +266,7 @@ class VideoLinkCaptureService : Service() {
     companion object {
         const val ACTION_START = "com.chastech.env.videolink.START"
         const val ACTION_STOP = "com.chastech.env.videolink.STOP"
+        const val ACTION_STARTED = "com.chastech.env.videolink.STARTED"
         const val ACTION_RESULT = "com.chastech.env.videolink.RESULT"
         const val EXTRA_SAVED = "capture_saved"
         const val EXTRA_MESSAGE = "capture_message"
@@ -255,7 +296,10 @@ class VideoLinkCaptureService : Service() {
                 return START_NOT_STICKY
             }
             ACTION_START -> {
-                if (projection != null || recorder != null) return START_STICKY
+                if (projection != null && recorder != null) {
+                    sendCaptureStarted()
+                    return START_NOT_STICKY
+                }
                 createNotificationChannel()
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     startForeground(
@@ -344,6 +388,7 @@ class VideoLinkCaptureService : Service() {
 
             videoRecorder.start()
             updateNotification("Recording screen · use Stop to finish")
+            sendCaptureStarted()
         } catch (error: Exception) {
             failCapture(error.message ?: "Screen recording could not start.")
         }
@@ -377,8 +422,6 @@ class VideoLinkCaptureService : Service() {
         stopping = true
         var saved = false
         try {
-            virtualDisplay?.release()
-            virtualDisplay = null
             val currentRecorder = recorder
             recorder = null
             if (currentRecorder != null) {
@@ -392,6 +435,8 @@ class VideoLinkCaptureService : Service() {
                     runCatching { currentRecorder.release() }
                 }
             }
+            virtualDisplay?.release()
+            virtualDisplay = null
             outputDescriptor?.close()
             outputDescriptor = null
             if (saved) {
@@ -488,6 +533,12 @@ class VideoLinkCaptureService : Service() {
             )
         )
         .build()
+
+    private fun sendCaptureStarted() {
+        sendBroadcast(
+            Intent(ACTION_STARTED).setPackage(packageName)
+        )
+    }
 
     private fun sendCaptureResult(saved: Boolean, message: String) {
         sendBroadcast(
