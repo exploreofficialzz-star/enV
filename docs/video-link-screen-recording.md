@@ -45,7 +45,8 @@ A valid provider URL only identifies the intended platform. It does not guarante
 
 ## Privacy, safety and fidelity
 
-- Capture is local to the device; enV does not send the recorded screen or original post to its media processor.
+- Capture is local to the device; enV does not send the recorded screen or original post to its media processor. Once the original post is already visible, the capture and save operation itself does not need the enV backend or a network connection.
+- Opening a remote post, signing into its platform, or loading uncached media still requires the platform/browser's normal network access.
 - The tool does not read platform cookies, credentials, private APIs, account databases or post metadata from hidden endpoints.
 - It does not bypass login requirements, anti-bot controls, DRM, protected windows or a platform's recording restrictions.
 - Only details actually visible at recording time are present in the output. Counts can change between opening the post and recording it.
