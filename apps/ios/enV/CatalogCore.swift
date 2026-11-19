@@ -144,7 +144,7 @@ struct Tool: Decodable, Identifiable, Hashable {
         let hasNativeDocumentEngine = nativeDocumentOperations.contains(id) && !requiresAuth
         let hasLocalToolEngine = clientSide && !requiresBackend && !requiresAuth
         return ["active", "beta"].contains(status.lowercased()) && !isUnderProduction &&
-            (hasNativeDocumentEngine || hasLocalToolEngine) && id != "music-downloader" && id != "video-link-screen-recording" &&
+            (hasNativeDocumentEngine || hasLocalToolEngine) && id != "music-downloader" &&
             !NativeCopy.isWebRuntimeOnly(id)
     }
     var offlineDescription: String {
