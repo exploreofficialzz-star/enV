@@ -41,6 +41,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -111,6 +113,24 @@ fun NativeVideoLinkRecorderScreen(initialPostUrl: String = "") {
     var isStarting by rememberSaveable { mutableStateOf(false) }
     var isRecording by rememberSaveable { mutableStateOf(false) }
     var isStopping by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(isStarting, isRecording) {
+        if (isStarting && !isRecording) {
+            delay(15_000)
+            if (isStarting && !isRecording) {
+                runCatching {
+                    context.startService(
+                        Intent(context, VideoLinkCaptureService::class.java)
+                            .setAction(VideoLinkCaptureService.ACTION_STOP)
+                    )
+                }
+                isStarting = false
+                isStopping = false
+                error = "Android did not confirm that recording started. Please try again."
+                status = "Capture did not start."
+            }
+        }
+    }
 
     DisposableEffect(context) {
         val captureResultReceiver = object : BroadcastReceiver() {
