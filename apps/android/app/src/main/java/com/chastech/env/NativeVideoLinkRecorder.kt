@@ -173,6 +173,9 @@ fun NativeVideoLinkRecorderScreen(initialPostUrl: String = "") {
                     error = null
                 }
                 .onFailure {
+                    isStarting = false
+                    isRecording = false
+                    isStopping = false
                     error = it.message ?: "Unable to start screen recording."
                     status = "Capture did not start."
                 }
