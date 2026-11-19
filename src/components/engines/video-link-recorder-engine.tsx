@@ -32,11 +32,10 @@ export function VideoLinkRecorderEngine() {
   const [provider, setProvider] = useState<string | null>(null);
   const [captureSupported, setCaptureSupported] = useState(false);
   const [secureContext, setSecureContext] = useState(true);
+  const [androidDevice, setAndroidDevice] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [hasAudio, setHasAudio] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [output, setOutput] = useState<CaptureOutput | null>(null);
 
   const startingRef = useRef(false);
@@ -49,6 +48,7 @@ export function VideoLinkRecorderEngine() {
 
   useEffect(() => {
     setSecureContext(window.isSecureContext);
+    setAndroidDevice(/Android/i.test(navigator.userAgent));
     setCaptureSupported(
       Boolean(navigator.mediaDevices?.getDisplayMedia) &&
       typeof MediaRecorder !== "undefined",
@@ -101,14 +101,18 @@ export function VideoLinkRecorderEngine() {
     const resolved = parseLink();
     if (!resolved) { startingRef.current = false; return; }
     setOutput(null);
-    setNotice(null);
     const opened = window.open(resolved.url, "_blank");
     if (!opened) {
       setError("Your browser blocked the new tab. Allow pop-ups for enV, then open the post again.");
       return;
     }
     try { opened.opener = null; } catch { /* Browser-controlled cross-origin opener isolation. */ }
-    setNotice("Post opened. Keep the original app or tab available, return here, and start capture when you are ready.");
+  }
+
+  function openNativeRecorder() {
+    const resolved = parseLink();
+    if (!resolved) return;
+    window.location.href = `env://tool/video-link-screen-recording?postUrl=${encodeURIComponent(resolved.url)}`;
   }
 
   function releaseCapture() {
@@ -152,10 +156,8 @@ export function VideoLinkRecorderEngine() {
     }
 
     setError(null);
-    setNotice(null);
     setOutput(null);
     setElapsedSeconds(0);
-    setHasAudio(false);
     chunksRef.current = [];
     stoppedRef.current = false;
 
@@ -184,9 +186,6 @@ export function VideoLinkRecorderEngine() {
       startingRef.current = false;
       return;
     }
-
-    const audioTracks = stream.getAudioTracks();
-    setHasAudio(audioTracks.length > 0);
     const mimeType = recorderMimeType();
     let recorder: MediaRecorder;
     try {
@@ -230,9 +229,6 @@ export function VideoLinkRecorderEngine() {
         size: blob.size,
       };
       setOutput(nextOutput);
-      setNotice(audioTracks.length
-        ? "Recording finished. The selected source supplied an audio track."
-        : "The browser did not provide an audio track for this selected source. The saved recording may be silent.");
       recordToolExecutionResult("video-link-screen-recording", "success", duration * 1000, "screen_capture");
       chunksRef.current = [];
     };
@@ -241,7 +237,6 @@ export function VideoLinkRecorderEngine() {
     try {
       recorder.start(1000);
       setIsRecording(true);
-      setNotice("Recording started. Switch to the original post, play the video and scroll through the details you want included. Return to enV and stop capture when finished.");
       stopTimerRef.current = window.setTimeout(stopCapture, MAX_CAPTURE_MS);
     } catch (reason) {
       releaseCapture();
@@ -257,14 +252,6 @@ export function VideoLinkRecorderEngine() {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-xl border border-border bg-surface-2 p-4 text-sm">
-        <div className="font-medium">Record the original post interface</div>
-        <p className="mt-1 text-muted">
-          Paste a post link and capture the real platform screen. The recording preserves the video, creator details, engagement counts and controls that are actually visible.
-        </p>
-        <p className="mt-2 text-xs text-muted">Choose the original post tab or the entire display in the browser's capture prompt. Browser support and the source platform determine whether audio can be included.</p>
-      </div>
-
       <div className="space-y-2">
         <label className="text-sm font-medium" htmlFor="video-post-recorder-link">Post link</label>
         <input
@@ -281,34 +268,39 @@ export function VideoLinkRecorderEngine() {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="outline" onClick={openPost} disabled={isRecording || !postLink.trim()}>
-          Open original post
-        </Button>
-        <Button type="button" onClick={() => void startCapture()} disabled={isRecording || !postLink.trim() || !captureSupported || !secureContext}>
-          Start recording
-        </Button>
+        {captureSupported ? (
+          <>
+            <Button type="button" variant="outline" onClick={openPost} disabled={isRecording || !postLink.trim()}>
+              Open post
+            </Button>
+            <Button type="button" onClick={() => void startCapture()} disabled={isRecording || !postLink.trim() || !secureContext}>
+              Start recording
+            </Button>
+          </>
+        ) : androidDevice ? (
+          <Button type="button" onClick={openNativeRecorder} disabled={isRecording || !postLink.trim()}>
+            Start recording
+          </Button>
+        ) : (
+          <Button type="button" disabled>
+            Start recording
+          </Button>
+        )}
         {isRecording ? <Button type="button" variant="danger" onClick={stopCapture}>Stop and finish</Button> : null}
       </div>
 
       {!secureContext ? <ErrorBanner message="Screen capture requires HTTPS. Open enV over a secure connection." /> : null}
-      {!captureSupported ? <div className="rounded-lg border border-border bg-surface-2 p-3 text-sm text-muted">
-        This browser does not expose screen recording. The browser version of this tool requires a supported desktop browser. Use the native enV app for mobile screen capture.
-      </div> : null}
       {isRecording ? (
         <div className="rounded-xl border border-border bg-surface-2 p-4" aria-live="polite">
           <div className="flex items-center justify-between gap-3">
             <strong>Recording screen</strong>
             <span className="font-mono text-sm tabular-nums">{formatTime(elapsedSeconds)}</span>
           </div>
-          <p className="mt-2 text-sm text-muted">{hasAudio ? "The screen and the selected source audio track are being recorded." : "The screen is being recorded. The browser did not supply a source-audio track."}</p>
           <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface">
             <div className="h-full w-full animate-pulse bg-accent" />
           </div>
-          <p className="mt-2 text-xs text-muted">Maximum capture time: 10 minutes. You can stop earlier; the recording stays on this device.</p>
         </div>
       ) : null}
-
-      {notice ? <p className="text-sm text-muted" role="status">{notice}</p> : null}
       {error ? <ErrorBanner message={error} /> : null}
 
       {output && previewUrl ? (
