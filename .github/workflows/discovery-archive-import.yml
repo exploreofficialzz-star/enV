@@ -1,0 +1,123 @@
+name: One-time discovery archive import
+
+on:
+  push:
+    branches:
+      - feat/discovery-archive-import-20261119
+
+permissions:
+  contents: write
+
+concurrency:
+  group: discovery-archive-import
+  cancel-in-progress: false
+
+jobs:
+  import-and-push-main:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out staging commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify main has not moved
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          expected_parent='a0c526a98a5c224cffbffae7b71e944300d51e45'
+          current_main="$(git rev-parse origin/main)"
+          if [[ "$current_main" != "$expected_parent" ]]; then
+            echo "main moved after the import branch was prepared; refusing to overwrite unrelated work."
+            echo "Expected $expected_parent, found $current_main"
+            exit 1
+          fi
+
+      - name: Extract authored archive files
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/discovery-import/payload-*.b64 | base64 --decode | tar -xJf - -C .
+          rm -rf .github/discovery-import
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Regenerate derived discovery artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GITHUB_SHA="$(git rev-parse origin/main)"
+          export GIT_COMMIT="$GITHUB_SHA"
+          unset VERCEL_GIT_COMMIT_SHA
+          npm run export:native-execution-matrix
+          npm run discovery:inventory
+          npm run discovery:knowledge-index
+          npm run discovery:search-golden
+          node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/evaluate-search-quality.mjs --json > audit/discovery/search-eval/results.v1.json
+          npm run discovery:related-audit -- --write
+          node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/validate-seo-offline.mjs --write
+
+      - name: Verify discovery gates and focused tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GITHUB_SHA="$(git rev-parse origin/main)"
+          export GIT_COMMIT="$GITHUB_SHA"
+          unset VERCEL_GIT_COMMIT_SHA
+          npm run discovery:check
+          npm run check:native-discovery
+          node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test \
+            scripts/discovery-inventory.test.mjs \
+            scripts/search-demand-core.test.mjs \
+            src/lib/search.test.ts \
+            src/lib/discovery-filters.test.ts \
+            src/lib/discovery-collections.test.ts \
+            src/lib/related-tools.test.ts \
+            src/lib/accessibility-studios.test.ts
+          npm run typecheck
+
+      - name: Prepare a clean, single-parent main commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/discovery-archive-import.yml
+          git show origin/main:vercel.json > vercel.json
+          git reset --mixed origin/main
+          git add package.json \
+            apps/shared/native-execution-matrix.json \
+            audit/discovery \
+            scripts/audit-related-tools.mjs \
+            scripts/discovery-inventory-core.mjs \
+            scripts/discovery-inventory.test.mjs \
+            scripts/evaluate-phrasing-hypotheses.mjs \
+            scripts/evaluate-search-quality.mjs \
+            scripts/fixtures/legacy-search-baseline.ts \
+            scripts/generate-discovery-inventory.mjs \
+            scripts/generate-search-golden.mjs \
+            scripts/generate-tool-knowledge-index.mjs \
+            scripts/learn-search-aliases.mjs \
+            scripts/search-demand-core.mjs \
+            scripts/search-demand-core.test.mjs \
+            scripts/validate-seo-offline.mjs \
+            src/data/discovery-collections.ts \
+            src/data/search-aliases.ts \
+            src/lib/accessibility-studios.test.ts \
+            src/lib/discovery-collections.test.ts \
+            src/lib/discovery-filters.test.ts \
+            src/lib/discovery-filters.ts \
+            src/lib/related-tools.test.ts \
+            src/lib/related-tools.ts \
+            src/lib/search.test.ts \
+            src/lib/search.ts
+          git diff --cached --check
+          git diff --cached --stat
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "feat(discovery): import verified inventory and search pipeline"
+          test -z "$(git status --porcelain)"
+
+      - name: Push verified commit to main
+        run: git push origin HEAD:main

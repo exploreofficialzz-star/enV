@@ -176,7 +176,8 @@
   "git": {
     "deploymentEnabled": {
       "main": true,
-      "research/global-discovery-brand-and-copy-20261114": false
+      "research/global-discovery-brand-and-copy-20261114": false,
+      "feat/discovery-archive-import-20261119": false
     }
   }
 }
