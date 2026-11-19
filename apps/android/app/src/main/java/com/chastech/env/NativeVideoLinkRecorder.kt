@@ -146,7 +146,10 @@ fun NativeVideoLinkRecorderScreen() {
         ContextCompat.registerReceiver(
             context,
             captureResultReceiver,
-            IntentFilter(VideoLinkCaptureService.ACTION_RESULT),
+            IntentFilter().apply {
+                addAction(VideoLinkCaptureService.ACTION_STARTED)
+                addAction(VideoLinkCaptureService.ACTION_RESULT)
+            },
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
         onDispose { context.unregisterReceiver(captureResultReceiver) }
@@ -300,24 +303,28 @@ class VideoLinkCaptureService : Service() {
                     sendCaptureStarted()
                     return START_NOT_STICKY
                 }
-                createNotificationChannel()
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    startForeground(
-                        NOTIFICATION_ID,
-                        buildNotification("Preparing screen capture"),
-                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
-                    )
-                } else {
-                    startForeground(NOTIFICATION_ID, buildNotification("Preparing screen capture"))
+                try {
+                    createNotificationChannel()
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        startForeground(
+                            NOTIFICATION_ID,
+                            buildNotification("Preparing screen capture"),
+                            android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+                        )
+                    } else {
+                        startForeground(NOTIFICATION_ID, buildNotification("Preparing screen capture"))
+                    }
+                    @Suppress("DEPRECATION")
+                    val projectionData = intent.getParcelableExtra<Intent>(EXTRA_PROJECTION_DATA)
+                    val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED)
+                    if (projectionData == null || resultCode != Activity.RESULT_OK) {
+                        failCapture("Screen-capture permission was not received.")
+                        return START_NOT_STICKY
+                    }
+                    startCapture(resultCode, projectionData)
+                } catch (error: Exception) {
+                    failCapture(error.message ?: "Android could not start the screen-capture service.")
                 }
-                @Suppress("DEPRECATION")
-                val projectionData = intent.getParcelableExtra<Intent>(EXTRA_PROJECTION_DATA)
-                val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED)
-                if (projectionData == null || resultCode != Activity.RESULT_OK) {
-                    failCapture("Screen-capture permission was not received.")
-                    return START_NOT_STICKY
-                }
-                startCapture(resultCode, projectionData)
             }
         }
         return START_NOT_STICKY
@@ -484,7 +491,7 @@ class VideoLinkCaptureService : Service() {
         virtualDisplay?.release()
         virtualDisplay = null
         deletePartialOutput()
-        updateNotification(message.take(100))
+        runCatching { updateNotification(message.take(100)) }
         sendCaptureResult(saved = false, message = message)
         val activeProjection = projection
         projection = null
