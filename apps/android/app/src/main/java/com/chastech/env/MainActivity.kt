@@ -187,6 +187,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         NativeAdsPrivacyManager.refreshConsent(this)
+        val initialToolId = intent?.data?.takeIf { it.scheme == "env" && it.host == "tool" }?.pathSegments?.firstOrNull()
         val favorites = FavoritesStore(applicationContext)
         setContent {
             var themeMode by rememberSaveable { mutableStateOf(favorites.getThemeMode()) }
@@ -212,6 +213,7 @@ class MainActivity : ComponentActivity() {
                         favorites.setThemeMode(themeMode)
                     },
                     onExit = { finishAffinity() },
+                    initialToolId = initialToolId,
                 )
             }
         }
@@ -219,7 +221,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun CatalogGate(favorites: FavoritesStore, darkMode: Boolean, themeMode: String, onUseSystemTheme: () -> Unit, onExit: () -> Unit) {
+private fun CatalogGate(favorites: FavoritesStore, darkMode: Boolean, themeMode: String, onUseSystemTheme: () -> Unit, onExit: () -> Unit, initialToolId: String? = null) {
     val context = LocalContext.current.applicationContext
     var catalog by remember { mutableStateOf<Catalog?>(null) }
     var loadFailed by remember { mutableStateOf(false) }
@@ -235,7 +237,7 @@ private fun CatalogGate(favorites: FavoritesStore, darkMode: Boolean, themeMode:
         result.getOrNull()?.let { catalog = it } ?: run { loadFailed = true }
     }
     when {
-        catalog != null -> EnVApp(catalog!!, favorites, darkMode, themeMode, onUseSystemTheme)
+        catalog != null -> EnVApp(catalog!!, favorites, darkMode, themeMode, onUseSystemTheme, initialToolId)
         loadFailed -> CatalogFailureScreen(darkMode) { retryCount += 1 }
         else -> NativeLaunchScreen(darkMode, onExit)
     }
@@ -295,7 +297,7 @@ private fun ToolRecord.isUnderProduction(): Boolean =
 private enum class AppTab { Home, Tools, Search, Saved, Account, Assistant }
 
 @Composable
-private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolean, themeMode: String, onUseSystemTheme: () -> Unit) {
+private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolean, themeMode: String, onUseSystemTheme: () -> Unit, initialToolId: String? = null) {
     val context = LocalContext.current
     var tab by rememberSaveable { mutableStateOf(AppTab.Home.name) }
     var query by rememberSaveable { mutableStateOf("") }
@@ -324,6 +326,9 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
             productionTool = null
             detailStack = listOf(routeId)
         }
+    }
+    LaunchedEffect(initialToolId) {
+        if (initialToolId == "video-link-screen-recording") openTool(initialToolId)
     }
     val openRelatedTool: (String) -> Unit = { id ->
         val candidate = catalog.displayTool(id)
