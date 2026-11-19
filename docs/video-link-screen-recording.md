@@ -30,19 +30,20 @@ A valid provider URL only identifies the intended platform. It does not guarante
 
 ### Android
 
-- Kotlin uses `MediaProjectionManager.createScreenCaptureIntent()` and the system consent prompt.
-- After consent, a foreground `mediaProjection` service records the full screen to MP4 with `MediaRecorder`, then opens the unchanged supplied post URL in an Android Custom Tab. This keeps the browser on the exact shared-post route instead of handing the URL to an installed social app's app-link handler.
-- The enV Android deep link opens this native tool directly and pre-fills the pasted post URL.
-- Users stop capture in enV or from the persistent capture notification. Final MP4 files are saved to `Movies/enV` on Android 10+ (or the app-specific Movies directory on older supported versions).
-- Android requires the `FOREGROUND_SERVICE_MEDIA_PROJECTION` permission and a foreground service declared with `foregroundServiceType="mediaProjection"`. A projection token is used for one capture session and is not reused.
-- This implementation currently records screen video but does not mux source-app playback audio. Android can capture another app's playback audio only when that source app's usage and capture policy allow it; protected or opted-out audio is unavailable. This is an explicit limitation, not a silent audio claim.
-- Android or the source app may blank protected surfaces. The capture service enforces a ten-minute maximum and cleans up partial output on failed finalization.
+- Kotlin passes the exact `postUrl` from the incoming `env://` deep link into the native recorder as an explicit parameter.
+- Android 14+ uses `MediaProjectionConfig.createConfigForDefaultDisplay()`, so the consent picker is restricted to the full default display rather than allowing an enV-only app-window capture.
+- The app does not display “Recording” merely because the service accepted a start request. The foreground service sends a started event only after `MediaRecorder.start()` succeeds; only then does enV open the unchanged post URL in a Custom Tab.
+- A foreground `mediaProjection` service records MP4 with `MediaRecorder`. Users stop capture in enV or from the persistent capture notification. Final MP4 files are saved to `Movies/enV` on Android 10+ (or the app-specific Movies directory on older supported versions).
+- Each session requires the system consent prompt and a fresh projection token. The service enforces a ten-minute maximum and removes partial output when finalization fails.
+- The native Android implementation currently records screen video only; source-app playback audio is not muxed into its MP4. Protected surfaces may also be blanked by Android or the source app.
 
 ### iOS
 
-- Swift validates the provider URL and displays that exact URL in an in-app `SFSafariViewController`, avoiding automatic handoff to a social app's universal-link handler.
-- iOS owns system-wide screen-recording permission, start/stop controls and the Photos destination. enV cannot silently start or stop an iOS full-display recording from the current deployment target.
-- Protected content and source-app audio restrictions remain controlled by iOS and the source platform.
+- iOS 27+ uses Apple's ScreenCaptureKit system picker, restricted to a single display, then records the full display to MP4 through `SCRecordingOutput`.
+- After capture begins, enV opens the exact post URL inside its in-app Safari view so the real platform page can be played while the full display is captured.
+- Users return to enV and stop the recording. enV waits for MP4 finalization and saves the result to Photos using add-only library authorization.
+- iOS 16.4–26 does not expose this ScreenCaptureKit full-display workflow. Those versions can still open the post, but full-display recording must be started manually with Control Center.
+- Apple and the source platform control recording consent, protected content and available audio tracks.
 
 ## Privacy, safety and fidelity
 
@@ -66,5 +67,5 @@ A valid provider URL only identifies the intended platform. It does not guarante
 
 - Web browser tests: open each supported provider, choose the original post tab/full display, record playback and scrolling, handle cancelled permission, track-ended capture, browser audio absence, output preview and exported-file playback.
 - Android physical-device tests: MediaProjection consent, switching to installed platform apps, orientation changes, permission revocation, notification stop, storage failure, MP4 finalization and source-app playback audio availability.
-- iOS physical-device tests: open original URLs into installed apps and Safari, start/stop Control Center capture, switch apps, preserve platform interface, Photos output and source-app audio behaviour.
+- iOS 27+ physical-device tests: approve the single-display picker, switch to the in-app post browser, verify full-display MP4 capture, stop and save to Photos. Also verify the documented manual Control Center fallback on iOS 16.4–26.
 - Provider tests must use public test posts and record the exact provider/device/browser/OS result. URL recognition alone is not provider acceptance.
