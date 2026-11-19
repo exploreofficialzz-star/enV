@@ -1,6 +1,9 @@
 import Foundation
 import SwiftUI
 import SafariServices
+import ScreenCaptureKit
+import Photos
+import AVFoundation
 
 private struct NativeVideoPostBrowserTarget: Identifiable {
     let id = UUID()
@@ -15,6 +18,254 @@ private struct NativeVideoPostBrowser: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ controller: SFSafariViewController, context: Context) {}
+}
+
+
+/// iOS 27+ system screen capture. The system picker grants full-display access;
+/// enV does not attempt to capture another app without explicit user approval.
+@available(iOS 27.0, *)
+@MainActor
+private final class NativePostInterfaceCaptureController: NSObject, ObservableObject, SCContentSharingPickerObserver, SCStreamDelegate, SCRecordingOutputDelegate {
+    @Published private(set) var isPreparing = false
+    @Published private(set) var isRecording = false
+    @Published private(set) var isStopping = false
+    @Published private(set) var message = ""
+    @Published var failure: String?
+
+    private let picker = SCContentSharingPicker.shared
+    private var stream: SCStream?
+    private var recordingOutput: SCRecordingOutput?
+    private var recordingURL: URL?
+    private var finishContinuation: CheckedContinuation<Void, Error>?
+
+    func start() {
+        guard !isPreparing, !isRecording, !isStopping else { return }
+        failure = nil
+        message = "Choose the full display to begin recording."
+        isPreparing = true
+
+        var configuration = SCContentSharingPickerConfiguration()
+        configuration.allowedPickerModes = .singleDisplay
+        configuration.showsMicrophoneControl = false
+        picker.defaultConfiguration = configuration
+        picker.add(self)
+        picker.present()
+    }
+
+    func contentSharingPicker(_ picker: SCContentSharingPicker, didUpdateWith filter: SCContentFilter, for stream: SCStream?) {
+        Task { @MainActor in
+            await beginRecording(with: filter)
+        }
+    }
+
+    func contentSharingPicker(_ picker: SCContentSharingPicker, didCancelFor stream: SCStream?) {
+        Task { @MainActor in
+            picker.remove(self)
+            isPreparing = false
+            message = ""
+        }
+    }
+
+    func contentSharingPickerStartDidFailWithError(_ error: Error) {
+        Task { @MainActor in
+            picker.remove(self)
+            isPreparing = false
+            failure = error.localizedDescription
+        }
+    }
+
+    private func beginRecording(with filter: SCContentFilter) async {
+        picker.remove(self)
+        guard stream == nil else {
+            isPreparing = false
+            failure = "A screen recording is already active."
+            return
+        }
+
+        do {
+            let streamConfiguration = SCStreamConfiguration()
+            let screen = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .first?.screen ?? UIScreen.main
+            let pixelSize = screen.nativeBounds.size
+            streamConfiguration.width = max(2, Int(pixelSize.width))
+            streamConfiguration.height = max(2, Int(pixelSize.height))
+            streamConfiguration.minimumFrameInterval = CMTime(value: 1, timescale: 30)
+            streamConfiguration.queueDepth = 5
+            streamConfiguration.capturesAudio = true
+            streamConfiguration.excludesCurrentProcessAudio = false
+
+            let outputURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("enV-Post-Interface-\(UUID().uuidString).mp4")
+            let outputConfiguration = SCRecordingOutputConfiguration()
+            outputConfiguration.outputURL = outputURL
+            let output = SCRecordingOutput(configuration: outputConfiguration, delegate: self)
+            let newStream = SCStream(filter: filter, configuration: streamConfiguration, delegate: self)
+            try newStream.addRecordingOutput(output)
+            try await newStream.startCapture()
+
+            stream = newStream
+            recordingOutput = output
+            recordingURL = outputURL
+            isPreparing = false
+            isRecording = true
+            message = "Recording the full display."
+        } catch {
+            isPreparing = false
+            isRecording = false
+            failure = error.localizedDescription
+            await tearDownStream()
+        }
+    }
+
+    func stop() {
+        guard isRecording, !isStopping else { return }
+        isStopping = true
+        message = "Finalizing the recording."
+        Task { @MainActor in
+            await finishRecording()
+        }
+    }
+
+    private func finishRecording() async {
+        guard let activeStream = stream, let output = recordingOutput, let url = recordingURL else {
+            isStopping = false
+            isRecording = false
+            failure = "There is no active screen recording to finish."
+            return
+        }
+
+        do {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                finishContinuation = continuation
+                do {
+                    try activeStream.removeRecordingOutput(output)
+                } catch {
+                    finishContinuation = nil
+                    continuation.resume(throwing: error)
+                }
+            }
+            try await activeStream.stopCapture()
+            try await saveRecordingToPhotos(url)
+            try? FileManager.default.removeItem(at: url)
+            message = "Recording saved to Photos."
+            failure = nil
+        } catch {
+            failure = error.localizedDescription
+            message = "The recording could not be saved."
+        }
+
+        await tearDownStream()
+        isRecording = false
+        isStopping = false
+    }
+
+    private func saveRecordingToPhotos(_ url: URL) async throws {
+        let authorization = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+        guard authorization == .authorized || authorization == .limited else {
+            throw NSError(
+                domain: "enV.VideoLinkCapture",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Allow enV to add recordings to Photos, then try again."]
+            )
+        }
+        try await PHPhotoLibrary.shared().performChanges {
+            let options = PHAssetResourceCreationOptions()
+            options.shouldMoveFile = false
+            let request = PHAssetCreationRequest.forAsset()
+            request.addResource(with: .video, fileURL: url, options: options)
+        }
+    }
+
+    private func tearDownStream() async {
+        if let activeStream = stream {
+            if activeStream.isRunning {
+                try? await activeStream.stopCapture()
+            }
+        }
+        stream = nil
+        recordingOutput = nil
+        recordingURL = nil
+    }
+
+    func recordingOutputDidStartRecording(_ recordingOutput: SCRecordingOutput) {}
+
+    func recordingOutputDidFinishRecording(_ recordingOutput: SCRecordingOutput) {
+        finishContinuation?.resume()
+        finishContinuation = nil
+    }
+
+    func recordingOutput(_ recordingOutput: SCRecordingOutput, didFailWithError error: Error) {
+        finishContinuation?.resume(throwing: error)
+        finishContinuation = nil
+        Task { @MainActor in
+            failure = error.localizedDescription
+            isPreparing = false
+        }
+    }
+
+    func stream(_ stream: SCStream, didStopWithError error: Error) {
+        Task { @MainActor in
+            guard isRecording || isPreparing else { return }
+            if isStopping { return }
+            failure = error.localizedDescription
+            message = "Screen capture stopped unexpectedly."
+            isPreparing = false
+            isRecording = false
+            isStopping = false
+            await tearDownStream()
+        }
+    }
+}
+
+@available(iOS 27.0, *)
+private struct NativePostCaptureControls: View {
+    let onRecordingStarted: () -> Void
+
+    @StateObject private var capture = NativePostInterfaceCaptureController()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button {
+                capture.start()
+            } label: {
+                Label(
+                    capture.isPreparing ? "Waiting for permission" : "Start recording",
+                    systemImage: "record.circle"
+                )
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Color.envInk)
+            .foregroundStyle(Color.envSurface)
+            .disabled(capture.isPreparing || capture.isRecording || capture.isStopping)
+
+            if capture.isRecording {
+                Button {
+                    capture.stop()
+                } label: {
+                    Label(capture.isStopping ? "Saving recording" : "Stop and save", systemImage: "stop.circle")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(capture.isStopping)
+            }
+
+            if !capture.message.isEmpty {
+                Text(capture.message)
+                    .font(.envScaled(size: 12, weight: .regular))
+                    .foregroundStyle(Color.envMuted)
+            }
+            if let failure = capture.failure {
+                Text(failure)
+                    .font(.envScaled(size: 12, weight: .medium))
+                    .foregroundStyle(.red)
+            }
+        }
+        .onChange(of: capture.isRecording) { recording in
+            if recording { onRecordingStarted() }
+        }
+    }
 }
 
 /// iOS presents the original post in an in-app browser. Screen recording remains OS-controlled.
@@ -110,6 +361,22 @@ struct NativeVideoLinkRecorderView: View {
                 .tint(Color.envInk)
                 .foregroundStyle(Color.envSurface)
                 .disabled(postLink.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                if #available(iOS 27.0, *) {
+                    NativePostCaptureControls {
+                        guard let url = validatedPost() else { return }
+                        browserTarget = NativeVideoPostBrowserTarget(url: url)
+                    }
+                } else {
+                    Button {
+                        failure = "Automatic full-display recording requires iOS 27 or later. On this iOS version, use Control Center Screen Recording."
+                    } label: {
+                        Label("Start recording", systemImage: "record.circle")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(postLink.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
 
                 if let failure {
                     Text(failure)
