@@ -120,7 +120,7 @@ struct NativeVideoLinkRecorderView: View {
             }
             .padding(16)
         }
-        .sheet(item: $browserTarget) { target in
+        .fullScreenCover(item: $browserTarget) { target in
             NativeVideoPostBrowser(url: target.url)
                 .ignoresSafeArea()
         }
