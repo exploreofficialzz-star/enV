@@ -193,7 +193,7 @@ fun NativeVideoLinkRecorderScreen() {
             enabled = postUrl.isNotBlank() && !isRecording,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Start recording and open post")
+            Text("Start recording")
         }
         if (isRecording) {
             Button(
