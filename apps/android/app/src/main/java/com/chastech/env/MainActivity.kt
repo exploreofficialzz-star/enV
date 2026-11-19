@@ -1088,7 +1088,7 @@ private fun nativeBackendSupported(tool: ToolRecord): Boolean = !NativeCopy.isWe
 
 internal fun ToolRecord.offlineDescription(): String {
     val canRunOffline = status.lowercase(Locale.ROOT) in setOf("active", "beta") &&
-        !isUnderProduction() && id != "music-downloader" && id != "video-link-screen-recording" && nativeSupported(this)
+        !isUnderProduction() && id != "music-downloader" && nativeSupported(this)
     if (!canRunOffline || description.startsWith("Works offline.", ignoreCase = true)) return description
     return "Works offline. $description"
 }
