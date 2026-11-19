@@ -22,6 +22,8 @@ const androidCatalog = read("apps/android/app/src/main/java/com/chastech/env/dat
 const androidManifest = read("apps/android/app/src/main/AndroidManifest.xml");
 const swift = read("apps/ios/enV/NativeVideoLinkRecorder.swift");
 const iosCatalog = read("apps/ios/enV/CatalogCore.swift");
+const iosInfo = read("apps/ios/enV/Info.plist");
+const iosWorkflow = read(".github/workflows/ios-build.yml");
 const iosRouter = read("apps/ios/enV/NativeZipArchiveView.swift");
 const docs = read("docs/video-link-screen-recording.md");
 const offlinePolicy = read("src/lib/offline/local-operation-policy.mjs");
@@ -66,6 +68,9 @@ assert.doesNotMatch(android, /Intent\(Intent\.ACTION_VIEW/);
 assert.match(android, /MediaProjectionManager/);
 assert.match(android, /createScreenCaptureIntent\(\)/);
 assert.match(android, /MediaProjectionConfig\.createConfigForDefaultDisplay\(\)/);
+assert.match(android, /fun NativeVideoLinkRecorderScreen\(initialPostUrl: String = ""\)/);
+assert.match(androidMain, /initialPostUrl = initialPostUrl/);
+
 assert.match(android, /const val ACTION_STARTED/);
 assert.match(android, /sendCaptureStarted\(\)/);
 assert.match(android, /ACTION_STARTED ->/);
@@ -93,13 +98,21 @@ assert.match(androidManifest, /android:name="\.VideoLinkCaptureService"/);
 assert.equal((androidManifest.match(/android:name="android\.permission\.FOREGROUND_SERVICE"/g) ?? []).length, 1);
 assert.doesNotMatch(android, /OpenDocument|copySelectedVideo|url-media\/download|Choose a video from this device/);
 
-// iOS opens the source URL and hands full-display recording to the real iOS system recorder.
+// iOS 27+ must use Apple's system full-display capture picker and MP4 output.
 assert.match(swift, /struct NativeVideoLinkRecorderView/);
-assert.match(swift, /Open post/);
 assert.match(swift, /SFSafariViewController/);
-assert.match(swift, /NativeVideoPostBrowser/);
-assert.doesNotMatch(swift, /Control Center|Open original post|@Environment\(\\.openURL\)/);
+assert.match(swift, /SCContentSharingPicker/);
+assert.match(swift, /allowedPickerModes = \.singleDisplay/);
+assert.match(swift, /SCRecordingOutput/);
+assert.match(swift, /addRecordingOutput/);
+assert.match(swift, /removeRecordingOutput/);
+assert.match(swift, /saveRecordingToPhotos/);
+assert.match(swift, /#available\(iOS 27\.0/);
+assert.doesNotMatch(swift, /Open original post|@Environment\(\\.openURL\)/);
 assert.doesNotMatch(swift, /fileImporter|NativeVideoLinkService|url-media\/download|Choose a video from this device/);
+assert.match(iosInfo, /NSScreenCaptureUsageDescription/);
+assert.match(iosInfo, /<string>screen-capture<\/string>/);
+assert.match(iosWorkflow, /runs-on: xcode-27/);
 assert.match(iosCatalog, /includingVideoLinkScreenRecording/);
 assert.match(androidMain, /id != "video-link-screen-recording"/, "Android does not falsely label remote post access as offline");
 assert.match(iosCatalog, /id != "video-link-screen-recording"/, "iOS does not falsely label remote post access as offline");
