@@ -26,7 +26,9 @@ const docs = read("docs/video-link-screen-recording.md");
 const offlinePolicy = read("src/lib/offline/local-operation-policy.mjs");
 
 assert.match(registry, new RegExp('id: "' + ID + '"'));
-assert.match(registry, /description: ""/);
+assert.match(registry, /const videoLinkScreenRecordingTool: ToolMeta = \\{[\\s\\S]*?description: ""/);
+assert.match(android, /id = "video-link-screen-recording"[\\s\\S]*?description = ""/);
+assert.match(iosCatalog, /id: "video-link-screen-recording"[\\s\\S]*?description: ""/);
 assert.match(router, /tool\.id === "video-link-screen-recording"[^\n]*VideoLinkRecorderEngine/);
 assert.match(preload, /video-link-recorder-engine/);
 assert.ok(offlinePolicy.includes('"' + ID + '"'), "the screen capture remains a local operation");
@@ -64,6 +66,7 @@ assert.match(android, /ContextCompat\.RECEIVER_NOT_EXPORTED/);
 assert.match(android, /sendCaptureResult\(saved = true/);
 assert.match(android, /sendCaptureResult\(saved = false/);
 assert.doesNotMatch(android, /Recording finalized\. The MP4 is saved/);
+assert.doesNotMatch(android, /Choose the entire screen|original social-media post screen/);
 assert.match(androidMain, /tool\.id == "video-link-screen-recording"[^\n]*NativeVideoLinkRecorderScreen\(\)/);
 assert.match(androidMain, /initialToolId == "video-link-screen-recording"/);
 assert.match(androidManifest, /android:scheme="env" android:host="tool" android:path="\/video-link-screen-recording"/);
