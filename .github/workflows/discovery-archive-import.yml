@@ -85,6 +85,7 @@ jobs:
             src/lib/discovery-collections.test.ts \
             src/lib/related-tools.test.ts \
             src/lib/accessibility-studios.test.ts
+          npm run build
           npm run typecheck
 
       - name: Prepare a clean, single-parent main commit
