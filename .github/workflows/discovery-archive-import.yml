@@ -228,21 +228,21 @@ jobs:
               exit 1
             }
             actual_paths="$(git diff --name-only "$expected_parent" "$current_main" | sort)"
-            expected_paths="$(printf '%s\\n' \\
-              'apps/android/app/src/main/AndroidManifest.xml' \\
-              'apps/android/app/src/main/java/com/chastech/env/MainActivity.kt' \\
-              'apps/android/app/src/main/java/com/chastech/env/NativeVideoLinkRecorder.kt' \\
-              'apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt' \\
-              'apps/ios/enV/CatalogCore.swift' \\
-              'apps/ios/enV/NativeVideoLinkRecorder.swift' \\
-              'docs/video-link-screen-recording.md' \\
-              'package.json' \\
-              'scripts/check-video-link-recorder.mjs' \\
-              'src/components/engines/video-link-recorder-engine.tsx' \\
+            expected_paths="$(printf '%s\n' \
+              'apps/android/app/src/main/AndroidManifest.xml' \
+              'apps/android/app/src/main/java/com/chastech/env/MainActivity.kt' \
+              'apps/android/app/src/main/java/com/chastech/env/NativeVideoLinkRecorder.kt' \
+              'apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt' \
+              'apps/ios/enV/CatalogCore.swift' \
+              'apps/ios/enV/NativeVideoLinkRecorder.swift' \
+              'docs/video-link-screen-recording.md' \
+              'package.json' \
+              'scripts/check-video-link-recorder.mjs' \
+              'src/components/engines/video-link-recorder-engine.tsx' \
               'src/lib/registry.ts' | sort)"
             if [[ "$actual_paths" != "$expected_paths" ]]; then
               echo "main advanced outside the reviewed Video Link recorder scope; refusing to push."
-              printf '%s\\n' "$actual_paths"
+              printf '%s\n' "$actual_paths"
               exit 1
             fi
             git config user.name "github-actions[bot]"
