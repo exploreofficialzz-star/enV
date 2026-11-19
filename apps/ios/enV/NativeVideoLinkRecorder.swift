@@ -30,6 +30,7 @@ private final class NativePostInterfaceCaptureController: NSObject, ObservableOb
     @Published private(set) var isRecording = false
     @Published private(set) var isStopping = false
     @Published private(set) var message = ""
+    @Published private(set) var finishedRecordingURL: URL?
     @Published var failure: String?
 
     private let picker = SCContentSharingPicker.shared
@@ -41,6 +42,10 @@ private final class NativePostInterfaceCaptureController: NSObject, ObservableOb
     func start() {
         guard !isPreparing, !isRecording, !isStopping else { return }
         failure = nil
+        if let oldURL = finishedRecordingURL {
+            try? FileManager.default.removeItem(at: oldURL)
+        }
+        finishedRecordingURL = nil
         message = "Choose the full display to begin recording."
         isPreparing = true
 
@@ -99,6 +104,8 @@ private final class NativePostInterfaceCaptureController: NSObject, ObservableOb
                 .appendingPathComponent("enV-Post-Interface-\(UUID().uuidString).mp4")
             let outputConfiguration = SCRecordingOutputConfiguration()
             outputConfiguration.outputURL = outputURL
+            outputConfiguration.outputFileType = .mp4
+            outputConfiguration.videoCodecType = .h264
             let output = SCRecordingOutput(configuration: outputConfiguration, delegate: self)
             let newStream = SCStream(filter: filter, configuration: streamConfiguration, delegate: self)
             try newStream.addRecordingOutput(output)
@@ -145,13 +152,21 @@ private final class NativePostInterfaceCaptureController: NSObject, ObservableOb
                 }
             }
             try await activeStream.stopCapture()
-            try await saveRecordingToPhotos(url)
-            try? FileManager.default.removeItem(at: url)
-            message = "Recording saved to Photos."
-            failure = nil
+            finishedRecordingURL = url
+            do {
+                try await saveRecordingToPhotos(url)
+                message = "Recording saved to Photos."
+                failure = nil
+            } catch {
+                message = "Recording finalized. Share the saved file or allow Photos access."
+                failure = error.localizedDescription
+            }
         } catch {
             failure = error.localizedDescription
-            message = "The recording could not be saved."
+            message = "The recording could not be finalized."
+            if FileManager.default.fileExists(atPath: url.path) {
+                finishedRecordingURL = url
+            }
         }
 
         await tearDownStream()
@@ -264,6 +279,13 @@ private struct NativePostCaptureControls: View {
                 Text(failure)
                     .font(.envScaled(size: 12, weight: .medium))
                     .foregroundStyle(.red)
+            }
+            if let fileURL = capture.finishedRecordingURL {
+                ShareLink(item: fileURL) {
+                    Label("Share recording", systemImage: "square.and.arrow.up")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
             }
         }
         .onChange(of: capture.isRecording) { recording in
