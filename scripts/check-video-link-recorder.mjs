@@ -23,11 +23,13 @@ const swift = read("apps/ios/enV/NativeVideoLinkRecorder.swift");
 const iosCatalog = read("apps/ios/enV/CatalogCore.swift");
 const iosRouter = read("apps/ios/enV/NativeZipArchiveView.swift");
 const docs = read("docs/video-link-screen-recording.md");
+const offlinePolicy = read("src/lib/offline/local-operation-policy.mjs");
 
 assert.match(registry, new RegExp('id: "' + ID + '"'));
 assert.match(registry, /real on-screen interface/);
 assert.match(router, /tool\.id === "video-link-screen-recording"[^\n]*VideoLinkRecorderEngine/);
 assert.match(preload, /video-link-recorder-engine/);
+assert.ok(offlinePolicy.includes('"' + ID + '"'), "the screen recorder remains a local offline operation");
 
 // Web must capture the actual display/tab; no downloader or local-file import path remains.
 assert.match(web, /navigator\.mediaDevices\.getDisplayMedia/);
