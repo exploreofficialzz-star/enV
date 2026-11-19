@@ -89,7 +89,7 @@ jobs:
 
   ios:
     name: Compile and test Swift implementation
-    runs-on: macos-15
+    runs-on: xcode-27
     timeout-minutes: 60
     defaults:
       run:
