@@ -55,8 +55,8 @@ private data class VideoPostLink(val uri: Uri, val provider: String)
 private val videoLinkCaptureDomains = linkedMapOf(
     "TikTok" to listOf("tiktok.com"),
     "Instagram" to listOf("instagram.com"),
-    "Facebook" to listOf("facebook.com", "fb.watch"),
-    "YouTube" to listOf("youtube.com", "youtu.be"),
+    "Facebook" to listOf("facebook.com", "fb.watch", "fb.com"),
+    "YouTube" to listOf("youtube.com", "youtu.be", "youtube-nocookie.com"),
     "X" to listOf("x.com", "twitter.com"),
     "Snapchat" to listOf("snapchat.com"),
     "Threads" to listOf("threads.net"),
@@ -77,6 +77,9 @@ private fun parseVideoPostLink(raw: String): VideoPostLink {
     require(uri.port == -1 || uri.port == 443) { "Custom ports are not supported for post links." }
     val host = uri.host?.lowercase(Locale.ROOT)?.removePrefix("www.")
         ?: throw IllegalArgumentException("That link is not valid.")
+    require(uri.path?.substringAfterLast('/')?.substringAfterLast('.')?.lowercase(Locale.ROOT) !in setOf("mp4", "m4v", "mov", "webm", "ogv", "mkv", "avi", "3gp")) {
+        "Paste the original platform post URL, not a direct video-file URL."
+    }
     val provider = videoLinkCaptureDomains.entries.firstOrNull { (_, domains) ->
         domains.any { host == it || host.endsWith(".$it") }
     }?.key ?: throw IllegalArgumentException("This platform is not supported yet.")
