@@ -25,6 +25,7 @@ import android.util.DisplayMetrics
 import android.view.Surface
 import android.view.WindowManager
 import android.provider.MediaStore
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -92,10 +93,11 @@ private fun parseVideoPostLink(raw: String): VideoPostLink {
 @Composable
 fun NativeVideoLinkRecorderScreen() {
     val context = LocalContext.current
-    var postUrl by rememberSaveable { mutableStateOf("") }
+    val initialPostUrl = remember { (context as? Activity)?.intent?.data?.getQueryParameter("postUrl").orEmpty() }
+    var postUrl by rememberSaveable { mutableStateOf(initialPostUrl) }
     var provider by rememberSaveable { mutableStateOf("") }
     var postUri by remember { mutableStateOf<Uri?>(null) }
-    var status by rememberSaveable { mutableStateOf("Paste a supported social-media post link to begin.") }
+    var status by rememberSaveable { mutableStateOf("") }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     var isRecording by rememberSaveable { mutableStateOf(false) }
 
@@ -133,10 +135,10 @@ fun NativeVideoLinkRecorderScreen() {
             runCatching { ContextCompat.startForegroundService(context, serviceIntent) }
                 .onSuccess {
                     isRecording = true
-                    status = "Recording started. The original post is opening. Play the video and scroll through the details you want to keep."
+                    status = "Recording."
                     error = null
                     postUri?.let { uri ->
-                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
+                        runCatching { CustomTabsIntent.Builder().setShowTitle(false).build().launchUrl(context, uri) }
                             .onFailure { error = "Recording started, but the post link could not be opened. Switch to the post manually." }
                     }
                 }
@@ -165,11 +167,6 @@ fun NativeVideoLinkRecorderScreen() {
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text(
-            "Record the original social-media post screen, including the video, creator details, engagement information and visible controls.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
         OutlinedTextField(
             value = postUrl,
             onValueChange = {
@@ -185,20 +182,6 @@ fun NativeVideoLinkRecorderScreen() {
         )
         if (provider.isNotBlank()) {
             Text("Platform: $provider", style = MaterialTheme.typography.labelMedium)
-        }
-        OutlinedButton(
-            onClick = {
-                val link = validatedLink() ?: return@OutlinedButton
-                runCatching {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, link.uri))
-                }.onFailure {
-                    error = "No app or browser could open this post link."
-                }
-            },
-            enabled = postUrl.isNotBlank() && !isRecording,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Open original post")
         }
         Button(
             onClick = {
@@ -231,13 +214,7 @@ fun NativeVideoLinkRecorderScreen() {
         if (error != null) {
             Text(error!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
-        Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "Choose the entire screen in Android's permission prompt to include the original app layout and navigation. Android or the source app may block protected content. This build records screen video as MP4; source-app playback audio is not included.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        if (status.isNotBlank()) Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
