@@ -29,7 +29,7 @@ assert.match(registry, new RegExp('id: "' + ID + '"'));
 assert.match(registry, /real on-screen interface/);
 assert.match(router, /tool\.id === "video-link-screen-recording"[^\n]*VideoLinkRecorderEngine/);
 assert.match(preload, /video-link-recorder-engine/);
-assert.ok(offlinePolicy.includes('"' + ID + '"'), "the screen recorder remains a local offline operation");
+assert.ok(offlinePolicy.includes('"' + ID + '"'), "the screen capture remains a local operation");
 
 // Web must capture the actual display/tab; no downloader or local-file import path remains.
 assert.match(web, /navigator\.mediaDevices\.getDisplayMedia/);
@@ -73,8 +73,8 @@ assert.match(swift, /Screen Recording/);
 assert.match(swift, /Photos/);
 assert.doesNotMatch(swift, /fileImporter|NativeVideoLinkService|url-media\/download|Choose a video from this device/);
 assert.match(iosCatalog, /includingVideoLinkScreenRecording/);
-assert.doesNotMatch(androidMain, /id != "video-link-screen-recording"/);
-assert.doesNotMatch(iosCatalog, /id != "video-link-screen-recording"/);
+assert.match(androidMain, /id != "video-link-screen-recording"/, "Android does not falsely label remote post access as offline");
+assert.match(iosCatalog, /id != "video-link-screen-recording"/, "iOS does not falsely label remote post access as offline");
 assert.match(iosRouter, /tool\.id == "video-link-screen-recording"[\s\S]*?NativeVideoLinkRecorderView\(\)/);
 
 for (const platform of ["TikTok", "Instagram", "Facebook", "YouTube", "X"]) {
