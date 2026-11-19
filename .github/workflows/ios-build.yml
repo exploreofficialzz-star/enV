@@ -40,7 +40,7 @@ concurrency:
 jobs:
   build-ios-simulator:
     name: Build and test native SwiftUI app
-    runs-on: macos-15
+    runs-on: xcode-27
     timeout-minutes: 60
     defaults:
       run:
