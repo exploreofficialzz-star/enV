@@ -36,10 +36,19 @@ jobs:
             }
             actual_paths="$(git diff --name-only "$expected_parent" "$current_main" | sort)"
             expected_paths="$(printf '%s\n' \
+              'apps/android/app/src/main/AndroidManifest.xml' \
               'apps/android/app/src/main/java/com/chastech/env/MainActivity.kt' \
-              'apps/android/app/src/main/java/com/chastech/env/NativeVideoLinkRecorder.kt' | sort)"
+              'apps/android/app/src/main/java/com/chastech/env/NativeVideoLinkRecorder.kt' \
+              'apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt' \
+              'apps/ios/enV/CatalogCore.swift' \
+              'apps/ios/enV/NativeVideoLinkRecorder.swift' \
+              'docs/video-link-screen-recording.md' \
+              'package.json' \
+              'scripts/check-video-link-recorder.mjs' \
+              'src/components/engines/video-link-recorder-engine.tsx' \
+              'src/lib/registry.ts' | sort)"
             if [[ "$actual_paths" != "$expected_paths" ]]; then
-              echo "main advanced with files outside the reviewed Android recorder follow-up; refusing to continue."
+              echo "main advanced with files outside the reviewed Video Link recorder scope; refusing to continue."
               printf '%s\n' "$actual_paths"
               exit 1
             fi
@@ -52,8 +61,34 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          git show origin/main:package.json > /tmp/enV-main-package.json
           cat .github/discovery-import/payload-*.b64 | base64 --decode | tar -xJf - -C .
           base64 --decode < .github/discovery-import/amendments.b64 | tar -xJf - -C .
+          cp package.json /tmp/enV-archive-package.json
+          cp /tmp/enV-main-package.json package.json
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const main = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          const imported = JSON.parse(fs.readFileSync("/tmp/enV-archive-package.json", "utf8"));
+          const stable = (value) => Array.isArray(value)
+            ? value.map(stable)
+            : value && typeof value === "object"
+              ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, stable(value[key])]))
+              : value;
+          const { scripts: mainScripts, ...mainRest } = main;
+          const { scripts: importedScripts, ...importedRest } = imported;
+          if (JSON.stringify(stable(mainRest)) !== JSON.stringify(stable(importedRest))) {
+            throw new Error("Discovery import package.json changes fields outside scripts; refusing to overwrite current main package metadata.");
+          }
+          main.scripts ??= {};
+          for (const [name, command] of Object.entries(importedScripts ?? {})) {
+            if (main.scripts[name] !== undefined && main.scripts[name] !== command) {
+              throw new Error("Conflicting package script " + name + "; refusing to replace current main command.");
+            }
+            main.scripts[name] = command;
+          }
+          fs.writeFileSync("package.json", JSON.stringify(main, null, 2) + "\n");
+          NODE
           rm -rf .github/discovery-import
 
       - name: Set up the repository Node.js version
