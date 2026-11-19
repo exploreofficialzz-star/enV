@@ -121,6 +121,14 @@ jobs:
           xcodebuild -version
           xcode-select -p
           xcodebuild -showsdks | grep -E 'iOS|iOS Simulator'
+      - name: Inspect iOS ScreenCaptureKit SDK
+        run: |
+          sdk_path="$(xcrun --sdk iphonesimulator --show-sdk-path)"
+          framework="$sdk_path/System/Library/Frameworks/ScreenCaptureKit.framework"
+          echo "iOS Simulator SDK: $sdk_path"
+          test -d "$framework"
+          test -f "$framework/Modules/module.modulemap"
+          sed -n '1,80p' "$framework/Modules/module.modulemap"
       - name: Build SwiftUI app for iOS Simulator
         run: |
           xcodebuild \
@@ -131,6 +139,7 @@ jobs:
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$RUNNER_TEMP/env-ios-derived-data" \
             CODE_SIGNING_ALLOWED=NO \
+            SWIFT_ENABLE_EXPLICIT_MODULES=NO \
             build
       - name: Select an available iPhone Simulator
         run: |
