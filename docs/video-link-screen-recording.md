@@ -21,16 +21,18 @@ A valid provider URL only identifies the intended platform. It does not guarante
 ### Web
 
 - Validates HTTPS post URLs against the provider allowlist and rejects direct media-file URLs.
-- Opens the original post in a separate browser tab or the platform's installed app when the browser/OS chooses that route.
-- Uses `navigator.mediaDevices.getDisplayMedia()` and `MediaRecorder` to record the display, window or browser tab selected by the user in the browser's own capture prompt.
-- Offers local preview and save after the recording is finalized. It preserves the actual container produced by the browser (MP4 where supported; otherwise WebM).
-- Requires HTTPS, a user gesture, a supported browser and explicit capture permission on every recording. Some mobile browsers do not expose display capture; users should use the native enV app instead.
-- Includes source audio only when the browser supplies an audio track for the selected capture source.
+- Opens the exact pasted post URL in a separate browser tab on supported desktop browsers.
+- Uses `navigator.mediaDevices.getDisplayMedia()` and `MediaRecorder` to capture the tab or display explicitly selected by the user.
+- On Android browsers without display-capture support, hands the exact URL to the installed enV app using the `env://tool/video-link-screen-recording` deep link.
+- Offers local preview and save after browser capture finalizes. The browser output remains in its actual supported container (MP4 where available; otherwise WebM).
+- Requires HTTPS, a user gesture, a supported browser and explicit capture permission. Mobile browser capture is not silently substituted for native capture.
+- Includes source audio only when the browser supplies an audio track for the selected source.
 
 ### Android
 
 - Kotlin uses `MediaProjectionManager.createScreenCaptureIntent()` and the system consent prompt.
-- After consent, a foreground `mediaProjection` service records the full screen to MP4 with `MediaRecorder`, then opens the supplied original post URL in its installed platform app or browser.
+- After consent, a foreground `mediaProjection` service records the full screen to MP4 with `MediaRecorder`, then opens the unchanged supplied post URL in an Android Custom Tab. This keeps the browser on the exact shared-post route instead of handing the URL to an installed social app's app-link handler.
+- The enV Android deep link opens this native tool directly and pre-fills the pasted post URL.
 - Users stop capture in enV or from the persistent capture notification. Final MP4 files are saved to `Movies/enV` on Android 10+ (or the app-specific Movies directory on older supported versions).
 - Android requires the `FOREGROUND_SERVICE_MEDIA_PROJECTION` permission and a foreground service declared with `foregroundServiceType="mediaProjection"`. A projection token is used for one capture session and is not reused.
 - This implementation currently records screen video but does not mux source-app playback audio. Android can capture another app's playback audio only when that source app's usage and capture policy allow it; protected or opted-out audio is unavailable. This is an explicit limitation, not a silent audio claim.
@@ -38,9 +40,8 @@ A valid provider URL only identifies the intended platform. It does not guarante
 
 ### iOS
 
-- Swift validates the provider URL and opens the original link using the system URL handler, allowing iOS to choose the installed social app or browser.
-- The current native deployment target is iOS 16.4. It guides the user to the built-in Control Center Screen Recording control, which records the full display and saves the finished video to Photos.
-- iOS owns the system recording permission, start/stop controls, and the output destination. enV does not claim it can programmatically start or stop another app's full-display recording from the current deployment target.
+- Swift validates the provider URL and displays that exact URL in an in-app `SFSafariViewController`, avoiding automatic handoff to a social app's universal-link handler.
+- iOS owns system-wide screen-recording permission, start/stop controls and the Photos destination. enV cannot silently start or stop an iOS full-display recording from the current deployment target.
 - Protected content and source-app audio restrictions remain controlled by iOS and the source platform.
 
 ## Privacy, safety and fidelity
