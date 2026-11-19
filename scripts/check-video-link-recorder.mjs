@@ -21,6 +21,7 @@ const androidMain = read("apps/android/app/src/main/java/com/chastech/env/MainAc
 const androidManifest = read("apps/android/app/src/main/AndroidManifest.xml");
 const swift = read("apps/ios/enV/NativeVideoLinkRecorder.swift");
 const iosCatalog = read("apps/ios/enV/CatalogCore.swift");
+const iosRouter = read("apps/ios/enV/NativeZipArchiveView.swift");
 const docs = read("docs/video-link-screen-recording.md");
 
 assert.match(registry, new RegExp('id: "' + ID + '"'));
@@ -64,6 +65,7 @@ assert.match(swift, /Screen Recording/);
 assert.match(swift, /Photos/);
 assert.doesNotMatch(swift, /fileImporter|NativeVideoLinkService|url-media\/download|Choose a video from this device/);
 assert.match(iosCatalog, /includingVideoLinkScreenRecording/);
+assert.match(iosRouter, /tool\.id == "video-link-screen-recording"[\s\S]*?NativeVideoLinkRecorderView\(\)/);
 
 for (const platform of ["TikTok", "Instagram", "Facebook", "YouTube", "X"]) {
   assert.ok(policy.includes(platform), "shared policy recognizes " + platform);
