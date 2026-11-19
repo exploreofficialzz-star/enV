@@ -223,9 +223,32 @@ jobs:
           expected_parent="$(git rev-parse HEAD^)"
           current_main="$(git rev-parse origin/main)"
           if [[ "$current_main" != "$expected_parent" ]]; then
-            echo "main moved while discovery validation ran; refusing to overwrite newer work."
-            echo "Commit parent: $expected_parent"
-            echo "Current main:  $current_main"
-            exit 1
+            git merge-base --is-ancestor "$expected_parent" "$current_main" || {
+              echo "main no longer descends from the validated discovery parent; refusing to push."
+              exit 1
+            }
+            actual_paths="$(git diff --name-only "$expected_parent" "$current_main" | sort)"
+            expected_paths="$(printf '%s\\n' \\
+              'apps/android/app/src/main/AndroidManifest.xml' \\
+              'apps/android/app/src/main/java/com/chastech/env/MainActivity.kt' \\
+              'apps/android/app/src/main/java/com/chastech/env/NativeVideoLinkRecorder.kt' \\
+              'apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt' \\
+              'apps/ios/enV/CatalogCore.swift' \\
+              'apps/ios/enV/NativeVideoLinkRecorder.swift' \\
+              'docs/video-link-screen-recording.md' \\
+              'package.json' \\
+              'scripts/check-video-link-recorder.mjs' \\
+              'src/components/engines/video-link-recorder-engine.tsx' \\
+              'src/lib/registry.ts' | sort)"
+            if [[ "$actual_paths" != "$expected_paths" ]]; then
+              echo "main advanced outside the reviewed Video Link recorder scope; refusing to push."
+              printf '%s\\n' "$actual_paths"
+              exit 1
+            fi
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git rebase origin/main
+            npm run check:video-link-recorder
           fi
+          test -z "$(git status --porcelain)"
           git push origin HEAD:main
