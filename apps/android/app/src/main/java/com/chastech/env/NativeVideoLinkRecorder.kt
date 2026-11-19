@@ -5,9 +5,11 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.media.MediaRecorder
@@ -37,6 +39,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -95,6 +98,27 @@ fun NativeVideoLinkRecorderScreen() {
     var status by rememberSaveable { mutableStateOf("Paste a supported social-media post link to begin.") }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     var isRecording by rememberSaveable { mutableStateOf(false) }
+
+    DisposableEffect(context) {
+        val captureResultReceiver = object : BroadcastReceiver() {
+            override fun onReceive(receiverContext: Context?, result: Intent?) {
+                if (result?.action != VideoLinkCaptureService.ACTION_RESULT) return
+                val saved = result.getBooleanExtra(VideoLinkCaptureService.EXTRA_SAVED, false)
+                val message = result.getStringExtra(VideoLinkCaptureService.EXTRA_MESSAGE)
+                    ?: if (saved) "Recording saved." else "Recording could not be saved."
+                isRecording = false
+                status = message
+                error = if (saved) null else message
+            }
+        }
+        ContextCompat.registerReceiver(
+            context,
+            captureResultReceiver,
+            IntentFilter(VideoLinkCaptureService.ACTION_RESULT),
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
+        onDispose { context.unregisterReceiver(captureResultReceiver) }
+    }
 
     val projectionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -196,7 +220,8 @@ fun NativeVideoLinkRecorderScreen() {
                             .setAction(VideoLinkCaptureService.ACTION_STOP)
                     )
                     isRecording = false
-                    status = "Recording finalized. The MP4 is saved in Movies/enV."
+                    error = null
+                    status = "Finishing the MP4 recording…"
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -224,6 +249,9 @@ class VideoLinkCaptureService : Service() {
     companion object {
         const val ACTION_START = "com.chastech.env.videolink.START"
         const val ACTION_STOP = "com.chastech.env.videolink.STOP"
+        const val ACTION_RESULT = "com.chastech.env.videolink.RESULT"
+        const val EXTRA_SAVED = "capture_saved"
+        const val EXTRA_MESSAGE = "capture_message"
         const val EXTRA_RESULT_CODE = "projection_result_code"
         const val EXTRA_PROJECTION_DATA = "projection_data"
         private const val CHANNEL_ID = "video_link_capture"
@@ -396,14 +424,24 @@ class VideoLinkCaptureService : Service() {
                         contentResolver.update(uri, values, null, null)
                     }
                 }
-                updateNotification("Recording saved as an MP4 in Movies/enV")
+                val message = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    "Recording saved as an MP4 in Movies/enV."
+                } else {
+                    "Recording saved to enV's app-specific Movies folder."
+                }
+                updateNotification(message)
+                sendCaptureResult(saved = true, message = message)
             } else {
                 deletePartialOutput()
-                updateNotification("Recording could not be finalized. Try a longer capture.")
+                val message = "Recording could not be finalized. Try a longer capture."
+                updateNotification(message)
+                sendCaptureResult(saved = false, message = message)
             }
         } catch (_: Exception) {
             deletePartialOutput()
-            updateNotification("Recording could not be saved.")
+            val message = "Recording could not be saved."
+            updateNotification(message)
+            sendCaptureResult(saved = false, message = message)
         } finally {
             val activeProjection = projection
             projection = null
@@ -425,6 +463,7 @@ class VideoLinkCaptureService : Service() {
         virtualDisplay = null
         deletePartialOutput()
         updateNotification(message.take(100))
+        sendCaptureResult(saved = false, message = message)
         val activeProjection = projection
         projection = null
         projectionCallback?.let { callback ->
@@ -472,6 +511,15 @@ class VideoLinkCaptureService : Service() {
             )
         )
         .build()
+
+    private fun sendCaptureResult(saved: Boolean, message: String) {
+        sendBroadcast(
+            Intent(ACTION_RESULT)
+                .setPackage(packageName)
+                .putExtra(EXTRA_SAVED, saved)
+                .putExtra(EXTRA_MESSAGE, message)
+        )
+    }
 
     private fun updateNotification(message: String) {
         getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(message))
