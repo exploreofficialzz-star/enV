@@ -102,11 +102,10 @@ private final class NativePostInterfaceCaptureController: NSObject, ObservableOb
             let output = SCRecordingOutput(configuration: outputConfiguration, delegate: self)
             let newStream = SCStream(filter: filter, configuration: streamConfiguration, delegate: self)
             try newStream.addRecordingOutput(output)
-            try await newStream.startCapture()
-
             stream = newStream
             recordingOutput = output
             recordingURL = outputURL
+            try await newStream.startCapture()
             isPreparing = false
             isRecording = true
             message = "Recording the full display."
@@ -189,16 +188,23 @@ private final class NativePostInterfaceCaptureController: NSObject, ObservableOb
     func recordingOutputDidStartRecording(_ recordingOutput: SCRecordingOutput) {}
 
     func recordingOutputDidFinishRecording(_ recordingOutput: SCRecordingOutput) {
-        finishContinuation?.resume()
-        finishContinuation = nil
+        Task { @MainActor in
+            guard let continuation = finishContinuation else { return }
+            finishContinuation = nil
+            continuation.resume()
+        }
     }
 
     func recordingOutput(_ recordingOutput: SCRecordingOutput, didFailWithError error: Error) {
-        finishContinuation?.resume(throwing: error)
-        finishContinuation = nil
         Task { @MainActor in
+            if let continuation = finishContinuation {
+                finishContinuation = nil
+                continuation.resume(throwing: error)
+            }
             failure = error.localizedDescription
             isPreparing = false
+            isRecording = false
+            isStopping = false
         }
     }
 
@@ -266,7 +272,7 @@ private struct NativePostCaptureControls: View {
     }
 }
 
-/// iOS presents the original post in an in-app browser. Screen recording remains OS-controlled.
+/// iOS uses the OS screen-sharing picker on iOS 27+; earlier versions retain manual Control Center capture.
 struct NativeVideoLinkRecorderView: View {
     @State private var postLink = ""
     @State private var provider = ""
