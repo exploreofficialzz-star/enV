@@ -187,7 +187,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         NativeAdsPrivacyManager.refreshConsent(this)
-        val initialToolId = intent?.data?.takeIf { it.scheme == "env" && it.host == "tool" }?.pathSegments?.firstOrNull()
+        val toolLaunchUri = intent?.data?.takeIf { it.scheme == "env" && it.host == "tool" }
+        val initialToolId = toolLaunchUri?.pathSegments?.firstOrNull()
+        val initialPostUrl = toolLaunchUri?.getQueryParameter("postUrl").orEmpty()
         val favorites = FavoritesStore(applicationContext)
         setContent {
             var themeMode by rememberSaveable { mutableStateOf(favorites.getThemeMode()) }
@@ -214,6 +216,7 @@ class MainActivity : ComponentActivity() {
                     },
                     onExit = { finishAffinity() },
                     initialToolId = initialToolId,
+                    initialPostUrl = initialPostUrl,
                 )
             }
         }
@@ -221,7 +224,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun CatalogGate(favorites: FavoritesStore, darkMode: Boolean, themeMode: String, onUseSystemTheme: () -> Unit, onExit: () -> Unit, initialToolId: String? = null) {
+private fun CatalogGate(favorites: FavoritesStore, darkMode: Boolean, themeMode: String, onUseSystemTheme: () -> Unit, onExit: () -> Unit, initialToolId: String? = null, initialPostUrl: String = "") {
     val context = LocalContext.current.applicationContext
     var catalog by remember { mutableStateOf<Catalog?>(null) }
     var loadFailed by remember { mutableStateOf(false) }
@@ -237,7 +240,7 @@ private fun CatalogGate(favorites: FavoritesStore, darkMode: Boolean, themeMode:
         result.getOrNull()?.let { catalog = it } ?: run { loadFailed = true }
     }
     when {
-        catalog != null -> EnVApp(catalog!!, favorites, darkMode, themeMode, onUseSystemTheme, initialToolId)
+        catalog != null -> EnVApp(catalog!!, favorites, darkMode, themeMode, onUseSystemTheme, initialToolId, initialPostUrl)
         loadFailed -> CatalogFailureScreen(darkMode) { retryCount += 1 }
         else -> NativeLaunchScreen(darkMode, onExit)
     }
@@ -297,7 +300,7 @@ private fun ToolRecord.isUnderProduction(): Boolean =
 private enum class AppTab { Home, Tools, Search, Saved, Account, Assistant }
 
 @Composable
-private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolean, themeMode: String, onUseSystemTheme: () -> Unit, initialToolId: String? = null) {
+private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolean, themeMode: String, onUseSystemTheme: () -> Unit, initialToolId: String? = null, initialPostUrl: String = "") {
     val context = LocalContext.current
     var tab by rememberSaveable { mutableStateOf(AppTab.Home.name) }
     var query by rememberSaveable { mutableStateOf("") }
@@ -1427,7 +1430,7 @@ private fun NativeToolForm(tool: ToolRecord, onRelatedTool: (String) -> Unit, st
     if (tool.category == "files" && tool.engine.type == "custom") { NativeFileWorkspaceScreen(tool.id); return }
     if (tool.id == "camera-studio") { NativeCameraStudioScreen(); return }
     if (tool.id == "music-downloader") { NativeMusicDownloaderScreen(); return }
-    if (tool.id == "video-link-screen-recording") { NativeVideoLinkRecorderScreen(); return }
+    if (tool.id == "video-link-screen-recording") { NativeVideoLinkRecorderScreen(initialPostUrl); return }
     if (tool.id == "song-metadata-analyzer" || tool.id == "audio-analyze-studio") { NativeMusicDataSandboxScreen(startInWorkspace); return }
     when (tool.engine.type) {
         "business" -> NativeBusinessToolForm(tool)
