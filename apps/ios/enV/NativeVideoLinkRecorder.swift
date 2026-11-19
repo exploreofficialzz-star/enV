@@ -178,10 +178,8 @@ private final class NativePostInterfaceCaptureController: NSObject, ObservableOb
     }
 
     private func tearDownStream() async {
-        if let activeStream = stream {
-            if activeStream.isRunning {
-                try? await activeStream.stopCapture()
-            }
+        if let activeStream = stream, activeStream.isCapturing {
+            try? await activeStream.stopCapture()
         }
         stream = nil
         recordingOutput = nil
