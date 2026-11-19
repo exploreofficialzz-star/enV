@@ -1,23 +1,37 @@
 package com.chastech.env
 
+import android.app.Activity
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
+import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
+import android.hardware.display.DisplayManager
+import android.hardware.display.VirtualDisplay
+import android.media.MediaRecorder
+import android.media.projection.MediaProjection
+import android.media.projection.MediaProjectionManager
 import android.net.Uri
-import android.provider.OpenableColumns
-import android.widget.MediaController
-import android.widget.VideoView
+import android.os.Build
+import android.os.Environment
+import android.os.Handler
+import android.os.IBinder
+import android.os.Looper
+import android.util.DisplayMetrics
+import android.view.Surface
+import android.view.WindowManager
+import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -26,335 +40,442 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import java.io.File
-import java.io.FileOutputStream
-import java.net.HttpURLConnection
-import java.net.URI
-import java.net.URL
 import java.util.Locale
-import java.util.UUID
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.json.JSONObject
 
-private const val VIDEO_LINK_MAX_BYTES = 500L * 1024L * 1024L
+private data class VideoPostLink(val uri: Uri, val provider: String)
 
-internal sealed interface VideoLinkParse {
-    data class Accepted(val url: String, val host: String, val platformLabel: String) : VideoLinkParse
-    data class Rejected(val reason: String) : VideoLinkParse
-}
-
-private val videoLinkProtectedPlatforms = listOf(
-    "Netflix" to listOf("netflix.com"),
-    "Disney+" to listOf("disneyplus.com", "hotstar.com"),
-    "Prime Video" to listOf("primevideo.com"),
-    "Max" to listOf("max.com", "hbomax.com"),
-    "Hulu" to listOf("hulu.com"),
-    "Apple TV" to listOf("tv.apple.com"),
-    "Peacock" to listOf("peacocktv.com"),
-    "Paramount+" to listOf("paramountplus.com"),
-    "Crunchyroll" to listOf("crunchyroll.com"),
-)
-
-private val videoLinkKnownPlatforms = listOf(
-    "YouTube" to listOf("youtube.com", "youtu.be", "youtube-nocookie.com"),
-    "Vimeo" to listOf("vimeo.com"),
-    "Dailymotion" to listOf("dailymotion.com", "dai.ly"),
+private val videoLinkCaptureDomains = linkedMapOf(
     "TikTok" to listOf("tiktok.com"),
     "Instagram" to listOf("instagram.com"),
-    "Facebook" to listOf("facebook.com", "fb.watch", "fb.com"),
+    "Facebook" to listOf("facebook.com", "fb.watch"),
+    "YouTube" to listOf("youtube.com", "youtu.be"),
     "X" to listOf("x.com", "twitter.com"),
-    "Twitch" to listOf("twitch.tv"),
-    "Reddit" to listOf("reddit.com", "redd.it"),
+    "Snapchat" to listOf("snapchat.com"),
+    "Threads" to listOf("threads.net"),
     "LinkedIn" to listOf("linkedin.com"),
+    "Reddit" to listOf("reddit.com"),
+    "Twitch" to listOf("twitch.tv"),
+    "Vimeo" to listOf("vimeo.com"),
+    "Dailymotion" to listOf("dailymotion.com", "dai.ly"),
 )
 
-private fun videoLinkHostMatches(host: String, domains: List<String>): Boolean =
-    domains.any { host == it || host.endsWith("." + it) }
-
-internal fun parseVideoLinkNative(raw: String): VideoLinkParse {
+private fun parseVideoPostLink(raw: String): VideoPostLink {
     val trimmed = raw.trim()
-    if (trimmed.isEmpty()) return VideoLinkParse.Rejected("Paste a video link first.")
-    val candidate = if (Regex("^[A-Za-z][A-Za-z0-9+.-]*:").containsMatchIn(trimmed)) trimmed else "https://" + trimmed
-    val uri = try { URI(candidate) } catch (_: Exception) {
-        return VideoLinkParse.Rejected("That does not look like a complete video link.")
-    }
-    if (!"https".equals(uri.scheme, ignoreCase = true)) {
-        return VideoLinkParse.Rejected("Use a secure HTTPS link.")
-    }
-    if (!uri.rawUserInfo.isNullOrEmpty()) {
-        return VideoLinkParse.Rejected("Links containing a username or password are not accepted.")
-    }
-    val host = (uri.host ?: "").lowercase(Locale.ROOT).removePrefix("www.")
-    if (host.isBlank() || host.contains(":") || Regex("^\\d{1,3}(\\.\\d{1,3}){3}$").matches(host) ||
-        host == "localhost" || host.endsWith(".localhost") || host.endsWith(".local") ||
-        host.endsWith(".internal") || !host.contains(".")) {
-        return VideoLinkParse.Rejected("Local, private-network and IP-address links are not accepted.")
-    }
-    videoLinkProtectedPlatforms.firstOrNull { videoLinkHostMatches(host, it.second) }?.let {
-        return VideoLinkParse.Rejected(it.first + " protects its video with DRM. enV cannot export protected streams.")
-    }
-    val label = videoLinkKnownPlatforms.firstOrNull { videoLinkHostMatches(host, it.second) }?.first ?: host
-    return VideoLinkParse.Accepted(uri.toString(), host, label)
-}
-
-private fun videoProviderFor(host: String): String = when {
-    videoLinkHostMatches(host, listOf("youtube.com", "youtu.be", "youtube-nocookie.com")) -> "youtube"
-    videoLinkHostMatches(host, listOf("tiktok.com")) -> "tiktok"
-    videoLinkHostMatches(host, listOf("facebook.com", "fb.watch", "fb.com")) -> "facebook"
-    videoLinkHostMatches(host, listOf("instagram.com")) -> "instagram"
-    videoLinkHostMatches(host, listOf("x.com", "twitter.com")) -> "x"
-    else -> "generic"
-}
-
-private fun videoApiBase(): String {
-    val base = BuildConfig.ENV_API_BASE_URL.trimEnd('/')
-    require(base.startsWith("https://", ignoreCase = true)) { "The enV API must use HTTPS in release builds." }
-    require(base.isNotBlank()) { "The enV media service is not configured in this app build." }
-    return base
-}
-
-private fun apiErrorMessage(status: Int, body: String): String {
-    val json = runCatching { JSONObject(body) }.getOrNull()
-    val message = sequenceOf(json?.opt("error"), json?.opt("message"))
-        .filterIsInstance<String>().map { it.trim() }
-        .firstOrNull { it.isNotEmpty() && it.lowercase(Locale.ROOT) !in setOf("true", "false", "null") }
-    return message ?: "The enV media service returned HTTP " + status + ". Please try again."
-}
-
-private fun fetchVideoLink(url: String, host: String, context: Context): File {
-    val connection = URL(videoApiBase() + "/api/backend/url-media/download").openConnection() as HttpURLConnection
-    connection.requestMethod = "POST"
-    connection.connectTimeout = 20_000
-    connection.readTimeout = 300_000
-    connection.doOutput = true
-    connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-    connection.setRequestProperty("Accept", "video/mp4, video/*, application/octet-stream")
-    val payload = JSONObject()
-        .put("url", url)
-        .put("provider", videoProviderFor(host))
-        .put("format", "mp4")
-        .put("audioOnly", false)
-        .put("maxBytes", VIDEO_LINK_MAX_BYTES)
-    var partial: File? = null
-    try {
-        connection.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
-        val status = connection.responseCode
-        if (status !in 200..299) {
-            val body = connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
-            throw IllegalStateException(apiErrorMessage(status, body))
-        }
-        val mime = (connection.contentType ?: "").substringBefore(';').trim().lowercase(Locale.ROOT)
-        require(mime.startsWith("video/") || mime == "application/octet-stream" || mime == "binary/octet-stream") {
-            "The media service response was not a video file."
-        }
-        val destination = File(context.cacheDir, "enV-video-" + UUID.randomUUID() + ".mp4")
-        partial = destination
-        var count = 0L
-        connection.inputStream.buffered().use { input ->
-            FileOutputStream(destination).buffered().use { output ->
-                val buffer = ByteArray(64 * 1024)
-                while (true) {
-                    val read = input.read(buffer)
-                    if (read < 0) break
-                    count += read
-                    require(count <= VIDEO_LINK_MAX_BYTES) { "The video is larger than the 500 MB limit." }
-                    output.write(buffer, 0, read)
-                }
-            }
-        }
-        require(destination.length() > 0L) { "The media service returned an empty video." }
-        return destination
-    } catch (failure: Throwable) {
-        partial?.delete()
-        throw failure
-    } finally {
-        connection.disconnect()
-    }
-}
-
-private fun safeVideoName(raw: String): String =
-    raw.replace(Regex("[\\\\/:*?\"<>|\\u0000-\\u001f]"), "-").take(100).ifBlank { "video.mp4" }
-
-private fun copySelectedVideo(context: Context, uri: Uri): File {
-    val resolver = context.contentResolver
-    val name = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
-        if (cursor.moveToFirst()) cursor.getString(0) else null
-    } ?: "video"
-    val mime = (resolver.getType(uri) ?: "").lowercase(Locale.ROOT)
-    val extension = name.substringAfterLast('.', "").lowercase(Locale.ROOT)
-    val knownExtension = extension in setOf("mp4", "m4v", "mov", "webm", "ogv", "mkv", "avi", "3gp")
-    require(mime.startsWith("video/") || knownExtension) { "Choose a video file such as MP4, MOV, WebM or MKV." }
-    val destination = File(context.cacheDir, "enV-local-" + UUID.randomUUID() + "-" + safeVideoName(name))
-    var count = 0L
-    try {
-        val input = resolver.openInputStream(uri) ?: throw IllegalStateException("The selected video could not be opened.")
-        input.use { source ->
-            FileOutputStream(destination).buffered().use { output ->
-                val buffer = ByteArray(64 * 1024)
-                while (true) {
-                    val read = source.read(buffer)
-                    if (read < 0) break
-                    count += read
-                    require(count <= VIDEO_LINK_MAX_BYTES) { "Choose a video file smaller than 500 MB." }
-                    output.write(buffer, 0, read)
-                }
-            }
-        }
-        require(count > 0L) { "The selected video file is empty." }
-        return destination
-    } catch (failure: Throwable) {
-        destination.delete()
-        throw failure
-    }
+    require(trimmed.isNotEmpty()) { "Paste a supported social-media post link." }
+    val candidate = if (trimmed.startsWith("https://", ignoreCase = true)) trimmed else "https://$trimmed"
+    val uri = Uri.parse(candidate)
+    require(uri.scheme.equals("https", ignoreCase = true)) { "Paste a secure HTTPS social-media post link." }
+    require(uri.encodedUserInfo.isNullOrEmpty()) { "Links containing embedded login credentials are not accepted." }
+    require(uri.port == -1 || uri.port == 443) { "Custom ports are not supported for post links." }
+    val host = uri.host?.lowercase(Locale.ROOT)?.removePrefix("www.")
+        ?: throw IllegalArgumentException("That link is not valid.")
+    val provider = videoLinkCaptureDomains.entries.firstOrNull { (_, domains) ->
+        domains.any { host == it || host.endsWith(".$it") }
+    }?.key ?: throw IllegalArgumentException("This platform is not supported yet.")
+    return VideoPostLink(uri, provider)
 }
 
 @Composable
 fun NativeVideoLinkRecorderScreen() {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var link by remember { mutableStateOf("") }
-    var rightsConfirmed by remember { mutableStateOf(false) }
-    var busy by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf("") }
-    var output by remember { mutableStateOf<File?>(null) }
-    var pendingSave by remember { mutableStateOf<File?>(null) }
+    var postUrl by rememberSaveable { mutableStateOf("") }
+    var provider by rememberSaveable { mutableStateOf("") }
+    var postUri by remember { mutableStateOf<Uri?>(null) }
+    var status by rememberSaveable { mutableStateOf("Paste a supported social-media post link to begin.") }
+    var error by rememberSaveable { mutableStateOf<String?>(null) }
+    var isRecording by rememberSaveable { mutableStateOf(false) }
 
-    val videoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            output?.delete()
-            output = null
-            link = ""
-            scope.launch {
-                busy = true
-                error = ""
-                status = "Preparing your video…"
-                val result = withContext(Dispatchers.IO) { runCatching { copySelectedVideo(context, uri) } }
-                result.onSuccess { output?.delete(); output = it; link = ""; status = "Your video is ready." }
-                    .onFailure { error = it.message ?: "The selected video could not be opened."; status = "" }
-                busy = false
+    val projectionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val data = result.data
+        if (result.resultCode == Activity.RESULT_OK && data != null) {
+            val serviceIntent = Intent(context, VideoLinkCaptureService::class.java).apply {
+                action = VideoLinkCaptureService.ACTION_START
+                putExtra(VideoLinkCaptureService.EXTRA_RESULT_CODE, result.resultCode)
+                putExtra(VideoLinkCaptureService.EXTRA_PROJECTION_DATA, data)
             }
+            runCatching { ContextCompat.startForegroundService(context, serviceIntent) }
+                .onSuccess {
+                    isRecording = true
+                    status = "Recording started. The original post is opening. Play the video and scroll through the details you want to keep."
+                    error = null
+                    postUri?.let { uri ->
+                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
+                            .onFailure { error = "Recording started, but the post link could not be opened. Switch to the post manually." }
+                    }
+                }
+                .onFailure {
+                    error = it.message ?: "Unable to start screen recording."
+                    status = "Capture did not start."
+                }
+        } else {
+            status = "Screen capture permission was cancelled."
         }
     }
 
-    val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { destination ->
-        val source = pendingSave
-        pendingSave = null
-        if (destination != null && source != null) {
-            scope.launch {
-                val result = withContext(Dispatchers.IO) {
-                    runCatching {
-                        context.contentResolver.openOutputStream(destination)?.use { target ->
-                            source.inputStream().buffered().use { input -> input.copyTo(target) }
-                        } ?: throw IllegalStateException("The save location could not be opened.")
-                    }
-                }
-                result.onSuccess { status = "Video saved successfully." }
-                    .onFailure { error = it.message ?: "The video could not be saved." }
+    fun validatedLink(): VideoPostLink? {
+        return runCatching { parseVideoPostLink(postUrl) }
+            .onSuccess {
+                provider = it.provider
+                error = null
             }
-        }
+            .onFailure {
+                error = it.message ?: "Paste a valid supported post link."
+            }
+            .getOrNull()
     }
 
     Column(
-        modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text("Video Link Screen Recording", style = MaterialTheme.typography.titleMedium)
-                Text("Submit a video link or select a video file. enV prepares the video and shows the result here.", style = MaterialTheme.typography.bodyMedium)
-            }
-        }
-
-        OutlinedTextField(
-            value = link,
-            onValueChange = { link = it; error = ""; status = ""; output?.delete(); output = null },
-            label = { Text("Video link") },
-            placeholder = { Text("Paste a public video link") },
-            singleLine = true,
-            enabled = !busy,
-            modifier = Modifier.fillMaxWidth(),
+        Text(
+            "Record the original social-media post screen, including the video, creator details, engagement information and visible controls.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            Checkbox(checked = rightsConfirmed, onCheckedChange = { rightsConfirmed = it }, enabled = !busy)
-            Text("I own this video or have permission to save and use it.", style = MaterialTheme.typography.bodySmall)
+        OutlinedTextField(
+            value = postUrl,
+            onValueChange = {
+                postUrl = it
+                provider = ""
+                error = null
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isRecording,
+            label = { Text("Social-media post link") },
+            placeholder = { Text("Paste a TikTok, Instagram, Facebook, YouTube, X or other supported post link") },
+            singleLine = true
+        )
+        if (provider.isNotBlank()) {
+            Text("Platform: $provider", style = MaterialTheme.typography.labelMedium)
+        }
+        OutlinedButton(
+            onClick = {
+                val link = validatedLink() ?: return@OutlinedButton
+                runCatching {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, link.uri))
+                }.onFailure {
+                    error = "No app or browser could open this post link."
+                }
+            },
+            enabled = postUrl.isNotBlank() && !isRecording,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Open original post")
         }
         Button(
             onClick = {
-                error = ""
-                status = ""
-                val parsed = parseVideoLinkNative(link)
-                if (parsed is VideoLinkParse.Rejected) {
-                    error = parsed.reason
-                } else if (!rightsConfirmed) {
-                    error = "Confirm that you own this video or have permission to save and use it."
-                } else {
-                    val accepted = parsed as VideoLinkParse.Accepted
-                    output?.delete()
-                    output = null
-                    busy = true
-                    status = "Retrieving the original video…"
-                    scope.launch {
-                        val result = withContext(Dispatchers.IO) {
-                            runCatching { fetchVideoLink(accepted.url, accepted.host, context) }
-                        }
-                        result.onSuccess { output = it; status = "Your video is ready." }
-                            .onFailure { error = it.message ?: "The video could not be retrieved."; status = "" }
-                        busy = false
-                    }
-                }
+                val link = validatedLink() ?: return@Button
+                postUri = link.uri
+                val manager = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                projectionLauncher.launch(manager.createScreenCaptureIntent())
             },
-            enabled = !busy && link.isNotBlank(),
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text(if (busy) "Processing video…" else "Process video") }
-
-        OutlinedButton(
-            onClick = { videoPicker.launch(arrayOf("video/*")) },
-            enabled = !busy,
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("Choose a video from this device") }
-        Text("Selected files stay on this device and are not uploaded.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-
-        if (busy) Text(status, style = MaterialTheme.typography.bodyMedium)
-        if (output != null) {
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Your video", style = MaterialTheme.typography.titleSmall)
-                    AndroidView(
-                        modifier = Modifier.fillMaxWidth().height(230.dp),
-                        factory = { viewContext ->
-                            VideoView(viewContext).apply {
-                                tag = output!!.absolutePath
-                                setVideoURI(Uri.fromFile(output!!))
-                                setMediaController(MediaController(viewContext).also { it.setAnchorView(this) })
-                            }
-                        },
-                        update = { view ->
-                            if (view.tag != output!!.absolutePath) {
-                                view.tag = output!!.absolutePath
-                                view.setVideoURI(Uri.fromFile(output!!))
-                                view.setMediaController(MediaController(context).also { it.setAnchorView(view) })
-                            }
-                        },
+            enabled = postUrl.isNotBlank() && !isRecording,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Start recording and open post")
+        }
+        if (isRecording) {
+            Button(
+                onClick = {
+                    context.startService(
+                        Intent(context, VideoLinkCaptureService::class.java)
+                            .setAction(VideoLinkCaptureService.ACTION_STOP)
                     )
-                    Text(output!!.name, style = MaterialTheme.typography.bodySmall)
-                    Button(
-                        onClick = { pendingSave = output; saveLauncher.launch(safeVideoName(output!!.name)) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) { Text("Save video") }
-                }
+                    isRecording = false
+                    status = "Recording finalized. The MP4 is saved in Movies/enV."
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Stop and save recording")
             }
         }
+        if (error != null) {
+            Text(error!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+        }
+        Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Choose the entire screen in Android's permission prompt to include the original app layout and navigation. Android or the source app may block protected content. This build records screen video as MP4; source-app playback audio is not included.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
 
-        if (status.isNotBlank() && !busy) Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (error.isNotBlank()) Text(error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+/**
+ * Records the actual Android display through MediaProjection.
+ * It never reads social-app databases, cookies, or private post endpoints.
+ */
+class VideoLinkCaptureService : Service() {
+    companion object {
+        const val ACTION_START = "com.chastech.env.videolink.START"
+        const val ACTION_STOP = "com.chastech.env.videolink.STOP"
+        const val EXTRA_RESULT_CODE = "projection_result_code"
+        const val EXTRA_PROJECTION_DATA = "projection_data"
+        private const val CHANNEL_ID = "video_link_capture"
+        private const val NOTIFICATION_ID = 7214
+        private const val MAX_DURATION_MS = 10 * 60 * 1000
+    }
+
+    private var projection: MediaProjection? = null
+    private var projectionCallback: MediaProjection.Callback? = null
+    private var virtualDisplay: VirtualDisplay? = null
+    private var recorder: MediaRecorder? = null
+    private var outputUri: Uri? = null
+    private var outputFile: File? = null
+    private var outputDescriptor: android.os.ParcelFileDescriptor? = null
+    private var stopping = false
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            ACTION_STOP -> {
+                stopCapture()
+                return START_NOT_STICKY
+            }
+            ACTION_START -> {
+                if (projection != null || recorder != null) return START_STICKY
+                createNotificationChannel()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(
+                        NOTIFICATION_ID,
+                        buildNotification("Preparing screen capture"),
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+                    )
+                } else {
+                    startForeground(NOTIFICATION_ID, buildNotification("Preparing screen capture"))
+                }
+                @Suppress("DEPRECATION")
+                val projectionData = intent.getParcelableExtra<Intent>(EXTRA_PROJECTION_DATA)
+                val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED)
+                if (projectionData == null || resultCode != Activity.RESULT_OK) {
+                    failCapture("Screen-capture permission was not received.")
+                    return START_NOT_STICKY
+                }
+                startCapture(resultCode, projectionData)
+            }
+        }
+        return START_NOT_STICKY
+    }
+
+    private fun startCapture(resultCode: Int, data: Intent) {
+        try {
+            val manager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+            val activeProjection = manager.getMediaProjection(resultCode, data)
+                ?: throw IllegalStateException("Android did not provide a screen-capture session.")
+            projection = activeProjection
+
+            val metrics = DisplayMetrics()
+            @Suppress("DEPRECATION")
+            (getSystemService(Context.WINDOW_SERVICE) as WindowManager).defaultDisplay.getRealMetrics(metrics)
+            val sourceWidth = metrics.widthPixels.coerceAtLeast(16)
+            val sourceHeight = metrics.heightPixels.coerceAtLeast(16)
+            val scale = minOf(1.0, 1920.0 / maxOf(sourceWidth, sourceHeight))
+            val width = ((sourceWidth * scale).toInt() / 16 * 16).coerceAtLeast(16)
+            val height = ((sourceHeight * scale).toInt() / 16 * 16).coerceAtLeast(16)
+
+            prepareOutput()
+            val videoRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                MediaRecorder(this)
+            } else {
+                @Suppress("DEPRECATION")
+                MediaRecorder()
+            }
+            recorder = videoRecorder
+            videoRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE)
+            videoRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            videoRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264)
+            videoRecorder.setVideoSize(width, height)
+            videoRecorder.setVideoFrameRate(30)
+            videoRecorder.setVideoEncodingBitRate((width.toLong() * height * 2L).toInt().coerceIn(2_000_000, 7_000_000))
+            val descriptor = outputDescriptor
+            if (descriptor != null) {
+                videoRecorder.setOutputFile(descriptor.fileDescriptor)
+            } else {
+                videoRecorder.setOutputFile(requireNotNull(outputFile).absolutePath)
+            }
+            videoRecorder.setMaxDuration(MAX_DURATION_MS)
+            videoRecorder.setOnInfoListener { _, what, _ ->
+                if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED) stopCapture()
+            }
+            videoRecorder.prepare()
+
+            val callback = object : MediaProjection.Callback() {
+                override fun onStop() {
+                    if (!stopping) stopCapture()
+                }
+            }
+            projectionCallback = callback
+            // Android 14+ requires a registered callback before creating the virtual display.
+            activeProjection.registerCallback(callback, mainHandler)
+
+            val surface: Surface = videoRecorder.surface
+            virtualDisplay = activeProjection.createVirtualDisplay(
+                "enV Video Link Capture",
+                width,
+                height,
+                metrics.densityDpi,
+                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                surface,
+                null,
+                mainHandler
+            ) ?: throw IllegalStateException("Android could not create a display for screen recording.")
+
+            videoRecorder.start()
+            updateNotification("Recording screen · use Stop to finish")
+        } catch (error: Exception) {
+            failCapture(error.message ?: "Screen recording could not start.")
+        }
+    }
+
+    private fun prepareOutput() {
+        val fileName = "enV-Post-Interface-${System.currentTimeMillis()}.mp4"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val values = ContentValues().apply {
+                put(MediaStore.Video.Media.DISPLAY_NAME, fileName)
+                put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+                put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/enV")
+                put(MediaStore.Video.Media.IS_PENDING, 1)
+            }
+            val uri = contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
+                ?: throw IllegalStateException("Could not create an MP4 in device storage.")
+            outputUri = uri
+            outputDescriptor = contentResolver.openFileDescriptor(uri, "w")
+                ?: throw IllegalStateException("Could not open the output MP4.")
+        } else {
+            val directory = File(getExternalFilesDir(Environment.DIRECTORY_MOVIES), "enV")
+            if (!directory.exists() && !directory.mkdirs()) {
+                throw IllegalStateException("Could not create the app's Movies folder.")
+            }
+            outputFile = File(directory, fileName)
+        }
+    }
+
+    private fun stopCapture() {
+        if (stopping) return
+        stopping = true
+        var saved = false
+        try {
+            virtualDisplay?.release()
+            virtualDisplay = null
+            val currentRecorder = recorder
+            recorder = null
+            if (currentRecorder != null) {
+                try {
+                    currentRecorder.stop()
+                    saved = true
+                } catch (_: RuntimeException) {
+                    saved = false
+                } finally {
+                    runCatching { currentRecorder.reset() }
+                    runCatching { currentRecorder.release() }
+                }
+            }
+            outputDescriptor?.close()
+            outputDescriptor = null
+            if (saved) {
+                outputUri?.let { uri ->
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        val values = ContentValues().apply { put(MediaStore.Video.Media.IS_PENDING, 0) }
+                        contentResolver.update(uri, values, null, null)
+                    }
+                }
+                updateNotification("Recording saved as an MP4 in Movies/enV")
+            } else {
+                deletePartialOutput()
+                updateNotification("Recording could not be finalized. Try a longer capture.")
+            }
+        } catch (_: Exception) {
+            deletePartialOutput()
+            updateNotification("Recording could not be saved.")
+        } finally {
+            val activeProjection = projection
+            projection = null
+            projectionCallback?.let { callback ->
+                runCatching { activeProjection?.unregisterCallback(callback) }
+            }
+            projectionCallback = null
+            runCatching { activeProjection?.stop() }
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+            stopping = false
+        }
+    }
+
+    private fun failCapture(message: String) {
+        if (stopping) return
+        stopping = true
+        virtualDisplay?.release()
+        virtualDisplay = null
+        deletePartialOutput()
+        updateNotification(message.take(100))
+        val activeProjection = projection
+        projection = null
+        projectionCallback?.let { callback ->
+            runCatching { activeProjection?.unregisterCallback(callback) }
+        }
+        projectionCallback = null
+        runCatching { activeProjection?.stop() }
+        runCatching { recorder?.reset() }
+        runCatching { recorder?.release() }
+        recorder = null
+        runCatching { outputDescriptor?.close() }
+        outputDescriptor = null
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
+    private fun deletePartialOutput() {
+        outputUri?.let { runCatching { contentResolver.delete(it, null, null) } }
+        outputUri = null
+        outputFile?.let { if (it.exists()) it.delete() }
+        outputFile = null
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(
+            NotificationChannel(CHANNEL_ID, "Video link screen recording", NotificationManager.IMPORTANCE_LOW)
+        )
+    }
+
+    private fun buildNotification(message: String) = NotificationCompat.Builder(this, CHANNEL_ID)
+        .setSmallIcon(android.R.drawable.presence_video_online)
+        .setContentTitle("enV Video Link Screen Recording")
+        .setContentText(message)
+        .setOngoing(true)
+        .addAction(
+            android.R.drawable.ic_media_pause,
+            "Stop",
+            PendingIntent.getService(
+                this,
+                NOTIFICATION_ID,
+                Intent(this, VideoLinkCaptureService::class.java).setAction(ACTION_STOP),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        )
+        .build()
+
+    private fun updateNotification(message: String) {
+        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, buildNotification(message))
+    }
+
+    override fun onDestroy() {
+        if (!stopping && projection != null) stopCapture()
+        super.onDestroy()
     }
 }
