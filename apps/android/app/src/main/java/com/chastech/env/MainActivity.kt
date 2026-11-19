@@ -1318,7 +1318,7 @@ private fun NativeToolInterfaceContent(
             }
             tool.category == "communication" -> NativeCommunicationToolForm(tool.id)
             backend -> NativeBackendToolForm(tool, true)
-            supported -> NativeToolForm(tool, onRelatedTool, startInWorkspace)
+            supported -> NativeToolForm(tool, onRelatedTool, startInWorkspace, initialPostUrl)
             tool.status == "planned" -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 StatusPill("Coming soon")
                 Text("This tool is not yet implemented natively.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1424,7 +1424,7 @@ private fun RelatedToolCard(tool: ToolRecord, onClick: () -> Unit) {
 }
 
 @Composable
-private fun NativeToolForm(tool: ToolRecord, onRelatedTool: (String) -> Unit, startInWorkspace: Boolean = false) {
+private fun NativeToolForm(tool: ToolRecord, onRelatedTool: (String) -> Unit, startInWorkspace: Boolean = false, initialPostUrl: String = "") {
     if (tool.id == "a-book") { NativeABookScreen(); return }
     if (tool.id == "zip-any-file") { NativeZipArchiveScreen(); return }
     if (tool.category == "files" && tool.engine.type == "custom") { NativeFileWorkspaceScreen(tool.id); return }
