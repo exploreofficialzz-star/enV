@@ -92,7 +92,7 @@ private fun parseVideoPostLink(raw: String): VideoPostLink {
 }
 
 @Composable
-fun NativeVideoLinkRecorderScreen() {
+fun NativeVideoLinkRecorderScreen(initialPostUrl: String = "") {
     val context = LocalContext.current
     val initialProvider = remember(initialPostUrl) {
         initialPostUrl.takeIf { it.isNotBlank() }?.let { raw ->
