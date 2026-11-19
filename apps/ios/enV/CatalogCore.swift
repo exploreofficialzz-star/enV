@@ -441,7 +441,7 @@ extension Catalog {
             id: "video-link-screen-recording",
             name: "Video Link Screen Recording",
             slug: "video-link-screen-recording",
-            description: "Open a supported social-media post and record its real on-screen interface, including video, creator details, engagement and visible controls.",
+            description: "Record the currently open social-media post's real on-screen interface, including the video, creator details, likes, comments, captions and visible controls. Capture stays on-device; the original post must already be accessible in its platform app or browser.",
             category: "video",
             subcategory: "Screen recording",
             keywords: ["screen recording", "screen recorder", "social media", "record post", "video link", "likes", "comments", "captions", "youtube", "shorts", "tiktok", "instagram", "facebook", "x", "snapchat", "threads"],
