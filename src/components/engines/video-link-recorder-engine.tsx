@@ -268,7 +268,11 @@ export function VideoLinkRecorderEngine() {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {captureSupported ? (
+        {androidDevice ? (
+          <Button type="button" onClick={openNativeRecorder} disabled={isRecording || !postLink.trim()}>
+            Start recording
+          </Button>
+        ) : captureSupported ? (
           <>
             <Button type="button" variant="outline" onClick={openPost} disabled={isRecording || !postLink.trim()}>
               Open post
@@ -277,10 +281,6 @@ export function VideoLinkRecorderEngine() {
               Start recording
             </Button>
           </>
-        ) : androidDevice ? (
-          <Button type="button" onClick={openNativeRecorder} disabled={isRecording || !postLink.trim()}>
-            Start recording
-          </Button>
         ) : (
           <Button type="button" disabled>
             Start recording
