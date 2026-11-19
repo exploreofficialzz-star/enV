@@ -71,6 +71,8 @@ assert.match(swift, /Screen Recording/);
 assert.match(swift, /Photos/);
 assert.doesNotMatch(swift, /fileImporter|NativeVideoLinkService|url-media\/download|Choose a video from this device/);
 assert.match(iosCatalog, /includingVideoLinkScreenRecording/);
+assert.doesNotMatch(androidMain, /id != "video-link-screen-recording"/);
+assert.doesNotMatch(iosCatalog, /id != "video-link-screen-recording"/);
 assert.match(iosRouter, /tool\.id == "video-link-screen-recording"[\s\S]*?NativeVideoLinkRecorderView\(\)/);
 
 for (const platform of ["TikTok", "Instagram", "Facebook", "YouTube", "X"]) {
