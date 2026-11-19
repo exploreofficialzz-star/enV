@@ -1,3 +1,4 @@
+import { parseScreenRecordingPostLink } from "./video-link-recording.ts";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -216,4 +217,40 @@ test("popup features open a phone-sized window without an opener", () => {
   assert.match(features, /noopener/);
   assert.match(features, /noreferrer/);
   assert.match(features, /width=430/);
+});
+
+
+test("screen-recording policy accepts the supported original platform pages", () => {
+  const cases = [
+    ["https://www.tiktok.com/@creator/video/1234567890", "TikTok"],
+    ["https://www.instagram.com/reel/ABCdef12345/", "Instagram"],
+    ["https://www.facebook.com/reel/1234567890", "Facebook"],
+    ["https://www.youtube.com/shorts/abcdefghijk", "YouTube"],
+    ["https://x.com/creator/status/123456789", "X"],
+    ["https://www.snapchat.com/spotlight/example", "Snapchat"],
+    ["https://www.threads.net/@creator/post/example", "Threads"],
+    ["https://www.linkedin.com/posts/example", "LinkedIn"],
+    ["https://www.reddit.com/r/videos/comments/example", "Reddit"],
+    ["https://www.twitch.tv/videos/12345", "Twitch"],
+    ["https://vimeo.com/123456", "Vimeo"],
+    ["https://www.dailymotion.com/video/abcdef", "Dailymotion"],
+  ] as const;
+  for (const [url, label] of cases) {
+    const result = parseScreenRecordingPostLink(url);
+    assert.equal(result.ok, true, url);
+    if (result.ok) assert.equal(result.platformLabel, label);
+  }
+});
+
+test("screen-recording policy rejects direct media URLs, protected streaming services and unsafe hosts", () => {
+  for (const url of [
+    "https://cdn.example.com/video.mp4",
+    "https://evil-tiktok.com/@creator/video/1",
+    "https://tiktok.com.attacker.example/@creator/video/1",
+    "http://instagram.com/reel/ABCdef12345/",
+    "https://user:pass@x.com/creator/status/1",
+    "https://netflix.com/watch/123",
+  ]) {
+    assert.equal(parseScreenRecordingPostLink(url).ok, false, url);
+  }
 });
