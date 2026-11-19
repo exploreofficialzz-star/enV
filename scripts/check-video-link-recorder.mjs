@@ -29,7 +29,7 @@ assert.match(registry, new RegExp('id: "' + ID + '"'));
 const recorderToolBlock = (source, marker, close) => {
   const start = source.indexOf(marker);
   assert.notEqual(start, -1, "recorder catalog entry exists: " + marker);
-  const end = source.indexOf(close, start);
+  const end = source.indexOf("\n};", start);
   assert.notEqual(end, -1, "recorder catalog entry closes: " + marker);
   return source.slice(start, end);
 };
