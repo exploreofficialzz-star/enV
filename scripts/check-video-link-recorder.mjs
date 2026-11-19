@@ -26,7 +26,7 @@ const docs = read("docs/video-link-screen-recording.md");
 const offlinePolicy = read("src/lib/offline/local-operation-policy.mjs");
 
 assert.match(registry, new RegExp('id: "' + ID + '"'));
-assert.match(registry, /real on-screen interface/);
+assert.match(registry, /description: ""/);
 assert.match(router, /tool\.id === "video-link-screen-recording"[^\n]*VideoLinkRecorderEngine/);
 assert.match(preload, /video-link-recorder-engine/);
 assert.ok(offlinePolicy.includes('"' + ID + '"'), "the screen capture remains a local operation");
@@ -93,7 +93,7 @@ for (const platform of ["TikTok", "Instagram", "Facebook", "YouTube", "X"]) {
 
 assert.match(docs, /actual social-media post interface/i);
 assert.match(docs, /MediaProjection/i);
-assert.match(docs, /Control Center/i);
+assert.match(docs, /SFSafariViewController/);
 assert.match(docs, /does \*\*not\*\* download/i);
 
 console.log("Video Link Screen Recording original-interface capture checks passed.");
