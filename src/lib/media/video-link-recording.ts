@@ -20,6 +20,8 @@ export type VideoPlatformId =
   | "twitch"
   | "reddit"
   | "linkedin"
+  | "snapchat"
+  | "threads"
   | "direct"
   | "other";
 
@@ -79,6 +81,8 @@ const PLATFORM_DOMAINS: ReadonlyArray<{ id: VideoPlatformId; label: string; doma
   { id: "twitch", label: "Twitch", domains: ["twitch.tv"] },
   { id: "reddit", label: "Reddit", domains: ["reddit.com", "redd.it"] },
   { id: "linkedin", label: "LinkedIn", domains: ["linkedin.com"] },
+  { id: "snapchat", label: "Snapchat", domains: ["snapchat.com"] },
+  { id: "threads", label: "Threads", domains: ["threads.net"] },
 ];
 
 export const EMBED_ALLOW = "autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write";
@@ -290,6 +294,62 @@ export function parseVideoLink(raw: string, options: VideoLinkOptions = {}): Vid
     platformLabel: known?.label ?? host,
     kind: "platform-page",
     embedUrl: buildEmbedUrl(platform, parsed, host, options),
+  };
+}
+
+
+// ---------------------------------------------------------------------------------------------
+// Original-post interface capture
+// ---------------------------------------------------------------------------------------------
+
+export type ScreenRecordingPostValidation =
+  | { ok: true; url: string; host: string; provider: VideoPlatformId; platformLabel: string }
+  | { ok: false; reason: string; platform?: string };
+
+const SCREEN_RECORDING_POST_PLATFORMS: ReadonlyArray<{
+  id: VideoPlatformId;
+  label: string;
+  domains: readonly string[];
+}> = [
+  { id: "tiktok", label: "TikTok", domains: ["tiktok.com"] },
+  { id: "instagram", label: "Instagram", domains: ["instagram.com"] },
+  { id: "facebook", label: "Facebook", domains: ["facebook.com", "fb.watch", "fb.com"] },
+  { id: "youtube", label: "YouTube", domains: ["youtube.com", "youtu.be", "youtube-nocookie.com"] },
+  { id: "x", label: "X", domains: ["x.com", "twitter.com"] },
+  { id: "snapchat", label: "Snapchat", domains: ["snapchat.com"] },
+  { id: "threads", label: "Threads", domains: ["threads.net"] },
+  { id: "linkedin", label: "LinkedIn", domains: ["linkedin.com"] },
+  { id: "reddit", label: "Reddit", domains: ["reddit.com", "redd.it"] },
+  { id: "twitch", label: "Twitch", domains: ["twitch.tv"] },
+  { id: "vimeo", label: "Vimeo", domains: ["vimeo.com"] },
+  { id: "dailymotion", label: "Dailymotion", domains: ["dailymotion.com", "dai.ly"] },
+];
+
+/**
+ * Accepts public post-page links only. It deliberately rejects direct media URLs:
+ * this tool records the real platform page and never extracts or downloads source media.
+ */
+export function parseScreenRecordingPostLink(raw: string): ScreenRecordingPostValidation {
+  const parsed = parseVideoLink(raw);
+  if (!parsed.ok) return parsed;
+  if (parsed.kind !== "platform-page") {
+    return { ok: false, reason: "Paste the original social-media post page link, not a direct video-file URL." };
+  }
+  const provider = SCREEN_RECORDING_POST_PLATFORMS.find((item) =>
+    item.domains.some((domain) => hostMatches(parsed.host, domain)),
+  );
+  if (!provider) {
+    return {
+      ok: false,
+      reason: "This platform is not supported yet. Use a public TikTok, Instagram, Facebook, YouTube, X, Snapchat, Threads, LinkedIn, Reddit, Twitch, Vimeo or Dailymotion post.",
+    };
+  }
+  return {
+    ok: true,
+    url: parsed.url,
+    host: parsed.host,
+    provider: provider.id,
+    platformLabel: provider.label,
   };
 }
 

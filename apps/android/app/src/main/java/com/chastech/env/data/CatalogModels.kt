@@ -268,10 +268,10 @@ fun Catalog.withVideoLinkScreenRecording(): Catalog {
         id = "video-link-screen-recording",
         name = "Video Link Screen Recording",
         slug = "video-link-screen-recording",
-        description = "Retrieve a supported public video link as a video file, or preview and save a video selected from your device. Processing runs automatically.",
+        description = "Record the currently open social-media post's real on-screen interface, including the video, creator details, likes, comments, captions and visible controls. Capture stays on-device; the original post must already be accessible in its platform app or browser.",
         category = "video",
-        keywords = listOf("video link", "video retrieval", "save video", "video file", "video preview", "youtube", "tiktok", "instagram", "facebook", "vimeo", "x", "twitter", "reel", "short"),
-        tags = listOf("video", "video-retrieval", "link", "download", "local-file"),
+        keywords = listOf("screen recording", "screen recorder", "social media", "record post", "video link", "likes", "comments", "captions", "youtube", "shorts", "tiktok", "instagram", "facebook", "x", "snapchat", "threads"),
+        tags = listOf("video", "screen-recording", "social-media", "capture", "link", "local"),
         icon = "Video",
         popularity = 1100,
         featured = true,
@@ -281,7 +281,7 @@ fun Catalog.withVideoLinkScreenRecording(): Catalog {
         status = "active",
         related = listOf("video-url-downloader", "url-media-inspector", "video-trimmer", "video-file-inspector"),
         engine = EngineInfo("custom", "video-link-screen-recording"),
-        subcategory = "Video retrieval",
+        subcategory = "Screen recording",
     )
     val updated = tools + tool
     return copy(

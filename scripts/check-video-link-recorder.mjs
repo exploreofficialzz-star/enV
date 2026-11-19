@@ -1,4 +1,4 @@
-// Static parity and regression checks for the automatic Video Link media workflow.
+// Cross-platform acceptance contract for recording the original social-media post interface.
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -9,72 +9,83 @@ const read = (path) => {
   assert.ok(existsSync(full), path + " exists");
   return readFileSync(full, "utf8");
 };
+
 const ID = "video-link-screen-recording";
-const files = {
-  lib: "src/lib/media/video-link-recording.ts",
-  engine: "src/components/engines/video-link-recorder-engine.tsx",
-  android: "apps/android/app/src/main/java/com/chastech/env/NativeVideoLinkRecorder.kt",
-  swift: "apps/ios/enV/NativeVideoLinkRecorder.swift",
-};
-const src = Object.fromEntries(Object.entries(files).map(([key, path]) => [key, read(path)]));
-
-assert.match(read("src/lib/registry.ts"), new RegExp('id: "' + ID + '"'), "registry defines the tool");
-assert.match(read("src/lib/registry.ts"), /videoLinkScreenRecordingTool\]/, "registry exposes the tool");
-assert.match(read("src/components/tools/tool-engine.tsx"), new RegExp('tool\\.id === "' + ID + '"'), "tool-engine routes the tool");
-assert.match(read("src/lib/tool-engine-preload.ts"), /video-link-recorder-engine/, "preload knows the engine");
-assert.match(read("src/lib/offline/local-operation-policy.mjs"), new RegExp('"' + ID + '"'), "local-file capability remains available offline");
-
-assert.match(src.engine, /downloadUrlMedia\(/, "web engine uses enV URL-media processing");
-assert.match(src.engine, /type="file"/, "web engine accepts local video files");
-assert.match(src.engine, /parseVideoLink\(/, "web engine applies shared URL safety rules");
-assert.match(src.engine, /<video[\s\S]*controls/, "web engine previews the returned video");
-assert.match(src.engine, /downloadBlob\(/, "web engine exposes a save action");
-assert.doesNotMatch(src.engine, /getDisplayMedia|MediaRecorder|<iframe|window\.open/, "web engine does not embed pages or use manual screen capture");
-
-assert.match(src.android, /\/api\/backend\/url-media\/download/, "Android uses the existing URL-media endpoint");
-assert.match(src.android, /ActivityResultContracts\.OpenDocument/, "Android supports local video selection");
-assert.match(src.android, /VideoView\(/, "Android provides native video playback");
-assert.match(src.android, /CreateDocument/, "Android provides a save destination");
-assert.match(src.android, /rightsConfirmed/, "Android requires permission confirmation for link processing");
-assert.doesNotMatch(src.android, /WebView|MediaProjection|MediaRecorder|getDisplayMedia/, "Android does not display provider pages or screen-record");
-assert.match(read("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt"), /tool\.id ===? "video-link-screen-recording"[^\n]*NativeVideoLinkRecorderScreen\(\)/, "Android routes the catalog tool to its native screen");
-assert.match(read("apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt"), /withVideoLinkScreenRecording/, "Android catalog registers the tool");
-
+const registry = read("src/lib/registry.ts");
+const policy = read("src/lib/media/video-link-recording.ts");
+const web = read("src/components/engines/video-link-recorder-engine.tsx");
+const router = read("src/components/tools/tool-engine.tsx");
+const preload = read("src/lib/tool-engine-preload.ts");
+const android = read("apps/android/app/src/main/java/com/chastech/env/NativeVideoLinkRecorder.kt");
+const androidMain = read("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt");
 const androidManifest = read("apps/android/app/src/main/AndroidManifest.xml");
-assert.doesNotMatch(androidManifest, /VideoLinkRecordingService|FOREGROUND_SERVICE_MEDIA_PROJECTION/, "Android manifest no longer registers the obsolete screen-capture service");
-assert.equal(existsSync(join(root, "apps/android/app/src/main/java/com/chastech/env/VideoLinkRecordingService.kt")), false, "obsolete Android screen-capture service is removed");
-assert.doesNotMatch(read("apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt"), /likes, comments and controls/, "Android catalog copy describes the new media workflow");
+const swift = read("apps/ios/enV/NativeVideoLinkRecorder.swift");
+const iosCatalog = read("apps/ios/enV/CatalogCore.swift");
+const iosRouter = read("apps/ios/enV/NativeZipArchiveView.swift");
+const docs = read("docs/video-link-screen-recording.md");
+const offlinePolicy = read("src/lib/offline/local-operation-policy.mjs");
 
-assert.match(src.swift, /\/api\/backend\/url-media\/download/, "iOS uses the existing URL-media endpoint");
-assert.match(src.swift, /URLSession\.shared\.download/, "iOS retrieves the actual media response");
-assert.match(src.swift, /fileImporter\(/, "iOS supports local video selection");
-assert.match(src.swift, /VideoPlayer\(/, "iOS provides native video playback");
-assert.match(src.swift, /ShareLink\(/, "iOS provides file export");
-assert.match(src.swift, /rightsConfirmed/, "iOS requires permission confirmation for link processing");
-assert.doesNotMatch(src.swift, /WKWebView|RPScreenRecorder|ReplayKit|MediaRecorder/, "iOS does not embed provider pages or screen-record");
-assert.match(read("apps/ios/enV/ToolViews.swift"), /tool\.id == "video-link-screen-recording"[^\n]*NativeVideoLinkRecorderView\(\)/, "iOS routes the catalog tool to its native screen");
-assert.match(read("apps/ios/enV/CatalogCore.swift"), /includingVideoLinkScreenRecording/, "iOS catalog registers the tool");
-assert.ok((read("apps/ios/enV.xcodeproj/project.pbxproj").match(/NativeVideoLinkRecorder\.swift/g) ?? []).length >= 4, "Xcode project includes the native Swift file");
+assert.match(registry, new RegExp('id: "' + ID + '"'));
+assert.match(registry, /real on-screen interface/);
+assert.match(router, /tool\.id === "video-link-screen-recording"[^\n]*VideoLinkRecorderEngine/);
+assert.match(preload, /video-link-recorder-engine/);
+assert.ok(offlinePolicy.includes('"' + ID + '"'), "the screen capture remains a local operation");
 
-assert.doesNotMatch(read("apps/ios/enV/CatalogCore.swift"), /likes, comments and controls/, "iOS catalog copy describes the new media workflow");
+// Web must capture the actual display/tab; no downloader or local-file import path remains.
+assert.match(web, /navigator\.mediaDevices\.getDisplayMedia/);
+assert.match(web, /new MediaRecorder\(/);
+assert.match(web, /window\.open\(/);
+assert.match(web, /parseScreenRecordingPostLink/);
+assert.match(web, /downloadBlob\(output\.blob/);
+assert.doesNotMatch(web, /downloadUrlMedia|url-media\/download|type="file"|type='file'|Choose a video from this device|useUploadedFile/);
 
-const normalise = (list) => [...new Set(list)].sort().join(",");
-const tsDomains = [...src.lib
-  .slice(src.lib.indexOf("PROTECTED_VIDEO_PLATFORMS"), src.lib.indexOf("DIRECT_VIDEO_EXTENSIONS"))
-  .matchAll(/"([a-z0-9.-]+\.[a-z]{2,})"/g)].map((m) => m[1]);
-const ktBlock = src.android.slice(src.android.indexOf("videoLinkProtectedPlatforms"), src.android.indexOf("videoLinkKnownPlatforms"));
-const ktDomains = [...ktBlock.matchAll(/"([a-z0-9.-]+\.[a-z]{2,})"/g)].map((m) => m[1]);
-const swBlock = src.swift.slice(src.swift.indexOf("static let protectedPlatforms"), src.swift.indexOf("static let knownPlatforms"));
-const swDomains = [...swBlock.matchAll(/"([a-z0-9.-]+\.[a-z]{2,})"/g)].map((m) => m[1]);
-assert.ok(tsDomains.length >= 9, "web protected-platform list parsed");
-assert.equal(normalise(ktDomains), normalise(tsDomains), "Android protected-platform list matches web");
-assert.equal(normalise(swDomains), normalise(tsDomains), "iOS protected-platform list matches web");
+// Strict link policy recognizes platform posts, refuses direct media files and protected streaming services.
+for (const host of ["tiktok.com", "instagram.com", "facebook.com", "youtube.com", "x.com", "snapchat.com", "threads.net", "linkedin.com", "reddit.com", "twitch.tv", "vimeo.com", "dailymotion.com"]) {
+  assert.ok(policy.includes(host), "post-link policy includes " + host);
+}
+assert.match(policy, /parseScreenRecordingPostLink/);
+assert.match(policy, /direct-video/);
+assert.match(policy, /PROTECTED_VIDEO_PLATFORMS/);
 
-const route = read("processor/url-media-route.mjs");
-assert.match(route, /\/api\/backend\/url-media\/download/, "Render processor maps the URL-media download route");
-const providerRegistry = read("scripts/media/provider-registry.mjs");
-for (const provider of ["youtube", "tiktok", "facebook", "instagram", "x"]) {
-  assert.ok(providerRegistry.includes(provider), "URL-media provider registry includes " + provider);
+// Android must use OS MediaProjection consent and save real screen video as MP4.
+assert.match(android, /MediaProjectionManager/);
+assert.match(android, /createScreenCaptureIntent\(\)/);
+assert.match(android, /MediaRecorder\.OutputFormat\.MPEG_4/);
+assert.match(android, /FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION/);
+assert.match(android, /Environment\.DIRECTORY_MOVIES/);
+assert.match(android, /"enV"/);
+assert.match(android, /DisposableEffect\(context\)/);
+assert.match(android, /ContextCompat\.RECEIVER_NOT_EXPORTED/);
+assert.match(android, /sendCaptureResult\(saved = true/);
+assert.match(android, /sendCaptureResult\(saved = false/);
+assert.doesNotMatch(android, /Recording finalized\. The MP4 is saved/);
+assert.match(androidMain, /tool\.id == "video-link-screen-recording"[^\n]*NativeVideoLinkRecorderScreen\(\)/);
+assert.match(androidManifest, /FOREGROUND_SERVICE_MEDIA_PROJECTION/);
+assert.match(androidManifest, /android:name="\.VideoLinkCaptureService"/);
+assert.equal((androidManifest.match(/android:name="android\.permission\.FOREGROUND_SERVICE"/g) ?? []).length, 1);
+assert.doesNotMatch(android, /OpenDocument|copySelectedVideo|url-media\/download|Choose a video from this device/);
+
+// iOS opens the source URL and hands full-display recording to the real iOS system recorder.
+assert.match(swift, /struct NativeVideoLinkRecorderView/);
+assert.match(swift, /Open original post/);
+assert.match(swift, /Control Center/);
+assert.match(swift, /Screen Recording/);
+assert.match(swift, /Photos/);
+assert.doesNotMatch(swift, /fileImporter|NativeVideoLinkService|url-media\/download|Choose a video from this device/);
+assert.match(iosCatalog, /includingVideoLinkScreenRecording/);
+assert.match(androidMain, /id != "video-link-screen-recording"/, "Android does not falsely label remote post access as offline");
+assert.match(iosCatalog, /id != "video-link-screen-recording"/, "iOS does not falsely label remote post access as offline");
+assert.match(iosRouter, /tool\.id == "video-link-screen-recording"[\s\S]*?NativeVideoLinkRecorderView\(\)/);
+
+for (const platform of ["TikTok", "Instagram", "Facebook", "YouTube", "X"]) {
+  assert.ok(policy.includes(platform), "shared policy recognizes " + platform);
+  assert.ok(swift.includes(platform) && android.includes(platform),
+    "native platform implementations recognize " + platform);
 }
 
-console.log("Video Link automatic media workflow checks passed.");
+assert.match(docs, /actual social-media post interface/i);
+assert.match(docs, /MediaProjection/i);
+assert.match(docs, /Control Center/i);
+assert.match(docs, /does \*\*not\*\* download/i);
+
+console.log("Video Link Screen Recording original-interface capture checks passed.");
