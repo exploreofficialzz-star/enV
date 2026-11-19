@@ -99,7 +99,7 @@ export function VideoLinkRecorderEngine() {
 
   function openPost() {
     const resolved = parseLink();
-    if (!resolved) return;
+    if (!resolved) { startingRef.current = false; return; }
     setOutput(null);
     setNotice(null);
     const opened = window.open(resolved.url, "_blank");
@@ -215,6 +215,7 @@ export function VideoLinkRecorderEngine() {
       const extension = finalType.toLowerCase().includes("mp4") ? "mp4" : "webm";
       const duration = Math.max(0, Math.floor((Date.now() - startedAtRef.current) / 1000));
       releaseCapture();
+      startingRef.current = false;
       setIsRecording(false);
       setElapsedSeconds(duration);
       if (!blob.size) {
@@ -265,9 +266,9 @@ export function VideoLinkRecorderEngine() {
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium" htmlFor="social-post-recorder-link">Post link</label>
+        <label className="text-sm font-medium" htmlFor="video-post-recorder-link">Post link</label>
         <input
-          id="social-post-recorder-link"
+          id="video-post-recorder-link"
           className="w-full rounded-md border border-border bg-background px-3 py-2"
           type="url"
           value={postLink}
