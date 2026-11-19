@@ -39,10 +39,10 @@ A valid provider URL only identifies the intended platform. It does not guarante
 
 ### iOS
 
-- iOS 27+ uses Apple's ScreenCaptureKit system picker, restricted to a single display, then records the full display to MP4 through `SCRecordingOutput`.
+- On a physical device running iOS 27+, enV uses Apple's ScreenCaptureKit system picker. Choose the full display (not only the enV app) to record the complete screen to MP4 through `SCRecordingOutput`.
 - After capture begins, enV opens the exact post URL inside its in-app Safari view so the real platform page can be played while the full display is captured.
 - Users return to enV and stop the recording. enV waits for MP4 finalization and saves the result to Photos using add-only library authorization.
-- iOS 16.4–26 does not expose this ScreenCaptureKit full-display workflow. Those versions can still open the post, but full-display recording must be started manually with Control Center.
+- iOS 16.4–26 does not expose this ScreenCaptureKit full-display workflow. Those versions can still open the post, but full-display recording must be started manually with Control Center. The ScreenCaptureKit path is physical-device-only; the iOS Simulator uses a build-safe fallback. The app target includes Apple's `com.apple.developer.screen-recording` entitlement, which must be present in the provisioning profile used to install a device build.
 - Apple and the source platform control recording consent, protected content and available audio tracks.
 
 ## Privacy, safety and fidelity
@@ -67,5 +67,5 @@ A valid provider URL only identifies the intended platform. It does not guarante
 
 - Web browser tests: open each supported provider, choose the original post tab/full display, record playback and scrolling, handle cancelled permission, track-ended capture, browser audio absence, output preview and exported-file playback.
 - Android physical-device tests: MediaProjection consent, switching to installed platform apps, orientation changes, permission revocation, notification stop, storage failure, MP4 finalization and source-app playback audio availability.
-- iOS 27+ physical-device tests: approve the single-display picker, switch to the in-app post browser, verify full-display MP4 capture, stop and save to Photos. Also verify the documented manual Control Center fallback on iOS 16.4–26.
+- iOS 27+ physical-device tests: approve the system picker and choose the full display, switch to the in-app post browser, verify full-display MP4 capture, stop and save to Photos. Also verify the documented manual Control Center fallback on iOS 16.4–26.
 - Provider tests must use public test posts and record the exact provider/device/browser/OS result. URL recognition alone is not provider acceptance.
