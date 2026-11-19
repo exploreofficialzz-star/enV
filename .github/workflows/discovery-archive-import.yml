@@ -61,6 +61,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          git show a0c526a98a5c224cffbffae7b71e944300d51e45:package.json > /tmp/enV-base-package.json
           git show origin/main:package.json > /tmp/enV-main-package.json
           cat .github/discovery-import/payload-*.b64 | base64 --decode | tar -xJf - -C .
           base64 --decode < .github/discovery-import/amendments.b64 | tar -xJf - -C .
@@ -68,6 +69,7 @@ jobs:
           cp /tmp/enV-main-package.json package.json
           node --input-type=module <<'NODE'
           import fs from "node:fs";
+          const base = JSON.parse(fs.readFileSync("/tmp/enV-base-package.json", "utf8"));
           const main = JSON.parse(fs.readFileSync("package.json", "utf8"));
           const imported = JSON.parse(fs.readFileSync("/tmp/enV-archive-package.json", "utf8"));
           const stable = (value) => Array.isArray(value)
@@ -75,17 +77,39 @@ jobs:
             : value && typeof value === "object"
               ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, stable(value[key])]))
               : value;
+          const { scripts: baseScripts, ...baseRest } = base;
           const { scripts: mainScripts, ...mainRest } = main;
           const { scripts: importedScripts, ...importedRest } = imported;
           if (JSON.stringify(stable(mainRest)) !== JSON.stringify(stable(importedRest))) {
             throw new Error("Discovery import package.json changes fields outside scripts; refusing to overwrite current main package metadata.");
           }
+          const isSubsequence = (needle, haystack) => {
+            let index = 0;
+            for (const value of haystack) if (value === needle[index]) index += 1;
+            return index === needle.length;
+          };
           main.scripts ??= {};
           for (const [name, command] of Object.entries(importedScripts ?? {})) {
-            if (main.scripts[name] !== undefined && main.scripts[name] !== command) {
+            const current = main.scripts[name];
+            if (current === undefined) {
+              main.scripts[name] = command;
+              continue;
+            }
+            if (current === command) continue;
+            if (name !== "verify") {
               throw new Error("Conflicting package script " + name + "; refusing to replace current main command.");
             }
-            main.scripts[name] = command;
+            const baseSteps = (baseScripts.verify ?? "").split(" && ");
+            const importedSteps = command.split(" && ");
+            const mainSteps = current.split(" && ");
+            if (!isSubsequence(baseSteps, importedSteps) || !isSubsequence(baseSteps, mainSteps)) {
+              throw new Error("The verify script changed beyond additive steps; refusing an unsafe package merge.");
+            }
+            const additions = importedSteps.filter((step) => !baseSteps.includes(step) && !mainSteps.includes(step));
+            const insertAt = mainSteps.indexOf("npm test");
+            if (insertAt < 0) throw new Error("Cannot locate npm test in main verify script.");
+            mainSteps.splice(insertAt, 0, ...additions);
+            main.scripts.verify = mainSteps.join(" && ");
           }
           fs.writeFileSync("package.json", JSON.stringify(main, null, 2) + "\n");
           NODE
