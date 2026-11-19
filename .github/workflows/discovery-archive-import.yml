@@ -207,6 +207,13 @@ jobs:
           while IFS= read -r -d '' path; do
             git restore --worktree -- "$path"
           done < <(git diff --name-only -z)
+          git clean -fd -- \
+            docs/seo-tool-inventory.md \
+            public/catalog-runtime \
+            public/llms.txt \
+            public/og \
+            public/robots.txt \
+            public/sitemap.xml
           git status --short
           git diff --cached --check
           git diff --cached --stat
