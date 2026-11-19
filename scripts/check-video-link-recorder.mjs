@@ -26,9 +26,16 @@ const docs = read("docs/video-link-screen-recording.md");
 const offlinePolicy = read("src/lib/offline/local-operation-policy.mjs");
 
 assert.match(registry, new RegExp('id: "' + ID + '"'));
-assert.match(registry, /const videoLinkScreenRecordingTool: ToolMeta = \\{[\\s\\S]*?description: ""/);
-assert.match(android, /id = "video-link-screen-recording"[\\s\\S]*?description = ""/);
-assert.match(iosCatalog, /id: "video-link-screen-recording"[\\s\\S]*?description: ""/);
+const recorderToolBlock = (source, marker, close) => {
+  const start = source.indexOf(marker);
+  assert.notEqual(start, -1, "recorder catalog entry exists: " + marker);
+  const end = source.indexOf(close, start);
+  assert.notEqual(end, -1, "recorder catalog entry closes: " + marker);
+  return source.slice(start, end);
+};
+assert.match(recorderToolBlock(registry, 'const videoLinkScreenRecordingTool: ToolMeta = {', "\\n};"), /description: ""/);
+assert.match(android.slice(android.indexOf('id = "video-link-screen-recording"'), android.indexOf('id = "video-link-screen-recording"') + 1400), /description = ""/);
+assert.match(iosCatalog.slice(iosCatalog.indexOf('id: "video-link-screen-recording"'), iosCatalog.indexOf('id: "video-link-screen-recording"') + 1400), /description: ""/);
 assert.match(router, /tool\.id === "video-link-screen-recording"[^\n]*VideoLinkRecorderEngine/);
 assert.match(preload, /video-link-recorder-engine/);
 assert.ok(offlinePolicy.includes('"' + ID + '"'), "the screen capture remains a local operation");
