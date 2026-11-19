@@ -1,232 +1,328 @@
-import { useEffect, useRef, useState } from "react";
-import { Download, FileVideo, Link2, UploadCloud } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ErrorBanner } from "@/components/tools/error-banner";
 import { downloadBlob } from "@/lib/utils";
-import { downloadUrlMedia, type UrlMediaProvider } from "@/lib/media/url-media";
-import { parseVideoLink } from "@/lib/media/video-link-recording";
+import { recordToolExecutionResult } from "@/lib/analytics/client";
+import { parseScreenRecordingPostLink } from "@/lib/media/video-link-recording";
 
-const MAX_VIDEO_BYTES = 500 * 1024 * 1024;
-const VIDEO_EXTENSIONS = new Set(["mp4", "m4v", "mov", "webm", "ogv", "mkv", "avi", "3gp"]);
+type CaptureOutput = { blob: Blob; filename: string; mimeType: string; size: number };
 
-type VideoOutput = { url: string; blob: Blob; name: string; source: "link" | "file" };
+const MAX_CAPTURE_MS = 10 * 60 * 1000;
 
-function providerFor(raw: string): UrlMediaProvider {
-  const host = new URL(raw).hostname.toLowerCase().replace(/^www\./, "");
-  const matches: Array<[UrlMediaProvider, string[]]> = [
-    ["youtube", ["youtube.com", "youtu.be", "youtube-nocookie.com"]],
-    ["tiktok", ["tiktok.com"]],
-    ["facebook", ["facebook.com", "fb.watch", "fb.com"]],
-    ["instagram", ["instagram.com"]],
-    ["x", ["x.com", "twitter.com"]],
+function recorderMimeType(): string | undefined {
+  if (typeof MediaRecorder === "undefined") return undefined;
+  const candidates = [
+    "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+    "video/mp4",
+    "video/webm;codecs=vp9,opus",
+    "video/webm;codecs=vp8,opus",
+    "video/webm",
   ];
-  const found = matches.find((entry) => entry[1].some((domain) => host === domain || host.endsWith("." + domain)));
-  return found ? found[0] : "generic";
+  return candidates.find((type) => MediaRecorder.isTypeSupported(type));
 }
 
-function safeFileName(raw: string, fallback: string) {
-  const name = raw.replace(/[\\/:*?"<>|\u0000-\u001f]/g, "-").trim().slice(0, 100);
-  return name || fallback;
+function formatTime(totalSeconds: number) {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
-function extensionFromMime(mime: string) {
-  if (mime.includes("webm")) return "webm";
-  if (mime.includes("quicktime")) return "mov";
-  if (mime.includes("ogg")) return "ogv";
-  return "mp4";
-}
-
-/** Retrieves real media files; no platform page is embedded or screen-recorded. */
 export function VideoLinkRecorderEngine() {
-  const [link, setLink] = useState("");
-  const [rightsConfirmed, setRightsConfirmed] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState<{ bytes: number; total?: number } | null>(null);
-  const [status, setStatus] = useState("");
-  const [error, setError] = useState("");
-  const [output, setOutput] = useState<VideoOutput | null>(null);
-  const controllerRef = useRef<AbortController | null>(null);
-  const outputUrlRef = useRef<string | null>(null);
+  const [postLink, setPostLink] = useState("");
+  const [provider, setProvider] = useState<string | null>(null);
+  const [captureSupported, setCaptureSupported] = useState(false);
+  const [secureContext, setSecureContext] = useState(true);
+  const [isRecording, setIsRecording] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [hasAudio, setHasAudio] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [output, setOutput] = useState<CaptureOutput | null>(null);
 
-  function clearOutput() {
-    if (outputUrlRef.current) URL.revokeObjectURL(outputUrlRef.current);
-    outputUrlRef.current = null;
-    setOutput(null);
-  }
+  const startingRef = useRef(false);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const startedAtRef = useRef(0);
+  const stopTimerRef = useRef<number | null>(null);
+  const stoppedRef = useRef(false);
 
-  function publishOutput(blob: Blob, name: string, source: VideoOutput["source"]) {
-    clearOutput();
-    const url = URL.createObjectURL(blob);
-    outputUrlRef.current = url;
-    setOutput({ url, blob, name, source });
-    setStatus("Your video is ready.");
-  }
-
-  useEffect(() => () => {
-    controllerRef.current?.abort();
-    if (outputUrlRef.current) URL.revokeObjectURL(outputUrlRef.current);
+  useEffect(() => {
+    setSecureContext(window.isSecureContext);
+    setCaptureSupported(
+      Boolean(navigator.mediaDevices?.getDisplayMedia) &&
+      typeof MediaRecorder !== "undefined",
+    );
   }, []);
 
-  async function processLink() {
-    setError("");
-    setStatus("");
-    setProgress(null);
-    if (!link.trim()) { setError("Paste a video link first."); return; }
-    if (!rightsConfirmed) { setError("Confirm that you own this video or have permission to save and use it."); return; }
+  const previewUrl = useMemo(
+    () => output ? URL.createObjectURL(output.blob) : null,
+    [output],
+  );
 
-    const parsed = parseVideoLink(link);
-    if (!parsed.ok) { setError(parsed.reason); return; }
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
 
-    clearOutput();
-    const controller = new AbortController();
-    controllerRef.current = controller;
-    setBusy(true);
-    setStatus("Retrieving the original video…");
+  useEffect(() => {
+    if (!isRecording) return;
+    const timer = window.setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startedAtRef.current) / 1000));
+    }, 500);
+    return () => window.clearInterval(timer);
+  }, [isRecording]);
+
+  useEffect(() => () => {
+    if (stopTimerRef.current !== null) window.clearTimeout(stopTimerRef.current);
+    const recorder = recorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      try { recorder.stop(); } catch { /* The browser may already be finalizing. */ }
+    }
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+  }, []);
+
+  function parseLink() {
     try {
-      const blob = await downloadUrlMedia(
-        { url: parsed.url, provider: providerFor(parsed.url), format: "mp4", audioOnly: false, maxBytes: MAX_VIDEO_BYTES },
-        controller.signal,
-        (_value, detail) => { if (detail) setProgress(detail); },
-      );
-      if (!blob.size) throw new Error("The media service returned an empty video.");
-      const mime = blob.type || "video/mp4";
-      const bareMime = mime.split(";")[0].trim();
-      if (!mime.startsWith("video/") && bareMime !== "application/octet-stream" && bareMime !== "binary/octet-stream") {
-        throw new Error("The media service response was not a video file.");
+      const result = parseScreenRecordingPostLink(postLink);
+      if (!result.ok) {
+        setError(result.reason);
+        return null;
       }
-      const extension = extensionFromMime(mime);
-      const host = new URL(parsed.url).hostname.replace(/^www\./, "").replace(/[^a-z0-9.-]/gi, "");
-      publishOutput(blob, safeFileName("enV-" + host + "." + extension, "enV-video.mp4"), "link");
-      setProgress({ bytes: blob.size, total: blob.size });
-    } catch (cause) {
-      if (!(cause instanceof Error && cause.name === "AbortError")) {
-        setError(cause instanceof Error ? cause.message : "The video could not be retrieved. Check the link and try again.");
-      }
-      setStatus("");
-    } finally {
-      if (controllerRef.current === controller) controllerRef.current = null;
-      setBusy(false);
+      setProvider(result.platformLabel);
+      setError(null);
+      return { url: result.url, provider: result.platformLabel };
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Enter a supported social-media post link.");
+      return null;
     }
   }
 
-  function useUploadedFile(selected: File | undefined) {
-    setError("");
-    setStatus("");
-    setProgress(null);
-    if (!selected) return;
-    clearOutput();
-    const extension = selected.name.split(".").pop()?.toLowerCase() ?? "";
-    if (!selected.type.startsWith("video/") && !VIDEO_EXTENSIONS.has(extension)) {
-      setError("Choose a video file such as MP4, MOV, WebM or MKV.");
+  function openPost() {
+    const resolved = parseLink();
+    if (!resolved) return;
+    setOutput(null);
+    setNotice(null);
+    const opened = window.open(resolved.url, "_blank");
+    if (!opened) {
+      setError("Your browser blocked the new tab. Allow pop-ups for enV, then open the post again.");
       return;
     }
-    if (!selected.size || selected.size > MAX_VIDEO_BYTES) {
-      setError("Choose a video file smaller than 500 MB.");
+    try { opened.opener = null; } catch { /* Browser-controlled cross-origin opener isolation. */ }
+    setNotice("Post opened. Keep the original app or tab available, return here, and start capture when you are ready.");
+  }
+
+  function releaseCapture() {
+    if (stopTimerRef.current !== null) {
+      window.clearTimeout(stopTimerRef.current);
+      stopTimerRef.current = null;
+    }
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    recorderRef.current = null;
+  }
+
+  function stopCapture() {
+    const recorder = recorderRef.current;
+    if (!recorder || recorder.state === "inactive" || stoppedRef.current) return;
+    stoppedRef.current = true;
+    try {
+      recorder.stop();
+    } catch {
+      releaseCapture();
+      startingRef.current = false;
+      setIsRecording(false);
+      setError("The browser could not finalize this recording. Try another capture.");
+    }
+  }
+
+  async function startCapture() {
+    if (isRecording || startingRef.current) return;
+    startingRef.current = true;
+    const resolved = parseLink();
+    if (!resolved) return;
+    if (!window.isSecureContext) {
+      setError("Screen capture requires a secure HTTPS connection. Open enV over HTTPS and try again.");
+      startingRef.current = false;
       return;
     }
-    setLink("");
-    setRightsConfirmed(true);
-    publishOutput(selected, safeFileName(selected.name, "enV-video." + (extension || "mp4")), "file");
+    if (!navigator.mediaDevices?.getDisplayMedia || typeof MediaRecorder === "undefined") {
+      setError("Screen recording is not available in this browser. Use the enV Android app, or a desktop browser with screen-capture support.");
+      startingRef.current = false;
+      return;
+    }
+
+    setError(null);
+    setNotice(null);
+    setOutput(null);
+    setElapsedSeconds(0);
+    setHasAudio(false);
+    chunksRef.current = [];
+    stoppedRef.current = false;
+
+    let stream: MediaStream;
+    try {
+      // Must remain directly inside this user-initiated action so the browser
+      // can present its own screen/tab permission picker.
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: { ideal: 30, max: 60 } },
+        audio: true,
+      });
+    } catch (reason) {
+      if (reason instanceof Error && reason.name === "NotAllowedError") {
+        setError("Screen capture was cancelled or permission was not granted.");
+      } else {
+        setError(reason instanceof Error ? reason.message : "The browser could not start screen capture.");
+      }
+      startingRef.current = false;
+      return;
+    }
+
+    const videoTrack = stream.getVideoTracks()[0];
+    if (!videoTrack) {
+      stream.getTracks().forEach((track) => track.stop());
+      setError("The selected screen source did not provide a video track.");
+      startingRef.current = false;
+      return;
+    }
+
+    const audioTracks = stream.getAudioTracks();
+    setHasAudio(audioTracks.length > 0);
+    const mimeType = recorderMimeType();
+    let recorder: MediaRecorder;
+    try {
+      recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+    } catch (reason) {
+      stream.getTracks().forEach((track) => track.stop());
+      setError(reason instanceof Error ? reason.message : "This browser cannot encode the selected screen source.");
+      startingRef.current = false;
+      return;
+    }
+
+    streamRef.current = stream;
+    recorderRef.current = recorder;
+    startedAtRef.current = Date.now();
+
+    recorder.ondataavailable = (event) => {
+      if (event.data && event.data.size > 0) chunksRef.current.push(event.data);
+    };
+    recorder.onerror = () => {
+      setError("The browser reported a recording error. Stop capture and try again.");
+      stopCapture();
+    };
+    recorder.onstop = () => {
+      const finalType = recorder.mimeType || mimeType || "video/webm";
+      const blob = new Blob(chunksRef.current, { type: finalType });
+      const extension = finalType.toLowerCase().includes("mp4") ? "mp4" : "webm";
+      const duration = Math.max(0, Math.floor((Date.now() - startedAtRef.current) / 1000));
+      releaseCapture();
+      setIsRecording(false);
+      setElapsedSeconds(duration);
+      if (!blob.size) {
+        setError("No screen frames were recorded. Check the selected tab and try again.");
+        recordToolExecutionResult("video-link-screen-recording", "failure", duration * 1000, "screen_capture", "EMPTY_CAPTURE");
+        return;
+      }
+      const nextOutput = {
+        blob,
+        filename: `env-video-link-interface-capture-${new Date().toISOString().replace(/[:.]/g, "-")}.${extension}`,
+        mimeType: finalType,
+        size: blob.size,
+      };
+      setOutput(nextOutput);
+      setNotice(audioTracks.length
+        ? "Recording finished. The selected source supplied an audio track."
+        : "The browser did not provide an audio track for this selected source. The saved recording may be silent.");
+      recordToolExecutionResult("video-link-screen-recording", "success", duration * 1000, "screen_capture");
+      chunksRef.current = [];
+    };
+
+    videoTrack.addEventListener("ended", stopCapture, { once: true });
+    try {
+      recorder.start(1000);
+      setIsRecording(true);
+      setNotice("Recording started. Switch to the original post, play the video and scroll through the details you want included. Return to enV and stop capture when finished.");
+      stopTimerRef.current = window.setTimeout(stopCapture, MAX_CAPTURE_MS);
+    } catch (reason) {
+      releaseCapture();
+      startingRef.current = false;
+      setError(reason instanceof Error ? reason.message : "The browser could not start recording.");
+    }
   }
 
-  function saveVideo() {
-    if (output) downloadBlob(output.blob, output.name);
-  }
-
-  function cancel() {
-    controllerRef.current?.abort();
-    setBusy(false);
-    setStatus("");
+  function saveRecording() {
+    if (!output) return;
+    downloadBlob(output.blob, output.filename);
   }
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-2xl border border-border bg-surface-2 p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-border bg-background">
-            <FileVideo aria-hidden="true" className="size-5" />
-          </div>
-          <div>
-            <h2 className="text-base font-semibold">Video Link Screen Recording</h2>
-            <p className="text-sm text-muted">Paste a supported video link or choose a video file. enV prepares the video automatically.</p>
-          </div>
-        </div>
+    <div className="space-y-5">
+      <div className="rounded-xl border border-border bg-surface-2 p-4 text-sm">
+        <div className="font-medium">Record the original post interface</div>
+        <p className="mt-1 text-muted">
+          Paste a post link and capture the real platform screen. The recording preserves the video, creator details, engagement counts and controls that are actually visible.
+        </p>
+        <p className="mt-2 text-xs text-muted">Choose the original post tab or the entire display in the browser's capture prompt. Browser support and the source platform determine whether audio can be included.</p>
       </div>
 
       <div className="space-y-2">
-        <label htmlFor="video-link-input" className="text-sm font-medium">Video link</label>
+        <label className="text-sm font-medium" htmlFor="social-post-recorder-link">Post link</label>
         <input
-          id="video-link-input"
+          id="social-post-recorder-link"
+          className="w-full rounded-md border border-border bg-background px-3 py-2"
           type="url"
-          inputMode="url"
+          value={postLink}
+          onChange={(event) => { setPostLink(event.target.value); setProvider(null); setError(null); }}
+          placeholder="Paste a TikTok, Instagram, Facebook, YouTube or other supported post link"
           autoComplete="off"
-          spellCheck={false}
-          value={link}
-          disabled={busy}
-          placeholder="Paste a public video link"
-          onChange={(event) => { setLink(event.target.value); clearOutput(); setError(""); setStatus(""); }}
-          onKeyDown={(event) => { if (event.key === "Enter") void processLink(); }}
-          className="flex h-12 w-full rounded-md bg-surface px-3 text-sm text-fg shadow-[var(--shadow-border)] placeholder:text-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
+          disabled={isRecording}
         />
-        <label className="flex min-h-10 items-start gap-2 rounded-xl border border-border px-3 py-2.5 text-sm">
-          <input
-            type="checkbox"
-            className="mt-0.5"
-            checked={rightsConfirmed}
-            disabled={busy}
-            onChange={(event) => setRightsConfirmed(event.target.checked)}
-          />
-          <span>I own this video or have permission to save and use it.</span>
-        </label>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Button type="button" onClick={() => void processLink()} disabled={busy || !link.trim() || !rightsConfirmed} className="sm:flex-1">
-            <Link2 /> {busy ? "Processing video…" : "Process video"}
-          </Button>
-          {busy ? <Button type="button" variant="outline" onClick={cancel}>Cancel</Button> : null}
-        </div>
+        {provider ? <p className="text-xs text-muted">Detected platform: <strong className="text-fg">{provider}</strong></p> : null}
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="h-px flex-1 bg-border" />
-        <span className="text-xs text-muted">OR</span>
-        <div className="h-px flex-1 bg-border" />
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" variant="outline" onClick={openPost} disabled={isRecording || !postLink.trim()}>
+          Open original post
+        </Button>
+        <Button type="button" onClick={() => void startCapture()} disabled={isRecording || !postLink.trim() || !captureSupported || !secureContext}>
+          Start recording
+        </Button>
+        {isRecording ? <Button type="button" variant="danger" onClick={stopCapture}>Stop and finish</Button> : null}
       </div>
 
-      <div className="space-y-2 rounded-2xl border border-border p-4">
-        <div className="flex items-center gap-2 text-sm font-medium"><UploadCloud className="size-4" /> Choose a video from this device</div>
-        <input
-          type="file"
-          accept="video/*,.mp4,.m4v,.mov,.webm,.ogv,.mkv,.avi,.3gp"
-          disabled={busy}
-          onChange={(event) => { const selected = event.target.files?.[0]; event.target.value = ""; useUploadedFile(selected); }}
-          className="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-surface-2 file:px-3 file:py-2 file:text-sm file:font-medium"
-        />
-        <p className="text-xs text-muted"><span className="font-medium">On-device processing.</span> Your selected file stays on this device and is not uploaded.</p>
-      </div>
-
-      {busy ? (
-        <div role="status" aria-live="polite" className="space-y-2 rounded-xl border border-border bg-surface-2 p-3 text-sm">
+      {!secureContext ? <ErrorBanner message="Screen capture requires HTTPS. Open enV over a secure connection." /> : null}
+      {!captureSupported ? <div className="rounded-lg border border-border bg-surface-2 p-3 text-sm text-muted">
+        This browser does not expose screen recording. The browser version of this tool requires a supported desktop browser. Use the native enV app for mobile screen capture.
+      </div> : null}
+      {isRecording ? (
+        <div className="rounded-xl border border-border bg-surface-2 p-4" aria-live="polite">
           <div className="flex items-center justify-between gap-3">
-            <span>{status || "Processing…"}</span>
-            <span className="text-muted">{progress ? (progress.bytes / 1048576).toFixed(1) + " MB" + (progress.total ? " / " + (progress.total / 1048576).toFixed(1) + " MB" : "") : ""}</span>
+            <strong>Recording screen</strong>
+            <span className="font-mono text-sm tabular-nums">{formatTime(elapsedSeconds)}</span>
           </div>
-          {progress?.total ? <div className="h-2 overflow-hidden rounded-full bg-surface"><div className="h-full bg-accent" style={{ width: Math.min(100, (progress.bytes / progress.total) * 100) + "%" }} /></div> : <div className="h-2 animate-pulse rounded-full bg-surface" />}
+          <p className="mt-2 text-sm text-muted">{hasAudio ? "The screen and the selected source audio track are being recorded." : "The screen is being recorded. The browser did not supply a source-audio track."}</p>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface">
+            <div className="h-full w-full animate-pulse bg-accent" />
+          </div>
+          <p className="mt-2 text-xs text-muted">Maximum capture time: 10 minutes. You can stop earlier; the recording stays on this device.</p>
         </div>
       ) : null}
 
-      {output ? (
-        <div className="space-y-3 rounded-2xl border border-border p-4">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold">Your video</h3>
-            <span className="text-xs text-muted">{(output.blob.size / 1048576).toFixed(1)} MB</span>
+      {notice ? <p className="text-sm text-muted" role="status">{notice}</p> : null}
+      {error ? <ErrorBanner message={error} /> : null}
+
+      {output && previewUrl ? (
+        <div className="space-y-3 rounded-xl border border-border bg-surface-2 p-4">
+          <div className="font-medium">Recording ready</div>
+          <video className="max-h-[70vh] w-full rounded-lg bg-black" src={previewUrl} controls playsInline />
+          <div className="text-sm text-muted">
+            {formatTime(elapsedSeconds)} · {(output.size / 1024 / 1024).toFixed(2)} MB · {output.mimeType}
           </div>
-          <video key={output.url} src={output.url} controls playsInline preload="metadata" className="max-h-[65vh] w-full rounded-xl bg-black" />
-          <p className="break-all text-xs text-muted">{output.name}{output.source === "file" ? " · Original file" : " · Retrieved video"}</p>
-          <Button type="button" onClick={saveVideo} className="w-full"><Download /> Save video</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" onClick={saveRecording}>Save recording</Button>
+            <Button type="button" variant="outline" onClick={() => setOutput(null)}>Discard</Button>
+          </div>
         </div>
       ) : null}
-
-      {status && !busy && !output ? <p role="status" className="text-sm text-muted">{status}</p> : null}
-      {error ? <div role="alert" className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</div> : null}
     </div>
   );
 }
