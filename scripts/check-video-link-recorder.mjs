@@ -126,7 +126,8 @@ for (const platform of ["TikTok", "Instagram", "Facebook", "YouTube", "X"]) {
 
 assert.match(docs, /actual social-media post interface/i);
 assert.match(docs, /MediaProjection/i);
-assert.match(docs, /SFSafariViewController/);
+assert.match(docs, /ScreenCaptureKit/);
+assert.match(docs, /MediaProjectionConfig\.createConfigForDefaultDisplay/);
 assert.match(docs, /does \*\*not\*\* download/i);
 
 console.log("Video Link Screen Recording original-interface capture checks passed.");
