@@ -100,8 +100,6 @@ private final class NativePostInterfaceCaptureController: NSObject, ObservableOb
             let pixelSize = screen.nativeBounds.size
             streamConfiguration.width = max(2, Int(pixelSize.width))
             streamConfiguration.height = max(2, Int(pixelSize.height))
-            streamConfiguration.minimumFrameInterval = CMTime(value: 1, timescale: 30)
-            streamConfiguration.queueDepth = 5
             streamConfiguration.capturesAudio = true
             streamConfiguration.excludesCurrentProcessAudio = false
 
