@@ -106,6 +106,8 @@ assert.match(swift, /SFSafariViewController/);
 assert.match(swift, /SCContentSharingPicker/);
 assert.match(swift, /picker\.isActive = true/);
 assert.match(swift, /picker\.present\(\)/);
+assert.match(swift, /allowedPickerModes = \.singleDisplay/);
+assert.match(swift, /recordingOutputDidStartRecording[\\s\\S]*?isRecording = true/);
 assert.match(swift, /SCRecordingOutput/);
 assert.match(swift, /addRecordingOutput/);
 assert.match(swift, /removeRecordingOutput/);
