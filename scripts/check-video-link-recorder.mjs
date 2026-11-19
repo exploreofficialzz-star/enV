@@ -35,6 +35,9 @@ assert.ok(offlinePolicy.includes('"' + ID + '"'), "the screen capture remains a 
 assert.match(web, /navigator\.mediaDevices\.getDisplayMedia/);
 assert.match(web, /new MediaRecorder\(/);
 assert.match(web, /window\.open\(/);
+assert.match(web, /env:\/\/tool\/video-link-screen-recording/);
+assert.doesNotMatch(web, /Record the original post interface|This browser does not expose screen recording/);
+
 assert.match(web, /parseScreenRecordingPostLink/);
 assert.match(web, /downloadBlob\(output\.blob/);
 assert.doesNotMatch(web, /downloadUrlMedia|url-media\/download|type="file"|type='file'|Choose a video from this device|useUploadedFile/);
@@ -48,6 +51,8 @@ assert.match(policy, /direct-video/);
 assert.match(policy, /PROTECTED_VIDEO_PLATFORMS/);
 
 // Android must use OS MediaProjection consent and save real screen video as MP4.
+assert.match(android, /CustomTabsIntent/);
+assert.doesNotMatch(android, /Intent\(Intent\.ACTION_VIEW/);
 assert.match(android, /MediaProjectionManager/);
 assert.match(android, /createScreenCaptureIntent\(\)/);
 assert.match(android, /MediaRecorder\.OutputFormat\.MPEG_4/);
@@ -60,6 +65,9 @@ assert.match(android, /sendCaptureResult\(saved = true/);
 assert.match(android, /sendCaptureResult\(saved = false/);
 assert.doesNotMatch(android, /Recording finalized\. The MP4 is saved/);
 assert.match(androidMain, /tool\.id == "video-link-screen-recording"[^\n]*NativeVideoLinkRecorderScreen\(\)/);
+assert.match(androidMain, /initialToolId == "video-link-screen-recording"/);
+assert.match(androidManifest, /android:scheme="env" android:host="tool" android:path="\/video-link-screen-recording"/);
+
 assert.match(androidManifest, /FOREGROUND_SERVICE_MEDIA_PROJECTION/);
 assert.match(androidManifest, /android:name="\.VideoLinkCaptureService"/);
 assert.equal((androidManifest.match(/android:name="android\.permission\.FOREGROUND_SERVICE"/g) ?? []).length, 1);
@@ -67,10 +75,10 @@ assert.doesNotMatch(android, /OpenDocument|copySelectedVideo|url-media\/download
 
 // iOS opens the source URL and hands full-display recording to the real iOS system recorder.
 assert.match(swift, /struct NativeVideoLinkRecorderView/);
-assert.match(swift, /Open original post/);
-assert.match(swift, /Control Center/);
-assert.match(swift, /Screen Recording/);
-assert.match(swift, /Photos/);
+assert.match(swift, /Open post/);
+assert.match(swift, /SFSafariViewController/);
+assert.match(swift, /NativeVideoPostBrowser/);
+assert.doesNotMatch(swift, /Control Center|Open original post|@Environment\(\\.openURL\)/);
 assert.doesNotMatch(swift, /fileImporter|NativeVideoLinkService|url-media\/download|Choose a video from this device/);
 assert.match(iosCatalog, /includingVideoLinkScreenRecording/);
 assert.match(androidMain, /id != "video-link-screen-recording"/, "Android does not falsely label remote post access as offline");
