@@ -20,6 +20,22 @@ on:
       - "package.json"
       - "package-lock.json"
 
+  pull_request:
+    paths:
+      - ".github/workflows/video-link-native-ci.yml"
+      - "apps/android/**"
+      - "apps/ios/**"
+      - "apps/shared/**"
+      - "src/lib/registry.ts"
+      - "src/lib/media/video-link-recording.ts"
+      - "src/lib/media/video-link-recording.test.ts"
+      - "src/data/**"
+      - "scripts/check-video-link-recorder.mjs"
+      - "scripts/export-native-catalog.mjs"
+      - "scripts/export-native-execution-matrix.mjs"
+      - "package.json"
+      - "package-lock.json"
+
 permissions:
   contents: read
 
