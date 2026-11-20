@@ -179,26 +179,7 @@ const cameraStudioTool: ToolMeta = {
   isNew: true,
 };
 
-const videoLinkScreenRecordingTool: ToolMeta = {
-  id: "video-link-screen-recording",
-  name: "Video Link Screen Recording",
-  slug: "video-link-screen-recording",
-  description: "Record a social-media post with its video and visible platform controls.",
-  category: "video",
-  subcategory: "Screen recording",
-  keywords: ["screen recording", "screen recorder", "record post", "social media", "video link", "capture interface", "likes", "comments", "captions", "youtube", "shorts", "tiktok", "instagram", "facebook", "x", "twitter", "snapchat", "threads"],
-  tags: ["video", "screen-recording", "social-media", "capture", "link", "local"],
-  icon: "Video",
-  popularity: 1100,
-  featured: true,
-  clientSide: true,
-  requiresBackend: false,
-  requiresAuth: false,
-  status: "active",
-  related: [],
-  engine: { type: "custom", id: "video-link-screen-recording" },
-  isNew: true,
-};
+
 
 const smartphonePrototypeLabTool: ToolMeta = {
   id: "smartphone-prototype-lab",
@@ -338,7 +319,6 @@ const catalogRuntimeTools: ToolMeta[] = [
   ...(!catalogTools.some((tool) => tool.id === aBookTool.id) ? [aBookTool] : []),
   ...(!catalogTools.some((tool) => tool.id === zipAnyFileTool.id) ? [zipAnyFileTool] : []),
   ...(!catalogTools.some((tool) => tool.id === cameraStudioTool.id) ? [cameraStudioTool] : []),
-  ...(!catalogTools.some((tool) => tool.id === videoLinkScreenRecordingTool.id) ? [videoLinkScreenRecordingTool] : []),
   ...(!catalogTools.some((tool) => tool.id === smartphonePrototypeLabTool.id) ? [smartphonePrototypeLabTool] : []),
   ...fileWorkspaceTools.filter((tool) => !catalogTools.some((catalogTool) => catalogTool.id === tool.id)),
 ];

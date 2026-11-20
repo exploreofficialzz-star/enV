@@ -2,12 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { evaluateRelatedToolsBaseline } from "./related-tools-baseline.mjs";
 
-const tool = (related = []) => ({ id: "video-link-screen-recording", status: "active", related });
+const tool = (related = []) => ({ id: "fixture-no-related-links", status: "active", related });
 const observed = { dangling: 5, self: 4, toPlanned: 106, toUndiscoverable: 287, noRelated: 496 };
 const baseline = {
   counts: { dangling: 5, self: 4, toPlanned: 106, toUndiscoverable: 287, noRelated: 495 },
   noRelatedExceptions: [{
-    id: "video-link-screen-recording",
+    id: "fixture-no-related-links",
     reason: "The tool records the original social-media post interface and intentionally has no related suggestions.",
   }],
 };
@@ -16,7 +16,7 @@ test("a documented active tool with no related links does not inflate the regres
   const result = evaluateRelatedToolsBaseline(observed, baseline, new Map([[tool().id, tool()]]));
   assert.equal(result.passed, true);
   assert.equal(result.adjustedCounts.noRelated, 495);
-  assert.deepEqual(result.exceptionIds, ["video-link-screen-recording"]);
+  assert.deepEqual(result.exceptionIds, ["fixture-no-related-links"]);
 });
 
 test("undocumented growth beyond the baseline still fails", () => {

@@ -33,7 +33,7 @@ export function isOfflineLocalTool(toolId: string): boolean {
 /** A short card/detail description for operations verified to run without a network. */
 export function offlineAwareToolDescription(tool: Pick<ToolMeta, "id" | "description">): string {
   const description = tool.description.trim();
-  if (tool.id === "video-link-screen-recording" || !isOfflineLocalTool(tool.id) || /^works offline\b/i.test(description)) return description;
+  if (!isOfflineLocalTool(tool.id) || /^works offline\b/i.test(description)) return description;
   return description ? `Works offline. ${description}` : "Works offline.";
 }
 

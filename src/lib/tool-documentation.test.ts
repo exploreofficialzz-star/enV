@@ -69,7 +69,6 @@ const LAZY_ENGINE_COMPONENTS = new Set(
 const DIRECT_TOOL_RENDERERS: Record<string, string> = {
   "smartphone-prototype-lab": "SmartphonePrototypeLabEngine",
   "camera-studio": "CameraStudioEngine",
-  "video-link-screen-recording": "VideoLinkRecorderEngine",
   "a-book": "ABookEngine",
   "zip-any-file": "ZipArchiveEngine",
   "music-downloader": "MusicDownloaderEngine",
