@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, BookOpen, ChevronDown, Heart, Maximize2, Minimize2 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { disclaimerText } from "@/lib/content";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { ToolAccessGate, AdFreeAfterThreeAdsDialog } from "@/components/tools/tool-access-gate";
@@ -114,7 +114,7 @@ export function ToolShell({
     };
   };
 
-  async function finalizeTokenReservation(outcome: ToolExecutionOutcome) {
+  const finalizeTokenReservation = useCallback(async (outcome: ToolExecutionOutcome) => {
     const reservationId = tokenReservationRef.current;
     if (!reservationId || tokenReservationFinalizedRef.current) return;
     tokenReservationFinalizedRef.current = true;
@@ -135,7 +135,7 @@ export function ToolShell({
     } catch {
       tokenReservationFinalizedRef.current = false;
     }
-  }
+  }, [tool.id]);
 
   const grantToolAccess = (mode: "ads" | "tokens", reservationId?: string) => {
     if (mode === "tokens" && reservationId) {
@@ -190,7 +190,7 @@ export function ToolShell({
       recordToolExecutionResult(tool.id, outcome, Date.now() - startedAt, "shared_result", errorCode);
       void finalizeTokenReservation(outcome);
     },
-  }), [tool.id]);
+  }), [tool.id, finalizeTokenReservation]);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isCssFullscreen, setIsCssFullscreen] = useState(false);
   const isMusicSandbox = ["song-metadata-analyzer", "audio-analyze-studio"].includes(tool.id);
