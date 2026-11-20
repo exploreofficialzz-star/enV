@@ -1033,6 +1033,7 @@ struct NativeFamilyToolView: View {
     let tool: Tool
     var initialDeveloperMode: String? = nil
     var initialDeveloperAction: String? = nil
+    @Environment(\.nativeToolAccessCompletion) private var nativeToolAccessCompletion
     @State private var executionTracker: NativeToolExecutionTracker
 
     init(tool: Tool, initialDeveloperMode: String? = nil, initialDeveloperAction: String? = nil) {
@@ -1066,6 +1067,7 @@ struct NativeFamilyToolView: View {
         }
         .environment(\.nativeToolExecutionTracker, executionTracker)
         .onAppear {
+            executionTracker.onFinished = nativeToolAccessCompletion
             NativeAnalyticsClient.record("tool_viewed", toolID: tool.id)
             Task { try? await NativeAnalyticsClient.flush() }
         }
@@ -6685,6 +6687,7 @@ final class NativeToolExecutionTracker {
     private let toolID: String
     private var startedAt: Date?
     private var resultRecorded = false
+    var onFinished: NativeToolAccessCompletion?
 
     init(toolID: String) { self.toolID = toolID }
 
@@ -6707,6 +6710,7 @@ final class NativeToolExecutionTracker {
             errorCode: success ? nil : "NATIVE_TOOL_FAILED"
         )
         Task { try? await NativeAnalyticsClient.flush() }
+        onFinished?(success)
     }
 
     func abandon() {
@@ -6721,6 +6725,7 @@ final class NativeToolExecutionTracker {
             errorCode: "NATIVE_TOOL_LEFT_BEFORE_RESULT"
         )
         Task { try? await NativeAnalyticsClient.flush() }
+        onFinished?(false)
     }
 }
 
