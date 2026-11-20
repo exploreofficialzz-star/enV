@@ -204,33 +204,24 @@ struct ToolDetailView: View {
                         .padding(.top, 16)
                 }
 
-                if tool.id != "video-link-screen-recording" {
-                    VStack(alignment: .leading, spacing: 12) {
-                        enVCharacterSpacedText("What this tool does")
-                            .font(.envScaled(size: 18, weight: .semibold))
-                            .foregroundStyle(Color.envInk)
-                        enVCharacterSpacedText(tool.description)
-                            .font(.envScaled(size: 14, weight: .regular))
-                            .foregroundStyle(Color.envMuted)
-                            .fixedSize(horizontal: false, vertical: true)
-                        if let guideURL = URL(string: "https://envtools.store/blog/tool-" + tool.id) {
-                            Link(destination: guideURL) {
-                                Label("Read the full guide", systemImage: "book")
-                                    .font(.envScaled(size: 14, weight: .semibold))
-                                    .foregroundStyle(Color.envAccent)
-                            }
-                            .padding(.top, 2)
+                VStack(alignment: .leading, spacing: 12) {
+                    enVCharacterSpacedText("What this tool does")
+                        .font(.envScaled(size: 18, weight: .semibold))
+                        .foregroundStyle(Color.envInk)
+                    enVCharacterSpacedText(tool.description)
+                        .font(.envScaled(size: 14, weight: .regular))
+                        .foregroundStyle(Color.envMuted)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let guideURL = URL(string: "https://envtools.store/blog/tool-" + tool.id) {
+                        Link(destination: guideURL) {
+                            Label("Read the full guide", systemImage: "book")
+                                .font(.envScaled(size: 14, weight: .semibold))
+                                .foregroundStyle(Color.envAccent)
                         }
+                        .padding(.top, 2)
                     }
-                    .padding(.top, 40)
-                } else if let guideURL = URL(string: "https://envtools.store/blog/tool-" + tool.id) {
-                    Link(destination: guideURL) {
-                        Label("Read the full guide", systemImage: "book")
-                            .font(.envScaled(size: 14, weight: .semibold))
-                            .foregroundStyle(Color.envAccent)
-                    }
-                    .padding(.top, 16)
                 }
+                .padding(.top, 40)
 
                 if !allRelatedTools.isEmpty {
                     enVCharacterSpacedText("Related tools")
@@ -1015,7 +1006,7 @@ enum NativeCoverage {
         case "converter": return NativeConverterEngine.operation(for: tool) != nil
         case "calculator": return NativeAudioEngine.supports(tool) || NativeCalculatorEngine.operation(for: tool.id) != nil || NativeExpansionCalculatorEngine.operation(for: tool.id) != nil || NativeMathExerciseEngine.operation(for: tool.id) != nil
         case "generator", "network", "seo", "developer", "cssgen": return NativeUtilityEngine.supports(tool)
-        case "custom": return tool.id == "a-book" || tool.id == "camera-studio" || tool.id == "video-link-screen-recording" || NativeProductivityEngine.supports(tool.id) || tool.category == "communication" || (tool.category == "celebrations" && NativeCelebrationEngine.parse(tool.id) != nil) || NativeAccessibilityEngine.supports(tool) || NativeEventEngine.supports(tool.id) || NativeEcommerceEngine.supports(tool)
+        case "custom": return tool.id == "a-book" || tool.id == "camera-studio" || NativeProductivityEngine.supports(tool.id) || tool.category == "communication" || (tool.category == "celebrations" && NativeCelebrationEngine.parse(tool.id) != nil) || NativeAccessibilityEngine.supports(tool) || NativeEventEngine.supports(tool.id) || NativeEcommerceEngine.supports(tool)
         default: return false
         }
     }
@@ -1060,7 +1051,7 @@ struct NativeFamilyToolView: View {
             case "calculator": if NativeAudioEngine.supports(tool) { NativeAudioToolView(tool: tool) } else if NativeCalculatorEngine.operation(for: tool.id) != nil { NativeCalculatorToolView(tool: tool) } else if NativeExpansionCalculatorEngine.operation(for: tool.id) != nil { NativeExpansionCalculatorToolView(tool: tool) } else if NativeMathExerciseEngine.operation(for: tool.id) != nil { NativeMathExerciseToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "generator", "network", "seo", "cssgen": if NativeUtilityEngine.supports(tool) { NativeUtilityToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             case "developer": if NativeUtilityEngine.supports(tool) { NativeDeveloperToolView(tool: tool, initialMode: initialDeveloperMode, initialAction: initialDeveloperAction) } else { NativeUnavailableToolView(tool: tool, backend: false) }
-            case "custom": if tool.category == "celebrations" { if NativeCelebrationEngine.parse(tool.id) != nil { NativeCelebrationToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) } } else if tool.category == "communication" { NativeCommunicationToolView(tool: tool) } else if tool.id == "camera-studio" || NativeProductivityEngine.supports(tool.id) { if tool.id == "camera-studio" { NativeCameraStudioView() } else { NativeProductivityToolView(tool: tool) } } else if tool.id == "video-link-screen-recording" { NativeVideoLinkRecorderView() } else if tool.id == "a-book" { NativeABookView() } else if NativeAccessibilityEngine.supports(tool) { NativeAccessibilityToolView(tool: tool) } else if NativeEventEngine.supports(tool.id) { NativeEventToolView(tool: tool) } else if NativeEcommerceEngine.supports(tool) { NativeEcommerceToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
+            case "custom": if tool.category == "celebrations" { if NativeCelebrationEngine.parse(tool.id) != nil { NativeCelebrationToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) } } else if tool.category == "communication" { NativeCommunicationToolView(tool: tool) } else if tool.id == "camera-studio" || NativeProductivityEngine.supports(tool.id) { if tool.id == "camera-studio" { NativeCameraStudioView() } else { NativeProductivityToolView(tool: tool) } } else if tool.id == "a-book" { NativeABookView() } else if NativeAccessibilityEngine.supports(tool) { NativeAccessibilityToolView(tool: tool) } else if NativeEventEngine.supports(tool.id) { NativeEventToolView(tool: tool) } else if NativeEcommerceEngine.supports(tool) { NativeEcommerceToolView(tool: tool) } else { NativeUnavailableToolView(tool: tool, backend: false) }
             default: NativeUnavailableToolView(tool: tool, backend: NativeBackendEngine.supports(tool))
             }
         }

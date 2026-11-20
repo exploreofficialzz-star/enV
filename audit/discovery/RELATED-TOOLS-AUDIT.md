@@ -10,6 +10,6 @@ Registry-level integrity of `related` links among non-planned tools. It does not
 - Links to active tools hidden from discovery: 287 — e.g. accessible-color-checker->accessible-color-generator, accessible-color-checker->accessible-color-helper, accessible-color-checker->accessible-color-preview, accessible-color-checker->accessible-color-simulator, accessible-color-checker->contrast-generator.
 - Reciprocal links: 7.6%; same-category links: 99.9%; cross-category links: 0.0%.
 
-- Tools with no related links: 496; documented intentional exceptions: 1 — video-link-screen-recording.
+- Tools with no related links: 495; documented intentional exceptions: 0.
 
 **PASS** — no unexplained category grew beyond the registered baseline (legacy defects remain; see counts).

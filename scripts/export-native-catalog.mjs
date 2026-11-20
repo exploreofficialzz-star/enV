@@ -21,28 +21,6 @@ const canonicalRuntimeTools = getAllTools();
 const publishedCatalogTools = applyGenericWorkflowPolicy(tools);
 const canonicalRuntimeById = new Map(canonicalRuntimeTools.map((tool) => [tool.id, tool]));
 const refinedCatalogTools = publishedCatalogTools.map((tool) => {
-  // The browser registry owns this stable ID's canonical presentation and operation.
-  // Keep Android/iOS catalogue exports aligned even when the checked-in generated
-  // source catalogue still contains the legacy JSON-to-CSV presentation.
-  if (tool.id === "video-link-screen-recording") {
-    const runtimeTool = canonicalRuntimeById.get(tool.id);
-    if (!runtimeTool) throw new Error("Canonical runtime record is missing for video-link-screen-recording.");
-    return {
-      ...tool,
-      name: runtimeTool.name,
-      description: runtimeTool.description,
-      category: runtimeTool.category,
-      slug: runtimeTool.slug,
-      keywords: runtimeTool.keywords,
-      tags: runtimeTool.tags,
-      engine: runtimeTool.engine,
-      clientSide: runtimeTool.clientSide,
-      requiresBackend: runtimeTool.requiresBackend,
-      requiresAuth: runtimeTool.requiresAuth,
-      status: runtimeTool.status,
-      related: runtimeTool.related,
-    };
-  }
   if (tool.id === "css-minifier-advanced") {
     const runtimeTool = canonicalRuntimeById.get(tool.id);
     if (!runtimeTool) throw new Error("Canonical runtime record is missing for css-minifier-advanced.");
@@ -166,26 +144,7 @@ const runtimeCatalogExtensions = [
     engine: { type: "custom", id: "camera-studio" },
     platformRuntimeExtension: true,
   },
-  {
-    id: "video-link-screen-recording",
-    name: "Video Link Screen Recording",
-    slug: "video-link-screen-recording",
-    description: "Record a social-media post with its video and visible platform controls.",
-    category: "video",
-    subcategory: "Screen recording",
-    keywords: ["screen recording", "screen recorder", "record post", "social media", "video link", "capture interface", "likes", "comments", "captions", "youtube", "shorts", "tiktok", "instagram", "facebook", "x", "snapchat", "threads"],
-    tags: ["video", "screen-recording", "capture", "link", "local"],
-    icon: "Video",
-    popularity: 1100,
-    featured: true,
-    clientSide: true,
-    requiresBackend: false,
-    requiresAuth: false,
-    status: "active",
-    related: ["video-url-downloader", "url-media-inspector", "video-trimmer", "video-file-inspector"],
-    engine: { type: "custom", id: "video-link-screen-recording" },
-    platformRuntimeExtension: true,
-  },
+
 ];
 const expandedTools = [
   ...refinedCatalogTools,

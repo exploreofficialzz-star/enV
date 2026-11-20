@@ -49,7 +49,7 @@ Each difference below is matched by a named rule. A difference that matches no r
 | Runtime not in shared native catalogue | RUNTIME_EXTENSION | 13 | 13 | 0 |
 | Shared native catalogue not in runtime | (no rule allows this) | 0 | 0 | 0 |
 
-**Runtime extensions** (in runtime, declared in `registry.ts`/datetime extensions, absent from the raw catalogue): `a-book`, `batch-file-renamer`, `camera-studio`, `duplicate-file-finder`, `file-compare`, `file-organizer`, `file-search`, `file-to-txt`, `folder-size-analyzer`, `music-downloader`, `smartphone-prototype-lab`, `video-link-screen-recording`, `zip-any-file`
+**Runtime extensions** (in runtime, declared in `registry.ts`/datetime extensions, absent from the raw catalogue): `a-book`, `batch-file-renamer`, `camera-studio`, `duplicate-file-finder`, `file-compare`, `file-organizer`, `file-search`, `file-to-txt`, `folder-size-analyzer`, `music-downloader`, `smartphone-prototype-lab`, `zip-any-file`
 
 **Virtual Studio records** (searchable, not in runtime): `devops-studio`, `diff-inspect-studio`, `encoding-studio`, `hash-studio`, `http-api-studio`, `json-studio`, `jwt-studio`, `markup-studio`, `regex-studio`, `sql-studio`, `the-world-lab`, `time-cron-studio`, `uuid-studio`, `ux-ui-studio`
 
