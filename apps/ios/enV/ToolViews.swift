@@ -204,24 +204,33 @@ struct ToolDetailView: View {
                         .padding(.top, 16)
                 }
 
-                VStack(alignment: .leading, spacing: 12) {
-                    enVCharacterSpacedText("What this tool does")
-                        .font(.envScaled(size: 18, weight: .semibold))
-                        .foregroundStyle(Color.envInk)
-                    enVCharacterSpacedText(tool.description)
-                        .font(.envScaled(size: 14, weight: .regular))
-                        .foregroundStyle(Color.envMuted)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if let guideURL = URL(string: "https://envtools.store/blog/tool-" + tool.id) {
-                        Link(destination: guideURL) {
-                            Label("Read the full guide", systemImage: "book")
-                                .font(.envScaled(size: 14, weight: .semibold))
-                                .foregroundStyle(Color.envAccent)
+                if tool.id != "video-link-screen-recording" {
+                    VStack(alignment: .leading, spacing: 12) {
+                        enVCharacterSpacedText("What this tool does")
+                            .font(.envScaled(size: 18, weight: .semibold))
+                            .foregroundStyle(Color.envInk)
+                        enVCharacterSpacedText(tool.description)
+                            .font(.envScaled(size: 14, weight: .regular))
+                            .foregroundStyle(Color.envMuted)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if let guideURL = URL(string: "https://envtools.store/blog/tool-" + tool.id) {
+                            Link(destination: guideURL) {
+                                Label("Read the full guide", systemImage: "book")
+                                    .font(.envScaled(size: 14, weight: .semibold))
+                                    .foregroundStyle(Color.envAccent)
+                            }
+                            .padding(.top, 2)
                         }
-                        .padding(.top, 2)
                     }
+                    .padding(.top, 40)
+                } else if let guideURL = URL(string: "https://envtools.store/blog/tool-" + tool.id) {
+                    Link(destination: guideURL) {
+                        Label("Read the full guide", systemImage: "book")
+                            .font(.envScaled(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.envAccent)
+                    }
+                    .padding(.top, 16)
                 }
-                .padding(.top, 40)
 
                 if !allRelatedTools.isEmpty {
                     enVCharacterSpacedText("Related tools")
