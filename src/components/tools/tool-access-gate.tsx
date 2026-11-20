@@ -148,11 +148,6 @@ export function ToolAccessGate({
             </button>
           ) : null}
 
-          {consent !== "granted" ? (
-            <Link to="/privacy" className="py-1 text-xs font-medium text-muted underline underline-offset-4">
-              Review advertising privacy choices
-            </Link>
-          ) : null}
         </div>
       )}
 
