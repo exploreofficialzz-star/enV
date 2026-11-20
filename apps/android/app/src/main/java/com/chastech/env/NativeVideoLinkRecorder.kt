@@ -114,7 +114,6 @@ fun NativeVideoLinkRecorderScreen(initialPostUrl: String = "", initialLaunchId: 
     var status by rememberSaveable { mutableStateOf("") }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     var isAwaitingPermission by rememberSaveable { mutableStateOf(false) }
-    var autoPromptedPostUrl by rememberSaveable { mutableStateOf("") }
     var isStarting by rememberSaveable { mutableStateOf(false) }
     var isRecording by rememberSaveable { mutableStateOf(false) }
     var isStopping by rememberSaveable { mutableStateOf(false) }
