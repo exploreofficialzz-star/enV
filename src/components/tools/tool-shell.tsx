@@ -54,10 +54,11 @@ export function ToolShell({
   const accessToolIds = new Set(String(import.meta.env.VITE_AD_ACCESS_TOOL_IDS ?? "").split(",").map((id) => id.trim()).filter(Boolean));
   const adAccessGateEnabled =
     import.meta.env.VITE_AD_ACCESS_GATE_ENABLED === "true" &&
+    toolAdEligible &&
+    accessToolIds.has(tool.id);
+  const rewardedAdsConfigured =
     import.meta.env.VITE_ADSENSE_PRIVACY_CONFIGURED === "true" &&
     Boolean(import.meta.env.VITE_ADSENSE_CLIENT_ID) &&
-    toolAdEligible &&
-    accessToolIds.has(tool.id) &&
     /^\/[A-Za-z0-9_./-]{2,180}$/.test(rewardedUnitPath);
   const [toolAccessUnlocked, setToolAccessUnlocked] = useState(false);
   const [showAdFreeOffer, setShowAdFreeOffer] = useState(false);
@@ -483,7 +484,7 @@ export function ToolShell({
             toolName={tool.name}
             user={accessUser}
             authPending={accessAuthPending}
-            rewardedAdsConfigured={rewardedUnitPath.length > 0}
+            rewardedAdsConfigured={rewardedAdsConfigured}
             preference={accessPreference}
             onPreferenceChange={saveAccessPreference}
             onWatchRewardedAd={() => showGoogleRewardedAd(rewardedUnitPath)}
