@@ -183,7 +183,7 @@ const videoLinkScreenRecordingTool: ToolMeta = {
   id: "video-link-screen-recording",
   name: "Video Link Screen Recording",
   slug: "video-link-screen-recording",
-  description: "",
+  description: "Record a social-media post with its video and visible platform controls.",
   category: "video",
   subcategory: "Screen recording",
   keywords: ["screen recording", "screen recorder", "record post", "social media", "video link", "capture interface", "likes", "comments", "captions", "youtube", "shorts", "tiktok", "instagram", "facebook", "x", "twitter", "snapchat", "threads"],
