@@ -8,7 +8,7 @@ const baseline = {
   counts: { dangling: 5, self: 4, toPlanned: 106, toUndiscoverable: 287, noRelated: 495 },
   noRelatedExceptions: [{
     id: "fixture-no-related-links",
-    reason: "The tool records the original social-media post interface and intentionally has no related suggestions.",
+    reason: "The fixture models an active tool with no related suggestions for baseline accounting.",
   }],
 };
 
