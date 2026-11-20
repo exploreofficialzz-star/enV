@@ -1,0 +1,409 @@
+{
+ "kind": "PHRASING_HYPOTHESES_NOT_MEASURED_DEMAND",
+ "note": "Plausible ways people may phrase a need, written from general knowledge of how web tools are searched. These are NOT query logs and say nothing about real volume. Replace/extend with Search Console and Bing exports via scripts/learn-search-aliases.mjs. Each case lists the tool IDs accepted as a correct answer; the first is the primary intent.",
+ "cases": [
+  [
+   "combine pdf files",
+   [
+    "pdf-merger",
+    "document-merger"
+   ]
+  ],
+  [
+   "join pdf",
+   [
+    "pdf-merger"
+   ]
+  ],
+  [
+   "pdf joiner",
+   [
+    "pdf-merger",
+    "document-merger"
+   ]
+  ],
+  [
+   "merge pdf files into one",
+   [
+    "pdf-merger",
+    "document-merger"
+   ]
+  ],
+  [
+   "reduce pdf size",
+   [
+    "pdf-compressor"
+   ]
+  ],
+  [
+   "shrink pdf",
+   [
+    "pdf-compressor"
+   ]
+  ],
+  [
+   "make pdf smaller",
+   [
+    "pdf-compressor"
+   ]
+  ],
+  [
+   "reduce image size",
+   [
+    "image-compressor"
+   ]
+  ],
+  [
+   "compress jpg",
+   [
+    "image-compressor"
+   ]
+  ],
+  [
+   "compress photo",
+   [
+    "image-compressor"
+   ]
+  ],
+  [
+   "image size reducer",
+   [
+    "image-compressor"
+   ]
+  ],
+  [
+   "resize image online",
+   [
+    "image-resizer"
+   ]
+  ],
+  [
+   "change image size",
+   [
+    "image-resizer"
+   ]
+  ],
+  [
+   "photo resizer",
+   [
+    "image-resizer"
+   ]
+  ],
+  [
+   "qr code maker",
+   [
+    "qr-generator"
+   ]
+  ],
+  [
+   "make qr code",
+   [
+    "qr-generator"
+   ]
+  ],
+  [
+   "create qr code",
+   [
+    "qr-generator"
+   ]
+  ],
+  [
+   "qr maker",
+   [
+    "qr-generator"
+   ]
+  ],
+  [
+   "json beautifier",
+   [
+    "json-formatter",
+    "json-beautifier"
+   ]
+  ],
+  [
+   "json pretty print",
+   [
+    "json-formatter"
+   ]
+  ],
+  [
+   "format json online",
+   [
+    "json-formatter",
+    "json-studio"
+   ]
+  ],
+  [
+   "json viewer",
+   [
+    "json-formatter"
+   ]
+  ],
+  [
+   "random password",
+   [
+    "password-generator"
+   ]
+  ],
+  [
+   "strong password generator",
+   [
+    "password-generator"
+   ]
+  ],
+  [
+   "generate password",
+   [
+    "password-generator"
+   ]
+  ],
+  [
+   "count words",
+   [
+    "word-counter"
+   ]
+  ],
+  [
+   "word count",
+   [
+    "word-counter"
+   ]
+  ],
+  [
+   "character count",
+   [
+    "word-counter",
+    "character-counter"
+   ]
+  ],
+  [
+   "body mass index",
+   [
+    "bmi-calculator"
+   ]
+  ],
+  [
+   "home loan calculator",
+   [
+    "mortgage-calculator"
+   ]
+  ],
+  [
+   "mortgage payment",
+   [
+    "mortgage-calculator"
+   ]
+  ],
+  [
+   "extract audio from video",
+   [
+    "video-to-mp3",
+    "video-audio-extractor"
+   ]
+  ],
+  [
+   "mp4 to mp3",
+   [
+    "video-to-mp3"
+   ]
+  ],
+  [
+   "convert video to audio",
+   [
+    "video-to-mp3",
+    "video-audio-extractor"
+   ]
+  ],
+  [
+   "cut video",
+   [
+    "video-trimmer"
+   ]
+  ],
+  [
+   "video cutter",
+   [
+    "video-trimmer"
+   ]
+  ],
+  [
+   "trim mp4",
+   [
+    "video-trimmer"
+   ]
+  ],
+  [
+   "make gif from video",
+   [
+    "video-to-gif"
+   ]
+  ],
+  [
+   "mp4 to gif",
+   [
+    "video-to-gif"
+   ]
+  ],
+  [
+   "remove metadata from photo",
+   [
+    "exif-remover"
+   ]
+  ],
+  [
+   "strip exif",
+   [
+    "exif-remover"
+   ]
+  ],
+  [
+   "heic to jpg",
+   [
+    "heic-converter"
+   ]
+  ],
+  [
+   "iphone photo to jpg",
+   [
+    "heic-converter"
+   ]
+  ],
+  [
+   "png to jpeg",
+   [
+    "file-png-to-jpg-converter"
+   ]
+  ],
+  [
+   "convert png to jpg",
+   [
+    "file-png-to-jpg-converter"
+   ]
+  ],
+  [
+   "epoch converter",
+   [
+    "unix-timestamp-converter"
+   ]
+  ],
+  [
+   "timestamp to date",
+   [
+    "unix-timestamp-converter"
+   ]
+  ],
+  [
+   "epoch to date",
+   [
+    "unix-timestamp-converter"
+   ]
+  ],
+  [
+   "dummy text",
+   [
+    "lorem-ipsum-generator"
+   ]
+  ],
+  [
+   "placeholder text",
+   [
+    "lorem-ipsum-generator"
+   ]
+  ],
+  [
+   "encode base64",
+   [
+    "base64-encoder"
+   ]
+  ],
+  [
+   "base64 encode",
+   [
+    "base64-encoder"
+   ]
+  ],
+  [
+   "text to base64",
+   [
+    "base64-encoder"
+   ]
+  ],
+  [
+   "regular expression tester",
+   [
+    "regex-tester",
+    "regex-studio"
+   ]
+  ],
+  [
+   "regex tester online",
+   [
+    "regex-tester",
+    "regex-studio"
+   ]
+  ],
+  [
+   "pomodoro technique timer",
+   [
+    "pomodoro-timer"
+   ]
+  ],
+  [
+   "gratuity calculator",
+   [
+    "tip-calculator"
+   ]
+  ],
+  [
+   "hex color picker",
+   [
+    "color-picker"
+   ]
+  ],
+  [
+   "color code picker",
+   [
+    "color-picker"
+   ]
+  ],
+  [
+   "encode url",
+   [
+    "url-encoder",
+    "url-encode"
+   ]
+  ],
+  [
+   "url encode",
+   [
+    "url-encoder",
+    "url-encode"
+   ]
+  ],
+  [
+   "image to pdf",
+   [
+    "images-to-pdf"
+   ]
+  ],
+  [
+   "convert image to pdf",
+   [
+    "images-to-pdf"
+   ]
+  ],
+  [
+   "jpg to pdf",
+   [
+    "images-to-pdf"
+   ]
+  ],
+  [
+   "pdf to image",
+   [
+    "pdf-image-extractor",
+    "document-image-extractor"
+   ]
+  ]
+ ]
+}

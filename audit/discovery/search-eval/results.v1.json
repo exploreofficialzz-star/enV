@@ -1,0 +1,983 @@
+{
+ "datasetVersion": "1.1.0",
+ "reviewStatus": "DRAFT_NOT_HUMAN_REVIEWED",
+ "legacy": {
+  "queries": 59,
+  "supportedQueries": 54,
+  "unsupportedQueries": 5,
+  "Precision@5": 0.178,
+  "Recall@10": 0.855,
+  "NDCG@10": 0.571,
+  "top1TargetRate": 0.315,
+  "zeroResultRateOnSupported": 0,
+  "correctNoMatchRate": 0.2
+ },
+ "current": {
+  "queries": 59,
+  "supportedQueries": 54,
+  "unsupportedQueries": 5,
+  "Precision@5": 0.252,
+  "Recall@10": 0.923,
+  "NDCG@10": 0.946,
+  "top1TargetRate": 0.926,
+  "zeroResultRateOnSupported": 0,
+  "correctNoMatchRate": 1
+ },
+ "heldOut": {
+  "legacy": {
+   "queries": 26,
+   "supportedQueries": 24,
+   "unsupportedQueries": 2,
+   "Precision@5": 0.158,
+   "Recall@10": 0.813,
+   "NDCG@10": 0.513,
+   "top1TargetRate": 0.25,
+   "zeroResultRateOnSupported": 0,
+   "correctNoMatchRate": 0
+  },
+  "current": {
+   "queries": 26,
+   "supportedQueries": 24,
+   "unsupportedQueries": 2,
+   "Precision@5": 0.242,
+   "Recall@10": 0.882,
+   "NDCG@10": 0.921,
+   "top1TargetRate": 0.917,
+   "zeroResultRateOnSupported": 0,
+   "correctNoMatchRate": 1
+  }
+ },
+ "rows": [
+  {
+   "id": "q001",
+   "type": "exact-name",
+   "query": "password generator",
+   "results": [
+    "password-generator",
+    "md5-hash"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q002",
+   "type": "exact-name",
+   "query": "bmi calculator",
+   "results": [
+    "bmi-calculator",
+    "bmi-calculator-metric",
+    "body-mass-index-percent-calculator",
+    "lean-body-mass-calculator",
+    "weighted-grade-calculator"
+   ],
+   "p5": 0.4,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q003",
+   "type": "exact-id",
+   "query": "sha256-hash",
+   "results": [
+    "sha256-hash",
+    "hash-studio",
+    "hash-generator",
+    "file-hash-calculator",
+    "duplicate-file-finder"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q004",
+   "type": "exact-name",
+   "query": "word counter",
+   "results": [
+    "word-counter",
+    "word-frequency"
+   ],
+   "p5": 0.2,
+   "r10": 0.5,
+   "ndcg": 0.9173194127129571,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q005",
+   "type": "exact-name",
+   "query": "qr code generator",
+   "results": [
+    "qr-generator",
+    "qr-code-styled",
+    "code128-barcode",
+    "code39-barcode",
+    "qr-code-high-error-correction"
+   ],
+   "p5": 0.4,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q006",
+   "type": "exact-name",
+   "query": "json formatter",
+   "results": [
+    "json-formatter"
+   ],
+   "p5": 0.2,
+   "r10": 0.5,
+   "ndcg": 0.7871546029909718,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q007",
+   "type": "task",
+   "query": "merge pdf",
+   "results": [
+    "pdf-merger",
+    "document-merger",
+    "docx-merger",
+    "image-merger",
+    "presentation-merger"
+   ],
+   "p5": 0.4,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q008",
+   "type": "task",
+   "query": "how do i make a pdf smaller",
+   "results": [
+    "pdf-compressor",
+    "document-compressor",
+    "docx-compressor",
+    "presentation-compressor",
+    "spreadsheet-compressor"
+   ],
+   "p5": 0.4,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q009",
+   "type": "task",
+   "query": "how to split pdf",
+   "results": [
+    "pdf-splitter",
+    "document-splitter",
+    "document-page-extractor"
+   ],
+   "p5": 0.4,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q010",
+   "type": "task",
+   "query": "compress image",
+   "results": [
+    "image-compressor",
+    "x-image-compressor",
+    "discord-image-compressor",
+    "facebook-image-compressor",
+    "instagram-image-compressor"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q011",
+   "type": "task",
+   "query": "resize photo",
+   "results": [
+    "image-resizer",
+    "discord-image-resizer",
+    "reddit-image-resizer",
+    "snapchat-image-resizer",
+    "threads-image-resizer"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q012",
+   "type": "task",
+   "query": "rotate video",
+   "results": [
+    "video-rotate"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q013",
+   "type": "task",
+   "query": "scan a barcode",
+   "results": [
+    "qr-payload-inspector"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q014",
+   "type": "synonym",
+   "query": "picture resize",
+   "results": [
+    "profile-picture-maker",
+    "image-resizer",
+    "discord-image-resizer",
+    "reddit-image-resizer",
+    "snapchat-image-resizer"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 0.6309297535714575,
+   "top1": 0,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q015",
+   "type": "synonym",
+   "query": "pwd generator",
+   "results": [
+    "password-generator",
+    "md5-hash"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q016",
+   "type": "synonym",
+   "query": "colour contrast",
+   "results": [
+    "contrast-checker",
+    "brightness-contrast",
+    "focus-state-checker",
+    "image-image-color-sampler"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q017",
+   "type": "abbreviation",
+   "query": "a11y focus ring",
+   "results": [
+    "focus-state-checker",
+    "keyboard-navigation-checker"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q018",
+   "type": "typo",
+   "query": "pdf mrge",
+   "results": [
+    "pdf-merger",
+    "document-merger",
+    "docx-merger",
+    "image-merger",
+    "presentation-merger"
+   ],
+   "p5": 0.4,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q019",
+   "type": "typo",
+   "query": "passwrod generator",
+   "results": [
+    "password-generator",
+    "md5-hash"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q020",
+   "type": "typo",
+   "query": "imge resizer",
+   "results": [
+    "image-resizer",
+    "x-image-resizer",
+    "instagram-image-resizer",
+    "tiktok-image-resizer",
+    "linkedin-image-resizer"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q021",
+   "type": "incomplete",
+   "query": "passw",
+   "results": [
+    "password-generator",
+    "password-strength-checker",
+    "md5-hash",
+    "voice-noise-reducer"
+   ],
+   "p5": 0.4,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q022",
+   "type": "format",
+   "query": "png to jpg",
+   "results": [
+    "file-png-to-jpg-converter",
+    "file-jpg-to-png-converter",
+    "image-compressor",
+    "images-to-pdf",
+    "heic-converter"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q023",
+   "type": "format",
+   "query": "jpg to png",
+   "results": [
+    "file-jpg-to-png-converter",
+    "file-png-to-jpg-converter",
+    "image-compressor",
+    "images-to-pdf",
+    "heic-converter"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q024",
+   "type": "format",
+   "query": "convert heic",
+   "results": [
+    "heic-converter"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q025",
+   "type": "format",
+   "query": "jpeg",
+   "results": [
+    "jpg-converter",
+    "file-jpg-to-png-converter",
+    "file-jpg-to-webp-converter",
+    "file-png-to-jpg-converter",
+    "file-webp-to-jpg-converter"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q026",
+   "type": "multi-constraint",
+   "query": "birthday event qr generator",
+   "results": [
+    "event-qr-generator",
+    "birthday-agenda-generator",
+    "birthday-invitation-generator",
+    "calendar-qr-generator",
+    "birthday-event-qr-generator"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q027",
+   "type": "task",
+   "query": "invoice",
+   "results": [
+    "invoice-generator",
+    "invoice-calculator",
+    "invoice-estimator",
+    "invoice-planner",
+    "invoice-template"
+   ],
+   "p5": 0.4,
+   "r10": 1,
+   "ndcg": 0.9176601606601069,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q028",
+   "type": "task",
+   "query": "mortgage",
+   "results": [
+    "mortgage-calculator"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q029",
+   "type": "task",
+   "query": "screen reader image description",
+   "results": [
+    "alt-text-checker"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q030",
+   "type": "task",
+   "query": "hash",
+   "results": [
+    "hash-studio",
+    "hash-generator",
+    "hash-compare",
+    "hash-beautifier",
+    "hash-converter"
+   ],
+   "p5": 0.4,
+   "r10": 0.6666666666666666,
+   "ndcg": 0.7136205775898136,
+   "top1": 0,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "q031",
+   "type": "unsupported",
+   "query": "zzzzqx",
+   "results": [],
+   "p5": null,
+   "r10": null,
+   "ndcg": null,
+   "top1": null,
+   "zero": true,
+   "expectEmpty": true
+  },
+  {
+   "id": "q032",
+   "type": "unsupported",
+   "query": "book a flight to mars",
+   "results": [],
+   "p5": null,
+   "r10": null,
+   "ndcg": null,
+   "top1": null,
+   "zero": true,
+   "expectEmpty": true
+  },
+  {
+   "id": "q033",
+   "type": "unsupported",
+   "query": "quantum teleportation booth",
+   "results": [],
+   "p5": null,
+   "r10": null,
+   "ndcg": null,
+   "top1": null,
+   "zero": true,
+   "expectEmpty": true
+  },
+  {
+   "id": "h001",
+   "type": "task",
+   "query": "convert csv to json",
+   "results": [
+    "file-csv-to-json-converter",
+    "csv-to-json",
+    "file-json-to-csv-converter",
+    "json-to-csv",
+    "json-studio"
+   ],
+   "p5": 0.4,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "h002",
+   "type": "task",
+   "query": "json to csv",
+   "results": [
+    "json-to-csv",
+    "file-json-to-csv-converter",
+    "csv-to-json",
+    "file-csv-to-json-converter",
+    "json-studio"
+   ],
+   "p5": 0.4,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "h003",
+   "type": "exact-name",
+   "query": "base64 encoder",
+   "results": [
+    "base64-encoder",
+    "encoding-studio"
+   ],
+   "p5": 0.2,
+   "r10": 0.5,
+   "ndcg": 0.7871546029909718,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "h004",
+   "type": "synonym",
+   "query": "percent encode a url",
+   "results": [
+    "url-encoder",
+    "url-encode",
+    "url-decode",
+    "url-decoder",
+    "encoding-studio"
+   ],
+   "p5": 0.4,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "h005",
+   "type": "task",
+   "query": "unix timestamp",
+   "results": [
+    "unix-timestamp-converter",
+    "time-cron-studio"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "h006",
+   "type": "exact-name",
+   "query": "lorem ipsum",
+   "results": [
+    "lorem-ipsum-generator"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "h007",
+   "type": "task",
+   "query": "calculate a tip",
+   "results": [
+    "tip-calculator",
+    "tip-split-calculator",
+    "math-exp-product-tip-bill-rate-a",
+    "math-exp-product-tip-bill-rate-c",
+    "math-exp-product-tip-bill-rate-b"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "h008",
+   "type": "task",
+   "query": "roll dice",
+   "results": [
+    "dice-roller"
+   ],
+   "p5": 0.2,
+   "r10": 0.5,
+   "ndcg": 0.7871546029909718,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "h009",
+   "type": "task",
+   "query": "rotate a pdf",
+   "results": [
+    "pdf-rotator"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "h010",
+   "type": "task",
+   "query": "add watermark to pdf",
+   "results": [
+    "pdf-watermark-tool",
+    "document-watermark-tool",
+    "docx-watermark-tool",
+    "image-watermark-tool",
+    "presentation-watermark-tool"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "h011",
+   "type": "format",
+   "query": "video to mp3",
+   "results": [
+    "video-to-mp3"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "h012",
+   "type": "task",
+   "query": "trim video",
+   "results": [
+    "video-trimmer",
+    "video-crop"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "h013",
+   "type": "task",
+   "query": "test regular expression",
+   "results": [
+    "regex-studio",
+    "regex-tester"
+   ],
+   "p5": 0.4,
+   "r10": 1,
+   "ndcg": 0.8339912323981488,
+   "top1": 0,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "h014",
+   "type": "task",
+   "query": "convert text to title case",
+   "results": [
+    "title-case-converter",
+    "kebab-case-converter",
+    "camel-case-converter",
+    "snake-case-converter",
+    "sentence-case-converter"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "h015",
+   "type": "task",
+   "query": "make a url slug",
+   "results": [
+    "slug-generator"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "h016",
+   "type": "task",
+   "query": "generate meta tags",
+   "results": [
+    "meta-tag-generator",
+    "meta-robots-generator",
+    "twitter-card-generator"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "h017",
+   "type": "task",
+   "query": "pick colors from an image",
+   "results": [
+    "image-color-picker",
+    "color-picker",
+    "image-palette",
+    "image-image-color-sampler",
+    "image-image-dominant-color-finder"
+   ],
+   "p5": 0.4,
+   "r10": 0.6666666666666666,
+   "ndcg": 0.9049495058460971,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "h018",
+   "type": "task",
+   "query": "compound interest",
+   "results": [
+    "compound-interest-calculator",
+    "interest-calculator"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "h019",
+   "type": "task",
+   "query": "savings goal",
+   "results": [
+    "savings-goal-calculator",
+    "finance-savings-goal-calculator"
+   ],
+   "p5": 0.4,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "h020",
+   "type": "task",
+   "query": "pomodoro",
+   "results": [
+    "pomodoro-timer"
+   ],
+   "p5": 0.2,
+   "r10": 0.5,
+   "ndcg": 0.7871546029909718,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "h021",
+   "type": "task",
+   "query": "view exif data",
+   "results": [
+    "exif-viewer"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "h022",
+   "type": "task",
+   "query": "remove exif metadata",
+   "results": [
+    "exif-remover",
+    "exif-viewer",
+    "image-image-metadata-cleaner"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "h023",
+   "type": "typo",
+   "query": "pomodro timer",
+   "results": [
+    "pomodoro-timer"
+   ],
+   "p5": 0.2,
+   "r10": 1,
+   "ndcg": 1,
+   "top1": 1,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "h024",
+   "type": "typo",
+   "query": "regexp tester",
+   "results": [
+    "regex-studio"
+   ],
+   "p5": 0,
+   "r10": 0,
+   "ndcg": 0,
+   "top1": 0,
+   "zero": false,
+   "expectEmpty": false
+  },
+  {
+   "id": "h025",
+   "type": "unsupported",
+   "query": "cure my cough",
+   "results": [],
+   "p5": null,
+   "r10": null,
+   "ndcg": null,
+   "top1": null,
+   "zero": true,
+   "expectEmpty": true
+  },
+  {
+   "id": "h026",
+   "type": "unsupported",
+   "query": "order a pizza",
+   "results": [],
+   "p5": null,
+   "r10": null,
+   "ndcg": null,
+   "top1": null,
+   "zero": true,
+   "expectEmpty": true
+  }
+ ]
+}

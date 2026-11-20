@@ -19,9 +19,10 @@ test("canonical Studio paths and all historical action paths remain resolvable",
   assert.ok(getToolByPath("accessibility", "line-height-helper"));
 });
 
-test("all 55 historic accessibility IDs and paths resolve to their Studio without losing an action mode", () => {
+test("all 56 accessibility IDs and legacy paths resolve to their Studio without losing an action mode", () => {
   const historical = getAllTools().filter((tool) => tool.category === "accessibility");
-  assert.equal(historical.length, 55);
+  // 55 original action records plus contrast-checker, whose single canonical destination is the Accessibility Studio.
+  assert.equal(historical.length, 56);
   const validModes = new Set(["checker", "generator", "helper", "preview", "simulator"]);
   for (const legacy of historical) {
     const studio = accessibilityStudioForKind(accessibilityKindFromToolId(legacy.id));

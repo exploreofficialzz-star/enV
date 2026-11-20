@@ -1,0 +1,518 @@
+{
+ "datasetVersion": "1.1.0",
+ "reviewStatus": "DRAFT_NOT_HUMAN_REVIEWED",
+ "note": "Relevance judgments were authored from registry metadata by an AI assistant and have NOT been reviewed by a human. Requirements 3.4/15 need human-reviewed judgments before any threshold is treated as an acceptance result. Grades: 3 = the tool the user wants, 2 = clearly useful alternative, 1 = related. Empty relevant list = the correct result is no match.",
+ "queries": [
+  {
+   "id": "q001",
+   "type": "exact-name",
+   "query": "password generator",
+   "relevant": {
+    "password-generator": 3
+   }
+  },
+  {
+   "id": "q002",
+   "type": "exact-name",
+   "query": "bmi calculator",
+   "relevant": {
+    "bmi-calculator": 3,
+    "bmi-calculator-metric": 2
+   }
+  },
+  {
+   "id": "q003",
+   "type": "exact-id",
+   "query": "sha256-hash",
+   "relevant": {
+    "sha256-hash": 3
+   }
+  },
+  {
+   "id": "q004",
+   "type": "exact-name",
+   "query": "word counter",
+   "relevant": {
+    "word-counter": 3,
+    "character-counter": 1
+   }
+  },
+  {
+   "id": "q005",
+   "type": "exact-name",
+   "query": "qr code generator",
+   "relevant": {
+    "qr-generator": 3,
+    "qr-code-styled": 2
+   }
+  },
+  {
+   "id": "q006",
+   "type": "exact-name",
+   "query": "json formatter",
+   "relevant": {
+    "json-formatter": 3,
+    "json-studio": 2
+   }
+  },
+  {
+   "id": "q007",
+   "type": "task",
+   "query": "merge pdf",
+   "relevant": {
+    "pdf-merger": 3,
+    "document-merger": 2
+   }
+  },
+  {
+   "id": "q008",
+   "type": "task",
+   "query": "how do i make a pdf smaller",
+   "relevant": {
+    "pdf-compressor": 3,
+    "document-compressor": 2
+   }
+  },
+  {
+   "id": "q009",
+   "type": "task",
+   "query": "how to split pdf",
+   "relevant": {
+    "pdf-splitter": 3,
+    "document-splitter": 2
+   }
+  },
+  {
+   "id": "q010",
+   "type": "task",
+   "query": "compress image",
+   "relevant": {
+    "image-compressor": 3
+   }
+  },
+  {
+   "id": "q011",
+   "type": "task",
+   "query": "resize photo",
+   "relevant": {
+    "image-resizer": 3
+   }
+  },
+  {
+   "id": "q012",
+   "type": "task",
+   "query": "rotate video",
+   "relevant": {
+    "video-rotate": 3
+   }
+  },
+  {
+   "id": "q013",
+   "type": "task",
+   "query": "scan a barcode",
+   "relevant": {
+    "qr-payload-inspector": 3
+   }
+  },
+  {
+   "id": "q014",
+   "type": "synonym",
+   "query": "picture resize",
+   "relevant": {
+    "image-resizer": 3
+   }
+  },
+  {
+   "id": "q015",
+   "type": "synonym",
+   "query": "pwd generator",
+   "relevant": {
+    "password-generator": 3
+   }
+  },
+  {
+   "id": "q016",
+   "type": "synonym",
+   "query": "colour contrast",
+   "relevant": {
+    "contrast-checker": 3
+   }
+  },
+  {
+   "id": "q017",
+   "type": "abbreviation",
+   "query": "a11y focus ring",
+   "relevant": {
+    "focus-state-checker": 3
+   }
+  },
+  {
+   "id": "q018",
+   "type": "typo",
+   "query": "pdf mrge",
+   "relevant": {
+    "pdf-merger": 3,
+    "document-merger": 2
+   }
+  },
+  {
+   "id": "q019",
+   "type": "typo",
+   "query": "passwrod generator",
+   "relevant": {
+    "password-generator": 3
+   }
+  },
+  {
+   "id": "q020",
+   "type": "typo",
+   "query": "imge resizer",
+   "relevant": {
+    "image-resizer": 3
+   }
+  },
+  {
+   "id": "q021",
+   "type": "incomplete",
+   "query": "passw",
+   "relevant": {
+    "password-generator": 3,
+    "password-strength-checker": 2
+   }
+  },
+  {
+   "id": "q022",
+   "type": "format",
+   "query": "png to jpg",
+   "relevant": {
+    "file-png-to-jpg-converter": 3
+   }
+  },
+  {
+   "id": "q023",
+   "type": "format",
+   "query": "jpg to png",
+   "relevant": {
+    "file-jpg-to-png-converter": 3
+   }
+  },
+  {
+   "id": "q024",
+   "type": "format",
+   "query": "convert heic",
+   "relevant": {
+    "heic-converter": 3
+   }
+  },
+  {
+   "id": "q025",
+   "type": "format",
+   "query": "jpeg",
+   "relevant": {
+    "jpg-converter": 3
+   }
+  },
+  {
+   "id": "q026",
+   "type": "multi-constraint",
+   "query": "birthday event qr generator",
+   "relevant": {
+    "event-qr-generator": 3
+   }
+  },
+  {
+   "id": "q027",
+   "type": "task",
+   "query": "invoice",
+   "relevant": {
+    "invoice-generator": 3,
+    "invoice-template": 2
+   }
+  },
+  {
+   "id": "q028",
+   "type": "task",
+   "query": "mortgage",
+   "relevant": {
+    "mortgage-calculator": 3
+   }
+  },
+  {
+   "id": "q029",
+   "type": "task",
+   "query": "screen reader image description",
+   "relevant": {
+    "alt-text-checker": 3
+   }
+  },
+  {
+   "id": "q030",
+   "type": "task",
+   "query": "hash",
+   "relevant": {
+    "hash-generator": 3,
+    "sha256-hash": 2,
+    "hash-studio": 2
+   }
+  },
+  {
+   "id": "q031",
+   "type": "unsupported",
+   "query": "zzzzqx",
+   "relevant": {}
+  },
+  {
+   "id": "q032",
+   "type": "unsupported",
+   "query": "book a flight to mars",
+   "relevant": {}
+  },
+  {
+   "id": "q033",
+   "type": "unsupported",
+   "query": "quantum teleportation booth",
+   "relevant": {}
+  },
+  {
+   "id": "h001",
+   "type": "task",
+   "query": "convert csv to json",
+   "relevant": {
+    "csv-to-json": 3,
+    "file-csv-to-json-converter": 3
+   },
+   "set": "held-out"
+  },
+  {
+   "id": "h002",
+   "type": "task",
+   "query": "json to csv",
+   "relevant": {
+    "json-to-csv": 3,
+    "file-json-to-csv-converter": 3
+   },
+   "set": "held-out"
+  },
+  {
+   "id": "h003",
+   "type": "exact-name",
+   "query": "base64 encoder",
+   "relevant": {
+    "base64-encoder": 3,
+    "base64-converter": 2
+   },
+   "set": "held-out"
+  },
+  {
+   "id": "h004",
+   "type": "synonym",
+   "query": "percent encode a url",
+   "relevant": {
+    "url-encoder": 3,
+    "url-encode": 3
+   },
+   "set": "held-out"
+  },
+  {
+   "id": "h005",
+   "type": "task",
+   "query": "unix timestamp",
+   "relevant": {
+    "unix-timestamp-converter": 3
+   },
+   "set": "held-out"
+  },
+  {
+   "id": "h006",
+   "type": "exact-name",
+   "query": "lorem ipsum",
+   "relevant": {
+    "lorem-ipsum-generator": 3
+   },
+   "set": "held-out"
+  },
+  {
+   "id": "h007",
+   "type": "task",
+   "query": "calculate a tip",
+   "relevant": {
+    "tip-calculator": 3
+   },
+   "set": "held-out"
+  },
+  {
+   "id": "h008",
+   "type": "task",
+   "query": "roll dice",
+   "relevant": {
+    "dice-roller": 3,
+    "dice-generator": 2
+   },
+   "set": "held-out"
+  },
+  {
+   "id": "h009",
+   "type": "task",
+   "query": "rotate a pdf",
+   "relevant": {
+    "pdf-rotator": 3
+   },
+   "set": "held-out"
+  },
+  {
+   "id": "h010",
+   "type": "task",
+   "query": "add watermark to pdf",
+   "relevant": {
+    "pdf-watermark-tool": 3
+   },
+   "set": "held-out"
+  },
+  {
+   "id": "h011",
+   "type": "format",
+   "query": "video to mp3",
+   "relevant": {
+    "video-to-mp3": 3
+   },
+   "set": "held-out"
+  },
+  {
+   "id": "h012",
+   "type": "task",
+   "query": "trim video",
+   "relevant": {
+    "video-trimmer": 3
+   },
+   "set": "held-out"
+  },
+  {
+   "id": "h013",
+   "type": "task",
+   "query": "test regular expression",
+   "relevant": {
+    "regex-tester": 3,
+    "regex-studio": 2
+   },
+   "set": "held-out"
+  },
+  {
+   "id": "h014",
+   "type": "task",
+   "query": "convert text to title case",
+   "relevant": {
+    "title-case-converter": 3
+   },
+   "set": "held-out"
+  },
+  {
+   "id": "h015",
+   "type": "task",
+   "query": "make a url slug",
+   "relevant": {
+    "slug-generator": 3
+   },
+   "set": "held-out"
+  },
+  {
+   "id": "h016",
+   "type": "task",
+   "query": "generate meta tags",
+   "relevant": {
+    "meta-tag-generator": 3
+   },
+   "set": "held-out"
+  },
+  {
+   "id": "h017",
+   "type": "task",
+   "query": "pick colors from an image",
+   "relevant": {
+    "image-color-picker": 3,
+    "image-palette": 2,
+    "palette-generator": 1
+   },
+   "set": "held-out"
+  },
+  {
+   "id": "h018",
+   "type": "task",
+   "query": "compound interest",
+   "relevant": {
+    "compound-interest-calculator": 3
+   },
+   "set": "held-out"
+  },
+  {
+   "id": "h019",
+   "type": "task",
+   "query": "savings goal",
+   "relevant": {
+    "savings-goal-calculator": 3,
+    "finance-savings-goal-calculator": 3
+   },
+   "set": "held-out"
+  },
+  {
+   "id": "h020",
+   "type": "task",
+   "query": "pomodoro",
+   "relevant": {
+    "pomodoro-timer": 3,
+    "focus-timer": 2
+   },
+   "set": "held-out"
+  },
+  {
+   "id": "h021",
+   "type": "task",
+   "query": "view exif data",
+   "relevant": {
+    "exif-viewer": 3
+   },
+   "set": "held-out"
+  },
+  {
+   "id": "h022",
+   "type": "task",
+   "query": "remove exif metadata",
+   "relevant": {
+    "exif-remover": 3
+   },
+   "set": "held-out"
+  },
+  {
+   "id": "h023",
+   "type": "typo",
+   "query": "pomodro timer",
+   "relevant": {
+    "pomodoro-timer": 3
+   },
+   "set": "held-out"
+  },
+  {
+   "id": "h024",
+   "type": "typo",
+   "query": "regexp tester",
+   "relevant": {
+    "regex-tester": 3
+   },
+   "set": "held-out"
+  },
+  {
+   "id": "h025",
+   "type": "unsupported",
+   "query": "cure my cough",
+   "relevant": {},
+   "set": "held-out"
+  },
+  {
+   "id": "h026",
+   "type": "unsupported",
+   "query": "order a pizza",
+   "relevant": {},
+   "set": "held-out"
+  }
+ ],
+ "heldOutNote": "Queries with set=held-out (h001-h026) were written AFTER the scorer was tuned and their relevant IDs were chosen by browsing registry names, not by running the scorer. They are scored once and must not be used for tuning."
+}

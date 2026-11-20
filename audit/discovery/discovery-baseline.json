@@ -1,0 +1,23 @@
+{
+ "note": "Snapshot recorded by --update-baseline. It has NOT been reviewed by a human owner yet: review the difference lists in DISCOVERY-RECONCILIATION-REPORT.md before treating it as accepted. Counts must match exactly; gap values may only shrink.",
+ "counts": {
+  "sourceRecords": 10001,
+  "sharedCatalogueRecords": 10001,
+  "runtimeRecords": 10014,
+  "searchableRecords": 9979,
+  "runtimeExtensionRecords": 13,
+  "virtualStudioRecords": 14,
+  "runtimePlanned": 260,
+  "categoryDefinitions": 43
+ },
+ "gaps": {
+  "PLANNED_IN_SEARCHABLE": 260,
+  "EMPTY_CATEGORY": 1,
+  "NATIVE_MATRIX_NAME_DRIFT": 0,
+  "NATIVE_WEB_ONLY_ACTIVE": 278,
+  "DUPLICATE_DISPLAY_NAMES": 654,
+  "UNDIFFERENTIATED_POPULARITY": 1,
+  "SEARCHABLE_NOT_ON_ANY_CATEGORY_ROUTE": 475,
+  "TOOLS_IN_MULTIPLE_CATEGORY_ROUTES": 1
+ }
+}

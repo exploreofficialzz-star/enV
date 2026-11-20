@@ -1,0 +1,16 @@
+{
+ "note": "Registered legacy link defects. Counts may shrink, never grow. Explicit noRelatedExceptions document intentional isolated tools and are validated against the live registry.",
+ "counts": {
+  "dangling": 5,
+  "self": 4,
+  "toPlanned": 106,
+  "toUndiscoverable": 287,
+  "noRelated": 495
+ },
+ "noRelatedExceptions": [
+  {
+   "id": "video-link-screen-recording",
+   "reason": "The tool records the original social-media post interface and intentionally has no related suggestions."
+  }
+ ]
+}

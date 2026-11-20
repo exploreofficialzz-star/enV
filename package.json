@@ -137,7 +137,19 @@
     "test:discovery": "npm run check:seo && node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/tool-documentation.test.ts src/components/engines/celebration-engine-utils.test.ts && node --test scripts/generic-workflow-policy.test.mjs scripts/audit-evidence-provenance.test.mjs scripts/source-inspection-evidence.test.mjs scripts/write-tool-audit-report.test.mjs scripts/reconcile-tool-inventories.test.mjs",
     "audit:tool-ledger": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/generate-tool-functional-audit-ledger.mjs",
     "check:video-link-recorder": "node scripts/check-video-link-recorder.mjs",
-    "audit:dependencies": "node scripts/check-npm-audit.mjs"
+    "audit:dependencies": "node scripts/check-npm-audit.mjs",
+    "discovery:inventory": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/generate-discovery-inventory.mjs",
+    "discovery:search-eval": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/evaluate-search-quality.mjs",
+    "discovery:knowledge-index": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/generate-tool-knowledge-index.mjs",
+    "discovery:knowledge-index:check": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/generate-tool-knowledge-index.mjs --check",
+    "discovery:search-golden": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/generate-search-golden.mjs",
+    "discovery:search-golden:check": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/generate-search-golden.mjs --check",
+    "discovery:seo-offline": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/validate-seo-offline.mjs",
+    "discovery:related-audit": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/audit-related-tools.mjs",
+    "discovery:check": "npm run discovery:inventory:check && npm run discovery:knowledge-index:check && npm run discovery:search-golden:check && npm run discovery:search-eval -- --gate && npm run discovery:phrasing-eval -- --gate && npm run discovery:related-audit && node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/validate-seo-offline.mjs --check",
+    "discovery:phrasing-eval": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/evaluate-phrasing-hypotheses.mjs",
+    "discovery:learn-aliases": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/learn-search-aliases.mjs",
+    "discovery:inventory:check": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/generate-discovery-inventory.mjs --check"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
