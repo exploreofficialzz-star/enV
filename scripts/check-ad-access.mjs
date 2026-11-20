@@ -41,6 +41,7 @@ const iosCalculator = read("apps/ios/enV/ToolViews.swift");
 const iosPrivacy = read("apps/ios/enV/ContentViews.swift");
 const iosApp = read("apps/ios/enV/enVApp.swift");
 const iosProject = read("apps/ios/enV.xcodeproj/project.pbxproj");
+const nativeToolViews = iosCalculator;
 
 assert.match(rootRoute, /ca-pub-2492078126313994/, "The AdSense site verification tag must use the publisher ID supplied by the account owner.");
 assert.match(rootRoute, /name: "google-adsense-account", content: ADSENSE_SITE_CLIENT_ID/, "The shared document head must expose Google AdSense site verification.");
@@ -54,7 +55,7 @@ assert.match(toolShell, /const adsterraAdsEnabled =\s*adsterraQualified && adste
 assert.match(toolShell, /useCurrentUserState\(\)/, "Selected access-gated tools must distinguish guests from signed-in users.");
 assert.match(toolShell, /adAccessGateEnabled && !toolAccessUnlocked/, "Selected tools must remain hidden until rewarded-ad or token access is granted.");
 assert.match(toolShell, /VITE_AD_ACCESS_TOOL_IDS/, "The access gate must use an explicit, deployment-controlled tool allowlist.");
-assert.match(toolShell, /<ToolExecutionTelemetryContext\.Provider value=\{executionTelemetry\}>\s*\{toolContent\}\s*<\/ToolExecutionTelemetryContext\.Provider>/, "Eligible tool content must render directly without an advertising access gate.");
+assert.match(toolShell, /<ToolExecutionTelemetryContext\.Provider value=\{executionTelemetry\}>\s*\{toolContent\}\s*<\/ToolExecutionTelemetryContext\.Provider>/, "The gate must preserve the normal tool execution telemetry context after access is granted.");
 assert.match(toolShell, /<\/section>\s*\{!isFullscreen && adsterraAdsEnabled[\s\S]*?<AdsterraBanner format="300x250" \/>[\s\S]*?<AdsterraNativeBanner \/>[\s\S]*?\}\s*\{tool\.category !== "creators"/, "Lower Adsterra placements must work for every eligible category, including Creator tools.");
 assert.match(toolShell, /openAdsterraSmartlinkFromOutput/, "Output actions must trigger the publisher Smartlink from a direct click.");
 assert.ok(toolShell.includes("copy|download|export|save|output|result|calculate|convert|generate"), "Output triggers must include copy, download, export and common output-producing actions.");
@@ -162,6 +163,14 @@ assert.match(androidAds, /tool\.status == "active"/, "Android ads must exclude n
 assert.match(androidAds, /tool\.requiresBackend|!tool\.requiresBackend/, "Android ads must exclude backend-dependent tools.");
 assert.match(androidAds, /restrictedDisclaimers/, "Android ads must apply the same sensitive-topic exclusions as Web.");
 assert.match(androidAds, /common\.AdLoadCallback|common\.LoadAdError/, "Android must use the current Google Ads callback API.");
+assert.match(androidGradle, /ENV_ADMOB_REWARDED_AD_UNIT_ID/, "Android rewarded ad unit configuration must be explicit.");
+assert.match(androidGradle, /ENV_AD_ACCESS_GATE_ENABLED[\s\S]*?false/, "Android rewarded access must be disabled by default.");
+assert.match(androidGradle, /ENV_AD_ACCESS_TOOL_IDS/, "Android rewarded access must have a separate tool allowlist.");
+assert.match(androidAds, /RewardedAd\.load\(/, "Android must load genuine Google rewarded video.");
+assert.match(androidAds, /ad\.show\(activity\)/, "Android must require the Google rewarded SDK reward callback.");
+assert.match(androidAds, /NativeRewardedAdProgress\.recordCompletion/, "Android must count reward callbacks in the rolling rewarded progress window.");
+assert.match(androidAds, /fun isRewardedAccessTool\(tool: ToolRecord\)/, "Android rewarded access must use a separate explicit tool allowlist.");
+assert.match(androidMain, /NativeRewardedToolAccessGate\(tool, onOpenWallet\)/, "Android tool interfaces must be wrapped by the native rewarded gate.");
 assert.match(androidMain, /NativeToolAdSlot\(tool\)/, "The native Android tool surface must include its ad slot.");
 assert.match(androidMain, /val online = NativeAdsPolicy\.isApplicationOnline\(context\)/, "Android hybrid runs must verify the enV origin.");
 assert.match(androidMain, /allowanceId != null && walletEligible -> runWithOfflineCharge\(\)/, "Android offline use must be journalled against a prepared allowance.");
@@ -178,6 +187,12 @@ assert.match(iosAds, /MobileAds\.shared\.start/, "iOS must initialize Google Mob
 assert.match(iosAds, /publisherPrivacyPersonalizationState = \.disabled/, "iOS ad requests must default to non-personalized treatment.");
 assert.match(iosAds, /coarseLocationCollectionEnabled = false/, "iOS ads must not collect coarse device location by default.");
 assert.match(iosAds, /static func isAdEligibleTool\(_ tool: Tool\)/, "iOS must evaluate the full catalog record using independent native ad eligibility.");
+assert.match(iosAds, /ENV_ADMOB_REWARDED_AD_UNIT_ID/, "iOS rewarded ad unit configuration must be explicit.");
+assert.match(iosAds, /ENV_AD_ACCESS_GATE_ENABLED/, "iOS rewarded access must have a dedicated feature flag.");
+assert.match(iosAds, /RewardedAd\.load\(with: NativeAdsPolicy\.rewardedUnitID, request: AdManagerRequest\(\)\)/, "iOS must load a native Google Ad Manager rewarded video.");
+assert.match(iosAds, /ad\.present\(from: nil\)/, "iOS rewarded ads must be user-initiated and presented natively.");
+assert.match(iosAds, /NativeRewardedAdProgress\.recordCompletion\(\)/, "iOS must count only the SDK reward callback.");
+assert.match(nativeToolViews, /NativeRewardedToolAccessGate\(tool: tool, onOpenWallet:/, "iOS tool interfaces must be wrapped by the Swift rewarded gate.");
 assert.match(iosAds, /static func isHybridTool\(_ tool: Tool\)/, "The existing iOS offline-wallet hybrid policy must remain available and unchanged.");
 assert.match(iosAds, /restrictedCategories/, "iOS must exclude fitness and personal tools like Web and Android.");
 assert.match(iosAds, /restrictedDisclaimers/, "iOS must exclude health, finance and earnings disclaimer tools.");
@@ -191,4 +206,4 @@ assert.match(iosPrivacy, /Advertising privacy options/, "iOS must surface advert
 assert.match(iosCalculator, /NativeToolAdSlot\(tool: tool\)/, "The native iOS tool surface must include its ad slot.");
 assert.match(iosCalculator, /NativeHybridAccessError\.offlineAllowanceRequired/, "iOS hybrid tools must block offline execution without a prepared allowance.");
 
-console.log("Ad-access checks PASS: non-blocking tool access, category-wide Adsterra eligibility, explicit advertising preference, native privacy controls and unchanged offline billing.");
+console.log("Ad-access checks PASS: explicit rewarded access allowlists, provider reward callbacks, three-view offer cadence, reviewed per-tool billing, native privacy controls and unchanged offline billing.");
