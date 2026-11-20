@@ -62,13 +62,13 @@ private final class NativePostInterfaceCaptureController: NSObject, ObservableOb
         picker.present()
     }
 
-    func contentSharingPicker(_ picker: SCContentSharingPicker, didUpdateWith filter: SCContentFilter, for stream: SCStream?) {
+    nonisolated func contentSharingPicker(_ picker: SCContentSharingPicker, didUpdateWith filter: SCContentFilter, for stream: SCStream?) {
         Task { @MainActor in
             await beginRecording(with: filter)
         }
     }
 
-    func contentSharingPicker(_ picker: SCContentSharingPicker, didCancelFor stream: SCStream?) {
+    nonisolated func contentSharingPicker(_ picker: SCContentSharingPicker, didCancelFor stream: SCStream?) {
         Task { @MainActor in
             picker.remove(self)
             picker.isActive = false
@@ -77,7 +77,7 @@ private final class NativePostInterfaceCaptureController: NSObject, ObservableOb
         }
     }
 
-    func contentSharingPickerStartDidFailWithError(_ error: Error) {
+    nonisolated func contentSharingPickerStartDidFailWithError(_ error: Error) {
         Task { @MainActor in
             picker.remove(self)
             picker.isActive = false
@@ -207,7 +207,7 @@ private final class NativePostInterfaceCaptureController: NSObject, ObservableOb
         // SCRecordingOutput writes the captured stream directly to the MP4 file.
     }
 
-    func recordingOutputDidStartRecording(_ recordingOutput: SCRecordingOutput) {
+    nonisolated func recordingOutputDidStartRecording(_ recordingOutput: SCRecordingOutput) {
         Task { @MainActor in
             isPreparing = false
             isRecording = true
@@ -216,7 +216,7 @@ private final class NativePostInterfaceCaptureController: NSObject, ObservableOb
         }
     }
 
-    func recordingOutputDidFinishRecording(_ recordingOutput: SCRecordingOutput) {
+    nonisolated func recordingOutputDidFinishRecording(_ recordingOutput: SCRecordingOutput) {
         Task { @MainActor in
             guard let continuation = finishContinuation else { return }
             finishContinuation = nil
@@ -224,7 +224,7 @@ private final class NativePostInterfaceCaptureController: NSObject, ObservableOb
         }
     }
 
-    func recordingOutput(_ recordingOutput: SCRecordingOutput, didFailWithError error: Error) {
+    nonisolated func recordingOutput(_ recordingOutput: SCRecordingOutput, didFailWithError error: Error) {
         Task { @MainActor in
             if let continuation = finishContinuation {
                 finishContinuation = nil
@@ -238,7 +238,7 @@ private final class NativePostInterfaceCaptureController: NSObject, ObservableOb
         }
     }
 
-    func stream(_ stream: SCStream, didStopWithError error: Error) {
+    nonisolated func stream(_ stream: SCStream, didStopWithError error: Error) {
         Task { @MainActor in
             guard isRecording || isPreparing else { return }
             if isStopping { return }
