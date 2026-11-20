@@ -8,11 +8,14 @@ import android.net.NetworkCapabilities
 import android.os.Handler
 import android.os.Looper
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,6 +24,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -32,11 +36,14 @@ import com.google.android.libraries.ads.mobile.sdk.banner.AdSize
 import com.google.android.libraries.ads.mobile.sdk.banner.AdView
 import com.google.android.libraries.ads.mobile.sdk.banner.BannerAd
 import com.google.android.libraries.ads.mobile.sdk.banner.BannerAdRequest
+import com.google.android.libraries.ads.mobile.sdk.common.AdRequest
 import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback
 import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 import com.google.android.libraries.ads.mobile.sdk.common.RequestConfiguration
 import com.chastech.env.data.ToolRecord
 import com.google.android.libraries.ads.mobile.sdk.initialization.InitializationConfig
+import com.google.android.libraries.ads.mobile.sdk.rewarded.RewardedAd
+import com.google.android.libraries.ads.mobile.sdk.rewarded.RewardedAdEventCallback
 import com.google.android.ump.ConsentInformation
 import com.google.android.ump.ConsentRequestParameters
 import com.google.android.ump.ConsentInformation.PrivacyOptionsRequirementStatus
@@ -54,10 +61,20 @@ import org.json.JSONObject
 internal object NativeAdsPolicy {
     private val toolIdPattern = Regex("[a-z0-9][a-z0-9-]{0,119}")
     val adsSelectionEnabled: Boolean get() = BuildConfig.ENV_ADS_ENABLED
-    val adDisplayConfigured: Boolean get() = BuildConfig.ENV_ADS_ENABLED &&
+    val privacySetupConfigured: Boolean get() = BuildConfig.ENV_ADS_ENABLED &&
         BuildConfig.ENV_ADS_PRIVACY_CONFIGURED &&
-        BuildConfig.ENV_ADMOB_APP_ID.matches(Regex("ca-app-pub-[0-9]{16}~[0-9]{10}")) &&
+        BuildConfig.ENV_ADMOB_APP_ID.matches(Regex("ca-app-pub-[0-9]{16}~[0-9]{10}"))
+    val adDisplayConfigured: Boolean get() = privacySetupConfigured &&
         BuildConfig.ENV_ADMOB_BANNER_AD_UNIT_ID.matches(Regex("ca-app-pub-[0-9]{16}/[0-9]{10}"))
+    val rewardedUnitId: String get() = BuildConfig.ENV_ADMOB_REWARDED_AD_UNIT_ID.trim()
+    private val rewardedToolIds: Set<String> by lazy {
+        BuildConfig.ENV_AD_ACCESS_TOOL_IDS.split(",").map { it.trim() }.filter { toolIdPattern.matches(it) }.toSet()
+    }
+    val rewardedAccessConfigured: Boolean get() = BuildConfig.ENV_AD_ACCESS_GATE_ENABLED &&
+        privacySetupConfigured &&
+        rewardedUnitId.matches(Regex("/[A-Za-z0-9_./-]{3,180}"))
+    fun isRewardedAccessTool(tool: ToolRecord): Boolean =
+        rewardedAccessConfigured && tool.id in rewardedToolIds && isAdEligibleTool(tool)
 
     private val allowlistedIds: Set<String> by lazy {
         BuildConfig.ENV_AD_SUPPORTED_TOOL_IDS.split(",").map { it.trim() }.filter { toolIdPattern.matches(it) }.toSet()
@@ -224,7 +241,7 @@ internal object NativeAdsPrivacyManager {
     private var refreshing = false
 
     fun refreshConsent(activity: Activity) {
-        if (!NativeAdsPolicy.adDisplayConfigured || refreshing) return
+        if (!NativeAdsPolicy.privacySetupConfigured || refreshing) return
         refreshing = true
         val information = UserMessagingPlatform.getConsentInformation(activity)
         val parameters = ConsentRequestParameters.Builder().build()
@@ -293,7 +310,7 @@ internal object NativeAdsPrivacyManager {
 internal fun NativeAdsPrivacyOptionsButton() {
     val context = LocalContext.current
     val activity = context as? Activity
-    if (!NativeAdsPolicy.adDisplayConfigured || !NativeAdsPrivacyManager.privacyOptionsRequired || activity == null) return
+    if (!NativeAdsPolicy.privacySetupConfigured || !NativeAdsPrivacyManager.privacyOptionsRequired || activity == null) return
     Button(onClick = { NativeAdsPrivacyManager.showPrivacyOptions(activity) }, modifier = Modifier.fillMaxWidth()) {
         Text("Advertising privacy options")
     }
@@ -344,6 +361,146 @@ internal fun NativeToolAdSlot(tool: ToolRecord) {
         AndroidView(
             modifier = Modifier.fillMaxWidth().wrapContentWidth(),
             factory = { adView },
+        )
+    }
+}
+
+private object NativeRewardedAdProgress {
+    private const val PREFS = "env_rewarded_ad_progress_v1"
+    private const val WINDOW_MS = 30L * 24L * 60L * 60L * 1_000L
+
+    fun recordCompletion(context: Context, now: Long = System.currentTimeMillis()): Boolean {
+        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val storedStart = prefs.getLong("period_started_at", 0L)
+        val expired = storedStart <= 0L || now < storedStart || now - storedStart >= WINDOW_MS
+        val start = if (expired) now else storedStart
+        val count = (if (expired) 0 else prefs.getInt("completed", 0)).coerceAtLeast(0) + 1
+        val offerShown = if (expired) false else prefs.getBoolean("offer_shown", false)
+        val shouldShowOffer = count >= 3 && !offerShown
+        val saved = prefs.edit()
+            .putLong("period_started_at", start)
+            .putInt("completed", count)
+            .putBoolean("offer_shown", offerShown || shouldShowOffer)
+            .commit()
+        return saved && shouldShowOffer
+    }
+}
+
+@Composable
+internal fun NativeRewardedToolAccessGate(
+    tool: ToolRecord,
+    onOpenWallet: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val context = LocalContext.current
+    val activity = context as? Activity
+    val preview = LocalInspectionMode.current
+    val consentReady = NativeAdsPrivacyManager.canRequestAds && NativeAdsPrivacyManager.sdkReady
+    val network = rememberValidatedAdNetwork(context)
+    var originReachable by remember(tool.id) { mutableStateOf(false) }
+    var unlocked by rememberSaveable(tool.id) { mutableStateOf(false) }
+    var busy by rememberSaveable(tool.id) { mutableStateOf(false) }
+    var feedback by rememberSaveable(tool.id) { mutableStateOf<String?>(null) }
+    var showAdFreeOffer by rememberSaveable(tool.id) { mutableStateOf(false) }
+
+    LaunchedEffect(network, tool.id) {
+        if (!network) originReachable = false
+        else originReachable = NativeAdsPolicy.isApplicationOnline(context)
+    }
+
+    if (preview || !NativeAdsPolicy.isRewardedAccessTool(tool)) {
+        content()
+        return
+    }
+
+    if (unlocked) content()
+    else {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("Continue to " + tool.name, style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Watch a complete rewarded video to use this tool for this visit. If you decline advertising or no ad is available, open Wallet to sign in and review your token options.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(
+                onClick = {
+                    if (activity == null || busy) return@Button
+                    busy = true
+                    feedback = null
+                    RewardedAd.load(
+                        AdRequest.Builder(NativeAdsPolicy.rewardedUnitId).build(),
+                        object : AdLoadCallback<RewardedAd> {
+                            override fun onAdLoaded(ad: RewardedAd) {
+                                var rewardEarned = false
+                                ad.adEventCallback = object : RewardedAdEventCallback {
+                                    override fun onAdDismissedFullScreenContent() {
+                                        Handler(Looper.getMainLooper()).post {
+                                            busy = false
+                                            if (!rewardEarned) feedback = "The rewarded ad was closed before completion. No access was unlocked."
+                                        }
+                                    }
+
+                                    override fun onAdFailedToShowFullScreenContent(error: com.google.android.libraries.ads.mobile.sdk.common.FullScreenContentError) {
+                                        Handler(Looper.getMainLooper()).post {
+                                            busy = false
+                                            feedback = "The rewarded ad could not be shown. Try again or use Wallet."
+                                        }
+                                    }
+                                }
+                                runCatching {
+                                    ad.show(activity) {
+                                        rewardEarned = true
+                                        val offer = NativeRewardedAdProgress.recordCompletion(context)
+                                        Handler(Looper.getMainLooper()).post {
+                                            unlocked = true
+                                            busy = false
+                                            showAdFreeOffer = offer
+                                        }
+                                    }
+                                }.onFailure {
+                                    busy = false
+                                    feedback = "The rewarded ad could not be shown. Try again or use Wallet."
+                                }
+                            }
+
+                            override fun onAdFailedToLoad(error: LoadAdError) {
+                                Handler(Looper.getMainLooper()).post {
+                                    busy = false
+                                    feedback = "A rewarded ad is unavailable. Check your connection or advertising settings, then try again."
+                                }
+                            }
+                        },
+                    )
+                },
+                enabled = !busy && activity != null && network && originReachable && consentReady,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (busy) "Loading rewarded ad…" else "Watch an ad to continue")
+            }
+            Button(onClick = onOpenWallet, modifier = Modifier.fillMaxWidth()) {
+                Text("Open Wallet / sign in")
+            }
+            if (!consentReady) {
+                Text("Google advertising privacy choices must permit ads before a rewarded video can load.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            feedback?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+        }
+    }
+
+    if (showAdFreeOffer) {
+        AlertDialog(
+            onDismissRequest = { showAdFreeOffer = false },
+            title = { Text("Ready to go ad-free?") },
+            text = { Text("You completed three rewarded ads in the last 30 days. Open Wallet to review token access for individual tools. Tool prices are enabled only after review.") },
+            confirmButton = {
+                Button(onClick = { showAdFreeOffer = false; onOpenWallet() }) { Text("Open Wallet") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAdFreeOffer = false }) { Text("Keep using ads") }
+            },
         )
     }
 }
