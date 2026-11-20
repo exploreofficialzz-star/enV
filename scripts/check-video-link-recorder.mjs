@@ -41,6 +41,8 @@ const recorderToolBlock = (source, marker, close) => {
 };
 const recorderCatalogEntry = recorderToolBlock(registry, 'const videoLinkScreenRecordingTool: ToolMeta = {', "\\n};");
 assert.ok(recorderCatalogEntry.includes('description: "Record a social-media post with its video and visible platform controls."'), "the tool keeps its concise description beneath the title");
+assert.match(read("src/lib/offline/capabilities.ts"), /tool\.id === "video-link-screen-recording" \|\| !isOfflineLocalTool/,
+  "the recorder does not claim to work offline while its original post needs a network");
 assert.ok(androidCatalog.includes('description = "Record a social-media post with its video and visible platform controls."'), "Android catalogue keeps the concise tool description");
 assert.ok(iosCatalog.includes('description: "Record a social-media post with its video and visible platform controls."'), "iOS catalogue keeps the concise tool description");
 const toolShell = read("src/components/tools/tool-shell.tsx");
