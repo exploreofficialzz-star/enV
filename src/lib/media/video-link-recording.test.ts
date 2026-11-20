@@ -231,9 +231,16 @@ test("screen-recording policy accepts the supported original platform pages", ()
     ["https://www.threads.net/@creator/post/example", "Threads"],
     ["https://www.linkedin.com/posts/example", "LinkedIn"],
     ["https://www.reddit.com/r/videos/comments/example", "Reddit"],
+    ["https://redd.it/abc123", "Reddit"],
     ["https://www.twitch.tv/videos/12345", "Twitch"],
     ["https://vimeo.com/123456", "Vimeo"],
     ["https://www.dailymotion.com/video/abcdef", "Dailymotion"],
+    ["https://dai.ly/abcde", "Dailymotion"],
+    ["https://youtu.be/abcdefghijk", "YouTube"],
+    ["https://youtube-nocookie.com/embed/abcdefghijk", "YouTube"],
+    ["https://twitter.com/creator/status/123456789", "X"],
+    ["https://fb.watch/example", "Facebook"],
+    ["https://fb.com/watch/123456789", "Facebook"],
   ] as const;
   for (const [url, label] of cases) {
     const result = parseScreenRecordingPostLink(url);

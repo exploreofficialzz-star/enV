@@ -68,7 +68,7 @@ private val videoLinkCaptureDomains = linkedMapOf(
     "Snapchat" to listOf("snapchat.com"),
     "Threads" to listOf("threads.net"),
     "LinkedIn" to listOf("linkedin.com"),
-    "Reddit" to listOf("reddit.com"),
+    "Reddit" to listOf("reddit.com", "redd.it"),
     "Twitch" to listOf("twitch.tv"),
     "Vimeo" to listOf("vimeo.com"),
     "Dailymotion" to listOf("dailymotion.com", "dai.ly"),

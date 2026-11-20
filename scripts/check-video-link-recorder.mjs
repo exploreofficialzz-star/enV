@@ -57,8 +57,16 @@ assert.match(web, /downloadBlob\(output\.blob/);
 assert.doesNotMatch(web, /downloadUrlMedia|url-media\/download|type="file"|type='file'|Choose a video from this device|useUploadedFile/);
 
 // Strict link policy recognizes platform posts, refuses direct media files and protected streaming services.
-for (const host of ["tiktok.com", "instagram.com", "facebook.com", "youtube.com", "x.com", "snapchat.com", "threads.net", "linkedin.com", "reddit.com", "twitch.tv", "vimeo.com", "dailymotion.com"]) {
-  assert.ok(policy.includes(host), "post-link policy includes " + host);
+// Every supported provider hostname must stay aligned across Web, Android and iOS.
+for (const host of [
+  "tiktok.com", "instagram.com", "facebook.com", "fb.watch", "fb.com",
+  "youtube.com", "youtu.be", "youtube-nocookie.com", "x.com", "twitter.com",
+  "snapchat.com", "threads.net", "linkedin.com", "reddit.com", "redd.it",
+  "twitch.tv", "vimeo.com", "dailymotion.com", "dai.ly",
+]) {
+  assert.ok(policy.includes('"'+host+'"'), "Web post-link policy includes " + host);
+  assert.ok(android.includes('"'+host+'"'), "Android post-link policy includes " + host);
+  assert.ok(swift.includes('"'+host+'"'), "iOS post-link policy includes " + host);
 }
 assert.match(policy, /parseScreenRecordingPostLink/);
 assert.match(policy, /direct-video/);
