@@ -250,7 +250,6 @@ fun NativeVideoLinkRecorderScreen(initialPostUrl: String = "") {
                 } else {
                     manager.createScreenCaptureIntent()
                 }
-                isStarting = true
                 status = "Waiting for screen-capture permission."
                 error = null
                 projectionLauncher.launch(captureIntent)
