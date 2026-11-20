@@ -74,9 +74,9 @@ internal object NativeAdsPolicy {
     private val rewardedToolIds: Set<String> by lazy {
         BuildConfig.ENV_AD_ACCESS_TOOL_IDS.split(",").map { it.trim() }.filter { toolIdPattern.matches(it) }.toSet()
     }
-    val rewardedAccessConfigured: Boolean get() = BuildConfig.ENV_AD_ACCESS_GATE_ENABLED &&
-        privacySetupConfigured &&
-        rewardedUnitId.matches(Regex("/[A-Za-z0-9_./-]{3,180}"))
+    val rewardedAccessConfigured: Boolean get() = BuildConfig.ENV_AD_ACCESS_GATE_ENABLED
+    val rewardedAdsConfigured: Boolean get() = rewardedAccessConfigured &&
+        privacySetupConfigured && rewardedUnitId.matches(Regex("/[A-Za-z0-9_./-]{3,180}"))
     fun isRewardedAccessTool(tool: ToolRecord): Boolean =
         rewardedAccessConfigured && tool.id in rewardedToolIds && isAdEligibleTool(tool)
 
@@ -542,7 +542,7 @@ internal fun NativeRewardedToolAccessGate(
                         },
                     )
                 },
-                enabled = !busy && activity != null && network && originReachable && consentReady,
+                enabled = !busy && activity != null && network && originReachable && consentReady && NativeAdsPolicy.rewardedAdsConfigured,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(if (busy) "Loading rewarded ad…" else "Watch an ad to continue")
