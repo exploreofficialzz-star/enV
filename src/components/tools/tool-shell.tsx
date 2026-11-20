@@ -356,7 +356,11 @@ export function ToolShell({
       {!isFullscreen && import.meta.env.VITE_ADSTERRA_ENABLED !== "true" ? <AdSlot tool={tool} /> : null}
       <AiAssistPanel toolId={tool.id} />
 
-      <section className="mt-10" aria-labelledby="tool-guide-heading">
+      <section
+        className="mt-10"
+        aria-labelledby={tool.id === "video-link-screen-recording" ? undefined : "tool-guide-heading"}
+        aria-label={tool.id === "video-link-screen-recording" ? "Tool documentation" : undefined}
+      >
         {tool.id !== "video-link-screen-recording" ? (
           <>
             <h2 id="tool-guide-heading" className="text-lg font-semibold">What this tool does</h2>
