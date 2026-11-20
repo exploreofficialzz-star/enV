@@ -54,9 +54,11 @@ export function ToolShell({
   const accessToolIds = new Set(String(import.meta.env.VITE_AD_ACCESS_TOOL_IDS ?? "").split(",").map((id) => id.trim()).filter(Boolean));
   const adAccessGateEnabled =
     import.meta.env.VITE_AD_ACCESS_GATE_ENABLED === "true" &&
+    import.meta.env.VITE_ADSENSE_PRIVACY_CONFIGURED === "true" &&
+    Boolean(import.meta.env.VITE_ADSENSE_CLIENT_ID) &&
     adsterraQualified &&
     accessToolIds.has(tool.id) &&
-    /^\\/[A-Za-z0-9_./-]{2,180}$/.test(rewardedUnitPath);
+    /^\/[A-Za-z0-9_./-]{2,180}$/.test(rewardedUnitPath);
   const [toolAccessUnlocked, setToolAccessUnlocked] = useState(false);
   const [showAdFreeOffer, setShowAdFreeOffer] = useState(false);
   const tokenReservationRef = useRef<string | null>(null);
@@ -383,7 +385,7 @@ export function ToolShell({
               <button
                 type="button"
                 onClick={() => void toggleFullscreen()}
-                disabled={isMusicSandbox && !prefsHydrated}
+                disabled={(isMusicSandbox && !prefsHydrated) || (adAccessGateEnabled && !toolAccessUnlocked)}
                 className="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-border text-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 aria-label={isFullscreen ? `Exit full screen for ${tool.name}` : `View ${tool.name} in full screen`}
                 title={isFullscreen ? "Exit full screen" : "View tool in full screen"}
