@@ -74,6 +74,9 @@ assert.match(android, /fun NativeVideoLinkRecorderScreen\(initialPostUrl: String
 assert.match(androidMain, /initialPostUrl = initialPostUrl/);
 
 assert.match(android, /const val ACTION_STARTED/);
+assert.match(android, /LaunchedEffect\(initialPostUrl\)/);
+assert.match(android, /autoPromptedPostUrl == initialPostUrl/);
+assert.match(android, /isAwaitingPermission = true/);
 assert.match(android, /sendCaptureStarted\(\)/);
 assert.match(android, /ACTION_STARTED ->/);
 assert.match(android, /addAction\(VideoLinkCaptureService\.ACTION_STARTED\)/);
