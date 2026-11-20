@@ -45,8 +45,8 @@ export function ToolShell({
   const [visibleRelatedCount, setVisibleRelatedCount] = useState(6);
   const [productionTool, setProductionTool] = useState<ToolMeta | null>(null);
   const note = disclaimerText(tool);
-  const adsterraQualified =
-    import.meta.env.VITE_ADSTERRA_ENABLED === "true" && isAdsterraQualifiedTool(tool);
+  const toolAdEligible = isAdsterraQualifiedTool(tool);
+  const adsterraQualified = import.meta.env.VITE_ADSTERRA_ENABLED === "true" && toolAdEligible;
   const [adsterraConsent, setAdsterraConsentState] = useState(getAdsterraConsent);
   const { user: accessUser, isPending: accessAuthPending } = useCurrentUserState();
   const [accessPreference, setAccessPreference] = useState<ToolAccessPreference>(getToolAccessPreference);
@@ -56,7 +56,7 @@ export function ToolShell({
     import.meta.env.VITE_AD_ACCESS_GATE_ENABLED === "true" &&
     import.meta.env.VITE_ADSENSE_PRIVACY_CONFIGURED === "true" &&
     Boolean(import.meta.env.VITE_ADSENSE_CLIENT_ID) &&
-    adsterraQualified &&
+    toolAdEligible &&
     accessToolIds.has(tool.id) &&
     /^\/[A-Za-z0-9_./-]{2,180}$/.test(rewardedUnitPath);
   const [toolAccessUnlocked, setToolAccessUnlocked] = useState(false);
@@ -130,7 +130,8 @@ export function ToolShell({
       });
       if (response.ok) {
         tokenReservationRef.current = null;
-        if (outcome !== "success") setToolAccessUnlocked(false);
+        // One ad/token grant authorizes one successful run of this tool.
+        setToolAccessUnlocked(false);
       } else {
         tokenReservationFinalizedRef.current = false;
       }
