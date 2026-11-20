@@ -27,6 +27,7 @@ const iosEntitlements = read("apps/ios/enV/enV.entitlements");
 const iosProject = read("apps/ios/enV.xcodeproj/project.pbxproj");
 const iosWorkflow = read(".github/workflows/ios-build.yml");
 const iosRouter = read("apps/ios/enV/NativeZipArchiveView.swift");
+const iosToolViews = read("apps/ios/enV/ToolViews.swift");
 const docs = read("docs/video-link-screen-recording.md");
 const offlinePolicy = read("src/lib/offline/local-operation-policy.mjs");
 
@@ -45,6 +46,10 @@ assert.ok(iosCatalog.includes('description: "Record a social-media post with its
 const toolShell = read("src/components/tools/tool-shell.tsx");
 assert.match(toolShell, /tool\.id !== "video-link-screen-recording"[\s\S]*?What this tool does/,
   "the long explanatory section is omitted only for the recorder, while the title description remains");
+assert.match(iosToolViews, /if tool\.id != "video-link-screen-recording"[\s\S]*?What this tool does/,
+  "iOS omits the duplicate recorder explanation");
+assert.match(iosToolViews, /else if let guideURL[\s\S]*?Read the full guide/,
+  "iOS retains the full-guide link after the explanation is removed");
 assert.match(router, /tool\.id === "video-link-screen-recording"[^\n]*VideoLinkRecorderEngine/);
 assert.match(preload, /video-link-recorder-engine/);
 assert.ok(offlinePolicy.includes('"' + ID + '"'), "the screen capture remains a local operation");
