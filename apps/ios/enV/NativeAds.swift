@@ -323,7 +323,9 @@ struct NativeRewardedToolAccessGate<Content: View>: View {
 
     var body: some View {
         Group {
-            if !isConfigured || unlocked {
+            // Offline/origin-unreachable execution stays under the existing
+            // native signed allowance and journal checks.
+            if !isConfigured || !reachability.hasNetwork || !originReachable || unlocked {
                 content()
                     .environment(\.nativeToolAccessCompletion, completeTokenSession)
             } else {
