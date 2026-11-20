@@ -3,6 +3,20 @@ type GoogleFcCallback = (() => void) | Record<string, () => void>;
 type GoogleFcApi = {
   callbackQueue?: GoogleFcCallback[];
   showRevocationMessage?: () => void;
+  getGoogleConsentModeValues?: () => GoogleFcConsentModeValues;
+  ConsentModePurposeStatusEnum?: {
+    CONSENT_MODE_PURPOSE_STATUS_UNKNOWN: number;
+    CONSENT_MODE_PURPOSE_STATUS_GRANTED: number;
+    CONSENT_MODE_PURPOSE_STATUS_DENIED: number;
+    CONSENT_MODE_PURPOSE_STATUS_NOT_APPLICABLE: number;
+    CONSENT_MODE_PURPOSE_STATUS_NOT_CONFIGURED: number;
+  };
+};
+type GoogleFcConsentModeValues = {
+  adStoragePurposeConsentStatus: number;
+  adUserDataPurposeConsentStatus: number;
+  adPersonalizationPurposeConsentStatus: number;
+  analyticsStoragePurposeConsentStatus: number;
 };
 
 declare global {
@@ -74,6 +88,31 @@ export function whenGooglePrivacyConsentDataReady(callback: () => void): void {
     CONSENT_DATA_READY: () => {
       window.__envGoogleConsentDataReady = true;
       callback();
+    },
+  });
+}
+
+/** Wait for Google's consent-mode data and require permission for ad-related purposes. */
+export function whenGoogleAdsConsentReady(callback: (allowed: boolean) => void): void {
+  ensureGoogleFcQueue().callbackQueue!.push({
+    CONSENT_MODE_DATA_READY: () => {
+      const api = window.googlefc;
+      const values = api?.getGoogleConsentModeValues?.();
+      const statuses = api?.ConsentModePurposeStatusEnum;
+      if (!values || !statuses) {
+        callback(false);
+        return;
+      }
+      const permitted = new Set([
+        statuses.CONSENT_MODE_PURPOSE_STATUS_GRANTED,
+        statuses.CONSENT_MODE_PURPOSE_STATUS_NOT_APPLICABLE,
+        statuses.CONSENT_MODE_PURPOSE_STATUS_NOT_CONFIGURED,
+      ]);
+      callback([
+        values.adStoragePurposeConsentStatus,
+        values.adUserDataPurposeConsentStatus,
+        values.adPersonalizationPurposeConsentStatus,
+      ].every((status) => permitted.has(status)));
     },
   });
 }
