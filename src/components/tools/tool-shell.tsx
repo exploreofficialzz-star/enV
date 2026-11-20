@@ -357,8 +357,12 @@ export function ToolShell({
       <AiAssistPanel toolId={tool.id} />
 
       <section className="mt-10" aria-labelledby="tool-guide-heading">
-        <h2 id="tool-guide-heading" className="text-lg font-semibold">What this tool does</h2>
-        <p className="mt-3 text-sm leading-6 text-muted">{offlineAwareToolDescription(tool)}</p>
+        {tool.id !== "video-link-screen-recording" ? (
+          <>
+            <h2 id="tool-guide-heading" className="text-lg font-semibold">What this tool does</h2>
+            <p className="mt-3 text-sm leading-6 text-muted">{offlineAwareToolDescription(tool)}</p>
+          </>
+        ) : null}
         <a
           href={toolDocumentationPath(tool)}
           className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-accent underline underline-offset-4"
