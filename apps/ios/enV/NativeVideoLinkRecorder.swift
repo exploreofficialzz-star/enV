@@ -54,7 +54,6 @@ private final class NativePostInterfaceCaptureController: NSObject, ObservableOb
         isPreparing = true
 
         var configuration = SCContentSharingPickerConfiguration()
-        configuration.allowedPickerModes = .singleDisplay
         configuration.showsMicrophoneControl = false
         picker.defaultConfiguration = configuration
         picker.add(self)
