@@ -62,6 +62,19 @@ export function ToolShell({
     /^\/[A-Za-z0-9_./-]{2,180}$/.test(rewardedUnitPath);
   const [toolAccessUnlocked, setToolAccessUnlocked] = useState(false);
   const [showAdFreeOffer, setShowAdFreeOffer] = useState(false);
+  const [browserOnline, setBrowserOnline] = useState(() =>
+    typeof navigator === "undefined" ? true : navigator.onLine
+  );
+  useEffect(() => {
+    const syncOnline = () => setBrowserOnline(navigator.onLine);
+    syncOnline();
+    window.addEventListener("online", syncOnline);
+    window.addEventListener("offline", syncOnline);
+    return () => {
+      window.removeEventListener("online", syncOnline);
+      window.removeEventListener("offline", syncOnline);
+    };
+  }, []);
   const tokenReservationRef = useRef<string | null>(null);
   const tokenReservationFinalizedRef = useRef(false);
   useEffect(() => {
@@ -479,7 +492,7 @@ export function ToolShell({
           startToolExecution("form_submit");
         }}
       >
-        {adAccessGateEnabled && !toolAccessUnlocked ? (
+        {adAccessGateEnabled && browserOnline && !toolAccessUnlocked ? (
           <ToolAccessGate
             toolName={tool.name}
             user={accessUser}
@@ -498,7 +511,7 @@ export function ToolShell({
             {toolContent}
           </ToolExecutionTelemetryContext.Provider>
         )}
-        {(!adAccessGateEnabled || toolAccessUnlocked) && !isFullscreen && tool.category !== "creators" ? <ToolCommunityPanel toolId={tool.id} discussionHref={"/community" + toolPath(tool)} initialFeed={initialCommunityFeed} /> : null}
+        {(!adAccessGateEnabled || !browserOnline || toolAccessUnlocked) && !isFullscreen && tool.category !== "creators" ? <ToolCommunityPanel toolId={tool.id} discussionHref={"/community" + toolPath(tool)} initialFeed={initialCommunityFeed} /> : null}
       </section>
 
       {!isFullscreen && adsterraAdsEnabled ? (
