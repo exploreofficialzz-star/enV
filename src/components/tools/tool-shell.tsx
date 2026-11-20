@@ -84,6 +84,9 @@ export function ToolShell({
 
   const tokenAccessRequest = async () => {
     if (!accessUser) return { ok: false as const, message: "Sign in before using enV tokens.", errorCode: "AUTH_REQUIRED" };
+    if (tokenReservationRef.current) {
+      return { ok: false as const, message: "Your previous token session is still being reconciled. Reload this tool before starting another paid session.", errorCode: "RESERVATION_PENDING" };
+    }
     const sessionId = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
       ? crypto.randomUUID()
       : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (character) => {
@@ -109,6 +112,8 @@ export function ToolShell({
         errorCode: payload?.error,
       };
     }
+    tokenReservationRef.current = payload.data.reservationId;
+    tokenReservationFinalizedRef.current = false;
     return {
       ok: true as const,
       reservationId: payload.data.reservationId,
@@ -130,22 +135,39 @@ export function ToolShell({
       });
       if (response.ok) {
         tokenReservationRef.current = null;
-        // One ad/token grant authorizes one successful run of this tool.
-        setToolAccessUnlocked(false);
+        tokenReservationFinalizedRef.current = false;
       } else {
+        // Fail closed: don't allow a second paid run while settlement is unresolved.
         tokenReservationFinalizedRef.current = false;
       }
+      setToolAccessUnlocked(false);
     } catch {
+      // Keep the reservation attached until pagehide can attempt a release.
       tokenReservationFinalizedRef.current = false;
+      setToolAccessUnlocked(false);
     }
   }, [tool.id]);
 
   const grantToolAccess = (mode: "ads" | "tokens", reservationId?: string) => {
-    if (mode === "tokens" && reservationId) {
+    if (mode === "tokens" && reservationId && tokenReservationRef.current !== reservationId) {
       tokenReservationRef.current = reservationId;
       tokenReservationFinalizedRef.current = false;
     }
     setToolAccessUnlocked(true);
+  };
+
+  const releasePendingTokenAccess = (reservationId: string) => {
+    void fetch("/api/billing/tool-access", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "release", toolId: tool.id, reservationId }),
+    }).then((response) => {
+      if (response.ok && tokenReservationRef.current === reservationId) {
+        tokenReservationRef.current = null;
+        tokenReservationFinalizedRef.current = false;
+      }
+    }).catch(() => undefined);
   };
 
   const toggleFavorite = usePrefs((s) => s.toggleFavorite);
@@ -461,12 +483,12 @@ export function ToolShell({
             toolName={tool.name}
             user={accessUser}
             authPending={accessAuthPending}
-            consent={adsterraConsent}
             rewardedAdsConfigured={rewardedUnitPath.length > 0}
             preference={accessPreference}
             onPreferenceChange={saveAccessPreference}
             onWatchRewardedAd={() => showGoogleRewardedAd(rewardedUnitPath)}
             onUseTokens={tokenAccessRequest}
+            onReleaseTokenAccess={releasePendingTokenAccess}
             onUnlocked={grantToolAccess}
             onAdFreeOfferReady={() => setShowAdFreeOffer(true)}
           />
