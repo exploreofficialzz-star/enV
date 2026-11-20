@@ -66,6 +66,8 @@ enum OfflineWalletNativeAPI {
     /// Verified paired account credential used by community identity requests.
     static func communityBearerToken() -> String? { loadSessionToken() }
 
+    static var isPaired: Bool { loadSessionToken() != nil }
+
     private static func loadSessionToken() -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
