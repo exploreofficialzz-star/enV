@@ -613,7 +613,7 @@ enum CatalogLoader {
         let data = try Data(contentsOf: url)
         let catalog = try JSONDecoder().decode(Catalog.self, from: data)
         guard !catalog.tools.isEmpty else { throw CocoaError(.fileReadCorruptFile) }
-        return catalog.nativeFacing().includingMusicDownloader().includingSongMetadataAnalyzer().includingABook().includingZipArchive().includingFileWorkspaceTools().includingCameraStudio().includingVideoLinkScreenRecording().includingDateTimeExtensions()
+        return catalog.nativeFacing().includingMusicDownloader().includingSongMetadataAnalyzer().includingABook().includingZipArchive().includingFileWorkspaceTools().includingCameraStudio().includingDateTimeExtensions()
     }
 }
 
