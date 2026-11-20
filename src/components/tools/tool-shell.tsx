@@ -49,7 +49,7 @@ export function ToolShell({
   const adsterraQualified = import.meta.env.VITE_ADSTERRA_ENABLED === "true" && toolAdEligible;
   const [adsterraConsent, setAdsterraConsentState] = useState(getAdsterraConsent);
   const { user: accessUser, isPending: accessAuthPending } = useCurrentUserState();
-  const [accessPreference, setAccessPreference] = useState<ToolAccessPreference>(getToolAccessPreference);
+  const [accessPreference, setAccessPreference] = useState<ToolAccessPreference>(() => getToolAccessPreference(tool.id));
   const rewardedUnitPath = String(import.meta.env.VITE_GAM_REWARDED_AD_UNIT_PATH ?? "").trim();
   const accessToolIds = new Set(String(import.meta.env.VITE_AD_ACCESS_TOOL_IDS ?? "").split(",").map((id) => id.trim()).filter(Boolean));
   const adAccessGateEnabled =
@@ -93,7 +93,7 @@ export function ToolShell({
     (!adAccessGateEnabled || accessPreference === "ads");
   const saveAccessPreference = (value: ToolAccessPreference) => {
     setAccessPreference(value);
-    setToolAccessPreference(value);
+    setToolAccessPreference(tool.id, value);
   };
 
   const tokenAccessRequest = async () => {
