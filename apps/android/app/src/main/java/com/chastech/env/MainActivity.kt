@@ -21,6 +21,7 @@ import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.provider.OpenableColumns
 import java.util.Locale
 import androidx.activity.ComponentActivity
@@ -145,7 +146,6 @@ import com.chastech.env.data.withSongMetadataAnalyzer
 import com.chastech.env.data.withABook
 import com.chastech.env.data.withCameraStudio
 import com.chastech.env.data.withZipArchive
-import com.chastech.env.data.withVideoLinkScreenRecording
 import com.chastech.env.data.withFileWorkspaceTools
 import com.chastech.env.data.withDateTimeExtensions
 import com.chastech.env.data.search
@@ -235,7 +235,7 @@ private fun CatalogGate(
         loadFailed = false
         val result = withContext(Dispatchers.IO) {
             runCatching {
-                context.assets.open("catalog.json").bufferedReader().use { Catalog.fromJson(it.readText()).withMusicDownloader().withSongMetadataAnalyzer().withABook().withZipArchive().withFileWorkspaceTools().withCameraStudio().withVideoLinkScreenRecording().withDateTimeExtensions() }
+                context.assets.open("catalog.json").bufferedReader().use { Catalog.fromJson(it.readText()).withMusicDownloader().withSongMetadataAnalyzer().withABook().withZipArchive().withFileWorkspaceTools().withCameraStudio().withDateTimeExtensions() }
                     .also { require(it.tools.isNotEmpty()) { "The bundled tool catalog is empty." } }
             }
         }
