@@ -18,6 +18,7 @@ export function ToolAccessGate({
   onPreferenceChange,
   onWatchRewardedAd,
   onUseTokens,
+  onReleaseTokenAccess,
   onUnlocked,
   onAdFreeOfferReady,
 }: {
@@ -29,12 +30,14 @@ export function ToolAccessGate({
   onPreferenceChange: (value: ToolAccessPreference) => void;
   onWatchRewardedAd: () => Promise<RewardedAdResult>;
   onUseTokens: () => Promise<ToolAccessResult>;
+  onReleaseTokenAccess: (reservationId: string) => void;
   onUnlocked: (mode: "ads" | "tokens", reservationId?: string) => void;
   onAdFreeOfferReady: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [tokenShortage, setTokenShortage] = useState(false);
+  const [pendingTokenAccess, setPendingTokenAccess] = useState<Extract<ToolAccessResult, { ok: true }> | null>(null);
   const canWatchRewardedAd = rewardedAdsConfigured;
 
   async function watchAd() {
@@ -67,7 +70,7 @@ export function ToolAccessGate({
     try {
       const result = await onUseTokens();
       if (result.ok) {
-        onUnlocked("tokens", result.reservationId);
+        setPendingTokenAccess(result);
       } else {
         setFeedback(result.message);
         setTokenShortage(result.errorCode === "INSUFFICIENT_CREDITS");
@@ -151,6 +154,40 @@ export function ToolAccessGate({
         </div>
       )}
 
+      {pendingTokenAccess ? (
+        <div className="w-full max-w-sm space-y-3 rounded-lg border border-border p-3 text-left" role="group" aria-label="Confirm token access">
+          <p className="text-sm font-semibold text-fg">
+            This tool costs {pendingTokenAccess.reservedTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} enV tokens per session.
+          </p>
+          <p className="text-xs leading-5 text-muted">
+            Tokens are reserved now and are deducted only after this tool reports a successful result. Failed or cancelled runs release the reservation.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              onUnlocked("tokens", pendingTokenAccess.reservationId);
+              setPendingTokenAccess(null);
+            }}
+            disabled={busy}
+            className="min-h-11 w-full rounded-lg bg-fg px-4 py-2 text-sm font-semibold text-bg"
+          >
+            Confirm and continue
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const reservation = pendingTokenAccess.reservationId;
+              setPendingTokenAccess(null);
+              onReleaseTokenAccess(reservation);
+            }}
+            disabled={busy}
+            className="min-h-10 w-full rounded-lg border border-border px-4 py-2 text-sm font-medium text-fg hover:bg-surface-2"
+          >
+            Cancel without charge
+          </button>
+        </div>
+      ) : null}
+
       {feedback ? (
         <div className="w-full max-w-sm space-y-2 text-sm" role="status" aria-live="polite">
           <p className="text-danger">{feedback}</p>
@@ -200,9 +237,9 @@ export function AdFreeAfterThreeAdsDialog({
         </p>
         <div className="mt-5 flex flex-col gap-2">
           {signedIn ? (
-            <Link to="/wallet" onClick={onChooseTokens} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-fg px-4 py-2 text-sm font-semibold text-bg">
+            <button type="button" onClick={onChooseTokens} className="min-h-11 rounded-lg bg-fg px-4 py-2 text-sm font-semibold text-bg">
               Use enV tokens
-            </Link>
+            </button>
           ) : (
             <Link to="/signup" className="inline-flex min-h-11 items-center justify-center rounded-lg bg-fg px-4 py-2 text-sm font-semibold text-bg">
               Create an account
