@@ -26,6 +26,8 @@ import android.util.DisplayMetrics
 import android.view.Surface
 import android.view.WindowManager
 import android.provider.MediaStore
+import android.widget.MediaController
+import android.widget.VideoView
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -52,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import java.io.File
@@ -94,7 +97,7 @@ private fun parseVideoPostLink(raw: String): VideoPostLink {
 }
 
 @Composable
-fun NativeVideoLinkRecorderScreen(initialPostUrl: String = "") {
+fun NativeVideoLinkRecorderScreen(initialPostUrl: String = "", initialLaunchId: Long = 0L) {
     val context = LocalContext.current
     val initialProvider = remember(initialPostUrl) {
         initialPostUrl.takeIf { it.isNotBlank() }?.let { raw ->
@@ -115,6 +118,8 @@ fun NativeVideoLinkRecorderScreen(initialPostUrl: String = "") {
     var isStarting by rememberSaveable { mutableStateOf(false) }
     var isRecording by rememberSaveable { mutableStateOf(false) }
     var isStopping by rememberSaveable { mutableStateOf(false) }
+    var savedRecordingUri by rememberSaveable { mutableStateOf<String?>(null) }
+    var autoPromptedLaunchId by rememberSaveable { mutableStateOf(0L) }
 
     LaunchedEffect(isStarting, isRecording) {
         if (isStarting && !isRecording) {
@@ -144,6 +149,7 @@ fun NativeVideoLinkRecorderScreen(initialPostUrl: String = "") {
                         isStopping = false
                         status = "Recording."
                         error = null
+                        savedRecordingUri = null
                         postUri?.let { uri ->
                             runCatching {
                                 CustomTabsIntent.Builder().setShowTitle(false).build().launchUrl(context, uri)
@@ -156,6 +162,8 @@ fun NativeVideoLinkRecorderScreen(initialPostUrl: String = "") {
                         val saved = result.getBooleanExtra(VideoLinkCaptureService.EXTRA_SAVED, false)
                         val message = result.getStringExtra(VideoLinkCaptureService.EXTRA_MESSAGE)
                             ?: if (saved) "Recording saved." else "Recording could not be saved."
+                        val outputUri = result.getStringExtra(VideoLinkCaptureService.EXTRA_OUTPUT_URI)
+                        savedRecordingUri = outputUri?.takeIf { saved }
                         isStarting = false
                         isRecording = false
                         isStopping = false
@@ -222,9 +230,10 @@ fun NativeVideoLinkRecorderScreen(initialPostUrl: String = "") {
             .getOrNull()
     }
 
-    LaunchedEffect(initialPostUrl) {
-        if (initialPostUrl.isBlank() || autoPromptedPostUrl == initialPostUrl) return@LaunchedEffect
-        autoPromptedPostUrl = initialPostUrl
+    LaunchedEffect(initialPostUrl, initialLaunchId) {
+        if (initialPostUrl.isBlank() || initialLaunchId == 0L || autoPromptedLaunchId == initialLaunchId) return@LaunchedEffect
+        autoPromptedLaunchId = initialLaunchId
+        savedRecordingUri = null
         val link = validatedLink() ?: return@LaunchedEffect
         postUri = link.uri
         val manager = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
@@ -254,6 +263,7 @@ fun NativeVideoLinkRecorderScreen(initialPostUrl: String = "") {
                 postUrl = it
                 provider = ""
                 postUri = null
+                savedRecordingUri = null
                 error = null
             },
             modifier = Modifier.fillMaxWidth(),
@@ -269,6 +279,7 @@ fun NativeVideoLinkRecorderScreen(initialPostUrl: String = "") {
             onClick = {
                 val link = validatedLink() ?: return@Button
                 postUri = link.uri
+                savedRecordingUri = null
                 val manager = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
                 val captureIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                     manager.createScreenCaptureIntent(MediaProjectionConfig.createConfigForDefaultDisplay())
@@ -311,6 +322,49 @@ fun NativeVideoLinkRecorderScreen(initialPostUrl: String = "") {
             Text(error!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
         if (status.isNotBlank()) Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        savedRecordingUri?.let { rawUri ->
+            val recordingUri = Uri.parse(rawUri)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Text("Recording ready", style = MaterialTheme.typography.titleSmall)
+                AndroidView(
+                    factory = { viewContext ->
+                        VideoView(viewContext).apply {
+                            val controls = MediaController(viewContext)
+                            controls.setAnchorView(this)
+                            setMediaController(controls)
+                            tag = rawUri
+                            setVideoURI(recordingUri)
+                        }
+                    },
+                    update = { videoView ->
+                        if (videoView.tag != rawUri) {
+                            videoView.tag = rawUri
+                            videoView.setVideoURI(recordingUri)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(220.dp),
+                )
+                if (recordingUri.scheme == "content") {
+                    OutlinedButton(
+                        onClick = {
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "video/mp4"
+                                putExtra(Intent.EXTRA_STREAM, recordingUri)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            runCatching {
+                                context.startActivity(Intent.createChooser(shareIntent, "Share recording"))
+                            }.onFailure {
+                                error = "The recording is saved, but sharing is unavailable on this device."
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Share recording")
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -326,6 +380,7 @@ class VideoLinkCaptureService : Service() {
         const val ACTION_RESULT = "com.chastech.env.videolink.RESULT"
         const val EXTRA_SAVED = "capture_saved"
         const val EXTRA_MESSAGE = "capture_message"
+        const val EXTRA_OUTPUT_URI = "capture_output_uri"
         const val EXTRA_RESULT_CODE = "projection_result_code"
         const val EXTRA_PROJECTION_DATA = "projection_data"
         private const val CHANNEL_ID = "video_link_capture"
@@ -512,7 +567,8 @@ class VideoLinkCaptureService : Service() {
                     "Recording saved to enV's app-specific Movies folder."
                 }
                 updateNotification(message)
-                sendCaptureResult(saved = true, message = message)
+                val recordingUri = outputUri ?: outputFile?.let { Uri.fromFile(it) }
+                sendCaptureResult(saved = true, message = message, recordingUri = recordingUri)
             } else {
                 deletePartialOutput()
                 val message = "Recording could not be finalized. Try a longer capture."
@@ -600,13 +656,13 @@ class VideoLinkCaptureService : Service() {
         )
     }
 
-    private fun sendCaptureResult(saved: Boolean, message: String) {
-        sendBroadcast(
-            Intent(ACTION_RESULT)
-                .setPackage(packageName)
-                .putExtra(EXTRA_SAVED, saved)
-                .putExtra(EXTRA_MESSAGE, message)
-        )
+    private fun sendCaptureResult(saved: Boolean, message: String, recordingUri: Uri? = null) {
+        val resultIntent = Intent(ACTION_RESULT)
+            .setPackage(packageName)
+            .putExtra(EXTRA_SAVED, saved)
+            .putExtra(EXTRA_MESSAGE, message)
+        recordingUri?.let { resultIntent.putExtra(EXTRA_OUTPUT_URI, it.toString()) }
+        sendBroadcast(resultIntent)
     }
 
     private fun updateNotification(message: String) {
