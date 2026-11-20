@@ -27,6 +27,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.CompositionLocalProvider
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -61,6 +64,7 @@ import java.net.URL
 import org.json.JSONObject
 
 internal val LocalNativeToolAccessCompletion = staticCompositionLocalOf<(Boolean) -> Unit> { {} }
+private val NativeToolAccessCleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
 internal object NativeAdsPolicy {
     private val toolIdPattern = Regex("[a-z0-9][a-z0-9-]{0,119}")
@@ -403,6 +407,7 @@ internal fun NativeRewardedToolAccessGate(
     val consentReady = NativeAdsPrivacyManager.canRequestAds && NativeAdsPrivacyManager.sdkReady
     val network = rememberValidatedAdNetwork(context)
     var originReachable by remember(tool.id) { mutableStateOf(false) }
+    var originCheckComplete by remember(tool.id) { mutableStateOf(false) }
     var unlocked by rememberSaveable(tool.id) { mutableStateOf(false) }
     var busy by rememberSaveable(tool.id) { mutableStateOf(false) }
     var feedback by rememberSaveable(tool.id) { mutableStateOf<String?>(null) }
@@ -411,12 +416,24 @@ internal fun NativeRewardedToolAccessGate(
     var activeReservation by remember(tool.id) { mutableStateOf<com.chastech.env.billing.OfflineWalletNativeApi.ToolAccessReservation?>(null) }
 
     LaunchedEffect(network, tool.id) {
+        originCheckComplete = false
         originReachable = network && NativeAdsPolicy.isApplicationOnline(context)
+        originCheckComplete = true
     }
 
     // Offline or origin-unreachable runs remain governed by the existing
     // signed allowance/journal path inside the native tool execution boundary.
-    if (preview || !NativeAdsPolicy.isRewardedAccessTool(tool) || !network || !originReachable) {
+    if (preview || !NativeAdsPolicy.isRewardedAccessTool(tool) || !network) {
+        content()
+        return
+    }
+    if (!originCheckComplete) {
+        Column(Modifier.fillMaxWidth().padding(24.dp)) {
+            Text("Checking enV connection…", style = MaterialTheme.typography.bodyMedium)
+        }
+        return
+    }
+    if (!originReachable) {
         content()
         return
     }
@@ -469,8 +486,8 @@ internal fun NativeRewardedToolAccessGate(
     DisposableEffect(tool.id) {
         onDispose {
             val reservation = activeReservation ?: pendingReservation
-            if (reservation != null) {
-                scope.launch {
+            if (reservation != null && !busy) {
+                NativeToolAccessCleanupScope.launch {
                     runCatching {
                         com.chastech.env.billing.OfflineWalletNativeApi.releaseToolAccess(context, tool.id, reservation.reservationId)
                     }
