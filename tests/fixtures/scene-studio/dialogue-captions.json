@@ -1,0 +1,15 @@
+{
+  "version": "1.0",
+  "settings": { "width": 1080, "height": 1920, "fps": 30, "duration": 6, "background": "#101826", "seed": 11 },
+  "objects": [
+    { "id": "speaker-hero", "type": "character", "name": "Hero", "position": [0, 0, 0], "color": "#f4b942" }
+  ],
+  "speakers": {
+    "hero": { "voiceId": "system", "color": "#ffd166" }
+  },
+  "dialogue": [
+    { "speaker": "hero", "text": "Welcome to my world.", "start": 1, "duration": 2.5 }
+  ],
+  "captions": { "style": "wordPop", "placement": "belowSpeaker", "highlightColor": "#ffd400", "safeMargin": 0.08 },
+  "export": { "format": "mp4", "quality": "balanced" }
+}

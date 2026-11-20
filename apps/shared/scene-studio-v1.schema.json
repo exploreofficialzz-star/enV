@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://envtools.store/schemas/scene-studio/v1.json",
+  "title": "enV Scene Studio scene document (proposed v1)",
+  "description": "Draft scene contract for owner review. This is not locked until approved.",
+  "type": "object",
+  "required": ["version"],
+  "properties": {
+    "version": { "const": "1.0", "description": "Proposed contract version; approval pending." },
+    "settings": { "$ref": "#/$defs/settings", "default": {} },
+    "camera": { "$ref": "#/$defs/camera", "default": {} },
+    "lights": { "type": "array", "items": { "$ref": "#/$defs/light" }, "default": [], "maxItems": 8 },
+    "objects": { "type": "array", "items": { "$ref": "#/$defs/object" }, "default": [], "maxItems": 100 },
+    "animations": { "type": "array", "items": { "$ref": "#/$defs/animation" }, "default": [], "maxItems": 200 },
+    "speakers": { "type": "object", "additionalProperties": { "$ref": "#/$defs/speaker" }, "default": {} },
+    "dialogue": { "type": "array", "items": { "$ref": "#/$defs/dialogueLine" }, "default": [], "maxItems": 300 },
+    "captions": { "$ref": "#/$defs/captions", "default": {} },
+    "export": { "$ref": "#/$defs/export", "default": {} }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "vector3": {
+      "type": "array",
+      "items": { "type": "number", "minimum": -10000, "maximum": 10000 },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "settings": {
+      "type": "object",
+      "properties": {
+        "width": { "type": "integer", "minimum": 64, "maximum": 1920, "default": 1080 },
+        "height": { "type": "integer", "minimum": 64, "maximum": 1920, "default": 1920 },
+        "fps": { "type": "integer", "minimum": 1, "maximum": 60, "default": 30 },
+        "duration": { "type": "number", "exclusiveMinimum": 0, "maximum": 60, "default": 8 },
+        "background": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$", "default": "#101826" },
+        "seed": { "type": "integer", "minimum": 0, "maximum": 2147483647, "default": 1 },
+        "quality": { "type": "string", "enum": ["low", "balanced", "high"], "default": "balanced" }
+      },
+      "additionalProperties": true
+    },
+    "camera": {
+      "type": "object",
+      "properties": {
+        "position": { "$ref": "#/$defs/vector3", "default": [0, 2, 8] },
+        "lookAt": { "$ref": "#/$defs/vector3", "default": [0, 1, 0] },
+        "fieldOfView": { "type": "number", "exclusiveMinimum": 0, "maximum": 120, "default": 45 }
+      },
+      "additionalProperties": true
+    },
+    "light": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["sun", "hemispheric", "point"], "default": "hemispheric" },
+        "intensity": { "type": "number", "minimum": 0, "maximum": 10, "default": 1 },
+        "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$", "default": "#ffffff" },
+        "position": { "$ref": "#/$defs/vector3", "default": [0, 5, 5] }
+      },
+      "required": ["type"],
+      "additionalProperties": true
+    },
+    "object": {
+      "type": "object",
+      "required": ["id", "type"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "type": { "type": "string", "minLength": 1, "maxLength": 80, "description": "Unknown builder types are accepted and shown as a placeholder with a warning." },
+        "name": { "type": "string", "maxLength": 160, "default": "Object" },
+        "style": { "type": "string", "maxLength": 80, "default": "simple" },
+        "asset": { "type": "string", "maxLength": 240, "default": "" },
+        "text": { "type": "string", "maxLength": 2000, "default": "" },
+        "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$", "default": "#f4b942" },
+        "position": { "$ref": "#/$defs/vector3", "default": [0, 0, 0] },
+        "rotation": { "$ref": "#/$defs/vector3", "default": [0, 0, 0], "description": "Euler angles in degrees, applied X then Y then Z." },
+        "scale": { "$ref": "#/$defs/vector3", "default": [1, 1, 1] },
+        "fontSize": { "type": "number", "exclusiveMinimum": 0, "maximum": 20, "default": 1 }
+      },
+      "additionalProperties": true
+    },
+    "animation": {
+      "type": "object",
+      "required": ["target", "property", "keyframes"],
+      "properties": {
+        "target": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "property": { "type": "string", "enum": ["position", "rotation", "scale"], "default": "position" },
+        "easing": { "type": "string", "enum": ["linear", "easeIn", "easeOut", "easeInOut"], "default": "linear" },
+        "keyframes": { "type": "array", "minItems": 1, "maxItems": 300, "items": { "$ref": "#/$defs/keyframe" } }
+      },
+      "additionalProperties": true
+    },
+    "keyframe": {
+      "type": "object",
+      "required": ["time", "value"],
+      "properties": {
+        "time": { "type": "number", "minimum": 0, "maximum": 60 },
+        "value": { "$ref": "#/$defs/vector3" }
+      },
+      "additionalProperties": true
+    },
+    "speaker": {
+      "type": "object",
+      "properties": {
+        "voiceId": { "type": "string", "maxLength": 80, "default": "system" },
+        "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$", "default": "#ffd166" }
+      },
+      "additionalProperties": true
+    },
+    "dialogueLine": {
+      "type": "object",
+      "required": ["speaker", "text", "start"],
+      "properties": {
+        "speaker": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "text": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "start": { "type": "number", "minimum": 0, "maximum": 60 },
+        "duration": { "type": "number", "exclusiveMinimum": 0, "maximum": 60, "default": 3 }
+      },
+      "additionalProperties": true
+    },
+    "captions": {
+      "type": "object",
+      "properties": {
+        "style": { "type": "string", "enum": ["wordPop", "outline", "simple"], "default": "wordPop" },
+        "placement": { "type": "string", "enum": ["belowSpeaker", "bottomCenter"], "default": "belowSpeaker" },
+        "highlightColor": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$", "default": "#ffd400" },
+        "safeMargin": { "type": "number", "minimum": 0, "maximum": 0.25, "default": 0.08 }
+      },
+      "additionalProperties": true
+    },
+    "export": {
+      "type": "object",
+      "properties": {
+        "format": { "type": "string", "enum": ["mp4", "webm"], "default": "mp4" },
+        "quality": { "type": "string", "enum": ["low", "balanced", "high"], "default": "balanced" }
+      },
+      "additionalProperties": true
+    }
+  }
+}

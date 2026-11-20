@@ -3,13 +3,13 @@
   "generatedBy": "scripts/export-native-execution-matrix.mjs",
   "stats": {
     "total": 10014,
-    "active": 9754,
-    "planned": 260,
-    "offlineNative": 7910,
+    "active": 9753,
+    "planned": 261,
+    "offlineNative": 7909,
     "backendNative": 1566,
     "webOnly": 278,
     "divergentActive": 0,
-    "fullyExecutable": 9476
+    "fullyExecutable": 9475
   },
   "tools": [
     {
@@ -90559,6 +90559,16 @@
       "ios": "offline-native"
     },
     {
+      "id": "scene-studio",
+      "name": "Scene Studio",
+      "status": "planned",
+      "category": "design",
+      "engine": "custom",
+      "android": "web-only",
+      "ios": "web-only",
+      "dispositionReason": "No matching native Android/iOS execution row is currently registered for this tool ID in the reconciled platform coverage sources. Keep it on Web until both native products have a verified dispatcher and acceptance evidence."
+    },
+    {
       "id": "music-downloader",
       "name": "Music Downloader",
       "status": "active",
@@ -90590,15 +90600,6 @@
       "name": "Camera Studio",
       "status": "active",
       "category": "photography",
-      "engine": "custom",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "video-link-screen-recording",
-      "name": "Video Link Screen Recording",
-      "status": "active",
-      "category": "video",
       "engine": "custom",
       "android": "offline-native",
       "ios": "offline-native"

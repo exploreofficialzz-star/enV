@@ -948,4 +948,24 @@ export const tools: ToolMeta[] = originalTools.map((tool) => {
   if (tool.id === "audio-channel-converter") return withToolIconDesign({ ...tool, clientSide: true, requiresBackend: false, engine: { type: "audio" as const, op: "channels-local" } });
   if (tool.id === "audio-volume-control") return withToolIconDesign({ ...tool, clientSide: true, requiresBackend: false, engine: { type: "audio" as const, op: "volume-local" } });
   return withToolIconDesign(tool);
-}).concat(audioStudioTools.filter((studioTool) => !originalTools.some((tool) => tool.id === studioTool.id)).map(withToolIconDesign));
+}).concat(
+  audioStudioTools.filter((studioTool) => !originalTools.some((tool) => tool.id === studioTool.id)).map(withToolIconDesign),
+  withToolIconDesign({
+    id: "scene-studio",
+    name: "Scene Studio",
+    slug: "scene-studio",
+    description: "Paste a declarative scene, preview 3D motion, and prepare a narrated captioned video.",
+    category: "design",
+    keywords: ["scene", "animation", "3d", "story", "video"],
+    tags: ["scene", "animation", "3d", "video"],
+    icon: "Box",
+    popularity: 96,
+    featured: false,
+    clientSide: true,
+    requiresBackend: false,
+    requiresAuth: false,
+    status: "planned",
+    related: [],
+    engine: { type: "custom", id: "scene-studio" },
+  }),
+);

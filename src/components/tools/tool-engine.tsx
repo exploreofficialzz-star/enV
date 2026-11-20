@@ -61,6 +61,7 @@ const AiMusicDataSandbox = lazy(() => import("@/components/engines/ai-music-data
 const ZipArchiveEngine = lazy(() => import("@/components/engines/zip-archive-engine").then((m) => ({ default: m.ZipArchiveEngine })));
 const CameraStudioEngine = lazy(() => import("@/components/engines/camera-studio-engine").then((m) => ({ default: m.CameraStudioEngine })));
 const SmartphonePrototypeLabEngine = lazy(() => import("@/components/engines/smartphone-prototype-lab-engine").then((m) => ({ default: m.SmartphonePrototypeLabEngine })));
+const SceneStudioEngine = lazy(() => import("@/components/engines/scene-studio-engine").then((m) => ({ default: m.SceneStudioEngine })));
 import { isEventTemplateTool } from "@/lib/events/event-templates";
 import { developerActionForLegacySlug, developerModeForLegacySlug, developerStudioForLegacySlug } from "@/lib/developer-studios-catalog";
 
@@ -79,6 +80,9 @@ function ToolEngineView({ tool, initialMode, initialAction, initialOp }: ToolEng
   // were previously marked planned. The catalog remains the compatibility index.
   if (tool.id === "smartphone-prototype-lab") return <SmartphonePrototypeLabEngine />;
   if (tool.id === "camera-studio") return <CameraStudioEngine />;
+  // The Web preview is shipped in phases; native catalog status remains planned
+  // until matching Kotlin and Swift implementations are present.
+  if (tool.id === "scene-studio") return <SceneStudioEngine />;
   // Flashcard Generator uses the implemented document/flashcards operation.
   if (tool.id === "flashcard-generator") return <DocumentEngine op="flashcards" />;
   // These legacy security records use the shared local password engine.

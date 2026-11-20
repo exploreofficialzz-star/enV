@@ -1,0 +1,10 @@
+{
+  "version": "1.0",
+  "settings": { "width": 1080, "height": 1920, "fps": 30, "duration": 8, "background": "#101826", "seed": 1 },
+  "camera": { "position": [0, 2, 8], "lookAt": [0, 1, 0] },
+  "lights": [{ "type": "hemispheric", "intensity": 1.1 }],
+  "objects": [
+    { "id": "ground", "type": "plane", "name": "Ground", "position": [0, -0.6, 0], "scale": [8, 1, 8], "color": "#314456" },
+    { "id": "hero", "type": "sphere", "name": "Hero", "position": [0, 1, 0], "scale": [1.2, 1.2, 1.2], "color": "#f4b942" }
+  ]
+}

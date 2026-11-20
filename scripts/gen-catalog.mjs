@@ -1452,6 +1452,11 @@ RAW.push(
   ["cagr-rate-from-values-calculator", "CAGR Rate from Values Calculator", "calculators", "Calculate compound annual growth rate from beginning value, ending value, and years.", "calculator", "exercise-cagr-cagr", "cagr growth beginning ending years", 0, 64, "n"],
 );
 
+// Scene Studio is intentionally listed as planned until native Kotlin and Swift
+// readers/renderers satisfy the shared-scene acceptance checks. Its web route is
+// explicitly enabled during the staged implementation.
+RAW.push(["scene-studio", "Scene Studio", "design", "Paste a declarative scene, preview 3D motion, and prepare a narrated captioned video.", "custom", "scene-studio", "scene animation 3d story video", 0, 96, "p"]);
+
 const tools = [];
 for (const row of RAW) {
   const [id, name, cat, desc, engineType, engineKey, kw, featured, pop, extra = ""] = row;
