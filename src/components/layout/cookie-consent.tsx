@@ -121,7 +121,7 @@ export function CookieConsent() {
             Cookie preferences
           </h2>
           <p id="env-cookie-description" className="mt-1 text-xs leading-5 text-muted">
-            Essential storage is always active. Analytics and advertising are optional. Your advertising choice only controls ad requests; it never affects whether you can use a tool.
+            Essential storage is always active. Analytics and advertising are optional. On selected access-gated tools, guests who cannot use the ad-supported path may need to sign in. Signed-in users can use only that tool's separately reviewed enV token price; no tokens are charged while a price remains unapproved.
           </p>
         </div>
         <a
