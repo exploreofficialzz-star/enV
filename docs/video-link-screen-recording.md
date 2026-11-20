@@ -35,6 +35,7 @@ A valid provider URL only identifies the intended platform. It does not guarante
 - Android 14+ uses `MediaProjectionConfig.createConfigForDefaultDisplay()`, so the consent picker is restricted to the full default display rather than allowing an enV-only app-window capture.
 - The app does not display “Recording” merely because the service accepted a start request. The foreground service sends a started event only after `MediaRecorder.start()` succeeds; only then does enV open the unchanged post URL in a Custom Tab.
 - A foreground `mediaProjection` service records MP4 with `MediaRecorder`. Users stop capture in enV or from the persistent capture notification. Final MP4 files are saved to `Movies/enV` on Android 10+ (or the app-specific Movies directory on older supported versions).
+- After finalization, the saved content URI is returned to the recorder screen for in-tool playback and sharing; the output is not left as an undiscoverable file-only result.
 - Each session requires the system consent prompt and a fresh projection token. The service enforces a ten-minute maximum and removes partial output when finalization fails.
 - The native Android implementation currently records screen video only; source-app playback audio is not muxed into its MP4. Protected surfaces may also be blanked by Android or the source app.
 

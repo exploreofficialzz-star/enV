@@ -268,7 +268,7 @@ fun Catalog.withVideoLinkScreenRecording(): Catalog {
         id = "video-link-screen-recording",
         name = "Video Link Screen Recording",
         slug = "video-link-screen-recording",
-        description = "",
+        description = "Record a social-media post with its video and visible platform controls.",
         category = "video",
         keywords = listOf("screen recording", "screen recorder", "social media", "record post", "video link", "likes", "comments", "captions", "youtube", "shorts", "tiktok", "instagram", "facebook", "x", "snapchat", "threads"),
         tags = listOf("video", "screen-recording", "social-media", "capture", "link", "local"),

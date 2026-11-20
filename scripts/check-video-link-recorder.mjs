@@ -27,6 +27,7 @@ const iosEntitlements = read("apps/ios/enV/enV.entitlements");
 const iosProject = read("apps/ios/enV.xcodeproj/project.pbxproj");
 const iosWorkflow = read(".github/workflows/ios-build.yml");
 const iosRouter = read("apps/ios/enV/NativeZipArchiveView.swift");
+const iosToolViews = read("apps/ios/enV/ToolViews.swift");
 const docs = read("docs/video-link-screen-recording.md");
 const offlinePolicy = read("src/lib/offline/local-operation-policy.mjs");
 
@@ -38,9 +39,19 @@ const recorderToolBlock = (source, marker, close) => {
   assert.notEqual(end, -1, "recorder catalog entry closes: " + marker);
   return source.slice(start, end);
 };
-assert.match(recorderToolBlock(registry, 'const videoLinkScreenRecordingTool: ToolMeta = {', "\\n};"), /description: ""/);
-assert.doesNotMatch(androidCatalog, /Record the currently open social-media post's real on-screen interface/);
-assert.doesNotMatch(iosCatalog, /Record the currently open social-media post's real on-screen interface/);
+const recorderCatalogEntry = recorderToolBlock(registry, 'const videoLinkScreenRecordingTool: ToolMeta = {', "\\n};");
+assert.ok(recorderCatalogEntry.includes('description: "Record a social-media post with its video and visible platform controls."'), "the tool keeps its concise description beneath the title");
+assert.match(read("src/lib/offline/capabilities.ts"), /tool\.id === "video-link-screen-recording" \|\| !isOfflineLocalTool/,
+  "the recorder does not claim to work offline while its original post needs a network");
+assert.ok(androidCatalog.includes('description = "Record a social-media post with its video and visible platform controls."'), "Android catalogue keeps the concise tool description");
+assert.ok(iosCatalog.includes('description: "Record a social-media post with its video and visible platform controls."'), "iOS catalogue keeps the concise tool description");
+const toolShell = read("src/components/tools/tool-shell.tsx");
+assert.match(toolShell, /tool\.id !== "video-link-screen-recording"[\s\S]*?What this tool does/,
+  "the long explanatory section is omitted only for the recorder, while the title description remains");
+assert.match(iosToolViews, /if tool\.id != "video-link-screen-recording"[\s\S]*?What this tool does/,
+  "iOS omits the duplicate recorder explanation");
+assert.match(iosToolViews, /else if let guideURL[\s\S]*?Read the full guide/,
+  "iOS retains the full-guide link after the explanation is removed");
 assert.match(router, /tool\.id === "video-link-screen-recording"[^\n]*VideoLinkRecorderEngine/);
 assert.match(preload, /video-link-recorder-engine/);
 assert.ok(offlinePolicy.includes('"' + ID + '"'), "the screen capture remains a local operation");
@@ -78,12 +89,15 @@ assert.doesNotMatch(android, /Intent\(Intent\.ACTION_VIEW/);
 assert.match(android, /MediaProjectionManager/);
 assert.match(android, /createScreenCaptureIntent\(\)/);
 assert.match(android, /MediaProjectionConfig\.createConfigForDefaultDisplay\(\)/);
-assert.match(android, /fun NativeVideoLinkRecorderScreen\(initialPostUrl: String = ""\)/);
+assert.match(android, /fun NativeVideoLinkRecorderScreen\(initialPostUrl: String = "", initialLaunchId: Long = 0L\)/);
 assert.match(androidMain, /initialPostUrl = initialPostUrl/);
 
 assert.match(android, /const val ACTION_STARTED/);
-assert.match(android, /LaunchedEffect\(initialPostUrl\)/);
-assert.match(android, /autoPromptedPostUrl == initialPostUrl/);
+assert.match(android, /LaunchedEffect\(initialPostUrl, initialLaunchId\)/);
+assert.match(android, /autoPromptedLaunchId == initialLaunchId/);
+assert.match(android, /savedRecordingUri/);
+assert.match(android, /VideoView/);
+assert.match(android, /EXTRA_OUTPUT_URI/);
 assert.match(android, /isAwaitingPermission = true/);
 assert.match(android, /sendCaptureStarted\(\)/);
 assert.match(android, /ACTION_STARTED ->/);
@@ -100,9 +114,17 @@ assert.match(android, /sendCaptureResult\(saved = true/);
 assert.match(android, /sendCaptureResult\(saved = false/);
 assert.doesNotMatch(android, /Recording finalized\. The MP4 is saved/);
 assert.doesNotMatch(android, /Choose the entire screen|original social-media post screen/);
-assert.match(androidMain, /tool\.id == "video-link-screen-recording"[^\n]*NativeVideoLinkRecorderScreen\(initialPostUrl\)/);
+assert.match(androidMain, /tool\.id == "video-link-screen-recording"[^\n]*NativeVideoLinkRecorderScreen\(initialPostUrl, initialLaunchId\)/);
 assert.match(androidMain, /getQueryParameter\("postUrl"\)/);
-assert.match(androidMain, /initialPostUrl = initialPostUrl/);
+assert.match(androidMain, /initialPostUrl = activeRecorderPostUrl/);
+assert.match(androidMain, /initialLaunchId = activeRecorderLaunchId/);
+assert.match(androidMain, /activeRecorderLaunchId != initialLaunchId/);
+assert.match(androidMain, /detailStack\.lastOrNull\(\) != "video-link-screen-recording"/);
+assert.match(androidMain, /NativeVideoLinkRecorderScreen\(initialPostUrl, initialLaunchId\)/);
+assert.match(androidMain, /override fun onNewIntent\(intent: Intent\)/);
+assert.match(androidMain, /setIntent\(intent\)/);
+assert.match(androidMain, /LaunchedEffect\(initialToolId, initialPostUrl, initialLaunchId\)/);
+assert.match(androidManifest, /android:launchMode="singleTop"/);
 assert.match(androidMain, /initialToolId == "video-link-screen-recording"/);
 assert.match(androidManifest, /android:scheme="env" android:host="tool" android:path="\/video-link-screen-recording"/);
 
