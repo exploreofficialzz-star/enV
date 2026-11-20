@@ -21,7 +21,6 @@ import android.net.Uri
 import androidx.browser.customtabs.CustomTabsIntent
 import android.os.Build
 import android.os.Bundle
-import android.os.SystemClock
 import android.provider.OpenableColumns
 import java.util.Locale
 import androidx.activity.ComponentActivity
@@ -183,28 +182,11 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.Year
 
-private data class NativeToolLaunchRequest(
-    val toolId: String? = null,
-    val postUrl: String = "",
-    val requestId: Long = 0L,
-)
-
-private fun parseNativeToolLaunchRequest(intent: Intent?): NativeToolLaunchRequest {
-    val uri = intent?.data?.takeIf { it.scheme == "env" && it.host == "tool" }
-    return NativeToolLaunchRequest(
-        toolId = uri?.pathSegments?.firstOrNull(),
-        postUrl = uri?.getQueryParameter("postUrl").orEmpty(),
-        requestId = if (uri != null) SystemClock.elapsedRealtimeNanos() else 0L,
-    )
-}
-
 class MainActivity : ComponentActivity() {
-    private var toolLaunchRequest by mutableStateOf(NativeToolLaunchRequest())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         NativeAdsPrivacyManager.refreshConsent(this)
-        toolLaunchRequest = parseNativeToolLaunchRequest(intent)
         val favorites = FavoritesStore(applicationContext)
         setContent {
             var themeMode by rememberSaveable { mutableStateOf(favorites.getThemeMode()) }
@@ -220,7 +202,6 @@ class MainActivity : ComponentActivity() {
                     isAppearanceLightNavigationBars = !darkMode && supportsLightNavigationBar
                 }
             }
-            val launch = toolLaunchRequest
             EnVTheme(darkTheme = darkMode) {
                 CatalogGate(
                     favorites,
@@ -231,19 +212,11 @@ class MainActivity : ComponentActivity() {
                         favorites.setThemeMode(themeMode)
                     },
                     onExit = { finishAffinity() },
-                    initialToolId = launch.toolId,
-                    initialPostUrl = launch.postUrl,
-                    initialLaunchId = launch.requestId,
                 )
             }
         }
     }
 
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        toolLaunchRequest = parseNativeToolLaunchRequest(intent)
-    }
 }
 
 @Composable
@@ -253,9 +226,6 @@ private fun CatalogGate(
     themeMode: String,
     onUseSystemTheme: () -> Unit,
     onExit: () -> Unit,
-    initialToolId: String? = null,
-    initialPostUrl: String = "",
-    initialLaunchId: Long = 0L,
 ) {
     val context = LocalContext.current.applicationContext
     var catalog by remember { mutableStateOf<Catalog?>(null) }
@@ -272,7 +242,7 @@ private fun CatalogGate(
         result.getOrNull()?.let { catalog = it } ?: run { loadFailed = true }
     }
     when {
-        catalog != null -> EnVApp(catalog!!, favorites, darkMode, themeMode, onUseSystemTheme, initialToolId, initialPostUrl, initialLaunchId)
+        catalog != null -> EnVApp(catalog!!, favorites, darkMode, themeMode, onUseSystemTheme)
         loadFailed -> CatalogFailureScreen(darkMode) { retryCount += 1 }
         else -> NativeLaunchScreen(darkMode, onExit)
     }
@@ -338,9 +308,6 @@ private fun EnVApp(
     darkMode: Boolean,
     themeMode: String,
     onUseSystemTheme: () -> Unit,
-    initialToolId: String? = null,
-    initialPostUrl: String = "",
-    initialLaunchId: Long = 0L,
 ) {
     val context = LocalContext.current
     var tab by rememberSaveable { mutableStateOf(AppTab.Home.name) }
@@ -349,8 +316,6 @@ private fun EnVApp(
     var assistantDraft by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf<String?>(null) }
     var detailStack by rememberSaveable { mutableStateOf(emptyList<String>()) }
-    var activeRecorderPostUrl by rememberSaveable { mutableStateOf("") }
-    var activeRecorderLaunchId by rememberSaveable { mutableStateOf(0L) }
     var isToolFullscreen by rememberSaveable { mutableStateOf(false) }
     var productionTool by remember { mutableStateOf<ToolRecord?>(null) }
     val openTool: (String) -> Unit = { id ->
@@ -371,23 +336,6 @@ private fun EnVApp(
         } else {
             productionTool = null
             detailStack = listOf(routeId)
-        }
-    }
-    LaunchedEffect(initialToolId, initialPostUrl, initialLaunchId) {
-        if (
-            initialToolId == "video-link-screen-recording" &&
-            initialLaunchId != 0L &&
-            activeRecorderLaunchId != initialLaunchId
-        ) {
-            activeRecorderPostUrl = initialPostUrl
-            activeRecorderLaunchId = initialLaunchId
-            openTool(initialToolId)
-        }
-    }
-    SideEffect {
-        if (detailStack.lastOrNull() != "video-link-screen-recording" && activeRecorderLaunchId != 0L) {
-            activeRecorderPostUrl = ""
-            activeRecorderLaunchId = 0L
         }
     }
     val openRelatedTool: (String) -> Unit = { id ->
@@ -496,8 +444,6 @@ private fun EnVApp(
                         onToggleFavorite = { favoriteIds = favorites.toggle(selected.id) },
                         isFullscreen = isToolFullscreen || isWorldLabTool,
                         onToggleFullscreen = { isToolFullscreen = !isToolFullscreen },
-                        initialPostUrl = activeRecorderPostUrl,
-                        initialLaunchId = activeRecorderLaunchId,
                     )
                 } else {
                     when (currentTab) {
@@ -1132,7 +1078,7 @@ private fun AccountScreen(catalog: Catalog, themeMode: String, onUseSystemTheme:
     }
 }
 
-private fun nativeSupported(tool: ToolRecord): Boolean = !NativeCopy.isWebRuntimeOnly(tool.id) && when { tool.category == "communication" -> true; tool.id == "camera-studio" -> true; tool.id == "music-downloader" -> true; tool.id == "video-link-screen-recording" -> true; NativeBackendEngine.supports(tool) -> false; tool.status == "planned" -> false; NativeAudioEngine.supports(tool) -> true; else -> when (tool.engine.type) {
+private fun nativeSupported(tool: ToolRecord): Boolean = !NativeCopy.isWebRuntimeOnly(tool.id) && when { tool.category == "communication" -> true; tool.id == "camera-studio" -> true; tool.id == "music-downloader" -> true; NativeBackendEngine.supports(tool) -> false; tool.status == "planned" -> false; NativeAudioEngine.supports(tool) -> true; else -> when (tool.engine.type) {
     "business" -> NativeBusinessEngine.supports(tool)
     "custom" -> tool.category == "files" || tool.category == "celebrations" || NativeProductivityEngine.supports(tool.id) || NativeAccessibilityEngine.supports(tool.id, tool.category) || NativeEventEngine.supports(tool.id) || NativeEcommerceEngine.supports(tool)
     "ai" -> NativeAiEngine.supports(tool)
@@ -1155,7 +1101,7 @@ private fun nativeBackendSupported(tool: ToolRecord): Boolean = !NativeCopy.isWe
 
 internal fun ToolRecord.offlineDescription(): String {
     val canRunOffline = status.lowercase(Locale.ROOT) in setOf("active", "beta") &&
-        !isUnderProduction() && id != "music-downloader" && id != "video-link-screen-recording" && nativeSupported(this)
+        !isUnderProduction() && id != "music-downloader" && nativeSupported(this)
     if (!canRunOffline || description.startsWith("Works offline.", ignoreCase = true)) return description
     return "Works offline. $description"
 }
@@ -1172,8 +1118,6 @@ private fun ToolDetail(
     onToggleFavorite: () -> Unit,
     isFullscreen: Boolean,
     onToggleFullscreen: () -> Unit,
-    initialPostUrl: String = "",
-    initialLaunchId: Long = 0L,
 ) {
     val supported = nativeSupported(tool)
     val backend = nativeBackendSupported(tool)
@@ -1237,8 +1181,6 @@ private fun ToolDetail(
                                     supported,
                                     onRelatedTool,
                                     startInWorkspace = true,
-                                    initialPostUrl = initialPostUrl,
-                                    initialLaunchId = initialLaunchId,
                                 )
                             }
                         }
@@ -1315,8 +1257,6 @@ private fun ToolDetail(
                         backend,
                         supported,
                         onRelatedTool,
-                        initialPostUrl = initialPostUrl,
-                        initialLaunchId = initialLaunchId,
                     )
                     if (!isFullscreen) NativeToolCommunityPanel(tool.id)
                     if (!isFullscreen) NativeToolAdSlot(tool)
@@ -1327,12 +1267,10 @@ private fun ToolDetail(
                 Spacer(Modifier.height(16.dp))
                 NativeAiAssistPanel(tool)
             }
-            if (tool.id != "video-link-screen-recording") {
-                Spacer(Modifier.height(40.dp))
-                Text("What this tool does", style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.Normal)
-                Text(tool.offlineDescription(), style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 20.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
-                Spacer(Modifier.height(28.dp))
-            }
+            Spacer(Modifier.height(40.dp))
+            Text("What this tool does", style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.Normal)
+            Text(tool.offlineDescription(), style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 20.sp), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+            Spacer(Modifier.height(28.dp))
             TextButton(
                 onClick = {
                     CustomTabsIntent.Builder().setShowTitle(true).build().launchUrl(
@@ -1376,8 +1314,6 @@ private fun NativeToolInterfaceContent(
     supported: Boolean,
     onRelatedTool: (String) -> Unit,
     startInWorkspace: Boolean = false,
-    initialPostUrl: String = "",
-    initialLaunchId: Long = 0L,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -1398,7 +1334,7 @@ private fun NativeToolInterfaceContent(
             }
             tool.category == "communication" -> NativeCommunicationToolForm(tool.id)
             backend -> NativeBackendToolForm(tool, true)
-            supported -> NativeToolForm(tool, onRelatedTool, startInWorkspace, initialPostUrl, initialLaunchId)
+            supported -> NativeToolForm(tool, onRelatedTool, startInWorkspace)
             tool.status == "planned" -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 StatusPill("Coming soon")
                 Text("This tool is not yet implemented natively.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1508,15 +1444,12 @@ private fun NativeToolForm(
     tool: ToolRecord,
     onRelatedTool: (String) -> Unit,
     startInWorkspace: Boolean = false,
-    initialPostUrl: String = "",
-    initialLaunchId: Long = 0L,
 ) {
     if (tool.id == "a-book") { NativeABookScreen(); return }
     if (tool.id == "zip-any-file") { NativeZipArchiveScreen(); return }
     if (tool.category == "files" && tool.engine.type == "custom") { NativeFileWorkspaceScreen(tool.id); return }
     if (tool.id == "camera-studio") { NativeCameraStudioScreen(); return }
     if (tool.id == "music-downloader") { NativeMusicDownloaderScreen(); return }
-    if (tool.id == "video-link-screen-recording") { NativeVideoLinkRecorderScreen(initialPostUrl, initialLaunchId); return }
     if (tool.id == "song-metadata-analyzer" || tool.id == "audio-analyze-studio") { NativeMusicDataSandboxScreen(startInWorkspace); return }
     when (tool.engine.type) {
         "business" -> NativeBusinessToolForm(tool)

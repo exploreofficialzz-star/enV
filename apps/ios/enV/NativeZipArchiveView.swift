@@ -8,9 +8,7 @@ struct NativeArchiveToolDestinationView: View {
     let tool: Tool
 
     var body: some View {
-        if tool.id == "video-link-screen-recording" {
-            NativeVideoLinkRecorderView()
-        } else if tool.id == "zip-any-file" {
+        if tool.id == "zip-any-file" {
             NativeZipArchiveScreen()
         } else if tool.id == "file-to-txt" {
             NativeFileToTextScreen()

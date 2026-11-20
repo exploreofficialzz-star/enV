@@ -33,10 +33,6 @@
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="${envAdmobAppId}" />
-        <service
-            android:name=".VideoLinkCaptureService"
-            android:exported="false"
-            android:foregroundServiceType="mediaProjection" />
         <activity
             android:name=".NativeGamePreviewActivity"
             android:exported="false" />
@@ -47,17 +43,10 @@
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize|density|uiMode" /><activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTop"
             android:screenOrientation="unspecified">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="env" android:host="tool" android:path="/video-link-screen-recording" />
             </intent-filter>
         </activity>
     </application>

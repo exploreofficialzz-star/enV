@@ -144,7 +144,7 @@ struct Tool: Decodable, Identifiable, Hashable {
         let hasNativeDocumentEngine = nativeDocumentOperations.contains(id) && !requiresAuth
         let hasLocalToolEngine = clientSide && !requiresBackend && !requiresAuth
         return ["active", "beta"].contains(status.lowercased()) && !isUnderProduction &&
-            (hasNativeDocumentEngine || hasLocalToolEngine) && id != "music-downloader" && id != "video-link-screen-recording" &&
+            (hasNativeDocumentEngine || hasLocalToolEngine) && id != "music-downloader" &&
             !NativeCopy.isWebRuntimeOnly(id)
     }
     var offlineDescription: String {
@@ -434,45 +434,6 @@ extension Catalog {
         )
     }
 
-    /// Registers Video Link Screen Recording as a native tool.
-    func includingVideoLinkScreenRecording() -> Catalog {
-        guard !tools.contains(where: { $0.id == "video-link-screen-recording" }) else { return self }
-        let tool = Tool(
-            id: "video-link-screen-recording",
-            name: "Video Link Screen Recording",
-            slug: "video-link-screen-recording",
-            description: "Record a social-media post with its video and visible platform controls.",
-            category: "video",
-            subcategory: "Screen recording",
-            keywords: ["screen recording", "screen recorder", "social media", "record post", "video link", "likes", "comments", "captions", "youtube", "shorts", "tiktok", "instagram", "facebook", "x", "snapchat", "threads"],
-            tags: ["video", "screen-recording", "social-media", "capture", "link", "local"],
-            icon: "Video",
-            popularity: 1100,
-            featured: true,
-            clientSide: true,
-            requiresBackend: false,
-            requiresAuth: false,
-            status: "active",
-            disclaimer: nil,
-            related: ["video-url-downloader", "url-media-inspector", "video-trimmer", "video-file-inspector"],
-            engine: ToolEngine(type: "custom", id: "video-link-screen-recording", op: "video-link-screen-recording", configuration: [:])
-        )
-        let updated = tools + [tool]
-        return Catalog(
-            schemaVersion: schemaVersion,
-            catalogVersion: catalogVersion,
-            counts: CatalogCounts(total: updated.count, active: updated.filter { $0.status == "active" || $0.status == "beta" }.count, planned: counts.planned, categories: counts.categories),
-            categories: categories,
-            tools: updated.sorted {
-                let leftCategory = $0.category.lowercased()
-                let rightCategory = $1.category.lowercased()
-                return leftCategory == rightCategory
-                    ? ($0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending)
-                    : leftCategory < rightCategory
-            },
-            relatedReferenceTools: relatedReferenceTools
-        )
-    }
 
     /// Registers the native local File workspace tools alongside the shared catalogue.
     func includingFileWorkspaceTools() -> Catalog {

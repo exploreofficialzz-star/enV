@@ -261,34 +261,6 @@ fun Catalog.withZipArchive(): Catalog {
     )
 }
 
-/** Registers Video Link Screen Recording without changing the shared web catalogue. */
-fun Catalog.withVideoLinkScreenRecording(): Catalog {
-    if (tools.any { it.id == "video-link-screen-recording" }) return this
-    val tool = ToolRecord(
-        id = "video-link-screen-recording",
-        name = "Video Link Screen Recording",
-        slug = "video-link-screen-recording",
-        description = "Record a social-media post with its video and visible platform controls.",
-        category = "video",
-        keywords = listOf("screen recording", "screen recorder", "social media", "record post", "video link", "likes", "comments", "captions", "youtube", "shorts", "tiktok", "instagram", "facebook", "x", "snapchat", "threads"),
-        tags = listOf("video", "screen-recording", "social-media", "capture", "link", "local"),
-        icon = "Video",
-        popularity = 1100,
-        featured = true,
-        clientSide = true,
-        requiresBackend = false,
-        requiresAuth = false,
-        status = "active",
-        related = listOf("video-url-downloader", "url-media-inspector", "video-trimmer", "video-file-inspector"),
-        engine = EngineInfo("custom", "video-link-screen-recording"),
-        subcategory = "Screen recording",
-    )
-    val updated = tools + tool
-    return copy(
-        counts = counts.copy(total = updated.size, active = updated.count { it.status == "active" || it.status == "beta" }),
-        tools = updated.sortedWith(compareBy<ToolRecord> { it.category }.thenBy { it.name.lowercase(Locale.ROOT) }.thenBy { it.id }),
-    )
-}
 
 /** Registers the native local File workspace tools without changing the generated base catalogue. */
 fun Catalog.withFileWorkspaceTools(): Catalog {
