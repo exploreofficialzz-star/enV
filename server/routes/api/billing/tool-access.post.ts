@@ -59,7 +59,8 @@ export default defineHandler(async (event) => {
 
   const principal = await requireOfflineBillingUser(request);
   if (!principal.userId) return principal.response ?? jsonResponse({ ok: false, error: "AUTH_REQUIRED" }, 401);
-  const operationId = `tool-access:${toolId}`;
+  const toolDigest = createHash("sha256").update(toolId).digest("hex").slice(0, 32);
+  const operationId = `tool-access:${toolDigest}`;
 
   try {
     if (action === "reserve") {
@@ -78,7 +79,6 @@ export default defineHandler(async (event) => {
           noTokensCharged: true,
         }, 409);
       }
-      const toolDigest = createHash("sha256").update(toolId).digest("hex").slice(0, 24);
       const reservation = await reserveCredits({
         userId: principal.userId,
         subunits: approval.subunitsPerSession,
