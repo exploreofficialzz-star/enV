@@ -89,6 +89,8 @@ assert.match(accessGate, /recordBrowserRewardedAdCompletion/);
 assert.match(tokenAccessRoute, /reserveCredits/);
 assert.match(tokenAccessRoute, /settleReservationAtReservedAmount/);
 assert.match(tokenAccessRoute, /getApprovedToolAccessPrice/);
+assert.match(tokenAccessRoute, /requireOfflineBillingUser/, "The tool-access API must accept verified paired Android and iOS sessions.");
+assert.match(tokenAccessRoute, /hasNativeAuthorization/, "Native bearer requests may omit browser Origin but still require a valid native billing session.");
 assert.match(approvedToolPrices, /approvedByToolId\.get\(toolId\)/);
 assert.match(shell, /!isFullscreen && import\.meta\.env\.VITE_ADSTERRA_ENABLED !== "true" \? <AdSlot tool=\{tool\} \/>/, "The Google fallback must remain tool-only when Adsterra is disabled.");
 
@@ -121,6 +123,8 @@ assert.match(offlinePolicy, /tokenPolicy: "monetization-pending"/, "Offline exec
 assert.match(offline, /BILLING_OFFLINE_ENABLED !== "true"/, "Production offline token spending must remain fail-closed.");
 assert.match(env, /VITE_ADS_ENABLED=false/, "Ads must remain off by default in the environment template.");
 assert.match(env, /VITE_ADSENSE_PRIVACY_CONFIGURED=false/, "CMP readiness must remain off by default.");
+assert.match(env, /VITE_AD_ACCESS_GATE_ENABLED=false/, "The access gate must remain disabled until Google rewarded inventory is configured.");
+assert.match(env, /VITE_GAM_REWARDED_AD_UNIT_PATH=/, "Web rewarded inventory must use a publisher-generated GAM unit path.");
 assert.match(adsterraWeb, /window\.addEventListener\("focus", onChange\)/, "Adsterra must retry when a mobile browser tab regains focus.");
 assert.match(adsterraWeb, /document\.addEventListener\("visibilitychange", onVisibilityChange\)/, "Adsterra must retry when the page becomes visible again.");
 assert.match(adsterraWeb, /window\.setInterval\([\s\S]*?15_000\)/, "Adsterra must retry transient same-origin reachability failures while visible.");
