@@ -87,7 +87,10 @@ assert.match(androidMain, /initialPostUrl = initialPostUrl/);
 
 assert.match(android, /const val ACTION_STARTED/);
 assert.match(android, /LaunchedEffect\(initialPostUrl\)/);
-assert.match(android, /autoPromptedPostUrl == initialPostUrl/);
+assert.match(android, /autoPromptedLaunchId == initialLaunchId/);
+assert.match(android, /savedRecordingUri/);
+assert.match(android, /VideoView/);
+assert.match(android, /EXTRA_OUTPUT_URI/);
 assert.match(android, /isAwaitingPermission = true/);
 assert.match(android, /sendCaptureStarted\(\)/);
 assert.match(android, /ACTION_STARTED ->/);
@@ -107,6 +110,12 @@ assert.doesNotMatch(android, /Choose the entire screen|original social-media pos
 assert.match(androidMain, /tool\.id == "video-link-screen-recording"[^\n]*NativeVideoLinkRecorderScreen\(initialPostUrl\)/);
 assert.match(androidMain, /getQueryParameter\("postUrl"\)/);
 assert.match(androidMain, /initialPostUrl = initialPostUrl/);
+assert.match(androidMain, /initialLaunchId = initialLaunchId/);
+assert.match(androidMain, /NativeVideoLinkRecorderScreen\(initialPostUrl, initialLaunchId\)/);
+assert.match(androidMain, /override fun onNewIntent\(intent: Intent\)/);
+assert.match(androidMain, /setIntent\(intent\)/);
+assert.match(androidMain, /LaunchedEffect\(initialToolId, initialPostUrl, initialLaunchId\)/);
+assert.match(androidManifest, /android:launchMode="singleTop"/);
 assert.match(androidMain, /initialToolId == "video-link-screen-recording"/);
 assert.match(androidManifest, /android:scheme="env" android:host="tool" android:path="\/video-link-screen-recording"/);
 
