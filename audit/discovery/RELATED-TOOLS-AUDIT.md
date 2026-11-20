@@ -2,7 +2,7 @@
 
 Registry-level integrity of `related` links among non-planned tools. It does not judge whether a suggestion is semantically useful.
 
-- Active/beta tools audited: 9754; related links: 55453.
+- Active/beta tools audited: 9753; related links: 55453.
 - Tools with fewer than 3 related links: 0.
 - **Dangling targets (ID not in registry): 5** — e.g. music-live-video-studio->video-compress, music-live-video-studio->video-trim, a-book->document-editor, zip-any-file->file-converter, zip-any-file->document-editor.
 - **Self-references: 4**; duplicate targets in one list: 0.

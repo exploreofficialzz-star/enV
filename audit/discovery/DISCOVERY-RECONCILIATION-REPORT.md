@@ -27,11 +27,11 @@ Unique-ID counts equal record counts on every surface (no duplicate or missing I
 
 | Class | Records |
 | --- | ---: |
-| Active | 9,754 |
+| Active | 9,753 |
 | Beta | 0 |
 | Planned | 260 |
 | Retired (removed from runtime, still in raw catalogue) | 0 |
-| Runtime extensions (not in raw catalogue) | 13 |
+| Runtime extensions (not in raw catalogue) | 12 |
 | Virtual Studio records (searchable only) | 14 |
 | Excluded from discovery search (runtime only) | 49 |
 | Alias routes (route differs from canonical route) | 475 |
@@ -61,7 +61,7 @@ Each difference below is matched by a named rule. A difference that matches no r
 
 ## 4. Status and lifecycle
 
-Runtime status: active 9754, planned 260. Searchable status: active 9719, planned 260. Raw catalogue status: active 10001.
+Runtime status: active 9753, planned 260. Searchable status: active 9718, planned 260. Raw catalogue status: active 10001.
 
 - Planned records in runtime that are classified as generic workflow placeholders: 260 of 260. Planned records with no explanation: 0.
 - **Planned records returned by `getSearchableTools()`: 260.** The UI labels them "Coming soon" (SearchBox, ToolCard), so they are not presented as usable, but the legacy scorer ranked them among active tools and Enter could navigate to them. The new search tiers planned records after active ones. Registered as gap `PLANNED_IN_SEARCHABLE` (they remain in discovery by design until the product decides otherwise).
@@ -125,7 +125,7 @@ The `generators` category is empty on every surface. It needs a taxonomy decisio
 - Android IDs 7902, iOS IDs 7902; IDs on one platform only: 0; manifest IDs not in runtime: 0.
 - **Committed `native-execution-matrix.json` is current.** It has 10014 rows; a fresh derivation from the current runtime has 10014. Runtime IDs missing from the committed matrix: _none_.
 - Committed matrix rows whose display name differs from the current runtime name: 0; whose status differs: 0; whose platform classification differs: 0.
-- Committed stats: total 10014, active 9754, planned 260, offline-native 7910, backend-native 1566, web-only 278. Fresh derivation: total 10014, active 9754, planned 260, offline-native 7910, backend-native 1566, web-only 278.
+- Committed stats: total 10013, active 9753, planned 260, offline-native 7909, backend-native 1566, web-only 278. Fresh derivation: total 10013, active 9753, planned 260, offline-native 7909, backend-native 1566, web-only 278.
 - A native manifest or matrix row is classification, not test evidence. `NATIVE_TESTED` requires exact-ID execution evidence (requirements §6).
 
 ## 7. Ranking inputs
