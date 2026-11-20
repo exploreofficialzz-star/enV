@@ -414,7 +414,9 @@ internal fun NativeRewardedToolAccessGate(
         originReachable = network && NativeAdsPolicy.isApplicationOnline(context)
     }
 
-    if (preview || !NativeAdsPolicy.isRewardedAccessTool(tool)) {
+    // Offline or origin-unreachable runs remain governed by the existing
+    // signed allowance/journal path inside the native tool execution boundary.
+    if (preview || !NativeAdsPolicy.isRewardedAccessTool(tool) || !network || !originReachable) {
         content()
         return
     }
