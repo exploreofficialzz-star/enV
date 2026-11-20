@@ -1331,9 +1331,12 @@ private fun NativeToolInterfaceContent(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val telemetry = remember(tool.id) {
-        NativeToolExecutionTelemetry(context.applicationContext, tool.id) {
-            scope.launch { runCatching { NativeAnalytics.flush(context.applicationContext) } }
-        }
+        NativeToolExecutionTelemetry(
+            context.applicationContext,
+            tool.id,
+            flush = { scope.launch { runCatching { NativeAnalytics.flush(context.applicationContext) } } },
+            onFinished = LocalNativeToolAccessCompletion.current,
+        )
     }
     DisposableEffect(telemetry) {
         onDispose { telemetry.abandon() }
@@ -3197,6 +3200,7 @@ internal class NativeToolExecutionTelemetry(
     private val context: Context,
     private val toolId: String,
     private val flush: () -> Unit,
+    private val onFinished: (Boolean) -> Unit = {},
 ) {
     private var startedAtMs: Long? = null
     private var resultRecorded = false
@@ -3222,6 +3226,7 @@ internal class NativeToolExecutionTelemetry(
             errorCode = if (success) null else "NATIVE_TOOL_FAILED",
         )
         flush()
+        onFinished(success)
     }
     @Synchronized fun abandon() {
         val start = startedAtMs ?: return
@@ -3237,6 +3242,7 @@ internal class NativeToolExecutionTelemetry(
             errorCode = "NATIVE_TOOL_LEFT_BEFORE_RESULT",
         )
         flush()
+        onFinished(false)
     }
 }
 
