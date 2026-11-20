@@ -349,6 +349,8 @@ private fun EnVApp(
     var assistantDraft by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf<String?>(null) }
     var detailStack by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    var activeRecorderPostUrl by rememberSaveable { mutableStateOf("") }
+    var activeRecorderLaunchId by rememberSaveable { mutableStateOf(0L) }
     var isToolFullscreen by rememberSaveable { mutableStateOf(false) }
     var productionTool by remember { mutableStateOf<ToolRecord?>(null) }
     val openTool: (String) -> Unit = { id ->
@@ -372,7 +374,21 @@ private fun EnVApp(
         }
     }
     LaunchedEffect(initialToolId, initialPostUrl, initialLaunchId) {
-        if (initialToolId == "video-link-screen-recording") openTool(initialToolId)
+        if (
+            initialToolId == "video-link-screen-recording" &&
+            initialLaunchId != 0L &&
+            activeRecorderLaunchId != initialLaunchId
+        ) {
+            activeRecorderPostUrl = initialPostUrl
+            activeRecorderLaunchId = initialLaunchId
+            openTool(initialToolId)
+        }
+    }
+    SideEffect {
+        if (detailStack.lastOrNull() != "video-link-screen-recording" && activeRecorderLaunchId != 0L) {
+            activeRecorderPostUrl = ""
+            activeRecorderLaunchId = 0L
+        }
     }
     val openRelatedTool: (String) -> Unit = { id ->
         val candidate = catalog.displayTool(id)
@@ -480,8 +496,8 @@ private fun EnVApp(
                         onToggleFavorite = { favoriteIds = favorites.toggle(selected.id) },
                         isFullscreen = isToolFullscreen || isWorldLabTool,
                         onToggleFullscreen = { isToolFullscreen = !isToolFullscreen },
-                        initialPostUrl = initialPostUrl,
-                        initialLaunchId = initialLaunchId,
+                        initialPostUrl = activeRecorderPostUrl,
+                        initialLaunchId = activeRecorderLaunchId,
                     )
                 } else {
                     when (currentTab) {
