@@ -5,6 +5,19 @@ import UIKit
 import GoogleMobileAds
 import UserMessagingPlatform
 
+typealias NativeToolAccessCompletion = @MainActor (Bool) -> Void
+
+private struct NativeToolAccessCompletionKey: EnvironmentKey {
+    static let defaultValue: NativeToolAccessCompletion = { _ in }
+}
+
+extension EnvironmentValues {
+    var nativeToolAccessCompletion: NativeToolAccessCompletion {
+        get { self[NativeToolAccessCompletionKey.self] }
+        set { self[NativeToolAccessCompletionKey.self] = newValue }
+    }
+}
+
 enum NativeAdsPolicy {
     private static let info = Bundle.main.infoDictionary ?? [:]
     private static func flag(_ key: String) -> Bool {
@@ -297,6 +310,9 @@ struct NativeRewardedToolAccessGate<Content: View>: View {
     @State private var busy = false
     @State private var message = ""
     @State private var showAdFreeOffer = false
+    @State private var showTokenConfirmation = false
+    @State private var pendingReservation: OfflineWalletNativeAPI.ToolAccessReservation?
+    @State private var activeReservation: OfflineWalletNativeAPI.ToolAccessReservation?
     @State private var adDelegate: NativeRewardedAdDelegate?
 
     private var isConfigured: Bool { NativeAdsPolicy.isRewardedAccessTool(tool) }
@@ -308,12 +324,13 @@ struct NativeRewardedToolAccessGate<Content: View>: View {
         Group {
             if !isConfigured || unlocked {
                 content()
+                    .environment(\.nativeToolAccessCompletion, completeTokenSession)
             } else {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Continue to " + tool.name)
                         .font(.envScaled(size: 19, weight: .semibold))
                         .foregroundStyle(Color.envInk)
-                    Text("Watch a complete rewarded video to use this tool for this visit. If you decline advertising or no ad is available, open Wallet to sign in and review your token options.")
+                    Text("Watch a complete rewarded video to use this tool for this visit, or use a reviewed enV token price for ad-free access.")
                         .font(.envScaled(size: 14, weight: .regular))
                         .foregroundStyle(Color.envMuted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -330,6 +347,17 @@ struct NativeRewardedToolAccessGate<Content: View>: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(!canWatch)
+
+                    Button(action: { Task { await reserveTokenAccess() } }) {
+                        Text(busy ? "Checking reviewed token price…" : "Use enV tokens (ad-free)")
+                            .font(.envScaled(size: 14, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(busy || !reachability.hasNetwork || !originReachable)
+
                     Button(action: onOpenWallet) {
                         Text("Open Wallet / sign in")
                             .font(.envScaled(size: 14, weight: .semibold))
@@ -338,12 +366,13 @@ struct NativeRewardedToolAccessGate<Content: View>: View {
                             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
                     }
                     .buttonStyle(.plain)
+
                     if !consent.canRequestAds {
                         Text("Google advertising privacy settings must permit ads before a rewarded video can load.")
                             .font(.envScaled(size: 12, weight: .regular))
                             .foregroundStyle(Color.envMuted)
                     } else if !reachability.hasNetwork || !originReachable {
-                        Text("A verified connection to enV is required for online rewarded access.")
+                        Text("A verified connection to enV is required for online access.")
                             .font(.envScaled(size: 12, weight: .regular))
                             .foregroundStyle(Color.envMuted)
                     }
@@ -366,11 +395,98 @@ struct NativeRewardedToolAccessGate<Content: View>: View {
             }
             originReachable = await NativeAdsPolicy.isApplicationOnline()
         }
+        .confirmationDialog(
+            "Confirm token access",
+            isPresented: $showTokenConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Confirm and continue") {
+                activeReservation = pendingReservation
+                pendingReservation = nil
+                unlocked = true
+                message = ""
+            }
+            Button("Cancel without charge", role: .cancel) {
+                guard let reservation = pendingReservation else { return }
+                pendingReservation = nil
+                Task { await releaseReservation(reservation) }
+            }
+        } message: {
+            if let reservation = pendingReservation {
+                Text("This tool costs \(reservation.reservedTokens.formatted()) enV tokens \(reservation.unitLabel). Tokens are deducted only after a successful tool result.")
+            }
+        }
         .alert("Ready to go ad-free?", isPresented: $showAdFreeOffer) {
-            Button("Open Wallet") { onOpenWallet() }
+            Button("Use enV tokens") { Task { await reserveTokenAccess() } }
             Button("Keep using ads", role: .cancel) { }
         } message: {
-            Text("You completed three rewarded ads in the last 30 days. Open Wallet to review token access for individual tools. Tool prices are enabled only after review.")
+            Text("You completed three rewarded ads in the last 30 days. Use the reviewed token price for individual tools.")
+        }
+        .onDisappear {
+            if let reservation = activeReservation {
+                activeReservation = nil
+                Task { await releaseReservation(reservation) }
+            }
+            if let reservation = pendingReservation {
+                pendingReservation = nil
+                Task { await releaseReservation(reservation) }
+            }
+        }
+    }
+
+    @MainActor
+    private func reserveTokenAccess() async {
+        guard !busy else { return }
+        guard OfflineWalletNativeAPI.isPaired else {
+            message = "Sign in to enV and pair this device from your Web Wallet before using tokens."
+            onOpenWallet()
+            return
+        }
+        guard reachability.hasNetwork && originReachable else {
+            message = "Connect to enV to verify the reviewed price and reserve tokens. No tokens were charged."
+            return
+        }
+        busy = true
+        message = ""
+        defer { busy = false }
+        do {
+            pendingReservation = try await OfflineWalletNativeAPI.reserveToolAccess(
+                toolID: tool.id,
+                sessionID: UUID().uuidString
+            )
+            showTokenConfirmation = true
+        } catch {
+            message = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func releaseReservation(_ reservation: OfflineWalletNativeAPI.ToolAccessReservation) async {
+        do {
+            try await OfflineWalletNativeAPI.releaseToolAccess(toolID: tool.id, reservationID: reservation.reservationID)
+        } catch {
+            message = "The unused token reservation could not be released yet. Reconnect Wallet before starting another paid session."
+        }
+    }
+
+    @MainActor
+    private func completeTokenSession(success: Bool) {
+        guard let reservation = activeReservation, !busy else { return }
+        busy = true
+        unlocked = false
+        Task {
+            do {
+                if success {
+                    try await OfflineWalletNativeAPI.settleToolAccess(toolID: tool.id, reservationID: reservation.reservationID)
+                } else {
+                    try await OfflineWalletNativeAPI.releaseToolAccess(toolID: tool.id, reservationID: reservation.reservationID)
+                }
+                activeReservation = nil
+                message = ""
+            } catch {
+                message = "Token settlement could not be verified. Access is paused to prevent another charge. " + error.localizedDescription
+            }
+            busy = false
         }
     }
 
@@ -392,7 +508,7 @@ struct NativeRewardedToolAccessGate<Content: View>: View {
             delegate.onFailure = {
                 Task { @MainActor in
                     self.busy = false
-                    self.message = "The rewarded ad could not be shown. Try again or use Wallet."
+                    self.message = "The rewarded ad could not be shown. Try again or use tokens."
                     self.adDelegate = nil
                 }
             }
