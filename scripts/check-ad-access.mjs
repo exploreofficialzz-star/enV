@@ -82,7 +82,9 @@ assert.match(privacy, /access-gated tools[\s\S]*?(?:separately reviewed enV toke
 assert.match(cookieConsent, /selected access-gated tools[\s\S]*?reviewed enV token price/i, "Cookie preferences must explain the access path when ads are declined.");
 assert.match(rewardedAccess, /rewardedSlotGranted/);
 assert.match(rewardedAccess, /rewardedSlotVideoCompleted/);
-assert.match(rewardedAccess, /whenGooglePrivacyConsentDataReady/);
+assert.match(rewardedAccess, /whenGoogleAdsConsentReady/);
+assert.match(read("src/lib/ads/browser.ts"), /adStoragePurposeConsentStatus[\s\S]*?adUserDataPurposeConsentStatus[\s\S]*?adPersonalizationPurposeConsentStatus/);
+assert.match(read("src/lib/ads/browser.ts"), /CONSENT_MODE_PURPOSE_STATUS_DENIED/);
 assert.match(rewardedProgress, /REWARDED_ADS_BEFORE_AD_FREE_OFFER = 3/);
 assert.match(rewardedProgress, /REWARDED_AD_PERIOD_MS = 30/);
 assert.match(accessGate, /recordBrowserRewardedAdCompletion/);
