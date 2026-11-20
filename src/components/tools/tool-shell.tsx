@@ -422,7 +422,7 @@ export function ToolShell({
               <button
                 type="button"
                 onClick={() => void toggleFullscreen()}
-                disabled={(isMusicSandbox && !prefsHydrated) || (adAccessGateEnabled && !toolAccessUnlocked)}
+                disabled={(isMusicSandbox && !prefsHydrated) || (adAccessGateEnabled && browserOnline && !toolAccessUnlocked)}
                 className="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-border text-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 aria-label={isFullscreen ? `Exit full screen for ${tool.name}` : `View ${tool.name} in full screen`}
                 title={isFullscreen ? "Exit full screen" : "View tool in full screen"}
