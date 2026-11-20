@@ -34,29 +34,39 @@ jobs:
               echo "main no longer descends from the reviewed import base; refusing to continue."
               exit 1
             }
-            actual_paths="$(git diff --name-only "$expected_parent" "$current_main" | sort)"
-            expected_paths="$(printf '%s\n' \
-              'apps/android/app/src/main/AndroidManifest.xml' \
-              'apps/android/app/src/main/java/com/chastech/env/MainActivity.kt' \
-              'apps/android/app/src/main/java/com/chastech/env/NativeVideoLinkRecorder.kt' \
-              'apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt' \
-              'apps/ios/enV/CatalogCore.swift' \
-              'apps/ios/enV/NativeVideoLinkRecorder.swift' \
-              'docs/video-link-screen-recording.md' \
-              'package.json' \
-              'scripts/check-video-link-recorder.mjs' \
-              'src/components/engines/video-link-recorder-engine.tsx' \
-              'src/lib/registry.ts' | sort)"
-            if [[ "$actual_paths" != "$expected_paths" ]]; then
-              echo "main advanced with files outside the reviewed Video Link recorder scope; refusing to continue."
-              printf '%s\n' "$actual_paths"
+          is_reviewed_recorder_path() {
+            case "$1" in
+              '.github/workflows/ios-build.yml') return 0 ;;
+              '.github/workflows/video-link-native-ci.yml') return 0 ;;
+              'apps/android/app/src/main/AndroidManifest.xml') return 0 ;;
+              'apps/android/app/src/main/java/com/chastech/env/MainActivity.kt') return 0 ;;
+              'apps/android/app/src/main/java/com/chastech/env/NativeVideoLinkRecorder.kt') return 0 ;;
+              'apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt') return 0 ;;
+              'apps/ios/enV.xcodeproj/project.pbxproj') return 0 ;;
+              'apps/ios/enV/CatalogCore.swift') return 0 ;;
+              'apps/ios/enV/Info.plist') return 0 ;;
+              'apps/ios/enV/NativeVideoLinkRecorder.swift') return 0 ;;
+              'apps/ios/enV/enV.entitlements') return 0 ;;
+              'docs/video-link-screen-recording.md') return 0 ;;
+              'package.json') return 0 ;;
+              'scripts/check-video-link-recorder.mjs') return 0 ;;
+              'src/components/engines/video-link-recorder-engine.tsx') return 0 ;;
+              'src/lib/media/video-link-recording.test.ts') return 0 ;;
+              'src/lib/registry.ts') return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+          while IFS= read -r changed_path; do
+            if ! is_reviewed_recorder_path "$changed_path"; then
+              echo "main changed outside the explicitly reviewed Video Link recorder paths; refusing to continue."
+              echo "$changed_path"
               exit 1
             fi
+          done < <(git diff --name-only "$expected_parent" "$current_main")
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git rebase origin/main
           fi
-
       - name: Extract authored archive and reviewed amendments
         shell: bash
         run: |
@@ -148,6 +158,7 @@ jobs:
           unset VERCEL_GIT_COMMIT_SHA
           npm run discovery:check
           npm run check:native-discovery
+          npm run check:video-link-recorder
           node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test \
             scripts/discovery-inventory.test.mjs \
             scripts/search-demand-core.test.mjs \
@@ -234,28 +245,70 @@ jobs:
               echo "main no longer descends from the validated discovery parent; refusing to push."
               exit 1
             }
-            actual_paths="$(git diff --name-only "$expected_parent" "$current_main" | sort)"
-            expected_paths="$(printf '%s\n' \
-              'apps/android/app/src/main/AndroidManifest.xml' \
-              'apps/android/app/src/main/java/com/chastech/env/MainActivity.kt' \
-              'apps/android/app/src/main/java/com/chastech/env/NativeVideoLinkRecorder.kt' \
-              'apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt' \
-              'apps/ios/enV/CatalogCore.swift' \
-              'apps/ios/enV/NativeVideoLinkRecorder.swift' \
-              'docs/video-link-screen-recording.md' \
-              'package.json' \
-              'scripts/check-video-link-recorder.mjs' \
-              'src/components/engines/video-link-recorder-engine.tsx' \
-              'src/lib/registry.ts' | sort)"
-            if [[ "$actual_paths" != "$expected_paths" ]]; then
-              echo "main advanced outside the reviewed Video Link recorder scope; refusing to push."
-              printf '%s\n' "$actual_paths"
+          is_reviewed_recorder_path() {
+            case "$1" in
+              '.github/workflows/ios-build.yml') return 0 ;;
+              '.github/workflows/video-link-native-ci.yml') return 0 ;;
+              'apps/android/app/src/main/AndroidManifest.xml') return 0 ;;
+              'apps/android/app/src/main/java/com/chastech/env/MainActivity.kt') return 0 ;;
+              'apps/android/app/src/main/java/com/chastech/env/NativeVideoLinkRecorder.kt') return 0 ;;
+              'apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt') return 0 ;;
+              'apps/ios/enV.xcodeproj/project.pbxproj') return 0 ;;
+              'apps/ios/enV/CatalogCore.swift') return 0 ;;
+              'apps/ios/enV/Info.plist') return 0 ;;
+              'apps/ios/enV/NativeVideoLinkRecorder.swift') return 0 ;;
+              'apps/ios/enV/enV.entitlements') return 0 ;;
+              'docs/video-link-screen-recording.md') return 0 ;;
+              'package.json') return 0 ;;
+              'scripts/check-video-link-recorder.mjs') return 0 ;;
+              'src/components/engines/video-link-recorder-engine.tsx') return 0 ;;
+              'src/lib/media/video-link-recording.test.ts') return 0 ;;
+              'src/lib/registry.ts') return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+          while IFS= read -r changed_path; do
+            if ! is_reviewed_recorder_path "$changed_path"; then
+              echo "main changed outside the explicitly reviewed Video Link recorder paths; refusing to continue."
+              echo "$changed_path"
               exit 1
             fi
+          done < <(git diff --name-only "$expected_parent" "$current_main")
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git rebase origin/main
+            export GITHUB_SHA="$(git rev-parse origin/main)"
+            export GIT_COMMIT="$GITHUB_SHA"
+            unset VERCEL_GIT_COMMIT_SHA
+            npm run discovery:check
+            npm run check:native-discovery
             npm run check:video-link-recorder
+            node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test \
+              scripts/discovery-inventory.test.mjs \
+              scripts/search-demand-core.test.mjs \
+              scripts/related-tools-baseline.test.mjs \
+              src/lib/search.test.ts \
+              src/lib/discovery-filters.test.ts \
+              src/lib/discovery-collections.test.ts \
+              src/lib/related-tools.test.ts \
+              src/lib/accessibility-studios.test.ts
+            npm run build
+            npm run typecheck
+            git restore --source=HEAD -- \
+              apps/shared/catalog.json \
+              apps/shared/native-engine-inventory.json \
+              docs/billing-tool-audit-2026-10-18.md \
+              src/data/billing-profile-index.json \
+              src/data/billing-profile-runtime-extensions.json \
+              src/data/billing-profiles.json \
+              src/data/home-tools.json
+            git clean -fd -- \
+              docs/seo-tool-inventory.md \
+              public/catalog-runtime \
+              public/llms.txt \
+              public/og \
+              public/robots.txt \
+              public/sitemap.xml
           fi
           test -z "$(git status --porcelain)"
           git push origin HEAD:main
