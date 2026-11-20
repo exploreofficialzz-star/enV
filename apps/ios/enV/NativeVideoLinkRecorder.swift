@@ -111,11 +111,11 @@ private final class NativePostInterfaceCaptureController: NSObject, ObservableOb
             outputConfiguration.outputURL = outputURL
             let output = SCRecordingOutput(configuration: outputConfiguration, delegate: self)
             let newStream = SCStream(filter: filter, configuration: streamConfiguration, delegate: self)
-            try newStream.addRecordingOutput(output)
             stream = newStream
             recordingOutput = output
             recordingURL = outputURL
             try await newStream.startCapture()
+            try newStream.addRecordingOutput(output)
             message = "Starting screen recording."
         } catch {
             isPreparing = false
