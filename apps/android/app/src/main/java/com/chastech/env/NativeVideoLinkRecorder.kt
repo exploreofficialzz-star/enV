@@ -110,6 +110,8 @@ fun NativeVideoLinkRecorderScreen(initialPostUrl: String = "") {
     }
     var status by rememberSaveable { mutableStateOf("") }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
+    var isAwaitingPermission by rememberSaveable { mutableStateOf(false) }
+    var autoPromptedPostUrl by rememberSaveable { mutableStateOf("") }
     var isStarting by rememberSaveable { mutableStateOf(false) }
     var isRecording by rememberSaveable { mutableStateOf(false) }
     var isStopping by rememberSaveable { mutableStateOf(false) }
@@ -178,6 +180,7 @@ fun NativeVideoLinkRecorderScreen(initialPostUrl: String = "") {
     val projectionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
+        isAwaitingPermission = false
         val data = result.data
         if (result.resultCode == Activity.RESULT_OK && data != null) {
             val serviceIntent = Intent(context, VideoLinkCaptureService::class.java).apply {
@@ -219,6 +222,28 @@ fun NativeVideoLinkRecorderScreen(initialPostUrl: String = "") {
             .getOrNull()
     }
 
+    LaunchedEffect(initialPostUrl) {
+        if (initialPostUrl.isBlank() || autoPromptedPostUrl == initialPostUrl) return@LaunchedEffect
+        autoPromptedPostUrl = initialPostUrl
+        val link = validatedLink() ?: return@LaunchedEffect
+        postUri = link.uri
+        val manager = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        val captureIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            manager.createScreenCaptureIntent(MediaProjectionConfig.createConfigForDefaultDisplay())
+        } else {
+            manager.createScreenCaptureIntent()
+        }
+        isAwaitingPermission = true
+        status = "Waiting for screen-capture permission."
+        error = null
+        runCatching { projectionLauncher.launch(captureIntent) }
+            .onFailure {
+                isAwaitingPermission = false
+                error = it.message ?: "Android could not open the screen-capture permission prompt."
+                status = "Capture did not start."
+            }
+    }
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -232,7 +257,7 @@ fun NativeVideoLinkRecorderScreen(initialPostUrl: String = "") {
                 error = null
             },
             modifier = Modifier.fillMaxWidth(),
-            enabled = !isRecording,
+            enabled = !isAwaitingPermission && !isStarting && !isRecording && !isStopping,
             label = { Text("Social-media post link") },
             placeholder = { Text("Paste a TikTok, Instagram, Facebook, YouTube, X or other supported post link") },
             singleLine = true
@@ -250,14 +275,20 @@ fun NativeVideoLinkRecorderScreen(initialPostUrl: String = "") {
                 } else {
                     manager.createScreenCaptureIntent()
                 }
+                isAwaitingPermission = true
                 status = "Waiting for screen-capture permission."
                 error = null
-                projectionLauncher.launch(captureIntent)
+                runCatching { projectionLauncher.launch(captureIntent) }
+                    .onFailure {
+                        isAwaitingPermission = false
+                        error = it.message ?: "Android could not open the screen-capture permission prompt."
+                        status = "Capture did not start."
+                    }
             },
-            enabled = postUrl.isNotBlank() && !isStarting && !isRecording && !isStopping,
+            enabled = postUrl.isNotBlank() && !isAwaitingPermission && !isStarting && !isRecording && !isStopping,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Start recording")
+            Text(if (isAwaitingPermission) "Allow screen capture" else "Start recording")
         }
         if (isRecording || isStarting) {
             Button(
