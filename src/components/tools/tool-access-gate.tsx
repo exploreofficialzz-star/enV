@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import type { AppUser } from "@/lib/auth/use-current-user";
-import type { AdsterraConsent } from "@/lib/ads/adsterra";
 import type { RewardedAdResult } from "@/lib/ads/rewarded-google";
 import { recordBrowserRewardedAdCompletion } from "@/lib/ads/rewarded-progress";
 import type { ToolAccessPreference } from "@/lib/ads/access-preference";
@@ -14,7 +13,6 @@ export function ToolAccessGate({
   toolName,
   user,
   authPending,
-  consent,
   rewardedAdsConfigured,
   preference,
   onPreferenceChange,
@@ -26,7 +24,6 @@ export function ToolAccessGate({
   toolName: string;
   user: AppUser | null;
   authPending: boolean;
-  consent: AdsterraConsent;
   rewardedAdsConfigured: boolean;
   preference: ToolAccessPreference;
   onPreferenceChange: (value: ToolAccessPreference) => void;
@@ -38,7 +35,7 @@ export function ToolAccessGate({
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [tokenShortage, setTokenShortage] = useState(false);
-  const canWatchRewardedAd = consent === "granted" && rewardedAdsConfigured;
+  const canWatchRewardedAd = rewardedAdsConfigured;
 
   async function watchAd() {
     if (busy) return;
@@ -108,9 +105,9 @@ export function ToolAccessGate({
             </button>
           ) : null}
 
-          {preference === "ads" && consent !== "granted" ? (
+          {preference === "ads" && !rewardedAdsConfigured ? (
             <p className="text-xs leading-5 text-muted">
-              Advertising is not enabled in your privacy choice. You can review that choice on the privacy page; it will not be changed automatically.
+              Rewarded ads are not available for this tool right now. Sign in to use an approved token option.
             </p>
           ) : null}
 
