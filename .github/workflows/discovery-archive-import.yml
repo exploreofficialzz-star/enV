@@ -80,7 +80,7 @@ jobs:
           path = Path('scripts/search-demand-core.test.mjs')
           source = path.read_text()
           unsafe_fixture = 'sk_live_' + 'AbCdEfGhIjKlMnOpQrStUvWx'
-          safe_fixture = 'synthetic_placeholder_token_123456789'
+          safe_fixture = 'synthetic_placeholder_token_for_unit_test'
           if source.count(unsafe_fixture) != 1:
               raise SystemExit('Expected synthetic token fixture was not found exactly once')
           path.write_text(source.replace(unsafe_fixture, safe_fixture))
