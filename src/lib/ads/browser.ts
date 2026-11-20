@@ -11,6 +11,22 @@ type GoogleFcApi = {
     CONSENT_MODE_PURPOSE_STATUS_NOT_APPLICABLE: number;
     CONSENT_MODE_PURPOSE_STATUS_NOT_CONFIGURED: number;
   };
+  getAdBlockerStatus?: () => number;
+  AdBlockerStatusEnum?: {
+    UNKNOWN: number;
+    EXTENSION_AD_BLOCKER: number;
+    NETWORK_LEVEL_AD_BLOCKER: number;
+    NO_AD_BLOCKER: number;
+  };
+  usstatesoptout?: {
+    getInitialUsStatesOptOutStatus?: () => number;
+    InitialUsStatesOptOutStatusEnum?: {
+      UNKNOWN: number;
+      DOES_NOT_APPLY: number;
+      NOT_OPTED_OUT: number;
+      OPTED_OUT: number;
+    };
+  };
 };
 type GoogleFcConsentModeValues = {
   adStoragePurposeConsentStatus: number;
@@ -92,27 +108,60 @@ export function whenGooglePrivacyConsentDataReady(callback: () => void): void {
   });
 }
 
-/** Wait for Google's consent-mode data and require permission for ad-related purposes. */
+/**
+ * Require resolved Google ad consent, no US privacy opt-out, and a clear
+ * ad-blocker signal. Unknown provider states fail closed instead of requesting
+ * an ad for a visitor whose permissions cannot be determined.
+ */
 export function whenGoogleAdsConsentReady(callback: (allowed: boolean) => void): void {
   ensureGoogleFcQueue().callbackQueue!.push({
     CONSENT_MODE_DATA_READY: () => {
       const api = window.googlefc;
       const values = api?.getGoogleConsentModeValues?.();
-      const statuses = api?.ConsentModePurposeStatusEnum;
-      if (!values || !statuses) {
+      const consentStatuses = api?.ConsentModePurposeStatusEnum;
+      if (!values || !consentStatuses) {
         callback(false);
         return;
       }
       const permitted = new Set([
-        statuses.CONSENT_MODE_PURPOSE_STATUS_GRANTED,
-        statuses.CONSENT_MODE_PURPOSE_STATUS_NOT_APPLICABLE,
-        statuses.CONSENT_MODE_PURPOSE_STATUS_NOT_CONFIGURED,
+        consentStatuses.CONSENT_MODE_PURPOSE_STATUS_GRANTED,
+        consentStatuses.CONSENT_MODE_PURPOSE_STATUS_NOT_APPLICABLE,
+        consentStatuses.CONSENT_MODE_PURPOSE_STATUS_NOT_CONFIGURED,
       ]);
-      callback([
+      const consentAllowed = [
         values.adStoragePurposeConsentStatus,
         values.adUserDataPurposeConsentStatus,
         values.adPersonalizationPurposeConsentStatus,
-      ].every((status) => permitted.has(status)));
+      ].every((status) => permitted.has(status));
+      if (!consentAllowed) {
+        callback(false);
+        return;
+      }
+
+      ensureGoogleFcQueue().callbackQueue!.push({
+        INITIAL_US_STATES_OPT_OUT_DATA_READY: () => {
+          const stateApi = window.googlefc?.usstatesoptout;
+          const stateStatus = stateApi?.getInitialUsStatesOptOutStatus?.();
+          const stateEnums = stateApi?.InitialUsStatesOptOutStatusEnum;
+          if (!stateEnums || stateStatus === undefined ||
+              (stateStatus !== stateEnums.DOES_NOT_APPLY && stateStatus !== stateEnums.NOT_OPTED_OUT)) {
+            callback(false);
+            return;
+          }
+
+          ensureGoogleFcQueue().callbackQueue!.push({
+            AD_BLOCK_DATA_READY: () => {
+              const blockerApi = window.googlefc;
+              const blockerStatus = blockerApi?.getAdBlockerStatus?.();
+              const blockerEnums = blockerApi?.AdBlockerStatusEnum;
+              callback(Boolean(
+                blockerEnums &&
+                blockerStatus === blockerEnums.NO_AD_BLOCKER
+              ));
+            },
+          });
+        },
+      });
     },
   });
 }
