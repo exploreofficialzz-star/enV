@@ -8,7 +8,7 @@ import {
 } from "../../../../src/lib/billing/ledger.server";
 import { getToolBillingProfile } from "../../../../src/lib/billing/tool-profiles.server";
 import { getApprovedToolAccessPrice } from "../../../../src/lib/billing/tool-access-pricing.server";
-import { isSameOriginRequest, jsonResponse, readJsonObject, requireBillingUser } from "../../../../src/lib/billing/http.server";
+import { isSameOriginRequest, jsonResponse, readJsonObject, requireOfflineBillingUser } from "../../../../src/lib/billing/http.server";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TOOL_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,119}$/;
@@ -41,7 +41,10 @@ function errorResponse(error: unknown) {
 export default defineHandler(async (event) => {
   const request = event.req;
   if (request.method !== "POST") return jsonResponse({ ok: false, error: "METHOD_NOT_ALLOWED" }, 405);
-  if (!isSameOriginRequest(request)) return jsonResponse({ ok: false, error: "CROSS_ORIGIN_REQUEST_BLOCKED" }, 403);
+  const hasNativeAuthorization = Boolean(request.headers.get("authorization"));
+  if (!hasNativeAuthorization && !isSameOriginRequest(request)) {
+    return jsonResponse({ ok: false, error: "CROSS_ORIGIN_REQUEST_BLOCKED" }, 403);
+  }
   const body = await readJsonObject(request, 4_096);
   if (!body) return jsonResponse({ ok: false, error: "INVALID_JSON", message: "Send a small JSON object." }, 400);
 
@@ -54,7 +57,7 @@ export default defineHandler(async (event) => {
     return jsonResponse({ ok: false, error: "INVALID_TOOL", message: "The tool id is invalid." }, 400);
   }
 
-  const principal = await requireBillingUser(request);
+  const principal = await requireOfflineBillingUser(request);
   if (!principal.userId) return principal.response ?? jsonResponse({ ok: false, error: "AUTH_REQUIRED" }, 401);
   const operationId = `tool-access:${toolId}`;
 
