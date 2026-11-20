@@ -70,7 +70,7 @@ test("activation removes previous-version homepage caches so stale content canno
   await harness.caches.open("env-web-shell-v2");
   await harness.caches.open("env-web-navigation-v3");
   const stalePages = await harness.caches.open("env-web-navigation-v3");
-  await stalePages.put({ url: "https://env-cache.test/tools/video/video-link-screen-recording" }, new Response("retired tool page", { status: 200, headers: { "content-type": "text/html; charset=utf-8" } }));
+  await stalePages.put({ url: "https://env-cache.test/tools/video/retired-example" }, new Response("retired tool page", { status: 200, headers: { "content-type": "text/html; charset=utf-8" } }));
   await harness.caches.open("env-web-navigation-v2");
   await harness.caches.open("env-web-shell-v1");
   let activationPromise;
