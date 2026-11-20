@@ -24,6 +24,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.CompositionLocalProvider
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -56,6 +59,8 @@ import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
 import org.json.JSONObject
+
+internal val LocalNativeToolAccessCompletion = staticCompositionLocalOf<(Boolean) -> Unit> { {} }
 
 internal object NativeAdsPolicy {
     private val toolIdPattern = Regex("[a-z0-9][a-z0-9-]{0,119}")
@@ -394,6 +399,7 @@ internal fun NativeRewardedToolAccessGate(
     val context = LocalContext.current
     val activity = context as? Activity
     val preview = LocalInspectionMode.current
+    val scope = rememberCoroutineScope()
     val consentReady = NativeAdsPrivacyManager.canRequestAds && NativeAdsPrivacyManager.sdkReady
     val network = rememberValidatedAdNetwork(context)
     var originReachable by remember(tool.id) { mutableStateOf(false) }
@@ -401,10 +407,11 @@ internal fun NativeRewardedToolAccessGate(
     var busy by rememberSaveable(tool.id) { mutableStateOf(false) }
     var feedback by rememberSaveable(tool.id) { mutableStateOf<String?>(null) }
     var showAdFreeOffer by rememberSaveable(tool.id) { mutableStateOf(false) }
+    var pendingReservation by remember(tool.id) { mutableStateOf<com.chastech.env.billing.OfflineWalletNativeApi.ToolAccessReservation?>(null) }
+    var activeReservation by remember(tool.id) { mutableStateOf<com.chastech.env.billing.OfflineWalletNativeApi.ToolAccessReservation?>(null) }
 
     LaunchedEffect(network, tool.id) {
-        if (!network) originReachable = false
-        else originReachable = NativeAdsPolicy.isApplicationOnline(context)
+        originReachable = network && NativeAdsPolicy.isApplicationOnline(context)
     }
 
     if (preview || !NativeAdsPolicy.isRewardedAccessTool(tool)) {
@@ -412,15 +419,76 @@ internal fun NativeRewardedToolAccessGate(
         return
     }
 
-    if (unlocked) content()
-    else {
+    suspend fun reserveTokenAccess() {
+        if (busy) return
+        if (!com.chastech.env.billing.OfflineWalletNativeApi.isPaired(context)) {
+            feedback = "Sign in to enV and pair this device from your Web Wallet before using tokens."
+            onOpenWallet()
+            return
+        }
+        busy = true
+        feedback = null
+        try {
+            pendingReservation = com.chastech.env.billing.OfflineWalletNativeApi.reserveToolAccess(
+                context,
+                tool.id,
+                java.util.UUID.randomUUID().toString(),
+            )
+        } catch (failure: Exception) {
+            feedback = failure.message ?: "A reviewed token price is not available for this tool. No tokens were charged."
+        } finally {
+            busy = false
+        }
+    }
+
+    fun completeTokenSession(success: Boolean) {
+        val reservation = activeReservation ?: return
+        if (busy) return
+        busy = true
+        unlocked = false
+        scope.launch {
+            try {
+                if (success) {
+                    com.chastech.env.billing.OfflineWalletNativeApi.settleToolAccess(context, tool.id, reservation.reservationId)
+                } else {
+                    com.chastech.env.billing.OfflineWalletNativeApi.releaseToolAccess(context, tool.id, reservation.reservationId)
+                }
+                activeReservation = null
+                feedback = null
+            } catch (failure: Exception) {
+                feedback = "Token settlement could not be verified. Access is paused to prevent another charge. " +
+                    (failure.message ?: "Reconnect and contact support before retrying.")
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    DisposableEffect(tool.id) {
+        onDispose {
+            val reservation = activeReservation ?: pendingReservation
+            if (reservation != null) {
+                scope.launch {
+                    runCatching {
+                        com.chastech.env.billing.OfflineWalletNativeApi.releaseToolAccess(context, tool.id, reservation.reservationId)
+                    }
+                }
+            }
+        }
+    }
+
+    if (unlocked) {
+        CompositionLocalProvider(LocalNativeToolAccessCompletion provides ::completeTokenSession) {
+            content()
+        }
+    } else {
         Column(
             modifier = Modifier.fillMaxWidth().padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text("Continue to " + tool.name, style = MaterialTheme.typography.titleMedium)
             Text(
-                "Watch a complete rewarded video to use this tool for this visit. If you decline advertising or no ad is available, open Wallet to sign in and review your token options.",
+                "Watch a complete rewarded video to use this tool for this visit, or choose a reviewed token price for ad-free access.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -445,7 +513,7 @@ internal fun NativeRewardedToolAccessGate(
                                     override fun onAdFailedToShowFullScreenContent(error: com.google.android.libraries.ads.mobile.sdk.common.FullScreenContentError) {
                                         Handler(Looper.getMainLooper()).post {
                                             busy = false
-                                            feedback = "The rewarded ad could not be shown. Try again or use Wallet."
+                                            feedback = "The rewarded ad could not be shown. Try again or use tokens."
                                         }
                                     }
                                 }
@@ -461,7 +529,7 @@ internal fun NativeRewardedToolAccessGate(
                                     }
                                 }.onFailure {
                                     busy = false
-                                    feedback = "The rewarded ad could not be shown. Try again or use Wallet."
+                                    feedback = "The rewarded ad could not be shown. Try again or use tokens."
                                 }
                             }
 
@@ -479,6 +547,13 @@ internal fun NativeRewardedToolAccessGate(
             ) {
                 Text(if (busy) "Loading rewarded ad…" else "Watch an ad to continue")
             }
+            Button(
+                onClick = { scope.launch { reserveTokenAccess() } },
+                enabled = !busy && network && originReachable,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (busy) "Checking reviewed token price…" else "Use enV tokens (ad-free)")
+            }
             Button(onClick = onOpenWallet, modifier = Modifier.fillMaxWidth()) {
                 Text("Open Wallet / sign in")
             }
@@ -489,13 +564,49 @@ internal fun NativeRewardedToolAccessGate(
         }
     }
 
+    pendingReservation?.let { reservation ->
+        AlertDialog(
+            onDismissRequest = {
+                pendingReservation = null
+                scope.launch {
+                    runCatching {
+                        com.chastech.env.billing.OfflineWalletNativeApi.releaseToolAccess(context, tool.id, reservation.reservationId)
+                    }
+                }
+            },
+            title = { Text("Confirm token access") },
+            text = {
+                Text("This tool costs " + reservation.reservedTokens.toString() + " enV tokens " +
+                    reservation.unitLabel + ". Tokens are deducted only after a successful tool result.")
+            },
+            confirmButton = {
+                Button(onClick = {
+                    activeReservation = reservation
+                    pendingReservation = null
+                    unlocked = true
+                    feedback = null
+                }) { Text("Confirm and continue") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    pendingReservation = null
+                    scope.launch {
+                        runCatching {
+                            com.chastech.env.billing.OfflineWalletNativeApi.releaseToolAccess(context, tool.id, reservation.reservationId)
+                        }
+                    }
+                }) { Text("Cancel without charge") }
+            },
+        )
+    }
+
     if (showAdFreeOffer) {
         AlertDialog(
             onDismissRequest = { showAdFreeOffer = false },
             title = { Text("Ready to go ad-free?") },
-            text = { Text("You completed three rewarded ads in the last 30 days. Open Wallet to review token access for individual tools. Tool prices are enabled only after review.") },
+            text = { Text("You completed three rewarded ads in the last 30 days. Use the reviewed token price for individual tools.") },
             confirmButton = {
-                Button(onClick = { showAdFreeOffer = false; onOpenWallet() }) { Text("Open Wallet") }
+                Button(onClick = { showAdFreeOffer = false; scope.launch { reserveTokenAccess() } }) { Text("Use enV tokens") }
             },
             dismissButton = {
                 TextButton(onClick = { showAdFreeOffer = false }) { Text("Keep using ads") }
