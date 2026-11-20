@@ -5,6 +5,7 @@ import SafariServices
 @preconcurrency import ScreenCaptureKit
 import Photos
 import AVFoundation
+import CoreMedia
 #endif
 
 private struct NativeVideoPostBrowserTarget: Identifiable {
@@ -28,7 +29,7 @@ private struct NativeVideoPostBrowser: UIViewControllerRepresentable {
 /// enV does not attempt to capture another app without explicit user approval.
 @available(iOS 27.0, *)
 @MainActor
-private final class NativePostInterfaceCaptureController: NSObject, ObservableObject, SCContentSharingPickerObserver, SCStreamDelegate, SCRecordingOutputDelegate {
+private final class NativePostInterfaceCaptureController: NSObject, ObservableObject, SCContentSharingPickerObserver, SCStreamDelegate, SCStreamOutput, SCRecordingOutputDelegate {
     @Published private(set) var isPreparing = false
     @Published private(set) var isRecording = false
     @Published private(set) var isStopping = false
@@ -111,6 +112,7 @@ private final class NativePostInterfaceCaptureController: NSObject, ObservableOb
             outputConfiguration.outputURL = outputURL
             let output = SCRecordingOutput(configuration: outputConfiguration, delegate: self)
             let newStream = SCStream(filter: filter, configuration: streamConfiguration, delegate: self)
+            try newStream.addStreamOutput(self, type: .screen, sampleHandlerQueue: .main)
             stream = newStream
             recordingOutput = output
             recordingURL = outputURL
@@ -199,6 +201,10 @@ private final class NativePostInterfaceCaptureController: NSObject, ObservableOb
         stream = nil
         recordingOutput = nil
         recordingURL = nil
+    }
+
+    nonisolated func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
+        // SCRecordingOutput writes the captured stream directly to the MP4 file.
     }
 
     func recordingOutputDidStartRecording(_ recordingOutput: SCRecordingOutput) {
