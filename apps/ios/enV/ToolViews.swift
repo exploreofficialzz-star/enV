@@ -110,6 +110,7 @@ struct ToolList: View {
 
 struct ToolDetailView: View {
     @EnvironmentObject private var store: CatalogStore
+    @EnvironmentObject private var informationRouter: NativeInformationRouter
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @AppStorage("env.selectedTab") private var selectedTab = NativeTab.home.rawValue
     @AppStorage("env.homeNavigationReset") private var homeNavigationReset = 0
@@ -195,8 +196,16 @@ struct ToolDetailView: View {
                     .padding(.top, 16)
                 }
 
-                toolInterface.padding(.top, 24)
-                if !isToolFullscreen { NativeToolAdSlot(tool: tool).padding(.top, 12) }
+                NativeRewardedToolAccessGate(tool: tool, onOpenWallet: {
+                    informationRouter.open("wallet")
+                    selectedTab = NativeTab.account.rawValue
+                }) {
+                    toolInterface
+                }
+                .padding(.top, 24)
+                if !isToolFullscreen && !NativeAdsPolicy.isRewardedAccessTool(tool) {
+                    NativeToolAdSlot(tool: tool).padding(.top, 12)
+                }
 
                 if !isToolFullscreen {
                 if let assistFeature = NativeAiAssistFeatureRegistry.feature(toolID: tool.id) {
