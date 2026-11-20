@@ -16,6 +16,24 @@ enum NativeAdsPolicy {
     static var privacyConfigured: Bool { flag("ENV_ADS_PRIVACY_CONFIGURED") }
     static var publisherAppID: String { info["GADApplicationIdentifier"] as? String ?? "" }
     static var bannerUnitID: String { info["ENV_ADMOB_BANNER_AD_UNIT_ID"] as? String ?? "" }
+    static var rewardedUnitID: String { info["ENV_ADMOB_REWARDED_AD_UNIT_ID"] as? String ?? "" }
+    static var rewardedAccessEnabled: Bool { flag("ENV_AD_ACCESS_GATE_ENABLED") }
+    static var rewardedToolIDs: Set<String> {
+        Set((info["ENV_AD_ACCESS_TOOL_IDS"] as? String ?? "")
+            .split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { $0.range(of: "^[a-z0-9][a-z0-9-]{0,119}$", options: .regularExpression) != nil })
+    }
+    static var privacySetupConfigured: Bool {
+        adsEnabled && privacyConfigured &&
+        publisherAppID.range(of: "^ca-app-pub-[0-9]{16}~[0-9]{10}$", options: .regularExpression) != nil
+    }
+    static var rewardedAccessConfigured: Bool {
+        rewardedAccessEnabled && privacySetupConfigured &&
+        rewardedUnitID.range(of: "^/[A-Za-z0-9_./-]{3,180}$", options: .regularExpression) != nil
+    }
+    static func isRewardedAccessTool(_ tool: Tool) -> Bool {
+        rewardedAccessConfigured && rewardedToolIDs.contains(tool.id) && isAdEligibleTool(tool)
+    }
     static var allowlistedToolIDs: Set<String> {
         Set((info["ENV_AD_SUPPORTED_TOOL_IDS"] as? String ?? "")
             .split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -23,8 +41,7 @@ enum NativeAdsPolicy {
     }
 
     static var adDisplayConfigured: Bool {
-        adsEnabled && privacyConfigured &&
-        publisherAppID.range(of: "^ca-app-pub-[0-9]{16}~[0-9]{10}$", options: .regularExpression) != nil &&
+        privacySetupConfigured &&
         bannerUnitID.range(of: "^ca-app-pub-[0-9]{16}/[0-9]{10}$", options: .regularExpression) != nil
     }
 
@@ -174,7 +191,7 @@ final class NativeAdsPrivacyManager: ObservableObject {
     private init() {}
 
     func refreshConsentAtLaunch() async {
-        guard NativeAdsPolicy.adDisplayConfigured, !refreshing else { return }
+        guard NativeAdsPolicy.privacySetupConfigured, !refreshing else { return }
         refreshing = true
         defer { refreshing = false }
         do {
@@ -233,6 +250,166 @@ private final class NativeAdsReachability: ObservableObject {
     }
 
     deinit { monitor.cancel() }
+}
+
+private enum NativeRewardedAdProgress {
+    private static let startKey = "env.rewardedAccess.periodStartedAt"
+    private static let countKey = "env.rewardedAccess.completed"
+    private static let offerShownKey = "env.rewardedAccess.offerShownAt"
+    private static let period: TimeInterval = 30 * 24 * 60 * 60
+
+    static func recordCompletion(now: Date = Date()) -> Bool {
+        let defaults = UserDefaults.standard
+        let storedStart = defaults.object(forKey: startKey) as? Date
+        let expired = storedStart == nil || now < storedStart! || now.timeIntervalSince(storedStart!) >= period
+        let start = expired ? now : storedStart!
+        let count = (expired ? 0 : defaults.integer(forKey: countKey)) + 1
+        let alreadyShown = expired ? false : defaults.object(forKey: offerShownKey) != nil
+        let shouldShow = count >= 3 && !alreadyShown
+        defaults.set(start, forKey: startKey)
+        defaults.set(count, forKey: countKey)
+        if shouldShow { defaults.set(now, forKey: offerShownKey) }
+        return shouldShow
+    }
+}
+
+private final class NativeRewardedAdDelegate: NSObject, FullScreenContentDelegate {
+    var onDismiss: (() -> Void)?
+    var onFailure: (() -> Void)?
+
+    func adDidDismissFullScreenContent(_ ad: FullScreenPresentingAd) {
+        onDismiss?()
+    }
+
+    func ad(_ ad: FullScreenPresentingAd, didFailToPresentFullScreenContentWithError error: Error) {
+        onFailure?()
+    }
+}
+
+struct NativeRewardedToolAccessGate<Content: View>: View {
+    let tool: Tool
+    let onOpenWallet: () -> Void
+    @ViewBuilder let content: () -> Content
+    @StateObject private var consent = NativeAdsPrivacyManager.shared
+    @StateObject private var reachability = NativeAdsReachability()
+    @State private var originReachable = false
+    @State private var unlocked = false
+    @State private var busy = false
+    @State private var message = ""
+    @State private var showAdFreeOffer = false
+    @State private var adDelegate: NativeRewardedAdDelegate?
+
+    private var isConfigured: Bool { NativeAdsPolicy.isRewardedAccessTool(tool) }
+    private var canWatch: Bool {
+        isConfigured && reachability.hasNetwork && originReachable && consent.canRequestAds && consent.sdkReady && !busy
+    }
+
+    var body: some View {
+        Group {
+            if !isConfigured || unlocked {
+                content()
+            } else {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Continue to " + tool.name)
+                        .font(.envScaled(size: 19, weight: .semibold))
+                        .foregroundStyle(Color.envInk)
+                    Text("Watch a complete rewarded video to use this tool for this visit. If you decline advertising or no ad is available, open Wallet to sign in and review your token options.")
+                        .font(.envScaled(size: 14, weight: .regular))
+                        .foregroundStyle(Color.envMuted)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button(action: { Task { await watchRewardedAd() } }) {
+                        HStack(spacing: 8) {
+                            if busy { ProgressView().tint(.white) }
+                            Text(busy ? "Loading rewarded ad…" : "Watch an ad to continue")
+                        }
+                        .font(.envScaled(size: 14, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 13)
+                        .background(Color.envInk, in: RoundedRectangle(cornerRadius: 10))
+                        .foregroundStyle(Color.envChrome)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!canWatch)
+                    Button(action: onOpenWallet) {
+                        Text("Open Wallet / sign in")
+                            .font(.envScaled(size: 14, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.envBorder, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    if !consent.canRequestAds {
+                        Text("Google advertising privacy settings must permit ads before a rewarded video can load.")
+                            .font(.envScaled(size: 12, weight: .regular))
+                            .foregroundStyle(Color.envMuted)
+                    } else if !reachability.hasNetwork || !originReachable {
+                        Text("A verified connection to enV is required for online rewarded access.")
+                            .font(.envScaled(size: 12, weight: .regular))
+                            .foregroundStyle(Color.envMuted)
+                    }
+                    if !message.isEmpty {
+                        Text(message)
+                            .font(.envScaled(size: 12, weight: .regular))
+                            .foregroundStyle(Color.red)
+                    }
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.envSurface2, in: RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.envBorder, lineWidth: 1))
+            }
+        }
+        .task(id: reachability.hasNetwork) {
+            guard reachability.hasNetwork else {
+                originReachable = false
+                return
+            }
+            originReachable = await NativeAdsPolicy.isApplicationOnline()
+        }
+        .alert("Ready to go ad-free?", isPresented: $showAdFreeOffer) {
+            Button("Open Wallet") { onOpenWallet() }
+            Button("Keep using ads", role: .cancel) { }
+        } message: {
+            Text("You completed three rewarded ads in the last 30 days. Open Wallet to review token access for individual tools. Tool prices are enabled only after review.")
+        }
+    }
+
+    @MainActor
+    private func watchRewardedAd() async {
+        guard canWatch else { return }
+        busy = true
+        message = ""
+        do {
+            let ad = try await RewardedAd.load(with: NativeAdsPolicy.rewardedUnitID, request: AdManagerRequest())
+            let delegate = NativeRewardedAdDelegate()
+            delegate.onDismiss = {
+                Task { @MainActor in
+                    self.busy = false
+                    if !self.unlocked { self.message = "The rewarded ad was closed before completion. No access was unlocked." }
+                    self.adDelegate = nil
+                }
+            }
+            delegate.onFailure = {
+                Task { @MainActor in
+                    self.busy = false
+                    self.message = "The rewarded ad could not be shown. Try again or use Wallet."
+                    self.adDelegate = nil
+                }
+            }
+            adDelegate = delegate
+            ad.fullScreenContentDelegate = delegate
+            ad.present(from: nil) {
+                Task { @MainActor in
+                    self.unlocked = true
+                    self.busy = false
+                    self.showAdFreeOffer = NativeRewardedAdProgress.recordCompletion()
+                }
+            }
+        } catch {
+            busy = false
+            message = "A rewarded ad is unavailable. Check your connection or advertising settings, then try again."
+        }
+    }
 }
 
 struct NativeToolAdSlot: View {
