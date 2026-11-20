@@ -1,4 +1,4 @@
-import { loadAdSenseScript, whenGooglePrivacyConsentDataReady } from "./browser";
+import { loadAdSenseScript, whenGoogleAdsConsentReady } from "./browser";
 
 type RewardedFormat = "REWARDED";
 
@@ -53,9 +53,10 @@ async function waitForGooglePrivacyChoice(): Promise<void> {
       await loadAdSenseScript(clientId);
       await new Promise<void>((resolve, reject) => {
         const timeout = window.setTimeout(() => reject(new Error("Google privacy settings did not finish loading.")), 15_000);
-        whenGooglePrivacyConsentDataReady(() => {
+        whenGoogleAdsConsentReady((allowed) => {
           window.clearTimeout(timeout);
-          resolve();
+          if (allowed) resolve();
+          else reject(new Error("Advertising consent was declined or is unavailable."));
         });
       });
     })().catch((error) => {
