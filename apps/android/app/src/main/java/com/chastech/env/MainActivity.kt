@@ -442,6 +442,14 @@ private fun EnVApp(
                         onCategory = { value -> detailStack = emptyList(); category = value; query = ""; tab = AppTab.Tools.name },
                         onRelatedTool = openRelatedTool,
                         onToggleFavorite = { favoriteIds = favorites.toggle(selected.id) },
+                        onOpenWallet = {
+                            informationReturnTab = tab
+                            informationPage = "wallet"
+                            tab = AppTab.Account.name
+                            detailStack = emptyList()
+                            showExchange = false
+                            showInformation = true
+                        },
                         isFullscreen = isToolFullscreen || isWorldLabTool,
                         onToggleFullscreen = { isToolFullscreen = !isToolFullscreen },
                     )
@@ -1116,6 +1124,7 @@ private fun ToolDetail(
     onCategory: (String) -> Unit,
     onRelatedTool: (String) -> Unit,
     onToggleFavorite: () -> Unit,
+    onOpenWallet: () -> Unit,
     isFullscreen: Boolean,
     onToggleFullscreen: () -> Unit,
 ) {
@@ -1175,13 +1184,15 @@ private fun ToolDetail(
                                 Modifier.weight(1f).fillMaxWidth().then(if (tool.id == "the-world-lab") Modifier else Modifier.verticalScroll(rememberScrollState())),
                                 verticalArrangement = Arrangement.spacedBy(0.dp),
                             ) {
-                                NativeToolInterfaceContent(
-                                    tool,
-                                    backend,
-                                    supported,
-                                    onRelatedTool,
-                                    startInWorkspace = true,
-                                )
+                                NativeRewardedToolAccessGate(tool, onOpenWallet) {
+                                    NativeToolInterfaceContent(
+                                        tool,
+                                        backend,
+                                        supported,
+                                        onRelatedTool,
+                                        startInWorkspace = true,
+                                    )
+                                }
                             }
                         }
                     }
@@ -1252,14 +1263,16 @@ private fun ToolDetail(
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
             ) {
                 Column(Modifier.fillMaxWidth().padding(if (compact) 16.dp else 24.dp)) {
-                    NativeToolInterfaceContent(
-                        tool,
-                        backend,
-                        supported,
-                        onRelatedTool,
-                    )
+                    NativeRewardedToolAccessGate(tool, onOpenWallet) {
+                        NativeToolInterfaceContent(
+                            tool,
+                            backend,
+                            supported,
+                            onRelatedTool,
+                        )
+                    }
                     if (!isFullscreen) NativeToolCommunityPanel(tool.id)
-                    if (!isFullscreen) NativeToolAdSlot(tool)
+                    if (!isFullscreen && !NativeAdsPolicy.isRewardedAccessTool(tool)) NativeToolAdSlot(tool)
                 }
             }
             if (!isFullscreen) {
