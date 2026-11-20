@@ -78,7 +78,7 @@ assert.match(slot, /isApplicationOnline\(\)/, "Ads must not be requested unless 
 assert.match(adPolicy, /export function isAdsterraQualifiedTool[\s\S]*?ADSTERRA_EXCLUDED_CONCEPTS\.test\(descriptiveIdentity\)/, "Adsterra eligibility must cover active ordinary tool pages and exclude Studio, AI, Labs and Sandbox metadata.");
 assert.match(adPolicy, /new Set\(\["ai", "lab", "labs", "studio", "studios"\]\)/, "Developer and Accessibility categories must remain eligible; only explicit Studio, AI and Labs categories are excluded.");
 assert.match(adPolicy, /ADSTERRA_EXCLUDED_CATEGORIES[\s\S]*?ADSTERRA_EXCLUDED_CONCEPTS/, "Adsterra policy must exclude Studio, AI, Labs and Sandbox experiences.");
-assert.match(privacy, /selected access-gated tools[\s\S]*?reviewed enV token price/i, "Privacy copy must describe the selected-tool account and reviewed token access paths.");
+assert.match(privacy, /access-gated tools[\s\S]*?(?:separately reviewed enV token price|separately reviewed enV token price)/i, "Privacy copy must describe the selected-tool account and reviewed token access paths.");
 assert.match(cookieConsent, /selected access-gated tools[\s\S]*?reviewed enV token price/i, "Cookie preferences must explain the access path when ads are declined.");
 assert.match(rewardedAccess, /rewardedSlotGranted/);
 assert.match(rewardedAccess, /rewardedSlotVideoCompleted/);
