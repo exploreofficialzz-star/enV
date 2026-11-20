@@ -40,8 +40,9 @@ enum NativeAdsPolicy {
         adsEnabled && privacyConfigured &&
         publisherAppID.range(of: "^ca-app-pub-[0-9]{16}~[0-9]{10}$", options: .regularExpression) != nil
     }
-    static var rewardedAccessConfigured: Bool {
-        rewardedAccessEnabled && privacySetupConfigured &&
+    static var rewardedAccessConfigured: Bool { rewardedAccessEnabled }
+    static var rewardedAdsConfigured: Bool {
+        rewardedAccessConfigured && privacySetupConfigured &&
         rewardedUnitID.range(of: "^/[A-Za-z0-9_./-]{3,180}$", options: .regularExpression) != nil
     }
     static func isRewardedAccessTool(_ tool: Tool) -> Bool {
@@ -317,7 +318,7 @@ struct NativeRewardedToolAccessGate<Content: View>: View {
 
     private var isConfigured: Bool { NativeAdsPolicy.isRewardedAccessTool(tool) }
     private var canWatch: Bool {
-        isConfigured && reachability.hasNetwork && originReachable && consent.canRequestAds && consent.sdkReady && !busy
+        isConfigured && NativeAdsPolicy.rewardedAdsConfigured && reachability.hasNetwork && originReachable && consent.canRequestAds && consent.sdkReady && !busy
     }
 
     var body: some View {
