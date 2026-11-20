@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildSeoArtifacts, buildSitemapArtifacts } from "./generate-seo-artifacts.mjs";
 import { buildIndexNowKeyArtifact } from "./indexnow-utils.mjs";
+import { SEO_CANONICAL_ORIGIN, SEO_REDIRECT_HOSTS } from "./seo-domain-policy.mjs";
 import { getToolByPath, getToolsByCategory } from "../src/lib/registry.ts";
 import { toolTaskGuidanceSource } from "../src/lib/tool-documentation.ts";
 import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema, toolSchema, organizationSchema, websiteSchema, boundedToolSeoTitle } from "@/lib/seo-metadata";
@@ -75,12 +76,23 @@ const canonicalRedirectHosts = new Set(
     (redirect.has ?? []).filter((condition) => condition.type === "host").map((condition) => condition.value)
   )
 );
-for (const host of ["www.envtools.store", "envtools.site", "www.envtools.site", "en-v.vercel.app"]) {
-  assert.ok(canonicalRedirectHosts.has(host), "Missing permanent canonical-host redirect for " + host);
+assert.deepEqual(
+  [...canonicalRedirectHosts].sort(),
+  [...SEO_REDIRECT_HOSTS].sort(),
+  "Vercel host redirects must match the explicit canonical-domain redirect policy."
+);
+assert.equal(SEO_CANONICAL_ORIGIN, "https://envtools.store", "The .store apex is the only canonical SEO origin.");
+assert.match(seoMetadataSource, /SITE_ORIGIN = "https:\\/\\/envtools\\.store"/, "SEO metadata must use the .store canonical origin.");
+for (const redirect of vercelConfig.redirects ?? []) {
+  assert.equal(redirect.source, "/:path*", "Canonical host redirects must preserve every requested path.");
+  assert.equal(redirect.destination, SEO_CANONICAL_ORIGIN + "/:path*", "Canonical host redirects must target the .store apex.");
+  assert.equal(redirect.permanent, true, "Canonical host redirects must be permanent.");
 }
-assert.ok((vercelConfig.redirects ?? []).filter((redirect) =>
-  (redirect.has ?? []).some((condition) => condition.value === "www.envtools.store" || condition.value === "envtools.site" || condition.value === "www.envtools.site" || condition.value === "en-v.vercel.app")
-).every((redirect) => redirect.destination.startsWith("https://envtools.store/") && redirect.permanent === true));
+const liveSeoCheckerSource = readFileSync(new URL("./check-live-seo.mjs", import.meta.url), "utf8");
+const seoSetupRunbookSource = readFileSync(new URL("../docs/seo-search-console-setup.md", import.meta.url), "utf8");
+for (const source of [JSON.stringify(vercelConfig), liveSeoCheckerSource, seoSetupRunbookSource]) {
+  assert.doesNotMatch(source, /envtools\\.site|en-v\\.vercel\\.app/i, "Retired domains must not remain in SEO deployment policy.");
+}
 
 assert.ok(result.urls.includes("/"));
 assert.ok(result.urls.includes("/tools"));
