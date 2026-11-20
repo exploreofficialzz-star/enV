@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import type { AppUser } from "@/lib/auth/use-current-user";
 import type { AdsterraConsent } from "@/lib/ads/adsterra";
 import type { RewardedAdResult } from "@/lib/ads/rewarded-google";
+import { recordBrowserRewardedAdCompletion } from "@/lib/ads/rewarded-progress";
 import type { ToolAccessPreference } from "@/lib/ads/access-preference";
 
 type ToolAccessResult =
@@ -51,8 +52,9 @@ export function ToolAccessGate({
           : "A rewarded ad could not be loaded. Check your connection and ad-blocking settings, or use account access.");
         return;
       }
+      const progress = recordBrowserRewardedAdCompletion();
       onUnlocked("ads");
-      onAdFreeOfferReady();
+      if (progress?.shouldShowAdFreeOffer) onAdFreeOfferReady();
     } catch {
       setFeedback("The rewarded ad could not be completed. No ad view was counted.");
     } finally {
@@ -206,9 +208,9 @@ export function AdFreeAfterThreeAdsDialog({
         </p>
         <div className="mt-5 flex flex-col gap-2">
           {signedIn ? (
-            <button type="button" onClick={onChooseTokens} className="min-h-11 rounded-lg bg-fg px-4 py-2 text-sm font-semibold text-bg">
+            <Link to="/wallet" onClick={onChooseTokens} className="inline-flex min-h-11 items-center justify-center rounded-lg bg-fg px-4 py-2 text-sm font-semibold text-bg">
               Use enV tokens
-            </button>
+            </Link>
           ) : (
             <Link to="/signup" className="inline-flex min-h-11 items-center justify-center rounded-lg bg-fg px-4 py-2 text-sm font-semibold text-bg">
               Create an account
