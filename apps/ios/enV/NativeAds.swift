@@ -307,6 +307,7 @@ struct NativeRewardedToolAccessGate<Content: View>: View {
     @StateObject private var consent = NativeAdsPrivacyManager.shared
     @StateObject private var reachability = NativeAdsReachability()
     @State private var originReachable = false
+    @State private var originCheckComplete = false
     @State private var unlocked = false
     @State private var busy = false
     @State private var message = ""
@@ -325,9 +326,13 @@ struct NativeRewardedToolAccessGate<Content: View>: View {
         Group {
             // Offline/origin-unreachable execution stays under the existing
             // native signed allowance and journal checks.
-            if !isConfigured || !reachability.hasNetwork || !originReachable || unlocked {
+            if !isConfigured || !reachability.hasNetwork || (originCheckComplete && !originReachable) || unlocked {
                 content()
                     .environment(\.nativeToolAccessCompletion, completeTokenSession)
+            } else if !originCheckComplete {
+                ProgressView("Checking enV connection…")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(20)
             } else {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Continue to " + tool.name)
@@ -392,11 +397,14 @@ struct NativeRewardedToolAccessGate<Content: View>: View {
             }
         }
         .task(id: reachability.hasNetwork) {
+            originCheckComplete = false
             guard reachability.hasNetwork else {
                 originReachable = false
+                originCheckComplete = true
                 return
             }
             originReachable = await NativeAdsPolicy.isApplicationOnline()
+            originCheckComplete = true
         }
         .confirmationDialog(
             "Confirm token access",
@@ -426,6 +434,7 @@ struct NativeRewardedToolAccessGate<Content: View>: View {
             Text("You completed three rewarded ads in the last 30 days. Use the reviewed token price for individual tools.")
         }
         .onDisappear {
+            guard !busy else { return }
             if let reservation = activeReservation {
                 activeReservation = nil
                 Task { await releaseReservation(reservation) }
