@@ -31,6 +31,7 @@ A valid provider URL only identifies the intended platform. It does not guarante
 ### Android
 
 - Kotlin passes the exact `postUrl` from the incoming `env://` deep link into the native recorder as an explicit parameter.
+- When the tool is opened from an Android browser handoff, it automatically presents the system screen-capture consent prompt. After the person approves, the recorder starts; no second enV start tap is required.
 - Android 14+ uses `MediaProjectionConfig.createConfigForDefaultDisplay()`, so the consent picker is restricted to the full default display rather than allowing an enV-only app-window capture.
 - The app does not display “Recording” merely because the service accepted a start request. The foreground service sends a started event only after `MediaRecorder.start()` succeeds; only then does enV open the unchanged post URL in a Custom Tab.
 - A foreground `mediaProjection` service records MP4 with `MediaRecorder`. Users stop capture in enV or from the persistent capture notification. Final MP4 files are saved to `Movies/enV` on Android 10+ (or the app-specific Movies directory on older supported versions).
