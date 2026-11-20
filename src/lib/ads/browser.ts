@@ -14,10 +14,16 @@ type GoogleFcApi = {
   getAdBlockerStatus?: () => number;
   AdBlockerStatusEnum?: {
     UNKNOWN: number;
-    EXTENSION_AD_BLOCKER: number;
+    EXTENSION_LEVEL_AD_BLOCKER: number;
     NETWORK_LEVEL_AD_BLOCKER: number;
     NO_AD_BLOCKER: number;
   };
+  AllowAdsStatusEnum?: {
+    UNKNOWN: number;
+    ADS_NOT_ALLOWED: number;
+    ADS_ALLOWED: number;
+  };
+  getAllowAdsStatus?: () => number;
   usstatesoptout?: {
     getInitialUsStatesOptOutStatus?: () => number;
     InitialUsStatesOptOutStatusEnum?: {
