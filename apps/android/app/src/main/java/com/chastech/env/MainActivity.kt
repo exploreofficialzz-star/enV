@@ -439,6 +439,7 @@ private fun EnVApp(catalog: Catalog, favorites: FavoritesStore, darkMode: Boolea
                         onToggleFavorite = { favoriteIds = favorites.toggle(selected.id) },
                         isFullscreen = isToolFullscreen || isWorldLabTool,
                         onToggleFullscreen = { isToolFullscreen = !isToolFullscreen },
+                        initialPostUrl = initialPostUrl,
                     )
                 } else {
                     when (currentTab) {
@@ -1113,6 +1114,7 @@ private fun ToolDetail(
     onToggleFavorite: () -> Unit,
     isFullscreen: Boolean,
     onToggleFullscreen: () -> Unit,
+    initialPostUrl: String = "",
 ) {
     val supported = nativeSupported(tool)
     val backend = nativeBackendSupported(tool)
@@ -1241,7 +1243,7 @@ private fun ToolDetail(
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
             ) {
                 Column(Modifier.fillMaxWidth().padding(if (compact) 16.dp else 24.dp)) {
-                    NativeToolInterfaceContent(tool, backend, supported, onRelatedTool)
+                    NativeToolInterfaceContent(tool, backend, supported, onRelatedTool, initialPostUrl = initialPostUrl)
                     if (!isFullscreen) NativeToolCommunityPanel(tool.id)
                     if (!isFullscreen) NativeToolAdSlot(tool)
                 }
@@ -1298,6 +1300,7 @@ private fun NativeToolInterfaceContent(
     supported: Boolean,
     onRelatedTool: (String) -> Unit,
     startInWorkspace: Boolean = false,
+    initialPostUrl: String = "",
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
