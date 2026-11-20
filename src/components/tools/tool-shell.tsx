@@ -558,7 +558,11 @@ export function ToolShell({
         open={showAdFreeOffer}
         signedIn={Boolean(accessUser)}
         onClose={() => setShowAdFreeOffer(false)}
-        onChooseTokens={() => saveAccessPreference("tokens")}
+        onChooseTokens={() => {
+          saveAccessPreference("tokens");
+          setToolAccessUnlocked(false);
+          setShowAdFreeOffer(false);
+        }}
       />
       <UnderProductionDialog
         open={productionTool !== null}
