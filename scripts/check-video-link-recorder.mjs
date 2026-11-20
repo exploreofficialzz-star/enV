@@ -38,9 +38,13 @@ const recorderToolBlock = (source, marker, close) => {
   assert.notEqual(end, -1, "recorder catalog entry closes: " + marker);
   return source.slice(start, end);
 };
-assert.match(recorderToolBlock(registry, 'const videoLinkScreenRecordingTool: ToolMeta = {', "\\n};"), /description: ""/);
-assert.doesNotMatch(androidCatalog, /Record the currently open social-media post's real on-screen interface/);
-assert.doesNotMatch(iosCatalog, /Record the currently open social-media post's real on-screen interface/);
+const recorderCatalogEntry = recorderToolBlock(registry, 'const videoLinkScreenRecordingTool: ToolMeta = {', "\\n};");
+assert.ok(recorderCatalogEntry.includes('description: "Record a social-media post with its video and visible platform controls."'), "the tool keeps its concise description beneath the title");
+assert.ok(androidCatalog.includes('description = "Record a social-media post with its video and visible platform controls."'), "Android catalogue keeps the concise tool description");
+assert.ok(iosCatalog.includes('description: "Record a social-media post with its video and visible platform controls."'), "iOS catalogue keeps the concise tool description");
+const toolShell = read("src/components/tools/tool-shell.tsx");
+assert.match(toolShell, /tool\.id !== "video-link-screen-recording"[\s\S]*?What this tool does/,
+  "the long explanatory section is omitted only for the recorder, while the title description remains");
 assert.match(router, /tool\.id === "video-link-screen-recording"[^\n]*VideoLinkRecorderEngine/);
 assert.match(preload, /video-link-recorder-engine/);
 assert.ok(offlinePolicy.includes('"' + ID + '"'), "the screen capture remains a local operation");
