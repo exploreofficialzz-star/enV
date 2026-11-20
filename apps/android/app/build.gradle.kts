@@ -16,12 +16,17 @@ android {
         buildConfigField("boolean", "ANALYTICS_ENABLED", providers.gradleProperty("envAnalyticsEnabled").orNull ?: "false")
         buildConfigField("boolean", "ENV_ADS_ENABLED", providers.gradleProperty("envAdsEnabled").orNull ?: "false")
         buildConfigField("boolean", "ENV_ADS_PRIVACY_CONFIGURED", providers.gradleProperty("envAdsPrivacyConfigured").orNull ?: "false")
+        buildConfigField("boolean", "ENV_AD_ACCESS_GATE_ENABLED", providers.gradleProperty("envAdAccessGateEnabled").orNull ?: "false")
+        val adAccessToolIds = (providers.gradleProperty("envAdAccessToolIds").orNull ?: "").split(",").map { it.trim() }.filter { it.matches(Regex("[a-z0-9][a-z0-9-]{0,119}")) }.distinct().joinToString(",")
+        buildConfigField("String", "ENV_AD_ACCESS_TOOL_IDS", "\"$adAccessToolIds\"")
         val adToolIds = (providers.gradleProperty("envAdSupportedToolIds").orNull ?: "").split(",").map { it.trim() }.filter { it.matches(Regex("[a-z0-9][a-z0-9-]{0,119}")) }.distinct().joinToString(",")
         val admobAppId = (providers.gradleProperty("envAdmobAppId").orNull ?: "ca-app-pub-3940256099942544~3347511713").filter { it.isLetterOrDigit() || it == '-' || it == '_' || it == '~' }
         val admobBannerUnit = providers.gradleProperty("envAdmobBannerAdUnitId").orNull ?: ""
+        val admobRewardedUnit = providers.gradleProperty("envAdmobRewardedAdUnitId").orNull ?: ""
         buildConfigField("String", "ENV_AD_SUPPORTED_TOOL_IDS", "\"$adToolIds\"")
         buildConfigField("String", "ENV_ADMOB_APP_ID", "\"$admobAppId\"")
         buildConfigField("String", "ENV_ADMOB_BANNER_AD_UNIT_ID", "\"$admobBannerUnit\"")
+        buildConfigField("String", "ENV_ADMOB_REWARDED_AD_UNIT_ID", "\"$admobRewardedUnit\"")
         manifestPlaceholders["envAdmobAppId"] = admobAppId
         versionCode = 7
         versionName = "1.1.1"
