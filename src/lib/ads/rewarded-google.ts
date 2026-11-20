@@ -1,3 +1,5 @@
+import { loadAdSenseScript, whenGooglePrivacyConsentDataReady } from "./browser";
+
 type RewardedFormat = "REWARDED";
 
 type GPTSlot = {
@@ -38,7 +40,31 @@ declare global {
 }
 
 let gptScriptPromise: Promise<void> | null = null;
+let privacyReadyPromise: Promise<void> | null = null;
 let gptServicesEnabled = false;
+
+async function waitForGooglePrivacyChoice(): Promise<void> {
+  const clientId = String(import.meta.env.VITE_ADSENSE_CLIENT_ID ?? "").trim();
+  if (import.meta.env.VITE_ADSENSE_PRIVACY_CONFIGURED !== "true" || !clientId) {
+    throw new Error("Google advertising privacy messaging is not configured.");
+  }
+  if (!privacyReadyPromise) {
+    privacyReadyPromise = (async () => {
+      await loadAdSenseScript(clientId);
+      await new Promise<void>((resolve, reject) => {
+        const timeout = window.setTimeout(() => reject(new Error("Google privacy settings did not finish loading.")), 15_000);
+        whenGooglePrivacyConsentDataReady(() => {
+          window.clearTimeout(timeout);
+          resolve();
+        });
+      });
+    })().catch((error) => {
+      privacyReadyPromise = null;
+      throw error;
+    });
+  }
+  await privacyReadyPromise;
+}
 
 function ensureGPTQueue(): GooglePublisherTag {
   window.googletag ??= { cmd: [], enums: { OutOfPageFormat: { REWARDED: "REWARDED" } } } as GooglePublisherTag;
@@ -91,6 +117,7 @@ export async function showGoogleRewardedAd(unitPath: string): Promise<RewardedAd
   if (!/^\/[A-Za-z0-9_./-]{2,180}$/.test(normalizedUnitPath)) return "unavailable";
 
   try {
+    await waitForGooglePrivacyChoice();
     await loadGPT();
   } catch {
     return "unavailable";
