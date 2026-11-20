@@ -53,7 +53,10 @@ assert.match(toolShell, /AdsterraBanner format="300x250"/, "Qualified tool pages
 assert.match(toolShell, /isAdsterraQualifiedTool\(tool\)/, "Each placement must be limited to the shared Adsterra eligibility policy.");
 assert.match(toolShell, /const adsterraAdsEnabled =\s*adsterraQualified && adsterraConsent === "granted"[\s\S]*?accessPreference === "ads"/, "Adsterra placements must follow the visitor's ad-versus-token mode and saved advertising choice.");
 assert.match(toolShell, /useCurrentUserState\(\)/, "Selected access-gated tools must distinguish guests from signed-in users.");
-assert.match(toolShell, /adAccessGateEnabled && !toolAccessUnlocked/, "Selected tools must remain hidden until rewarded-ad or token access is granted.");
+assert.match(toolShell, /adAccessGateEnabled && browserOnline && !toolAccessUnlocked/, "Selected online tools must remain hidden until rewarded-ad or token access is granted.");
+assert.match(toolShell, /adAccessGateEnabled && browserOnline && !toolAccessUnlocked/, "Offline mode must leave the existing offline eligibility checks in control.");
+assert.match(read("apps/android/app/src/main/java/com/chastech/env/NativeAds.kt"), /!network \|\| !originReachable/, "Android must preserve the established offline allowance execution path.");
+assert.match(read("apps/ios/enV/NativeAds.swift"), /!reachability\.hasNetwork \|\| !originReachable/, "iOS must preserve the established offline allowance execution path.");
 assert.match(toolShell, /VITE_AD_ACCESS_TOOL_IDS/, "The access gate must use an explicit, deployment-controlled tool allowlist.");
 assert.match(toolShell, /<ToolExecutionTelemetryContext\.Provider value=\{executionTelemetry\}>\s*\{toolContent\}\s*<\/ToolExecutionTelemetryContext\.Provider>/, "The gate must preserve the normal tool execution telemetry context after access is granted.");
 assert.match(toolShell, /<\/section>\s*\{!isFullscreen && adsterraAdsEnabled[\s\S]*?<AdsterraBanner format="300x250" \/>[\s\S]*?<AdsterraNativeBanner \/>[\s\S]*?\}\s*\{tool\.category !== "creators"/, "Lower Adsterra placements must work for every eligible category, including Creator tools.");
