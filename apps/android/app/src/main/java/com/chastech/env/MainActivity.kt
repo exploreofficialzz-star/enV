@@ -95,6 +95,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.mapSaver
@@ -1330,12 +1331,14 @@ private fun NativeToolInterfaceContent(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val completionCallback = LocalNativeToolAccessCompletion.current
+    val latestCompletionCallback by rememberUpdatedState(completionCallback)
     val telemetry = remember(tool.id) {
         NativeToolExecutionTelemetry(
             context.applicationContext,
             tool.id,
             flush = { scope.launch { runCatching { NativeAnalytics.flush(context.applicationContext) } } },
-            onFinished = LocalNativeToolAccessCompletion.current,
+            onFinished = { success -> latestCompletionCallback(success) },
         )
     }
     DisposableEffect(telemetry) {
