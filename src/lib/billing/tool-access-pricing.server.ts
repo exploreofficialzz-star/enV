@@ -1,4 +1,5 @@
 import approvedPrices from "../../data/billing-tool-access-approvals.json" with { type: "json" };
+import offlineEligibleTools from "../../data/offline-eligible-tools.json" with { type: "json" };
 
 export type ApprovedToolAccessPrice = {
   toolId: string;
@@ -14,6 +15,8 @@ type ApprovalRegistry = {
 };
 
 const registry = approvedPrices as ApprovalRegistry;
+type OfflineEligibleRegistry = { profiles: { toolId: string; billingKey: string; subunitsPerUnit: number; platforms: string[] }[] };
+const offlineProfiles = new Map((offlineEligibleTools as OfflineEligibleRegistry).profiles.map((profile) => [profile.toolId, profile]));
 const validToolId = /^[a-z0-9][a-z0-9-]{0,119}$/;
 const approvedByToolId = new Map<string, ApprovedToolAccessPrice>();
 
@@ -24,6 +27,9 @@ for (const profile of registry.profiles) {
       typeof profile.unitLabel !== "string" || profile.unitLabel.length < 1 || profile.unitLabel.length > 48 ||
       typeof profile.pricingVersion !== "string" || profile.pricingVersion.length < 1 || profile.pricingVersion.length > 80 ||
       profile.adFreeAccessEnabled !== true ||
+      profile.unitLabel !== "calculation" ||
+      profile.pricingVersion !== registry.pricingVersion ||
+      (() => { const source = offlineProfiles.get(profile.toolId); return !source || source.billingKey !== "local.calculator" || source.subunitsPerUnit !== profile.subunitsPerSession || !["web", "android", "ios"].every((platform) => source.platforms.includes(platform)); })() ||
       approvedByToolId.has(profile.toolId)) {
     throw new Error("The reviewed per-tool access price registry contains an invalid or duplicate approval.");
   }
@@ -31,8 +37,10 @@ for (const profile of registry.profiles) {
 }
 
 /**
- * This manually reviewed registry is the only source that can activate paid,
- * ad-free access. Generated provisional profiles are never treated as approved.
+ * This static registry approves only the existing cross-platform local-calculator
+ * cohort, at its canonical 100-milli-token per-calculation rate. Each price is
+ * cross-checked against the current offline-eligibility registry; provisional
+ * cloud, AI, media and generic tool profiles can never activate paid access.
  */
 export function getApprovedToolAccessPrice(toolId: string): ApprovedToolAccessPrice | null {
   if (typeof toolId !== "string" || !validToolId.test(toolId)) return null;
