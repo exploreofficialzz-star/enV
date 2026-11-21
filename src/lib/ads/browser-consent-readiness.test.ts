@@ -23,11 +23,6 @@ function withGoogleFc<T>(run: (queue: CallbackItem[], windowStub: Record<string,
   }
 }
 
-function runConsentCallbacks(queue: CallbackItem[], windowStub: Record<string, unknown>) {
-  const api = windowStub.googlefc as Record<string, unknown>;
-  (api.callbackQueue as CallbackItem[]).length = 0;
-}
-
 test("Google rewarded consent decisions are cached after all privacy checks finish", () => {
   withGoogleFc((queue, windowStub) => {
     const api = windowStub.googlefc as Record<string, unknown>;
