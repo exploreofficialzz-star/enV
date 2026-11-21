@@ -68,7 +68,7 @@ async function waitForGooglePrivacyChoice(): Promise<void> {
 }
 
 function ensureGPTQueue(): GooglePublisherTag {
-  window.googletag ??= { cmd: [], enums: { OutOfPageFormat: { REWARDED: "REWARDED" } } } as GooglePublisherTag;
+  window.googletag ??= { cmd: [], enums: { OutOfPageFormat: { REWARDED: "REWARDED" } } } as unknown as GooglePublisherTag;
   return window.googletag;
 }
 
