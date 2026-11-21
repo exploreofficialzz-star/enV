@@ -78,8 +78,9 @@ internal object NativeAdsPolicy {
     val rewardedAccessConfigured: Boolean get() = BuildConfig.ENV_AD_ACCESS_GATE_ENABLED
     val rewardedAdsConfigured: Boolean get() = rewardedAccessConfigured &&
         privacySetupConfigured && rewardedUnitId.matches(Regex("/[A-Za-z0-9_./-]{3,180}"))
-    fun isRewardedAccessTool(tool: ToolRecord): Boolean =
-        rewardedAccessConfigured && tool.id in rewardedToolIds && isAdEligibleTool(tool)
+    fun isRewardedAccessTool(context: Context, tool: ToolRecord): Boolean =
+        rewardedAccessConfigured && tool.id in rewardedToolIds &&
+            isAdEligibleTool(tool) && isHybridTool(context, tool)
 
     private val allowlistedIds: Set<String> by lazy {
         BuildConfig.ENV_AD_SUPPORTED_TOOL_IDS.split(",").map { it.trim() }.filter { toolIdPattern.matches(it) }.toSet()
@@ -112,7 +113,8 @@ internal object NativeAdsPolicy {
     fun isHybridTool(context: Context, tool: ToolRecord): Boolean {
         val restrictedDisclaimers = setOf("health", "finance", "earnings")
         val restrictedCategories = setOf("fitness", "personal")
-        return tool.id in allowlistedIds &&
+        val rewardedAccessTool = rewardedAccessConfigured && tool.id in rewardedToolIds
+        return (tool.id in allowlistedIds || rewardedAccessTool) &&
             tool.id in crossPlatformMeteredIds(context) &&
             tool.status == "active" &&
             tool.clientSide &&
@@ -420,7 +422,7 @@ internal fun NativeRewardedToolAccessGate(
 
     // Offline or origin-unreachable runs remain governed by the existing
     // signed allowance/journal path inside the native tool execution boundary.
-    if (preview || !NativeAdsPolicy.isRewardedAccessTool(tool) || !network) {
+    if (preview || !NativeAdsPolicy.isRewardedAccessTool(context, tool) || !network) {
         content()
         return
     }
