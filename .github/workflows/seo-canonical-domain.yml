@@ -43,5 +43,8 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
+      - name: Generate canonical SEO artifacts
+        run: node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/generate-seo-artifacts.mjs
+
       - name: Validate generated SEO artifacts and canonical host policy
         run: npm run check:seo
