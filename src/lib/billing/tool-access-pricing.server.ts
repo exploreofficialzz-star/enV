@@ -21,15 +21,17 @@ const validToolId = /^[a-z0-9][a-z0-9-]{0,119}$/;
 const approvedByToolId = new Map<string, ApprovedToolAccessPrice>();
 
 for (const profile of registry.profiles) {
+  const offlineProfile = profile ? offlineProfiles.get(profile.toolId) : undefined;
   if (!profile || !validToolId.test(profile.toolId) ||
       !Number.isSafeInteger(profile.subunitsPerSession) || profile.subunitsPerSession < 1 ||
       profile.subunitsPerSession > 9_000_000_000_000 ||
-      typeof profile.unitLabel !== "string" || profile.unitLabel.length < 1 || profile.unitLabel.length > 48 ||
-      typeof profile.pricingVersion !== "string" || profile.pricingVersion.length < 1 || profile.pricingVersion.length > 80 ||
+      typeof profile.unitLabel !== "string" || profile.unitLabel !== "calculation" ||
+      typeof profile.pricingVersion !== "string" || profile.pricingVersion !== registry.pricingVersion ||
       profile.adFreeAccessEnabled !== true ||
-      profile.unitLabel !== "calculation" ||
-      profile.pricingVersion !== registry.pricingVersion ||
-      (() => { const source = offlineProfiles.get(profile.toolId); return !source || source.billingKey !== "local.calculator" || source.subunitsPerUnit !== profile.subunitsPerSession || !["web", "android", "ios"].every((platform) => source.platforms.includes(platform)); })() ||
+      !offlineProfile ||
+      offlineProfile.billingKey !== "local.calculator" ||
+      offlineProfile.subunitsPerUnit !== profile.subunitsPerSession ||
+      !["web", "android", "ios"].every((platform) => offlineProfile.platforms.includes(platform)) ||
       approvedByToolId.has(profile.toolId)) {
     throw new Error("The reviewed per-tool access price registry contains an invalid or duplicate approval.");
   }
