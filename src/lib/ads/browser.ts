@@ -46,6 +46,8 @@ declare global {
     adsbygoogle?: AdsByGoogleQueue;
     googlefc?: GoogleFcApi;
     __envGoogleConsentDataReady?: boolean;
+    __envGoogleAdsConsentDecisionReady?: boolean;
+    __envGoogleAdsAllowed?: boolean;
   }
 }
 
@@ -120,13 +122,24 @@ export function whenGooglePrivacyConsentDataReady(callback: () => void): void {
  * an ad for a visitor whose permissions cannot be determined.
  */
 export function whenGoogleAdsConsentReady(callback: (allowed: boolean) => void): void {
+  if (window.__envGoogleAdsConsentDecisionReady === true) {
+    callback(window.__envGoogleAdsAllowed === true);
+    return;
+  }
+
+  const finish = (allowed: boolean) => {
+    window.__envGoogleAdsAllowed = allowed;
+    window.__envGoogleAdsConsentDecisionReady = true;
+    callback(allowed);
+  };
+
   ensureGoogleFcQueue().callbackQueue!.push({
     CONSENT_MODE_DATA_READY: () => {
       const api = window.googlefc;
       const values = api?.getGoogleConsentModeValues?.();
       const consentStatuses = api?.ConsentModePurposeStatusEnum;
       if (!values || !consentStatuses) {
-        callback(false);
+        finish(false);
         return;
       }
       const permitted = new Set([
@@ -140,7 +153,7 @@ export function whenGoogleAdsConsentReady(callback: (allowed: boolean) => void):
         values.adPersonalizationPurposeConsentStatus,
       ].every((status) => permitted.has(status));
       if (!consentAllowed) {
-        callback(false);
+        finish(false);
         return;
       }
 
@@ -151,7 +164,7 @@ export function whenGoogleAdsConsentReady(callback: (allowed: boolean) => void):
           const stateEnums = stateApi?.InitialUsStatesOptOutStatusEnum;
           if (!stateEnums || stateStatus === undefined ||
               (stateStatus !== stateEnums.DOES_NOT_APPLY && stateStatus !== stateEnums.NOT_OPTED_OUT)) {
-            callback(false);
+            finish(false);
             return;
           }
 
@@ -160,7 +173,7 @@ export function whenGoogleAdsConsentReady(callback: (allowed: boolean) => void):
               const blockerApi = window.googlefc;
               const blockerStatus = blockerApi?.getAdBlockerStatus?.();
               const blockerEnums = blockerApi?.AdBlockerStatusEnum;
-              callback(Boolean(
+              finish(Boolean(
                 blockerEnums &&
                 blockerStatus === blockerEnums.NO_AD_BLOCKER
               ));
@@ -173,6 +186,8 @@ export function whenGoogleAdsConsentReady(callback: (allowed: boolean) => void):
 }
 
 export function reopenGooglePrivacySettings(): void {
+  window.__envGoogleAdsConsentDecisionReady = false;
+  window.__envGoogleAdsAllowed = false;
   ensureGoogleFcQueue().callbackQueue!.push(() => {
     window.googlefc?.showRevocationMessage?.();
   });
