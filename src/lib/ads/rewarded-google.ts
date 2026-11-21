@@ -50,15 +50,24 @@ async function waitForGooglePrivacyChoice(): Promise<void> {
   }
   if (!privacyReadyPromise) {
     privacyReadyPromise = (async () => {
-      await loadAdSenseScript(clientId);
-      await new Promise<void>((resolve, reject) => {
-        const timeout = window.setTimeout(() => reject(new Error("Google privacy settings did not finish loading.")), 15_000);
+      let timeout: number | null = null;
+      const consentPromise = new Promise<void>((resolve, reject) => {
+        timeout = window.setTimeout(() => reject(new Error("Google privacy settings did not finish loading.")), 15_000);
+        // Queue the consent callback before loading the publisher tag. The CMP may
+        // resolve its initial decision as soon as that script executes.
         whenGoogleAdsConsentReady((allowed) => {
-          window.clearTimeout(timeout);
+          if (timeout !== null) window.clearTimeout(timeout);
+          timeout = null;
           if (allowed) resolve();
           else reject(new Error("Advertising consent was declined or is unavailable."));
         });
       });
+      try {
+        await Promise.all([loadAdSenseScript(clientId), consentPromise]);
+      } catch (error) {
+        if (timeout !== null) window.clearTimeout(timeout);
+        throw error;
+      }
     })().catch((error) => {
       privacyReadyPromise = null;
       throw error;
