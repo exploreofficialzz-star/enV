@@ -115,7 +115,7 @@ export function ToolShell({
     });
     const payload = await response.json().catch(() => null) as {
       ok?: boolean;
-      data?: { reservationId?: string; reservedTokens?: number };
+      data?: { reservationId?: string; reservedTokens?: number; unitLabel?: string };
       error?: string;
       message?: string;
     } | null;
@@ -132,6 +132,7 @@ export function ToolShell({
       ok: true as const,
       reservationId: payload.data.reservationId,
       reservedTokens: payload.data.reservedTokens ?? 0,
+      unitLabel: payload.data.unitLabel ?? "run",
     };
   };
 
