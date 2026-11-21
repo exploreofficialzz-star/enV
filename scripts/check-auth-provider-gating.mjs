@@ -40,6 +40,8 @@ assert.ok(server.includes("APPLE_PRIVATE_KEY"), "Apple private key must only be 
 assert.ok(server.includes("emailPasswordUiRequested && !emailPasswordAuthEnabled"), "Email UI/provider mismatch must be diagnosed.");
 assert.ok(server.includes("googleUiRequested && !googleConfigured"), "Google UI/provider mismatch must be diagnosed.");
 assert.ok(server.includes("requireLocalEmailVerified: true"), "OAuth account linking must require an already verified local email.");
+assert.ok(server.includes("trustedProviders: OAUTH_PROVIDERS.map((provider) => provider.providerId)"), "Google must not be added to the forced trusted-provider list, which bypasses provider email verification.");
+assert.ok(server.includes("requireEmailVerification: true"), "Google sign-in must require Google to assert a verified email address.");
 assert.ok(server.includes("appleClientSecret && appleGeneratedSecretConfigured"), "Reject conflicting manual/generated Apple client-secret configuration.");
 assert.ok(!server.includes("requireLocalEmailVerified: false"), "Do not allow OAuth to link into an unverified local account.");
 assert.ok(server.includes("appleUiRequested && !appleConfigured"), "Apple UI/provider mismatch must be diagnosed.");
