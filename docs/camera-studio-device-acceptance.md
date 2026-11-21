@@ -21,13 +21,22 @@ For every test run, record:
 
 A result without this evidence remains NOT RUN.
 
+## Compatibility boundary
+
+- Android's OS feature flag can be advertised below API 30, but the current CameraX pair-discovery implementation uses CameraManager.getConcurrentCameraIds(), which is only available from API 30. CameraX's compatibility implementation returns an empty concurrent-pair set below that level. Therefore this CameraX dual-recording path still requires Android 11+ and FEATURE_CAMERA_CONCURRENT plus an actual front/rear pair. Android 10 phones are not supported by this path even when a feature flag is exposed.
+- A separate pre-Android-11 Camera2 engine could experimentally open independent camera devices on some vendor builds, but Android does not guarantee those unrelated camera IDs can stream concurrently. Android 9 logical multi-camera support only guarantees physical-camera stream combinations inside a logical camera group; it does not guarantee front + rear capture. A legacy adapter is NOT IMPLEMENTED and would require hardware-specific testing before release.
+- iOS uses the AVCaptureMultiCamSession support flag, supported formats, and live hardware/system-pressure costs. It now retries a low-power 480p/24 profile after the 720p/30 profile fails or exceeds the device resource budget.
+- Browser dual capture requests the second camera at progressively lower resource profiles (720p/30, 480p/24, then 240p/15). The browser and camera driver may still prohibit opening both cameras at once.
+- No software path can make simultaneous capture universally available on hardware/OS combinations that do not expose concurrent camera streams. Do not simulate dual capture by duplicating frames or label sequential capture as simultaneous.
+
 ## Device coverage
 
 | Platform cohort | Minimum coverage | Required checks | Status |
 |---|---|---|---|
-| Android 10 baseline | At least one physical Android 10 phone | Single-camera preview/capture, permission denial and retry, save, fallback messaging; dual-camera must remain unavailable because CameraX concurrent capture requires Android 11+ | NOT RUN |
+| Android 10 baseline | At least one physical Android 10 phone | Verify current CameraX dual mode correctly falls back to single camera; record feature declaration; a separate legacy Camera2 dual path is NOT IMPLEMENTED and must not be marked PASS | NOT RUN |
 | Android 11+ dual-capable | At least one phone where CameraX reports a front/rear concurrent pair | Simultaneous preview, PiP composition, one-file recording, audio, orientation, stop/finalize, filters | NOT RUN |
 | Android 11+ non-dual-capable | At least one phone where the concurrent pair is not reported | Clear unavailable state and working single-camera fallback | NOT RUN |
+| Android 11+ low/mid-range dual-capable | At least one constrained-memory phone that reports a concurrent front/rear pair | 720p bind, SD retry, actual output resolution/FPS, heat, encoder load, audio and finalization | NOT RUN |
 | Android low/mid-range | At least one constrained-memory phone | Heat, dropped frames, recording length, low storage, background/foreground, resource release | NOT RUN |
 | iOS MultiCam-capable | At least one physical iPhone where `AVCaptureMultiCamSession.isMultiCamSupported` is true | Both cameras, synchronized PiP, audio, orientation, thermal pressure, finalization | NOT RUN |
 | iOS non-MultiCam | At least one physical iPhone where MultiCam is unavailable | Clear unavailable state and working single-camera fallback | NOT RUN |
@@ -38,6 +47,9 @@ A result without this evidence remains NOT RUN.
 | Scenario | Required acceptance behaviour | Status |
 |---|---|---|
 | Dual-camera capability and graceful fallback | Detect actual concurrent-camera support; never duplicate one stream to fake dual capture; keep single camera usable if unsupported | NOT RUN |
+| Dual-camera preview/export parity | Confirm the same distinct front and rear frames appear in preview and the saved composition; PiP placement, crop, orientation, mirroring and 9:16 portrait framing match; iOS dual mode keeps the Natural look until live filtered preview is supported | NOT RUN |
+| Dual-mode controls and capability truthfulness | While two cameras are active, hide single-camera zoom, exposure, lens, focus, white-balance, ISO/shutter, stabilization and photo-timer controls unless they are applied to the active dual streams; never display stale single-camera values | NOT RUN |
+| Adaptive dual-camera quality fallback | Android retries 720p then SD; iOS retries 720p/30 then 480p/24; browser retries 720p/30, 480p/24 and 240p/15; preview and exported output must match the selected profile | NOT RUN |
 | Front/rear orientation and mirroring | Portrait and landscape clips are upright; front inset mirroring is intentional; PiP does not crop the subject unexpectedly | NOT RUN |
 | Microphone permission and audio synchronization | Ask only when recording with sound; silent recording works after denial; audio stays synchronized with the exported video | NOT RUN |
 | Low-storage and recording finalization | Show a recoverable error, do not publish a partial file as complete, and preserve an already completed take when a save picker is canceled | NOT RUN |
@@ -45,8 +57,8 @@ A result without this evidence remains NOT RUN.
 | Thermal and battery behaviour | Run repeated and sustained recording; note thermal warnings, throttling, dropped frames and battery drain; do not advertise unmeasured performance | NOT RUN |
 | Filter preview-to-export parity | Each native color look is visible in preview and present in the saved photo/video; Natural resets correctly; no stale filter after mode changes | NOT RUN |
 | Video stabilization | Verify Android Camera2 and iOS AVFoundation enable stabilization only when reported by the active camera/format, including each concurrent feed; compare supported modes and exported motion at the same resolution/frame rate | NOT RUN |
-| Face tracking and original AR effects | Test one and multiple faces, glasses/crown alignment, face movement/entry/exit, rotation, low light, processing latency, frame drops and exact preview-to-export parity | NOT RUN |
-| Beauty / soft-light effects | Verify iOS face-only softening is subtle and bounded; verify Android soft glow stays attached to the detected face; confirm no effect is applied to unsupported photo/dual modes | NOT RUN |
+| Face tracking and original AR effects | Test the 468-point face mesh on Android and Vision landmarks on iOS; glasses, crown, bunny ears and moustache alignment; face movement/entry/exit, rotation, low light, thermal load, processing latency, frame drops and exact preview-to-export parity | NOT RUN |
+| Beauty / soft-light effects | Verify iOS face-only softening is subtle and bounded; verify Android soft glow is not described as skin smoothing; measure face-mesh inference overhead on low-end phones and confirm effects stay off in photo/dual modes | NOT RUN |
 | Face-effect privacy and lifecycle | Confirm no face data leaves device; disabling effects stops analysis; leaving Camera Studio releases Vision/ML Kit resources and camera outputs | NOT RUN |
 | Manual camera controls | Verify actual sensor capability gating; ISO/shutter, white balance, focus distance/lock and optical lens selection change capture output; unsupported controls are hidden | NOT RUN |
 | Permission revoked in Settings | Return to Camera Studio after revocation; camera is not bound until permission returns; retry/settings route works | NOT RUN |
@@ -65,7 +77,7 @@ A result without this evidence remains NOT RUN.
 - Android Camera2 video stabilization defaults on when the active camera reports `CONTROL_VIDEO_STABILIZATION_MODE_ON`, remains user-toggleable, resets to the supported default, and is hidden when unsupported. It is limited to video mode. Concurrent front/rear mode requests stabilization independently for each supported feed.
 - iOS AVFoundation video stabilization, using `.auto` only when the active video connection reports support; dual-camera video connections request `.auto` independently when supported.
 - Android Camera2-interoperability manual sensor ISO/shutter, supported white-balance modes, focus lock/focus distance, and rear-lens selection, shown only when reported by the active camera.
-- iOS manual ISO/shutter, white-balance presets, focus lock and optical-lens selection, shown only where the active device supports them.
+- iOS manual ISO/shutter, white-balance presets, focus lock and optical-lens selection, shown only where the active single-camera device supports them. These single-camera controls are hidden in dual mode until equivalent controls can be applied to both live streams.
 - iOS Vision face-landmark detection throttled to 15 updates/second, with original glasses and crown overlays plus subtle face-only softening. The same transformed frame goes to the preview and video writer.
 - Android bundled ML Kit face detection/tracking with timestamp-matched CameraX `OverlayEffect` masks for original glasses, crown and a face-following soft glow. The effect targets preview and video capture; it is disabled in still-photo mode.
 - Face detection and overlays run locally on-device. No face frames or landmark results are sent to enV servers by these implementations.
@@ -76,10 +88,10 @@ These are source-level implementations, not device acceptance. A green build sti
 ### Still not implemented — do not advertise as available
 
 - A licensed Snapchat Lens catalogue or Snap Camera Kit integration. The included glasses, crown and soft-light examples are original enV effects and must not be described as Snapchat lenses.
-- Expression-driven blendshape effects, detailed 3D face meshes, occlusion-aware accessories, skin-tone-aware retouching and a full beauty studio. The current iOS Beauty mode is subtle face-only softening; Android Soft glow is a face-following light overlay, not skin smoothing.
+- Expression-driven blendshape effects, depth-aware 3D accessories/occlusion, skin-tone-aware retouching and a full beauty studio. Android now uses an on-device 468-point ML Kit face mesh for original 2D masks; the SDK is beta and adds about 6.4 MB to the app bundle. The mesh is limited to close selfie-like framing (about 2 metres) and is throttled to around 15 inference frames per second. iOS continues to use Vision landmarks. The current iOS Beauty mode is subtle face-only softening; Android Soft glow remains a face-following light overlay, not skin smoothing.
 - Face masks during simultaneous front-and-rear recording. Dual-camera mode and face-effect mode are currently separate modes.
 
-Face detection is off by default. Keep capability/performance fallbacks visible and never claim advanced retouching, proprietary Snapchat effects or device-wide support before further implementation and testing.
+Face effects are off by default. Keep capability/performance fallbacks visible and never claim advanced retouching, licensed Snapchat effects or device-wide support before further implementation and testing. Validate mesh latency and heat on Tecno/Infinix-class low-end phones before enabling it by default.
 
 ## Safe execution notes
 

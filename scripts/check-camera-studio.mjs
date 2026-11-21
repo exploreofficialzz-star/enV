@@ -53,7 +53,12 @@ assert.match(androidCamera, /FallbackStrategy\.lowerQualityOrHigherThan/);
 assert.match(androidCamera, /setVideoCaptureTargetFrameRate/);
 assert.match(androidCamera, /ProcessCameraProvider\.getInstance/);
 assert.match(androidCamera, /availableConcurrentCameraInfos/);
-assert.match(androidCamera, /FEATURE_CAMERA_CONCURRENT/);
+assert.match(androidCamera, /Build\.VERSION\.SDK_INT < Build\.VERSION_CODES\.R/, "The current CameraX concurrent-pair discovery requires Android 11/API 30.");
+assert.match(androidCamera, /hasSystemFeature\(PackageManager\.FEATURE_CAMERA_CONCURRENT\)/, "Require the OS concurrent-camera feature declaration as well as a returned pair.");
+assert.match(androidCamera, /legacy Camera2 adapter would be required/, "Do not claim pre-Android-11 support without a separate legacy Camera2 path.");
+assert.match(androidCamera, /availableConcurrentCameraInfos/);
+assert.match(androidCamera, /for \(quality in listOf\(Quality\.HD, Quality\.SD\)\)/, "Android retries dual recording at SD quality for lower-resource devices.");
+assert.match(androidCamera, /low-power SD quality/);
 assert.match(androidCamera, /ConcurrentCamera\.SingleCameraConfig/);
 assert.match(androidCamera, /concurrentCamera\.cameras\.forEach/);
 assert.match(androidCamera, /Camera2CameraControl\.from\(activeCamera\.cameraControl\)/, "Android concurrent camera feeds request stabilization independently.");
@@ -205,9 +210,21 @@ assert.match(androidCamera, /CameraEffect\.PREVIEW or CameraEffect\.VIDEO_CAPTUR
 assert.match(androidCamera, /cameraEffect\.setEffects\(nativeCameraEffects\(selectedLook\)\)/);
 assert.match(androidCamera, /addEffect\(cameraEffect\)/);
 assert.match(androidCamera, /CameraCharacteristics\.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR/);
+assert.match(androidCamera, /CameraCharacteristics\.SENSOR_INFO_SENSITIVITY_RANGE/);
+assert.match(androidCamera, /CameraCharacteristics\.SENSOR_INFO_EXPOSURE_TIME_RANGE/);
 assert.match(androidCamera, /CaptureRequest\.SENSOR_SENSITIVITY/);
 assert.match(androidCamera, /CaptureRequest\.SENSOR_EXPOSURE_TIME/);
+assert.match(androidCamera, /manualExposureEnabled && manualSensorSupported && manualIsoRange != null && manualExposureTimeRange != null/, "Manual ISO/shutter only enable when the active camera reports manual sensor capability and ranges.");
+assert.match(androidCamera, /setCaptureRequestOption\(CaptureRequest\.CONTROL_AE_MODE, CaptureRequest\.CONTROL_AE_MODE_OFF\)/);
+assert.match(androidCamera, /setCaptureRequestOption\(CaptureRequest\.CONTROL_AE_MODE, CaptureRequest\.CONTROL_AE_MODE_ON\)/);
 assert.match(androidCamera, /CaptureRequest\.LENS_FOCUS_DISTANCE/);
+assert.match(androidCamera, /CaptureRequest\.CONTROL_AF_MODE_OFF/);
+assert.match(androidCamera, /CaptureRequest\.CONTROL_AF_MODE_CONTINUOUS_PICTURE/);
+assert.match(androidCamera, /controller\.setTapToFocusEnabled\(!manualFocusLocked\)/, "Focus lock disables tap-to-focus until Auto is restored.");
+assert.match(androidCamera, /whiteBalanceModes\.contains\(it\.second\)/, "White-balance choices are limited to modes advertised by the active camera.");
+assert.match(androidCamera, /discoveredWhiteBalanceModes\.contains\(CaptureRequest\.CONTROL_AWB_MODE_AUTO\)/, "Switching to a lens with different AWB modes resets to a supported mode.");
+assert.match(androidCamera, /if \(whiteBalanceModes\.contains\(selectedWhiteBalance\)\)/, "Unsupported white-balance presets are not sent to the active camera.");
+assert.match(androidCamera, /clearCaptureRequestOption\(CaptureRequest\.CONTROL_AWB_MODE\)/, "Unsupported AWB overrides are cleared to restore the camera default.");
 assert.match(androidCamera, /CaptureRequest\.CONTROL_AWB_MODE/);
 assert.match(androidCamera, /CameraCharacteristics.CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES/);
 assert.match(androidCamera, /CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_ON/);
@@ -253,9 +270,33 @@ const iosDualCamera = iosCamera.slice(iosCamera.indexOf("private final class Nat
 assert.match(iosDualCamera, /AVCaptureSessionWasInterrupted/, "iOS dual-camera mode observes system interruptions.");
 assert.match(iosDualCamera, /AVCaptureSessionInterruptionEnded/, "iOS dual-camera mode reconnects after interruption ends.");
 assert.match(iosDualCamera, /AVCaptureSessionRuntimeError/, "iOS dual-camera mode handles capture runtime errors.");
+assert.match(iosDualCamera, /configureBestAvailableSession/);
+assert.match(iosDualCamera, /lastAppendedBackTime/, "iOS dual capture never reuses an already-written rear frame.");
+assert.match(iosDualCamera, /lastAppendedFrontTime/, "iOS dual capture never reuses an already-written front frame.");
+assert.match(iosDualCamera, /let pipWidth = CGFloat\(outputWidth\) \* 0\.32/, "iOS exported PiP width scales with the active output quality.");
+assert.match(iosDualCamera, /let horizontalMargin = CGFloat\(outputWidth\) \* 24\.0 \/ 720\.0/, "iOS exported PiP horizontal margin scales with the active output quality.");
+assert.match(iosDualCamera, /let verticalMargin = CGFloat\(outputHeight\) \* 24\.0 \/ 1280\.0/, "iOS exported PiP vertical margin scales with the active output quality.");
+assert.match(iosDualCamera, /let height = width \* 330\.0 \/ 232\.0/, "iOS live PiP uses the same aspect ratio as the saved PiP.");
+assert.match(iosCamera, /\.aspectRatio\(dualCameraMode \? 9\.0 \/ 16\.0 : 4\.0 \/ 3\.0, contentMode: \.fit\)/, "iOS dual preview uses the same portrait aspect ratio as the exported video.");
+assert.match(iosDualCamera, /configureSession\(maxWidth: 1280, maxHeight: 720, frameRate: 30\)/);
+assert.match(iosDualCamera, /configureSession\(maxWidth: 640, maxHeight: 480, frameRate: 24\)/);
+assert.match(iosDualCamera, /format\.isMultiCamSupported/);
+assert.match(engine, /const secondaryProfiles = \[/);
+assert.match(engine, /low-power 240p \/ 15 fps/);
+assert.match(engine, /max: profile\.width/);
+assert.match(engine, /max: profile\.frameRate/);
+assert.match(engine, /const secondaryFacingMode = dualStream\?\.getVideoTracks\(\)\[0\]\?\.getSettings\(\)\.facingMode/);
+assert.match(engine, /aria-label="Second camera preview"[\s\S]*?filter: previewFilter[\s\S]*?scaleX\(-1\)/, "The secondary browser preview mirrors and filters the same feed as its saved composition.");
 assert.match(iosDualCamera, /mediaServicesWereReset/, "iOS dual-camera mode handles media-services resets.");
 assert.match(iosDualCamera, /resumeAfterFinalization/, "iOS dual-camera mode resumes only after an interrupted clip has finalized.");
 assert.match(iosDualCamera, /restartSessionLocked/, "iOS dual-camera mode has a guarded session recovery path.");
+assert.match(iosCamera, /look = \.natural[\s\S]*?capture\.setLook\(\.natural\)[\s\S]*?dualCameraMode = true/, "iOS dual preview and export start with the same Natural look.");
+assert.match(iosCamera, /if !dualCameraMode \{\s*HStack \{\s*Text\("Photo look"/, "The look selector stays hidden while dual preview cannot process it.");
+assert.match(iosCamera, /if !dualCameraMode && capture\.zoomMaximum > 1/, "iOS dual mode hides the inactive single-camera zoom control.");
+assert.match(iosCamera, /if !dualCameraMode, let exposureRange = capture\.exposureBiasRange/, "iOS dual mode hides inactive single-camera exposure compensation.");
+assert.match(iosCamera, /if !dualCameraMode \{\s*DisclosureGroup\("Advanced controls"/, "iOS dual mode hides inactive lens, focus, white-balance and manual exposure controls.");
+assert.match(iosCamera, /if !dualCameraMode && mode == "Photo" \{\s*HStack \{\s*Text\("Photo timer"/, "iOS dual-video mode hides the photo-only timer.");
+
 assert.match(iosCamera, /mediaServicesWereReset/);
 assert.match(iosCamera, /PHPhotoLibrary\.shared\(\)\.performChanges/);
 assert.match(iosCamera, /requestAccess\(for: \.audio\)/);
@@ -297,3 +338,6 @@ for (const gate of [
 }
 
 console.log("Camera Studio checks passed: web dual-camera composition, Android CameraX concurrent recording, native live filters and manual controls, iOS AVFoundation filtered recording and optical lenses, plus explicit physical-device release gates.");
+
+// Keep the local AR face-effects checks in every Camera Studio verification path.
+await import("./check-camera-studio-face-effects.mjs");
