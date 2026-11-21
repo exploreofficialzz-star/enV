@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/production-live-smoke.yml"
       - "scripts/check-live-seo.mjs"
+      - "scripts/seo-domain-policy.mjs"
       - "scripts/generate-seo-artifacts.mjs"
       - "scripts/check-seo-artifacts.mjs"
       - "scripts/check-seo-rendered-routes.mjs"

@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-const ORIGIN = "https://envtools.store";
+import { SEO_CANONICAL_ORIGIN, SEO_REDIRECT_HOSTS } from "./seo-domain-policy.mjs";
+
+const ORIGIN = SEO_CANONICAL_ORIGIN;
 const EXPECTED_HOMEPAGE_TITLE = "enV | Tools for everyday tasks";
 const EXPECTED_BUILD_SHA = process.env.GITHUB_SHA?.trim() ?? "";
 const USER_AGENT = "enV-production-seo-smoke/1.0";
@@ -129,8 +131,7 @@ async function checkStaticAssets() {
 }
 
 async function checkCanonicalHosts() {
-  const aliases = ["www.envtools.store", "envtools.site", "www.envtools.site", "en-v.vercel.app"];
-  for (const host of aliases) {
+  for (const host of SEO_REDIRECT_HOSTS) {
     const aliasUrl = "https://" + host + "/robots.txt";
     let initial;
     try {
