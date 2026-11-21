@@ -54,9 +54,6 @@ import com.google.android.ump.ConsentInformation
 import com.google.android.ump.ConsentRequestParameters
 import com.google.android.ump.ConsentInformation.PrivacyOptionsRequirementStatus
 import com.google.android.ump.UserMessagingPlatform
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
@@ -433,7 +430,7 @@ internal fun NativeRewardedToolAccessGate(
         }
         return
     }
-    if (!originReachable) {
+    if (!network || !originReachable) {
         content()
         return
     }
