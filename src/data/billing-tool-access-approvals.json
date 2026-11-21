@@ -1,4 +1,1874 @@
 {
-  "pricingVersion": "env-tool-access-review-v1",
-  "profiles": []
+  "pricingVersion": "env-tool-access-local-calculator-v1",
+  "profiles": [
+    {
+      "toolId": "angular-speed-rad-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "angular-speed-rpm-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "area-per-person-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "automotive-braking-force",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "automotive-wheel-speed-from-rpm",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "average-speed-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "battery-energy-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "beam-load-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "beam-uniform-load-total-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "belt-speed-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "calorie-burn-per-minute-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "civil-concrete-weight",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "civil-earthwork-trapezoidal-volume",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "civil-hydrostatic-force-vertical-wall",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "click-through-rate-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "commission-rate-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "construction-board-foot-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "construction-carpet-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "construction-concrete-volume-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "construction-concrete-weight-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "construction-excavation-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "construction-flooring-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "construction-gravel-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "construction-grout-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "construction-gutter-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "construction-insulation-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "construction-land-area-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "construction-lumber-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "construction-material-cost-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "construction-mortar-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "construction-mulch-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "construction-paint-coverage-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "construction-post-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "construction-shingle-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "construction-soil-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "cooking-ratio-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "cooking-temperature-conversion-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "cost-per-acquisition-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "cost-per-click-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "cost-per-thousand-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "cycling-speed-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "data-transfer-time-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "days-inventory-outstanding-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "decimal-hours-to-minutes-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "decimal-to-percent-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "download-time-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "drag-force-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "dynamic-pressure-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "electrical-battery-energy",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "electrical-capacitive-reactance",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "electrical-capacitor-energy",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "electrical-energy-kwh",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "electrical-frequency-period",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "electrical-inductive-reactance",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "electrical-lr-time-constant",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "electrical-power-v-i",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "electrical-rc-time-constant",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "electrical-resistor-power-i-r",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "electrical-resistor-power-v-r",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "electrical-transformer-secondary-voltage",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "electrical-voltage-drop-percent",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "engineering-circle-area",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "engineering-circle-section-modulus",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "engineering-pipe-flow-area",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "engineering-poisson-ratio",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "engineering-rectangle-second-moment",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "engineering-rectangle-section-modulus",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "engineering-solid-circle-inertia",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "engineering-thermal-stress",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "engineering-trapezoid-area",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "finance-401k-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "finance-apr-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "finance-arr-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "finance-bond-yield-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "finance-burn-rate-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "finance-cagr-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "finance-cash-flow-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "finance-churn-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "finance-commission-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "finance-customer-acquisition-cost-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "finance-customer-lifetime-value-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "finance-debt-to-income-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "finance-discount-rate-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "finance-emergency-fund-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "finance-hourly-to-salary-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "finance-inventory-turnover-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "finance-mrr-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "finance-operating-margin-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "finance-overtime-pay-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "finance-pension-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "finance-present-value-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "finance-recurring-revenue-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "finance-runway-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "finance-salary-to-hourly-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "flow-velocity-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "fluid-bernoulli-pressure",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "fluid-darcy-friction-factor-laminar",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "fluid-darcy-pressure-drop",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "fluid-dynamic-pressure",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "fluid-flow-rate",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "fluid-hydraulic-diameter",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "fluid-reynolds-number",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "force-from-pressure-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "gear-output-speed-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "gear-ratio-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "gear-train-ratio-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "gravitational-force-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "half-life-decay-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "heat-transfer-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "hydration-needs-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "hydraulic-force-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "hydraulic-pressure-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "inventory-turnover-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "labor-cost-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "lift-force-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "materials-bulk-modulus",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "materials-shear-stress",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "materials-strain",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "materials-stress",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "materials-youngs-modulus",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "math-ellipse-area-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "math-exponent-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "math-frustum-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "math-gcd-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "math-matrix-2x2-determinant",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "math-midpoint-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "math-parallelogram-area-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "math-point-slope-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "math-prism-volume-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "math-pyramid-volume-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "math-rhombus-area-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "math-scale-factor-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "math-sector-area-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "math-similarity-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "math-torus-volume-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "math-trapezoid-area-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "math-vector-3d-dot",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "math-z-score-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-advantage-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-beam-deflection-cantilever",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-bearing-life",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-belt-speed",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-bending-stress",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-bolt-preload-from-torque",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-deflection-cantilever-end-load",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-deflection-simply-supported-center-load",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-gear-ratio",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-horsepower-to-power",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-hydraulic-force",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-hydraulic-pressure",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-kinetic-friction-force",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-linear-momentum-change",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-output-rpm",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-power-to-horsepower",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-power-torque-rpm",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-pressure-force",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-pulley-speed-ratio",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-pump-hydraulic-power",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-rpm-from-speed",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-safety-factor",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-shaft-angle-of-twist",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-shaft-power-from-rpm",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-shaft-torsional-stress",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-spring-rate",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-torsional-shear-stress",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "mechanical-work-energy-spring",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "midpoint-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "minutes-to-decimal-hours-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "molarity-dilution-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "molarity-from-mass-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "momentum-velocity-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "ohms-power-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "operating-margin-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "payback-period-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "percent-to-decimal-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "photon-wavelength-energy-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-angular-acceleration",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-angular-momentum",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-buoyant-force",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-capacitor-charge",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-capacitor-voltage",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-centripetal-acceleration",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-centripetal-force",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-coefficient-friction",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-density",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-efficiency",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-electric-field-point-charge",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-electric-force",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-electric-potential-point-charge",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-frequency-period",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-gravitational-force",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-hydrostatic-pressure",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-impulse",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-induction-emf",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-kinematic-displacement",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-kinematic-distance-velocity",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-kinematic-final-velocity",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-kinetic-energy",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-mechanical-energy",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-momentum",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-newtons-second-law",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-photon-energy",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-potential-energy",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-power",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-pressure",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-relativistic-energy",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-resistivity",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-rotational-kinematics",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-rotational-kinetic-energy",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-spring-energy",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-spring-force",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-wave-speed",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "physics-weight-force",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "pipe-volume-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "power-law-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "pressure-force-area-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "pressure-from-depth-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "pump-power-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "recipe-cost-per-serving-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "revenue-per-user-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "reynolds-number-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "science-acceleration-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "science-buoyancy-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "science-capacitor-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "science-density-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "science-dilution-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "science-electrical-energy-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "science-force-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "science-frequency-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "science-half-life-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "science-heat-energy-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "science-ideal-gas-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "science-inductor-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "science-kinetic-energy-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "science-molarity-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "science-moles-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "science-momentum-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "science-photon-energy-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "science-potential-energy-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "science-power-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "science-pressure-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "science-resistor-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "science-velocity-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "science-voltage-divider-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "science-wavelength-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "solar-panel-energy-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "spring-energy-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "statistics-coefficient-variation",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "statistics-z-score",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "steps-to-distance-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "structures-beam-self-weight-load",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "structures-column-slenderness-ratio",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "structures-euler-buckling-load",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "structures-thermal-expansion",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "thermal-cop-refrigerator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "thermal-expansion-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "thermal-heat-energy",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "thermal-heat-exchanger-duty",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "thermal-heat-transfer-rate",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "thermal-hvac-air-changes-per-hour",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "thermal-hvac-sensible-load",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "thermal-ideal-gas-pressure",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "thermal-ideal-gas-volume",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "thermal-latent-heat",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "thermal-newton-cooling-rate",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "torque-from-force-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    },
+    {
+      "toolId": "wave-period-calculator",
+      "subunitsPerSession": 100,
+      "unitLabel": "calculation",
+      "pricingVersion": "env-tool-access-local-calculator-v1",
+      "adFreeAccessEnabled": true
+    }
+  ]
 }
