@@ -24,7 +24,7 @@ import {
   AdsterraNativeBanner,
   AdsterraResponsiveBanner,
 } from "@/components/ads/adsterra-ad";
-import { isAdsterraQualifiedTool } from "@/lib/ads/policy";
+import { isAdsterraQualifiedTool, isPaidHybridAccessToolId } from "@/lib/ads/policy";
 import { ADSTERRA_CONSENT_STORAGE_KEY, getAdsterraConsent, openAdsterraSmartlinkFromOutput } from "@/lib/ads/adsterra";
 import type { PublicCommunityFeed } from "@/lib/community/public-feed.functions";
 import { ToolExecutionTelemetryContext, type ToolExecutionTelemetry, type ToolExecutionOutcome } from "@/components/tools/tool-execution-context";
@@ -51,11 +51,11 @@ export function ToolShell({
   const { user: accessUser, isPending: accessAuthPending } = useCurrentUserState();
   const [accessPreference, setAccessPreference] = useState<ToolAccessPreference>(() => getToolAccessPreference(tool.id));
   const rewardedUnitPath = String(import.meta.env.VITE_GAM_REWARDED_AD_UNIT_PATH ?? "").trim();
-  const accessToolIds = new Set(String(import.meta.env.VITE_AD_ACCESS_TOOL_IDS ?? "").split(",").map((id) => id.trim()).filter(Boolean));
+  const accessToolIds = String(import.meta.env.VITE_AD_ACCESS_TOOL_IDS ?? "");
   const adAccessGateEnabled =
     import.meta.env.VITE_AD_ACCESS_GATE_ENABLED === "true" &&
     toolAdEligible &&
-    accessToolIds.has(tool.id);
+    isPaidHybridAccessToolId(tool.id, { toolIds: accessToolIds }, tool);
   const rewardedAdsConfigured =
     import.meta.env.VITE_ADSENSE_PRIVACY_CONFIGURED === "true" &&
     Boolean(import.meta.env.VITE_ADSENSE_CLIENT_ID) &&
