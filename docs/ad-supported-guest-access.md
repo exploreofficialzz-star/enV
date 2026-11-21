@@ -4,7 +4,7 @@
 
 The hybrid economy applies only to tool IDs explicitly selected for the cohort.
 
-- **Online:** a selected tool is publicly usable without enV sign-in. Ads are an optional funding placement below the tool interface. Tool execution does not depend on an ad being filled or clicked.
+- **Online:** a selected access-gated tool can be used by a guest only through the ad-supported path: explicit advertising consent, then a user-initiated rewarded ad that Google confirms was granted and completed. A banner impression, banner click or Smartlink open never unlocks the tool. A guest who declines or cannot complete the ad must create/sign in to an enV account. A signed-in user can choose a token-backed, ad-free session only when that exact tool has a manually approved price. The server reserves that per-tool price and settles it only after a successful tool result; failed or abandoned runs release the reservation. No provisional price is charged.
 - **Offline:** the same selected tool requires an authenticated enV account and a valid, pre-issued offline allowance. The allowance must be active, unexpired, and use the current offline pricing version. A failed/missing allowance rejects the operation before the tool computes or reveals a result.
 - **Unselected tools:** retain their existing access and offline policy. The feature must not silently broaden to every local tool.
 
@@ -14,7 +14,7 @@ The selected hybrid cohort is intersected with `src/data/offline-eligible-tools.
 
 Native AdMob advertising is **off by default** in Android and iOS builds until production publisher IDs, banner units and UMP privacy messaging are configured. Web Adsterra is a separate rollout: its production flag is enabled only for `envtools.store`, while requests remain gated by explicit visitor consent and same-origin availability. Never treat an Adsterra Web flag as proof that native AdMob is configured.
 
-The selected-tool allowlist is the offline-access boundary only and is evaluated independently from ad rendering. Web Adsterra uses a separate policy for active, public, device-local tools across categories, excluding Studio, AI, Labs/Sandbox and restricted sensitive experiences. It does not require membership in the offline-wallet registry. A qualified guest must explicitly allow ads to use that tool; a guest who declines or has not chosen must sign in/create an account, and signed-in users can use the tool without ads. These online access rules do not change offline allowance enforcement.
+The selected-tool allowlist is the offline-access boundary only and is evaluated independently from ad rendering. Web Adsterra banner placements use their own eligibility policy for active ordinary tools, excluding Studio, AI, Labs/Sandbox and restricted sensitive experiences. The rewarded access gate has a separate, explicit VITE_AD_ACCESS_TOOL_IDS allowlist and is disabled unless the rewarded ad unit and Google privacy messaging are configured. Adsterra banners and Smartlink do not count as rewarded views. A guest who declines advertising or cannot complete the rewarded ad must sign in; a signed-in user must use the exact tool's approved token price. If a reviewed price is absent, the server rejects token access and does not charge. These online access rules do not change offline allowance enforcement.
 
 The following are not supplied by this repository and must not be fabricated:
 
@@ -44,6 +44,16 @@ The Web component requests non-personalized ads. That is not equivalent to “no
 
 Do not turn on `VITE_ADSENSE_PRIVACY_CONFIGURED` merely to make ads render. Configure the messages and regions in the AdSense Privacy & Messaging console first. Where Google requires a certified CMP (including applicable EEA, UK, and Switzerland traffic), ensure its message and consent flow are actually published and test both consent and refusal paths.
 
+## Rewarded-ad access and three-view offer
+
+Web rewarded ads use Google Publisher Tag (Google Ad Manager), not the existing Adsterra banners or Smartlink. Set VITE_AD_ACCESS_GATE_ENABLED=true, populate VITE_AD_ACCESS_TOOL_IDS with the exact reviewed tool IDs, set the publisher-generated VITE_GAM_REWARDED_AD_UNIT_PATH, and publish/test Google Privacy & Messaging before enabling the gate. The same-origin page must have a valid VITE_ADSENSE_CLIENT_ID and VITE_ADSENSE_PRIVACY_CONFIGURED=true for the CMP-ready path. Keep every value empty/false until the publisher account and consent configuration are ready.
+
+A rewarded view counts only after GPT emits both rewardedSlotGranted and rewardedSlotVideoCompleted for the same slot. Before requesting the slot, the Web flow also waits for the Google consent-mode decision, checks US state opt-out data when applicable, and requires Google's ad-blocker status to resolve to no blocker. Declined/unknown consent, a privacy opt-out, an active ad blocker, or an unknown blocker state does not request an ad; a guest must sign in instead. rewardedSlotClosed alone, a fill/impression, a click, a banner, or an Adsterra Smartlink does not count. After three such completions within a rolling 30-day window, enV shows the ad-free token offer once for that window. The completion count is a local browser preference; it does not create token credits or discounts.
+
+The native apps use their platform's Google Mobile Ads rewarded callback (Android Kotlin, iOS Swift), with separate production rewarded unit IDs and explicit UMP consent. Native banners do not count as rewarded views. Always use Google's dedicated test rewarded units in development, then replace them with the publisher's production IDs before release.
+
+Paid access uses a separate manual approval registry at src/data/billing-tool-access-approvals.json. It is intentionally empty until each tool's price is reviewed. Generated provisionalSubunitsPerUnit values are not production prices. The API will return TOOL_PRICE_NOT_APPROVED without reserving or deducting tokens until the tool has an approved session price. On an approved tool, the server determines the amount, reserves funds before unlocking, settles the reserved server-side amount only after a successful tool result, and releases it on failure or abandonment. Client-supplied prices are never accepted.
+
 ## Android / AdMob configuration
 
 The Android app uses Kotlin, Jetpack Compose, Google Mobile Ads Next-Gen SDK, and UMP. No WebView is used.
@@ -56,6 +66,7 @@ Gradle properties (for example in a protected release `gradle.properties` or CI 
 | `envAdsPrivacyConfigured` | `true` only after UMP messages are published and tested in AdMob |
 | `envAdmobAppId` | Production Android app ID, format `ca-app-pub-################~##########` |
 | `envAdmobBannerAdUnitId` | Production Android banner unit ID |
+| `envAdmobRewardedAdUnitId` | Production Android rewarded unit ID |
 | `envAdSupportedToolIds` | The same reviewed comma-separated cohort as Web |
 
 The checked-in app ID default is Google's Android **test app ID**. Ads remain disabled and the test banner unit is not configured. Replace it through protected build properties before any production ad release. The client refreshes UMP consent on launch, checks `canRequestAds`, hides slots without validated network, and exposes the required privacy-options form from Privacy when UMP says it is required.
@@ -72,6 +83,7 @@ Set these Xcode User-Defined Build Settings in the protected release configurati
 | `ENV_ADS_PRIVACY_CONFIGURED` | `YES` only after UMP messages are published and tested in AdMob |
 | `ENV_ADMOB_APP_ID` | Production iOS app ID |
 | `ENV_ADMOB_BANNER_AD_UNIT_ID` | Production iOS banner unit ID |
+| `ENV_ADMOB_REWARDED_AD_UNIT_ID` | Production iOS rewarded unit ID |
 | `ENV_AD_SUPPORTED_TOOL_IDS` | The same reviewed comma-separated cohort as Web and Android |
 
 The checked-in iOS app ID is Google's iOS **test app ID** and the ad unit is blank; the feature defaults off. The app refreshes UMP consent at launch, waits for consent before initializing Google Mobile Ads, uses a native adaptive banner, and exposes the UMP privacy-options form on the Privacy page when required.
@@ -98,7 +110,7 @@ As of 2026-11-09, the verified GitHub `main` commit `b975bf1b774925e6b29325eadaf
 
 Before launch, verify:
 
-1. A Web guest can use an Adsterra-qualified tool only after explicitly allowing advertising; declining or leaving consent unset presents a tool-level sign-up/sign-in choice. Signed-in users can use that tool without ads.
+1. A Web guest can use a rewarded-access tool only after explicitly allowing advertising and completing the rewarded video; declining or failing the provider request presents sign-up/sign-in or approved token access.
 2. Web Adsterra scripts are not requested when disabled, unqualified, consent is missing/declined, or the application origin is unreachable. Verify eligibility is independent of offline-wallet enrollment.
 3. Android and iOS guest can run the same selected tool while online without sign-in.
 4. UMP consent/refusal and privacy-options paths work on both native platforms.

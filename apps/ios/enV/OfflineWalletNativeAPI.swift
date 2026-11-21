@@ -66,6 +66,8 @@ enum OfflineWalletNativeAPI {
     /// Verified paired account credential used by community identity requests.
     static func communityBearerToken() -> String? { loadSessionToken() }
 
+
+
     private static func loadSessionToken() -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -156,6 +158,66 @@ enum OfflineWalletNativeAPI {
             bearer: bearer,
             queryItems: queryItems
         ))
+    }
+
+    struct ToolAccessReservation {
+        let reservationID: String
+        let toolID: String
+        let reservedTokens: Double
+        let unitLabel: String
+    }
+
+    static func reserveToolAccess(toolID: String, sessionID: String) async throws -> ToolAccessReservation {
+        guard toolID.range(of: "^[a-z0-9][a-z0-9-]{0,119}$", options: .regularExpression) != nil,
+              UUID(uuidString: sessionID) != nil else {
+            throw OfflineWalletNativeAPIError.unavailable("The tool access request is invalid.")
+        }
+        guard let bearer = loadSessionToken() else {
+            throw OfflineWalletNativeAPIError.unavailable("Sign in to enV and pair this device from your Web Wallet to use tokens.")
+        }
+        let body = try JSONSerialization.data(withJSONObject: [
+            "action": "reserve",
+            "toolId": toolID,
+            "sessionId": sessionID
+        ])
+        let data = try responseData(await makeRequest(path: "api/billing/tool-access", method: "POST", body: body, bearer: bearer))
+        guard let reservationID = data["reservationId"] as? String,
+              UUID(uuidString: reservationID) != nil,
+              let subunits = data["reservedSubunits"] as? NSNumber,
+              subunits.doubleValue.isFinite, subunits.doubleValue >= 1 else {
+            throw OfflineWalletNativeAPIError.invalidReply
+        }
+        return ToolAccessReservation(
+            reservationID: reservationID,
+            toolID: toolID,
+            reservedTokens: subunits.doubleValue / 1_000,
+            unitLabel: data["unitLabel"] as? String ?? "per session"
+        )
+    }
+
+    static func settleToolAccess(toolID: String, reservationID: String) async throws {
+        try await completeToolAccess(toolID: toolID, reservationID: reservationID, action: "settle")
+    }
+
+    static func releaseToolAccess(toolID: String, reservationID: String) async throws {
+        try await completeToolAccess(toolID: toolID, reservationID: reservationID, action: "release")
+    }
+
+    private static func completeToolAccess(toolID: String, reservationID: String, action: String) async throws {
+        guard action == "settle" || action == "release",
+              UUID(uuidString: reservationID) != nil,
+              toolID.range(of: "^[a-z0-9][a-z0-9-]{0,119}$", options: .regularExpression) != nil else {
+            throw OfflineWalletNativeAPIError.unavailable("The tool settlement request is invalid.")
+        }
+        guard let bearer = loadSessionToken() else {
+            throw OfflineWalletNativeAPIError.unavailable("The paired account session is unavailable. Reconnect Wallet before settlement.")
+        }
+        let body = try JSONSerialization.data(withJSONObject: [
+            "action": action,
+            "toolId": toolID,
+            "reservationId": reservationID
+        ])
+        _ = try responseData(await makeRequest(path: "api/billing/tool-access", method: "POST", body: body, bearer: bearer))
     }
 
     static func checkAvailability() async -> (enabled: Bool, code: String, message: String) {

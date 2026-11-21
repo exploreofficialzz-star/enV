@@ -10,6 +10,10 @@ export interface ToolBillingProfile {
   unitLabel: string;
   optionalAiAssistProfile: string | null;
   premiumRequired: boolean;
+  /** Generator audit flags are consumed by server-side access policy. */
+  manualAuditRequired?: boolean;
+  priceStatus?: "approved" | "provisional" | "requires-cost-measurement" | string;
+  adsEligible?: boolean;
 }
 
 type ProfileIndex = {

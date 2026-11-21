@@ -1,5 +1,6 @@
 import { classifyOfflineToolRecord } from "../offline/policy.mjs";
 import offlineEligibleTools from "../../data/offline-eligible-tools.json" with { type: "json" };
+import approvedToolAccessPrices from "../../data/billing-tool-access-approvals.json" with { type: "json" };
 
 /** Public ad settings are deliberately independent from wallet and token-billing policy. */
 export type AdEnvironment = {
@@ -39,6 +40,16 @@ const ADSTERRA_EXCLUDED_CONCEPTS = /\b(?:studio|studios|lab|labs|laboratory|labo
 const OFFLINE_PROFILE_IDS = new Set(
   offlineEligibleTools.profiles
     .filter((profile) => profile.billingKey.startsWith("local.") && ["web", "android", "ios"].every((platform) => profile.platforms.includes(platform)))
+    .map((profile) => profile.toolId),
+);
+type ApprovedAccessPrices = {
+  profiles: { toolId: string; subunitsPerSession: number; unitLabel: string; pricingVersion: string; adFreeAccessEnabled: boolean }[];
+};
+const APPROVED_TOKEN_ACCESS_TOOL_IDS = new Set(
+  (approvedToolAccessPrices as ApprovedAccessPrices).profiles
+    .filter((profile) => profile.adFreeAccessEnabled === true &&
+      Number.isSafeInteger(profile.subunitsPerSession) && profile.subunitsPerSession > 0 &&
+      profile.unitLabel === "calculation" && profile.pricingVersion === "env-tool-access-local-calculator-v1")
     .map((profile) => profile.toolId),
 );
 
@@ -111,6 +122,17 @@ export function isAdsterraQualifiedTool(tool: AdEligibleTool): boolean {
 /** A selected hybrid tool must remain metered offline even while ad serving is disabled. */
 export function isHybridAccessToolId(toolId: string, env: AdEnvironment, tool: AdEligibleTool): boolean {
   return parseAllowedToolIds(env.toolIds).has(toolId) && isEligibleHybridToolRecord(toolId, tool);
+}
+
+/**
+ * Rewarded-ad access also offers token purchase, so only explicitly selected
+ * tools with a reviewed static price and a cross-platform offline allowance may
+ * enter this gate. Unpriced or unmetered tools remain outside the paid gate.
+ */
+export function isPaidHybridAccessToolId(toolId: string, env: AdEnvironment, tool: AdEligibleTool): boolean {
+  return APPROVED_TOKEN_ACCESS_TOOL_IDS.has(toolId) &&
+    parseAllowedToolIds(env.toolIds).has(toolId) &&
+    isEligibleHybridToolRecord(toolId, tool);
 }
 
 /** Ad rendering is a separate, stricter decision from the guest/offline access boundary. */

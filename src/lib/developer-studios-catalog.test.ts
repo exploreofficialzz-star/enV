@@ -77,7 +77,7 @@ test("Developer category shows only fourteen Studios while legacy tools remain s
 
   const searchIndex = getSearchableTools().filter((tool) => tool.category === "developer");
   assert.equal(searchIndex.filter((tool) => tool.tags.includes("developer-studio")).length, 14);
-  assert.equal(searchIndex.filter((tool) => !tool.tags.includes("developer-studio")).length, 474);
+  assert.equal(searchIndex.filter((tool) => !tool.tags.includes("developer-studio")).length, 475, "all 475 legacy Developer tools remain searchable alongside the fourteen Studios");
   assert.ok(searchIndex.some((tool) => tool.slug === "json-diff"), "individual tools remain searchable");
   assert.ok(getToolByPath("developer", "json-diff"), "legacy URLs remain resolvable and redirect at the route layer");
 });
