@@ -592,7 +592,7 @@ internal fun NativeRewardedToolAccessGate(
             },
             title = { Text("Confirm token access") },
             text = {
-                Text("This tool costs " + reservation.reservedTokens.toString() + " enV tokens " +
+                Text("This tool costs " + reservation.reservedTokens.toString() + " enV tokens per " +
                     reservation.unitLabel + ". Tokens are deducted only after a successful tool result.")
             },
             confirmButton = {
