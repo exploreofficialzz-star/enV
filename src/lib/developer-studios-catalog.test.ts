@@ -69,7 +69,7 @@ test("High-value legacy routes resolve to semantically relevant Studio modes", (
   assert.deepEqual(resolve("developer-sql-schema-generator"), { studio: "sql-studio", mode: "schema", action: "encode" });
 });
 
-test("Developer category shows only fourteen Studios while legacy tools remain searchable", () => {
+test("Developer category shows fourteen Studios while legacy tools and the canonical CSS Minifier route remain searchable", () => {
   const categoryTools = getToolsByCategory("developer");
   assert.equal(categoryTools.length, 14);
   assert.ok(categoryTools.every((tool) => tool.tags.includes("developer-studio")));
@@ -77,7 +77,17 @@ test("Developer category shows only fourteen Studios while legacy tools remain s
 
   const searchIndex = getSearchableTools().filter((tool) => tool.category === "developer");
   assert.equal(searchIndex.filter((tool) => tool.tags.includes("developer-studio")).length, 14);
-  assert.equal(searchIndex.filter((tool) => !tool.tags.includes("developer-studio")).length, 474);
+  const nonStudioDeveloperTools = searchIndex.filter((tool) => !tool.tags.includes("developer-studio"));
+  // 474 source-catalogue Developer records remain searchable. The Web runtime
+  // additionally exposes the canonical Advanced CSS Minifier here after moving
+  // its legacy source row out of Files; it must not be counted as a second tool.
+  assert.equal(nonStudioDeveloperTools.length, 475);
+  assert.equal(nonStudioDeveloperTools.filter((tool) => tool.id !== "css-minifier-advanced").length, 474);
+  const advancedCssMinifier = nonStudioDeveloperTools.find((tool) => tool.id === "css-minifier-advanced");
+  assert.ok(advancedCssMinifier, "the canonical Advanced CSS Minifier route remains in Developer discovery");
+  assert.equal(advancedCssMinifier?.category, "developer");
+  assert.equal(advancedCssMinifier?.slug, "css-minifier-advanced");
+  assert.equal(advancedCssMinifier?.name, "Advanced CSS Minifier");
   assert.ok(searchIndex.some((tool) => tool.slug === "json-diff"), "individual tools remain searchable");
   assert.ok(getToolByPath("developer", "json-diff"), "legacy URLs remain resolvable and redirect at the route layer");
 });
