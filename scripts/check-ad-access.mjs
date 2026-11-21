@@ -55,7 +55,7 @@ assert.match(toolShell, /const adsterraAdsEnabled =\s*adsterraQualified && adste
 assert.match(toolShell, /useCurrentUserState\(\)/, "Selected access-gated tools must distinguish guests from signed-in users.");
 assert.match(toolShell, /adAccessGateEnabled && browserOnline && !toolAccessUnlocked/, "Selected online tools must remain hidden until rewarded-ad or token access is granted.");
 assert.match(toolShell, /adAccessGateEnabled && browserOnline && !toolAccessUnlocked/, "Offline mode must leave the existing offline eligibility checks in control.");
-assert.match(androidAds, /if \(preview \|\| !NativeAdsPolicy\.isRewardedAccessTool\(tool\) \|\| !network\) \{\s*content\(\)\s*return\s*\}[\s\S]*?if \(!network \|\| !originReachable\) \{\s*content\(\)\s*return\s*\}/, "Android must preserve the signed offline allowance path and defer online access only when enV is reachable.");
+assert.match(androidAds, /if \(preview \|\| !NativeAdsPolicy\.isRewardedAccessTool\(context, tool\) \|\| !network\) \{\s*content\(\)\s*return\s*\}[\s\S]*?if \(!network \|\| !originReachable\) \{\s*content\(\)\s*return\s*\}/, "Android must preserve the signed offline allowance path and defer online access only when enV is reachable.");
 assert.match(read("apps/ios/enV/NativeAds.swift"), /!reachability\.hasNetwork \|\| !originReachable/, "iOS must preserve the established offline allowance execution path.");
 assert.match(toolShell, /VITE_AD_ACCESS_TOOL_IDS/, "The access gate must use an explicit, deployment-controlled tool allowlist.");
 assert.match(toolShell, /<ToolExecutionTelemetryContext\.Provider value=\{executionTelemetry\}>\s*\{toolContent\}\s*<\/ToolExecutionTelemetryContext\.Provider>/, "The gate must preserve the normal tool execution telemetry context after access is granted.");
@@ -198,7 +198,7 @@ assert.match(androidGradle, /ENV_AD_ACCESS_TOOL_IDS/, "Android rewarded access m
 assert.match(androidAds, /RewardedAd\.load\(/, "Android must load genuine Google rewarded video.");
 assert.match(androidAds, /ad\.show\(activity\)/, "Android must require the Google rewarded SDK reward callback.");
 assert.match(androidAds, /NativeRewardedAdProgress\.recordCompletion/, "Android must count reward callbacks in the rolling rewarded progress window.");
-assert.match(androidAds, /fun isRewardedAccessTool\(tool: ToolRecord\)/, "Android rewarded access must use a separate explicit tool allowlist.");
+assert.match(androidAds, /fun isRewardedAccessTool\(context: Context, tool: ToolRecord\)/, "Android rewarded access must use a separate explicit tool allowlist.");
 assert.match(androidMain, /NativeRewardedToolAccessGate\(tool, onOpenWallet\)/, "Android tool interfaces must be wrapped by the native rewarded gate.");
 assert.match(androidMain, /NativeToolAdSlot\(tool\)/, "The native Android tool surface must include its ad slot.");
 assert.match(androidMain, /val online = NativeAdsPolicy\.isApplicationOnline\(context\)/, "Android hybrid runs must verify the enV origin.");
