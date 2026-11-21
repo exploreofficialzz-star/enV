@@ -424,7 +424,7 @@ struct NativeRewardedToolAccessGate<Content: View>: View {
             }
         } message: {
             if let reservation = pendingReservation {
-                Text("This tool costs \(reservation.reservedTokens.formatted()) enV tokens \(reservation.unitLabel). Tokens are deducted only after a successful tool result.")
+                Text("This tool costs \(reservation.reservedTokens.formatted()) enV tokens per \(reservation.unitLabel). Tokens are deducted only after a successful tool result.")
             }
         }
         .alert("Ready to go ad-free?", isPresented: $showAdFreeOffer) {
