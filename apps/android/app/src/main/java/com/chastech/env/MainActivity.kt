@@ -1273,7 +1273,7 @@ private fun ToolDetail(
                         )
                     }
                     if (!isFullscreen) NativeToolCommunityPanel(tool.id)
-                    if (!isFullscreen && !NativeAdsPolicy.isRewardedAccessTool(tool)) NativeToolAdSlot(tool)
+                    if (!isFullscreen && !NativeAdsPolicy.isRewardedAccessTool(context, tool)) NativeToolAdSlot(tool)
                 }
             }
             if (!isFullscreen) {
