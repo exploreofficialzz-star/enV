@@ -6,7 +6,7 @@ import { recordBrowserRewardedAdCompletion } from "@/lib/ads/rewarded-progress";
 import type { ToolAccessPreference } from "@/lib/ads/access-preference";
 
 type ToolAccessResult =
-  | { ok: true; reservationId: string; reservedTokens: number }
+  | { ok: true; reservationId: string; reservedTokens: number; unitLabel: string }
   | { ok: false; message: string; errorCode?: string };
 
 export function ToolAccessGate({
@@ -157,7 +157,7 @@ export function ToolAccessGate({
       {pendingTokenAccess ? (
         <div className="w-full max-w-sm space-y-3 rounded-lg border border-border p-3 text-left" role="group" aria-label="Confirm token access">
           <p className="text-sm font-semibold text-fg">
-            This tool costs {pendingTokenAccess.reservedTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} enV tokens per session.
+            This tool costs {pendingTokenAccess.reservedTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} enV tokens per {pendingTokenAccess.unitLabel}.
           </p>
           <p className="text-xs leading-5 text-muted">
             Tokens are reserved now and are deducted only after this tool reports a successful result. Failed or cancelled runs release the reservation.
