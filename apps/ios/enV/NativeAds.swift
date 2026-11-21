@@ -46,7 +46,8 @@ enum NativeAdsPolicy {
         rewardedUnitID.range(of: "^/[A-Za-z0-9_./-]{3,180}$", options: .regularExpression) != nil
     }
     static func isRewardedAccessTool(_ tool: Tool) -> Bool {
-        rewardedAccessConfigured && rewardedToolIDs.contains(tool.id) && isAdEligibleTool(tool)
+        rewardedAccessConfigured && rewardedToolIDs.contains(tool.id) &&
+            isAdEligibleTool(tool) && isHybridTool(tool)
     }
     static var allowlistedToolIDs: Set<String> {
         Set((info["ENV_AD_SUPPORTED_TOOL_IDS"] as? String ?? "")
@@ -81,7 +82,8 @@ enum NativeAdsPolicy {
     static func isHybridTool(_ tool: Tool) -> Bool {
         let restrictedDisclaimers: Set<String> = ["health", "finance", "earnings"]
         let restrictedCategories: Set<String> = ["fitness", "personal"]
-        return allowlistedToolIDs.contains(tool.id) &&
+        let rewardedAccessTool = rewardedAccessEnabled && rewardedToolIDs.contains(tool.id)
+        return (allowlistedToolIDs.contains(tool.id) || rewardedAccessTool) &&
             crossPlatformMeteredIDs.contains(tool.id) &&
             tool.status == "active" &&
             tool.clientSide &&
