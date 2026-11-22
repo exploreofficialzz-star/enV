@@ -1,6 +1,20 @@
 export type ProductivityMode = "stopwatch" | "focus" | "pomodoro";
 export type TimerPhase = "focus" | "break";
 
+/** Map stable catalogue tool IDs to their actual timer modes. */
+export function productivityModeForToolId(toolId: string): ProductivityMode | null {
+  switch (toolId) {
+    case "focus-timer":
+      return "focus";
+    case "pomodoro-timer":
+      return "pomodoro";
+    case "stopwatch":
+      return "stopwatch";
+    default:
+      return null;
+  }
+}
+
 export interface ProductivityTimerState {
   mode: ProductivityMode;
   running: boolean;
