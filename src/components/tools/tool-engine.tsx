@@ -166,7 +166,7 @@ function ToolEngineView({ tool, initialMode, initialAction, initialOp }: ToolEng
         const format = tool.id.endsWith("-subtitles") ? "srt" : "txt";
         return <TranscriptionEngine mode={tool.category === "audio" ? "audio" : "video"} format={format} />;
       }
-      if (tool.category === "productivity") return <ProductivityEngine op={tool.engine.id} />;
+      if (tool.category === "productivity") return <ProductivityEngine toolId={tool.id} />;
       if (tool.category === "personal") return <PersonalEngine toolId={tool.id} />;
       if (tool.category === "communication") return <CommunicationEngine toolId={tool.id} />;
       if (tool.category === "celebrations") return <CelebrationEngine toolId={tool.id} />;
