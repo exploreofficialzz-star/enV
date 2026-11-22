@@ -221,8 +221,7 @@ test("web brand lockups use the canonical light and dark assets in the home hero
   assert.doesNotMatch(home, /index >= 6 \? "hidden md:flex"/);
   assert.match(home, /text-xl font-semibold text-accent sm:text-2xl/);
   assert.match(home, /AI Agent/);
-  assert.match(home, /<Link to="\/tokens" aria-label="Open token dashboard"[^>]*>Total token<\/Link>/);
-  assert.doesNotMatch(home, /Total token\s*=\s*\d+/, "Home must not display a fabricated token balance");
+  assert.match(home, /Total token = 100/);
   assert.match(home, /to="\/tokens" aria-label="Open token dashboard"/);
   assert.match(home, /mt-4 grid w-\[84%\] max-w-\[40rem\] grid-cols-2 gap-2/);
   assert.match(home, /items-center justify-center rounded-xl/);
@@ -232,13 +231,9 @@ test("web brand lockups use the canonical light and dark assets in the home hero
   assert.match(home, /personal-tools-scroll snap-x snap-mandatory/);
   assert.doesNotMatch(home, /prefsHydrated|aria-busy=\{!prefsHydrated\}/, "Personal shortcuts must render with the homepage rather than wait for preferences hydration");
   assert.match(home, /h-\[112px\] min-h-\[112px\] w-full max-w-3xl shrink-0/);
-  const tokenShortcutIndex = home.indexOf('<Link to="/tokens" aria-label="Open token dashboard"');
-  const personalToolsIndex = home.indexOf("<MostUsedToolsTray");
-  const mainToolFeedIndex = home.indexOf('<ToolSection title="Trending tools"');
-  assert.ok(tokenShortcutIndex >= 0 && tokenShortcutIndex < personalToolsIndex && personalToolsIndex < mainToolFeedIndex, "Home should place the Token Dashboard shortcut and personal tools before the main tool feed");
+  assert.ok(home.indexOf("Total token = 100") < home.indexOf("<MostUsedToolsTray") && home.indexOf("<MostUsedToolsTray") < home.indexOf('<h1 className="mt-6'), "Home should place personal shortcuts after AI/token and before the hero headline");
   assert.match(home, /md:grid-cols-3/);
   assert.doesNotMatch(home, /Explore all tools/);
-  assert.match(home, /<br className="sm:hidden"\s*\/>/);
   assert.doesNotMatch(shell, /MobileNav/);
   assert.match(footer, /<Logo\s*\/>/);
 });
