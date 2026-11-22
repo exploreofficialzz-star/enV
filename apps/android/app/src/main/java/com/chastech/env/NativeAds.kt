@@ -663,7 +663,12 @@ internal fun NativeRewardedToolAccessGate(
             title = { Text("Ready to go ad-free?") },
             text = { Text("You completed three rewarded ads in the last 30 days. Use the reviewed token price for individual tools.") },
             confirmButton = {
-                Button(onClick = { showAdFreeOffer = false; scope.launch { reserveTokenAccess() } }) { Text("Use enV tokens") }
+                Button(onClick = {
+                    // This visit was already unlocked by the rewarded ad. Save the token preference for the next visit only.
+                    NativeToolAccessPreference.setPrefersTokens(context, tool.id, true)
+                    preferTokens = true
+                    showAdFreeOffer = false
+                }) { Text("Use enV tokens") }
             },
             dismissButton = {
                 TextButton(onClick = {
