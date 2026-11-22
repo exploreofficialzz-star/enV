@@ -3,13 +3,13 @@ export const DEPLOYMENT_POLL_INTERVAL_MS = 5_000;
 export const DEPLOYMENT_REQUEST_TIMEOUT_MS = 10_000;
 
 function readHomepageMetadata(html) {
-  const head = html.match(/<head\\b[^>]*>([\\s\\S]*?)<\\/head>/i)?.[1] ?? "";
-  const title = head.match(/<title\\b[^>]*>([\\s\\S]*?)<\\/title>/i)?.[1]
+  const head = html.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i)?.[1] ?? "";
+  const title = head.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1]
     ?.replace(/<[^>]+>/g, "").trim() ?? "";
-  const buildShaTag = [...head.matchAll(/<meta\\b[^>]*>/gi)]
+  const buildShaTag = [...head.matchAll(/<meta\b[^>]*>/gi)]
     .map((match) => match[0])
-    .find((tag) => /\\bname\\s*=\\s*(?:"env-build-sha"|'env-build-sha')/i.test(tag));
-  const content = buildShaTag?.match(/\\bcontent\\s*=\\s*(?:"([^"]*)"|'([^']*)')/i);
+    .find((tag) => /\bname\s*=\s*(?:"env-build-sha"|'env-build-sha')/i.test(tag));
+  const content = buildShaTag?.match(/\bcontent\s*=\s*(?:"([^"]*)"|'([^']*)')/i);
   return { title, buildSha: content?.[1] ?? content?.[2] ?? "" };
 }
 
