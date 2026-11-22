@@ -58,6 +58,10 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "The archive could not be processed. Check the file and try again.";
 }
 
+function isPickerPermissionError(error: unknown): boolean {
+  return error instanceof DOMException && (error.name === "NotAllowedError" || error.name === "SecurityError");
+}
+
 export function ZipArchiveEngine() {
   const [mode, setMode] = useState<"compress" | "extract">("compress");
   const [files, setFiles] = useState<File[]>([]);
@@ -70,8 +74,6 @@ export function ZipArchiveEngine() {
   const [error, setError] = useState("");
 
   const totalBytes = useMemo(() => files.reduce((sum, file) => sum + file.size, 0), [files]);
-  const canUseSavePicker = typeof window !== "undefined" && typeof archiveWindow().showSaveFilePicker === "function";
-  const canUseDirectoryPicker = typeof window !== "undefined" && typeof archiveWindow().showDirectoryPicker === "function";
 
   function setTab(next: "compress" | "extract") {
     if (busy) return;
@@ -81,7 +83,26 @@ export function ZipArchiveEngine() {
     setProgress(0);
   }
 
-  async function createArchive() {
+  function handleCreateArchiveClick() {
+    if (!files.length || busy) return;
+
+    // The browser requires the save picker to be requested synchronously from this click.
+    const picker = archiveWindow().showSaveFilePicker;
+    let saveHandlePromise: Promise<SaveFileHandle> | null = null;
+    if (picker) {
+      try {
+        saveHandlePromise = picker.call(window, {
+          suggestedName: `${archiveName.trim() || "enV-archive"}.zip`,
+          types: [{ description: "ZIP archive", accept: { "application/zip": [".zip"] } }],
+        });
+      } catch (cause) {
+        saveHandlePromise = Promise.reject(cause);
+      }
+    }
+    void createArchive(saveHandlePromise);
+  }
+
+  async function createArchive(saveHandlePromise: Promise<SaveFileHandle> | null) {
     if (!files.length || busy) return;
     setError("");
     setStatus("");
@@ -91,16 +112,25 @@ export function ZipArchiveEngine() {
     let hasDiskHandle = false;
     const bufferedChunks: Uint8Array[] = [];
     try {
-      if (canUseSavePicker) {
-        const handle = await archiveWindow().showSaveFilePicker!({
-          suggestedName: `${archiveName.trim() || "enV-archive"}.zip`,
-          types: [{ description: "ZIP archive", accept: { "application/zip": [".zip"] } }],
-        });
+      let handle: SaveFileHandle | null = null;
+      if (saveHandlePromise) {
+        try {
+          handle = await saveHandlePromise;
+        } catch (cause) {
+          if (!isPickerPermissionError(cause)) throw cause;
+          if (totalBytes > MAX_BROWSER_BUFFER_BYTES) {
+            throw new Error("Your browser blocked the save dialog and cannot safely buffer an archive larger than 256 MB. Open enV in Chrome or Edge and try again.");
+          }
+          setStatus("The save dialog was unavailable. Preparing a browser download instead.");
+        }
+      }
+
+      if (handle) {
         output = await handle.createWritable();
         hasDiskHandle = true;
       } else {
         if (totalBytes > MAX_BROWSER_BUFFER_BYTES) {
-          throw new Error("This browser cannot save very large files directly. Use the native enV app or a browser with direct file saving for files over 256 MB.");
+          throw new Error("This browser cannot safely buffer archives larger than 256 MB. Use a browser with direct file saving or the native enV app.");
         }
         output = new WritableStream<Uint8Array>({
           write(chunk) { bufferedChunks.push(chunk.slice()); },
@@ -147,7 +177,23 @@ export function ZipArchiveEngine() {
     }
   }
 
-  async function extractArchive() {
+  function handleExtractArchiveClick() {
+    if (!archive || busy) return;
+
+    // Request folder access before starting any asynchronous extraction work.
+    const picker = archiveWindow().showDirectoryPicker;
+    let destinationPromise: Promise<DirectoryHandle> | null = null;
+    if (picker) {
+      try {
+        destinationPromise = picker.call(window, { mode: "readwrite" });
+      } catch (cause) {
+        destinationPromise = Promise.reject(cause);
+      }
+    }
+    void extractArchive(destinationPromise);
+  }
+
+  async function extractArchive(destinationPromise: Promise<DirectoryHandle> | null) {
     if (!archive || busy) return;
     setError("");
     setStatus("");
@@ -155,8 +201,14 @@ export function ZipArchiveEngine() {
     setBusy(true);
     let reader: ZipReader<BlobReader> | null = null;
     try {
-      const directoryPicker = archiveWindow().showDirectoryPicker;
-      const destination = directoryPicker ? await directoryPicker.call(window, { mode: "readwrite" }) : null;
+      let destination: DirectoryHandle | null = null;
+      if (destinationPromise) {
+        try {
+          destination = await destinationPromise;
+        } catch (cause) {
+          if (!isPickerPermissionError(cause)) throw cause;
+        }
+      }
       reader = new ZipReader(new BlobReader(archive), { useWebWorkers: true });
       const entries = await reader.getEntries();
       if (!entries.length) throw new Error("This ZIP archive does not contain any files.");
@@ -295,7 +347,7 @@ export function ZipArchiveEngine() {
               </button>
             </div>
           </div>
-          <button type="button" onClick={() => void createArchive()} disabled={!files.length || busy} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-fg px-4 py-3 text-sm font-semibold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40">
+          <button type="button" onClick={handleCreateArchiveClick} disabled={!files.length || busy} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-fg px-4 py-3 text-sm font-semibold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40">
             {busy ? <LoaderCircle className="size-4 animate-spin" /> : <Archive className="size-4" />}
             {busy ? "Creating archive…" : "Create ZIP archive"}
           </button>
@@ -304,7 +356,7 @@ export function ZipArchiveEngine() {
         <div className="space-y-4">
           <FileDropzone accept=".zip,application/zip,application/x-zip-compressed" disabled={busy} label="Drop a ZIP archive or browse" onFiles={(next) => { setArchive(next[0] ?? null); setError(""); setStatus(""); }} />
           {archive ? <div className="flex items-center justify-between rounded-xl border border-border bg-surface px-4 py-3 text-sm"><span className="min-w-0 truncate text-fg">{archive.name}</span><span className="ml-3 shrink-0 text-xs text-muted">{formatArchiveBytes(archive.size)}</span><button type="button" aria-label="Remove archive" onClick={() => setArchive(null)} className="ml-2 rounded p-1 text-muted hover:text-fg"><Trash2 className="size-3.5" /></button></div> : null}
-          <button type="button" onClick={() => void extractArchive()} disabled={!archive || busy} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-fg px-4 py-3 text-sm font-semibold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40">
+          <button type="button" onClick={handleExtractArchiveClick} disabled={!archive || busy} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-fg px-4 py-3 text-sm font-semibold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40">
             {busy ? <LoaderCircle className="size-4 animate-spin" /> : <FolderOpen className="size-4" />}
             {busy ? "Extracting…" : "Extract files"}
           </button>
