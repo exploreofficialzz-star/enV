@@ -233,7 +233,7 @@ export function AdFreeAfterThreeAdsDialog({
         </div>
         <h2 id="env-ad-free-offer-title" className="text-xl font-semibold">Ready to go ad-free?</h2>
         <p className="mt-2 text-sm leading-6 text-muted">
-          Use enV tokens for ad-free access to selected tools. Each tool has its own reviewed access price; enV will not charge a provisional or unapproved rate.
+          Your rewarded visit stays free. Choose enV tokens as the default for future visits; the reviewed price will be shown for confirmation before any token-backed use. Unapproved tools are never charged.
         </p>
         <div className="mt-5 flex flex-col gap-2">
           {signedIn ? (
