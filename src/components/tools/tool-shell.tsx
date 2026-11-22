@@ -596,8 +596,8 @@ export function ToolShell({
         signedIn={Boolean(accessUser)}
         onClose={() => setShowAdFreeOffer(false)}
         onChooseTokens={() => {
+          // This visit was already unlocked by the rewarded ad. Save the token preference for the next visit only.
           saveAccessPreference("tokens");
-          setToolAccessUnlocked(false);
           setShowAdFreeOffer(false);
         }}
       />
