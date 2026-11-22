@@ -50,6 +50,38 @@ test("human-reviewed descriptions are preserved exactly", () => {
   assert.equal(refineGeneratedToolDescription(tool), tool.description);
 });
 
+test("short task descriptions keep their meaning and gain relevant usage guidance", () => {
+  const cone = {
+    id: "cone-calculator",
+    name: "Cone Calculator",
+    category: "calculators",
+    description: "Volume and surface area of a cone.",
+  };
+  const coneDescription = refineGeneratedToolDescription(cone);
+  assert.ok(coneDescription.startsWith(cone.description));
+  assert.match(coneDescription, /required values|units|formula assumptions/i);
+  assert.ok(coneDescription.length >= 35);
+
+  const bio = {
+    id: "bio-generator",
+    name: "Bio Generator",
+    category: "ai",
+    description: "Short bios from a role and tone.",
+  };
+  const bioDescription = refineGeneratedToolDescription(bio);
+  assert.ok(bioDescription.startsWith(bio.description));
+  assert.match(bioDescription, /audience and key details/i);
+  assert.ok(bioDescription.length >= 35);
+
+  const determinant = {
+    id: "math-matrix-2x2-determinant",
+    name: "2×2 Matrix Determinant Calculator",
+    category: "calculators",
+    description: "math matrix determinant",
+  };
+  assert.match(refineGeneratedToolDescription(determinant), /^Calculate 2×2 matrix determinant from the values you enter/i);
+});
+
 test("catalogue family placeholders are refined without an expanded product name", () => {
   const tool = {
     id: "math-break-even-calculator",

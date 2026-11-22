@@ -3,6 +3,42 @@ type GoogleFcCallback = (() => void) | Record<string, () => void>;
 type GoogleFcApi = {
   callbackQueue?: GoogleFcCallback[];
   showRevocationMessage?: () => void;
+  getGoogleConsentModeValues?: () => GoogleFcConsentModeValues;
+  ConsentModePurposeStatusEnum?: {
+    CONSENT_MODE_PURPOSE_STATUS_UNKNOWN: number;
+    CONSENT_MODE_PURPOSE_STATUS_GRANTED: number;
+    CONSENT_MODE_PURPOSE_STATUS_DENIED: number;
+    CONSENT_MODE_PURPOSE_STATUS_NOT_APPLICABLE: number;
+    CONSENT_MODE_PURPOSE_STATUS_NOT_CONFIGURED: number;
+  };
+  getAdBlockerStatus?: () => number;
+  AdBlockerStatusEnum?: {
+    UNKNOWN: number;
+    EXTENSION_LEVEL_AD_BLOCKER: number;
+    NETWORK_LEVEL_AD_BLOCKER: number;
+    NO_AD_BLOCKER: number;
+  };
+  AllowAdsStatusEnum?: {
+    UNKNOWN: number;
+    ADS_NOT_ALLOWED: number;
+    ADS_ALLOWED: number;
+  };
+  getAllowAdsStatus?: () => number;
+  usstatesoptout?: {
+    getInitialUsStatesOptOutStatus?: () => number;
+    InitialUsStatesOptOutStatusEnum?: {
+      UNKNOWN: number;
+      DOES_NOT_APPLY: number;
+      NOT_OPTED_OUT: number;
+      OPTED_OUT: number;
+    };
+  };
+};
+type GoogleFcConsentModeValues = {
+  adStoragePurposeConsentStatus: number;
+  adUserDataPurposeConsentStatus: number;
+  adPersonalizationPurposeConsentStatus: number;
+  analyticsStoragePurposeConsentStatus: number;
 };
 
 declare global {
@@ -10,6 +46,8 @@ declare global {
     adsbygoogle?: AdsByGoogleQueue;
     googlefc?: GoogleFcApi;
     __envGoogleConsentDataReady?: boolean;
+    __envGoogleAdsConsentDecisionReady?: boolean;
+    __envGoogleAdsAllowed?: boolean;
   }
 }
 
@@ -78,7 +116,78 @@ export function whenGooglePrivacyConsentDataReady(callback: () => void): void {
   });
 }
 
+/**
+ * Require resolved Google ad consent, no US privacy opt-out, and a clear
+ * ad-blocker signal. Unknown provider states fail closed instead of requesting
+ * an ad for a visitor whose permissions cannot be determined.
+ */
+export function whenGoogleAdsConsentReady(callback: (allowed: boolean) => void): void {
+  if (window.__envGoogleAdsConsentDecisionReady === true) {
+    callback(window.__envGoogleAdsAllowed === true);
+    return;
+  }
+
+  const finish = (allowed: boolean) => {
+    window.__envGoogleAdsAllowed = allowed;
+    window.__envGoogleAdsConsentDecisionReady = true;
+    callback(allowed);
+  };
+
+  ensureGoogleFcQueue().callbackQueue!.push({
+    CONSENT_MODE_DATA_READY: () => {
+      const api = window.googlefc;
+      const values = api?.getGoogleConsentModeValues?.();
+      const consentStatuses = api?.ConsentModePurposeStatusEnum;
+      if (!values || !consentStatuses) {
+        finish(false);
+        return;
+      }
+      const permitted = new Set([
+        consentStatuses.CONSENT_MODE_PURPOSE_STATUS_GRANTED,
+        consentStatuses.CONSENT_MODE_PURPOSE_STATUS_NOT_APPLICABLE,
+        consentStatuses.CONSENT_MODE_PURPOSE_STATUS_NOT_CONFIGURED,
+      ]);
+      const consentAllowed = [
+        values.adStoragePurposeConsentStatus,
+        values.adUserDataPurposeConsentStatus,
+        values.adPersonalizationPurposeConsentStatus,
+      ].every((status) => permitted.has(status));
+      if (!consentAllowed) {
+        finish(false);
+        return;
+      }
+
+      ensureGoogleFcQueue().callbackQueue!.push({
+        INITIAL_US_STATES_OPT_OUT_DATA_READY: () => {
+          const stateApi = window.googlefc?.usstatesoptout;
+          const stateStatus = stateApi?.getInitialUsStatesOptOutStatus?.();
+          const stateEnums = stateApi?.InitialUsStatesOptOutStatusEnum;
+          if (!stateEnums || stateStatus === undefined ||
+              (stateStatus !== stateEnums.DOES_NOT_APPLY && stateStatus !== stateEnums.NOT_OPTED_OUT)) {
+            finish(false);
+            return;
+          }
+
+          ensureGoogleFcQueue().callbackQueue!.push({
+            AD_BLOCK_DATA_READY: () => {
+              const blockerApi = window.googlefc;
+              const blockerStatus = blockerApi?.getAdBlockerStatus?.();
+              const blockerEnums = blockerApi?.AdBlockerStatusEnum;
+              finish(Boolean(
+                blockerEnums &&
+                blockerStatus === blockerEnums.NO_AD_BLOCKER
+              ));
+            },
+          });
+        },
+      });
+    },
+  });
+}
+
 export function reopenGooglePrivacySettings(): void {
+  window.__envGoogleAdsConsentDecisionReady = false;
+  window.__envGoogleAdsAllowed = false;
   ensureGoogleFcQueue().callbackQueue!.push(() => {
     window.googlefc?.showRevocationMessage?.();
   });
