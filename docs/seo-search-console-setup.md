@@ -47,17 +47,18 @@ Set these Vercel project environment variables for the appropriate deployment en
 
 Use only the token value supplied by the relevant provider, not a complete HTML tag. Save the variables in Vercel, then trigger a new deployment. The values are public verification markers and are intentionally not committed to Git.
 
-### Vercel configuration audit snapshot — 14 November 2026
+### Vercel configuration audit snapshot — 22 November 2026
 
-The connected `env` Vercel project was checked without decrypting or displaying secret values:
+The connected `env` production project was checked without decrypting or displaying secret values:
 
 - `INDEXNOW_KEY`: present as a sensitive Production-only variable.
-- The matching public key file has not yet been verified on the canonical production domain from this PR branch; a configured Vercel secret is not evidence that the deployment published it or that IndexNow accepted a notification.
-- `INDEXNOW_SUBMIT_ALL`: absent, which is correct for routine deployments; add it temporarily only for the documented first full-site synchronization after the key file is live.
+- `INDEXNOW_SUBMIT_ALL`: absent. This is the correct routine setting; do not enable full-site submission on every deployment.
 - `VITE_GOOGLE_SITE_VERIFICATION`: not configured.
 - `VITE_BING_SITE_VERIFICATION`: not configured.
 
-Therefore the IndexNow key is provisioned, but the Google and Bing HTML verification meta tags will not be emitted until the owner adds the corresponding values after completing provider ownership setup. A variable record alone does not prove Search Console or Bing ownership, sitemap processing, or indexing.
+The production build generated the canonical robots, sitemap and LLM discovery files. Its IndexNow notifier previously returned early when there were no changed indexable URLs, before checking whether the configured key file was publicly available. The implementation now verifies the key file on every production build before deciding whether a URL notification is needed. A successful build/test of that code is not yet a public verification receipt; record the next production build's key-file verification result and any actual IndexNow HTTP response separately.
+
+The Google and Bing verification meta tags will not be emitted until the owner supplies the exact provider-issued values after completing the corresponding ownership setup. Their absence does not invalidate the existing canonical metadata or sitemap, but it means HTML-token verification is not configured. A variable record alone does not prove provider ownership, sitemap processing, or indexing.
 
 DNS verification is often preferable because it is independent of application deployments.
 
@@ -117,7 +118,7 @@ Before considering an SEO release complete:
 - Private or interaction-only routes remain noindex.
 - The production deployment is READY and the live canonical domain serves the same robots.txt, sitemap, and llms.txt as the committed build.
 - The `Production live connectivity smoke` workflow runs every 30 minutes and on manual dispatch. Its `scripts/check-live-seo.mjs` step checks the live robots policy, sitemap and shards, llms.txt, canonical host, required public routes, private-route exclusion, and representative server-rendered page metadata/schema.
-- Search Console and Bing Webmaster Tools have verified ownership and have accepted the sitemap.
+- Search Console and Bing Webmaster Tools ownership and sitemap processing are external release gates. Close each only after the corresponding provider dashboard shows verified ownership and successful sitemap processing; repository metadata, verification-tag support, and sitemap generation are not substitutes for that evidence.
 
 This setup improves crawlability and clarity. It does not promise rankings, indexing, rich results, AI citations, or traffic.
 
