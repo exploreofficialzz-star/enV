@@ -89,6 +89,9 @@ for (const redirect of vercelConfig.redirects ?? []) {
   assert.equal(redirect.permanent, true, "Canonical host redirects must be permanent.");
 }
 const liveSeoCheckerSource = readFileSync(new URL("./check-live-seo.mjs", import.meta.url), "utf8");
+assert.ok(liveSeoCheckerSource.includes("const DEPLOYMENT_WAIT_TIMEOUT_MS = 12 * 60 * 1000;"), "Live SEO smoke must allow the production deployment enough time to finish.");
+assert.ok(liveSeoCheckerSource.includes("if (!(await waitForHomepageDeployment())) return;"), "Live SEO checks must stop when the current Git revision is not deployed, rather than inspect stale production.");
+
 const seoSetupRunbookSource = readFileSync(new URL("../docs/seo-search-console-setup.md", import.meta.url), "utf8");
 for (const source of [JSON.stringify(vercelConfig), liveSeoCheckerSource, seoSetupRunbookSource]) {
   assert.ok(!source.includes("envtools.site"), "Retired .site domains must not remain in SEO deployment policy.");
