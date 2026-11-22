@@ -284,22 +284,23 @@ async function checkRenderedRoute(path, schema) {
 
 async function main() {
   try {
-    if (!(await waitForHomepageDeployment())) return;
-    await checkStaticAssets();
-    await checkCanonicalHosts();
-    for (const [path, schema] of [
-      ["/", "WebSite"],
-      ["/tools", "CollectionPage"],
-      ["/tools/calculators", "CollectionPage"],
-      ["/tools/creators", "CollectionPage"],
-      ["/tools/celebrations", "CollectionPage"],
-      ["/tools/celebrations/birthday-page-generator", "SoftwareApplication"],
-      ["/blog/tool-birthday-page-generator", "TechArticle"],
-      ["/tools/developer/json-studio", "SoftwareApplication"],
-      ["/blog", "CollectionPage"],
-      ["/blog/tool-json-studio", "TechArticle"],
-      ["/tools/files/zip-any-file", "SoftwareApplication"],
-    ]) await checkRenderedRoute(path, schema);
+    if (await waitForHomepageDeployment()) {
+      await checkStaticAssets();
+      await checkCanonicalHosts();
+      for (const [path, schema] of [
+        ["/", "WebSite"],
+        ["/tools", "CollectionPage"],
+        ["/tools/calculators", "CollectionPage"],
+        ["/tools/creators", "CollectionPage"],
+        ["/tools/celebrations", "CollectionPage"],
+        ["/tools/celebrations/birthday-page-generator", "SoftwareApplication"],
+        ["/blog/tool-birthday-page-generator", "TechArticle"],
+        ["/tools/developer/json-studio", "SoftwareApplication"],
+        ["/blog", "CollectionPage"],
+        ["/blog/tool-json-studio", "TechArticle"],
+        ["/tools/files/zip-any-file", "SoftwareApplication"],
+      ]) await checkRenderedRoute(path, schema);
+    }
   } catch (error) {
     failures.push(String(error));
   }
