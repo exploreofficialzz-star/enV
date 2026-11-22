@@ -332,7 +332,10 @@ export function DeveloperEngine({ op, tool, initialInput }: Props) {
   const loadExample = () => { setInput(initialInput ?? example.input); setSecondary(example.secondary ?? ""); setFlags(example.flags ?? "g"); setReplacement(example.replacement ?? ""); setRegexMode("test"); setOut(""); setError(null); };
   const handleEnter = (event: KeyboardEvent<HTMLTextAreaElement>) => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); void run(); } };
   return <div className="space-y-4">
-    <p className="text-xs text-muted" role="note"><span className="font-medium text-foreground">On-device processing.</span> This Developer workspace handles its input locally on this device.</p>
+    <aside className="rounded-lg border border-border bg-surface px-3 py-2.5" aria-label="Processing information">
+      <p className="text-sm font-medium">On-device processing</p>
+      <p className="mt-1 text-xs text-muted">Core formatting, parsing, hashing and transformations run in this browser without uploading your input. Some Developer tools also offer separate optional AI assistance; when you choose to use it, the selected content is sent to enV’s AI service and the configured provider under the AI panel’s privacy rules. Review that notice before sending sensitive content.</p>
+    </aside>
     {parentStudio ? <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-3 text-sm"><div><p className="font-medium">Part of {parentStudio.name}</p><p className="mt-0.5 text-xs text-muted">Open the grouped workspace to switch between related developer tasks.</p></div><a href={parentStudioUrl} className="inline-flex min-h-9 items-center rounded-md border border-border px-3 py-2 font-medium hover:bg-surface-2">Open Studio</a></div> : null}
 
     <div className="flex flex-wrap items-center gap-2">
