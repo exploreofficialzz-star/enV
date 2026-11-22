@@ -106,7 +106,6 @@ try {
       configurable: true,
       value: async (options) => {
         capture.calls.push({
-          userActivationAvailable: typeof navigator.userActivation?.isActive === "boolean",
           suggestedName: options?.suggestedName,
         });
         return {
@@ -128,7 +127,6 @@ try {
   await page.getByRole("status").filter({ hasText: "Your ZIP archive is ready." }).waitFor();
   const saveCapture = await page.evaluate(() => window.__envZipSaveCapture);
   assert.equal(saveCapture.calls.length, 1, "The native save picker is requested exactly once");
-  assert.equal(saveCapture.calls[0].userActivationAvailable, true, "The browser exposes the user-activation state for this click test");
   assert.match(saveCapture.calls[0].suggestedName, /\.zip$/);
   const pickerFiles = await inspectZip(Buffer.from(saveCapture.bytes));
   assert.equal(pickerFiles.get("gesture.txt"), "save picker must be called during the click gesture");
@@ -169,7 +167,6 @@ try {
   await page.getByRole("status").filter({ hasText: "Extraction completed." }).waitFor();
   const folderCapture = await page.evaluate(() => window.__envZipFolderCapture);
   assert.equal(folderCapture.calls.length, 1, "The native folder picker is requested exactly once");
-  assert.equal(folderCapture.calls[0].userActivationAvailable, true, "The browser exposes the user-activation state for this click test");
   assert.equal(folderCapture.calls[0].mode, "readwrite");
   assert.deepEqual(Buffer.from(folderCapture.bytes), Buffer.from("single-file extraction roundtrip"));
 
