@@ -71,7 +71,7 @@ internal object NativeAdsPolicy {
         BuildConfig.ENV_ADMOB_APP_ID.matches(Regex("ca-app-pub-[0-9]{16}~[0-9]{10}"))
     val adDisplayConfigured: Boolean get() = privacySetupConfigured &&
         BuildConfig.ENV_ADMOB_BANNER_AD_UNIT_ID.matches(Regex("ca-app-pub-[0-9]{16}/[0-9]{10}"))
-    val rewardedUnitId: String get() = BuildConfig.ENV_ADMOB_REWARDED_AD_UNIT_ID.trim()
+    val rewardedUnitPath: String get() = BuildConfig.ENV_GAM_REWARDED_AD_UNIT_PATH.trim()
     private val rewardedToolIds: Set<String> by lazy {
         BuildConfig.ENV_AD_ACCESS_TOOL_IDS.split(",").map { it.trim() }.filter { toolIdPattern.matches(it) }.toSet()
     }
