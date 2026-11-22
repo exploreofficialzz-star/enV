@@ -230,9 +230,9 @@ assert.match(iosAds, /MobileAds\.shared\.start/, "iOS must initialize Google Mob
 assert.match(iosAds, /publisherPrivacyPersonalizationState = \.disabled/, "iOS ad requests must default to non-personalized treatment.");
 assert.match(iosAds, /coarseLocationCollectionEnabled = false/, "iOS ads must not collect coarse device location by default.");
 assert.match(iosAds, /static func isAdEligibleTool\(_ tool: Tool\)/, "iOS must evaluate the full catalog record using independent native ad eligibility.");
-assert.match(iosAds, /ENV_ADMOB_REWARDED_AD_UNIT_ID/, "iOS rewarded configuration must require a Google Ad Manager unit path.");
+assert.match(iosAds, /ENV_GAM_REWARDED_AD_UNIT_PATH/, "iOS rewarded configuration must require a Google Ad Manager unit path.");
 assert.match(iosAds, /ENV_AD_ACCESS_GATE_ENABLED/, "iOS rewarded access must have a dedicated feature flag.");
-assert.match(iosAds, /RewardedAd\.load\(with: NativeAdsPolicy\.rewardedUnitID, request: AdManagerRequest\(\)\)/, "iOS must load a native Google Ad Manager rewarded video.");
+assert.match(iosAds, /RewardedAd\.load\(with: NativeAdsPolicy\.rewardedUnitPath, request: AdManagerRequest\(\)\)/, "iOS must load a native Google Ad Manager rewarded video.");
 assert.match(iosAds, /ad\.present\(from: nil\)/, "iOS rewarded ads must be user-initiated and presented natively.");
 assert.match(iosAds, /NativeRewardedAdProgress\.recordCompletion\(\)/, "iOS must count only the SDK reward callback.");
 assert.match(nativeToolViews, /NativeRewardedToolAccessGate\(tool: tool, onOpenWallet:/, "iOS tool interfaces must be wrapped by the Swift rewarded gate.");
