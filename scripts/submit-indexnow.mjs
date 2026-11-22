@@ -58,10 +58,18 @@ async function main() {
   }
 
   const artifacts = buildSeoArtifacts({ indexNowKey: key });
+  // Verify the production key file on every production build, even when there
+  // is no previous commit or no indexable URL change to notify.
+  const verification = await verifyIndexNowKeyFile(key).catch((error) => ({ ok: false, reason: String(error) }));
+  if (!verification.ok) {
+    process.stdout.write("IndexNow submission deferred: " + verification.reason + " The key file must be live on the canonical domain before URL notifications can be accepted.\n");
+    return;
+  }
+
   const baseSha = previousCommitSha();
   const forceAll = process.argv.includes("--submit-all") || process.env.INDEXNOW_SUBMIT_ALL === "true";
   if (!baseSha && !forceAll) {
-    process.stdout.write("IndexNow submission skipped: no previous deployment commit is available for change detection.\n");
+    process.stdout.write("IndexNow key file verified; submission skipped: no previous deployment commit is available for change detection.\n");
     return;
   }
 
@@ -70,15 +78,6 @@ async function main() {
   const changed = forceAll ? groups.all : selectChangedUrls(changedFiles(baseSha), groups, currentSet);
   const removed = forceAll ? [] : previousSitemapUrls(baseSha).filter((url) => !currentSet.has(url));
   const urlList = [...new Set([...changed, ...removed])];
-
-  // Verify the production key file on every production build, including builds
-  // with no URL changes. This keeps key-file publication observable instead of
-  // silently skipping the ownership check on an empty notification set.
-  const verification = await verifyIndexNowKeyFile(key).catch((error) => ({ ok: false, reason: String(error) }));
-  if (!verification.ok) {
-    process.stdout.write("IndexNow submission deferred: " + verification.reason + " The key file must be live on the canonical domain before URL notifications can be accepted.\n");
-    return;
-  }
 
   if (urlList.length === 0) {
     process.stdout.write("IndexNow key file verified; submission skipped: no indexable public URLs changed in this deployment.\n");
