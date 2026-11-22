@@ -262,9 +262,9 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-	F50000000000000000000000 /* Build configuration list for PBXProject */ = {isa = XCConfigurationList; buildConfigurations = (F80000000000000000000000,F90000000000000000000000,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
-	F60000000000000000000000 /* Build configuration list for enV */ = {isa = XCConfigurationList; buildConfigurations = (F80000000000000000000000,F90000000000000000000000,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
-	F70000000000000000000000 /* Build configuration list for enVTests */ = {isa = XCConfigurationList; buildConfigurations = (FA0000000000000000000000,FB0000000000000000000000,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
-		9B0000000000000000000014 /* Build configuration list for enVUITests */ = {isa = XCConfigurationList; buildConfigurations = (9B0000000000000000000011,9B0000000000000000000012,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+	F50000000000000000000000 /* Build configuration list for PBXProject */ = {isa = XCConfigurationList; buildConfigurations = (F80000000000000000000000,F90000000000000000000000,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Debug; };
+	F60000000000000000000000 /* Build configuration list for enV */ = {isa = XCConfigurationList; buildConfigurations = (F80000000000000000000000,F90000000000000000000000,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Debug; };
+	F70000000000000000000000 /* Build configuration list for enVTests */ = {isa = XCConfigurationList; buildConfigurations = (FA0000000000000000000000,FB0000000000000000000000,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Debug; };
+		9B0000000000000000000014 /* Build configuration list for enVUITests */ = {isa = XCConfigurationList; buildConfigurations = (9B0000000000000000000011,9B0000000000000000000012,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Debug; };
 /* End XCConfigurationList section */
 }; rootObject = ABCDEFABCDEFABCDEFABCDEF /* Project object */; }
