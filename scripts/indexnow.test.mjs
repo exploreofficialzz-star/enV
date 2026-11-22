@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildIndexNowKeyArtifact, chunkIndexNowUrls, indexNowResponseState, indexNowRetryDelayMs, parseIndexNowRetryAfter, routeGroups, selectChangedUrls, submitIndexNowBatch, urlsFromXml } from "./indexnow-utils.mjs";
+import { buildIndexNowKeyArtifact, chunkIndexNowUrls, indexNowResponseState, indexNowRetryDelayMs, parseIndexNowRetryAfter, routeGroups, selectChangedUrls, submitIndexNowBatch, urlsFromXml, verifyIndexNowKeyFile } from "./indexnow-utils.mjs";
 
 test("IndexNow ownership key files are generated only for valid keys", () => {
   assert.equal(buildIndexNowKeyArtifact(""), null);
@@ -10,6 +10,41 @@ test("IndexNow ownership key files are generated only for valid keys", () => {
   });
   assert.throws(() => buildIndexNowKeyArtifact("bad key"), /INDEXNOW_KEY/);
   assert.throws(() => buildIndexNowKeyArtifact("x".repeat(129)), /INDEXNOW_KEY/);
+});
+
+test("production IndexNow key verification confirms the canonical public file before notifying", async () => {
+  const key = "a1b2c3d4-e5f6";
+  let requestedUrl = "";
+  let requestOptions;
+  const result = await verifyIndexNowKeyFile(key, async (url, options) => {
+    requestedUrl = url;
+    requestOptions = options;
+    return { ok: true, status: 200, text: async () => key };
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.url, "https://envtools.store/" + key + ".txt");
+  assert.equal(requestedUrl, result.url);
+  assert.equal(requestOptions.redirect, "follow");
+});
+
+test("IndexNow key verification defers on missing, invalid or mismatched public key files", async () => {
+  await assert.rejects(() => verifyIndexNowKeyFile("bad key", async () => {
+    assert.fail("Invalid key must be rejected before a network request.");
+  }), /INDEXNOW_KEY/);
+  const unavailable = await verifyIndexNowKeyFile("a1b2c3d4", async () => ({
+    ok: false, status: 404, text: async () => "not found",
+  }));
+  assert.deepEqual(unavailable, {
+    ok: false,
+    reason: "The production key file returned HTTP 404.",
+  });
+  const mismatched = await verifyIndexNowKeyFile("a1b2c3d4", async () => ({
+    ok: true, status: 200, text: async () => "different-key",
+  }));
+  assert.deepEqual(mismatched, {
+    ok: false,
+    reason: "The production key file content does not match INDEXNOW_KEY.",
+  });
 });
 
 test("sitemap URL parsing decodes XML values and excludes non-canonical hosts", () => {

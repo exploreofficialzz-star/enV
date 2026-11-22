@@ -89,6 +89,15 @@ for (const redirect of vercelConfig.redirects ?? []) {
   assert.equal(redirect.permanent, true, "Canonical host redirects must be permanent.");
 }
 const liveSeoCheckerSource = readFileSync(new URL("./check-live-seo.mjs", import.meta.url), "utf8");
+const zipBrowserAuditSource = readFileSync(new URL("./audit-zip-any-file-browser.mjs", import.meta.url), "utf8");
+assert.ok(
+  liveSeoCheckerSource.includes('assert(!html.includes("Private and on-device")'),
+  "The live ZIP route smoke must not require a privacy label that the Web tool intentionally does not repeat inside its controls."
+);
+assert.ok(
+  zipBrowserAuditSource.includes('getByText("Private and on-device", { exact: true }).count(), 0'),
+  "The ZIP browser audit remains the source of truth for the Web privacy-disclosure presentation contract."
+);
 const seoSetupRunbookSource = readFileSync(new URL("../docs/seo-search-console-setup.md", import.meta.url), "utf8");
 for (const source of [JSON.stringify(vercelConfig), liveSeoCheckerSource, seoSetupRunbookSource]) {
   assert.ok(!source.includes("envtools.site"), "Retired .site domains must not remain in SEO deployment policy.");
