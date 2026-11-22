@@ -93,7 +93,7 @@ assert.match(read("src/lib/ads/browser.ts"), /NO_AD_BLOCKER/);
 assert.match(read("src/lib/ads/browser.ts"), /INITIAL_US_STATES_OPT_OUT_DATA_READY[\s\S]*?OPTED_OUT/);
 assert.match(rewardedProgress, /REWARDED_ADS_BEFORE_AD_FREE_OFFER = 3/);
 assert.match(rewardedProgress, /REWARDED_AD_PERIOD_MS = 30/);
-assert.match(rewardedProgress, /completedAt\.filter\(\(timestamp\) => timestamp > cutoff && timestamp <= now\)/, "Web must filter each completion against the trailing 30-day window.");
+assert.match(rewardedProgress, /completedAt\s*\.filter\(\(timestamp\) => timestamp > cutoff && timestamp <= now\)/, "Web must filter each completion against the trailing 30-day window.");
 assert.match(read("src/lib/ads/rewarded-progress.test.ts"), /completions expire individually once they leave the trailing 30-day window/);
 assert.match(accessGate, /recordBrowserRewardedAdCompletion/);
 assert.match(tokenAccessRoute, /reserveCredits/);
