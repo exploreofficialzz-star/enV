@@ -241,9 +241,14 @@ export function AdFreeAfterThreeAdsDialog({
               Use enV tokens
             </button>
           ) : (
-            <Link to="/signup" className="inline-flex min-h-11 items-center justify-center rounded-lg bg-fg px-4 py-2 text-sm font-semibold text-bg">
-              Create an account
-            </Link>
+            <>
+              <Link to="/signup" className="inline-flex min-h-11 items-center justify-center rounded-lg bg-fg px-4 py-2 text-sm font-semibold text-bg">
+                Create an account
+              </Link>
+              <Link to="/login" className="py-1 text-sm font-medium text-accent underline underline-offset-4">
+                Already have an account? Sign in
+              </Link>
+            </>
           )}
           <button type="button" onClick={onClose} className="min-h-10 rounded-lg border border-border px-4 py-2 text-sm font-medium text-fg hover:bg-surface-2">
             Keep using ads
