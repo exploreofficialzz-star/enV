@@ -195,8 +195,8 @@ async function waitForHomepageDeployment() {
         signal: AbortSignal.timeout(Math.min(10_000, remainingMs)),
       });
       const html = await response.text();
-      const head = html.match(/<head\\b[^>]*>([\\s\\S]*?)<\\/head>/i)?.[1] ?? "";
-      const title = head.match(/<title\\b[^>]*>([\\s\\S]*?)<\\/title>/i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "";
+      const head = html.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i)?.[1] ?? "";
+      const title = head.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "";
       const buildSha = metaContent(head, "name", "env-build-sha");
       last = { status: response.status, title, buildSha, url: response.url };
       const matchingBuild = EXPECTED_BUILD_SHA ? buildSha === EXPECTED_BUILD_SHA : title === EXPECTED_HOMEPAGE_TITLE;
