@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
-import { chunkIndexNowUrls, routeGroups, selectChangedUrls, submitIndexNowBatch, urlsFromXml } from "./indexnow-utils.mjs";
+import { chunkIndexNowUrls, routeGroups, selectChangedUrls, submitIndexNowBatch, urlsFromXml, verifyIndexNowKeyFile } from "./indexnow-utils.mjs";
 import { resolve } from "node:path";
 import { buildSeoArtifacts } from "./generate-seo-artifacts.mjs";
 
@@ -45,15 +45,6 @@ function previousSitemapUrls(baseSha) {
   return [...new Set(urls)];
 }
 
-async function verifyKeyFile(key) {
-  const url = SITE_ORIGIN + "/" + key + ".txt";
-  const response = await fetch(url, { redirect: "follow", signal: AbortSignal.timeout(12_000) });
-  if (!response.ok) return { ok: false, reason: "The production key file returned HTTP " + response.status + "." };
-  const body = (await response.text()).trim();
-  if (body !== key) return { ok: false, reason: "The production key file content does not match INDEXNOW_KEY." };
-  return { ok: true, url };
-}
-
 async function main() {
   if (process.env.VERCEL_ENV !== "production") {
     process.stdout.write("IndexNow submission skipped outside the production build.\n");
@@ -80,14 +71,17 @@ async function main() {
   const removed = forceAll ? [] : previousSitemapUrls(baseSha).filter((url) => !currentSet.has(url));
   const urlList = [...new Set([...changed, ...removed])];
 
-  if (urlList.length === 0) {
-    process.stdout.write("IndexNow submission skipped: no indexable public URLs changed in this deployment.\n");
+  // Verify the production key file on every production build, including builds
+  // with no URL changes. This keeps key-file publication observable instead of
+  // silently skipping the ownership check on an empty notification set.
+  const verification = await verifyIndexNowKeyFile(key).catch((error) => ({ ok: false, reason: String(error) }));
+  if (!verification.ok) {
+    process.stdout.write("IndexNow submission deferred: " + verification.reason + " The key file must be live on the canonical domain before URL notifications can be accepted.\n");
     return;
   }
 
-  const verification = await verifyKeyFile(key).catch((error) => ({ ok: false, reason: String(error) }));
-  if (!verification.ok) {
-    process.stdout.write("IndexNow submission deferred: " + verification.reason + " The key file must be live on the canonical domain before URL notifications can be accepted.\n");
+  if (urlList.length === 0) {
+    process.stdout.write("IndexNow key file verified; submission skipped: no indexable public URLs changed in this deployment.\n");
     return;
   }
 
