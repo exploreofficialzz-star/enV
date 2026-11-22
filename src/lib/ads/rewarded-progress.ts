@@ -1,10 +1,10 @@
-export const REWARDED_AD_PROGRESS_KEY = "env.ads.rewarded-progress.v1";
+export const REWARDED_AD_PROGRESS_KEY = "env.ads.rewarded-progress.v2";
 export const REWARDED_AD_PERIOD_MS = 30 * 24 * 60 * 60 * 1_000;
 export const REWARDED_ADS_BEFORE_AD_FREE_OFFER = 3;
+const MAX_STORED_COMPLETIONS = 100;
 
 export type RewardedAdProgress = {
-  periodStartedAt: number;
-  completed: number;
+  completedAt: number[];
   adFreeOfferShownAt: number | null;
 };
 
@@ -18,23 +18,37 @@ type StorageLike = Pick<Storage, "getItem" | "setItem">;
 function validProgress(value: unknown): value is RewardedAdProgress {
   if (!value || typeof value !== "object") return false;
   const record = value as Record<string, unknown>;
-  return Number.isSafeInteger(record.periodStartedAt) &&
-    Number.isSafeInteger(record.completed) &&
-    (record.completed as number) >= 0 &&
-    (record.adFreeOfferShownAt === null || Number.isSafeInteger(record.adFreeOfferShownAt));
+  return Array.isArray(record.completedAt) &&
+    record.completedAt.every((timestamp) => Number.isSafeInteger(timestamp) && (timestamp as number) >= 0) &&
+    (record.adFreeOfferShownAt === null ||
+      (Number.isSafeInteger(record.adFreeOfferShownAt) && (record.adFreeOfferShownAt as number) >= 0));
+}
+
+function emptyProgress(): RewardedAdProgress {
+  return { completedAt: [], adFreeOfferShownAt: null };
 }
 
 export function readRewardedAdProgress(storage: StorageLike, now = Date.now()): RewardedAdProgress {
-  const empty: RewardedAdProgress = { periodStartedAt: now, completed: 0, adFreeOfferShownAt: null };
   try {
     const raw = storage.getItem(REWARDED_AD_PROGRESS_KEY);
-    if (!raw) return empty;
+    if (!raw) return emptyProgress();
     const parsed: unknown = JSON.parse(raw);
-    if (!validProgress(parsed)) return empty;
-    const expired = now < parsed.periodStartedAt || now - parsed.periodStartedAt >= REWARDED_AD_PERIOD_MS;
-    return expired ? empty : parsed;
+    if (!validProgress(parsed)) return emptyProgress();
+
+    const cutoff = now - REWARDED_AD_PERIOD_MS;
+    const completedAt = parsed.completedAt
+      .filter((timestamp) => timestamp > cutoff && timestamp <= now)
+      .sort((left, right) => left - right)
+      .slice(-MAX_STORED_COMPLETIONS);
+    const offerTimestamp = parsed.adFreeOfferShownAt;
+    const adFreeOfferShownAt = offerTimestamp !== null &&
+      offerTimestamp > cutoff &&
+      offerTimestamp <= now
+      ? offerTimestamp
+      : null;
+    return { completedAt, adFreeOfferShownAt };
   } catch {
-    return empty;
+    return emptyProgress();
   }
 }
 
@@ -44,12 +58,11 @@ export function recordRewardedAdCompletion(
   now = Date.now(),
 ): RewardedAdProgressResult {
   const current = readRewardedAdProgress(storage, now);
-  const completed = current.completed + 1;
-  const shouldShowAdFreeOffer = completed >= REWARDED_ADS_BEFORE_AD_FREE_OFFER &&
+  const completedAt = [...current.completedAt, now].slice(-MAX_STORED_COMPLETIONS);
+  const shouldShowAdFreeOffer = completedAt.length >= REWARDED_ADS_BEFORE_AD_FREE_OFFER &&
     current.adFreeOfferShownAt === null;
   const progress: RewardedAdProgress = {
-    ...current,
-    completed,
+    completedAt,
     adFreeOfferShownAt: shouldShowAdFreeOffer ? now : current.adFreeOfferShownAt,
   };
   storage.setItem(REWARDED_AD_PROGRESS_KEY, JSON.stringify(progress));
