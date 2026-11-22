@@ -43,7 +43,7 @@ enum NativeAdsPolicy {
     static var rewardedAccessConfigured: Bool { rewardedAccessEnabled }
     static var rewardedAdsConfigured: Bool {
         rewardedAccessConfigured && privacySetupConfigured &&
-        rewardedUnitID.range(of: "^/[A-Za-z0-9_./-]{3,180}$", options: .regularExpression) != nil
+        rewardedUnitPath.range(of: "^/[A-Za-z0-9_./-]{3,180}$", options: .regularExpression) != nil
     }
     static func isRewardedAccessTool(_ tool: Tool) -> Bool {
         rewardedAccessConfigured && rewardedToolIDs.contains(tool.id) &&
@@ -546,7 +546,7 @@ struct NativeRewardedToolAccessGate<Content: View>: View {
         busy = true
         message = ""
         do {
-            let ad = try await RewardedAd.load(with: NativeAdsPolicy.rewardedUnitID, request: AdManagerRequest())
+            let ad = try await RewardedAd.load(with: NativeAdsPolicy.rewardedUnitPath, request: AdManagerRequest())
             let delegate = NativeRewardedAdDelegate()
             delegate.onDismiss = {
                 Task { @MainActor in
