@@ -192,7 +192,6 @@ test("production app error boundary hides raw exception messages", async () => {
   assert.match(source, /const FALLBACK_MESSAGE = "We couldn’t complete this page request\. Try again or return to enV\."/);
   assert.match(source, /return FALLBACK_MESSAGE;/);
 });
-});
 
 test("URL-media public errors use stable messages and opaque request IDs", async () => {
   const source = await readFile(new URL("./url-media-processor.mjs", import.meta.url), "utf8");
