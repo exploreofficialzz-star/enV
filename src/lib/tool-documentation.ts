@@ -445,16 +445,17 @@ export function toolDocumentationSummary(tool: ToolMeta): string {
     && /^[A-Z0-9"'“‘(]/.test(description)
     && /[.!?]["')\]]?$/.test(description);
 
-  if (isCompleteSentence) return description;
-
   const name = tool.name.trim();
-  // Guide-specific overview text is rendered in the guide body. Keep the
-  // search snippet independently worded so it is not repeated verbatim.
   const engine = tool.engine.type;
 
   if (engine === "calculator") {
     return `Use ${name} to calculate results from the values you enter. Confirm the field labels, units, and assumptions, then check the output before relying on it.`;
   }
+  if (isCompleteSentence) return description;
+
+  // Guide-specific overview text is rendered in the guide body. Keep the
+  // search snippet independently worded so it is not repeated verbatim.
+
   if (engine === "converter" || engine === "file-converter") {
     return `Use ${name} to convert supported values or files. Confirm the source and target options, then verify the converted result before using it.`;
   }
