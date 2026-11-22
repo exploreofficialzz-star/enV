@@ -53,8 +53,8 @@ assert.match(toolShell, /AdsterraBanner format="300x250"/, "Qualified tool pages
 assert.match(toolShell, /isAdsterraQualifiedTool\(tool\)/, "Each placement must be limited to the shared Adsterra eligibility policy.");
 assert.match(toolShell, /const adsterraAdsEnabled =\s*adsterraQualified && adsterraConsent === "granted"[\s\S]*?accessPreference === "ads"/, "Adsterra placements must follow the visitor's ad-versus-token mode and saved advertising choice.");
 assert.match(toolShell, /useCurrentUserState\(\)/, "Selected access-gated tools must distinguish guests from signed-in users.");
-assert.match(toolShell, /accessPreferenceState\\.toolId === tool\\.id[\\s\\S]*?getToolAccessPreference\\(tool\\.id\\)/, "The Web access preference must be resolved against the active tool ID during route changes.");
-assert.match(toolShell, /setAccessPreferenceState\\(\\{ toolId: tool\\.id, value \\}\\)/, "Changing access preference must persist under the active tool ID.");
+assert.match(toolShell, /accessPreferenceState\.toolId === tool\.id[\s\S]*?getToolAccessPreference\(tool\.id\)/, "The Web access preference must be resolved against the active tool ID during route changes.");
+assert.match(toolShell, /setAccessPreferenceState\(\{ toolId: tool\.id, value \}\)/, "Changing access preference must persist under the active tool ID.");
 assert.match(toolShell, /adAccessGateEnabled && browserOnline && !toolAccessUnlocked/, "Selected online tools must remain hidden until rewarded-ad or token access is granted.");
 assert.match(toolShell, /adAccessGateEnabled && browserOnline && !toolAccessUnlocked/, "Offline mode must leave the existing offline eligibility checks in control.");
 assert.match(androidAds, /if \(preview \|\| !NativeAdsPolicy\.isRewardedAccessTool\(context, tool\) \|\| !network\) \{\s*content\(\)\s*return\s*\}[\s\S]*?if \(!network \|\| !originReachable\) \{\s*content\(\)\s*return\s*\}/, "Android must preserve the signed offline allowance path and defer online access only when enV is reachable.");
