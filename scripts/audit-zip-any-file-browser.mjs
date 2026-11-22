@@ -111,8 +111,8 @@ try {
         });
         return {
           createWritable: async () => new WritableStream({
-            write(chunk) { capture.chunks.push(...Array.from(new Uint8Array(chunk))); },
-            close() { capture.bytes = [...capture.chunks]; },
+            write(chunk) { capture.chunks.push(Array.from(new Uint8Array(chunk))); },
+            close() { capture.bytes = capture.chunks.flat(); },
           }),
         };
       },
@@ -129,7 +129,7 @@ try {
   const saveCapture = await page.evaluate(() => window.__envZipSaveCapture);
   assert.equal(saveCapture.calls.length, 1, "The native save picker is requested exactly once");
   assert.equal(saveCapture.calls[0].active, true, "The save picker is called while transient user activation is active");
-  assert.match(saveCapture.calls[0].suggestedName, /\\.zip$/);
+  assert.match(saveCapture.calls[0].suggestedName, /\.zip$/);
   const pickerFiles = await inspectZip(Buffer.from(saveCapture.bytes));
   assert.equal(pickerFiles.get("gesture.txt"), "save picker must be called during the click gesture");
 
@@ -158,7 +158,7 @@ try {
     toolResults: [{
       toolId: "zip-any-file",
       status: "passed",
-      checks: ["routeRendering", "interactionExecution", "outputValidation", "runtimeErrorCheck", "fileImportExport"],
+      checks: ["routeRendering", "interactionExecution", "outputValidation", "runtimeErrorCheck", "fileImportExport", "savePickerUserActivation", "savePickerFallback"],
       notes: "Verified multi-file and single-file local ZIP creation, CRC-checked reads, extraction round-trip, active-user-gesture save-picker access, blocked-picker download fallback, byte preservation and zero application API write requests.",
     }],
     reportPath: process.argv.find((value) => value.startsWith("--report="))?.slice("--report=".length),
