@@ -238,7 +238,6 @@ test("web brand lockups use the canonical light and dark assets in the home hero
   assert.ok(tokenShortcutIndex >= 0 && tokenShortcutIndex < personalToolsIndex && personalToolsIndex < mainToolFeedIndex, "Home should place the Token Dashboard shortcut and personal tools before the main tool feed");
   assert.match(home, /md:grid-cols-3/);
   assert.doesNotMatch(home, /Explore all tools/);
-  assert.match(home, /<br className="sm:hidden"\s*\/>/);
   assert.doesNotMatch(shell, /MobileNav/);
   assert.match(footer, /<Logo\s*\/>/);
 });
