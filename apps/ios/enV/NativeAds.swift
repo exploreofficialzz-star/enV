@@ -465,7 +465,11 @@ struct NativeRewardedToolAccessGate<Content: View>: View {
             }
         }
         .alert("Ready to go ad-free?", isPresented: $showAdFreeOffer) {
-            Button("Use enV tokens") { Task { await reserveTokenAccess() } }
+            Button("Use enV tokens") {
+                // This visit was already unlocked by the rewarded ad. Save the token preference for the next visit only.
+                NativeToolAccessPreference.setPrefersTokens(true, for: tool.id)
+                preferTokens = true
+            }
             Button("Keep using ads", role: .cancel) {
                 NativeToolAccessPreference.setPrefersTokens(false, for: tool.id)
                 preferTokens = false
