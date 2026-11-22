@@ -5,7 +5,7 @@ import { SEO_CANONICAL_ORIGIN, SEO_REDIRECT_HOSTS } from "./seo-domain-policy.mj
 const ORIGIN = SEO_CANONICAL_ORIGIN;
 const EXPECTED_HOMEPAGE_TITLE = "enV | Tools for everyday tasks";
 const EXPECTED_BUILD_SHA = process.env.GITHUB_SHA?.trim() ?? "";
-const DEPLOYMENT_WAIT_TIMEOUT_MS = 12 * 60 * 1000;
+const DEPLOYMENT_WAIT_TIMEOUT_MS = 20 * 60 * 1000;
 const DEPLOYMENT_POLL_INTERVAL_MS = 5_000;
 const USER_AGENT = "enV-production-seo-smoke/1.0";
 const failures = [];
