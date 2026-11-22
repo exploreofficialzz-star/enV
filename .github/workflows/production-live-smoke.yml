@@ -116,7 +116,7 @@ jobs:
           console.log('Application backend gateway and required processors report ready.');
           NODE
 
-      - name: Check payment funding-options contract
+      - name: Check payment funding-options public contract
         if: always()
         shell: bash
         run: |
@@ -132,48 +132,51 @@ jobs:
           const response = JSON.parse(fs.readFileSync('/tmp/env-funding-options.json', 'utf8'));
           const data = response?.data;
           const failures = [];
-          const providers = Array.isArray(data?.providers) ? data.providers : [];
-          const allowed = new Set(['paystack', 'flutterwave', 'cryptomus']);
-          const ids = providers.map((provider) => provider?.id);
-          if (response?.ok !== true || !data || providers.length === 0) {
-            failures.push('Funding-options response is missing provider routing data.');
+          if (response?.ok !== true || !data || typeof data !== 'object') {
+            failures.push('Funding-options response must contain the public data object.');
           }
-          if (new Set(ids).size !== ids.length || ids.some((id) => !allowed.has(id))) {
-            failures.push('Funding-options response contains duplicate or unsupported providers.');
+          if (data && (data.countryCode !== null && typeof data.countryCode !== 'string')) {
+            failures.push('Funding-options countryCode must be a string or null.');
           }
-          for (const provider of providers) {
-            const id = provider?.id ?? 'unknown';
-            if (typeof provider.enabled !== 'boolean' || !/^[A-Z]{3}$/.test(provider.currency ?? '') ||
-                !Array.isArray(provider.packs) ||
-                (provider.packs.length > 0 && provider.packs.map((pack) => pack?.tokens).join(',') !== '100,250,500,1000')) {
-              failures.push(`The ${id} funding-options contract is malformed.`);
-              continue;
+          if (data && (data.currency !== null && !/^[A-Z]{3}$/.test(data.currency ?? ''))) {
+            failures.push('Funding-options currency must be an ISO-style three-letter code or null.');
+          }
+          if (data && typeof data.message !== 'string') {
+            failures.push('Funding-options response is missing its customer-facing explanation.');
+          }
+          const methods = data?.methods;
+          for (const id of ['card', 'local', 'more']) {
+            if (typeof methods?.[id] !== 'boolean') failures.push(`Funding-options method "${id}" must be an explicit boolean.`);
+          }
+          const flutterwave = data?.flutterwave;
+          if (!flutterwave || typeof flutterwave.enabled !== 'boolean' ||
+              (flutterwave.currency !== null && !/^[A-Z]{3}$/.test(flutterwave.currency ?? '')) ||
+              !Array.isArray(flutterwave.paymentMethods) || !Array.isArray(flutterwave.mobileNetworks)) {
+            failures.push('Funding-options Flutterwave customer-method summary is malformed.');
+          } else {
+            if (flutterwave.paymentMethods.some((method) => typeof method !== 'string' || !method.trim())) {
+              failures.push('Funding-options payment method entries must be non-empty strings.');
             }
-            if (Object.hasOwn(provider, 'fxRate') || Object.hasOwn(provider, 'fxSource') ||
-                Object.hasOwn(provider, 'fxUpdatedAt')) {
-              failures.push(`The public ${id} contract exposes the upstream FX snapshot.`);
+            if (new Set(flutterwave.paymentMethods).size !== flutterwave.paymentMethods.length) {
+              failures.push('Funding-options payment method entries must be unique.');
             }
-            for (const pack of provider.packs) {
-              if (typeof pack.enabled !== 'boolean') {
-                failures.push(`The ${id} provider omitted pack-level availability.`);
-              }
-              if (Object.hasOwn(pack, 'amountMinor') || Object.hasOwn(pack, 'fxRate') ||
-                  Object.hasOwn(pack, 'fxSource') || Object.hasOwn(pack, 'fxUpdatedAt')) {
-                failures.push(`The public ${id} pack exposes a local amount or raw FX quote.`);
-              }
-            }
-            if (provider.enabled && !provider.packs.some((pack) => pack.enabled === true)) {
-              failures.push(`The enabled ${id} provider has no purchasable pack.`);
+            if (flutterwave.mobileNetworks.some((network) =>
+              !network || typeof network.network !== 'string' || !network.network.trim() ||
+              typeof network.name !== 'string' || !network.name.trim())) {
+              failures.push('Funding-options mobile network entries must contain a network id and display name.');
             }
           }
-          if (data && data.anyEnabled !== providers.some((provider) => provider.enabled === true)) {
-            failures.push('The aggregate anyEnabled flag does not match provider availability.');
+          // Provider identities, routing decisions, raw FX quotes and prices are
+          // intentionally kept on the server. The public endpoint exposes only
+          // customer-facing method availability and safe Flutterwave method hints.
+          if (data && ['providers', 'provider', 'anyEnabled', 'fxRate', 'fxSource', 'fxUpdatedAt'].some((key) => Object.hasOwn(data, key))) {
+            failures.push('Funding-options public response exposes server-only provider routing or FX metadata.');
           }
           if (failures.length) {
             for (const failure of failures) console.error(`FAIL: ${failure}`);
             process.exit(1);
           }
-          console.log(`Payment API contract healthy; Paystack enabled=${providers.find((provider) => provider.id === 'paystack')?.enabled === true}; Cryptomus enabled=${providers.find((provider) => provider.id === 'cryptomus')?.enabled === true}. This contract check does not imply live provider approval.`);
+          console.log(`Funding-options public contract healthy; country=${data.countryCode ?? 'unresolved'}; currency=${data.currency ?? 'unavailable'}; customer methods=${Object.entries(methods).filter(([, enabled]) => enabled).map(([id]) => id).join(',') || 'none'}; Flutterwave enabled=${flutterwave.enabled}. Provider identities and pricing remain server-side.`);
           NODE
 
       - name: Check account session API
@@ -211,7 +214,7 @@ jobs:
           console.log(`Account session endpoint healthy; signed-in session=${Boolean(session?.user)}.`);
           NODE
 
-      - name: Check AI status endpoint contract
+      - name: Check optional AI status contract
         if: always()
         shell: bash
         run: |
@@ -220,21 +223,30 @@ jobs:
             --retry 3 --retry-delay 3 --retry-all-errors \
             --connect-timeout 10 --max-time 30 \
             --output /tmp/env-ai-status.json \
-            --write-out 'AI status HTTP %{http_code}; downloaded %{size_download} bytes\n' \
+            --write-out 'AI status HTTP %{http_code}; downloaded %{size_download} bytes\\n' \
             https://envtools.store/api/ai/status
           node --input-type=module - <<'NODE'
           import fs from 'node:fs';
           const status = JSON.parse(fs.readFileSync('/tmp/env-ai-status.json', 'utf8'));
-          const entries = Object.values(status.tasks ?? {});
-          const available = entries.filter((task) => task?.available === true).length;
-          const reasons = entries.reduce((counts, task) => {
+          const entries = Object.entries(status.tasks ?? {});
+          const available = entries.filter(([, task]) => task?.available === true).length;
+          const reasons = entries.reduce((counts, [, task]) => {
             const reason = task?.available === true ? 'available' : (task?.reason ?? 'unspecified');
             counts[reason] = (counts[reason] ?? 0) + 1;
             return counts;
           }, {});
-          if (status.ok !== true || status.enabled !== true || entries.length === 0 || available === 0) {
-            console.error(`FAIL: AI is not operational. enabled=${status.enabled === true}; tasks=${entries.length}; available=${available}; task states=${JSON.stringify(reasons)}.`);
+          const malformed = entries.filter(([, task]) =>
+            !task || typeof task.available !== 'boolean' ||
+            (task.available !== true && (typeof task.reason !== 'string' || !task.reason.trim()))
+          );
+          if (status.ok !== true || typeof status.enabled !== 'boolean' ||
+              entries.length === 0 || malformed.length > 0 ||
+              (status.enabled === false && available > 0)) {
+            console.error(`FAIL: AI status contract is inconsistent. enabled=${status.enabled === true}; tasks=${entries.length}; available=${available}; malformed=${malformed.length}; task states=${JSON.stringify(reasons)}.`);
             process.exit(1);
           }
-          console.log(`AI status healthy; enabled=true; tasks=${entries.length}; available=${available}; task states=${JSON.stringify(reasons)}.`);
+          // AI is optional. An installation with no provider credentials is a
+          // healthy explicit state: all AI panels must remain hidden while
+          // deterministic tools continue to work.
+          console.log(`AI status contract healthy; master switch enabled=${status.enabled}; tasks=${entries.length}; available=${available}; task states=${JSON.stringify(reasons)}. Zero available tasks is valid only as an explicit reported state, not evidence that AI is usable.`);
           NODE

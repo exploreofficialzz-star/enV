@@ -41,7 +41,10 @@ const SUFFIXES = [
 
 /** @param {unknown} value @returns {string} */
 function lower(value) {
-  return String(value ?? "").trim().toLowerCase();
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\b([\p{L}\p{N}]+)(?:\s+\1\b)+/gu, "$1");
 }
 
 /** @param {string} name @returns {{prefix: string, operation: string}} */
@@ -322,7 +325,11 @@ function describe(category, prefix, operation) {
     if (has("export preset")) return "Review export settings for " + label + " and match them to the intended destination.";
     if (has("format guide")) return "Compare audio format guidance for " + label + " and confirm compatibility with your intended playback or publishing service.";
   }
-  if (category === "mockups" && has("mockup")) return "Create a clearly labeled fictional " + subject + " mockup for a story, presentation or interface concept. It is not a real conversation or notification.";
+  if (category === "mockups" && has("mockup")) {
+    // Names assembled from repeated platform/task words should not repeat the same word.
+    const mockupSubject = subject.replace(/\b(\w+)(?:\s+\1\b)+/gi, "$1");
+    return "Create a clearly labeled fictional " + mockupSubject + " mockup for a story, presentation or interface concept. It is not a real conversation or notification.";
+  }
   if (category === "screenshots") {
     if (has("annotation")) return "Add notes or visual callouts to a screenshot for review or presentation.";
     if (has("redaction")) return "Cover selected sensitive areas in a screenshot before sharing it. Check the exported file to confirm the information is concealed.";
@@ -371,7 +378,34 @@ export function refineGeneratedToolDescription(tool) {
     /mockup\.$/i.test(current) ||
     /utility for games and gaming communities\.$/i.test(current) ||
     /^create a personalized .* celebration experience\.$/i.test(current);
-  if (!lowQuality) return current;
+  const shortCopyGuidance = {
+    ai: "Add the intended audience and key details, then review every claim and edit the draft before sharing.",
+    business: "Add the relevant names, figures and requirements, then check the result before using it in your workflow.",
+    calculators: "Enter the required values, review the displayed result and check the units or formula assumptions before relying on it.",
+    creators: "Add the topic and audience, then adapt the wording to your platform before publishing.",
+    datetime: "Choose the relevant date, time zone or interval, then verify the displayed result before scheduling.",
+    design: "Adjust the available settings, inspect the preview and copy or export the result when it is ready.",
+    developer: "Paste the relevant input, inspect the output and test it in your project before shipping.",
+    education: "Choose a topic and difficulty, work through the result and check each step as you learn.",
+    files: "Select a supported file, check its detected format and verify the exported result before sharing.",
+    fitness: "Enter the relevant activity and measurement details, then treat the estimate as general guidance.",
+    mockups: "Customize the visible details and review the clearly labelled sample before using it in a presentation.",
+    pdf: "Select the document and required pages, then open the exported file to confirm its content and order.",
+    productivity: "Enter the task and timing details, then review the schedule and adjust it to your needs.",
+    qr: "Enter the destination or data, inspect the preview and test the exported code with a scanner.",
+    random: "Add the available choices, adjust the settings and review the selected result before using it.",
+    security: "Enter only non-sensitive test content, inspect the findings and verify them in your own environment.",
+    seo: "Enter the page details and target terms, then verify suggestions against the live page before acting.",
+    testdata: "Choose the field types and constraints, then validate the sample against your test requirements.",
+    text: "Enter the source text, review the formatting and proofread the output before sharing or publishing.",
+    converters: "Select the source and destination units or formats, then verify the converted result before using it.",
+    video: "Enter the clip settings or select a supported file, then review timing, dimensions and compatibility before exporting.",
+    network: "Enter the host or connection details, inspect the returned result and verify it in your own environment.",
+  }[tool.category] ?? "Add the required details, review the output and confirm it suits your use before sharing.";
+  if (!lowQuality && current.length < 35 && /[.!?]$/.test(current)) {
+    return `${current} ${shortCopyGuidance}`;
+  }
+  if (!lowQuality && current.length >= 35) return current;
 
   if (tool.category === "calculators") {
     const base = tool.name.replace(/\s+Calculator$/i, "");

@@ -28,7 +28,7 @@ test("generated family and cross-category entries explain their task", () => {
     ["file-csv-to-json-converter", /convert CSV to JSON/i],
     ["angle-quick-converter", /convert angle values/i],
     ["youtube-revenue-calculator", /youtube creator revenue/i],
-    ["youtube-image-resizer", /resize images for use on youtube/i],
+    ["youtube-image-resizer", /Frame and resize for YouTube: Community post image at 1080×1080/i],
     ["invoice-template", /reusable invoice template/i],
     ["birthday-rsvp-page", /rsvp page for a birthday event/i],
     ["ai-chat-chat-mockup", /clearly labeled fictional ai chat mockup/i],

@@ -152,7 +152,7 @@
 		888888888888888888888888 /* catalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = catalog.json; path = ../shared/catalog.json; sourceTree = "<group>"; };
 		D9C644EB1332427BA2BD80E4 /* native-icons */ = {isa = PBXFileReference; lastKnownFileType = folder; name = native-icons; path = ../shared/native-icons; sourceTree = "<group>"; };
 	C30000000000000000000001 /* NativeCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeCopy.swift; sourceTree = "<group>"; };
-	C30000000000000000000002 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+	C30000000000000000000002 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = enV/Assets.xcassets; sourceTree = "<group>"; };
         B40000000000000000000001 /* NativeEngineData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeEngineData.swift; sourceTree = "<group>"; };
         B40000000000000000000002 /* NativeConverterEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeConverterEngine.swift; sourceTree = "<group>"; };
         B40000000000000000000003 /* NativeExpansionCalculatorEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeExpansionCalculatorEngine.swift; sourceTree = "<group>"; };
@@ -262,9 +262,9 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-	F50000000000000000000000 /* Build configuration list for PBXProject */ = {isa = XCConfigurationList; buildConfigurations = (F80000000000000000000000,F90000000000000000000000,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
-	F60000000000000000000000 /* Build configuration list for enV */ = {isa = XCConfigurationList; buildConfigurations = (F80000000000000000000000,F90000000000000000000000,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
-	F70000000000000000000000 /* Build configuration list for enVTests */ = {isa = XCConfigurationList; buildConfigurations = (FA0000000000000000000000,FB0000000000000000000000,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
-		9B0000000000000000000014 /* Build configuration list for enVUITests */ = {isa = XCConfigurationList; buildConfigurations = (9B0000000000000000000011,9B0000000000000000000012,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+	F50000000000000000000000 /* Build configuration list for PBXProject */ = {isa = XCConfigurationList; buildConfigurations = (F80000000000000000000000,F90000000000000000000000,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Debug; };
+	F60000000000000000000000 /* Build configuration list for enV */ = {isa = XCConfigurationList; buildConfigurations = (F80000000000000000000000,F90000000000000000000000,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Debug; };
+	F70000000000000000000000 /* Build configuration list for enVTests */ = {isa = XCConfigurationList; buildConfigurations = (FA0000000000000000000000,FB0000000000000000000000,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Debug; };
+		9B0000000000000000000014 /* Build configuration list for enVUITests */ = {isa = XCConfigurationList; buildConfigurations = (9B0000000000000000000011,9B0000000000000000000012,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Debug; };
 /* End XCConfigurationList section */
 }; rootObject = ABCDEFABCDEFABCDEFABCDEF /* Project object */; }
