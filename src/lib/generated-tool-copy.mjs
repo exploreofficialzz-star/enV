@@ -41,7 +41,10 @@ const SUFFIXES = [
 
 /** @param {unknown} value @returns {string} */
 function lower(value) {
-  return String(value ?? "").trim().toLowerCase();
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\b([\p{L}\p{N}]+)(?:\s+\1\b)+/gu, "$1");
 }
 
 /** @param {string} name @returns {{prefix: string, operation: string}} */
