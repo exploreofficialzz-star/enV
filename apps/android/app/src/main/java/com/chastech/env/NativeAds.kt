@@ -393,6 +393,23 @@ private object NativeRewardedAdProgress {
     }
 }
 
+private object NativeToolAccessPreference {
+    private const val PREFS = "env_tool_access_preference_v1"
+
+    private fun key(toolId: String) = "tool:$toolId"
+
+    fun prefersTokens(context: Context, toolId: String): Boolean =
+        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(key(toolId), "ads") == "tokens"
+
+    fun setPrefersTokens(context: Context, toolId: String, prefersTokens: Boolean) {
+        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putString(key(toolId), if (prefersTokens) "tokens" else "ads")
+            .apply()
+    }
+}
+
 @Composable
 internal fun NativeRewardedToolAccessGate(
     tool: ToolRecord,
@@ -411,6 +428,7 @@ internal fun NativeRewardedToolAccessGate(
     var busy by rememberSaveable(tool.id) { mutableStateOf(false) }
     var feedback by rememberSaveable(tool.id) { mutableStateOf<String?>(null) }
     var showAdFreeOffer by rememberSaveable(tool.id) { mutableStateOf(false) }
+    var preferTokens by rememberSaveable(tool.id) { mutableStateOf(NativeToolAccessPreference.prefersTokens(context, tool.id)) }
     var pendingReservation by remember(tool.id) { mutableStateOf<com.chastech.env.billing.OfflineWalletNativeApi.ToolAccessReservation?>(null) }
     var activeReservation by remember(tool.id) { mutableStateOf<com.chastech.env.billing.OfflineWalletNativeApi.ToolAccessReservation?>(null) }
 
@@ -438,6 +456,8 @@ internal fun NativeRewardedToolAccessGate(
     }
 
     suspend fun reserveTokenAccess() {
+        NativeToolAccessPreference.setPrefersTokens(context, tool.id, true)
+        preferTokens = true
         if (busy) return
         if (!com.chastech.env.billing.OfflineWalletNativeApi.isPaired(context)) {
             feedback = "Sign in to enV and pair this device from your Web Wallet before using tokens."
@@ -513,6 +533,8 @@ internal fun NativeRewardedToolAccessGate(
             Button(
                 onClick = {
                     if (activity == null || busy) return@Button
+                    NativeToolAccessPreference.setPrefersTokens(context, tool.id, false)
+                    preferTokens = false
                     busy = true
                     feedback = null
                     RewardedAd.load(
