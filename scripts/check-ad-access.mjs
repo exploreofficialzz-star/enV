@@ -212,6 +212,15 @@ assert.match(iosAds, /private enum NativeToolAccessPreference/, "iOS must persis
 assert.match(iosAds, /UserDefaults\.standard\.string\(forKey: key\(for: toolID\)\)/, "iOS access preference must use device-local UserDefaults.");
 assert.match(iosAds, /preferTokens = NativeToolAccessPreference\.prefersTokens\(for: tool\.id\)/, "iOS must restore the selected per-tool access preference.");
 assert.match(iosAds, /if !preferTokens[\s\S]*?Use rewarded ads instead/, "iOS must let token-preferring users switch back to rewarded ads.");
+const androidOfferStart = androidAds.indexOf("if (showAdFreeOffer)");
+const androidOfferBlock = androidOfferStart >= 0 ? androidAds.slice(androidOfferStart, androidAds.indexOf("\n    }\n}", androidOfferStart) + 7) : "";
+assert.match(androidOfferBlock, /NativeToolAccessPreference\.setPrefersTokens\(context, tool\.id, true\)/, "Android's post-reward offer must save token preference for the next visit.");
+assert.doesNotMatch(androidOfferBlock, /reserveTokenAccess/, "Android's post-reward offer must not reserve tokens for the already-unlocked visit.");
+const iosOfferStart = iosAds.indexOf('Button("Use enV tokens")');
+const iosOfferEnd = iosAds.indexOf('Button("Keep using ads"', iosOfferStart);
+const iosOfferBlock = iosOfferStart >= 0 ? iosAds.slice(iosOfferStart, iosOfferEnd >= 0 ? iosOfferEnd : iosOfferStart + 700) : "";
+assert.match(iosOfferBlock, /NativeToolAccessPreference\.setPrefersTokens\(true, for: tool\.id\)/, "iOS's post-reward offer must save token preference for the next visit.");
+assert.doesNotMatch(iosOfferBlock, /reserveTokenAccess/, "iOS's post-reward offer must not reserve tokens for the already-unlocked visit.");
 assert.match(androidAds, /fun isRewardedAccessTool\(context: Context, tool: ToolRecord\)/, "Android rewarded access must use a separate explicit tool allowlist.");
 assert.match(androidMain, /NativeRewardedToolAccessGate\(tool, onOpenWallet\)/, "Android tool interfaces must be wrapped by the native rewarded gate.");
 assert.match(androidMain, /NativeToolAdSlot\(tool\)/, "The native Android tool surface must include its ad slot.");
