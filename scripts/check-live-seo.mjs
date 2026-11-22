@@ -5,6 +5,8 @@ import { SEO_CANONICAL_ORIGIN, SEO_REDIRECT_HOSTS } from "./seo-domain-policy.mj
 const ORIGIN = SEO_CANONICAL_ORIGIN;
 const EXPECTED_HOMEPAGE_TITLE = "enV | Tools for everyday tasks";
 const EXPECTED_BUILD_SHA = process.env.GITHUB_SHA?.trim() ?? "";
+const DEPLOYMENT_WAIT_TIMEOUT_MS = 12 * 60 * 1000;
+const DEPLOYMENT_POLL_INTERVAL_MS = 5_000;
 const USER_AGENT = "enV-production-seo-smoke/1.0";
 const failures = [];
 const checked = [];
@@ -178,34 +180,42 @@ async function checkCanonicalHosts() {
 
 async function waitForHomepageDeployment() {
   // The live smoke is triggered by a Git push while Vercel builds in parallel.
-  // Wait for a page-level build marker before evaluating production metadata,
-  // otherwise a fast smoke can accidentally inspect the previous deployment.
+  // Wait for the exact commit marker before checking redirects or route metadata;
+  // otherwise the smoke can mistake the previous production deployment for this release.
   let last = { status: 0, title: "", url: ORIGIN + "/" };
-  for (let attempt = 1; attempt <= 36; attempt += 1) {
+  const deadline = Date.now() + DEPLOYMENT_WAIT_TIMEOUT_MS;
+  let attempts = 0;
+  while (Date.now() < deadline) {
+    attempts += 1;
     try {
+      const remainingMs = Math.max(1, deadline - Date.now());
       const response = await fetch(ORIGIN + "/", {
         redirect: "follow",
         headers: { "user-agent": USER_AGENT },
-        signal: AbortSignal.timeout(10_000),
+        signal: AbortSignal.timeout(Math.min(10_000, remainingMs)),
       });
       const html = await response.text();
-      const head = html.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i)?.[1] ?? "";
-      const title = head.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "";
+      const head = html.match(/<head\\b[^>]*>([\\s\\S]*?)<\\/head>/i)?.[1] ?? "";
+      const title = head.match(/<title\\b[^>]*>([\\s\\S]*?)<\\/title>/i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "";
       const buildSha = metaContent(head, "name", "env-build-sha");
       last = { status: response.status, title, buildSha, url: response.url };
       const matchingBuild = EXPECTED_BUILD_SHA ? buildSha === EXPECTED_BUILD_SHA : title === EXPECTED_HOMEPAGE_TITLE;
       if (response.status === 200 && title === EXPECTED_HOMEPAGE_TITLE && matchingBuild) {
-        checked.push({ path: "/", status: response.status, title, buildSha, deploymentVersionConfirmed: true });
+        checked.push({ path: "/", status: response.status, title, buildSha, deploymentVersionConfirmed: true, attempts });
         return true;
       }
     } catch (error) {
       last = { status: 0, title: "", url: ORIGIN + "/", error: String(error) };
     }
-    if (attempt < 36) await new Promise((resolve) => setTimeout(resolve, 5_000));
+    const sleepMs = Math.min(DEPLOYMENT_POLL_INTERVAL_MS, Math.max(0, deadline - Date.now()));
+    if (sleepMs > 0) await new Promise((resolve) => setTimeout(resolve, sleepMs));
   }
   failures.push(
-    "production did not serve the current homepage build within 180 seconds (expected title="
-    + JSON.stringify(EXPECTED_HOMEPAGE_TITLE) + ", last response=" + JSON.stringify(last) + ")"
+    "production did not serve the current homepage build within "
+    + Math.ceil(DEPLOYMENT_WAIT_TIMEOUT_MS / 1000) + " seconds (attempts=" + attempts
+    + ", expected title=" + JSON.stringify(EXPECTED_HOMEPAGE_TITLE)
+    + ", expected build SHA=" + JSON.stringify(EXPECTED_BUILD_SHA)
+    + ", last response=" + JSON.stringify(last) + ")"
   );
   return false;
 }
@@ -274,7 +284,7 @@ async function checkRenderedRoute(path, schema) {
 
 async function main() {
   try {
-    await waitForHomepageDeployment();
+    if (!(await waitForHomepageDeployment())) return;
     await checkStaticAssets();
     await checkCanonicalHosts();
     for (const [path, schema] of [
