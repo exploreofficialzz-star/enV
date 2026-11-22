@@ -1235,7 +1235,7 @@ function Account() {
                 <span className="grid size-13 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10 text-white shadow-inner sm:size-16"><Wallet size={28} aria-hidden="true"/></span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 text-xs font-medium text-white/90 sm:text-sm">
-                    <span>Total enV balance</span>
+                    <span>Total balance</span>
                     <button type="button" onClick={() => setShowBalance(value => !value)} aria-label={showBalance ? "Hide balance" : "Show balance"} title={showBalance ? "Hide balance" : "Show balance"} className="inline-flex size-8 items-center justify-center rounded-full text-white/90 transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70">
                       {showBalance ? <Eye size={16} aria-hidden="true"/> : <EyeOff size={16} aria-hidden="true"/>}
                     </button>
