@@ -1,5 +1,25 @@
 const SITE_ORIGIN = "https://envtools.store";
 
+export async function verifyIndexNowKeyFile(key, fetchImpl = fetch) {
+  const normalizedKey = String(key ?? "").trim();
+  if (!/^[A-Za-z0-9-]{8,128}$/.test(normalizedKey)) {
+    throw new Error("INDEXNOW_KEY must contain 8-128 letters, numbers or hyphens.");
+  }
+  const url = SITE_ORIGIN + "/" + normalizedKey + ".txt";
+  const response = await fetchImpl(url, {
+    redirect: "follow",
+    signal: AbortSignal.timeout(12_000),
+  });
+  if (!response.ok) {
+    return { ok: false, reason: "The production key file returned HTTP " + response.status + "." };
+  }
+  const body = (await response.text()).trim();
+  if (body !== normalizedKey) {
+    return { ok: false, reason: "The production key file content does not match INDEXNOW_KEY." };
+  }
+  return { ok: true, url };
+}
+
 export function chunkIndexNowUrls(urls, maxUrlsPerPost = 10_000) {
   if (!Array.isArray(urls)) throw new TypeError("IndexNow URLs must be an array.");
   if (!Number.isInteger(maxUrlsPerPost) || maxUrlsPerPost < 1 || maxUrlsPerPost > 10_000) {
