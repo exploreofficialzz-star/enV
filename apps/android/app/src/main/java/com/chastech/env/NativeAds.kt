@@ -530,9 +530,10 @@ internal fun NativeRewardedToolAccessGate(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Button(
-                onClick = {
-                    if (activity == null || busy) return@Button
+            if (!preferTokens) {
+                Button(
+                    onClick = {
+                        if (activity == null || busy) return@Button
                     NativeToolAccessPreference.setPrefersTokens(context, tool.id, false)
                     preferTokens = false
                     busy = true
@@ -584,8 +585,18 @@ internal fun NativeRewardedToolAccessGate(
                 },
                 enabled = !busy && activity != null && network && originReachable && consentReady && NativeAdsPolicy.rewardedAdsConfigured,
                 modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(if (busy) "Loading rewarded ad…" else "Watch an ad to continue")
+                ) {
+                    Text(if (busy) "Loading rewarded ad…" else "Watch an ad to continue")
+                }
+            } else {
+                TextButton(
+                    onClick = {
+                        NativeToolAccessPreference.setPrefersTokens(context, tool.id, false)
+                        preferTokens = false
+                    },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Use rewarded ads instead") }
             }
             Button(
                 onClick = { scope.launch { reserveTokenAccess() } },
@@ -649,7 +660,11 @@ internal fun NativeRewardedToolAccessGate(
                 Button(onClick = { showAdFreeOffer = false; scope.launch { reserveTokenAccess() } }) { Text("Use enV tokens") }
             },
             dismissButton = {
-                TextButton(onClick = { showAdFreeOffer = false }) { Text("Keep using ads") }
+                TextButton(onClick = {
+                    NativeToolAccessPreference.setPrefersTokens(context, tool.id, false)
+                    preferTokens = false
+                    showAdFreeOffer = false
+                }) { Text("Keep using ads") }
             },
         )
     }
