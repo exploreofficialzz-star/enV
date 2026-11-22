@@ -98,6 +98,101 @@ try {
   assert.equal((await readDownload(extractedDownload)).toString("utf8"), "single-file extraction roundtrip");
   await page.getByRole("status").filter({ hasText: "Extraction completed." }).waitFor();
 
+  await page.getByRole("tab", { name: "Compress" }).click();
+  await page.evaluate(() => {
+    const capture = { calls: [], chunks: [], bytes: [] };
+    Object.defineProperty(window, "__envZipSaveCapture", { configurable: true, value: capture });
+    Object.defineProperty(window, "showSaveFilePicker", {
+      configurable: true,
+      value: async (options) => {
+        capture.calls.push({
+          active: navigator.userActivation?.isActive === true,
+          suggestedName: options?.suggestedName,
+        });
+        return {
+          createWritable: async () => new WritableStream({
+            write(chunk) { capture.chunks.push(Array.from(new Uint8Array(chunk))); },
+            close() { capture.bytes = capture.chunks.flat(); },
+          }),
+        };
+      },
+    });
+  });
+  await fileInput.setInputFiles({
+    name: "gesture.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("save picker must be called during the click gesture"),
+  });
+  await page.getByText("1 file", { exact: false }).waitFor();
+  await page.getByRole("button", { name: "Create ZIP archive" }).click();
+  await page.getByRole("status").filter({ hasText: "Your ZIP archive is ready." }).waitFor();
+  const saveCapture = await page.evaluate(() => window.__envZipSaveCapture);
+  assert.equal(saveCapture.calls.length, 1, "The native save picker is requested exactly once");
+  assert.equal(saveCapture.calls[0].active, true, "The save picker is called while transient user activation is active");
+  assert.match(saveCapture.calls[0].suggestedName, /\.zip$/);
+  const pickerFiles = await inspectZip(Buffer.from(saveCapture.bytes));
+  assert.equal(pickerFiles.get("gesture.txt"), "save picker must be called during the click gesture");
+
+  await page.getByRole("tab", { name: "Extract" }).click();
+  await page.evaluate(() => {
+    const capture = { calls: [], chunks: [], bytes: [] };
+    Object.defineProperty(window, "__envZipFolderCapture", { configurable: true, value: capture });
+    Object.defineProperty(window, "showDirectoryPicker", {
+      configurable: true,
+      value: async (options) => {
+        capture.calls.push({
+          active: navigator.userActivation?.isActive === true,
+          mode: options?.mode,
+        });
+        return {
+          getDirectoryHandle: async () => { throw new DOMException("No child folder expected in this test.", "NotFoundError"); },
+          getFileHandle: async (_name, fileOptions) => {
+            if (!fileOptions?.create) throw new DOMException("The output file does not exist yet.", "NotFoundError");
+            return {
+              createWritable: async () => new WritableStream({
+                write(chunk) { capture.chunks.push(Array.from(new Uint8Array(chunk))); },
+                close() { capture.bytes = capture.chunks.flat(); },
+              }),
+            };
+          },
+        };
+      },
+    });
+  });
+  await fileInput.setInputFiles({
+    name: "folder-picker-test.zip",
+    mimeType: "application/zip",
+    buffer: singleZip,
+  });
+  await page.getByText("folder-picker-test.zip", { exact: true }).first().waitFor();
+  await page.getByRole("button", { name: "Extract files" }).click();
+  await page.getByRole("status").filter({ hasText: "Extraction completed." }).waitFor();
+  const folderCapture = await page.evaluate(() => window.__envZipFolderCapture);
+  assert.equal(folderCapture.calls.length, 1, "The native folder picker is requested exactly once");
+  assert.equal(folderCapture.calls[0].active, true, "The folder picker is called while transient user activation is active");
+  assert.equal(folderCapture.calls[0].mode, "readwrite");
+  assert.deepEqual(Buffer.from(folderCapture.bytes), Buffer.from("single-file extraction roundtrip"));
+
+  await page.getByRole("tab", { name: "Compress" }).click();
+  await page.evaluate(() => {
+    Object.defineProperty(window, "showSaveFilePicker", {
+      configurable: true,
+      value: async () => { throw new DOMException("The browser did not grant a save gesture.", "NotAllowedError"); },
+    });
+  });
+  await fileInput.setInputFiles({
+    name: "fallback.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("blocked save picker falls back to a normal browser download"),
+  });
+  await page.getByText("1 file", { exact: false }).waitFor();
+  const blockedPickerDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Create ZIP archive" }).click();
+  const blockedPickerDownload = await blockedPickerDownloadPromise;
+  const blockedPickerFiles = await inspectZip(await readDownload(blockedPickerDownload));
+  assert.equal(blockedPickerFiles.get("fallback.txt"), "blocked save picker falls back to a normal browser download");
+  await page.getByRole("status").filter({ hasText: "Your ZIP archive is ready." }).waitFor();
+
   assert.deepEqual(localWriteRequests, [], "Compression and extraction do not send files to application APIs");
   writeToolAuditReport({
     auditId: "zip-any-file-browser",
@@ -105,7 +200,7 @@ try {
       toolId: "zip-any-file",
       status: "passed",
       checks: ["routeRendering", "interactionExecution", "outputValidation", "runtimeErrorCheck", "fileImportExport"],
-      notes: "Verified multi-file and single-file local ZIP creation, CRC-checked reads, extraction round-trip, byte preservation and zero application API write requests.",
+      notes: "Verified multi-file and single-file local ZIP creation, CRC-checked reads, extraction round-trip, active-user-gesture save and folder picker access, blocked-save-picker download fallback, byte preservation and zero application API write requests.",
     }],
     reportPath: process.argv.find((value) => value.startsWith("--report="))?.slice("--report=".length),
   });
@@ -117,6 +212,9 @@ try {
       "multiple local files compress into a readable ZIP",
       "single local file compresses into a readable ZIP",
       "single-file extraction restores the original bytes",
+      "save picker is requested during active user activation",
+      "extraction folder picker is requested during active user activation",
+      "a blocked save picker falls back to a normal browser download",
       "ZIP CRC checks pass",
       "compression and extraction make no application API write requests",
     ],
