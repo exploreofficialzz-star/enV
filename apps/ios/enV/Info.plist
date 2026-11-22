@@ -38,7 +38,7 @@
 	<key>ENV_ADMOB_BANNER_AD_UNIT_ID</key>
 	<string>$(ENV_ADMOB_BANNER_AD_UNIT_ID)</string>
 	<key>ENV_GAM_REWARDED_AD_UNIT_PATH</key>
-	<string>$(ENV_ADMOB_REWARDED_AD_UNIT_ID)</string>
+	<string>$(ENV_GAM_REWARDED_AD_UNIT_PATH)</string>
 	<key>ENV_AD_ACCESS_GATE_ENABLED</key>
 	<string>$(ENV_AD_ACCESS_GATE_ENABLED)</string>
 	<key>ENV_AD_ACCESS_TOOL_IDS</key>
