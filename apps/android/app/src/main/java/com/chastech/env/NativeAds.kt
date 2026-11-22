@@ -77,7 +77,7 @@ internal object NativeAdsPolicy {
     }
     val rewardedAccessConfigured: Boolean get() = BuildConfig.ENV_AD_ACCESS_GATE_ENABLED
     val rewardedAdsConfigured: Boolean get() = rewardedAccessConfigured &&
-        privacySetupConfigured && rewardedUnitId.matches(Regex("/[A-Za-z0-9_./-]{3,180}"))
+        privacySetupConfigured && rewardedUnitPath.matches(Regex("/[A-Za-z0-9_./-]{3,180}"))
     fun isRewardedAccessTool(context: Context, tool: ToolRecord): Boolean =
         rewardedAccessConfigured && tool.id in rewardedToolIds &&
             isAdEligibleTool(tool) && isHybridTool(context, tool)
@@ -539,7 +539,7 @@ internal fun NativeRewardedToolAccessGate(
                     busy = true
                     feedback = null
                     RewardedAd.load(
-                        AdRequest.Builder(NativeAdsPolicy.rewardedUnitId).build(),
+                        AdRequest.Builder(NativeAdsPolicy.rewardedUnitPath).build(),
                         object : AdLoadCallback<RewardedAd> {
                             override fun onAdLoaded(ad: RewardedAd) {
                                 var rewardEarned = false
