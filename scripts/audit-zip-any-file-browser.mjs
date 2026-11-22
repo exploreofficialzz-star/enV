@@ -98,6 +98,60 @@ try {
   assert.equal((await readDownload(extractedDownload)).toString("utf8"), "single-file extraction roundtrip");
   await page.getByRole("status").filter({ hasText: "Extraction completed." }).waitFor();
 
+  await page.getByRole("tab", { name: "Compress" }).click();
+  await page.evaluate(() => {
+    const capture = { calls: [], chunks: [], bytes: [] };
+    Object.defineProperty(window, "__envZipSaveCapture", { configurable: true, value: capture });
+    Object.defineProperty(window, "showSaveFilePicker", {
+      configurable: true,
+      value: async (options) => {
+        capture.calls.push({
+          active: navigator.userActivation?.isActive === true,
+          suggestedName: options?.suggestedName,
+        });
+        return {
+          createWritable: async () => new WritableStream({
+            write(chunk) { capture.chunks.push(...Array.from(new Uint8Array(chunk))); },
+            close() { capture.bytes = [...capture.chunks]; },
+          }),
+        };
+      },
+    });
+  });
+  await fileInput.setInputFiles({
+    name: "gesture.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("save picker must be called during the click gesture"),
+  });
+  await page.getByText("1 file", { exact: false }).waitFor();
+  await page.getByRole("button", { name: "Create ZIP archive" }).click();
+  await page.getByRole("status").filter({ hasText: "Your ZIP archive is ready." }).waitFor();
+  const saveCapture = await page.evaluate(() => window.__envZipSaveCapture);
+  assert.equal(saveCapture.calls.length, 1, "The native save picker is requested exactly once");
+  assert.equal(saveCapture.calls[0].active, true, "The save picker is called while transient user activation is active");
+  assert.match(saveCapture.calls[0].suggestedName, /\\.zip$/);
+  const pickerFiles = await inspectZip(Buffer.from(saveCapture.bytes));
+  assert.equal(pickerFiles.get("gesture.txt"), "save picker must be called during the click gesture");
+
+  await page.evaluate(() => {
+    Object.defineProperty(window, "showSaveFilePicker", {
+      configurable: true,
+      value: async () => { throw new DOMException("The browser did not grant a save gesture.", "NotAllowedError"); },
+    });
+  });
+  await fileInput.setInputFiles({
+    name: "fallback.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("blocked save picker falls back to a normal browser download"),
+  });
+  await page.getByText("1 file", { exact: false }).waitFor();
+  const blockedPickerDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Create ZIP archive" }).click();
+  const blockedPickerDownload = await blockedPickerDownloadPromise;
+  const blockedPickerFiles = await inspectZip(await readDownload(blockedPickerDownload));
+  assert.equal(blockedPickerFiles.get("fallback.txt"), "blocked save picker falls back to a normal browser download");
+  await page.getByRole("status").filter({ hasText: "Your ZIP archive is ready." }).waitFor();
+
   assert.deepEqual(localWriteRequests, [], "Compression and extraction do not send files to application APIs");
   writeToolAuditReport({
     auditId: "zip-any-file-browser",
@@ -117,6 +171,8 @@ try {
       "multiple local files compress into a readable ZIP",
       "single local file compresses into a readable ZIP",
       "single-file extraction restores the original bytes",
+      "save picker is requested during active user activation",
+      "a blocked save picker falls back to a normal browser download",
       "ZIP CRC checks pass",
       "compression and extraction make no application API write requests",
     ],
