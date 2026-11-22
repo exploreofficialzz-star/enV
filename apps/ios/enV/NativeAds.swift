@@ -289,6 +289,20 @@ private enum NativeRewardedAdProgress {
     }
 }
 
+private enum NativeToolAccessPreference {
+    private static func key(for toolID: String) -> String {
+        "env.native.tool-access-preference.v1.\(toolID)"
+    }
+
+    static func prefersTokens(for toolID: String) -> Bool {
+        UserDefaults.standard.string(forKey: key(for: toolID)) == "tokens"
+    }
+
+    static func setPrefersTokens(_ value: Bool, for toolID: String) {
+        UserDefaults.standard.set(value ? "tokens" : "ads", forKey: key(for: toolID))
+    }
+}
+
 private final class NativeRewardedAdDelegate: NSObject, FullScreenContentDelegate {
     var onDismiss: (() -> Void)?
     var onFailure: (() -> Void)?
@@ -314,6 +328,7 @@ struct NativeRewardedToolAccessGate<Content: View>: View {
     @State private var busy = false
     @State private var message = ""
     @State private var showAdFreeOffer = false
+    @State private var preferTokens = false
     @State private var showTokenConfirmation = false
     @State private var pendingReservation: OfflineWalletNativeAPI.ToolAccessReservation?
     @State private var activeReservation: OfflineWalletNativeAPI.ToolAccessReservation?
@@ -344,19 +359,30 @@ struct NativeRewardedToolAccessGate<Content: View>: View {
                         .font(.envScaled(size: 14, weight: .regular))
                         .foregroundStyle(Color.envMuted)
                         .fixedSize(horizontal: false, vertical: true)
-                    Button(action: { Task { await watchRewardedAd() } }) {
-                        HStack(spacing: 8) {
-                            if busy { ProgressView().tint(.white) }
-                            Text(busy ? "Loading rewarded ad…" : "Watch an ad to continue")
+                    if !preferTokens {
+                        Button(action: { Task { await watchRewardedAd() } }) {
+                            HStack(spacing: 8) {
+                                if busy { ProgressView().tint(.white) }
+                                Text(busy ? "Loading rewarded ad…" : "Watch an ad to continue")
+                            }
+                            .font(.envScaled(size: 14, weight: .semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 13)
+                            .background(Color.envInk, in: RoundedRectangle(cornerRadius: 10))
+                            .foregroundStyle(Color.envChrome)
                         }
-                        .font(.envScaled(size: 14, weight: .semibold))
+                        .buttonStyle(.plain)
+                        .disabled(!canWatch)
+                    } else {
+                        Button("Use rewarded ads instead") {
+                            NativeToolAccessPreference.setPrefersTokens(false, for: tool.id)
+                            preferTokens = false
+                        }
+                        .font(.envScaled(size: 13, weight: .medium))
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 13)
-                        .background(Color.envInk, in: RoundedRectangle(cornerRadius: 10))
-                        .foregroundStyle(Color.envChrome)
+                        .padding(.vertical, 8)
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
-                    .disabled(!canWatch)
 
                     Button(action: { Task { await reserveTokenAccess() } }) {
                         Text(busy ? "Checking reviewed token price…" : "Use enV tokens (ad-free)")
@@ -408,6 +434,9 @@ struct NativeRewardedToolAccessGate<Content: View>: View {
             originReachable = await NativeAdsPolicy.isApplicationOnline()
             originCheckComplete = true
         }
+        .onAppear {
+            preferTokens = NativeToolAccessPreference.prefersTokens(for: tool.id)
+        }
         .confirmationDialog(
             "Confirm token access",
             isPresented: $showTokenConfirmation,
@@ -431,7 +460,10 @@ struct NativeRewardedToolAccessGate<Content: View>: View {
         }
         .alert("Ready to go ad-free?", isPresented: $showAdFreeOffer) {
             Button("Use enV tokens") { Task { await reserveTokenAccess() } }
-            Button("Keep using ads", role: .cancel) { }
+            Button("Keep using ads", role: .cancel) {
+                NativeToolAccessPreference.setPrefersTokens(false, for: tool.id)
+                preferTokens = false
+            }
         } message: {
             Text("You completed three rewarded ads in the last 30 days. Use the reviewed token price for individual tools.")
         }
@@ -450,6 +482,8 @@ struct NativeRewardedToolAccessGate<Content: View>: View {
 
     @MainActor
     private func reserveTokenAccess() async {
+        NativeToolAccessPreference.setPrefersTokens(true, for: tool.id)
+        preferTokens = true
         guard !busy else { return }
         guard OfflineWalletNativeAPI.isPaired else {
             message = "Sign in to enV and pair this device from your Web Wallet before using tokens."
@@ -506,6 +540,8 @@ struct NativeRewardedToolAccessGate<Content: View>: View {
 
     @MainActor
     private func watchRewardedAd() async {
+        NativeToolAccessPreference.setPrefersTokens(false, for: tool.id)
+        preferTokens = false
         guard canWatch else { return }
         busy = true
         message = ""
