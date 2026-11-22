@@ -55,7 +55,7 @@ The connected `env` Vercel project and the production deployment were checked wi
 - `www.envtools.store` returns HTTP 308 directly to the canonical apex, preserving the requested path.
 - `envtool.vercel.app` returns HTTP 308 directly to the canonical apex, preserving the requested path. This redirect is provided by the production Vercel configuration.
 - The project domain inventory contains the canonical apex, `www`, `android`, `ios`, `feedback`, `updates`, `userbehavior`, and the approved `envtool.vercel.app` redirect alias. No `.site` domain is attached.
-- A repository-wide source search found no `envtools.site` or `www.envtools.site` references. The remaining `en-v.vercel.app` strings are negative-test fixtures, not live website destinations.
+- A repository-wide source search found no references to the retired website domains. Remaining retired Vercel alias references occur only in negative-test fixtures, not live website destinations.
 - The production SEO smoke received HTTP 200 for `/robots.txt`, `/llms.txt`, and `/sitemap.xml`. The sitemap reported 10,268 URLs in one shard.
 - The live smoke's canonical-host checks passed for both alternate hosts. Its separate remaining route-content finding is that the Zip any file page is missing its local privacy notice; that does not change the redirect result.
 - `INDEXNOW_KEY`: present as a sensitive Production-only variable. Its matching public key file has not yet been independently verified on the canonical production domain, so do not treat the secret's presence as proof that IndexNow is ready.
