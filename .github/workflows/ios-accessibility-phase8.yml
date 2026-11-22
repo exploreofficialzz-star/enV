@@ -41,6 +41,7 @@ jobs:
           xcodebuild test \
             -project apps/ios/enV.xcodeproj \
             -scheme enV \
+            -configuration Debug \
             -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
             -parallel-testing-enabled NO \
             -resultBundlePath "$RUNNER_TEMP/enV-accessibility-phase8.xcresult"
