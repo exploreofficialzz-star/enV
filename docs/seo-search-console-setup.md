@@ -47,17 +47,23 @@ Set these Vercel project environment variables for the appropriate deployment en
 
 Use only the token value supplied by the relevant provider, not a complete HTML tag. Save the variables in Vercel, then trigger a new deployment. The values are public verification markers and are intentionally not committed to Git.
 
-### Vercel configuration audit snapshot — 14 November 2026
+### Vercel configuration and production SEO audit snapshot — 22 November 2026
 
-The connected `env` Vercel project was checked without decrypting or displaying secret values:
+The connected `env` Vercel project and the production deployment were checked without decrypting or displaying secret values. The production deployment for commit `e1a1e71883e6bab7cd7b9f25e96d7f063bda3458` is READY.
 
-- `INDEXNOW_KEY`: present as a sensitive Production-only variable.
-- The matching public key file has not yet been verified on the canonical production domain from this PR branch; a configured Vercel secret is not evidence that the deployment published it or that IndexNow accepted a notification.
-- `INDEXNOW_SUBMIT_ALL`: absent, which is correct for routine deployments; add it temporarily only for the documented first full-site synchronization after the key file is live.
+- `envtools.store` is the canonical website origin.
+- `www.envtools.store` returns HTTP 308 directly to the canonical apex, preserving the requested path.
+- `envtool.vercel.app` returns HTTP 308 directly to the canonical apex, preserving the requested path. This redirect is provided by the production Vercel configuration.
+- The project domain inventory contains the canonical apex, `www`, `android`, `ios`, `feedback`, `updates`, `userbehavior`, and the approved `envtool.vercel.app` redirect alias. No `.site` domain is attached.
+- A repository-wide source search found no `envtools.site` or `www.envtools.site` references. The remaining `en-v.vercel.app` strings are negative-test fixtures, not live website destinations.
+- The production SEO smoke received HTTP 200 for `/robots.txt`, `/llms.txt`, and `/sitemap.xml`. The sitemap reported 10,268 URLs in one shard.
+- The live smoke's canonical-host checks passed for both alternate hosts. Its separate remaining route-content finding is that the Zip any file page is missing its local privacy notice; that does not change the redirect result.
+- `INDEXNOW_KEY`: present as a sensitive Production-only variable. Its matching public key file has not yet been independently verified on the canonical production domain, so do not treat the secret's presence as proof that IndexNow is ready.
+- `INDEXNOW_SUBMIT_ALL`: absent, which is correct for routine deployments. The first full-site synchronization has not been performed.
 - `VITE_GOOGLE_SITE_VERIFICATION`: not configured.
 - `VITE_BING_SITE_VERIFICATION`: not configured.
 
-Therefore the IndexNow key is provisioned, but the Google and Bing HTML verification meta tags will not be emitted until the owner adds the corresponding values after completing provider ownership setup. A variable record alone does not prove Search Console or Bing ownership, sitemap processing, or indexing.
+Google Search Console and Bing Webmaster ownership and sitemap-processing status have not been verified in their external account dashboards during this audit. The absence of HTML-verification environment variables means those meta tags are not emitted; it does not establish whether DNS ownership verification has already been completed.
 
 DNS verification is often preferable because it is independent of application deployments.
 
