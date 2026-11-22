@@ -123,6 +123,10 @@ assert.match(read("apps/ios/enV/OfflineWalletNativeAPI.swift"), /static func res
 assert.match(tokenAccessRoute, /requireOfflineBillingUser/, "The tool-access API must accept verified paired Android and iOS sessions.");
 assert.match(tokenAccessRoute, /hasNativeAuthorization/, "Native bearer requests may omit browser Origin but still require a valid native billing session.");
 assert.match(approvedToolPrices, /approvedByToolId\.get\(toolId\)/);
+const accessRolloutDocs = read("docs/ad-supported-guest-access.md");
+assert.match(accessRolloutDocs, /267 approved cross-platform local-calculator prices/);
+assert.match(accessRolloutDocs, /ENV_GAM_REWARDED_AD_UNIT_PATH/);
+assert.match(accessRolloutDocs, /the current rewarded visit remains free and creates no token reservation/i, "The runbook must state that choosing tokens from the three-ad offer only applies to future visits.");
 assert.match(shell, /!isFullscreen && import\.meta\.env\.VITE_ADSTERRA_ENABLED !== "true" \? <AdSlot tool=\{tool\} \/>/, "The Google fallback must remain tool-only when Adsterra is disabled.");
 
 assert.match(slot, /whenGooglePrivacyConsentDataReady/, "Web ad requests must wait for the CMP consent-data-ready callback.");
