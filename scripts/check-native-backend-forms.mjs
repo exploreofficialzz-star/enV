@@ -51,7 +51,8 @@ const apiOperations = [...operationList[1].matchAll(/"([a-z0-9-]+)"/g)].map((mat
 const catalogOperations = docs.map((tool) => tool.engine.op ?? tool.id);
 assert.equal(new Set(apiOperations).size, apiOperations.length, "document API allowlist must not contain duplicate operations");
 assert.deepEqual([...apiOperations].sort(), [...catalogOperations].sort(), "document API allowlist must exactly cover all catalog document-backend operations");
-assert.match(docWeb, /multiple=\{\/merger\|comparison\|splitter\/\.test\(op\)\}/);
+assert.match(docWeb, /const multiple = \/merger\|comparison\|splitter\/\.test\(op\);/);
+assert.match(docWeb, /multiple=\{multiple\}/);
 assert.match(android, /Regex\("merger\|comparison\|splitter"\)/);
 assert.match(ios, /merger\|comparison\|splitter/);
 assert.match(docWeb, /\.test\(op\).*pages/);

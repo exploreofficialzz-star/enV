@@ -184,7 +184,12 @@ test("production API CORS defaults to the canonical app origin", async () => {
 test("production app error boundary hides raw exception messages", async () => {
   const source = await readFile(new URL("../src/lib/error-component.tsx", import.meta.url), "utf8");
   assert.match(source, /if \(!import\.meta\.env\.DEV\) return FALLBACK_MESSAGE/);
-  assert.match(source, /We couldn’t load this page\. Refresh and try again\./);
+  assert.match(source, /if \(status === 401\) return "Your session may have expired/);
+  assert.match(source, /if \(status === 403\) return "You do not have permission/);
+  assert.match(source, /if \(status === 404\) return "This page or resource could not be found/);
+  assert.match(source, /if \(status === 429\) return "enV is handling too many requests/);
+  assert.match(source, /const FALLBACK_MESSAGE = "We couldn’t complete this page request\. Try again or return to enV\."/);
+  assert.match(source, /return FALLBACK_MESSAGE;/);
 });
 
 test("URL-media public errors use stable messages and opaque request IDs", async () => {

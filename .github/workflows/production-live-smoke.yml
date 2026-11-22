@@ -132,48 +132,45 @@ jobs:
           const response = JSON.parse(fs.readFileSync('/tmp/env-funding-options.json', 'utf8'));
           const data = response?.data;
           const failures = [];
-          const providers = Array.isArray(data?.providers) ? data.providers : [];
-          const allowed = new Set(['paystack', 'flutterwave', 'cryptomus']);
-          const ids = providers.map((provider) => provider?.id);
-          if (response?.ok !== true || !data || providers.length === 0) {
-            failures.push('Funding-options response is missing provider routing data.');
+          const methods = data?.methods;
+          const flutterwave = data?.flutterwave;
+          const failures = [];
+          if (response?.ok !== true || !data || typeof data !== 'object') {
+            failures.push('Funding-options response is missing its public data object.');
           }
-          if (new Set(ids).size !== ids.length || ids.some((id) => !allowed.has(id))) {
-            failures.push('Funding-options response contains duplicate or unsupported providers.');
+          if (data && data.countryCode !== null && typeof data.countryCode !== 'string') {
+            failures.push('Funding-options countryCode must be a string or null.');
           }
-          for (const provider of providers) {
-            const id = provider?.id ?? 'unknown';
-            if (typeof provider.enabled !== 'boolean' || !/^[A-Z]{3}$/.test(provider.currency ?? '') ||
-                !Array.isArray(provider.packs) ||
-                (provider.packs.length > 0 && provider.packs.map((pack) => pack?.tokens).join(',') !== '100,250,500,1000')) {
-              failures.push(`The ${id} funding-options contract is malformed.`);
-              continue;
-            }
-            if (Object.hasOwn(provider, 'fxRate') || Object.hasOwn(provider, 'fxSource') ||
-                Object.hasOwn(provider, 'fxUpdatedAt')) {
-              failures.push(`The public ${id} contract exposes the upstream FX snapshot.`);
-            }
-            for (const pack of provider.packs) {
-              if (typeof pack.enabled !== 'boolean') {
-                failures.push(`The ${id} provider omitted pack-level availability.`);
-              }
-              if (Object.hasOwn(pack, 'amountMinor') || Object.hasOwn(pack, 'fxRate') ||
-                  Object.hasOwn(pack, 'fxSource') || Object.hasOwn(pack, 'fxUpdatedAt')) {
-                failures.push(`The public ${id} pack exposes a local amount or raw FX quote.`);
-              }
-            }
-            if (provider.enabled && !provider.packs.some((pack) => pack.enabled === true)) {
-              failures.push(`The enabled ${id} provider has no purchasable pack.`);
+          if (data && data.currency !== null && !/^[A-Z]{3}$/.test(data.currency ?? '')) {
+            failures.push('Funding-options currency must be a three-letter code or null.');
+          }
+          if (data && typeof data.message !== 'string') {
+            failures.push('Funding-options response is missing its customer-facing explanation.');
+          }
+          for (const id of ['card', 'local', 'more']) {
+            if (typeof methods?.[id] !== 'boolean') {
+              failures.push(`The public ${id} payment-method availability flag is missing.`);
             }
           }
-          if (data && data.anyEnabled !== providers.some((provider) => provider.enabled === true)) {
-            failures.push('The aggregate anyEnabled flag does not match provider availability.');
+          if (!flutterwave || typeof flutterwave.enabled !== 'boolean' ||
+              (flutterwave.currency !== null && !/^[A-Z]{3}$/.test(flutterwave.currency ?? '')) ||
+              !Array.isArray(flutterwave.paymentMethods) ||
+              !Array.isArray(flutterwave.mobileNetworks)) {
+            failures.push('The customer-facing Flutterwave summary is malformed.');
+          }
+          if (flutterwave?.enabled === true &&
+              flutterwave.paymentMethods.length === 0 &&
+              flutterwave.mobileNetworks.length === 0) {
+            failures.push('Flutterwave is marked enabled without an available customer payment method.');
+          }
+          if (data && Object.hasOwn(data, 'providers')) {
+            failures.push('The public funding-options response exposes provider routing records.');
           }
           if (failures.length) {
             for (const failure of failures) console.error(`FAIL: ${failure}`);
             process.exit(1);
           }
-          console.log(`Payment API contract healthy; Paystack enabled=${providers.find((provider) => provider.id === 'paystack')?.enabled === true}; Cryptomus enabled=${providers.find((provider) => provider.id === 'cryptomus')?.enabled === true}. This contract check does not imply live provider approval.`);
+          console.log(`Payment API public contract healthy; card=${methods.card}; local=${methods.local}; more=${methods.more}; Flutterwave enabled=${flutterwave.enabled}. Provider identities and pricing remain server-side.`);
           NODE
 
       - name: Check account session API
