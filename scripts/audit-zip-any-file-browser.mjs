@@ -159,7 +159,7 @@ try {
       toolId: "zip-any-file",
       status: "passed",
       checks: ["routeRendering", "interactionExecution", "outputValidation", "runtimeErrorCheck", "fileImportExport"],
-      notes: "Verified multi-file and single-file local ZIP creation, CRC-checked reads, extraction round-trip, byte preservation and zero application API write requests.",
+      notes: "Verified multi-file and single-file local ZIP creation, CRC-checked reads, extraction round-trip, active-user-gesture save-picker access, blocked-picker download fallback, byte preservation and zero application API write requests.",
     }],
     reportPath: process.argv.find((value) => value.startsWith("--report="))?.slice("--report=".length),
   });
