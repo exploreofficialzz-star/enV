@@ -19,7 +19,7 @@ test("production IndexNow key verification confirms the canonical public file be
   const result = await verifyIndexNowKeyFile(key, async (url, options) => {
     requestedUrl = url;
     requestOptions = options;
-    return { ok: true, status: 200, text: async () => key + "\\n" };
+    return { ok: true, status: 200, text: async () => key };
   });
   assert.equal(result.ok, true);
   assert.equal(result.url, "https://envtools.store/" + key + ".txt");
