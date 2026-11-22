@@ -9,6 +9,7 @@ import {
   displayedMilliseconds,
   formatCountdown,
   formatStopwatch,
+  productivityModeForToolId,
   recordProductivityLap,
   resetProductivityTimer,
   setFocusDurations,
@@ -20,10 +21,14 @@ import {
 
 const monotonicNow = () => performance.now();
 
-export function ProductivityEngine({ op }: { op: string }) {
-  if (op === "stopwatch") return <Stopwatch />;
-  if (op === "pomodoro") return <CycleTimer mode="pomodoro" />;
-  return <CycleTimer mode="focus" />;
+export function ProductivityEngine({ toolId }: { toolId: string }) {
+  const mode = productivityModeForToolId(toolId);
+  if (mode === "stopwatch") return <Stopwatch />;
+  if (mode === "pomodoro") return <CycleTimer mode="pomodoro" />;
+  if (mode === "focus") return <CycleTimer mode="focus" />;
+  return <p className="rounded-xl border border-danger/30 bg-danger/5 p-3 text-sm text-danger" role="alert">
+    This productivity tool has no configured timer mode.
+  </p>;
 }
 
 function useProductivityTimer(mode: ProductivityMode): [ProductivityTimerState, (next: (current: ProductivityTimerState) => ProductivityTimerState) => void] {
