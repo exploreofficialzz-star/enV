@@ -58,6 +58,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
+import org.json.JSONArray
 import org.json.JSONObject
 
 internal val LocalNativeToolAccessCompletion = staticCompositionLocalOf<(Boolean) -> Unit> { {} }
@@ -373,22 +374,27 @@ internal fun NativeToolAdSlot(tool: ToolRecord) {
 }
 
 private object NativeRewardedAdProgress {
-    private const val PREFS = "env_rewarded_ad_progress_v1"
+    private const val PREFS = "env_rewarded_ad_progress_v2"
     private const val WINDOW_MS = 30L * 24L * 60L * 60L * 1_000L
+    private const val MAX_STORED_COMPLETIONS = 100
 
     fun recordCompletion(context: Context, now: Long = System.currentTimeMillis()): Boolean {
         val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val storedStart = prefs.getLong("period_started_at", 0L)
-        val expired = storedStart <= 0L || now < storedStart || now - storedStart >= WINDOW_MS
-        val start = if (expired) now else storedStart
-        val count = (if (expired) 0 else prefs.getInt("completed", 0)).coerceAtLeast(0) + 1
-        val offerShown = if (expired) false else prefs.getBoolean("offer_shown", false)
-        val shouldShowOffer = count >= 3 && !offerShown
-        val saved = prefs.edit()
-            .putLong("period_started_at", start)
-            .putInt("completed", count)
-            .putBoolean("offer_shown", offerShown || shouldShowOffer)
-            .commit()
+        val cutoff = now - WINDOW_MS
+        val stored = runCatching {
+            val timestamps = JSONArray(prefs.getString("completion_timestamps", "[]") ?: "[]")
+            (0 until timestamps.length()).map { timestamps.optLong(it, 0L) }
+        }.getOrDefault(emptyList())
+        val completions = (stored.filter { it > cutoff && it <= now } + now)
+            .sorted()
+            .takeLast(MAX_STORED_COMPLETIONS)
+        val lastOfferAt = prefs.getLong("offer_shown_at", 0L)
+        val offerCooldownActive = lastOfferAt > cutoff && lastOfferAt <= now
+        val shouldShowOffer = completions.size >= 3 && !offerCooldownActive
+        val timestamps = JSONArray().apply { completions.forEach { put(it) } }
+        val editor = prefs.edit().putString("completion_timestamps", timestamps.toString())
+        if (shouldShowOffer) editor.putLong("offer_shown_at", now)
+        val saved = editor.commit()
         return saved && shouldShowOffer
     }
 }
