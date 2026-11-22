@@ -452,7 +452,7 @@ export function toolDocumentationSummary(tool: ToolMeta): string {
   // search snippet independently worded so it is not repeated verbatim.
   const engine = tool.engine.type;
 
-  if (engine === "calculator") {
+  if (engine === "calculator" || tool.category === "calculators" || /\bcalculator$/i.test(name)) {
     return `Use ${name} to calculate results from the values you enter. Confirm the field labels, units, and assumptions, then check the output before relying on it.`;
   }
   if (engine === "converter" || engine === "file-converter") {

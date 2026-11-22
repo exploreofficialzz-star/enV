@@ -325,7 +325,11 @@ function describe(category, prefix, operation) {
     if (has("export preset")) return "Review export settings for " + label + " and match them to the intended destination.";
     if (has("format guide")) return "Compare audio format guidance for " + label + " and confirm compatibility with your intended playback or publishing service.";
   }
-  if (category === "mockups" && has("mockup")) return "Create a clearly labeled fictional " + subject + " mockup for a story, presentation or interface concept. It is not a real conversation or notification.";
+  if (category === "mockups" && has("mockup")) {
+    // Names assembled from repeated platform/task words should not repeat the same word.
+    const mockupSubject = subject.replace(/\b(\w+)(?:\s+\1\b)+/gi, "$1");
+    return "Create a clearly labeled fictional " + mockupSubject + " mockup for a story, presentation or interface concept. It is not a real conversation or notification.";
+  }
   if (category === "screenshots") {
     if (has("annotation")) return "Add notes or visual callouts to a screenshot for review or presentation.";
     if (has("redaction")) return "Cover selected sensitive areas in a screenshot before sharing it. Check the exported file to confirm the information is concealed.";

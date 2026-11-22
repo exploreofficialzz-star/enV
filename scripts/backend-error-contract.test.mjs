@@ -183,7 +183,7 @@ test("production API CORS defaults to the canonical app origin", async () => {
 
 test("production app error boundary hides raw exception messages", async () => {
   const source = await readFile(new URL("../src/lib/error-component.tsx", import.meta.url), "utf8");
-  assert.match(source, /if (import\.meta\.env\.DEV) \{\s*if (error instanceof Error && error\.message) return error\.message;/);
+  assert.match(source, /if \(import\.meta\.env\.DEV\) \{\s*if \(error instanceof Error && error\.message\) return error\.message;/);
   assert.match(source, /if (status === 401) return "Your session may have expired/);
   assert.match(source, /if (status === 403) return "You do not have permission/);
   assert.match(source, /if (status === 404) return "This page or resource could not be found/);
