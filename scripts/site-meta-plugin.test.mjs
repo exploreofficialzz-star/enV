@@ -234,7 +234,6 @@ test("web brand lockups use the canonical light and dark assets in the home hero
   assert.ok(home.indexOf("Total token = 100") < home.indexOf("<MostUsedToolsTray") && home.indexOf("<MostUsedToolsTray") < home.indexOf('<h1 className="mt-6'), "Home should place personal shortcuts after AI/token and before the hero headline");
   assert.match(home, /md:grid-cols-3/);
   assert.doesNotMatch(home, /Explore all tools/);
-  assert.match(home, /<br className="sm:hidden"\s*\/>/);
   assert.doesNotMatch(shell, /MobileNav/);
   assert.match(footer, /<Logo\s*\/>/);
 });

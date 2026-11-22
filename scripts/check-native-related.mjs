@@ -5,13 +5,21 @@ import { dirname, resolve } from "node:path";
 import { tools as baseWebTools } from "../src/data/catalog.ts";
 import { applyGenericWorkflowPolicy } from "../src/lib/generic-workflow-policy.mjs";
 import { DATETIME_TOOL_EXTENSIONS } from "../src/lib/datetime/catalog-tools.ts";
+import { getAllTools } from "../src/lib/registry.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path) => readFileSync(resolve(root, path), "utf8");
 
-// Merge typed runtime extensions into both generated bases before comparing Web/native catalogue parity.
+// Match the exporter's canonical runtime override before comparing generated Web/native catalogues.
+// The source catalogue retains a legacy file-converter-shaped record under this stable ID;
+// the runtime resolver deliberately presents it as Advanced CSS Minifier in Developer Studio.
+const canonicalRuntimeById = new Map(getAllTools().map((tool) => [tool.id, tool]));
+const canonicalCssMinifier = canonicalRuntimeById.get("css-minifier-advanced");
+assert.ok(canonicalCssMinifier, "Canonical runtime record is missing for css-minifier-advanced.");
 const webTools = [
-  ...applyGenericWorkflowPolicy(baseWebTools),
+  ...applyGenericWorkflowPolicy(baseWebTools).map((tool) =>
+    tool.id === "css-minifier-advanced" ? canonicalCssMinifier : tool
+  ),
   ...DATETIME_TOOL_EXTENSIONS.filter((extension) => !baseWebTools.some((tool) => tool.id === extension.id)),
 ];
 const sharedBaseTools = JSON.parse(read("apps/shared/catalog.json")).tools;

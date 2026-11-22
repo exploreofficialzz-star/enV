@@ -120,7 +120,8 @@ const tokenDashboard = requireText("src/components/billing/token-dashboard.tsx",
 if (tokenDashboard.includes("Sign in to load your real enV balance") || tokenDashboard.includes(">Sign in</Link>")) errors.push("Token dashboard must not show the redundant sign-in prompt card.");
 if (!tokenDashboard.includes('wallet ? tokenLabel(wallet.availableTokens) : "—"')) errors.push("Token dashboard must not show a fabricated zero balance when account data is unavailable.");
 if (!tokenDashboard.includes('loadState === "loading" ? null')) errors.push("Token dashboard must not render a textual loading placeholder while the first request is pending.");
-const wallet = requireText("src/routes/wallet.tsx", ['createFileRoute("/wallet")', "Total balance", "Tag enV on your videos", "Refer a friend"], "Wallet page");
+const wallet = requireText("src/routes/wallet.tsx", ['createFileRoute("/wallet")', "Tag enV on your videos", "Refer a friend"], "Wallet page");
+if (!wallet.includes("Total enV balance") && !wallet.includes("Total balance")) errors.push("Wallet page is missing its visible balance label.");
 for (const item of ['const isWalletPage = pathname === "/wallet"', '<h1 className="text-xl font-semibold tracking-tight text-fg sm:text-2xl">Wallet</h1>', 'aria-label="Notifications"', 'aria-label="Profile and account"']) {
   if (!header.includes(item)) errors.push(`Wallet shared header is missing ${item}`);
 }
@@ -143,7 +144,7 @@ const iosMenuStart = ios.indexOf("Menu {", ios.indexOf("ToolbarItemGroup(placeme
 const iosMenuEnd = ios.indexOf("} label: {", iosMenuStart);
 const iosMenu = iosMenuStart >= 0 && iosMenuEnd > iosMenuStart ? ios.slice(iosMenuStart, iosMenuEnd) : "";
 for (const removed of ['Button("AI Agent")', 'Button("Sign in")', 'Button("Create account")', 'Button("Search tools")', 'Section("LEGAL")']) if (iosMenu.includes(removed)) errors.push(`iOS overflow menu still contains ${removed}`);
-const iosViews = requireText("apps/ios/enV/ContentViews.swift", ['HomePreviewBar(title: "Total token = 100", action:', "private struct WebHomeFooter: View", 'linkGroup("Legal"', "Estimated tokens across enV tools", 'case "report-bugs": NativeFeedbackRequestView(isBugReport: true)', 'case "suggest-tool": NativeFeedbackRequestView(isBugReport: false)', 'private struct NativeFeedbackRequestView: View']);
+const iosViews = requireText("apps/ios/enV/ContentViews.swift", ['HomePreviewBar(title: "Total token", action: { onInformation("token-dashboard") }', "private struct WebHomeFooter: View", 'linkGroup("Legal"', "Estimated tokens across enV tools", 'case "report-bugs": NativeFeedbackRequestView(isBugReport: true)', 'case "suggest-tool": NativeFeedbackRequestView(isBugReport: false)', 'private struct NativeFeedbackRequestView: View']);
 if (/linkGroup\("Product"|linkGroup\("Resources"/.test(iosViews)) errors.push("iOS footer still renders the moved Product/Resources groups.");
 if (!iosMenu.includes('https://envtools.store/account')) errors.push("iOS Account must open the unified enV sign-in page directly.");
 if (!iosViews.includes('Button("Continue to sign in")') || !iosViews.includes('https://envtools.store/account')) errors.push("iOS Account entry must use the shared enV sign-in page.");
