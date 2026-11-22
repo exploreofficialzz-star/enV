@@ -221,7 +221,8 @@ test("web brand lockups use the canonical light and dark assets in the home hero
   assert.doesNotMatch(home, /index >= 6 \? "hidden md:flex"/);
   assert.match(home, /text-xl font-semibold text-accent sm:text-2xl/);
   assert.match(home, /AI Agent/);
-  assert.match(home, /<Link to="\\/tokens" aria-label="Open token dashboard"[^>]*>Total token<\\/Link>/);\n  assert.doesNotMatch(home, /Total token\\s*=\\s*\\d+/, "Home must not display a fabricated token balance");
+  assert.match(home, /<Link to="\/tokens" aria-label="Open token dashboard"[^>]*>Total token<\/Link>/);
+  assert.doesNotMatch(home, /Total token\s*=\s*\d+/, "Home must not display a fabricated token balance");
   assert.match(home, /to="\/tokens" aria-label="Open token dashboard"/);
   assert.match(home, /mt-4 grid w-\[84%\] max-w-\[40rem\] grid-cols-2 gap-2/);
   assert.match(home, /items-center justify-center rounded-xl/);
