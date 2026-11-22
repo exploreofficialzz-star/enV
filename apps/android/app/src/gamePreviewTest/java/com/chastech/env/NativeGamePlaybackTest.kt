@@ -91,23 +91,29 @@ class NativeGamePlaybackTest {
             ?.isNotEmpty() == true
         assertTrue("System launcher ANR dialog must be dismissed before touch testing", !remainingSystemDialog)
 
-        val x = (image.width * 0.263).toInt()
-        val y = (image.height * 0.913).toInt()
+        // Take the comparison baseline only after the system overlay is gone, so
+        // dismissing the dialog itself can never satisfy the movement assertion.
+        val movementBaseline = requireNotNull(automation.takeScreenshot())
+        val cleanCapture = automation.executeShellCommand("screencap -p /sdcard/Download/env-game-preview.png")
+        ParcelFileDescriptor.AutoCloseInputStream(cleanCapture).use { it.readBytes() }
+
+        val x = (movementBaseline.width * 0.263).toInt()
+        val y = (movementBaseline.height * 0.913).toInt()
         val touch = automation.executeShellCommand("input swipe $x $y $x $y 1500")
         ParcelFileDescriptor.AutoCloseInputStream(touch).use { it.readBytes() }
         SystemClock.sleep(700)
         val after = requireNotNull(automation.takeScreenshot())
         var changed = 0
-        val step = maxOf(4, image.height / 80)
-        for (py in image.height / 5 until image.height * 4 / 5 step step) {
-            for (px in image.width / 5 until image.width * 4 / 5 step step) {
-                if (image.getPixel(px, py) != after.getPixel(px, py)) changed++
+        val step = maxOf(4, movementBaseline.height / 80)
+        for (py in movementBaseline.height / 5 until movementBaseline.height * 4 / 5 step step) {
+            for (px in movementBaseline.width / 5 until movementBaseline.width * 4 / 5 step step) {
+                if (movementBaseline.getPixel(px, py) != after.getPixel(px, py)) changed++
             }
         }
         val afterCapture = automation.executeShellCommand("screencap -p /sdcard/Download/env-game-after.png")
         ParcelFileDescriptor.AutoCloseInputStream(afterCapture).use { it.readBytes() }
-        val screenWidth = image.width
-        val screenHeight = image.height
+        val screenWidth = movementBaseline.width
+        val screenHeight = movementBaseline.height
         assertTrue("Touch movement did not change the rendered scene; changed samples=$changed", changed > 25)
         // The Godot runtime is isolated in :game_preview. Exit it before the test
         // runner uninstalls the app, so the native graphics process releases EGL
@@ -145,6 +151,7 @@ class NativeGamePlaybackTest {
         )
         println("Native game exited cleanly before instrumentation cleanup")
         image.recycle()
+        movementBaseline.recycle()
         after.recycle()
     }
 }
