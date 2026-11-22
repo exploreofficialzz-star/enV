@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { SEO_CANONICAL_ORIGIN, SEO_REDIRECT_HOSTS } from "./seo-domain-policy.mjs";
+import { waitForHomepageDeployment as waitForMatchingHomepageDeployment, DEPLOYMENT_WAIT_TIMEOUT_MS } from "./live-seo-deployment-wait.mjs";
 
 const ORIGIN = SEO_CANONICAL_ORIGIN;
 const EXPECTED_HOMEPAGE_TITLE = "enV | Tools for everyday tasks";
@@ -177,35 +178,32 @@ async function checkCanonicalHosts() {
 }
 
 async function waitForHomepageDeployment() {
-  // The live smoke is triggered by a Git push while Vercel builds in parallel.
-  // Wait for a page-level build marker before evaluating production metadata,
-  // otherwise a fast smoke can accidentally inspect the previous deployment.
-  let last = { status: 0, title: "", url: ORIGIN + "/" };
-  for (let attempt = 1; attempt <= 36; attempt += 1) {
-    try {
-      const response = await fetch(ORIGIN + "/", {
-        redirect: "follow",
-        headers: { "user-agent": USER_AGENT },
-        signal: AbortSignal.timeout(10_000),
-      });
-      const html = await response.text();
-      const head = html.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i)?.[1] ?? "";
-      const title = head.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "";
-      const buildSha = metaContent(head, "name", "env-build-sha");
-      last = { status: response.status, title, buildSha, url: response.url };
-      const matchingBuild = EXPECTED_BUILD_SHA ? buildSha === EXPECTED_BUILD_SHA : title === EXPECTED_HOMEPAGE_TITLE;
-      if (response.status === 200 && title === EXPECTED_HOMEPAGE_TITLE && matchingBuild) {
-        checked.push({ path: "/", status: response.status, title, buildSha, deploymentVersionConfirmed: true });
-        return true;
-      }
-    } catch (error) {
-      last = { status: 0, title: "", url: ORIGIN + "/", error: String(error) };
-    }
-    if (attempt < 36) await new Promise((resolve) => setTimeout(resolve, 5_000));
+  // A Git push starts the production smoke and Vercel build in parallel.
+  // Match the exact commit before checking redirects or page metadata so the
+  // smoke cannot accidentally certify the previous production deployment.
+  const result = await waitForMatchingHomepageDeployment({
+    origin: ORIGIN,
+    expectedTitle: EXPECTED_HOMEPAGE_TITLE,
+    expectedSha: EXPECTED_BUILD_SHA,
+    fetchImpl: (url, options) => fetch(url, options),
+    requestHeaders: { "user-agent": USER_AGENT },
+  });
+  if (result.matched) {
+    checked.push({
+      path: "/",
+      status: result.last.status,
+      title: result.last.title,
+      buildSha: result.last.buildSha,
+      deploymentVersionConfirmed: true,
+      waitAttempts: result.attempts,
+      waitDurationMs: result.elapsedMs,
+    });
+    return true;
   }
   failures.push(
-    "production did not serve the current homepage build within 180 seconds (expected title="
-    + JSON.stringify(EXPECTED_HOMEPAGE_TITLE) + ", last response=" + JSON.stringify(last) + ")"
+    "production did not serve the current homepage build within "
+    + Math.round(DEPLOYMENT_WAIT_TIMEOUT_MS / 60_000) + " minutes (expected title="
+    + JSON.stringify(EXPECTED_HOMEPAGE_TITLE) + ", last response=" + JSON.stringify(result.last) + ")"
   );
   return false;
 }
