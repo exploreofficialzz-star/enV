@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "evidenceSetId": "pr154-files-17-source-review-fb57fb49",
-  "inspectedAgainstCommit": "fb57fb4946d6b668c467e63baeeeac75f0870361",
-  "note": "Content-pinned source review for the 17 Files/CSS tool IDs with current browser evidence. Each listed source path is checked against its Git blob SHA-1 before it contributes. Source inspection does not imply full functional, token, offline, backend, accessibility, or native verification.",
+  "evidenceSetId": "pr182-current-head-source-review-8a6acc7a",
+  "inspectedAgainstCommit": "8a6acc7a5fe385ea65f3ab67f0a5324dc7c3c9f7",
+  "note": "Content-pinned source review for the 17 Files/CSS tool IDs with browser evidence. Paths were rechecked against the current Ads/Token PR source at 8a6acc7a; each listed path is verified against its exact Git blob SHA-1. Source inspection does not imply full functional, token, offline, backend, accessibility, or native verification.",
   "records": [
     {
       "id": "files-workspace-six-source-review",
@@ -21,7 +21,7 @@
         },
         {
           "path": "src/lib/registry.ts",
-          "gitBlobSha1": "12a01cdd19c84badd4da198cbae98531a89e8c55"
+          "gitBlobSha1": "77f5eb065621e3c4b81252c2a267a7629c152ef7"
         },
         {
           "path": "src/components/tools/tool-engine.tsx",
@@ -134,7 +134,7 @@
         },
         {
           "path": "src/lib/registry.ts",
-          "gitBlobSha1": "12a01cdd19c84badd4da198cbae98531a89e8c55"
+          "gitBlobSha1": "77f5eb065621e3c4b81252c2a267a7629c152ef7"
         },
         {
           "path": "scripts/gen-catalog.mjs",
@@ -196,7 +196,7 @@
       "files": [
         {
           "path": "src/lib/registry.ts",
-          "gitBlobSha1": "12a01cdd19c84badd4da198cbae98531a89e8c55"
+          "gitBlobSha1": "77f5eb065621e3c4b81252c2a267a7629c152ef7"
         },
         {
           "path": "src/routes/tools/$category/$slug.tsx",
@@ -208,7 +208,7 @@
         },
         {
           "path": "src/components/engines/developer-engine.tsx",
-          "gitBlobSha1": "cf33ae761992afb864e0c2eadc1de2c9d84539e8"
+          "gitBlobSha1": "6c3879e3b0f00e7f25a80856adf9f02548bcc5fe"
         },
         {
           "path": "src/components/engines/developer-studio-engine.tsx",
