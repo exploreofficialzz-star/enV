@@ -192,7 +192,7 @@ assert.match(androidAds, /tool\.status == "active"/, "Android ads must exclude n
 assert.match(androidAds, /tool\.requiresBackend|!tool\.requiresBackend/, "Android ads must exclude backend-dependent tools.");
 assert.match(androidAds, /restrictedDisclaimers/, "Android ads must apply the same sensitive-topic exclusions as Web.");
 assert.match(androidAds, /common\.AdLoadCallback|common\.LoadAdError/, "Android must use the current Google Ads callback API.");
-assert.match(androidGradle, /ENV_ADMOB_REWARDED_AD_UNIT_ID/, "Android rewarded ad unit configuration must be explicit.");
+assert.match(androidGradle, /ENV_GAM_REWARDED_AD_UNIT_PATH/, "Android rewarded configuration must require a Google Ad Manager unit path.");
 assert.match(androidGradle, /ENV_AD_ACCESS_GATE_ENABLED[\s\S]*?false/, "Android rewarded access must be disabled by default.");
 assert.match(androidGradle, /ENV_AD_ACCESS_TOOL_IDS/, "Android rewarded access must have a separate tool allowlist.");
 assert.match(androidAds, /RewardedAd\.load\(/, "Android must load genuine Google rewarded video.");
@@ -224,7 +224,7 @@ assert.match(iosAds, /MobileAds\.shared\.start/, "iOS must initialize Google Mob
 assert.match(iosAds, /publisherPrivacyPersonalizationState = \.disabled/, "iOS ad requests must default to non-personalized treatment.");
 assert.match(iosAds, /coarseLocationCollectionEnabled = false/, "iOS ads must not collect coarse device location by default.");
 assert.match(iosAds, /static func isAdEligibleTool\(_ tool: Tool\)/, "iOS must evaluate the full catalog record using independent native ad eligibility.");
-assert.match(iosAds, /ENV_ADMOB_REWARDED_AD_UNIT_ID/, "iOS rewarded ad unit configuration must be explicit.");
+assert.match(iosAds, /ENV_ADMOB_REWARDED_AD_UNIT_ID/, "iOS rewarded configuration must require a Google Ad Manager unit path.");
 assert.match(iosAds, /ENV_AD_ACCESS_GATE_ENABLED/, "iOS rewarded access must have a dedicated feature flag.");
 assert.match(iosAds, /RewardedAd\.load\(with: NativeAdsPolicy\.rewardedUnitID, request: AdManagerRequest\(\)\)/, "iOS must load a native Google Ad Manager rewarded video.");
 assert.match(iosAds, /ad\.present\(from: nil\)/, "iOS rewarded ads must be user-initiated and presented natively.");
