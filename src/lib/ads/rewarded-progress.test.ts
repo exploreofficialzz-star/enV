@@ -16,31 +16,46 @@ function memoryStorage(initial?: string) {
   };
 }
 
-test("the ad-free offer appears exactly once after three verified completions", () => {
+test("the ad-free offer appears after three verified completions in the trailing 30 days", () => {
   const storage = memoryStorage();
   const now = 1_800_000_000_000;
   assert.equal(recordRewardedAdCompletion(storage, now).shouldShowAdFreeOffer, false);
   assert.equal(recordRewardedAdCompletion(storage, now + 1).shouldShowAdFreeOffer, false);
   const third = recordRewardedAdCompletion(storage, now + 2);
   assert.equal(third.shouldShowAdFreeOffer, true);
-  assert.equal(third.progress.completed, 3);
+  assert.deepEqual(third.progress.completedAt, [now, now + 1, now + 2]);
   assert.equal(recordRewardedAdCompletion(storage, now + 3).shouldShowAdFreeOffer, false);
 });
 
-test("rewarded progress resets after the rolling 30-day period", () => {
+test("completions expire individually once they leave the trailing 30-day window", () => {
+  const storage = memoryStorage();
+  const start = 1_800_000_000_000;
+  recordRewardedAdCompletion(storage, start);
+  recordRewardedAdCompletion(storage, start + REWARDED_AD_PERIOD_MS - 1);
+
+  const now = start + REWARDED_AD_PERIOD_MS + 1_000;
+  const third = recordRewardedAdCompletion(storage, now);
+  assert.equal(third.shouldShowAdFreeOffer, false);
+  assert.deepEqual(third.progress.completedAt, [start + REWARDED_AD_PERIOD_MS - 1, now]);
+});
+
+test("the ad-free offer can appear again after its 30-day cooldown when three new completions qualify", () => {
   const storage = memoryStorage();
   const now = 1_800_000_000_000;
   recordRewardedAdCompletion(storage, now);
-  const afterPeriod = readRewardedAdProgress(storage, now + REWARDED_AD_PERIOD_MS);
-  assert.equal(afterPeriod.completed, 0);
-  assert.equal(afterPeriod.periodStartedAt, now + REWARDED_AD_PERIOD_MS);
+  recordRewardedAdCompletion(storage, now + 1);
+  assert.equal(recordRewardedAdCompletion(storage, now + 2).shouldShowAdFreeOffer, true);
+
+  const afterCooldown = now + REWARDED_AD_PERIOD_MS + 10;
+  assert.equal(recordRewardedAdCompletion(storage, afterCooldown).shouldShowAdFreeOffer, false);
+  assert.equal(recordRewardedAdCompletion(storage, afterCooldown + 1).shouldShowAdFreeOffer, false);
+  assert.equal(recordRewardedAdCompletion(storage, afterCooldown + 2).shouldShowAdFreeOffer, true);
 });
 
 test("malformed stored progress is ignored instead of blocking ad access", () => {
   const storage = memoryStorage("{not-json");
   assert.deepEqual(readRewardedAdProgress(storage, 1_800_000_000_000), {
-    periodStartedAt: 1_800_000_000_000,
-    completed: 0,
+    completedAt: [],
     adFreeOfferShownAt: null,
   });
 });
