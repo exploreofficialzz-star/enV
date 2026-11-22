@@ -1,3 +1,11 @@
+test("catalogue timer IDs resolve to their distinct functional modes", () => {
+  assert.equal(productivityModeForToolId("focus-timer"), "focus");
+  assert.equal(productivityModeForToolId("pomodoro-timer"), "pomodoro");
+  assert.equal(productivityModeForToolId("stopwatch"), "stopwatch");
+  assert.equal(productivityModeForToolId("focus-music"), null);
+  assert.equal(productivityModeForToolId("unknown-timer"), null);
+});
+
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
@@ -7,6 +15,7 @@ import {
   formatCountdown,
   formatStopwatch,
   pauseProductivityTimer,
+  productivityModeForToolId,
   recordProductivityLap,
   resetProductivityTimer,
   setFocusDurations,
