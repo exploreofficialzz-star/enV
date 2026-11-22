@@ -187,7 +187,7 @@ test("production app error boundary hides raw exception messages", async () => {
   assert.ok(messageFunction, "public error message formatter must be present");
   assert.match(messageFunction, /if \(import\.meta\.env\.DEV\) \{\s*if \(error instanceof Error && error\.message\) return error\.message;\s*if \(typeof error === "string" && error\) return error;\s*\}/);
   assert.match(messageFunction, /return FALLBACK_MESSAGE;/);
-  assert.equal((messageFunction.match(/error\.message/g) ?? []).length, 1, "raw exception messages must occur only in the development-only branch");
+  assert.equal((messageFunction.match(/error\.message/g) ?? []).length, 2, "raw exception messages must occur only in the development-only branch");
   assert.match(source, /if \(status === 401\) return "Your session may have expired/);
   assert.match(source, /if \(status === 403\) return "You do not have permission/);
   assert.match(source, /if \(status === 404\) return "This page or resource could not be found/);
