@@ -29,7 +29,7 @@ enum NativeAdsPolicy {
     static var privacyConfigured: Bool { flag("ENV_ADS_PRIVACY_CONFIGURED") }
     static var publisherAppID: String { info["GADApplicationIdentifier"] as? String ?? "" }
     static var bannerUnitID: String { info["ENV_ADMOB_BANNER_AD_UNIT_ID"] as? String ?? "" }
-    static var rewardedUnitID: String { info["ENV_ADMOB_REWARDED_AD_UNIT_ID"] as? String ?? "" }
+    static var rewardedUnitPath: String { info["ENV_GAM_REWARDED_AD_UNIT_PATH"] as? String ?? "" }
     static var rewardedAccessEnabled: Bool { flag("ENV_AD_ACCESS_GATE_ENABLED") }
     static var rewardedToolIDs: Set<String> {
         Set((info["ENV_AD_ACCESS_TOOL_IDS"] as? String ?? "")
