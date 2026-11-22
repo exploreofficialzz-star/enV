@@ -198,6 +198,14 @@ assert.match(androidGradle, /ENV_AD_ACCESS_TOOL_IDS/, "Android rewarded access m
 assert.match(androidAds, /RewardedAd\.load\(/, "Android must load genuine Google rewarded video.");
 assert.match(androidAds, /ad\.show\(activity\)/, "Android must require the Google rewarded SDK reward callback.");
 assert.match(androidAds, /NativeRewardedAdProgress\.recordCompletion/, "Android must count reward callbacks in the rolling rewarded progress window.");
+assert.match(androidAds, /private object NativeToolAccessPreference/, "Android must persist the visitor's per-tool access preference on the device.");
+assert.match(androidAds, /getSharedPreferences\(PREFS, Context\.MODE_PRIVATE\)/, "Android access preference must use app-private storage.");
+assert.match(androidAds, /rememberSaveable\(tool\.id\).*NativeToolAccessPreference\.prefersTokens/s, "Android must restore the selected per-tool access preference.");
+assert.match(androidAds, /if \(!preferTokens\)[\s\S]*?Use rewarded ads instead/, "Android must let token-preferring users switch back to rewarded ads.");
+assert.match(iosAds, /private enum NativeToolAccessPreference/, "iOS must persist the visitor's per-tool access preference.");
+assert.match(iosAds, /UserDefaults\.standard\.string\(forKey: key\(for: toolID\)\)/, "iOS access preference must use device-local UserDefaults.");
+assert.match(iosAds, /preferTokens = NativeToolAccessPreference\.prefersTokens\(for: tool\.id\)/, "iOS must restore the selected per-tool access preference.");
+assert.match(iosAds, /if !preferTokens[\s\S]*?Use rewarded ads instead/, "iOS must let token-preferring users switch back to rewarded ads.");
 assert.match(androidAds, /fun isRewardedAccessTool\(context: Context, tool: ToolRecord\)/, "Android rewarded access must use a separate explicit tool allowlist.");
 assert.match(androidMain, /NativeRewardedToolAccessGate\(tool, onOpenWallet\)/, "Android tool interfaces must be wrapped by the native rewarded gate.");
 assert.match(androidMain, /NativeToolAdSlot\(tool\)/, "The native Android tool surface must include its ad slot.");
