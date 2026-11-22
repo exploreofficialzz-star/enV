@@ -22,11 +22,11 @@ android {
         val adToolIds = (providers.gradleProperty("envAdSupportedToolIds").orNull ?: "").split(",").map { it.trim() }.filter { it.matches(Regex("[a-z0-9][a-z0-9-]{0,119}")) }.distinct().joinToString(",")
         val admobAppId = (providers.gradleProperty("envAdmobAppId").orNull ?: "ca-app-pub-3940256099942544~3347511713").filter { it.isLetterOrDigit() || it == '-' || it == '_' || it == '~' }
         val admobBannerUnit = providers.gradleProperty("envAdmobBannerAdUnitId").orNull ?: ""
-        val admobRewardedUnit = providers.gradleProperty("envAdmobRewardedAdUnitId").orNull ?: ""
+        val gamRewardedUnitPath = providers.gradleProperty("envGamRewardedAdUnitPath").orNull ?: ""
         buildConfigField("String", "ENV_AD_SUPPORTED_TOOL_IDS", "\"$adToolIds\"")
         buildConfigField("String", "ENV_ADMOB_APP_ID", "\"$admobAppId\"")
         buildConfigField("String", "ENV_ADMOB_BANNER_AD_UNIT_ID", "\"$admobBannerUnit\"")
-        buildConfigField("String", "ENV_ADMOB_REWARDED_AD_UNIT_ID", "\"$admobRewardedUnit\"")
+        buildConfigField("String", "ENV_GAM_REWARDED_AD_UNIT_PATH", "\"$gamRewardedUnitPath\"")
         manifestPlaceholders["envAdmobAppId"] = admobAppId
         versionCode = 7
         versionName = "1.1.1"
