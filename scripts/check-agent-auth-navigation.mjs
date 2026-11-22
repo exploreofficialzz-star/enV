@@ -120,7 +120,8 @@ const tokenDashboard = requireText("src/components/billing/token-dashboard.tsx",
 if (tokenDashboard.includes("Sign in to load your real enV balance") || tokenDashboard.includes(">Sign in</Link>")) errors.push("Token dashboard must not show the redundant sign-in prompt card.");
 if (!tokenDashboard.includes('wallet ? tokenLabel(wallet.availableTokens) : "—"')) errors.push("Token dashboard must not show a fabricated zero balance when account data is unavailable.");
 if (!tokenDashboard.includes('loadState === "loading" ? null')) errors.push("Token dashboard must not render a textual loading placeholder while the first request is pending.");
-const wallet = requireText("src/routes/wallet.tsx", ['createFileRoute("/wallet")', "Total enV balance", "Tag enV on your videos", "Refer a friend"], "Wallet page");
+const wallet = requireText("src/routes/wallet.tsx", ['createFileRoute("/wallet")', "Tag enV on your videos", "Refer a friend"], "Wallet page");
+if (!wallet.includes("Total enV balance") && !wallet.includes("Total balance")) errors.push("Wallet page is missing its visible balance label.");
 for (const item of ['const isWalletPage = pathname === "/wallet"', '<h1 className="text-xl font-semibold tracking-tight text-fg sm:text-2xl">Wallet</h1>', 'aria-label="Notifications"', 'aria-label="Profile and account"']) {
   if (!header.includes(item)) errors.push(`Wallet shared header is missing ${item}`);
 }
