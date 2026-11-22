@@ -139,7 +139,6 @@ try {
       configurable: true,
       value: async (options) => {
         capture.calls.push({
-          userActivationAvailable: typeof navigator.userActivation?.isActive === "boolean",
           mode: options?.mode,
         });
         return {
