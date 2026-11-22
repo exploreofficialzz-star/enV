@@ -106,6 +106,7 @@ try {
       configurable: true,
       value: async (options) => {
         capture.calls.push({
+          active: navigator.userActivation?.isActive === true,
           suggestedName: options?.suggestedName,
         });
         return {
@@ -127,6 +128,7 @@ try {
   await page.getByRole("status").filter({ hasText: "Your ZIP archive is ready." }).waitFor();
   const saveCapture = await page.evaluate(() => window.__envZipSaveCapture);
   assert.equal(saveCapture.calls.length, 1, "The native save picker is requested exactly once");
+  assert.equal(saveCapture.calls[0].active, true, "The save picker is called while transient user activation is active");
   assert.match(saveCapture.calls[0].suggestedName, /\.zip$/);
   const pickerFiles = await inspectZip(Buffer.from(saveCapture.bytes));
   assert.equal(pickerFiles.get("gesture.txt"), "save picker must be called during the click gesture");
@@ -139,6 +141,7 @@ try {
       configurable: true,
       value: async (options) => {
         capture.calls.push({
+          active: navigator.userActivation?.isActive === true,
           mode: options?.mode,
         });
         return {
@@ -166,6 +169,7 @@ try {
   await page.getByRole("status").filter({ hasText: "Extraction completed." }).waitFor();
   const folderCapture = await page.evaluate(() => window.__envZipFolderCapture);
   assert.equal(folderCapture.calls.length, 1, "The native folder picker is requested exactly once");
+  assert.equal(folderCapture.calls[0].active, true, "The folder picker is called while transient user activation is active");
   assert.equal(folderCapture.calls[0].mode, "readwrite");
   assert.deepEqual(Buffer.from(folderCapture.bytes), Buffer.from("single-file extraction roundtrip"));
 
@@ -195,8 +199,8 @@ try {
     toolResults: [{
       toolId: "zip-any-file",
       status: "passed",
-      checks: ["routeRendering", "interactionExecution", "outputValidation", "runtimeErrorCheck", "fileImportExport", "savePickerClickHandler", "directoryPickerClickHandler", "savePickerFallback"],
-      notes: "Verified multi-file and single-file local ZIP creation, CRC-checked reads, extraction round-trip, direct click-handler save and folder picker access, blocked-save-picker download fallback, byte preservation and zero application API write requests.",
+      checks: ["routeRendering", "interactionExecution", "outputValidation", "runtimeErrorCheck", "fileImportExport"],
+      notes: "Verified multi-file and single-file local ZIP creation, CRC-checked reads, extraction round-trip, active-user-gesture save and folder picker access, blocked-save-picker download fallback, byte preservation and zero application API write requests.",
     }],
     reportPath: process.argv.find((value) => value.startsWith("--report="))?.slice("--report=".length),
   });
@@ -208,8 +212,8 @@ try {
       "multiple local files compress into a readable ZIP",
       "single local file compresses into a readable ZIP",
       "single-file extraction restores the original bytes",
-      "save picker is invoked by the Create ZIP click handler",
-      "extraction folder picker is invoked by the Extract click handler",
+      "save picker is requested during active user activation",
+      "extraction folder picker is requested during active user activation",
       "a blocked save picker falls back to a normal browser download",
       "ZIP CRC checks pass",
       "compression and extraction make no application API write requests",
