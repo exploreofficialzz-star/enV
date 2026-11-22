@@ -266,7 +266,7 @@ async function checkRenderedRoute(path, schema) {
   if (path === "/tools/files/zip-any-file") {
     assert(html.includes("Zip any file"), "Zip any file route does not render its tool name");
     assert(html.includes("Compress") && html.includes("Extract"), "Zip any file route is missing compression or extraction controls");
-    assert(html.includes("Private and on-device"), "Zip any file route is missing its local privacy notice");
+    assert(!html.includes("Private and on-device"), "Zip any file Web controls must not duplicate the privacy explanation; the browser audit enforces the same presentation contract");
     assert(!html.includes('id="under-production-title"') && !html.includes('id="under-production-direct-title"'), "Zip any file is incorrectly blocked by the production notice");
   }
   checked.push({ path, status: response.status, title, canonical, schema, buildSha, socialImage: ogImage, socialImageBytes: imageBytes.length });
