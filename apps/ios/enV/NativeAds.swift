@@ -269,21 +269,27 @@ private final class NativeAdsReachability: ObservableObject {
 }
 
 private enum NativeRewardedAdProgress {
-    private static let startKey = "env.rewardedAccess.periodStartedAt"
-    private static let countKey = "env.rewardedAccess.completed"
-    private static let offerShownKey = "env.rewardedAccess.offerShownAt"
+    private static let completionTimesKey = "env.rewardedAccess.completionTimestamps.v2"
+    private static let offerShownKey = "env.rewardedAccess.offerShownAt.v2"
     private static let period: TimeInterval = 30 * 24 * 60 * 60
+    private static let maxStoredCompletions = 100
 
     static func recordCompletion(now: Date = Date()) -> Bool {
         let defaults = UserDefaults.standard
-        let storedStart = defaults.object(forKey: startKey) as? Date
-        let expired = storedStart == nil || now < storedStart! || now.timeIntervalSince(storedStart!) >= period
-        let start = expired ? now : storedStart!
-        let count = (expired ? 0 : defaults.integer(forKey: countKey)) + 1
-        let alreadyShown = expired ? false : defaults.object(forKey: offerShownKey) != nil
-        let shouldShow = count >= 3 && !alreadyShown
-        defaults.set(start, forKey: startKey)
-        defaults.set(count, forKey: countKey)
+        let timestamp = now.timeIntervalSince1970
+        let cutoff = timestamp - period
+        let stored = defaults.array(forKey: completionTimesKey) as? [Double] ?? []
+        let completions = Array(
+            (stored.filter { $0 > cutoff && $0 <= timestamp } + [timestamp])
+                .sorted()
+                .suffix(maxStoredCompletions)
+        )
+        let lastOffer = defaults.object(forKey: offerShownKey) as? Date
+        let offerCooldownActive = lastOffer.map {
+            now >= $0 && now.timeIntervalSince($0) < period
+        } ?? false
+        let shouldShow = completions.count >= 3 && !offerCooldownActive
+        defaults.set(completions, forKey: completionTimesKey)
         if shouldShow { defaults.set(now, forKey: offerShownKey) }
         return shouldShow
     }
