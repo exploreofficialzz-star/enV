@@ -17,12 +17,6 @@ import java.net.URL
  * from advertising configuration.
  */
 internal object NativeToolAccessPolicy {
-    private val toolIdPattern = Regex("[a-z0-9][a-z0-9-]{0,119}")
-    private val allowlistedIds: Set<String> by lazy {
-        BuildConfig.ENV_HYBRID_TOOL_IDS.split(",").map { it.trim() }
-            .filter { toolIdPattern.matches(it) }.toSet()
-    }
-
     @Volatile private var cachedCrossPlatformMeteredIds: Set<String>? = null
 
     private fun crossPlatformMeteredIds(context: Context): Set<String> {
@@ -50,8 +44,7 @@ internal object NativeToolAccessPolicy {
     fun isHybridTool(context: Context, tool: ToolRecord): Boolean {
         val restrictedDisclaimers = setOf("health", "finance", "earnings")
         val restrictedCategories = setOf("fitness", "personal")
-        return tool.id in allowlistedIds &&
-            tool.id in crossPlatformMeteredIds(context) &&
+        return tool.id in crossPlatformMeteredIds(context) &&
             tool.status == "active" &&
             tool.clientSide &&
             !tool.requiresBackend &&
@@ -88,6 +81,8 @@ internal object NativeToolAccessPolicy {
 }
 
 /** Native ad access is intentionally absent until a separate Android launch. */
+internal val LocalNativeToolAccessCompletion = androidx.compose.runtime.staticCompositionLocalOf<(Boolean) -> Unit> { {} }
+
 @androidx.compose.runtime.Composable
 internal fun NativeToolAccessContainer(content: @androidx.compose.runtime.Composable () -> Unit) {
     content()
