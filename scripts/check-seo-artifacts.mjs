@@ -252,7 +252,7 @@ const guideDescriptionCollisionGroup = firstCollisionGroup(
   result.guideTools,
   (tool) => toolGuideSeoDescription(tool, [tool]),
 );
-const longIdTemplate = result.tools[0];
+const longIdTemplate = result.tools.find((tool) => tool.category !== "developer") ?? result.tools[0];
 const longIdCollisionPeers = [
   {
     ...longIdTemplate,
