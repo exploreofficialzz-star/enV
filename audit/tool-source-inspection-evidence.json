@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "evidenceSetId": "pr182-current-head-source-review-8a6acc7a",
-  "inspectedAgainstCommit": "8a6acc7a5fe385ea65f3ab67f0a5324dc7c3c9f7",
-  "note": "Content-pinned source review for the 17 Files/CSS tool IDs with browser evidence. Paths were rechecked against the current Ads/Token PR source at 8a6acc7a; each listed path is verified against its exact Git blob SHA-1. Source inspection does not imply full functional, token, offline, backend, accessibility, or native verification.",
+  "evidenceSetId": "full-public-discovery-source-review-582bdea",
+  "inspectedAgainstCommit": "582bdea89ff8a7ad3dc5b0458bc1fd6024bfc4e1",
+  "note": "Content-pinned source review for the 17 Files/CSS tool IDs with browser evidence. The three changed source files were re-reviewed against the 23 November discovery branch head; every listed path is pinned to its exact Git blob SHA-1. Source inspection does not imply full functional, token, offline, backend, accessibility, or native verification.",
   "records": [
     {
       "id": "files-workspace-six-source-review",
@@ -21,7 +21,7 @@
         },
         {
           "path": "src/lib/registry.ts",
-          "gitBlobSha1": "77f5eb065621e3c4b81252c2a267a7629c152ef7"
+          "gitBlobSha1": "5ca60d720270b6b629017cddeb7c2d4adf12c906"
         },
         {
           "path": "src/components/tools/tool-engine.tsx",
@@ -43,7 +43,7 @@
       "files": [
         {
           "path": "src/components/engines/zip-archive-engine.tsx",
-          "gitBlobSha1": "11e1585cc9bd3f1cdeb5cee95d2f4a98bba28580"
+          "gitBlobSha1": "9b9b79bc87861caf2befdc87e55cef1f74fa3d28"
         },
         {
           "path": "src/lib/zip/archive-utils.ts",
@@ -134,7 +134,7 @@
         },
         {
           "path": "src/lib/registry.ts",
-          "gitBlobSha1": "77f5eb065621e3c4b81252c2a267a7629c152ef7"
+          "gitBlobSha1": "5ca60d720270b6b629017cddeb7c2d4adf12c906"
         },
         {
           "path": "scripts/gen-catalog.mjs",
@@ -196,11 +196,11 @@
       "files": [
         {
           "path": "src/lib/registry.ts",
-          "gitBlobSha1": "77f5eb065621e3c4b81252c2a267a7629c152ef7"
+          "gitBlobSha1": "5ca60d720270b6b629017cddeb7c2d4adf12c906"
         },
         {
           "path": "src/routes/tools/$category/$slug.tsx",
-          "gitBlobSha1": "c3171ec815d322b8cd863dba3d90204ae986f779"
+          "gitBlobSha1": "6e624815c82d33787aeb9664522d660c3fc0e517"
         },
         {
           "path": "src/components/tools/tool-engine.tsx",
