@@ -143,10 +143,24 @@ test("ordering is deterministic and explanations are grounded in indexed fields"
   const first = searchToolResults(corpus, "pdf", 10);
   const second = searchToolResults([...corpus].reverse(), "pdf", 10);
   assert.deepEqual(first.tools.map((item) => item.id), second.tools.map((item) => item.id));
+  assert.ok(first.matches.length > 0);
+  for (const match of first.matches) {
+    assert.ok(match.reasons.length > 0, "A non-empty query result must include its actual matched fields.");
+    assert.match(match.explanation, /^Matched /, "A non-empty query result must not fall back to a generic popularity label.");
+    assert.notEqual(match.explanation, "Popular tool");
+    assert.ok(match.reasons.every((reason) => ["name", "id", "keyword", "tag", "subcategory", "category", "description"].includes(reason.field)));
+  }
+  const popular = searchToolResults(corpus, "", 10);
+  assert.ok(popular.matches.length > 0);
+  assert.ok(popular.matches.every((match) => match.explanation === "Popular tool"), "The generic popularity explanation is reserved for an empty query.");
+
+  const fillerOnly = searchToolResults(corpus, "the and to", 10);
+  assert.equal(fillerOnly.matches.length, 0, "A non-empty query containing only stop words must not become a popularity list.");
+  assert.equal(fillerOnly.matchCount, 0);
+
   const merged = searchToolResults(corpus, "merge pdf", 1).matches[0];
   assert.equal(merged.tool.id, "pdf-merger");
   assert.match(merged.explanation, /^Matched /);
-  assert.ok(merged.reasons.every((reason) => ["name", "id", "keyword", "tag", "subcategory", "category", "description"].includes(reason.field)));
 });
 
 // ---------------------------------------------------------------------------------------------

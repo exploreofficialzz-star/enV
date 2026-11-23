@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "evidenceSetId": "pr182-current-head-source-review-8a6acc7a",
-  "inspectedAgainstCommit": "8a6acc7a5fe385ea65f3ab67f0a5324dc7c3c9f7",
-  "note": "Content-pinned source review for the 17 Files/CSS tool IDs with browser evidence. Paths were rechecked against the current Ads/Token PR source at 8a6acc7a; each listed path is verified against its exact Git blob SHA-1. Source inspection does not imply full functional, token, offline, backend, accessibility, or native verification.",
+  "evidenceSetId": "full-public-discovery-source-review-20261123",
+  "inspectedAgainstCommit": "95dec77f735b5ed3039a50bbf3ee331e06e99b6b",
+  "note": "Content-pinned source review for the Files/CSS tool IDs with browser evidence. Source hashes cover the current discovery changes and the Adsterra document-path update; every listed file is pinned to its exact Git blob SHA-1. Source inspection does not imply full functional, token, offline, backend, accessibility, or native verification.",
   "records": [
     {
       "id": "files-workspace-six-source-review",
@@ -21,7 +21,7 @@
         },
         {
           "path": "src/lib/registry.ts",
-          "gitBlobSha1": "77f5eb065621e3c4b81252c2a267a7629c152ef7"
+          "gitBlobSha1": "5ca60d720270b6b629017cddeb7c2d4adf12c906"
         },
         {
           "path": "src/components/tools/tool-engine.tsx",
@@ -43,7 +43,7 @@
       "files": [
         {
           "path": "src/components/engines/zip-archive-engine.tsx",
-          "gitBlobSha1": "11e1585cc9bd3f1cdeb5cee95d2f4a98bba28580"
+          "gitBlobSha1": "9b9b79bc87861caf2befdc87e55cef1f74fa3d28"
         },
         {
           "path": "src/lib/zip/archive-utils.ts",
@@ -57,9 +57,11 @@
       "reviewedAreas": [
         "ZIP creation and extraction workflows",
         "Archive path traversal guards, entry and expanded-size limits, compression-ratio protection, CRC checks, and destination collision handling",
-        "Runtime dispatch"
+        "Runtime dispatch",
+        "Direct user-gesture file-picker activation and bounded browser-download fallback when picker permission is denied"
       ],
-      "notes": "Reviewed the archive implementation and shared safety helpers. The browser audit separately tests representative create/extract round trips."
+      "notes": "Re-reviewed against main at 42ca10c63997bd9771d91ee01967a23245f76e3b. The save-file and extraction-folder pickers are requested synchronously by their respective button handlers. NotAllowedError/SecurityError uses the bounded 256 MiB browser-buffer/download fallback; larger archives fail with explicit guidance. Existing archive path, entry-count, expanded-size, compression-ratio, CRC and destination-collision safeguards and runtime dispatch were rechecked. The Production Check browser audit separately exercises picker activation, archive bytes/CRC, the blocked-picker fallback and extraction.",
+      "inspectedAgainstCommit": "42ca10c63997bd9771d91ee01967a23245f76e3b"
     },
     {
       "id": "file-to-txt-source-review",
@@ -73,7 +75,7 @@
         },
         {
           "path": "src/lib/documents/local-document.ts",
-          "gitBlobSha1": "ac3687a1e30579d1f6c66f8a7d65fd1b3c2a0c37"
+          "gitBlobSha1": "4d5890c294cccad146a5567ecc8836437d635fda"
         },
         {
           "path": "src/lib/a-book/pdf-reader.ts",
@@ -90,7 +92,7 @@
         "PDF.js selectable-text extraction limits, cancellation and timeout behavior",
         "Scanned PDF no-OCR behavior, output-size limits, and download/dispatch"
       ],
-      "notes": "Reviewed local extraction code and explicit limits. OCR is not included and is not claimed."
+      "notes": "Re-reviewed the current local extraction and PDF page-selection path. PDF extraction accepts validated one-based page numbers and comma-separated ranges, checks selections against the actual PDF page count, retains the 500-page cap, and has regression tests for selected pages and malformed/out-of-range input. DOCX limits remain explicit. OCR is not included and is not claimed."
     },
     {
       "id": "file-size-converter-source-review",
@@ -134,7 +136,7 @@
         },
         {
           "path": "src/lib/registry.ts",
-          "gitBlobSha1": "77f5eb065621e3c4b81252c2a267a7629c152ef7"
+          "gitBlobSha1": "5ca60d720270b6b629017cddeb7c2d4adf12c906"
         },
         {
           "path": "scripts/gen-catalog.mjs",
@@ -196,11 +198,11 @@
       "files": [
         {
           "path": "src/lib/registry.ts",
-          "gitBlobSha1": "77f5eb065621e3c4b81252c2a267a7629c152ef7"
+          "gitBlobSha1": "5ca60d720270b6b629017cddeb7c2d4adf12c906"
         },
         {
           "path": "src/routes/tools/$category/$slug.tsx",
-          "gitBlobSha1": "c3171ec815d322b8cd863dba3d90204ae986f779"
+          "gitBlobSha1": "c6654eb1fa2af7cc9ba543d50a64c640dfe7f58c"
         },
         {
           "path": "src/components/tools/tool-engine.tsx",
@@ -233,7 +235,7 @@
         "CSS comment, whitespace and trailing-semicolon handling",
         "Web execution dispatch"
       ],
-      "notes": "Reviewed the current Web source path. Separate browser evidence verifies representative execution and output; source review alone is not native or full functional acceptance."
+      "notes": "Reviewed the current Web source path at the discovery head. The route now uses a precomputed canonical SEO resolver; the legacy CSS minify route still preserves css-minify while redirecting into Markup & Style Studio. Separate browser evidence verifies representative execution and output; source review alone is not native or full functional acceptance."
     }
   ]
 }

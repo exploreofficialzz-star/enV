@@ -69,8 +69,8 @@ test("engagement controls are combined with each platform's tool-interface card"
     "Web renders one engagement panel per tool detail page");
 
   assert.match(androidDetail,
-    /NativeRewardedToolAccessGate\(tool, onOpenWallet\) \{\s*NativeToolInterfaceContent\(\s*tool,\s*backend,\s*supported,\s*onRelatedTool,\s*\)\s*\}\s*if \(!isFullscreen\) NativeToolCommunityPanel\(tool\.id\)/,
-    "Android keeps execution inside the rewarded-access gate and places the single community panel after it inside the same tool card");
+    /NativeToolAccessContainer\s*\{\s*NativeToolInterfaceContent\(\s*tool,\s*backend,\s*supported,\s*onRelatedTool,\s*\)\s*\}\s*if \(!isFullscreen\) NativeToolCommunityPanel\(tool\.id\)/,
+    "Android keeps execution inside the native prelaunch access container and places the single community panel after it inside the same tool card");
   assert.equal((androidDetail.match(/NativeToolCommunityPanel\(tool\.id\)/g) ?? []).length, 1,
     "Android mounts engagement once inside the tool card");
   assert.match(android, /Column\(\s*modifier = Modifier\.fillMaxWidth\(\)\.padding\(top = 12\.dp\)/);

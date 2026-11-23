@@ -61,7 +61,11 @@ assert.match(ios, /operation\.contains\("page-"\).*operation\.hasSuffix\("splitt
 assert.match(docWeb, /watermark/);
 assert.match(android, /operation\.contains\("watermark"\)/);
 assert.match(ios, /operation\.contains\("watermark"\)/);
-assert.match(docWeb, /onClick=\{\(\)=>\{setFiles\(\[\]\);setOut\(""\);setErr\(null\)\}\}/);
+assert.match(docWeb, /onClick=\{\(\)=>\{setFiles\(\[\]\);setOut\(""\);setErr\(null\);setOutput\(null\);\}\}/);
+assert.match(docWeb, /fetch\(apiUrl\("\/api\/backend\/documents"\)/);
+assert.match(docWeb, /for \(const file of files\) form\.append\("files", file, file\.name\)/);
+assert.match(docWeb, /form\.append\("params", JSON\.stringify\(\{ pages, text: watermarkText \}\)\)/);
+assert.match(docWeb, /if \(LOCAL\.has\(op\)\) \{\s*result = await runLocalDocument\(op, files, \{ pages \}\);/s);
 assert.match(android, /if \(isDocument\) OutlinedButton\(onClick\s*=\s*\{\s*output = ""\s*error = ""\s*bytes = null\s*files = emptyList\(\)\s*\}\s*\)/s);
 assert.match(ios, /Button\("Reset", action: reset\)\.buttonStyle\(\.bordered\)(?!\.disabled\(working\))/);
 assert.match(ios, /private func reset\(\) \{ files = \[\]; output = ""; outputData = nil; error = nil \}/);

@@ -44,6 +44,9 @@ jobs:
           npm run check:ai
           node --experimental-strip-types --test 'src/lib/ai/**/*.test.ts'
 
+      - name: Generate the TanStack route tree and verify the Web production build
+        run: npm run build
+
       - name: Start browser-audit server
         run: |
           npm run dev > /tmp/enV-game-dev.log 2>&1 &

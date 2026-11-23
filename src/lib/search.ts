@@ -423,9 +423,12 @@ export function searchToolResults(tools: ToolMeta[], query: string, limit = 40, 
 
   type Ranked = { doc: ToolDoc; score: number };
   const ranked: Ranked[] = [];
-  if (!normalized || terms.length === 0) {
+  if (!normalized) {
+    // Popularity ordering is the empty-search experience only. A non-empty query
+    // that consists entirely of ignored filler words must not silently turn into
+    // generic recommendations with fabricated relevance explanations.
     for (const doc of pool.docs) if (eligible(doc.tool)) ranked.push({ doc, score: doc.tool.popularity ?? 0 });
-  } else {
+  } else if (terms.length > 0) {
     const candidates = new Set<number>();
     for (const term of terms) for (const variant of term.variants) for (const key of variant.stems) for (const index of pool.postings.get(key) ?? []) candidates.add(index);
     for (const index of candidates) {

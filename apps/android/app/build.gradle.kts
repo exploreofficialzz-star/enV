@@ -14,20 +14,6 @@ android {
         targetSdk = 36
         buildConfigField("String", "ENV_API_BASE_URL", "\"${providers.gradleProperty("ENV_API_BASE_URL").orNull ?: "https://env-q3mq.onrender.com"}\"")
         buildConfigField("boolean", "ANALYTICS_ENABLED", providers.gradleProperty("envAnalyticsEnabled").orNull ?: "false")
-        buildConfigField("boolean", "ENV_ADS_ENABLED", providers.gradleProperty("envAdsEnabled").orNull ?: "false")
-        buildConfigField("boolean", "ENV_ADS_PRIVACY_CONFIGURED", providers.gradleProperty("envAdsPrivacyConfigured").orNull ?: "false")
-        buildConfigField("boolean", "ENV_AD_ACCESS_GATE_ENABLED", providers.gradleProperty("envAdAccessGateEnabled").orNull ?: "false")
-        val adAccessToolIds = (providers.gradleProperty("envAdAccessToolIds").orNull ?: "").split(",").map { it.trim() }.filter { it.matches(Regex("[a-z0-9][a-z0-9-]{0,119}")) }.distinct().joinToString(",")
-        buildConfigField("String", "ENV_AD_ACCESS_TOOL_IDS", "\"$adAccessToolIds\"")
-        val adToolIds = (providers.gradleProperty("envAdSupportedToolIds").orNull ?: "").split(",").map { it.trim() }.filter { it.matches(Regex("[a-z0-9][a-z0-9-]{0,119}")) }.distinct().joinToString(",")
-        val admobAppId = (providers.gradleProperty("envAdmobAppId").orNull ?: "ca-app-pub-3940256099942544~3347511713").filter { it.isLetterOrDigit() || it == '-' || it == '_' || it == '~' }
-        val admobBannerUnit = providers.gradleProperty("envAdmobBannerAdUnitId").orNull ?: ""
-        val gamRewardedUnitPath = providers.gradleProperty("envGamRewardedAdUnitPath").orNull ?: ""
-        buildConfigField("String", "ENV_AD_SUPPORTED_TOOL_IDS", "\"$adToolIds\"")
-        buildConfigField("String", "ENV_ADMOB_APP_ID", "\"$admobAppId\"")
-        buildConfigField("String", "ENV_ADMOB_BANNER_AD_UNIT_ID", "\"$admobBannerUnit\"")
-        buildConfigField("String", "ENV_GAM_REWARDED_AD_UNIT_PATH", "\"$gamRewardedUnitPath\"")
-        manifestPlaceholders["envAdmobAppId"] = admobAppId
         versionCode = 7
         versionName = "1.1.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -119,9 +105,6 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("com.google.zxing:core:3.5.3")
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
-    // Optional Google ads are disabled unless a publisher and UMP message setup are supplied.
-    implementation("com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk:1.6.0")
-    implementation("com.google.android.ump:user-messaging-platform:4.0.0")
     // Bundled on-device OCR model; no runtime model download or remote service.
     implementation("com.google.mlkit:text-recognition:16.0.1")
     // Bundled, on-device face landmarks and tracking for original local camera effects.

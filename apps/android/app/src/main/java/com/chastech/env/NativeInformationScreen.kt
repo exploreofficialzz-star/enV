@@ -343,8 +343,6 @@ fun NativeInformationScreen(pageId: String, catalog: com.chastech.env.data.Catal
                 "history" -> NativeWalletHistory()
                 "privacy" -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     PrivacyInformation()
-                    NativeAdsPrivacyDisclosure()
-                    NativeAdsPrivacyOptionsButton()
                 }
                 "terms" -> TermsInformation()
                 "disclaimer" -> DisclaimerInformation()

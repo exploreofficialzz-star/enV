@@ -3,12 +3,49 @@ import { readFileSync } from "node:fs";
 import { buildSeoArtifacts, buildSitemapArtifacts } from "./generate-seo-artifacts.mjs";
 import { buildIndexNowKeyArtifact } from "./indexnow-utils.mjs";
 import { SEO_CANONICAL_ORIGIN, SEO_REDIRECT_HOSTS } from "./seo-domain-policy.mjs";
-import { getToolByPath, getToolsByCategory } from "../src/lib/registry.ts";
+import { getAllTools, getToolByPath, getToolsByCategory } from "../src/lib/registry.ts";
 import { toolTaskGuidanceSource } from "../src/lib/tool-documentation.ts";
-import { toolSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema, toolSchema, organizationSchema, websiteSchema, boundedToolSeoTitle } from "@/lib/seo-metadata";
+import { toolSeoDescription, toolGuideSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema, toolSchema, organizationSchema, websiteSchema, boundedToolSeoTitle, createCanonicalSeoToolResolver } from "@/lib/seo-metadata";
 
 const nativeInventory = JSON.parse(readFileSync(new URL("../apps/shared/native-engine-inventory.json", import.meta.url), "utf8"));
 const result = buildSeoArtifacts();
+
+// The inventory generator and rendered route heads use this indexed resolver.
+// Verify canonical identity directly, then exercise the expansion-fingerprint alias path.
+const resolveCanonicalSeoTool = createCanonicalSeoToolResolver(result.guideTools);
+for (const tool of result.guideTools.slice(0, 40)) {
+  assert.equal(
+    resolveCanonicalSeoTool(tool)?.id,
+    tool.id,
+    "Each canonical public guide candidate must resolve to itself: " + tool.id,
+  );
+}
+const expansionCanonicalFixture = {
+  ...result.tools[0],
+  id: "synthetic-expansion-canonical",
+  slug: "synthetic-expansion-canonical",
+  name: "Synthetic product relation",
+  description: "Calculate a product relation from two input values.",
+  category: "calculators",
+  status: "active",
+  engine: { type: "calculator", formula: "exp-product-synthetic-product-relation" },
+};
+const expansionAliasFixture = {
+  ...expansionCanonicalFixture,
+  id: "synthetic-expansion-legacy-alias",
+  slug: "synthetic-expansion-legacy-alias",
+};
+const expansionResolver = createCanonicalSeoToolResolver([expansionCanonicalFixture]);
+assert.equal(
+  expansionResolver(expansionAliasFixture)?.id,
+  expansionCanonicalFixture.id,
+  "A generated expansion variant must resolve to its matching canonical formula page.",
+);
+assert.equal(
+  expansionResolver({ ...expansionAliasFixture, description: "A different calculation." }),
+  undefined,
+  "A different generated description must not be incorrectly consolidated.",
+);
 
 // Accessibility Studio routing keeps legacy Design discovery aliases visible while
 // retaining one stable runtime/search identity and one canonical Accessibility URL.
@@ -54,6 +91,19 @@ const assistantPromptSource = readFileSync(new URL("../src/lib/ai/server/tasks/a
 const catalogueGeneratorSource = readFileSync(new URL("./gen-catalog.mjs", import.meta.url), "utf8");
 const toolRouteSource = readFileSync(new URL("../src/routes/tools/$category/$slug.tsx", import.meta.url), "utf8");
 const guideRouteSource = readFileSync(new URL("../src/routes/blog.$slug.tsx", import.meta.url), "utf8");
+const discoverySearchRouteSource = readFileSync(new URL("../src/routes/search.tsx", import.meta.url), "utf8");
+const allToolsDirectorySource = readFileSync(new URL("../src/routes/tools/index.tsx", import.meta.url), "utf8");
+const sharedSearchBoxSource = readFileSync(new URL("../src/components/tools/search-box.tsx", import.meta.url), "utf8");
+assert.ok(discoverySearchRouteSource.includes("searchToolResults"), "Search results must retain each ranked tool's grounded match record.");
+assert.ok(discoverySearchRouteSource.includes("results.matches"), "Search UI must render the ranked match records rather than losing their explanations.");
+assert.ok(discoverySearchRouteSource.includes("results.matchCount === 0"), "Search UI must preserve the empty state when no tools match.");
+assert.ok(discoverySearchRouteSource.includes("Math.min(count + PAGE_SIZE, results.matchCount)"), "Search UI must preserve pagination using the structured match count.");
+assert.ok(discoverySearchRouteSource.includes("{ tool, explanation }"), "Every discovery card must expose its own why-this-matched explanation.");
+assert.ok(sharedSearchBoxSource.includes("searchToolResults(searchable, q, 8).matches"), "The shared search dropdown must retain each ranked match record.");
+assert.ok(sharedSearchBoxSource.includes("match.explanation"), "The shared search dropdown must explain why each individual tool matched.");
+assert.ok(sharedSearchBoxSource.includes("aria-label=") && sharedSearchBoxSource.includes("Why "), "The shared search dropdown must expose an accessible per-tool match label.");
+assert.ok(allToolsDirectorySource.includes("searchToolResults(all, query, all.length).matches"), "The All tools directory must preserve individual ranked match records.");
+assert.ok(allToolsDirectorySource.includes("{ tool, explanation }"), "The All tools directory must show an explanation next to every queried tool result.");
 const renderedAuditWorkflowSource = readFileSync(new URL("../.github/workflows/accessibility-phase8.yml", import.meta.url), "utf8");
 const seoHeadSource = seoMetadataSource.slice(seoMetadataSource.indexOf("export function seoPageHead"), seoMetadataSource.indexOf("export function organizationSchema"));
 assert.ok(rootRouteSource.includes("...webmasterVerificationMeta()"), "Search Console verification must be emitted once from the root document.");
@@ -175,6 +225,112 @@ for (const title of [longTargetX, longTargetY, guideTargetX, guideTargetY]) {
 const publicToolTitles = result.tools.map((tool) => toolSeoTitle(tool, result.tools));
 const publicToolPaths = result.tools.map(canonicalToolPath);
 const publicGuideTitles = result.guideTools.map((tool) => toolGuideSeoTitle(tool, result.guideTools));
+const publicToolDescriptions = result.tools.map((tool) => toolSeoDescription(tool, result.tools));
+
+// Collision positions must remain identical when the same immutable peer list
+// arrives in a different order; this protects deterministic SEO output while the
+// generator uses cached per-list indexes instead of rescanning every peer per page.
+function firstCollisionGroup(tools, keyFor) {
+  const groups = new Map();
+  for (const tool of tools) {
+    const key = keyFor(tool);
+    const group = groups.get(key);
+    if (group) group.push(tool);
+    else groups.set(key, [tool]);
+  }
+  return [...groups.values()].find((group) => group.length > 1) ?? [];
+}
+const toolTitleCollisionGroup = firstCollisionGroup(
+  result.tools,
+  (tool) => boundedToolSeoTitle(tool.name, " Online | enV"),
+);
+if (toolTitleCollisionGroup.length > 1) {
+  const reorderedPeers = [...toolTitleCollisionGroup].reverse();
+  for (const tool of toolTitleCollisionGroup) {
+    assert.equal(
+      toolSeoTitle(tool, reorderedPeers),
+      toolSeoTitle(tool, toolTitleCollisionGroup),
+      "Tool title collision positions must not depend on peer input order.",
+    );
+  }
+}
+const guideTitleCollisionGroup = firstCollisionGroup(
+  result.guideTools,
+  (tool) => boundedToolSeoTitle(
+    tool.name,
+    /[—–-]\s*Solve for\s+/i.test(tool.name) ? " guide | enV" : " documentation | enV",
+  ),
+);
+if (guideTitleCollisionGroup.length > 1) {
+  const reorderedPeers = [...guideTitleCollisionGroup].reverse();
+  for (const tool of guideTitleCollisionGroup) {
+    assert.equal(
+      toolGuideSeoTitle(tool, reorderedPeers),
+      toolGuideSeoTitle(tool, guideTitleCollisionGroup),
+      "Guide title collision positions must not depend on peer input order.",
+    );
+  }
+}
+const toolDescriptionCollisionGroup = firstCollisionGroup(
+  result.tools,
+  (tool) => toolSeoDescription(tool, [tool]),
+);
+if (toolDescriptionCollisionGroup.length > 1) {
+  const reorderedPeers = [...toolDescriptionCollisionGroup].reverse();
+  for (const tool of toolDescriptionCollisionGroup) {
+    assert.equal(
+      toolSeoDescription(tool, reorderedPeers),
+      toolSeoDescription(tool, toolDescriptionCollisionGroup),
+      "Tool description collision output must not depend on peer input order.",
+    );
+  }
+}
+const guideDescriptionCollisionGroup = firstCollisionGroup(
+  result.guideTools,
+  (tool) => toolGuideSeoDescription(tool, [tool]),
+);
+const longIdTemplate = result.tools.find((tool) => tool.category !== "developer") ?? result.tools[0];
+const longIdSharedPrefix = "synthetic-long-tool-id-" + "shared-segment-".repeat(8);
+const longIdCollisionPeers = [
+  {
+    ...longIdTemplate,
+    id: longIdSharedPrefix + "-variant-a",
+    slug: "synthetic-long-tool-a",
+  },
+  {
+    ...longIdTemplate,
+    id: longIdSharedPrefix + "-variant-b",
+    slug: "synthetic-long-tool-b",
+  },
+];
+assert.equal(
+  longIdCollisionPeers[0].id.slice(0, 88),
+  longIdCollisionPeers[1].id.slice(0, 88),
+  "Synthetic long IDs must share the full retained prefix so uniqueness depends on the compact hash suffix.",
+);
+const longIdToolDescriptions = longIdCollisionPeers.map((tool) => toolSeoDescription(tool, longIdCollisionPeers));
+const longIdGuideDescriptions = longIdCollisionPeers.map((tool) => toolGuideSeoDescription(tool, longIdCollisionPeers));
+for (const description of [...longIdToolDescriptions, ...longIdGuideDescriptions]) {
+  assert.ok(description.length >= 45 && description.length <= 160, "Long-ID collision descriptions must stay within the 45-160 character metadata contract.");
+}
+assert.equal(new Set(longIdToolDescriptions).size, 2, "Long-ID tool descriptions must remain unique.");
+assert.equal(new Set(longIdGuideDescriptions).size, 2, "Long-ID guide descriptions must remain unique.");
+if (guideDescriptionCollisionGroup.length > 1) {
+  const reorderedPeers = [...guideDescriptionCollisionGroup].reverse();
+  for (const tool of guideDescriptionCollisionGroup) {
+    assert.equal(
+      toolGuideSeoDescription(tool, reorderedPeers),
+      toolGuideSeoDescription(tool, guideDescriptionCollisionGroup),
+      "Guide description collision output must not depend on peer input order.",
+    );
+  }
+}
+
+assert.equal(
+  new Set(publicToolDescriptions).size,
+  publicToolDescriptions.length,
+  "Canonical public tool meta descriptions must be unique.",
+);
 assert.equal(new Set(publicToolTitles).size, publicToolTitles.length, "Canonical public tool SEO titles must be unique.");
 assert.equal(new Set(publicToolPaths).size, publicToolPaths.length, "Canonical public tool URLs must be unique.");
 assert.equal(new Set(publicGuideTitles).size, publicGuideTitles.length, "Public tool guide SEO titles must be unique.");
@@ -189,7 +345,7 @@ assert.equal(result.urls.length, new Set(result.urls).size, "Sitemap routes must
 assert.ok(result.urls.every((path) => !["/wallet", "/account", "/settings", "/login", "/search"].includes(path)));
 for (const tool of result.tools) {
   const title = toolSeoTitle(tool, result.tools);
-  const description = toolSeoDescription(tool);
+  const description = toolSeoDescription(tool, result.tools);
   const terms = toolSearchIntentTerms(tool);
   assert.ok(title.length <= 65, "SEO title exceeds 65 characters for " + tool.id);
   const identifyingName = tool.name.trim().split(/\s+/)[0].toLowerCase();
@@ -233,6 +389,7 @@ for (const tool of result.tools) {
   assert.ok(result.urls.includes(route), "Missing sitemap entry for " + tool.id);
   assert.ok(result.urls.includes(guide), "Missing guide sitemap entry for " + tool.id);
   assert.ok(result.llms.includes("https://envtools.store" + route), "Missing llms.txt tool link for " + tool.id);
+  assert.ok(result.llms.includes(toolSeoDescription(tool, result.tools)), "llms.txt must retain the individual task description for " + tool.id);
   assert.ok(result.llms.includes("https://envtools.store" + guide), "Missing llms.txt guide link for " + tool.id);
 }
 assert.ok(renderedAuditWorkflowSource.includes("docs/seo-tool-inventory.md"), "Rendered SEO workflow must upload the generated per-tool review inventory as an artifact.");
@@ -243,19 +400,26 @@ for (const article of result.articles) {
   assert.ok(result.urls.includes("/blog/" + article.slug), "Missing article sitemap entry for " + article.slug);
   assert.ok(result.llms.includes("https://envtools.store/blog/" + article.slug), "Missing article in llms.txt for " + article.slug);
 }
+const publicGuideDescriptions = result.guideTools.map((tool) => toolGuideSeoDescription(tool, result.guideTools));
+assert.equal(
+  new Set(publicGuideDescriptions).size,
+  publicGuideDescriptions.length,
+  "Public tool guide meta descriptions must be unique across canonical guide routes.",
+);
 for (const tool of result.guideTools) {
   const taskGuidanceSource = toolTaskGuidanceSource(tool);
   const guideInventorySection = result.inventory.split("## Individual usage guide coverage")[1] ?? "";
   const guideInventoryRow = guideInventorySection.split("\n").find((row) => row.startsWith("| " + tool.id + " |"));
   assert.ok(guideInventoryRow?.split(" | ").includes(taskGuidanceSource), "Guide inventory row has the wrong task-guidance source for " + tool.id);
   const guideTitle = toolGuideSeoTitle(tool, result.guideTools);
-  const guideDescription = toolSeoDescription(tool);
+  const guideDescription = toolGuideSeoDescription(tool, result.guideTools);
   assert.ok(guideTitle.length <= 65, "Guide SEO title exceeds 65 characters for " + tool.id);
   const guideIdentifyingName = tool.name.trim().split(/\s+/)[0].toLowerCase();
   assert.ok(guideTitle.toLowerCase().startsWith(guideIdentifyingName), "Guide title must preserve the first identifying name token: " + tool.id + " (name=" + JSON.stringify(tool.name) + ", title=" + JSON.stringify(guideTitle) + ")");
   const guideSolveForTarget = tool.name.match(/[—–-]\s*Solve for\s+(.+)$/i)?.[1]?.trim();
   if (guideSolveForTarget) assert.ok(guideTitle.toLowerCase().includes("solve for " + guideSolveForTarget.toLowerCase()), "Guide title must preserve its distinct formula target: " + tool.id);
   assert.ok(guideDescription.length >= 45 && guideDescription.length <= 160, "Guide SEO description must be 45-160 characters for " + tool.id);
+  assert.notEqual(guideDescription, toolSeoDescription(tool, result.tools), "Tool and guide descriptions must be distinct for " + tool.id);
   assert.ok(result.inventory.includes(inventoryCell(guideTitle)), "Inventory misses guide title for " + tool.id);
   assert.ok(result.inventory.includes(inventoryCell(guideDescription)), "Inventory misses guide description for " + tool.id);
   const guide = "/blog/tool-" + tool.id;

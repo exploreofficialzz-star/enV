@@ -3,6 +3,15 @@ import type { ToolMeta } from "@/types/tool";
 export const SOCIAL_CARD_WIDTH = 1200;
 export const SOCIAL_CARD_HEIGHT = 630;
 const SITE_ORIGIN = "https://envtools.store";
+const representativeToolIdsCache = new WeakMap<readonly ToolMeta[], ReadonlySet<string>>();
+
+function representativeToolIds(tools: readonly ToolMeta[]): ReadonlySet<string> {
+  const cached = representativeToolIdsCache.get(tools);
+  if (cached) return cached;
+  const ids = new Set(socialCardRepresentativeTools(tools).map((tool) => tool.id));
+  representativeToolIdsCache.set(tools, ids);
+  return ids;
+}
 
 export type SocialCardMetadata = {
   image: string;
@@ -54,7 +63,7 @@ export function toolSocialCard(
   canonicalTools: readonly ToolMeta[],
   kind: "tools" | "guides" = "tools",
 ): SocialCardMetadata {
-  const isRepresentative = socialCardRepresentativeTools(canonicalTools).some((candidate) => candidate.id === tool.id);
+  const isRepresentative = representativeToolIds(canonicalTools).has(tool.id);
   const imagePath = isRepresentative
     ? "/og/cards/" + kind + "/" + encodeURIComponent(tool.id) + ".png"
     : "/og/cards/categories/" + encodeURIComponent(tool.category) + ".png";
