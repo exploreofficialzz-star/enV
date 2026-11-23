@@ -153,8 +153,8 @@
   ],
   "git": {
     "deploymentEnabled": {
-      "main": true,
-      "research/global-discovery-brand-and-copy-20261114": false
+      "*": false,
+      "main": true
     }
   }
 }

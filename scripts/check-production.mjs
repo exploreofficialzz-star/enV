@@ -60,6 +60,16 @@ if (!existsSync(new URL(".github/workflows/production-check.yml", root))) errors
 const vercel = JSON.parse(text("vercel.json"));
 if (vercel.buildCommand !== "npm run build") errors.push("vercel.json: buildCommand must remain npm run build");
 if (!vercel.installCommand?.startsWith("npm ci")) errors.push("vercel.json: installCommand must use npm ci");
+const deploymentEnabled = vercel.git?.deploymentEnabled;
+if (
+  !deploymentEnabled ||
+  deploymentEnabled["*"] !== false ||
+  deploymentEnabled.main !== true ||
+  Object.keys(deploymentEnabled).length !== 2
+) {
+  errors.push("vercel.json: Git deployments must be disabled for every branch except main");
+}
+
 const headers = vercel.headers ?? [];
 const headerNames = new Set(headers.flatMap((h) => (h.headers ?? []).map((x) => x.key.toLowerCase())));
 for (const required of ["x-content-type-options", "referrer-policy", "x-frame-options", "strict-transport-security"]) {
