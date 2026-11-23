@@ -332,6 +332,13 @@ async function main() {
   if (summary.duplicateToolDescriptionGroups > 0 || summary.duplicateGuideDescriptionGroups > 0) {
     addFailure("Duplicate meta descriptions were found among canonical tool or guide pages (tools " + summary.duplicateToolDescriptionGroups + ", guides " + summary.duplicateGuideDescriptionGroups + ").");
   }
+  if (summary.orphanToolAndGuideRoutes > 0) {
+    const examples = summary.orphanSamples.slice(0, 12).map((route) => route.path).join(", ");
+    addFailure(
+      "Found " + summary.orphanToolAndGuideRoutes
+      + " canonical tool/guide route(s) with no inbound internal HTML links. Examples: " + examples,
+    );
+  }
   const report = {
     schemaVersion: 1,
     auditType: "full-public-discovery-rendered-route-audit",
