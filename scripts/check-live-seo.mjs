@@ -183,22 +183,34 @@ async function checkCanonicalHosts() {
 async function checkCrawlerAccess() {
   // This verifies HTTP delivery under crawler User-Agent request paths only.
   // It does not authenticate a genuine crawler or replace provider IP validation.
-  const agents = ["Googlebot", "Bingbot", "OAI-SearchBot", "Claude-SearchBot", "PerplexityBot"];
+  const agents = [
+    ["Googlebot", "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"],
+    ["Bingbot", "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)"],
+    ["OAI-SearchBot", "OAI-SearchBot/1.0"],
+    ["Claude-SearchBot", "Claude-SearchBot/1.0"],
+    ["PerplexityBot", "PerplexityBot/1.0"],
+  ];
   const paths = ["/", "/tools", "/tools/developer/json-studio"];
-  for (const agent of agents) {
+  for (const [agent, userAgent] of agents) {
     for (const path of paths) {
       try {
-        const response = await get(ORIGIN + path, agent + " " + path, agent);
+        const response = await get(ORIGIN + path, agent + " " + path, userAgent);
         const html = await response.text();
         const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
         assert(response.status === 200, agent + " received HTTP " + response.status + " for " + path);
         assert(contentType.includes("text/html"), agent + " received a non-HTML response for " + path + ": " + contentType);
-        const head = html.match(/<head\\b[^>]*>([\\s\\S]*?)<\\/head>/i)?.[1] ?? "";
-        const title = head.match(/<title\\b[^>]*>([\\s\\S]*?)<\\/title>/i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "";
+        const lower = html.toLowerCase();
+        const headStart = lower.indexOf("<head");
+        const headEnd = lower.indexOf("</head>", headStart);
+        const head = headStart >= 0 && headEnd > headStart ? html.slice(headStart, headEnd) : "";
+        const titleStart = head.toLowerCase().indexOf("<title");
+        const titleContentStart = titleStart >= 0 ? head.indexOf(">", titleStart) + 1 : -1;
+        const titleEnd = titleContentStart > 0 ? head.toLowerCase().indexOf("</title>", titleContentStart) : -1;
+        const title = titleEnd > titleContentStart ? head.slice(titleContentStart, titleEnd).replace(/<[^>]+>/g, "").trim() : "";
         const buildSha = metaContent(head, "name", "env-build-sha");
         assert(Boolean(title), agent + " received HTML without a page title for " + path);
         if (EXPECTED_BUILD_SHA) assert(buildSha === EXPECTED_BUILD_SHA, agent + " received a stale deployment for " + path + " (build SHA " + buildSha + ")");
-        assert(!/challenge-platform|cf-chl-|just a moment\.\.\./i.test(html), agent + " received a bot challenge page for " + path);
+        assert(!/challenge-platform|cf-chl-|just a moment\\.\\.\\./i.test(html), agent + " received a bot challenge page for " + path);
         checked.push({ path, crawlerUserAgent: agent, status: response.status, title, buildSha, contentType });
       } catch (error) {
         failures.push(agent + " could not fetch " + path + ": " + String(error));
