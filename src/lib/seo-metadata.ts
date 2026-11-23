@@ -235,7 +235,8 @@ function uniqueToolDescription(base: string, tool: ToolMeta, peers: readonly Too
   const task = String(tool.description ?? "").replace(/\s+/g, " ").trim()
     || tool.engine.type + ("op" in tool.engine ? " " + String(tool.engine.op) : "");
   const discriminator = " · Task: " + cleanMetaDescription(task || tool.name, 38) + " · " + tool.id;
-  return cleanMetaDescription(base, Math.max(35, 160 - discriminator.length)) + discriminator;
+  const baseBudget = Math.max(1, 160 - discriminator.length);
+  return cleanMetaDescription(base, baseBudget) + discriminator;
 }
 
 function toolSeoDescriptionBase(tool: ToolMeta): string {
