@@ -81,6 +81,8 @@ assert.match(privacy, /Adsterra advertising/, "The Web privacy notice must discl
 assert.doesNotMatch(privacy, /Google AdSense|Google Ad Manager|AdMob|UMP/, "The Web privacy policy must not describe Google ads as the active provider.");
 assert.match(consent, /getAdsterraConsent|setAdsterraConsent/, "Visitors must be able to grant, deny, and withdraw Adsterra consent.");
 assert.match(offlineClient, /isHybridAccessToolId/, "The offline wallet boundary must remain active for the selected cohort.");
+assert.match(offlineClient, /toolIds: import\.meta\.env\.VITE_AD_ACCESS_TOOL_IDS/, "Offline metering must use its allowlist even when the online Adsterra gate is disabled.");
+assert.doesNotMatch(offlineClient, /VITE_AD_ACCESS_GATE_ENABLED === "true"/, "Offline wallet enforcement must not depend on the online advertising gate.");
 assert.match(offlineClient, /getSelectedWebOfflineAllowanceId/, "Offline hybrid runs must require the existing pre-issued local allowance.");
 assert.match(offlineClient, /runOfflineMeteredOperation/, "Offline selected-tool usage must still be journalled.");
 assert.match(accessRoute, /getApprovedToolAccessPrice/, "The online token route must resolve the manually approved per-tool price.");
