@@ -145,9 +145,8 @@ export async function runOfflineMeteredOperationIfSelected<T>(input: { toolId: s
 
   const catalogTool = getToolById(input.toolId);
   const hybridAdTool = Boolean(catalogTool && isHybridAccessToolId(input.toolId, {
-    toolIds: import.meta.env.VITE_AD_ACCESS_GATE_ENABLED === "true"
-      ? import.meta.env.VITE_AD_ACCESS_TOOL_IDS
-      : "",
+    // Offline allowance selection is independent from the online Adsterra gate.
+    toolIds: import.meta.env.VITE_AD_ACCESS_TOOL_IDS,
   }, catalogTool));
 
   if (hybridAdTool && await isApplicationOnline()) {
