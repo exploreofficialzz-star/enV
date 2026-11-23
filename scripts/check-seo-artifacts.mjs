@@ -57,6 +57,7 @@ const guideRouteSource = readFileSync(new URL("../src/routes/blog.$slug.tsx", im
 const discoverySearchRouteSource = readFileSync(new URL("../src/routes/search.tsx", import.meta.url), "utf8");
 assert.ok(discoverySearchRouteSource.includes("searchToolResults"), "Search results must retain each ranked tool's grounded match record.");
 assert.ok(discoverySearchRouteSource.includes("results.matches"), "Search UI must render the ranked match records rather than losing their explanations.");
+assert.ok(discoverySearchRouteSource.includes("results.matchCount === 0"), "Search UI must preserve the empty state when no tools match.");
 assert.ok(discoverySearchRouteSource.includes("{ tool, explanation }"), "Every discovery card must expose its own why-this-matched explanation.");
 const renderedAuditWorkflowSource = readFileSync(new URL("../.github/workflows/accessibility-phase8.yml", import.meta.url), "utf8");
 const seoHeadSource = seoMetadataSource.slice(seoMetadataSource.indexOf("export function seoPageHead"), seoMetadataSource.indexOf("export function organizationSchema"));
