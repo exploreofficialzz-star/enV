@@ -6,6 +6,8 @@ on:
       - feat/full-public-discovery-audit-20261123
     paths:
       - .github/workflows/regenerate-discovery-artifacts.yml
+      - scripts/generate-discovery-inventory.mjs
+      - scripts/discovery-inventory-core.mjs
 
 permissions:
   contents: write
@@ -32,7 +34,7 @@ jobs:
           cache: npm
 
       - name: Install locked dependencies
-        run: npm ci
+        run: npm ci --no-audit --no-fund
 
       - name: Regenerate native catalogue and execution inventory
         run: |
@@ -44,54 +46,114 @@ jobs:
       - name: Regenerate canonical SEO artifacts
         run: npm run generate:seo
 
-      - name: Accept only the confirmed one-record catalogue removal
+      - name: Verify the exact discovery inventory delta before accepting it
         shell: bash
         run: |
+          set -euo pipefail
           cp audit/discovery/discovery-baseline.json /tmp/discovery-baseline-before.json
-          npm run discovery:inventory -- --update-baseline
+          cp audit/discovery/discovery-inventory.json /tmp/discovery-inventory-before.json
+
+          # The generator writes the candidate inventory/report before returning its
+          # expected COUNT_DRIFT exit status. Do not update the accepted baseline yet.
+          set +e
+          npm run discovery:inventory
+          inventory_status=$?
+          set -e
+          if [ "$inventory_status" -gt 1 ]; then
+            echo "Inventory generation failed for a reason other than its validator result."
+            exit "$inventory_status"
+          fi
+
           node --input-type=module <<'NODE'
           import fs from "node:fs";
-          const before = JSON.parse(fs.readFileSync("/tmp/discovery-baseline-before.json", "utf8"));
-          const after = JSON.parse(fs.readFileSync("audit/discovery/discovery-baseline.json", "utf8"));
-          const changed = Object.keys(before.counts)
-            .filter((key) => before.counts[key] !== after.counts[key])
-            .sort();
-          const allowed = ["runtimeExtensionRecords", "runtimeRecords", "searchableRecords"];
-          if (JSON.stringify(changed) !== JSON.stringify(allowed)) {
-            throw new Error("Unexpected discovery count changes: " + changed.join(", "));
+
+          const beforeBaseline = JSON.parse(fs.readFileSync("/tmp/discovery-baseline-before.json", "utf8"));
+          const beforeInventory = JSON.parse(fs.readFileSync("/tmp/discovery-inventory-before.json", "utf8"));
+          const currentInventory = JSON.parse(fs.readFileSync("audit/discovery/discovery-inventory.json", "utf8"));
+          const report = fs.readFileSync("audit/discovery/DISCOVERY-RECONCILIATION-REPORT.md", "utf8");
+
+          const beforeIds = new Set(beforeInventory.records.map((record) => record.id));
+          const currentIds = new Set(currentInventory.records.map((record) => record.id));
+          const removed = [...beforeIds].filter((id) => !currentIds.has(id)).sort();
+          const added = [...currentIds].filter((id) => !beforeIds.has(id)).sort();
+          const expectedRemoved = ["video-link-screen-recording"];
+
+          if (JSON.stringify(removed) !== JSON.stringify(expectedRemoved) || added.length !== 0) {
+            throw new Error("Discovery identity change is not the reviewed one-record removal. Removed: "
+              + JSON.stringify(removed) + "; added: " + JSON.stringify(added));
           }
-          if (JSON.stringify(before.gaps) !== JSON.stringify(after.gaps)) {
-            throw new Error("A registered discovery gap changed. Human review is required; baseline not accepted.");
-          }
+
           const expected = {
             runtimeRecords: 10013,
             searchableRecords: 9978,
             runtimeExtensionRecords: 12
           };
+          const changedCounts = Object.keys(beforeBaseline.counts)
+            .filter((key) => beforeBaseline.counts[key] !== currentInventory.summary[key])
+            .sort();
+          const expectedChangedCounts = ["runtimeExtensionRecords", "runtimeRecords", "searchableRecords"];
+          if (JSON.stringify(changedCounts) !== JSON.stringify(expectedChangedCounts)) {
+            throw new Error("Unexpected discovery count fields changed: " + JSON.stringify(changedCounts));
+          }
           for (const [key, value] of Object.entries(expected)) {
-            if (after.counts[key] !== value) {
-              throw new Error("Unexpected " + key + ": " + after.counts[key] + " (expected " + value + ")");
+            if (currentInventory.summary[key] !== value) {
+              throw new Error("Unexpected " + key + ": " + currentInventory.summary[key] + " (expected " + value + ")");
             }
           }
-          console.log("Accepted the confirmed removal of video-link-screen-recording only; registered discovery gap baselines remain unchanged.");
+
+          const validationSection = report.split("## 8. Validator result")[1]?.split("Registered gaps")[0] ?? "";
+          const failures = [...validationSection.matchAll(/^- `([^`]+)`/gm)].map((match) => match[1]);
+          if (failures.length !== 0 &&
+              (failures.length !== 3 || failures.some((code) => code !== "COUNT_DRIFT"))) {
+            throw new Error("Unexpected inventory validator failures: " + JSON.stringify(failures));
+          }
+
+          const currentGaps = new Map();
+          for (const line of report.split("\n")) {
+            const match = line.match(/^\| `([^`]+)` \| (\d+) \| (\d+) \|$/);
+            if (match) currentGaps.set(match[1], Number(match[2]));
+          }
+          const priorGapCodes = Object.keys(beforeBaseline.gaps).sort();
+          const nextGapCodes = [...currentGaps.keys()].sort();
+          if (JSON.stringify(priorGapCodes) !== JSON.stringify(nextGapCodes)) {
+            throw new Error("The registered discovery gap set changed.");
+          }
+          for (const [code, prior] of Object.entries(beforeBaseline.gaps)) {
+            const current = currentGaps.get(code);
+            if (current === undefined || current > prior) {
+              throw new Error("Registered gap grew or disappeared unexpectedly: " + code + " (before " + prior + ", current " + current + ")");
+            }
+          }
+
+          console.log("Verified exact removal: video-link-screen-recording; no added IDs; only the three expected counts decreased; all registered discovery gaps stayed level or improved.");
           NODE
 
-      - name: Generate discovery inventory, knowledge index and search golden
+      - name: Accept reviewed counts and regenerate discovery artifacts
         run: |
+          npm run discovery:inventory -- --update-baseline
           npm run discovery:inventory
           npm run discovery:knowledge-index
           npm run discovery:search-golden
-          node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/validate-seo-offline.mjs
+          npm run discovery:seo-offline
+          npm run discovery:check
 
-      - name: Verify all generated discovery artifacts
-        run: npm run discovery:check
-
-      - name: Commit only regenerated generated files and remove this temporary workflow
+      - name: Commit only regenerated generated files and remove this one-time workflow
         shell: bash
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add             apps/shared/catalog.json             apps/shared/native-engine-inventory.json             apps/shared/native-execution-matrix.json             src/data/billing-profile-runtime-extensions.json             audit/discovery/discovery-baseline.json             audit/discovery/discovery-inventory.json             audit/discovery/DISCOVERY-RECONCILIATION-REPORT.md             audit/discovery/SEO-OFFLINE-VALIDATION.md             audit/discovery/tool-knowledge-index.json             audit/discovery/search-eval/native-golden.v1.json
+          git add \
+            apps/shared/catalog.json \
+            apps/shared/native-engine-inventory.json \
+            apps/shared/native-execution-matrix.json \
+            src/data/billing-profile-runtime-extensions.json \
+            audit/discovery/discovery-baseline.json \
+            audit/discovery/discovery-inventory.json \
+            audit/discovery/DISCOVERY-RECONCILIATION-REPORT.md \
+            audit/discovery/SEO-OFFLINE-VALIDATION.md \
+            audit/discovery/tool-knowledge-index.json \
+            audit/discovery/search-eval/native-golden.v1.json
           git rm .github/workflows/regenerate-discovery-artifacts.yml
           git diff --cached --check
           git diff --cached --stat
