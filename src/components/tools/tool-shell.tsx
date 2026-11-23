@@ -100,7 +100,7 @@ export function ToolShell({
     return true;
   };
   useEffect(() => {
-    if (!adsterraAdsEnabled) return;
+    if (!adAccessGateEnabled || !adsterraAdsEnabled) return;
     const onPlacementLoaded = () => {
       const progress = recordBrowserAdSupportedVisit(tool.id);
       if (progress?.shouldShowAdFreeOffer) setShowAdFreeOffer(true);
