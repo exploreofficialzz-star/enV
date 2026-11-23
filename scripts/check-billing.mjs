@@ -191,6 +191,15 @@ assert.match(tokenGuidePage, /Number\.MAX_SAFE_INTEGER/, "token guide search mus
 assert.match(tokenGuidePage, /Show more tools \(/, "token guide must allow users to browse beyond the first results");
 assert.match(tokenGuidePage, /token button on the home page/, "guide must direct account-usage reviews to the Home token button");
 assert.equal(profiles.toolCount, runtimeCatalog.length, "generated base-catalogue profile count must match the current canonical catalogue");
+const sceneStudioProfile = profiles.profiles.find((profile) => profile.toolId === "scene-studio");
+assert.ok(sceneStudioProfile, "Scene Studio must have a generated billing profile");
+assert.equal(sceneStudioProfile.toolStatus, "active", "Scene Studio billing must follow the active runtime tool status");
+assert.equal(sceneStudioProfile.category, "video", "Scene Studio must retain its Video category in billing");
+assert.equal(sceneStudioProfile.executionMode, "local-device", "Scene Studio browser rendering must not be misclassified as remote processing");
+assert.equal(sceneStudioProfile.billingKey, "local.general", "Scene Studio must use the standard local token policy until metering is validated");
+assert.equal(sceneStudioProfile.pricingMode, "per-unit-hypothesis", "Scene Studio local usage must not be priced using unmeasured provider cost");
+assert.equal(sceneStudioProfile.optionalAiAssistProfile, null, "Local Scene Studio operations must not incur AI-assist charges unless AI is explicitly invoked");
+assert.equal(sceneStudioProfile.adsEligible, false, "Scene Studio must not be made ad-eligible by its billing classification");
 assert.deepEqual([...expectedRuntimeToolIds].filter((id) => !profileIds.has(id)), [], "every base-catalogue and native runtime-extension tool must have an auditable billing profile");
 assert.equal(runtimeExtensionProfileIndex.toolCount, runtimeExtensionProfileIndex.profiles.length, "runtime-extension profile count must match its header");
 assert.equal(runtimeExtensionProfileIds.size, runtimeExtensionProfileIndex.profiles.length, "runtime-extension profile IDs must be unique");
