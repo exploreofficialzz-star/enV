@@ -55,9 +55,9 @@ const catalogueGeneratorSource = readFileSync(new URL("./gen-catalog.mjs", impor
 const toolRouteSource = readFileSync(new URL("../src/routes/tools/$category/$slug.tsx", import.meta.url), "utf8");
 const guideRouteSource = readFileSync(new URL("../src/routes/blog.$slug.tsx", import.meta.url), "utf8");
 const discoverySearchRouteSource = readFileSync(new URL("../src/routes/search.tsx", import.meta.url), "utf8");
-assert.match(discoverySearchRouteSource, /searchToolResults/, "Search results must retain each ranked tool's grounded match record.");
-assert.match(discoverySearchRouteSource, /results\\.matches/, "Search UI must render the ranked match records rather than losing their explanations.");
-assert.match(discoverySearchRouteSource, /\\{ tool, explanation \\}/, "Every discovery card must expose its own why-this-matched explanation.");
+assert.ok(discoverySearchRouteSource.includes("searchToolResults"), "Search results must retain each ranked tool's grounded match record.");
+assert.ok(discoverySearchRouteSource.includes("results.matches"), "Search UI must render the ranked match records rather than losing their explanations.");
+assert.ok(discoverySearchRouteSource.includes("{ tool, explanation }"), "Every discovery card must expose its own why-this-matched explanation.");
 const renderedAuditWorkflowSource = readFileSync(new URL("../.github/workflows/accessibility-phase8.yml", import.meta.url), "utf8");
 const seoHeadSource = seoMetadataSource.slice(seoMetadataSource.indexOf("export function seoPageHead"), seoMetadataSource.indexOf("export function organizationSchema"));
 assert.ok(rootRouteSource.includes("...webmasterVerificationMeta()"), "Search Console verification must be emitted once from the root document.");
