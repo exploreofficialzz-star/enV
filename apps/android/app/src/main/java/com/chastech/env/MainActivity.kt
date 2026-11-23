@@ -187,7 +187,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        NativeAdsPrivacyManager.refreshConsent(this)
         val favorites = FavoritesStore(applicationContext)
         setContent {
             var themeMode by rememberSaveable { mutableStateOf(favorites.getThemeMode()) }
@@ -1185,7 +1184,7 @@ private fun ToolDetail(
                                 Modifier.weight(1f).fillMaxWidth().then(if (tool.id == "the-world-lab") Modifier else Modifier.verticalScroll(rememberScrollState())),
                                 verticalArrangement = Arrangement.spacedBy(0.dp),
                             ) {
-                                NativeRewardedToolAccessGate(tool, onOpenWallet) {
+                                NativeToolAccessContainer {
                                     NativeToolInterfaceContent(
                                         tool,
                                         backend,
@@ -1264,7 +1263,7 @@ private fun ToolDetail(
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
             ) {
                 Column(Modifier.fillMaxWidth().padding(if (compact) 16.dp else 24.dp)) {
-                    NativeRewardedToolAccessGate(tool, onOpenWallet) {
+                    NativeToolAccessContainer {
                         NativeToolInterfaceContent(
                             tool,
                             backend,
@@ -1273,7 +1272,6 @@ private fun ToolDetail(
                         )
                     }
                     if (!isFullscreen) NativeToolCommunityPanel(tool.id)
-                    if (!isFullscreen && !NativeAdsPolicy.isRewardedAccessTool(context, tool)) NativeToolAdSlot(tool)
                 }
             }
             if (!isFullscreen) {
@@ -2281,7 +2279,7 @@ private fun NativeCalculatorToolForm(tool: ToolRecord) {
             onRun = {
                 val allowanceId = runCatching { journal.activeAllowanceId() }.getOrNull()
                 val walletEligible = runCatching { journal.isEligibleTool(context, tool.id) }.getOrDefault(false)
-                val hybridAdTool = NativeAdsPolicy.isHybridTool(context, tool)
+                val hybridTool = NativeToolAccessPolicy.isHybridTool(context, tool)
 
                 fun runWithoutOfflineCharge() {
                     runCatching { NativeCalculatorEngine.run(operation, values.toMap()) }.fold(
@@ -2323,11 +2321,11 @@ private fun NativeCalculatorToolForm(tool: ToolRecord) {
                     }
                 }
 
-                if (!hybridAdTool) {
+                if (!hybridTool) {
                     if (allowanceId != null && walletEligible) runWithOfflineCharge() else runWithoutOfflineCharge()
                 } else {
                     scope.launch {
-                        val online = NativeAdsPolicy.isApplicationOnline(context)
+                        val online = NativeToolAccessPolicy.isApplicationOnline(context)
                         when {
                             online -> runWithoutOfflineCharge()
                             allowanceId != null && walletEligible -> runWithOfflineCharge()
