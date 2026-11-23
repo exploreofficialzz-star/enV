@@ -97,6 +97,9 @@ function appendBannerScript(
     }, 15_000);
     script.addEventListener("load", () => {
       window.clearTimeout(loadTimeout);
+      window.dispatchEvent(new CustomEvent("env:adsterra-placement-loaded", {
+        detail: { placementId: unit.placementId },
+      }));
       resolve();
     }, { once: true });
     script.addEventListener("error", () => {
@@ -248,6 +251,9 @@ export function AdsterraNativeBanner() {
       window.clearTimeout(loadTimeout);
       if (failureHandled) return;
       failureHandled = true;
+      window.dispatchEvent(new CustomEvent("env:adsterra-placement-loaded", {
+        detail: { placementId: ADSTERRA_NATIVE_BANNER.placementId },
+      }));
       if (active) setFailed(false);
     }, { once: true });
     script.addEventListener("error", () => {
