@@ -62,7 +62,11 @@ jobs:
       - name: Refresh source-derived native and SEO discovery artifacts
         run: |
           npm run export:native-catalog
+          npm run generate:billing-profiles
+          npm run check:native-discovery
+          npm run export:native-execution-matrix
           npm run generate:seo
+          npm run discovery:seo-offline
 
       - name: Run SEO parser and deployment-wait regression tests
         run: npm run check:seo
