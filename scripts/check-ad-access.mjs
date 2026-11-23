@@ -114,7 +114,7 @@ assert.doesNotMatch(androidMain, /NativeRewardedToolAccessGate|NativeToolAdSlot|
 assert.doesNotMatch(androidGradle, /ads-mobile-sdk|user-messaging-platform|ENV_ADMOB|ENV_GAM_REWARDED|ENV_ADS_ENABLED/, "Android Gradle must not bundle Google Mobile Ads or UMP.");
 assert.doesNotMatch(androidGradle, /ENV_HYBRID_TOOL_IDS/, "Android build configuration must not use an ad-specific hybrid allowlist.");
 assert.match(androidGradle, /sourceSets\["main"\]\.assets\.srcDir\(file\("\.\.\/\.\.\/shared"\)\)/, "Android must bundle the shared offline registry as a native asset.");
-assert.match(androidAds, /profile\.billingKey\.startsWith\("local\."\)/, "Android hybrid access must use local billing profiles.");
+assert.match(androidAds, /optString\("billingKey"\)\.startsWith\("local\."\)/, "Android hybrid access must use local billing profiles.");
 assert.match(androidAds, /hasAllPlatforms/, "Android hybrid access must require Web, Android and iOS coverage.");
 assert.doesNotMatch(androidManifest, /com\.google\.android\.gms\.ads\.APPLICATION_ID/, "Android manifest must not contain an AdMob app ID.");
 assert.doesNotMatch(androidInfo, /NativeAdsPrivacyDisclosure|NativeAdsPrivacyOptionsButton/, "Android Privacy screen must not expose unconfigured Google ad controls.");
