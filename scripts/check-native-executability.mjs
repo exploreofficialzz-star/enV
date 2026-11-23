@@ -31,7 +31,7 @@ const active = m.tools.filter((tool) => tool.status === "active" || tool.status 
 const divergent = active.filter((tool) => tool.android !== tool.ios);
 const invalid = active.filter((tool) => !["offline-native", "backend-native", "web-only"].includes(tool.android) ||
   !["offline-native", "backend-native", "web-only"].includes(tool.ios));
-const requiredWebOnly = ["smartphone-prototype-lab"];
+const requiredWebOnly = ["smartphone-prototype-lab", "scene-studio"];
 const invalidWebOnly = requiredWebOnly.filter((id) => {
   const row = m.tools.find((tool) => tool.id === id);
   return !row || row.android !== "web-only" || row.ios !== "web-only" || !row.dispositionReason;

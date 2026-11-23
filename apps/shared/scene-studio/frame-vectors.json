@@ -1,0 +1,2961 @@
+{
+  "description": "Frame-state vectors. Kotlin and Swift must reproduce every number within `tolerance`. Regenerate with UPDATE_SCENE_STUDIO_VECTORS=1 only when the rules in frame-state.ts deliberately change.",
+  "tolerance": 0.000001,
+  "euler": [
+    {
+      "rotation": [
+        30,
+        40,
+        50
+      ],
+      "order": "XYZ",
+      "quaternion": [
+        0.3600421736976789,
+        0.19662822552874049,
+        0.463826910250329,
+        0.7852207150935987
+      ]
+    },
+    {
+      "rotation": [
+        -120,
+        15,
+        200
+      ],
+      "order": "XYZ",
+      "quaternion": [
+        0.213368782530687,
+        0.8342393057232674,
+        0.5078203091463996,
+        0.02524038522265551
+      ]
+    },
+    {
+      "rotation": [
+        30,
+        40,
+        50
+      ],
+      "order": "XZY",
+      "quaternion": [
+        0.08080468869083998,
+        0.19662822552874049,
+        0.463826910250329,
+        0.8600421736976789
+      ]
+    },
+    {
+      "rotation": [
+        -120,
+        15,
+        200
+      ],
+      "order": "XZY",
+      "quaternion": [
+        0.08482557646121844,
+        0.8342393057232675,
+        0.5078203091463996,
+        -0.19740297865746004
+      ]
+    },
+    {
+      "rotation": [
+        30,
+        40,
+        50
+      ],
+      "order": "YXZ",
+      "quaternion": [
+        0.3600421736976789,
+        0.19662822552874049,
+        0.30337177447125957,
+        0.860042173697679
+      ]
+    },
+    {
+      "rotation": [
+        -120,
+        15,
+        200
+      ],
+      "order": "YXZ",
+      "quaternion": [
+        0.213368782530687,
+        0.8342393057232674,
+        0.4685622770186428,
+        -0.19740297865746007
+      ]
+    },
+    {
+      "rotation": [
+        30,
+        40,
+        50
+      ],
+      "order": "YZX",
+      "quaternion": [
+        0.3600421736976789,
+        0.40219849353410964,
+        0.30337177447125957,
+        0.7852207150935986
+      ]
+    },
+    {
+      "rotation": [
+        -120,
+        15,
+        200
+      ],
+      "order": "YZX",
+      "quaternion": [
+        0.21336878253068697,
+        -0.8569049411400828,
+        0.4685622770186428,
+        0.025240385222655523
+      ]
+    },
+    {
+      "rotation": [
+        30,
+        40,
+        50
+      ],
+      "order": "ZXY",
+      "quaternion": [
+        0.08080468869083998,
+        0.40219849353410964,
+        0.463826910250329,
+        0.7852207150935986
+      ]
+    },
+    {
+      "rotation": [
+        -120,
+        15,
+        200
+      ],
+      "order": "ZXY",
+      "quaternion": [
+        0.08482557646121844,
+        -0.8569049411400829,
+        0.5078203091463996,
+        0.025240385222655523
+      ]
+    },
+    {
+      "rotation": [
+        30,
+        40,
+        50
+      ],
+      "order": "ZYX",
+      "quaternion": [
+        0.08080468869083998,
+        0.40219849353410964,
+        0.30337177447125957,
+        0.8600421736976789
+      ]
+    },
+    {
+      "rotation": [
+        -120,
+        15,
+        200
+      ],
+      "order": "ZYX",
+      "quaternion": [
+        0.08482557646121841,
+        -0.8569049411400828,
+        0.4685622770186428,
+        -0.19740297865746004
+      ]
+    }
+  ],
+  "frames": [
+    {
+      "scene": "scenes/valid/02-walk-and-talk.json",
+      "frame": 0,
+      "camera": {
+        "type": "perspective",
+        "position": [
+          0,
+          2,
+          8
+        ],
+        "lookAt": [
+          0,
+          1,
+          0
+        ],
+        "fov": 45,
+        "roll": 0,
+        "orthoHeight": 0,
+        "shotIndex": null
+      },
+      "objects": {
+        "hero": {
+          "position": [
+            -2,
+            0,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": "#f4b942",
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "tree1": {
+          "position": [
+            3,
+            0,
+            -2
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1.5,
+            1.5,
+            1.5
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "title": {
+          "position": [
+            0,
+            3,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        }
+      },
+      "layers": []
+    },
+    {
+      "scene": "scenes/valid/02-walk-and-talk.json",
+      "frame": 60,
+      "camera": {
+        "type": "perspective",
+        "position": [
+          0,
+          2,
+          8
+        ],
+        "lookAt": [
+          0,
+          1,
+          0
+        ],
+        "fov": 45,
+        "roll": 0,
+        "orthoHeight": 0,
+        "shotIndex": null
+      },
+      "objects": {
+        "hero": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": "#f4b942",
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "tree1": {
+          "position": [
+            3,
+            0,
+            -2
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1.5,
+            1.5,
+            1.5
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "title": {
+          "position": [
+            0,
+            3,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        }
+      },
+      "layers": []
+    },
+    {
+      "scene": "scenes/valid/02-walk-and-talk.json",
+      "frame": 120,
+      "camera": {
+        "type": "perspective",
+        "position": [
+          0,
+          2,
+          8
+        ],
+        "lookAt": [
+          0,
+          1,
+          0
+        ],
+        "fov": 45,
+        "roll": 0,
+        "orthoHeight": 0,
+        "shotIndex": null
+      },
+      "objects": {
+        "hero": {
+          "position": [
+            2,
+            0,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": "#f4b942",
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "tree1": {
+          "position": [
+            3,
+            0,
+            -2
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1.5,
+            1.5,
+            1.5
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "title": {
+          "position": [
+            0,
+            3,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        }
+      },
+      "layers": []
+    },
+    {
+      "scene": "scenes/valid/02-walk-and-talk.json",
+      "frame": 239,
+      "camera": {
+        "type": "perspective",
+        "position": [
+          0,
+          2,
+          8
+        ],
+        "lookAt": [
+          0,
+          1,
+          0
+        ],
+        "fov": 45,
+        "roll": 0,
+        "orthoHeight": 0,
+        "shotIndex": null
+      },
+      "objects": {
+        "hero": {
+          "position": [
+            2,
+            0,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": "#f4b942",
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "tree1": {
+          "position": [
+            3,
+            0,
+            -2
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1.5,
+            1.5,
+            1.5
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "title": {
+          "position": [
+            0,
+            3,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        }
+      },
+      "layers": []
+    },
+    {
+      "scene": "scenes/valid/04-night-flood-cinematic.json",
+      "frame": 0,
+      "camera": {
+        "type": "perspective",
+        "position": [
+          -0.010074477590387688,
+          2.1976433557691055,
+          9
+        ],
+        "lookAt": [
+          0,
+          1,
+          0
+        ],
+        "fov": 42,
+        "roll": 0.09121164126554504,
+        "orthoHeight": 0,
+        "shotIndex": 0
+      },
+      "objects": {
+        "ground": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "quaternion": [
+            -0.7071067811865475,
+            0,
+            0,
+            0.7071067811865476
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": "#2a2f38",
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "pipe": {
+          "position": [
+            0,
+            0.8,
+            -2
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "hero": {
+          "position": [
+            -1.5,
+            0,
+            1
+          ],
+          "quaternion": [
+            0,
+            0.7071067811865475,
+            0,
+            0.7071067811865476
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": "Run",
+          "clipTime": 0
+        },
+        "officer": {
+          "position": [
+            3,
+            0,
+            2
+          ],
+          "quaternion": [
+            0,
+            0.7071067811865475,
+            0,
+            0.7071067811865475
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": "Idle",
+          "clipTime": 0
+        },
+        "rain": {
+          "position": [
+            0,
+            6,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "flood": {
+          "position": [
+            0,
+            0.15,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": "#1c2b3a",
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        }
+      },
+      "layers": [
+        {
+          "id": "vignette_tint",
+          "position": [
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 0.12,
+          "color": "#000814"
+        }
+      ]
+    },
+    {
+      "scene": "scenes/valid/04-night-flood-cinematic.json",
+      "frame": 45,
+      "camera": {
+        "type": "perspective",
+        "position": [
+          -0.003935415763407946,
+          2.201368439901853,
+          9
+        ],
+        "lookAt": [
+          0,
+          1,
+          0
+        ],
+        "fov": 42,
+        "roll": -0.10752730874810368,
+        "orthoHeight": 0,
+        "shotIndex": 0
+      },
+      "objects": {
+        "ground": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "quaternion": [
+            -0.7071067811865475,
+            0,
+            0,
+            0.7071067811865476
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": "#2a2f38",
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "pipe": {
+          "position": [
+            0,
+            0.8,
+            -2
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "hero": {
+          "position": [
+            -1.2890625,
+            0.1125,
+            0.690625
+          ],
+          "quaternion": [
+            0,
+            0.7071067811865475,
+            0,
+            0.7071067811865476
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": "Run",
+          "clipTime": 1.5
+        },
+        "officer": {
+          "position": [
+            3,
+            0,
+            2
+          ],
+          "quaternion": [
+            0,
+            0.7071067811865475,
+            0,
+            0.7071067811865475
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": "Idle",
+          "clipTime": 1.5
+        },
+        "rain": {
+          "position": [
+            0,
+            6,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "flood": {
+          "position": [
+            0,
+            0.15,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": "#1a2937",
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        }
+      },
+      "layers": [
+        {
+          "id": "vignette_tint",
+          "position": [
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 0.12,
+          "color": "#000814"
+        }
+      ]
+    },
+    {
+      "scene": "scenes/valid/04-night-flood-cinematic.json",
+      "frame": 119,
+      "camera": {
+        "type": "perspective",
+        "position": [
+          -0.011434826211553695,
+          2.206008519559107,
+          9
+        ],
+        "lookAt": [
+          0,
+          1,
+          0
+        ],
+        "fov": 42,
+        "roll": -0.03421595191569239,
+        "orthoHeight": 0,
+        "shotIndex": 0
+      },
+      "objects": {
+        "ground": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "quaternion": [
+            -0.7071067811865475,
+            0,
+            0,
+            0.7071067811865476
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": "#2a2f38",
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "pipe": {
+          "position": [
+            0,
+            0.8,
+            -2
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "hero": {
+          "position": [
+            -0.02489583333333334,
+            0.7867222222222223,
+            -1.1634861111111112
+          ],
+          "quaternion": [
+            0,
+            0.7071067811865475,
+            0,
+            0.7071067811865476
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": "Swim",
+          "clipTime": 0.4666666666666668
+        },
+        "officer": {
+          "position": [
+            3,
+            0,
+            2
+          ],
+          "quaternion": [
+            0,
+            0.7071067811865475,
+            0,
+            0.7071067811865475
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": "Idle",
+          "clipTime": 3.966666666666667
+        },
+        "rain": {
+          "position": [
+            0,
+            6,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "flood": {
+          "position": [
+            0,
+            0.15,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": "#172432",
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        }
+      },
+      "layers": [
+        {
+          "id": "vignette_tint",
+          "position": [
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 0.12,
+          "color": "#000814"
+        }
+      ]
+    },
+    {
+      "scene": "scenes/valid/04-night-flood-cinematic.json",
+      "frame": 120,
+      "camera": {
+        "type": "perspective",
+        "position": [
+          -0.002551168678328395,
+          1.0079204379487783,
+          2.5
+        ],
+        "lookAt": [
+          0,
+          1,
+          0
+        ],
+        "fov": 32,
+        "roll": 0.12482521263882518,
+        "orthoHeight": 0,
+        "shotIndex": 1
+      },
+      "objects": {
+        "ground": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "quaternion": [
+            -0.7071067811865475,
+            0,
+            0,
+            0.7071067811865476
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": "#2a2f38",
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "pipe": {
+          "position": [
+            0,
+            0.8,
+            -2
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "hero": {
+          "position": [
+            0,
+            0.8,
+            -1.2
+          ],
+          "quaternion": [
+            0,
+            0.7071067811865475,
+            0,
+            0.7071067811865476
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": "Swim",
+          "clipTime": 0.5
+        },
+        "officer": {
+          "position": [
+            3,
+            0,
+            2
+          ],
+          "quaternion": [
+            0,
+            0.7071067811865475,
+            0,
+            0.7071067811865475
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": "Idle",
+          "clipTime": 4
+        },
+        "rain": {
+          "position": [
+            0,
+            6,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "flood": {
+          "position": [
+            0,
+            0.15,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": "#172432",
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        }
+      },
+      "layers": [
+        {
+          "id": "vignette_tint",
+          "position": [
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 0.12,
+          "color": "#000814"
+        }
+      ]
+    },
+    {
+      "scene": "scenes/valid/04-night-flood-cinematic.json",
+      "frame": 135,
+      "camera": {
+        "type": "perspective",
+        "position": [
+          0.014422683818265798,
+          0.9815666653029621,
+          2.2421875
+        ],
+        "lookAt": [
+          0,
+          1,
+          0
+        ],
+        "fov": 32,
+        "roll": -0.029545717407017946,
+        "orthoHeight": 0,
+        "shotIndex": 1
+      },
+      "objects": {
+        "ground": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "quaternion": [
+            -0.7071067811865475,
+            0,
+            0,
+            0.7071067811865476
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": "#2a2f38",
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "pipe": {
+          "position": [
+            0,
+            0.8,
+            -2
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "hero": {
+          "position": [
+            0,
+            0.8,
+            -1.2
+          ],
+          "quaternion": [
+            0,
+            0.7071067811865475,
+            0,
+            0.7071067811865476
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": "Swim",
+          "clipTime": 1
+        },
+        "officer": {
+          "position": [
+            3,
+            0,
+            2
+          ],
+          "quaternion": [
+            0,
+            0.773010453362737,
+            0,
+            0.6343932841636455
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": "Idle",
+          "clipTime": 4.5
+        },
+        "rain": {
+          "position": [
+            0,
+            6,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "flood": {
+          "position": [
+            0,
+            0.15,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": "#172431",
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        }
+      },
+      "layers": [
+        {
+          "id": "vignette_tint",
+          "position": [
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 0.12,
+          "color": "#000814"
+        }
+      ]
+    },
+    {
+      "scene": "scenes/valid/04-night-flood-cinematic.json",
+      "frame": 150,
+      "camera": {
+        "type": "perspective",
+        "position": [
+          -0.007207596376538276,
+          1.0046843465510755,
+          2.01875
+        ],
+        "lookAt": [
+          0,
+          1,
+          0
+        ],
+        "fov": 32,
+        "roll": -0.10743667427450419,
+        "orthoHeight": 0,
+        "shotIndex": 1
+      },
+      "objects": {
+        "ground": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "quaternion": [
+            -0.7071067811865475,
+            0,
+            0,
+            0.7071067811865476
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": "#2a2f38",
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "pipe": {
+          "position": [
+            0,
+            0.8,
+            -2
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "hero": {
+          "position": [
+            0,
+            0.8,
+            -1.2
+          ],
+          "quaternion": [
+            0,
+            0.7071067811865475,
+            0,
+            0.7071067811865476
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": "Swim",
+          "clipTime": 1.5
+        },
+        "officer": {
+          "position": [
+            3,
+            0,
+            2
+          ],
+          "quaternion": [
+            0,
+            0.9238795325112867,
+            0,
+            0.3826834323650898
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": "Run",
+          "clipTime": 0
+        },
+        "rain": {
+          "position": [
+            0,
+            6,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "flood": {
+          "position": [
+            0,
+            0.15,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": "#162330",
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        }
+      },
+      "layers": [
+        {
+          "id": "vignette_tint",
+          "position": [
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 0.12,
+          "color": "#000814"
+        }
+      ]
+    },
+    {
+      "scene": "scenes/valid/04-night-flood-cinematic.json",
+      "frame": 200,
+      "camera": {
+        "type": "perspective",
+        "position": [
+          -0.0034959892835468055,
+          0.9839121142216026,
+          1.5222222222222221
+        ],
+        "lookAt": [
+          0,
+          1,
+          0
+        ],
+        "fov": 32,
+        "roll": -0.044953615963459016,
+        "orthoHeight": 0,
+        "shotIndex": 1
+      },
+      "objects": {
+        "ground": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "quaternion": [
+            -0.7071067811865475,
+            0,
+            0,
+            0.7071067811865476
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": "#2a2f38",
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "pipe": {
+          "position": [
+            0,
+            0.8,
+            -2
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "hero": {
+          "position": [
+            0,
+            0.8,
+            -1.2
+          ],
+          "quaternion": [
+            0,
+            0.7071067811865475,
+            0,
+            0.7071067811865476
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": "Swim",
+          "clipTime": 3.166666666666667
+        },
+        "officer": {
+          "position": [
+            3,
+            0,
+            2
+          ],
+          "quaternion": [
+            0,
+            1,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": "Run",
+          "clipTime": 1.666666666666667
+        },
+        "rain": {
+          "position": [
+            0,
+            6,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "flood": {
+          "position": [
+            0,
+            0.15,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": "#14202d",
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        }
+      },
+      "layers": [
+        {
+          "id": "vignette_tint",
+          "position": [
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 0.12,
+          "color": "#000814"
+        }
+      ]
+    },
+    {
+      "scene": "scenes/valid/04-night-flood-cinematic.json",
+      "frame": 239,
+      "camera": {
+        "type": "perspective",
+        "position": [
+          -0.00857879757829005,
+          0.9979546312335134,
+          1.4000763888888887
+        ],
+        "lookAt": [
+          0,
+          1,
+          0
+        ],
+        "fov": 32,
+        "roll": -0.08421359371393947,
+        "orthoHeight": 0,
+        "shotIndex": 1
+      },
+      "objects": {
+        "ground": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "quaternion": [
+            -0.7071067811865475,
+            0,
+            0,
+            0.7071067811865476
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": "#2a2f38",
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "pipe": {
+          "position": [
+            0,
+            0.8,
+            -2
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "hero": {
+          "position": [
+            0,
+            0.8,
+            -1.2
+          ],
+          "quaternion": [
+            0,
+            0.7071067811865475,
+            0,
+            0.7071067811865476
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": "Swim",
+          "clipTime": 4.466666666666667
+        },
+        "officer": {
+          "position": [
+            3,
+            0,
+            2
+          ],
+          "quaternion": [
+            0,
+            1,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": "Run",
+          "clipTime": 2.966666666666667
+        },
+        "rain": {
+          "position": [
+            0,
+            6,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "flood": {
+          "position": [
+            0,
+            0.15,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": "#131e2a",
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        }
+      },
+      "layers": [
+        {
+          "id": "vignette_tint",
+          "position": [
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 0.12,
+          "color": "#000814"
+        }
+      ]
+    },
+    {
+      "scene": "scenes/valid/04-night-flood-cinematic.json",
+      "frame": 240,
+      "camera": {
+        "type": "perspective",
+        "position": [
+          -0.0028145331540144983,
+          0.8165334356715903,
+          4
+        ],
+        "lookAt": [
+          0,
+          0.8,
+          0
+        ],
+        "fov": 50,
+        "roll": 0.09934192895889282,
+        "orthoHeight": 0,
+        "shotIndex": 2
+      },
+      "objects": {
+        "ground": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "quaternion": [
+            -0.7071067811865475,
+            0,
+            0,
+            0.7071067811865476
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": "#2a2f38",
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "pipe": {
+          "position": [
+            0,
+            0.8,
+            -2
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "hero": {
+          "position": [
+            0,
+            0.8,
+            -1.2
+          ],
+          "quaternion": [
+            0,
+            0.7071067811865475,
+            0,
+            0.7071067811865476
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": "Swim",
+          "clipTime": 4.5
+        },
+        "officer": {
+          "position": [
+            3,
+            0,
+            2
+          ],
+          "quaternion": [
+            0,
+            1,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": "Run",
+          "clipTime": 3
+        },
+        "rain": {
+          "position": [
+            0,
+            6,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "flood": {
+          "position": [
+            0,
+            0.15,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": "#131e2a",
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        }
+      },
+      "layers": [
+        {
+          "id": "vignette_tint",
+          "position": [
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 0.12,
+          "color": "#000814"
+        }
+      ]
+    },
+    {
+      "scene": "scenes/valid/04-night-flood-cinematic.json",
+      "frame": 300,
+      "camera": {
+        "type": "perspective",
+        "position": [
+          -0.013643501373007894,
+          0.788710098399315,
+          4
+        ],
+        "lookAt": [
+          0,
+          0.8,
+          0
+        ],
+        "fov": 50,
+        "roll": -0.1131683198036626,
+        "orthoHeight": 0,
+        "shotIndex": 2
+      },
+      "objects": {
+        "ground": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "quaternion": [
+            -0.7071067811865475,
+            0,
+            0,
+            0.7071067811865476
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": "#2a2f38",
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "pipe": {
+          "position": [
+            0,
+            0.8,
+            -2
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "hero": {
+          "position": [
+            0,
+            0.8,
+            -1.2
+          ],
+          "quaternion": [
+            0,
+            0.7071067811865475,
+            0,
+            0.7071067811865476
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": "Swim",
+          "clipTime": 6.5
+        },
+        "officer": {
+          "position": [
+            3,
+            0,
+            2
+          ],
+          "quaternion": [
+            0,
+            1,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": "Run",
+          "clipTime": 5
+        },
+        "rain": {
+          "position": [
+            0,
+            6,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "flood": {
+          "position": [
+            0,
+            0.15,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": "#101a26",
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        }
+      },
+      "layers": [
+        {
+          "id": "vignette_tint",
+          "position": [
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 0.12,
+          "color": "#000814"
+        }
+      ]
+    },
+    {
+      "scene": "scenes/valid/04-night-flood-cinematic.json",
+      "frame": 359,
+      "camera": {
+        "type": "perspective",
+        "position": [
+          -0.00039098145953480603,
+          0.7891407522298206,
+          4
+        ],
+        "lookAt": [
+          0,
+          0.8,
+          0
+        ],
+        "fov": 50,
+        "roll": -0.14636259725755424,
+        "orthoHeight": 0,
+        "shotIndex": 2
+      },
+      "objects": {
+        "ground": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "quaternion": [
+            -0.7071067811865475,
+            0,
+            0,
+            0.7071067811865476
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": "#2a2f38",
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "pipe": {
+          "position": [
+            0,
+            0.8,
+            -2
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "hero": {
+          "position": [
+            0,
+            0.8,
+            -1.2
+          ],
+          "quaternion": [
+            0,
+            0.7071067811865475,
+            0,
+            0.7071067811865476
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": "Swim",
+          "clipTime": 8.466666666666667
+        },
+        "officer": {
+          "position": [
+            3,
+            0,
+            2
+          ],
+          "quaternion": [
+            0,
+            1,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": "Run",
+          "clipTime": 6.966666666666667
+        },
+        "rain": {
+          "position": [
+            0,
+            6,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": null,
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        },
+        "flood": {
+          "position": [
+            0,
+            0.15,
+            0
+          ],
+          "quaternion": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "color": "#0e1722",
+          "opacity": 1,
+          "visible": true,
+          "clip": null,
+          "clipTime": 0
+        }
+      },
+      "layers": [
+        {
+          "id": "vignette_tint",
+          "position": [
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 0.12,
+          "color": "#000814"
+        }
+      ]
+    },
+    {
+      "scene": "scenes/valid/05-2d-motion-title.json",
+      "frame": 0,
+      "camera": {
+        "type": "perspective",
+        "position": [
+          0,
+          2,
+          8
+        ],
+        "lookAt": [
+          0,
+          1,
+          0
+        ],
+        "fov": 45,
+        "roll": 0,
+        "orthoHeight": 0,
+        "shotIndex": null
+      },
+      "objects": {},
+      "layers": [
+        {
+          "id": "bg",
+          "position": [
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 1,
+          "color": "#101a3a"
+        },
+        {
+          "id": "badge",
+          "position": [
+            540,
+            700
+          ],
+          "scale": [
+            0.2,
+            0.2
+          ],
+          "rotation": -45,
+          "opacity": 0,
+          "color": "#ffcf33"
+        },
+        {
+          "id": "underline",
+          "position": [
+            540,
+            1220
+          ],
+          "scale": [
+            0,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 1,
+          "color": "#d90429"
+        }
+      ]
+    },
+    {
+      "scene": "scenes/valid/05-2d-motion-title.json",
+      "frame": 20,
+      "camera": {
+        "type": "perspective",
+        "position": [
+          0,
+          2,
+          8
+        ],
+        "lookAt": [
+          0,
+          1,
+          0
+        ],
+        "fov": 45,
+        "roll": 0,
+        "orthoHeight": 0,
+        "shotIndex": null
+      },
+      "objects": {},
+      "layers": [
+        {
+          "id": "bg",
+          "position": [
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 1,
+          "color": "#101a3a"
+        },
+        {
+          "id": "badge",
+          "position": [
+            540,
+            700
+          ],
+          "scale": [
+            0.9777777777777779,
+            0.9777777777777779
+          ],
+          "rotation": -17.77777777777778,
+          "opacity": 0.9722222222222222,
+          "color": "#ffcf33"
+        },
+        {
+          "id": "title",
+          "position": [
+            540,
+            1225.3472222222222
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 1,
+          "color": "#ffffff"
+        },
+        {
+          "id": "underline",
+          "position": [
+            540,
+            1220
+          ],
+          "scale": [
+            0,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 1,
+          "color": "#d90429"
+        }
+      ]
+    },
+    {
+      "scene": "scenes/valid/05-2d-motion-title.json",
+      "frame": 40,
+      "camera": {
+        "type": "perspective",
+        "position": [
+          0,
+          2,
+          8
+        ],
+        "lookAt": [
+          0,
+          1,
+          0
+        ],
+        "fov": 45,
+        "roll": 0,
+        "orthoHeight": 0,
+        "shotIndex": null
+      },
+      "objects": {},
+      "layers": [
+        {
+          "id": "bg",
+          "position": [
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 1,
+          "color": "#101a3a"
+        },
+        {
+          "id": "badge",
+          "position": [
+            540,
+            700
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 1,
+          "color": "#ffcf33"
+        },
+        {
+          "id": "title",
+          "position": [
+            540,
+            1100
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 1,
+          "color": "#ffffff"
+        },
+        {
+          "id": "underline",
+          "position": [
+            540,
+            1220
+          ],
+          "scale": [
+            0.0027434842249656867,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 1,
+          "color": "#d90429"
+        }
+      ]
+    },
+    {
+      "scene": "scenes/valid/05-2d-motion-title.json",
+      "frame": 60,
+      "camera": {
+        "type": "perspective",
+        "position": [
+          0,
+          2,
+          8
+        ],
+        "lookAt": [
+          0,
+          1,
+          0
+        ],
+        "fov": 45,
+        "roll": 0,
+        "orthoHeight": 0,
+        "shotIndex": null
+      },
+      "objects": {},
+      "layers": [
+        {
+          "id": "bg",
+          "position": [
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 1,
+          "color": "#101a3a"
+        },
+        {
+          "id": "badge",
+          "position": [
+            540,
+            700
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 1,
+          "color": "#ffcf33"
+        },
+        {
+          "id": "title",
+          "position": [
+            540,
+            1100
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 1,
+          "color": "#ffffff"
+        },
+        {
+          "id": "underline",
+          "position": [
+            540,
+            1220
+          ],
+          "scale": [
+            0.9012345679012344,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 1,
+          "color": "#d90429"
+        }
+      ]
+    },
+    {
+      "scene": "scenes/valid/05-2d-motion-title.json",
+      "frame": 100,
+      "camera": {
+        "type": "perspective",
+        "position": [
+          0,
+          2,
+          8
+        ],
+        "lookAt": [
+          0,
+          1,
+          0
+        ],
+        "fov": 45,
+        "roll": 0,
+        "orthoHeight": 0,
+        "shotIndex": null
+      },
+      "objects": {},
+      "layers": [
+        {
+          "id": "bg",
+          "position": [
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 1,
+          "color": "#101a3a"
+        },
+        {
+          "id": "badge",
+          "position": [
+            540,
+            700
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 1,
+          "color": "#ffcf33"
+        },
+        {
+          "id": "title",
+          "position": [
+            540,
+            1100
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 1,
+          "color": "#ffffff"
+        },
+        {
+          "id": "underline",
+          "position": [
+            540,
+            1220
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 1,
+          "color": "#d90429"
+        }
+      ]
+    },
+    {
+      "scene": "scenes/valid/05-2d-motion-title.json",
+      "frame": 179,
+      "camera": {
+        "type": "perspective",
+        "position": [
+          0,
+          2,
+          8
+        ],
+        "lookAt": [
+          0,
+          1,
+          0
+        ],
+        "fov": 45,
+        "roll": 0,
+        "orthoHeight": 0,
+        "shotIndex": null
+      },
+      "objects": {},
+      "layers": [
+        {
+          "id": "bg",
+          "position": [
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 1,
+          "color": "#101a3a"
+        },
+        {
+          "id": "badge",
+          "position": [
+            540,
+            700
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 1,
+          "color": "#ffcf33"
+        },
+        {
+          "id": "title",
+          "position": [
+            540,
+            1100
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 1,
+          "color": "#ffffff"
+        },
+        {
+          "id": "underline",
+          "position": [
+            540,
+            1220
+          ],
+          "scale": [
+            1,
+            1
+          ],
+          "rotation": 0,
+          "opacity": 1,
+          "color": "#d90429"
+        }
+      ]
+    }
+  ]
+}

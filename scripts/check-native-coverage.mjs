@@ -95,7 +95,7 @@ for (const id of fileWorkspaceIds) {
     throw new Error(`File workspace coverage is missing native implementation evidence for ${id}.`);
   }
 }
-const explicitWebOnlyIds = ['smartphone-prototype-lab'];
+const explicitWebOnlyIds = ['smartphone-prototype-lab', 'scene-studio'];
 for (const id of explicitWebOnlyIds) {
   if (!byId.has(id)) throw new Error(`Expected Web-only runtime tool is absent from registry: ${id}`);
   if (android.has(id) || ios.has(id)) throw new Error(`Web-only runtime tool was incorrectly marked native: ${id}`);

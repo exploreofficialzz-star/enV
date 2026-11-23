@@ -36,6 +36,7 @@ for (const tool of catalog) {
 }
 const intentionalWebOnlyReasons = {
   "smartphone-prototype-lab": "The current experience is a Web scene and does not have an independent Kotlin or Swift implementation; do not wrap the Web experience in a native WebView.",
+  "scene-studio": "Scene Studio editing, preview and export are Web-only. Kotlin/Swift reader and render-math sources are not yet connected to complete native editing, GPU rendering or video export; do not wrap the Web editor in a native WebView.",
 };
 const active = new Set(catalog.filter((tool) => tool.status === "active" || tool.status === "beta").map((tool) => tool.id));
 const rows = catalog.map((tool) => {

@@ -1,0 +1,22 @@
+{
+  "version": "1.0",
+  "settings": { "width": 1080, "height": 1920, "fps": 30, "duration": 8, "background": "#101826" },
+  "camera": { "position": [0, 2, 8], "lookAt": [0, 1, 0] },
+  "lights": [{ "type": "sun", "intensity": 1.2 }],
+  "objects": [
+    { "id": "hero", "type": "character", "style": "simple", "color": "#f4b942", "position": [-2, 0, 0] },
+    { "id": "tree1", "type": "asset", "asset": "library/tree_oak", "position": [3, 0, -2], "scale": 1.5 },
+    { "id": "title", "type": "text", "text": "Hello", "position": [0, 3, 0] }
+  ],
+  "animations": [
+    {
+      "target": "hero",
+      "property": "position",
+      "easing": "easeInOut",
+      "keyframes": [{ "time": 0, "value": [-2, 0, 0] }, { "time": 4, "value": [2, 0, 0] }]
+    }
+  ],
+  "dialogue": [{ "speaker": "hero", "text": "Welcome to my world.", "start": 1 }],
+  "captions": { "style": "pop", "placement": "belowSpeaker", "highlightColor": "#ffd400" },
+  "export": { "format": "mp4", "quality": "high" }
+}

@@ -197,6 +197,15 @@ assert.equal(runtimeExtensionProfileIds.size, runtimeExtensionProfileIndex.profi
 const expectedExtensionIds = [...new Set([...(nativeInventory.runtimeExtensionIds ?? []), ...DATETIME_TOOL_EXTENSIONS.map((tool) => tool.id)])].filter((id) => !new Set(runtimeCatalog.map((tool) => tool.id)).has(id)).sort();
 assert.deepEqual([...runtimeExtensionProfileIds].sort(), expectedExtensionIds, "supplemental billing profiles must exactly cover native runtime extensions missing from the catalogue");
 assert.ok(runtimeExtensionProfileIndex.profiles.every((profile) => profile.billingKey && profile.pricingMode && profile.manualAuditRequired === true && profile.adsEligible === false && profile.priceStatus === "provisional"), "runtime extensions require explicit, provisional, ad-free billing profiles");
+const sceneStudioBillingProfile = runtimeExtensionProfileIndex.profiles.find((profile) => profile.toolId === "scene-studio");
+assert.ok(sceneStudioBillingProfile, "Scene Studio must have a runtime-extension billing profile");
+assert.equal(sceneStudioBillingProfile.toolStatus, "active");
+assert.equal(sceneStudioBillingProfile.category, "video");
+assert.equal(sceneStudioBillingProfile.executionMode, "local-device");
+assert.equal(sceneStudioBillingProfile.billingKey, "local.general");
+assert.equal(sceneStudioBillingProfile.optionalAiAssistProfile, null);
+assert.equal(sceneStudioBillingProfile.adsEligible, false);
+assert.equal(sceneStudioBillingProfile.manualAuditRequired, true);
 const aBookBillingProfile = runtimeExtensionProfileIndex.profiles.find((profile) => profile.toolId === "a-book");
 assert.ok(aBookBillingProfile, "A book must have an explicit runtime billing profile.");
 assert.equal(aBookBillingProfile.executionMode, "local-device", "A book must remain a local-device operation.");

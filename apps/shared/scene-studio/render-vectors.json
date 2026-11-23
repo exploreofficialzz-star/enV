@@ -1,0 +1,2271 @@
+{
+  "description": "Render-math vectors: hash, particle positions, character poses, water height. Kotlin and Swift must reproduce them within `tolerance`. Regenerate with UPDATE_SCENE_STUDIO_VECTORS=1 only when the rules deliberately change.",
+  "tolerance": 1e-9,
+  "hash": [
+    {
+      "seed": 0,
+      "i": 0,
+      "salt": 0,
+      "value": 0
+    },
+    {
+      "seed": 1,
+      "i": 2,
+      "salt": 3,
+      "value": 0.620183161459863
+    },
+    {
+      "seed": 42,
+      "i": 17,
+      "salt": 4,
+      "value": 0.659791125683114
+    },
+    {
+      "seed": -5,
+      "i": 99,
+      "salt": 2,
+      "value": 0.760845905868337
+    },
+    {
+      "seed": 123456,
+      "i": 7,
+      "salt": 1,
+      "value": 0.537893012631685
+    },
+    {
+      "seed": 2147483647,
+      "i": 2147483647,
+      "salt": 2147483647,
+      "value": 0.547613975824788
+    }
+  ],
+  "particles": [
+    {
+      "type": "rain",
+      "i": 0,
+      "time": 0,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": -1.48716388860717,
+        "y": -5.8707026168704,
+        "z": 2.51359721412882,
+        "size": 0.0125096819577739,
+        "streak": 0.415290458733216,
+        "alpha": 0.262742048944347
+      }
+    },
+    {
+      "type": "rain",
+      "i": 5,
+      "time": 1.3,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": -0.752632772561163,
+        "y": -3.64663209747523,
+        "z": -3.10489260591567,
+        "size": 0.0155425213142298,
+        "streak": 0.506275639426894,
+        "alpha": 0.338563032855745
+      }
+    },
+    {
+      "type": "rain",
+      "i": 17,
+      "time": 4.25,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": 0.679947248017415,
+        "y": -1.56661962484941,
+        "z": 1.42111549619585,
+        "size": 0.0185979112568311,
+        "streak": 0.597937337704934,
+        "alpha": 0.414947781420778
+      }
+    },
+    {
+      "type": "rain",
+      "i": 63,
+      "time": 9.9,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": 1.70703693487123,
+        "y": -1.88555831685663,
+        "z": 2.55083967000246,
+        "size": 0.0147686931728385,
+        "streak": 0.483060795185156,
+        "alpha": 0.319217329320963
+      }
+    },
+    {
+      "type": "snow",
+      "i": 0,
+      "time": 0,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": -1.64171408975854,
+        "y": -5.8707026168704,
+        "z": 2.33321318784537,
+        "size": 0.0265290458733216,
+        "streak": 0,
+        "alpha": 0.8
+      }
+    },
+    {
+      "type": "snow",
+      "i": 5,
+      "time": 1.3,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": -0.671939922372138,
+        "y": -5.34689598290017,
+        "z": -2.83800146164903,
+        "size": 0.0356275639426894,
+        "streak": 0,
+        "alpha": 0.8
+      }
+    },
+    {
+      "type": "snow",
+      "i": 17,
+      "time": 4.25,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": 0.815071294253099,
+        "y": -4.54367576692602,
+        "z": 1.62779106188038,
+        "size": 0.0447937337704934,
+        "streak": 0,
+        "alpha": 0.8
+      }
+    },
+    {
+      "type": "snow",
+      "i": 63,
+      "time": 9.9,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": 1.29471484573869,
+        "y": -1.0660614374117,
+        "z": 2.36098008826103,
+        "size": 0.0333060795185156,
+        "streak": 0,
+        "alpha": 0.8
+      }
+    },
+    {
+      "type": "smoke",
+      "i": 0,
+      "time": 0,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": -0.530062077515814,
+        "y": 5.8707026168704,
+        "z": 0.0662074500449171,
+        "size": 1.57414052337408,
+        "streak": 0,
+        "alpha": 0.00132202150972281
+      }
+    },
+    {
+      "type": "smoke",
+      "i": 5,
+      "time": 1.3,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": 0.172589738001105,
+        "y": 5.89663209747523,
+        "z": 0.072571441839355,
+        "size": 1.57932641949505,
+        "streak": 0,
+        "alpha": 0.000849105694754104
+      }
+    },
+    {
+      "type": "smoke",
+      "i": 17,
+      "time": 4.25,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": 0.30965168670677,
+        "y": 5.69161962484941,
+        "z": 0.180302724794293,
+        "size": 1.53832392496988,
+        "streak": 0,
+        "alpha": 0.00726473796751899
+      }
+    },
+    {
+      "type": "smoke",
+      "i": 63,
+      "time": 9.9,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": 0.187290403632801,
+        "y": 5.63555831685662,
+        "z": 0.498800445618401,
+        "size": 1.52711166337132,
+        "streak": 0,
+        "alpha": 0.0100344657525668
+      }
+    },
+    {
+      "type": "fire",
+      "i": 0,
+      "time": 0,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": -0.00277468786246572,
+        "y": 5.8707026168704,
+        "z": 0.00379168465700151,
+        "size": 0.0679399735919483,
+        "streak": 0,
+        "alpha": 0.00487123935129576
+      }
+    },
+    {
+      "type": "fire",
+      "i": 5,
+      "time": 1.3,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": -0.0487716096824066,
+        "y": 1.69663209747523,
+        "z": -0.15588411044598,
+        "size": 0.300663231064361,
+        "streak": 0,
+        "alpha": 0.9
+      }
+    },
+    {
+      "type": "fire",
+      "i": 17,
+      "time": 4.25,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": 0.0328704928992707,
+        "y": 1.19161962484941,
+        "z": 0.0797214117318562,
+        "size": 0.391075661304619,
+        "streak": 0,
+        "alpha": 0.9
+      }
+    },
+    {
+      "type": "fire",
+      "i": 63,
+      "time": 9.9,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": 0.0179343139785678,
+        "y": 5.03555831685662,
+        "z": 0.0287015878889375,
+        "size": 0.121321943535661,
+        "streak": 0,
+        "alpha": 0.219239443295042
+      }
+    },
+    {
+      "type": "sparks",
+      "i": 0,
+      "time": 0,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": -0.647916353130303,
+        "y": -4.22735672733825,
+        "z": 0.885394904564654,
+        "size": 0.035,
+        "streak": 0.08,
+        "alpha": 0.00839446734862426
+      }
+    },
+    {
+      "type": "sparks",
+      "i": 5,
+      "time": 1.3,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": -0.259175695441275,
+        "y": -1.15162707611745,
+        "z": -0.828378907240687,
+        "size": 0.035,
+        "streak": 0.08,
+        "alpha": 0.714471164152492
+      }
+    },
+    {
+      "type": "sparks",
+      "i": 17,
+      "time": 4.25,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": 0.0902346570117051,
+        "y": 0.751550446289845,
+        "z": 0.218847775302833,
+        "size": 0.035,
+        "streak": 0.08,
+        "alpha": 1
+      }
+    },
+    {
+      "type": "sparks",
+      "i": 63,
+      "time": 9.9,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": 0.409845967548926,
+        "y": -1.17359088712349,
+        "z": 0.655906329764811,
+        "size": 0.035,
+        "streak": 0.08,
+        "alpha": 0.80182884165429
+      }
+    },
+    {
+      "type": "dust",
+      "i": 0,
+      "time": 0,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": -1.44288003796687,
+        "y": 5.8707026168704,
+        "z": 2.77062852560436,
+        "size": 0.0210193639155477,
+        "streak": 0,
+        "alpha": 0.0536852601935593
+      }
+    },
+    {
+      "type": "dust",
+      "i": 5,
+      "time": 1.3,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": -0.571432110238403,
+        "y": 4.59663209747523,
+        "z": -3.5045673811091,
+        "size": 0.0270850426284596,
+        "streak": 0,
+        "alpha": 0.45
+      }
+    },
+    {
+      "type": "dust",
+      "i": 17,
+      "time": 4.25,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": 0.253755353366132,
+        "y": 1.44161962484941,
+        "z": 1.59825651833803,
+        "size": 0.0331958225136623,
+        "streak": 0,
+        "alpha": 0.45
+      }
+    },
+    {
+      "type": "dust",
+      "i": 63,
+      "time": 9.9,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": 1.76816326173077,
+        "y": 1.73555831685662,
+        "z": 2.74848377770219,
+        "size": 0.0255373863456771,
+        "streak": 0,
+        "alpha": 0.45
+      }
+    },
+    {
+      "type": "splash",
+      "i": 0,
+      "time": 0,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": -0.163759644802824,
+        "y": 3.88613365093346,
+        "z": 0.371619815372285,
+        "size": 0.0630580917466432,
+        "streak": 0,
+        "alpha": 0.00671557387889941
+      }
+    },
+    {
+      "type": "splash",
+      "i": 5,
+      "time": 1.3,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": -0.50167733294632,
+        "y": 1.99145851675025,
+        "z": 0.350906554079323,
+        "size": 0.0812551278853789,
+        "streak": 0,
+        "alpha": 0.327048850871595
+      }
+    },
+    {
+      "type": "splash",
+      "i": 17,
+      "time": 4.25,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": -0.970116331608639,
+        "y": 3.52119267957664,
+        "z": -0.374223965752259,
+        "size": 0.0995874675409868,
+        "streak": 0,
+        "alpha": 0.0132980696212777
+      }
+    },
+    {
+      "type": "splash",
+      "i": 63,
+      "time": 9.9,
+      "seed": 42,
+      "params": {
+        "intensity": 0.6,
+        "area": 10,
+        "height": 6
+      },
+      "particle": {
+        "x": -0.342552121252436,
+        "y": 3.86559289739478,
+        "z": -0.535232890617206,
+        "size": 0.0766121590370312,
+        "streak": 0,
+        "alpha": 0.0180191778236016
+      }
+    }
+  ],
+  "poses": [
+    {
+      "clip": "Fall",
+      "time": 0,
+      "pose": {
+        "hipL": 0.191770215441681,
+        "hipR": 0.239388857641583,
+        "kneeL": 0.5,
+        "kneeR": 0.5,
+        "shoulderL": 2.4,
+        "shoulderR": 2.89583240522623,
+        "armOutL": 0.6,
+        "armOutR": 0.6,
+        "elbowL": 0.1,
+        "elbowR": 0.1,
+        "spinePitch": 0,
+        "bodyPitch": 0,
+        "bodyY": 0,
+        "headNod": 0,
+        "headTurn": 0
+      }
+    },
+    {
+      "clip": "Fall",
+      "time": 0.25,
+      "pose": {
+        "hipL": -0.191770215441681,
+        "hipR": -0.239388857641583,
+        "kneeL": 0.5,
+        "kneeR": 0.5,
+        "shoulderL": 2.4,
+        "shoulderR": 1.90416759477377,
+        "armOutL": 0.6,
+        "armOutR": 0.6,
+        "elbowL": 0.1,
+        "elbowR": 0.1,
+        "spinePitch": 0,
+        "bodyPitch": 0.247487373415292,
+        "bodyY": 0,
+        "headNod": 0,
+        "headTurn": 0
+      }
+    },
+    {
+      "clip": "Fall",
+      "time": 0.9,
+      "pose": {
+        "hipL": -0.274591990042709,
+        "hipR": 0.378748367696922,
+        "kneeL": 0.5,
+        "kneeR": 0.5,
+        "shoulderL": 1.92447174185242,
+        "shoulderR": 2.61448983752097,
+        "armOutL": 0.6,
+        "armOutR": 0.6,
+        "elbowL": 0.1,
+        "elbowR": 0.1,
+        "spinePitch": 0,
+        "bodyPitch": 0.108155948031232,
+        "bodyY": 0,
+        "headNod": 0,
+        "headTurn": 0
+      }
+    },
+    {
+      "clip": "Fall",
+      "time": 2.5,
+      "pose": {
+        "hipL": 0.191770215441681,
+        "hipR": 0.239388857641583,
+        "kneeL": 0.5,
+        "kneeR": 0.5,
+        "shoulderL": 2.4,
+        "shoulderR": 2.89583240522623,
+        "armOutL": 0.6,
+        "armOutR": 0.6,
+        "elbowL": 0.1,
+        "elbowR": 0.1,
+        "spinePitch": 0,
+        "bodyPitch": 0.35,
+        "bodyY": 0,
+        "headNod": 0,
+        "headTurn": 0
+      }
+    },
+    {
+      "clip": "Idle",
+      "time": 0,
+      "pose": {
+        "hipL": 0,
+        "hipR": 0,
+        "kneeL": 0,
+        "kneeR": 0,
+        "shoulderL": 0,
+        "shoulderR": 0,
+        "armOutL": 0.08,
+        "armOutR": 0.08,
+        "elbowL": 0.1,
+        "elbowR": 0.1,
+        "spinePitch": 0,
+        "bodyPitch": 0,
+        "bodyY": 0,
+        "headNod": 0,
+        "headTurn": 0.0673176787846317
+      }
+    },
+    {
+      "clip": "Idle",
+      "time": 0.25,
+      "pose": {
+        "hipL": 0,
+        "hipR": 0,
+        "kneeL": 0,
+        "kneeR": 0,
+        "shoulderL": 0.025,
+        "shoulderR": -0.025,
+        "armOutL": 0.08,
+        "armOutR": 0.08,
+        "elbowL": 0.1,
+        "elbowR": 0.1,
+        "spinePitch": 0.01,
+        "bodyPitch": 0,
+        "bodyY": 0,
+        "headNod": 0,
+        "headTurn": 0.0799109121860174
+      }
+    },
+    {
+      "clip": "Idle",
+      "time": 0.9,
+      "pose": {
+        "hipL": 0,
+        "hipR": 0,
+        "kneeL": 0,
+        "kneeR": 0,
+        "shoulderL": 0.0475528258147577,
+        "shoulderR": -0.0475528258147577,
+        "armOutL": 0.08,
+        "armOutR": 0.08,
+        "elbowL": 0.1,
+        "elbowR": 0.1,
+        "spinePitch": 0.0190211303259031,
+        "bodyPitch": 0,
+        "bodyY": 0,
+        "headNod": 0,
+        "headTurn": 0.0203063355348903
+      }
+    },
+    {
+      "clip": "Idle",
+      "time": 2.5,
+      "pose": {
+        "hipL": 0,
+        "hipR": 0,
+        "kneeL": 0,
+        "kneeR": 0,
+        "shoulderL": -0.0433012701892219,
+        "shoulderR": 0.0433012701892219,
+        "armOutL": 0.08,
+        "armOutR": 0.08,
+        "elbowL": 0.1,
+        "elbowR": 0.1,
+        "spinePitch": -0.0173205080756888,
+        "bodyPitch": 0,
+        "bodyY": 0,
+        "headNod": 0,
+        "headTurn": -0.00377440241609365
+      }
+    },
+    {
+      "clip": "Run",
+      "time": 0,
+      "pose": {
+        "hipL": 0,
+        "hipR": 0,
+        "kneeL": 1.3,
+        "kneeR": 0,
+        "shoulderL": 0,
+        "shoulderR": 0,
+        "armOutL": 0.08,
+        "armOutR": 0.08,
+        "elbowL": 1.2,
+        "elbowR": 1.2,
+        "spinePitch": 0.22,
+        "bodyPitch": 0,
+        "bodyY": 0,
+        "headNod": 0,
+        "headTurn": 0
+      }
+    },
+    {
+      "clip": "Run",
+      "time": 0.25,
+      "pose": {
+        "hipL": 0.55839598967785,
+        "hipR": -0.55839598967785,
+        "kneeL": 0,
+        "kneeR": 1.05172209268743,
+        "shoulderL": -0.529006727063226,
+        "shoulderR": 0.529006727063226,
+        "armOutL": 0.08,
+        "armOutR": 0.08,
+        "elbowL": 1.2,
+        "elbowR": 1.2,
+        "spinePitch": 0.22,
+        "bodyPitch": 0,
+        "bodyY": 0.0176335575687742,
+        "headNod": 0,
+        "headTurn": 0
+      }
+    },
+    {
+      "clip": "Run",
+      "time": 0.9,
+      "pose": {
+        "hipL": 0.349718325050444,
+        "hipR": -0.349718325050444,
+        "kneeL": 0,
+        "kneeR": 1.20870943165473,
+        "shoulderL": -0.33131209741621,
+        "shoulderR": 0.33131209741621,
+        "armOutL": 0.08,
+        "armOutR": 0.08,
+        "elbowL": 1.2,
+        "elbowR": 1.2,
+        "spinePitch": 0.22,
+        "bodyPitch": 0,
+        "bodyY": 0.0110437365805403,
+        "headNod": 0,
+        "headTurn": 0
+      }
+    },
+    {
+      "clip": "Run",
+      "time": 2.5,
+      "pose": {
+        "hipL": -9.30731567351988e-16,
+        "hipR": 9.30731567351988e-16,
+        "kneeL": 1.3,
+        "kneeR": 0,
+        "shoulderL": 8.81745695386094e-16,
+        "shoulderR": -8.81745695386094e-16,
+        "armOutL": 0.08,
+        "armOutR": 0.08,
+        "elbowL": 1.2,
+        "elbowR": 1.2,
+        "spinePitch": 0.22,
+        "bodyPitch": 0,
+        "bodyY": 2.93915231795365e-17,
+        "headNod": 0,
+        "headTurn": 0
+      }
+    },
+    {
+      "clip": "Sit",
+      "time": 0,
+      "pose": {
+        "hipL": 1.5,
+        "hipR": 1.5,
+        "kneeL": 1.5,
+        "kneeR": 1.5,
+        "shoulderL": 0.4,
+        "shoulderR": 0.4,
+        "armOutL": 0.08,
+        "armOutR": 0.08,
+        "elbowL": 1.1,
+        "elbowR": 1.1,
+        "spinePitch": 0,
+        "bodyPitch": 0,
+        "bodyY": -0.27,
+        "headNod": 0,
+        "headTurn": 0
+      }
+    },
+    {
+      "clip": "Sit",
+      "time": 0.25,
+      "pose": {
+        "hipL": 1.5,
+        "hipR": 1.5,
+        "kneeL": 1.5,
+        "kneeR": 1.5,
+        "shoulderL": 0.4,
+        "shoulderR": 0.4,
+        "armOutL": 0.08,
+        "armOutR": 0.08,
+        "elbowL": 1.1,
+        "elbowR": 1.1,
+        "spinePitch": 0,
+        "bodyPitch": 0,
+        "bodyY": -0.27,
+        "headNod": 0,
+        "headTurn": 0
+      }
+    },
+    {
+      "clip": "Sit",
+      "time": 0.9,
+      "pose": {
+        "hipL": 1.5,
+        "hipR": 1.5,
+        "kneeL": 1.5,
+        "kneeR": 1.5,
+        "shoulderL": 0.4,
+        "shoulderR": 0.4,
+        "armOutL": 0.08,
+        "armOutR": 0.08,
+        "elbowL": 1.1,
+        "elbowR": 1.1,
+        "spinePitch": 0,
+        "bodyPitch": 0,
+        "bodyY": -0.27,
+        "headNod": 0,
+        "headTurn": 0
+      }
+    },
+    {
+      "clip": "Sit",
+      "time": 2.5,
+      "pose": {
+        "hipL": 1.5,
+        "hipR": 1.5,
+        "kneeL": 1.5,
+        "kneeR": 1.5,
+        "shoulderL": 0.4,
+        "shoulderR": 0.4,
+        "armOutL": 0.08,
+        "armOutR": 0.08,
+        "elbowL": 1.1,
+        "elbowR": 1.1,
+        "spinePitch": 0,
+        "bodyPitch": 0,
+        "bodyY": -0.27,
+        "headNod": 0,
+        "headTurn": 0
+      }
+    },
+    {
+      "clip": "Swim",
+      "time": 0,
+      "pose": {
+        "hipL": 0,
+        "hipR": 0,
+        "kneeL": 0,
+        "kneeR": 0,
+        "shoulderL": 0,
+        "shoulderR": -3.14159265358979,
+        "armOutL": 0.08,
+        "armOutR": 0.08,
+        "elbowL": 0.4,
+        "elbowR": 0.4,
+        "spinePitch": 0,
+        "bodyPitch": 1.5707963267949,
+        "bodyY": -0.1,
+        "headNod": -0.5,
+        "headTurn": 0
+      }
+    },
+    {
+      "clip": "Swim",
+      "time": 0.25,
+      "pose": {
+        "hipL": -7.34788079488412e-17,
+        "hipR": 7.34788079488412e-17,
+        "kneeL": 0,
+        "kneeR": 0,
+        "shoulderL": 1.25663706143592,
+        "shoulderR": -1.88495559215388,
+        "armOutL": 0.08,
+        "armOutR": 0.08,
+        "elbowL": 0.4,
+        "elbowR": 0.4,
+        "spinePitch": 0,
+        "bodyPitch": 1.5707963267949,
+        "bodyY": -0.1,
+        "headNod": -0.5,
+        "headTurn": 0
+      }
+    },
+    {
+      "clip": "Swim",
+      "time": 0.9,
+      "pose": {
+        "hipL": -0.176335575687742,
+        "hipR": 0.176335575687742,
+        "kneeL": 0,
+        "kneeR": 0,
+        "shoulderL": -1.75929188601028,
+        "shoulderR": 1.38230076757951,
+        "armOutL": 0.08,
+        "armOutR": 0.08,
+        "elbowL": 0.4,
+        "elbowR": 0.4,
+        "spinePitch": 0,
+        "bodyPitch": 1.5707963267949,
+        "bodyY": -0.1,
+        "headNod": -0.5,
+        "headTurn": 0
+      }
+    },
+    {
+      "clip": "Swim",
+      "time": 2.5,
+      "pose": {
+        "hipL": -7.34788079488412e-16,
+        "hipR": 7.34788079488412e-16,
+        "kneeL": 0,
+        "kneeR": 0,
+        "shoulderL": 0,
+        "shoulderR": -3.14159265358979,
+        "armOutL": 0.08,
+        "armOutR": 0.08,
+        "elbowL": 0.4,
+        "elbowR": 0.4,
+        "spinePitch": 0,
+        "bodyPitch": 1.5707963267949,
+        "bodyY": -0.1,
+        "headNod": -0.5,
+        "headTurn": 0
+      }
+    },
+    {
+      "clip": "Talk",
+      "time": 0,
+      "pose": {
+        "hipL": 0,
+        "hipR": 0,
+        "kneeL": 0,
+        "kneeR": 0,
+        "shoulderL": 0.45,
+        "shoulderR": 0.649872080912452,
+        "armOutL": 0.08,
+        "armOutR": 0.08,
+        "elbowL": 1,
+        "elbowR": 1,
+        "spinePitch": 0,
+        "bodyPitch": 0,
+        "bodyY": 0,
+        "headNod": 0,
+        "headTurn": 0
+      }
+    },
+    {
+      "clip": "Talk",
+      "time": 0.25,
+      "pose": {
+        "hipL": 0,
+        "hipR": 0,
+        "kneeL": 0,
+        "kneeR": 0,
+        "shoulderL": 0.662132034355964,
+        "shoulderR": 0.555847427833721,
+        "armOutL": 0.08,
+        "armOutR": 0.08,
+        "elbowL": 1,
+        "elbowR": 1,
+        "spinePitch": 0,
+        "bodyPitch": 0,
+        "bodyY": 0,
+        "headNod": 0.08,
+        "headTurn": 0.0848528137423857
+      }
+    },
+    {
+      "clip": "Talk",
+      "time": 0.9,
+      "pose": {
+        "hipL": 0,
+        "hipR": 0,
+        "kneeL": 0,
+        "kneeR": 0,
+        "shoulderL": 0.542705098312484,
+        "shoulderR": 0.0620977588076069,
+        "armOutL": 0.08,
+        "armOutR": 0.08,
+        "elbowL": 1,
+        "elbowR": 1,
+        "spinePitch": 0,
+        "bodyPitch": 0,
+        "bodyY": 0,
+        "headNod": -0.0470228201833979,
+        "headTurn": 0.0370820393249937
+      }
+    },
+    {
+      "clip": "Talk",
+      "time": 2.5,
+      "pose": {
+        "hipL": 0,
+        "hipR": 0,
+        "kneeL": 0,
+        "kneeR": 0,
+        "shoulderL": 0.75,
+        "shoulderR": 0.341240143309614,
+        "armOutL": 0.08,
+        "armOutR": 0.08,
+        "elbowL": 1,
+        "elbowR": 1,
+        "spinePitch": 0,
+        "bodyPitch": 0,
+        "bodyY": 0,
+        "headNod": 4.89858719658941e-17,
+        "headTurn": 0.12
+      }
+    },
+    {
+      "clip": "Walk",
+      "time": 0,
+      "pose": {
+        "hipL": 0,
+        "hipR": 0,
+        "kneeL": 0.7,
+        "kneeR": 0,
+        "shoulderL": 0,
+        "shoulderR": 0,
+        "armOutL": 0.08,
+        "armOutR": 0.08,
+        "elbowL": 0.2,
+        "elbowR": 0.2,
+        "spinePitch": 0.05,
+        "bodyPitch": 0,
+        "bodyY": 0,
+        "headNod": 0,
+        "headTurn": 0
+      }
+    },
+    {
+      "clip": "Walk",
+      "time": 0.25,
+      "pose": {
+        "hipL": 0.55,
+        "hipR": -0.55,
+        "kneeL": 8.57252759403147e-17,
+        "kneeR": 0,
+        "shoulderL": -0.5,
+        "shoulderR": 0.5,
+        "armOutL": 0.08,
+        "armOutR": 0.08,
+        "elbowL": 0.35,
+        "elbowR": 0.2,
+        "spinePitch": 0.05,
+        "bodyPitch": 0,
+        "bodyY": 0.015,
+        "headNod": 0,
+        "headTurn": 0
+      }
+    },
+    {
+      "clip": "Walk",
+      "time": 0.9,
+      "pose": {
+        "hipL": -0.32328188876086,
+        "hipR": 0.32328188876086,
+        "kneeL": 0.566311896062463,
+        "kneeR": 0,
+        "shoulderL": 0.293892626146237,
+        "shoulderR": -0.293892626146237,
+        "armOutL": 0.08,
+        "armOutR": 0.08,
+        "elbowL": 0.2,
+        "elbowR": 0.288167787843871,
+        "spinePitch": 0.05,
+        "bodyPitch": 0,
+        "bodyY": 0.0088167787843871,
+        "headNod": 0,
+        "headTurn": 0
+      }
+    },
+    {
+      "clip": "Walk",
+      "time": 2.5,
+      "pose": {
+        "hipL": 3.36777869765522e-16,
+        "hipR": -3.36777869765522e-16,
+        "kneeL": 0,
+        "kneeR": 0.7,
+        "shoulderL": -3.06161699786838e-16,
+        "shoulderR": 3.06161699786838e-16,
+        "armOutL": 0.08,
+        "armOutR": 0.08,
+        "elbowL": 0.2,
+        "elbowR": 0.2,
+        "spinePitch": 0.05,
+        "bodyPitch": 0,
+        "bodyY": 9.18485099360515e-18,
+        "headNod": 0,
+        "headTurn": 0
+      }
+    },
+    {
+      "clip": "Wave",
+      "time": 0,
+      "pose": {
+        "hipL": 0,
+        "hipR": 0,
+        "kneeL": 0,
+        "kneeR": 0,
+        "shoulderL": 0,
+        "shoulderR": 0,
+        "armOutL": 0.08,
+        "armOutR": 2.6,
+        "elbowL": 0.1,
+        "elbowR": 0.5,
+        "spinePitch": 0.02,
+        "bodyPitch": 0,
+        "bodyY": 0,
+        "headNod": 0,
+        "headTurn": 0.1
+      }
+    },
+    {
+      "clip": "Wave",
+      "time": 0.25,
+      "pose": {
+        "hipL": 0,
+        "hipR": 0,
+        "kneeL": 0,
+        "kneeR": 0,
+        "shoulderL": 0,
+        "shoulderR": 0,
+        "armOutL": 0.08,
+        "armOutR": 2.6,
+        "elbowL": 0.1,
+        "elbowR": 0.5,
+        "spinePitch": 0.02,
+        "bodyPitch": 0,
+        "bodyY": 0,
+        "headNod": 0,
+        "headTurn": 0.1
+      }
+    },
+    {
+      "clip": "Wave",
+      "time": 0.9,
+      "pose": {
+        "hipL": 0,
+        "hipR": 0,
+        "kneeL": 0,
+        "kneeR": 0,
+        "shoulderL": 0,
+        "shoulderR": 0,
+        "armOutL": 0.08,
+        "armOutR": 2.6,
+        "elbowL": 0.1,
+        "elbowR": 0.0720245676671808,
+        "spinePitch": 0.02,
+        "bodyPitch": 0,
+        "bodyY": 0,
+        "headNod": 0,
+        "headTurn": 0.1
+      }
+    },
+    {
+      "clip": "Wave",
+      "time": 2.5,
+      "pose": {
+        "hipL": 0,
+        "hipR": 0,
+        "kneeL": 0,
+        "kneeR": 0,
+        "shoulderL": 0,
+        "shoulderR": 0,
+        "armOutL": 0.08,
+        "armOutR": 2.6,
+        "elbowL": 0.1,
+        "elbowR": 0.499999999999999,
+        "spinePitch": 0.02,
+        "bodyPitch": 0,
+        "bodyY": 0,
+        "headNod": 0,
+        "headTurn": 0.1
+      }
+    }
+  ],
+  "waves": [
+    {
+      "x": 0,
+      "z": 0,
+      "time": 0,
+      "params": {
+        "waveHeight": 0.4,
+        "waveSpeed": 1.5,
+        "flow": 0.8
+      },
+      "height": 0.0535376083691434
+    },
+    {
+      "x": 3.5,
+      "z": -2,
+      "time": 1.25,
+      "params": {
+        "waveHeight": 0.4,
+        "waveSpeed": 1.5,
+        "flow": 0.8
+      },
+      "height": -0.205458877712934
+    },
+    {
+      "x": -12,
+      "z": 8,
+      "time": 7.5,
+      "params": {
+        "waveHeight": 0.4,
+        "waveSpeed": 1.5,
+        "flow": 0.8
+      },
+      "height": 0.146364182014023
+    }
+  ],
+  "counts": [
+    {
+      "type": "rain",
+      "quality": "low",
+      "intensity": 0.6,
+      "count": 360
+    },
+    {
+      "type": "rain",
+      "quality": "medium",
+      "intensity": 0.6,
+      "count": 630
+    },
+    {
+      "type": "rain",
+      "quality": "high",
+      "intensity": 0.6,
+      "count": 900
+    },
+    {
+      "type": "snow",
+      "quality": "low",
+      "intensity": 0.6,
+      "count": 192
+    },
+    {
+      "type": "snow",
+      "quality": "medium",
+      "intensity": 0.6,
+      "count": 336
+    },
+    {
+      "type": "snow",
+      "quality": "high",
+      "intensity": 0.6,
+      "count": 480
+    },
+    {
+      "type": "smoke",
+      "quality": "low",
+      "intensity": 0.6,
+      "count": 14
+    },
+    {
+      "type": "smoke",
+      "quality": "medium",
+      "intensity": 0.6,
+      "count": 25
+    },
+    {
+      "type": "smoke",
+      "quality": "high",
+      "intensity": 0.6,
+      "count": 36
+    },
+    {
+      "type": "fire",
+      "quality": "low",
+      "intensity": 0.6,
+      "count": 19
+    },
+    {
+      "type": "fire",
+      "quality": "medium",
+      "intensity": 0.6,
+      "count": 34
+    },
+    {
+      "type": "fire",
+      "quality": "high",
+      "intensity": 0.6,
+      "count": 48
+    },
+    {
+      "type": "sparks",
+      "quality": "low",
+      "intensity": 0.6,
+      "count": 29
+    },
+    {
+      "type": "sparks",
+      "quality": "medium",
+      "intensity": 0.6,
+      "count": 50
+    },
+    {
+      "type": "sparks",
+      "quality": "high",
+      "intensity": 0.6,
+      "count": 72
+    },
+    {
+      "type": "dust",
+      "quality": "low",
+      "intensity": 0.6,
+      "count": 48
+    },
+    {
+      "type": "dust",
+      "quality": "medium",
+      "intensity": 0.6,
+      "count": 84
+    },
+    {
+      "type": "dust",
+      "quality": "high",
+      "intensity": 0.6,
+      "count": 120
+    },
+    {
+      "type": "splash",
+      "quality": "low",
+      "intensity": 0.6,
+      "count": 36
+    },
+    {
+      "type": "splash",
+      "quality": "medium",
+      "intensity": 0.6,
+      "count": 63
+    },
+    {
+      "type": "splash",
+      "quality": "high",
+      "intensity": 0.6,
+      "count": 90
+    }
+  ],
+  "sky": [
+    {
+      "preset": "studio",
+      "y": -1,
+      "color": [
+        0.552941176470588,
+        0.564705882352941,
+        0.592156862745098
+      ]
+    },
+    {
+      "preset": "studio",
+      "y": -0.2,
+      "color": [
+        0.705098039215686,
+        0.715294117647059,
+        0.736470588235294
+      ]
+    },
+    {
+      "preset": "studio",
+      "y": 0,
+      "color": [
+        0.933333333333333,
+        0.941176470588235,
+        0.952941176470588
+      ]
+    },
+    {
+      "preset": "studio",
+      "y": 0.3,
+      "color": [
+        0.893343290700258,
+        0.904995003444024,
+        0.922472572559673
+      ]
+    },
+    {
+      "preset": "studio",
+      "y": 1,
+      "color": [
+        0.850980392156863,
+        0.866666666666667,
+        0.890196078431372
+      ]
+    },
+    {
+      "preset": "day",
+      "y": -1,
+      "color": [
+        0.47843137254902,
+        0.541176470588235,
+        0.415686274509804
+      ]
+    },
+    {
+      "preset": "day",
+      "y": -0.2,
+      "color": [
+        0.611764705882353,
+        0.685490196078431,
+        0.636862745098039
+      ]
+    },
+    {
+      "preset": "day",
+      "y": 0,
+      "color": [
+        0.811764705882353,
+        0.901960784313726,
+        0.968627450980392
+      ]
+    },
+    {
+      "preset": "day",
+      "y": 0.3,
+      "color": [
+        0.590867327528221,
+        0.759139203481313,
+        0.903881667669698
+      ]
+    },
+    {
+      "preset": "day",
+      "y": 1,
+      "color": [
+        0.356862745098039,
+        0.607843137254902,
+        0.835294117647059
+      ]
+    },
+    {
+      "preset": "sunset",
+      "y": -1,
+      "color": [
+        0.227450980392157,
+        0.184313725490196,
+        0.207843137254902
+      ]
+    },
+    {
+      "preset": "sunset",
+      "y": -0.2,
+      "color": [
+        0.516078431372549,
+        0.370980392156863,
+        0.265882352941176
+      ]
+    },
+    {
+      "preset": "sunset",
+      "y": 0,
+      "color": [
+        0.949019607843137,
+        0.650980392156863,
+        0.352941176470588
+      ]
+    },
+    {
+      "preset": "sunset",
+      "y": 0.3,
+      "color": [
+        0.60053495061205,
+        0.454838754480349,
+        0.413878384292418
+      ]
+    },
+    {
+      "preset": "sunset",
+      "y": 1,
+      "color": [
+        0.231372549019608,
+        0.247058823529412,
+        0.47843137254902
+      ]
+    },
+    {
+      "preset": "night",
+      "y": -1,
+      "color": [
+        0.0274509803921569,
+        0.0352941176470588,
+        0.0588235294117647
+      ]
+    },
+    {
+      "preset": "night",
+      "y": -0.2,
+      "color": [
+        0.0415686274509804,
+        0.0619607843137255,
+        0.115294117647059
+      ]
+    },
+    {
+      "preset": "night",
+      "y": 0,
+      "color": [
+        0.0627450980392157,
+        0.101960784313725,
+        0.2
+      ]
+    },
+    {
+      "preset": "night",
+      "y": 0.3,
+      "color": [
+        0.0398936451060296,
+        0.0638750294250821,
+        0.131445641200442
+      ]
+    },
+    {
+      "preset": "night",
+      "y": 1,
+      "color": [
+        0.0156862745098039,
+        0.0235294117647059,
+        0.0588235294117647
+      ]
+    },
+    {
+      "preset": "overcast",
+      "y": -1,
+      "color": [
+        0.427450980392157,
+        0.447058823529412,
+        0.474509803921569
+      ]
+    },
+    {
+      "preset": "overcast",
+      "y": -0.2,
+      "color": [
+        0.56235294117647,
+        0.583529411764706,
+        0.609411764705882
+      ]
+    },
+    {
+      "preset": "overcast",
+      "y": 0,
+      "color": [
+        0.764705882352941,
+        0.788235294117647,
+        0.811764705882353
+      ]
+    },
+    {
+      "preset": "overcast",
+      "y": 0.3,
+      "color": [
+        0.686630084831222,
+        0.715872359829224,
+        0.747018922571659
+      ]
+    },
+    {
+      "preset": "overcast",
+      "y": 1,
+      "color": [
+        0.603921568627451,
+        0.63921568627451,
+        0.67843137254902
+      ]
+    },
+    {
+      "preset": "none",
+      "y": -1,
+      "color": [
+        0.501960784313725,
+        0.501960784313725,
+        0.501960784313725
+      ]
+    },
+    {
+      "preset": "none",
+      "y": -0.2,
+      "color": [
+        0.501960784313725,
+        0.501960784313725,
+        0.501960784313725
+      ]
+    },
+    {
+      "preset": "none",
+      "y": 0,
+      "color": [
+        0.501960784313725,
+        0.501960784313725,
+        0.501960784313725
+      ]
+    },
+    {
+      "preset": "none",
+      "y": 0.3,
+      "color": [
+        0.501960784313725,
+        0.501960784313725,
+        0.501960784313725
+      ]
+    },
+    {
+      "preset": "none",
+      "y": 1,
+      "color": [
+        0.501960784313725,
+        0.501960784313725,
+        0.501960784313725
+      ]
+    }
+  ],
+  "lightRange": [
+    {
+      "intensity": 0,
+      "range": 10
+    },
+    {
+      "intensity": 2.5,
+      "range": 20
+    },
+    {
+      "intensity": 20,
+      "range": 90
+    },
+    {
+      "intensity": 1000,
+      "range": 90
+    }
+  ],
+  "post": [
+    {
+      "post": {
+        "bloom": 0,
+        "bloomThreshold": 0.8,
+        "vignette": 0,
+        "grain": 0,
+        "depthOfField": 0,
+        "focusDistance": 8,
+        "toneMapping": "aces",
+        "exposure": 1,
+        "contrast": 1,
+        "saturation": 1
+      },
+      "plan": {
+        "bloom": false,
+        "bloomWeight": 0,
+        "bloomThreshold": 0.8,
+        "vignette": false,
+        "vignetteWeight": 0,
+        "grain": false,
+        "grainIntensity": 0,
+        "depthOfField": false,
+        "focusDistanceMm": 8000,
+        "fStop": 8,
+        "toneMapping": "aces",
+        "exposure": 1,
+        "contrast": 1,
+        "saturation": 1
+      }
+    },
+    {
+      "post": {
+        "bloom": 1.5,
+        "bloomThreshold": 0.5,
+        "vignette": 0.4,
+        "grain": 0.2,
+        "depthOfField": 0.5,
+        "focusDistance": 3,
+        "toneMapping": "neutral",
+        "exposure": 1.5,
+        "contrast": 1.2,
+        "saturation": 0.8
+      },
+      "plan": {
+        "bloom": true,
+        "bloomWeight": 0.8,
+        "bloomThreshold": 0.5,
+        "vignette": true,
+        "vignetteWeight": 2,
+        "grain": true,
+        "grainIntensity": 6,
+        "depthOfField": true,
+        "focusDistanceMm": 3000,
+        "fStop": 4.6,
+        "toneMapping": "neutral",
+        "exposure": 1.5,
+        "contrast": 1.2,
+        "saturation": 0.8
+      }
+    },
+    {
+      "post": {
+        "bloom": 3,
+        "bloomThreshold": 1,
+        "vignette": 1,
+        "grain": 1,
+        "depthOfField": 1,
+        "focusDistance": 0.1,
+        "toneMapping": "none",
+        "exposure": 0.1,
+        "contrast": 2,
+        "saturation": 2
+      },
+      "plan": {
+        "bloom": true,
+        "bloomWeight": 0.8,
+        "bloomThreshold": 1,
+        "vignette": true,
+        "vignetteWeight": 5,
+        "grain": true,
+        "grainIntensity": 30,
+        "depthOfField": true,
+        "focusDistanceMm": 100,
+        "fStop": 1.2,
+        "toneMapping": "none",
+        "exposure": 0.1,
+        "contrast": 2,
+        "saturation": 2
+      }
+    }
+  ],
+  "camera": [
+    {
+      "camera": {
+        "type": "perspective",
+        "position": [
+          0,
+          0,
+          5
+        ],
+        "lookAt": [
+          0,
+          0,
+          0
+        ],
+        "fov": 60,
+        "roll": 0,
+        "orthoHeight": 0,
+        "shotIndex": null
+      },
+      "basis": {
+        "forward": [
+          0,
+          0,
+          -1
+        ],
+        "right": [
+          1,
+          0,
+          0
+        ],
+        "up": [
+          0,
+          1,
+          0
+        ]
+      },
+      "points": [
+        {
+          "point": [
+            0,
+            0,
+            0
+          ],
+          "screen": {
+            "x": 960,
+            "y": 540,
+            "depth": 5
+          }
+        },
+        {
+          "point": [
+            1,
+            1,
+            1
+          ],
+          "screen": {
+            "x": 1193.8268590218,
+            "y": 306.173140978202,
+            "depth": 4
+          }
+        },
+        {
+          "point": [
+            -2,
+            0.5,
+            3
+          ],
+          "screen": {
+            "x": 24.6925639128061,
+            "y": 306.173140978202,
+            "depth": 2
+          }
+        },
+        {
+          "point": [
+            0,
+            0,
+            10
+          ],
+          "screen": null
+        },
+        {
+          "point": [
+            5,
+            -3,
+            -4
+          ],
+          "screen": {
+            "x": 1479.61524227066,
+            "y": 851.769145362398,
+            "depth": 9
+          }
+        }
+      ]
+    },
+    {
+      "camera": {
+        "type": "perspective",
+        "position": [
+          3,
+          2,
+          1
+        ],
+        "lookAt": [
+          0,
+          1,
+          0
+        ],
+        "fov": 45,
+        "roll": 12,
+        "orthoHeight": 0,
+        "shotIndex": null
+      },
+      "basis": {
+        "forward": [
+          -0.904534033733291,
+          -0.301511344577764,
+          -0.301511344577764
+        ],
+        "right": [
+          0.36878823633324,
+          -0.19823601906153,
+          -0.908128689938191
+        ],
+        "up": [
+          -0.214040693701922,
+          0.932627144060018,
+          -0.290505062954252
+        ]
+      },
+      "points": [
+        {
+          "point": [
+            0,
+            0,
+            0
+          ],
+          "screen": {
+            "x": 1031.42777294093,
+            "y": 876.041251230872,
+            "depth": 3.61813613493316
+          }
+        },
+        {
+          "point": [
+            1,
+            1,
+            1
+          ],
+          "screen": {
+            "x": 626.856960503142,
+            "y": 851.650842828856,
+            "depth": 2.11057941204435
+          }
+        },
+        {
+          "point": [
+            -2,
+            0.5,
+            3
+          ],
+          "screen": {
+            "x": -42.7774876697437,
+            "y": 811.280511680691,
+            "depth": 4.37191449637757
+          }
+        },
+        {
+          "point": [
+            0,
+            0,
+            10
+          ],
+          "screen": {
+            "x": -18244.2761241673,
+            "y": 8836.67921897401,
+            "depth": 0.603022689155527
+          }
+        },
+        {
+          "point": [
+            5,
+            -3,
+            -4
+          ],
+          "screen": {
+            "x": 7736.91092250939,
+            "y": 4473.245619308,
+            "depth": 1.20604537831105
+          }
+        }
+      ]
+    },
+    {
+      "camera": {
+        "type": "orthographic",
+        "position": [
+          0,
+          10,
+          0
+        ],
+        "lookAt": [
+          0,
+          0,
+          0
+        ],
+        "fov": 40,
+        "roll": 0,
+        "orthoHeight": 7.279404685324047,
+        "shotIndex": null
+      },
+      "basis": {
+        "forward": [
+          0,
+          -1,
+          0
+        ],
+        "right": [
+          1,
+          0,
+          0
+        ],
+        "up": [
+          0,
+          0,
+          -1
+        ]
+      },
+      "points": [
+        {
+          "point": [
+            0,
+            0,
+            0
+          ],
+          "screen": {
+            "x": 960,
+            "y": 540,
+            "depth": 10
+          }
+        },
+        {
+          "point": [
+            1,
+            1,
+            1
+          ],
+          "screen": {
+            "x": 1108.36378065055,
+            "y": 688.36378065055,
+            "depth": 9
+          }
+        },
+        {
+          "point": [
+            -2,
+            0.5,
+            3
+          ],
+          "screen": {
+            "x": 663.272438698901,
+            "y": 985.091341951649,
+            "depth": 9.5
+          }
+        },
+        {
+          "point": [
+            0,
+            0,
+            10
+          ],
+          "screen": {
+            "x": 960,
+            "y": 2023.6378065055,
+            "depth": 10
+          }
+        },
+        {
+          "point": [
+            5,
+            -3,
+            -4
+          ],
+          "screen": {
+            "x": 1701.81890325275,
+            "y": -53.4551226021985,
+            "depth": 13
+          }
+        }
+      ]
+    },
+    {
+      "camera": {
+        "type": "perspective",
+        "position": [
+          0,
+          -10,
+          0
+        ],
+        "lookAt": [
+          0,
+          0,
+          0
+        ],
+        "fov": 50,
+        "roll": 3,
+        "orthoHeight": 0,
+        "shotIndex": null
+      },
+      "basis": {
+        "forward": [
+          0,
+          1,
+          0
+        ],
+        "right": [
+          0.998629534754574,
+          0,
+          -0.0523359562429438
+        ],
+        "up": [
+          0.0523359562429438,
+          0,
+          0.998629534754574
+        ]
+      },
+      "points": [
+        {
+          "point": [
+            0,
+            0,
+            0
+          ],
+          "screen": {
+            "x": 960,
+            "y": 540,
+            "depth": 10
+          }
+        },
+        {
+          "point": [
+            1,
+            1,
+            1
+          ],
+          "screen": {
+            "x": 1059.62180809946,
+            "y": 429.358773174828,
+            "depth": 11
+          }
+        },
+        {
+          "point": [
+            -2,
+            0.5,
+            3
+          ],
+          "screen": {
+            "x": 722.408210176648,
+            "y": 221.130812354898,
+            "depth": 10.5
+          }
+        },
+        {
+          "point": [
+            0,
+            0,
+            10
+          ],
+          "screen": {
+            "x": 899.393197008582,
+            "y": -616.446692085469,
+            "depth": 10
+          }
+        },
+        {
+          "point": [
+            5,
+            -3,
+            -4
+          ],
+          "screen": {
+            "x": 1820.66581034186,
+            "y": 1157.5361076264,
+            "depth": 7
+          }
+        }
+      ]
+    },
+    {
+      "camera": {
+        "type": "perspective",
+        "position": [
+          1,
+          1,
+          1
+        ],
+        "lookAt": [
+          1,
+          1,
+          1
+        ],
+        "fov": 45,
+        "roll": 0,
+        "orthoHeight": 0,
+        "shotIndex": null
+      },
+      "basis": {
+        "forward": [
+          0,
+          0,
+          -1
+        ],
+        "right": [
+          1,
+          0,
+          0
+        ],
+        "up": [
+          0,
+          1,
+          0
+        ]
+      },
+      "points": [
+        {
+          "point": [
+            0,
+            0,
+            0
+          ],
+          "screen": {
+            "x": -343.675323681472,
+            "y": 1843.67532368147,
+            "depth": 1
+          }
+        },
+        {
+          "point": [
+            1,
+            1,
+            1
+          ],
+          "screen": null
+        },
+        {
+          "point": [
+            -2,
+            0.5,
+            3
+          ],
+          "screen": null
+        },
+        {
+          "point": [
+            0,
+            0,
+            10
+          ],
+          "screen": null
+        },
+        {
+          "point": [
+            5,
+            -3,
+            -4
+          ],
+          "screen": {
+            "x": 2002.94025894518,
+            "y": 1582.94025894518,
+            "depth": 5
+          }
+        }
+      ]
+    }
+  ]
+}

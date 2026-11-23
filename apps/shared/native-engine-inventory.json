@@ -4,7 +4,8 @@
   "runtimeExtensionIds": [
     "zip-any-file",
     "a-book",
-    "camera-studio"
+    "camera-studio",
+    "scene-studio"
   ],
   "source": "src/data/catalog.ts",
   "platforms": {

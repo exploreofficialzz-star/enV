@@ -1,0 +1,573 @@
+{
+  "description": "Cross-platform conformance vectors for sampleTrack. Colours are compared exactly; numbers within 1e-9.",
+  "vectors": [
+    {
+      "name": "linear midpoint",
+      "track": {
+        "easing": "linear",
+        "loop": false,
+        "keyframes": [
+          {
+            "time": 0,
+            "value": 0
+          },
+          {
+            "time": 2,
+            "value": 10
+          }
+        ]
+      },
+      "samples": [
+        {
+          "time": -1,
+          "value": 0
+        },
+        {
+          "time": 0,
+          "value": 0
+        },
+        {
+          "time": 1,
+          "value": 5
+        },
+        {
+          "time": 2,
+          "value": 10
+        },
+        {
+          "time": 9,
+          "value": 10
+        }
+      ]
+    },
+    {
+      "name": "easeIn quarter",
+      "track": {
+        "easing": "easeIn",
+        "loop": false,
+        "keyframes": [
+          {
+            "time": 0,
+            "value": 0
+          },
+          {
+            "time": 4,
+            "value": 8
+          }
+        ]
+      },
+      "samples": [
+        {
+          "time": 1,
+          "value": 0.5
+        },
+        {
+          "time": 2,
+          "value": 2
+        }
+      ]
+    },
+    {
+      "name": "easeOut quarter",
+      "track": {
+        "easing": "easeOut",
+        "loop": false,
+        "keyframes": [
+          {
+            "time": 0,
+            "value": 0
+          },
+          {
+            "time": 4,
+            "value": 8
+          }
+        ]
+      },
+      "samples": [
+        {
+          "time": 1,
+          "value": 3.5
+        }
+      ]
+    },
+    {
+      "name": "easeInOut",
+      "track": {
+        "easing": "easeInOut",
+        "loop": false,
+        "keyframes": [
+          {
+            "time": 0,
+            "value": 0
+          },
+          {
+            "time": 4,
+            "value": 8
+          }
+        ]
+      },
+      "samples": [
+        {
+          "time": 1,
+          "value": 1
+        },
+        {
+          "time": 2,
+          "value": 4
+        },
+        {
+          "time": 3,
+          "value": 7
+        }
+      ]
+    },
+    {
+      "name": "step holds start value",
+      "track": {
+        "easing": "step",
+        "loop": false,
+        "keyframes": [
+          {
+            "time": 0,
+            "value": 1
+          },
+          {
+            "time": 2,
+            "value": 9
+          }
+        ]
+      },
+      "samples": [
+        {
+          "time": 1.99,
+          "value": 1
+        },
+        {
+          "time": 2,
+          "value": 9
+        }
+      ]
+    },
+    {
+      "name": "vector position",
+      "track": {
+        "easing": "linear",
+        "loop": false,
+        "keyframes": [
+          {
+            "time": 0,
+            "value": [
+              -2,
+              0,
+              0
+            ]
+          },
+          {
+            "time": 4,
+            "value": [
+              2,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      "samples": [
+        {
+          "time": 1,
+          "value": [
+            -1,
+            0,
+            0
+          ]
+        },
+        {
+          "time": 4,
+          "value": [
+            2,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "per-keyframe easing overrides track",
+      "track": {
+        "easing": "linear",
+        "loop": false,
+        "keyframes": [
+          {
+            "time": 0,
+            "value": 0,
+            "easing": "easeIn"
+          },
+          {
+            "time": 4,
+            "value": 8
+          }
+        ]
+      },
+      "samples": [
+        {
+          "time": 2,
+          "value": 2
+        }
+      ]
+    },
+    {
+      "name": "colour blend",
+      "track": {
+        "easing": "linear",
+        "loop": false,
+        "keyframes": [
+          {
+            "time": 0,
+            "value": "#000000"
+          },
+          {
+            "time": 2,
+            "value": "#ff8040"
+          }
+        ],
+        "property": "color"
+      },
+      "samples": [
+        {
+          "time": 1,
+          "value": "#804020"
+        }
+      ]
+    },
+    {
+      "name": "boolean steps",
+      "track": {
+        "easing": "linear",
+        "loop": false,
+        "keyframes": [
+          {
+            "time": 0,
+            "value": true
+          },
+          {
+            "time": 1,
+            "value": false
+          }
+        ],
+        "property": "visible"
+      },
+      "samples": [
+        {
+          "time": 0.5,
+          "value": true
+        },
+        {
+          "time": 1,
+          "value": false
+        }
+      ]
+    },
+    {
+      "name": "loop wraps",
+      "track": {
+        "easing": "linear",
+        "loop": true,
+        "keyframes": [
+          {
+            "time": 0,
+            "value": 0
+          },
+          {
+            "time": 2,
+            "value": 10
+          }
+        ]
+      },
+      "samples": [
+        {
+          "time": 3,
+          "value": 5
+        },
+        {
+          "time": 5,
+          "value": 5
+        }
+      ]
+    },
+    {
+      "name": "three keyframes",
+      "track": {
+        "easing": "linear",
+        "loop": false,
+        "keyframes": [
+          {
+            "time": 0,
+            "value": 0
+          },
+          {
+            "time": 1,
+            "value": 10
+          },
+          {
+            "time": 3,
+            "value": 0
+          }
+        ]
+      },
+      "samples": [
+        {
+          "time": 0.5,
+          "value": 5
+        },
+        {
+          "time": 1,
+          "value": 10
+        },
+        {
+          "time": 2,
+          "value": 5
+        }
+      ]
+    },
+    {
+      "name": "quaternion slerp",
+      "track": {
+        "property": "quaternion",
+        "easing": "linear",
+        "loop": false,
+        "keyframes": [
+          {
+            "time": 0,
+            "value": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          {
+            "time": 2,
+            "value": [
+              0,
+              0.7071067811865476,
+              0,
+              0.7071067811865476
+            ]
+          }
+        ]
+      },
+      "samples": [
+        {
+          "time": 0,
+          "value": [
+            0,
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "time": 1,
+          "value": [
+            0,
+            0.3826834323650897,
+            0,
+            0.9238795325112866
+          ]
+        },
+        {
+          "time": 2,
+          "value": [
+            0,
+            0.7071067811865476,
+            0,
+            0.7071067811865476
+          ]
+        }
+      ]
+    },
+    {
+      "name": "quaternion takes the shortest path",
+      "track": {
+        "property": "quaternion",
+        "easing": "linear",
+        "loop": false,
+        "keyframes": [
+          {
+            "time": 0,
+            "value": [
+              0,
+              0,
+              0,
+              1
+            ]
+          },
+          {
+            "time": 2,
+            "value": [
+              0,
+              -0.7071067811865476,
+              0,
+              -0.7071067811865476
+            ]
+          }
+        ]
+      },
+      "samples": [
+        {
+          "time": 1,
+          "value": [
+            0,
+            0.3826834323650897,
+            0,
+            0.9238795325112866
+          ]
+        }
+      ]
+    },
+    {
+      "name": "clip names step",
+      "track": {
+        "property": "clip",
+        "easing": "linear",
+        "loop": false,
+        "keyframes": [
+          {
+            "time": 0,
+            "value": "Idle"
+          },
+          {
+            "time": 2,
+            "value": "Swim"
+          }
+        ]
+      },
+      "samples": [
+        {
+          "time": 1,
+          "value": "Idle"
+        },
+        {
+          "time": 2,
+          "value": "Swim"
+        }
+      ]
+    },
+    {
+      "name": "2D layer position",
+      "track": {
+        "property": "position",
+        "easing": "linear",
+        "loop": false,
+        "keyframes": [
+          {
+            "time": 0,
+            "value": [
+              0,
+              100
+            ]
+          },
+          {
+            "time": 2,
+            "value": [
+              200,
+              300
+            ]
+          }
+        ]
+      },
+      "samples": [
+        {
+          "time": 1,
+          "value": [
+            100,
+            200
+          ]
+        }
+      ]
+    }
+  ],
+  "seededRandom": {
+    "seed": 1,
+    "firstFive": [
+      0.6270739405881613,
+      0.002735721180215478,
+      0.5274470399599522,
+      0.9810509674716741,
+      0.9683778982143849
+    ],
+    "algorithm": "mulberry32"
+  },
+  "valueNoise": {
+    "description": "valueNoise(seed, x, channel). 32-bit integer hash, smoothstep blend.",
+    "samples": [
+      {
+        "seed": 1,
+        "x": 0,
+        "channel": 0,
+        "value": 0.7338732648640871
+      },
+      {
+        "seed": 1,
+        "x": 0.5,
+        "channel": 0,
+        "value": 0.24848205782473087
+      },
+      {
+        "seed": 1,
+        "x": 1,
+        "channel": 0,
+        "value": -0.23690914921462536
+      },
+      {
+        "seed": 1,
+        "x": 2.25,
+        "channel": 0,
+        "value": 0.24131003477668855
+      },
+      {
+        "seed": 7,
+        "x": 0,
+        "channel": 1,
+        "value": -0.4956082673743367
+      },
+      {
+        "seed": 7,
+        "x": 10.75,
+        "channel": 1,
+        "value": 0.6082830353552708
+      }
+    ]
+  },
+  "cameraShake": {
+    "description": "cameraShake(seed, time, {amount, speed})",
+    "samples": [
+      {
+        "seed": 1,
+        "time": 0.5,
+        "shake": {
+          "amount": 0.5,
+          "speed": 4
+        },
+        "value": [
+          0.09542979719117284,
+          -0.3915639400947839,
+          -0.24874007399193943
+        ]
+      },
+      {
+        "seed": 1,
+        "time": 3,
+        "shake": {
+          "amount": 0,
+          "speed": 4
+        },
+        "value": [
+          0,
+          0,
+          0
+        ]
+      }
+    ]
+  }
+}

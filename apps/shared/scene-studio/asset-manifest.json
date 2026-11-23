@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "licenseAllowlist": ["CC0-1.0", "CC-BY-4.0", "MIT", "Apache-2.0", "OFL-1.1"],
+  "attributionRequired": ["CC-BY-4.0", "OFL-1.1"],
+  "packs": [
+    {
+      "id": "quaternius-characters",
+      "name": "Quaternius rigged characters and animation clips",
+      "author": "Quaternius",
+      "source": "https://quaternius.com/",
+      "license": "CC0-1.0",
+      "status": "planned",
+      "assets": [
+        { "id": "library/character_casual", "kind": "model", "tags": ["person", "casual", "rigged"], "clips": ["Idle", "Walk", "Run", "Wave", "Talk", "Swim", "Fall", "Sit"] },
+        { "id": "library/character_officer", "kind": "model", "tags": ["person", "police", "uniform", "rigged"], "clips": ["Idle", "Walk", "Run", "Wave", "Talk", "Swim", "Fall", "Sit"] }
+      ]
+    },
+    {
+      "id": "quaternius-nature",
+      "name": "Quaternius nature models",
+      "author": "Quaternius",
+      "source": "https://quaternius.com/",
+      "license": "CC0-1.0",
+      "status": "planned",
+      "assets": [
+        { "id": "library/tree_oak", "kind": "model", "tags": ["tree", "nature"] },
+        { "id": "library/tree_pine", "kind": "model", "tags": ["tree", "nature"] },
+        { "id": "library/rock_large", "kind": "model", "tags": ["rock", "nature"] }
+      ]
+    },
+    {
+      "id": "polyhaven-hdris",
+      "name": "Poly Haven HDRI skies",
+      "author": "Poly Haven contributors",
+      "source": "https://polyhaven.com/hdris",
+      "license": "CC0-1.0",
+      "status": "planned",
+      "assets": [
+        { "id": "library/sky_night", "kind": "hdri", "tags": ["night", "sky"] },
+        { "id": "library/sky_day", "kind": "hdri", "tags": ["day", "sky"] },
+        { "id": "library/sky_overcast", "kind": "hdri", "tags": ["overcast", "sky"] }
+      ]
+    },
+    {
+      "id": "kenney-audio",
+      "name": "Kenney sound effects",
+      "author": "Kenney",
+      "source": "https://kenney.nl/assets?q=audio",
+      "license": "CC0-1.0",
+      "status": "planned",
+      "assets": [
+        { "id": "library/whoosh_soft", "kind": "audio", "tags": ["whoosh", "transition"] }
+      ]
+    },
+    {
+      "id": "ambience-pack",
+      "name": "Ambience loops (rain, drones)",
+      "author": "To be sourced under a CC0 license",
+      "source": "https://freesound.org/",
+      "license": "CC0-1.0",
+      "status": "planned",
+      "assets": [
+        { "id": "library/rain_loop", "kind": "audio", "tags": ["rain", "ambience", "loop"] },
+        { "id": "library/tension_drone", "kind": "audio", "tags": ["music", "tense", "loop"] }
+      ]
+    }
+  ]
+}
