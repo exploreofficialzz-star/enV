@@ -391,7 +391,10 @@ export function getToolsByCategory(category: CategoryId): ToolMeta[] {
   const items = category === "accessibility"
     ? accessibilityStudios
     : category === "developer"
-      ? developerStudios
+      ? [
+          ...developerStudios,
+          ...searchableTools.filter((tool) => tool.category === "developer" && !tool.tags.includes("developer-studio")),
+        ]
       : [
           ...allTools.filter((t) => t.category === category && isDiscoverable(t)),
           ...legacyAccessibilityCategoryTools.filter((t) => t.category === category && isDiscoverable(t)),
