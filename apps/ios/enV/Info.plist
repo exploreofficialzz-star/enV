@@ -27,8 +27,6 @@
 	</dict>
 	<key>UILaunchScreen</key>
 	<dict/>
-	<key>ENV_HYBRID_TOOL_IDS</key>
-	<string>$(ENV_HYBRID_TOOL_IDS)</string>
 	<key>ENV_API_BASE_URL</key>
 	<string>$(ENV_API_BASE_URL)</string>
 	<!-- Build setting defaults to NO; enable only after server privacy and consent gates pass. -->
