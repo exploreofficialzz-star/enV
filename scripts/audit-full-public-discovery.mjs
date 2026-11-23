@@ -9,6 +9,7 @@ import { buildSeoArtifacts } from "./generate-seo-artifacts.mjs";
 import {
   articleSeoTitle,
   canonicalToolPath,
+  toolGuideSeoDescription,
   categorySeoTitle,
   toolGuideSeoTitle,
   toolSeoDescription,
@@ -95,7 +96,7 @@ function createRouteSpecs(artifacts) {
         name: guide.name,
         schema: "TechArticle",
         expectedTitle: toolGuideSeoTitle(guide, artifacts.guideTools),
-        expectedDescription: toolSeoDescription(guide),
+        expectedDescription: toolGuideSeoDescription(guide),
       });
       continue;
     }
