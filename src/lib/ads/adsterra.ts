@@ -39,8 +39,7 @@ export type AdsterraBannerFormat = keyof typeof ADSTERRA_BANNER_UNITS;
 /**
  * Adsterra is a display placement only. A banner impression, click, or Smartlink
  * never unlocks a tool or counts as a rewarded completion. The separate
- * rewarded-access gate, when configured, verifies Google Ad Manager reward
- * events and uses the server-priced token path. Offline allowance is separate.
+ * per-user rewarded-video completion. The server-priced token path is separate. Offline allowance is separate.
  */
 export function canRequestAdsterraAds(
   enabled: boolean,
@@ -48,17 +47,6 @@ export function canRequestAdsterraAds(
   online: boolean,
 ): boolean {
   return enabled && consent === "granted" && online;
-}
-
-/** Open the publisher's Smartlink in a separate tab from an explicit output action. */
-export function openAdsterraSmartlinkFromOutput(): void {
-  if (typeof window === "undefined" || typeof document === "undefined") return;
-  if (!canRequestAdsterraAds(isAdsterraEnabled(), getAdsterraConsent(), navigator.onLine)) return;
-  const eligibleToolSurface = document.querySelector<HTMLElement>(
-    '[data-env-tool-id][data-env-ad-eligible="true"]:not(.env-tool-fullscreen)',
-  );
-  if (!eligibleToolSurface || document.fullscreenElement === eligibleToolSurface) return;
-  window.open(ADSTERRA_SMARTLINK_URL, "_blank", "noopener,noreferrer");
 }
 
 export function isAdsterraEnabled(): boolean {
