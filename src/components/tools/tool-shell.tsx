@@ -493,12 +493,6 @@ export function ToolShell({
           const action = target.closest("button,a,[role=button]");
           if (!action || (action instanceof HTMLButtonElement && action.disabled)) return;
           const label = [action.getAttribute("aria-label"), action.getAttribute("title"), action.textContent].filter(Boolean).join(" ");
-          const isFileDownload = action instanceof HTMLAnchorElement && action.hasAttribute("download");
-          const isOutputAction =
-            isFileDownload ||
-            /\b(copy|download|export|save|output|result|calculate|convert|generate|analy[sz]e|process|format|validate|inspect|scan|encode|decode|resize|compress|extract|transcribe|create|execute|compare|merge|split|apply|build|render)\b/i.test(label);
-          if (adsterraAdsEnabled && isOutputAction) {
-          }
           if (/\b(run|calculate|convert|generate|analy[sz]e|process|format|validate|inspect|scan|encode|decode|resize|compress|extract|transcribe|create|execute|search|lookup|compare|merge|split|apply|build|render|submit|start)\b/i.test(label)) {
             startToolExecution("action_button");
           }
@@ -520,7 +514,6 @@ export function ToolShell({
             onUseTokens={tokenAccessRequest}
             onReleaseTokenAccess={releasePendingTokenAccess}
             onUnlocked={grantToolAccess}
-            onAdFreeOfferReady={() => setShowAdFreeOffer(true)}
           />
         ) : (
           <ToolExecutionTelemetryContext.Provider value={executionTelemetry}>
