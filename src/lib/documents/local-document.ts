@@ -82,7 +82,7 @@ function parseLocalPdfPageRange(value: string, pageCount: number): number[] {
   if (!tokens.length) throw new Error("Enter at least one PDF page or range.");
   const selected = new Set<number>();
   for (const token of tokens) {
-    const match = /^(\\d+)(?:\\s*-\\s*(\\d+))?$/.exec(token);
+    const match = /^(\d+)(?:\s*-\s*(\d+))?$/.exec(token);
     if (!match) throw new Error("Use page numbers and ranges such as 1,3-5.");
     const first = Number(match[1]);
     const last = Number(match[2] ?? match[1]);
