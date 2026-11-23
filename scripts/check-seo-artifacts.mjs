@@ -3,12 +3,27 @@ import { readFileSync } from "node:fs";
 import { buildSeoArtifacts, buildSitemapArtifacts } from "./generate-seo-artifacts.mjs";
 import { buildIndexNowKeyArtifact } from "./indexnow-utils.mjs";
 import { SEO_CANONICAL_ORIGIN, SEO_REDIRECT_HOSTS } from "./seo-domain-policy.mjs";
-import { getToolByPath, getToolsByCategory } from "../src/lib/registry.ts";
+import { getAllTools, getToolByPath, getToolsByCategory } from "../src/lib/registry.ts";
 import { toolTaskGuidanceSource } from "../src/lib/tool-documentation.ts";
-import { toolSeoDescription, toolGuideSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema, toolSchema, organizationSchema, websiteSchema, boundedToolSeoTitle } from "@/lib/seo-metadata";
+import { toolSeoDescription, toolGuideSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema, toolSchema, organizationSchema, websiteSchema, boundedToolSeoTitle, canonicalSeoToolFor, createCanonicalSeoToolResolver } from "@/lib/seo-metadata";
 
 const nativeInventory = JSON.parse(readFileSync(new URL("../apps/shared/native-engine-inventory.json", import.meta.url), "utf8"));
 const result = buildSeoArtifacts();
+
+// The inventory generator uses the indexed resolver for every stable ID. Compare
+// it with the original find-based helper on representative runtime tools to guard
+// canonical ID/fingerprint semantics while keeping the production inventory pass O(n).
+const resolveCanonicalSeoTool = createCanonicalSeoToolResolver(result.guideTools);
+const canonicalResolverSamples = getAllTools()
+  .filter((tool) => tool.engine?.type === "calculator")
+  .slice(0, 40);
+for (const tool of canonicalResolverSamples) {
+  assert.equal(
+    resolveCanonicalSeoTool(tool)?.id,
+    canonicalSeoToolFor(tool, result.guideTools)?.id,
+    "Indexed canonical SEO lookup must preserve the original canonical ID for " + tool.id,
+  );
+}
 
 // Accessibility Studio routing keeps legacy Design discovery aliases visible while
 // retaining one stable runtime/search identity and one canonical Accessibility URL.
