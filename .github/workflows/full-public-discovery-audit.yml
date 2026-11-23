@@ -1,0 +1,116 @@
+name: Full public discovery audit
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 4 * * 1"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/full-public-discovery-audit.yml"
+      - "scripts/audit-full-public-discovery.mjs"
+      - "scripts/full-public-discovery-audit-core.mjs"
+      - "scripts/full-public-discovery-audit-core.test.mjs"
+      - "scripts/generate-seo-artifacts.mjs"
+      - "src/lib/seo-metadata.ts"
+      - "src/lib/registry.ts"
+      - "src/lib/tool-documentation.ts"
+      - "src/data/catalog.ts"
+      - "src/data/categories.ts"
+      - "src/routes/**"
+      - "package.json"
+  pull_request:
+    paths:
+      - ".github/workflows/full-public-discovery-audit.yml"
+      - "scripts/audit-full-public-discovery.mjs"
+      - "scripts/full-public-discovery-audit-core.mjs"
+      - "scripts/full-public-discovery-audit-core.test.mjs"
+      - "scripts/generate-seo-artifacts.mjs"
+      - "src/lib/seo-metadata.ts"
+      - "src/lib/registry.ts"
+      - "src/lib/tool-documentation.ts"
+      - "src/data/catalog.ts"
+      - "src/data/categories.ts"
+      - "src/routes/**"
+      - "package.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: full-public-discovery-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  crawl:
+    name: Crawl every canonical public discovery route
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Refresh source-derived native and SEO discovery artifacts
+        run: |
+          npm run export:native-catalog
+          npm run generate:billing-profiles
+          npm run check:native-discovery
+          npm run export:native-execution-matrix
+          npm run generate:seo
+          npm run discovery:seo-offline
+
+      - name: Run discovery, guide and SEO regression tests
+        run: npm run test:discovery
+
+      - name: Run discovery relevance, phrasing and cross-link gates
+        run: npm run discovery:check
+
+      - name: Typecheck the application
+        run: npm run typecheck
+
+      - name: Start local SSR server
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run dev > /tmp/env-full-discovery-audit.log 2>&1 &
+          echo $! > /tmp/env-full-discovery-audit.pid
+          for attempt in {1..120}; do
+            if curl --fail --silent --show-error http://127.0.0.1:8080/ >/dev/null; then
+              echo "Local SSR server is ready."
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/env-full-discovery-audit.log
+          exit 1
+
+      - name: Crawl all canonical tool, guide, category and article routes
+        env:
+          SEO_AUDIT_BASE_URL: http://127.0.0.1:8080
+          DISCOVERY_AUDIT_CONCURRENCY: "8"
+          DISCOVERY_AUDIT_REQUEST_TIMEOUT_MS: "20000"
+        run: npm run audit:discovery:full -- --report=artifacts/full-discovery-audit/report.json
+
+      - name: Upload full discovery audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-public-discovery-audit
+          path: |
+            artifacts/full-discovery-audit/report.json
+            audit/discovery/SEO-OFFLINE-VALIDATION.md
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Show local SSR diagnostics on failure
+        if: failure()
+        run: cat /tmp/env-full-discovery-audit.log

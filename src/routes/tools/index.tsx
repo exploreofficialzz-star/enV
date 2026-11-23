@@ -6,7 +6,7 @@ import { ToolCard } from "@/components/tools/tool-card";
 import { SearchBox } from "@/components/tools/search-box";
 import { CATEGORIES } from "@/data/categories";
 import { getSearchableTools, getToolsByCategory } from "@/lib/registry";
-import { searchTools } from "@/lib/search";
+import { searchToolResults } from "@/lib/search";
 import { toolIcon } from "@/lib/icons";
 import { isIndexableTool, seoPageHead, categorySchema, canonicalSeoTools } from "@/lib/seo-metadata";
 import { toolsIndexSocialCard } from "@/lib/seo-social-cards";
@@ -37,13 +37,13 @@ function Tools() {
   const { q } = Route.useSearch();
   const query = q;
   const [visibleByCategory, setVisibleByCategory] = useState<Record<string, number>>({});
-  const matchingTools = useMemo(() => searchTools(all, query, all.length), [all, query]);
+  const matchingResults = useMemo(() => searchToolResults(all, query, all.length).matches, [all, query]);
   const sections = useMemo(
     () => CATEGORIES.map((category) => ({
       category,
-      tools: matchingTools.filter((tool) => tool.category === category.id),
-    })).filter((section) => section.tools.length > 0),
-    [matchingTools],
+      matches: matchingResults.filter((match) => match.tool.category === category.id),
+    })).filter((section) => section.matches.length > 0),
+    [matchingResults],
   );
 
   return (
@@ -60,10 +60,10 @@ function Tools() {
           <p className="mt-8 rounded-xl bg-surface p-6 text-sm text-muted shadow-[var(--shadow-border)]">No tools match your search. Try another name or keyword.</p>
         ) : (
           <div id="all-tools" className="mt-8 space-y-10">
-            {sections.map(({ category, tools }) => {
+            {sections.map(({ category, matches: categoryMatches }) => {
               const Icon = toolIcon(category.icon);
               const visibleCount = visibleByCategory[category.id] ?? INITIAL_TOOLS_PER_CATEGORY;
-              const visibleTools = tools.slice(0, visibleCount);
+              const visibleMatches = categoryMatches.slice(0, visibleCount);
               return (
                 <section key={category.id} id={`category-${category.id}`} className="scroll-mt-24">
                   <div className="mb-4 flex items-center gap-3">
@@ -84,15 +84,20 @@ function Tools() {
                     </div>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {visibleTools.map((tool) => <ToolCard key={tool.id} tool={tool} />)}
+                    {visibleMatches.map(({ tool, explanation }) => (
+                      <div key={tool.id} className="min-w-0">
+                        <ToolCard tool={tool} />
+                        {query.trim() ? <p className="mt-2 px-1 text-xs leading-5 text-muted" aria-label={"Why " + tool.name + " matched"}>{explanation}</p> : null}
+                      </div>
+                    ))}
                   </div>
-                  {visibleCount < tools.length ? (
+                  {visibleCount < categoryMatches.length ? (
                     <div className="mt-3 flex justify-end">
                       <button
                         type="button"
                         onClick={() => setVisibleByCategory((current) => ({
                           ...current,
-                          [category.id]: Math.min(visibleCount + MORE_TOOLS_PER_CLICK, tools.length),
+                          [category.id]: Math.min(visibleCount + MORE_TOOLS_PER_CLICK, categoryMatches.length),
                         }))}
                         className="inline-flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-sm font-semibold text-accent shadow-[var(--shadow-border)] transition-colors hover:bg-surface-2"
                         aria-label={`See more ${category.name} tools`}

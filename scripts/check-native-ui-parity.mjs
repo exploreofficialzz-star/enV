@@ -120,6 +120,7 @@ assert.match(iosApp, /EnVIcon\(name: "Heart", size: 24, tint: \.envMuted\)\.fram
 assert.match(iosApp, /EnVIcon\(name: "LayoutGrid", size: 24, tint: \.envMuted\)\.frame\(width: 44, height: 44\)/, "iOS Tools target must meet the 44pt hit-area minimum");
 assert.match(iosApp, /\.frame\(width: 44, height: 44\)\s*\.contentShape\(Rectangle\(\)\)/, "iOS overflow menu target must meet the 44pt hit-area minimum");
 assert.match(iosContent, /horizontalSizeClass == \.regular \? 20 : 16/);
+assert.match(iosContent, /\.prefix\(horizontalSizeClass == \.regular \? 12 : 6\)/, "iOS Home must adapt the number of visible tool previews to the available width");
 assert.match(iosContent, /\.font\(\.envScaled\(size: 30, weight: \.bold\)\)/);
 assert.match(iosContent, /LazyVStack\(alignment: \.leading, spacing: 24\)/);
 assert.match(iosTools, /\.font\(\.envScaled\(size: 14, weight: \.semibold\)\)/);

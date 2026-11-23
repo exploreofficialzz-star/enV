@@ -10,7 +10,7 @@ import { toolIcon } from "@/lib/icons";
 import { DesignCategoryExplorer } from "@/components/tools/design-category-explorer";
 import { CreatorCategoryLauncher } from "@/components/tools/creator-category-launcher";
 import type { CategoryId } from "@/types/tool";
-import { isIndexableTool, seoPageHead, categorySchema, categorySeoTitle, canonicalSeoTools } from "@/lib/seo-metadata";
+import { isIndexableTool, seoPageHead, categorySchema, categorySeoTitle, canonicalSeoTools, canonicalToolPath } from "@/lib/seo-metadata";
 import { categorySocialCard } from "@/lib/seo-social-cards";
 
 export const Route = createFileRoute("/tools/$category/")({
@@ -40,6 +40,7 @@ export const Route = createFileRoute("/tools/$category/")({
 function Category() {
   const { category } = Route.useParams();
   const tools = useMemo(() => getToolsByCategory(category as CategoryId).sort((a, b) => b.popularity - a.popularity || a.name.localeCompare(b.name)), [category]);
+  const publicTools = useMemo(() => canonicalSeoTools(tools.filter(isIndexableTool)), [tools]);
   const developerStudios = category === "developer" ? tools.filter((tool) => tool.tags.includes("developer-studio")) : [];
   const legacyTools = category === "developer" ? tools.filter((tool) => !tool.tags.includes("developer-studio")) : tools;
   const [visibleCount, setVisibleCount] = useState(6);
@@ -95,6 +96,43 @@ function Category() {
               </>
             )}
           </>}
+          {publicTools.length > 0 ? (
+            <details className="mt-8 rounded-xl border border-border bg-surface p-4">
+              <summary className="cursor-pointer text-sm font-semibold text-accent">
+                Browse all {meta?.name ?? category} tools ({publicTools.length})
+              </summary>
+              <h2 className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted">Tool pages</h2>
+              <nav
+                aria-label={"All " + (meta?.name ?? category) + " tool pages"}
+                className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
+              >
+                {publicTools.map((tool) => (
+                  <a
+                    key={tool.id}
+                    href={canonicalToolPath(tool)}
+                    className="min-w-0 rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm font-medium text-accent transition-colors hover:border-accent/40"
+                  >
+                    {tool.name}
+                  </a>
+                ))}
+              </nav>
+              <h2 className="mt-5 text-xs font-semibold uppercase tracking-wide text-muted">Usage guides</h2>
+              <nav
+                aria-label={"All " + (meta?.name ?? category) + " usage guides"}
+                className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
+              >
+                {publicTools.map((tool) => (
+                  <a
+                    key={tool.id}
+                    href={"/blog/tool-" + tool.id}
+                    className="min-w-0 rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm font-medium text-accent transition-colors hover:border-accent/40"
+                  >
+                    {tool.name} guide
+                  </a>
+                ))}
+              </nav>
+            </details>
+          ) : null}
         </>
       </section>
     </AppShell>
