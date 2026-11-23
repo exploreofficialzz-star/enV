@@ -131,6 +131,13 @@ jobs:
       - name: Accept reviewed counts and regenerate discovery artifacts
         run: |
           npm run discovery:inventory -- --update-baseline
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const path = "audit/discovery/discovery-baseline.json";
+          const baseline = JSON.parse(fs.readFileSync(path, "utf8"));
+          baseline.note = "Reviewed 2026-11-23: the prior runtime extension video-link-screen-recording is the sole removed stable ID. The source-derived before/after ID sets, the three expected count reductions, and every registered gap ratchet were verified before accepting this baseline. This records inventory identity only; it is not per-tool functional acceptance evidence.";
+          fs.writeFileSync(path, JSON.stringify(baseline, null, 1) + "\\n");
+          NODE
           npm run discovery:inventory
           npm run discovery:knowledge-index
           npm run discovery:search-golden
@@ -153,7 +160,11 @@ jobs:
             audit/discovery/DISCOVERY-RECONCILIATION-REPORT.md \
             audit/discovery/SEO-OFFLINE-VALIDATION.md \
             audit/discovery/tool-knowledge-index.json \
-            audit/discovery/search-eval/native-golden.v1.json
+            audit/discovery/search-eval/native-golden.v1.json \
+            public/robots.txt \
+            public/sitemap.xml \
+            public/llms.txt \
+            public/sitemaps
           git rm .github/workflows/regenerate-discovery-artifacts.yml
           git diff --cached --check
           git diff --cached --stat
