@@ -268,18 +268,24 @@ const guideDescriptionCollisionGroup = firstCollisionGroup(
   (tool) => toolGuideSeoDescription(tool, [tool]),
 );
 const longIdTemplate = result.tools.find((tool) => tool.category !== "developer") ?? result.tools[0];
+const longIdSharedPrefix = "synthetic-long-tool-id-" + "shared-segment-".repeat(8);
 const longIdCollisionPeers = [
   {
     ...longIdTemplate,
-    id: "synthetic-long-tool-id-a-" + "x".repeat(92),
+    id: longIdSharedPrefix + "-variant-a",
     slug: "synthetic-long-tool-a",
   },
   {
     ...longIdTemplate,
-    id: "synthetic-long-tool-id-b-" + "y".repeat(92),
+    id: longIdSharedPrefix + "-variant-b",
     slug: "synthetic-long-tool-b",
   },
 ];
+assert.equal(
+  longIdCollisionPeers[0].id.slice(0, 88),
+  longIdCollisionPeers[1].id.slice(0, 88),
+  "Synthetic long IDs must share the full retained prefix so uniqueness depends on the compact hash suffix.",
+);
 const longIdToolDescriptions = longIdCollisionPeers.map((tool) => toolSeoDescription(tool, longIdCollisionPeers));
 const longIdGuideDescriptions = longIdCollisionPeers.map((tool) => toolGuideSeoDescription(tool, longIdCollisionPeers));
 for (const description of [...longIdToolDescriptions, ...longIdGuideDescriptions]) {
