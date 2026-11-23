@@ -145,16 +145,9 @@ export async function runOfflineMeteredOperationIfSelected<T>(input: { toolId: s
 
   const catalogTool = getToolById(input.toolId);
   const hybridAdTool = Boolean(catalogTool && isHybridAccessToolId(input.toolId, {
-    enabled: import.meta.env.VITE_ADS_ENABLED,
-    clientId: import.meta.env.VITE_ADSENSE_CLIENT_ID,
-    toolSlotId: import.meta.env.VITE_ADSENSE_TOOL_SLOT_ID,
-    privacyConfigured: import.meta.env.VITE_ADSENSE_PRIVACY_CONFIGURED,
-    // The rewarded-access allowlist must receive the same offline token
-    // allowance enforcement as the legacy hybrid ad-supported list.
-    toolIds: [
-      import.meta.env.VITE_AD_SUPPORTED_TOOL_IDS,
-      import.meta.env.VITE_AD_ACCESS_GATE_ENABLED === "true" ? import.meta.env.VITE_AD_ACCESS_TOOL_IDS : "",
-    ].filter(Boolean).join(","),
+    toolIds: import.meta.env.VITE_AD_ACCESS_GATE_ENABLED === "true"
+      ? import.meta.env.VITE_AD_ACCESS_TOOL_IDS
+      : "",
   }, catalogTool));
 
   if (hybridAdTool && await isApplicationOnline()) {
