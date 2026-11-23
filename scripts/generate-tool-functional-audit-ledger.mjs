@@ -9,6 +9,7 @@ import { tools as sourceCatalogTools } from "../src/data/catalog.ts";
 import { reconcileToolInventories } from "./reconcile-tool-inventories.mjs";
 import { validateSourceInspectionEvidence } from "./source-inspection-evidence.mjs";
 import { validateToolAuditReport } from "./write-tool-audit-report.mjs";
+import { REQUIRED_CALCULATOR_BROWSER_TOOL_IDS, selectCalculatorBrowserAuditToolIds } from "./calculator-browser-audit-scope.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const args = process.argv.slice(2);
@@ -609,6 +610,99 @@ if (!converterToolIds.length) {
     invalidEvidence.push({
       auditId: "converters-browser",
       reason: "dynamic-converter-report-could-not-be-read",
+      detail: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+// Calculator browser scope is derived from the current active calculator-engine IDs.
+// The same selector is used by the runner and this ledger, so the expected sample
+// cannot drift from the IDs actually tested. The default sample is supplied by CI.
+const activeCalculatorToolIds = runtimeTools
+  .filter((tool) => tool.category === "calculators" && tool.status === "active" && tool.engine?.type === "calculator")
+  .map((tool) => tool.id);
+const calculatorSampleOption = process.env.BROWSER_AUDIT_SAMPLE;
+const calculatorSampleSize = calculatorSampleOption === undefined ? Infinity : Number(calculatorSampleOption);
+const calculatorReportPath = path.join(root, "artifacts/tool-functional-audit/calculators-browser.json");
+let expectedCalculatorToolIds = [];
+let calculatorScopeError = null;
+try {
+  expectedCalculatorToolIds = selectCalculatorBrowserAuditToolIds(activeCalculatorToolIds, {
+    sampleSize: calculatorSampleSize,
+    mandatoryToolIds: REQUIRED_CALCULATOR_BROWSER_TOOL_IDS,
+  });
+} catch (error) {
+  calculatorScopeError = error instanceof Error ? error.message : String(error);
+  invalidEvidence.push({
+    auditId: "calculators-browser",
+    reason: "calculator-browser-expected-scope-could-not-be-derived",
+    detail: calculatorScopeError,
+    activeCalculatorToolCount: activeCalculatorToolIds.length,
+    sampleOption: calculatorSampleOption ?? null,
+  });
+}
+if (!calculatorScopeError && !expectedCalculatorToolIds.length) {
+  invalidEvidence.push({
+    auditId: "calculators-browser",
+    reason: "no-active-calculator-engine-tools-found-in-runtime-registry",
+  });
+} else if (!calculatorScopeError && !fs.existsSync(calculatorReportPath)) {
+  if (process.env.GITHUB_ACTIONS === "true") {
+    invalidEvidence.push({
+      auditId: "calculators-browser",
+      reason: "dynamic-calculator-report-missing-in-github-actions",
+      expectedToolCount: expectedCalculatorToolIds.length,
+      path: path.relative(root, calculatorReportPath),
+    });
+  }
+} else if (!calculatorScopeError) {
+  try {
+    const calculatorReport = JSON.parse(fs.readFileSync(calculatorReportPath, "utf8"));
+    const validation = validateToolAuditReport(calculatorReport, {
+      auditId: "calculators-browser",
+      expectedToolIds: expectedCalculatorToolIds,
+      currentCommit,
+      githubActions: process.env.GITHUB_ACTIONS === "true",
+      workflowRunId: process.env.GITHUB_RUN_ID ? Number(process.env.GITHUB_RUN_ID) : null,
+      jobId: process.env.GITHUB_JOB ?? null,
+    });
+    if (!validation.valid) {
+      invalidEvidence.push({
+        auditId: "calculators-browser",
+        reason: "dynamic-calculator-report-invalid-or-not-current",
+        errors: validation.errors,
+        expectedToolCount: expectedCalculatorToolIds.length,
+        reportToolCount: calculatorReport.toolResults?.length ?? null,
+        reportCommit: calculatorReport.observedCommit ?? null,
+        currentCommit,
+        reportWorkflowRunId: calculatorReport.workflowRunId ?? null,
+        currentWorkflowRunId: process.env.GITHUB_RUN_ID ? Number(process.env.GITHUB_RUN_ID) : null,
+        reportJobId: calculatorReport.jobId ?? null,
+        currentJobId: process.env.GITHUB_JOB ?? null,
+      });
+    } else {
+      for (const item of validation.toolResults) {
+        const blocked = item.status === "blocked";
+        evidenceAudits.push({
+          id: "calculators-browser-" + item.toolId + "-" + item.status,
+          kind: blocked ? "blocked" : "browser",
+          result: blocked ? "blocked" : "passed",
+          script: "scripts/browser-calculator-audit.mjs",
+          workflow: "Production Check",
+          workflowRunId: calculatorReport.workflowRunId,
+          jobId: calculatorReport.jobId,
+          step: "Verify active calculator tools in the browser",
+          toolIds: [item.toolId],
+          testedCommit: calculatorReport.observedCommit,
+          checks: blocked ? item.blockedChecks : item.checks,
+          notes: item.notes ?? "",
+        });
+      }
+    }
+  } catch (error) {
+    invalidEvidence.push({
+      auditId: "calculators-browser",
+      reason: "dynamic-calculator-report-could-not-be-read",
       detail: error instanceof Error ? error.message : String(error),
     });
   }

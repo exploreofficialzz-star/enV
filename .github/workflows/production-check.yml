@@ -122,6 +122,13 @@ jobs:
             npx playwright install --with-deps chromium
           fi
 
+      - name: Validate calculator browser audit scope and syntax
+        run: |
+          node --check scripts/calculator-browser-audit-scope.mjs
+          node --check scripts/browser-calculator-audit.mjs
+          node --check scripts/generate-tool-functional-audit-ledger.mjs
+          node --test scripts/calculator-browser-audit-scope.test.mjs
+
       - name: Verify local DOCX and PDF extraction safety limits
         run: node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/documents/local-document.test.ts
 
@@ -199,7 +206,33 @@ jobs:
       - name: Verify production
         env:
           BROWSER_AUDIT_SAMPLE: 250
+          TOOL_AUDIT_REPORT_PATH: artifacts/tool-functional-audit/calculators-browser.json
         run: npm run verify
+
+      - name: Ensure current-run calculator browser evidence exists
+        if: always()
+        env:
+          BROWSER_AUDIT_SAMPLE: 250
+          TOOL_AUDIT_REPORT_PATH: artifacts/tool-functional-audit/calculators-browser.json
+        run: |
+          report="artifacts/tool-functional-audit/calculators-browser.json"
+          if [ -s "$report" ]; then
+            echo "The verify sequence already produced the current-run calculator report."
+          else
+            echo "The verify sequence stopped before calculator browser auditing; running the dedicated audit now."
+            npm run audit:calculators:browser -- --report=artifacts/tool-functional-audit/calculators-detail.json
+          fi
+
+      - name: Upload calculator browser audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: calculator-browser-audit
+          path: |
+            artifacts/tool-functional-audit/calculators-browser.json
+            artifacts/tool-functional-audit/calculators-detail.json
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Reconcile native execution matrix for per-tool audit
         if: always()
@@ -207,6 +240,8 @@ jobs:
 
       - name: Generate per-tool functional audit ledger
         if: always()
+        env:
+          BROWSER_AUDIT_SAMPLE: 250
         run: npm run audit:tool-ledger -- --output=audit/tool-functional-audit-ledger.json
 
       - name: Upload per-tool functional audit ledger

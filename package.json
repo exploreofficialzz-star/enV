@@ -135,7 +135,7 @@
     "check:catalog-runtime": "node scripts/check-catalog-runtime.mjs",
     "postbuild": "node scripts/check-catalog-runtime.mjs",
     "check:native-discovery": "node scripts/check-native-store-discovery.mjs",
-    "test:discovery": "npm run check:seo && node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/tool-documentation.test.ts src/components/engines/celebration-engine-utils.test.ts && node --test scripts/generic-workflow-policy.test.mjs scripts/audit-evidence-provenance.test.mjs scripts/source-inspection-evidence.test.mjs scripts/write-tool-audit-report.test.mjs scripts/reconcile-tool-inventories.test.mjs",
+    "test:discovery": "npm run check:seo && node --experimental-strip-types --import ./scripts/register-ts-alias.mjs --test src/lib/tool-documentation.test.ts src/components/engines/celebration-engine-utils.test.ts && node --test scripts/generic-workflow-policy.test.mjs scripts/audit-evidence-provenance.test.mjs scripts/source-inspection-evidence.test.mjs scripts/write-tool-audit-report.test.mjs scripts/reconcile-tool-inventories.test.mjs scripts/calculator-browser-audit-scope.test.mjs",
     "audit:tool-ledger": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/generate-tool-functional-audit-ledger.mjs",
     "audit:dependencies": "node scripts/check-npm-audit.mjs",
     "discovery:inventory": "node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/generate-discovery-inventory.mjs",
