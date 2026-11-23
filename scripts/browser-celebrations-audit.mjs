@@ -140,7 +140,9 @@ try {
         assert.equal(await frame.locator('a[href="https://example.org/rsvp"]').count(), 1, "Invitation RSVP link missing");
       }
       if (tool.id.endsWith("interactive-card") || tool.id.endsWith("reveal-page") || tool.id.endsWith("surprise-page")) {
-        await frame.locator("button[data-reveal]").click();
+        const revealButton = frame.locator('button[data-reveal][data-reveal-ready="true"]');
+        await revealButton.waitFor({ state: "visible" });
+        await revealButton.click();
         await frame.locator("[data-reveal-content]").waitFor({ state: "visible" });
       }
       if (tool.id.endsWith("quiz-generator")) {
