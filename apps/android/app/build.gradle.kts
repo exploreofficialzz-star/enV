@@ -14,8 +14,6 @@ android {
         targetSdk = 36
         buildConfigField("String", "ENV_API_BASE_URL", "\"${providers.gradleProperty("ENV_API_BASE_URL").orNull ?: "https://env-q3mq.onrender.com"}\"")
         buildConfigField("boolean", "ANALYTICS_ENABLED", providers.gradleProperty("envAnalyticsEnabled").orNull ?: "false")
-        val hybridToolIds = (providers.gradleProperty("envHybridToolIds").orNull ?: "").split(",").map { it.trim() }.filter { it.matches(Regex("[a-z0-9][a-z0-9-]{0,119}")) }.distinct().joinToString(",")
-        buildConfigField("String", "ENV_HYBRID_TOOL_IDS", "\"$hybridToolIds\"")
         versionCode = 7
         versionName = "1.1.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
