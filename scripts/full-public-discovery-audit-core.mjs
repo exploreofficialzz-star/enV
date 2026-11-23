@@ -10,12 +10,12 @@ function decodeHtmlEntities(value) {
 }
 
 function readAttribute(tag, name) {
-  const match = tag.match(new RegExp("\\\\b" + name + "\\\\s*=\\\\s*(?:\\"([^\\"]*)\\"|'([^']*)'|([^\\s>]+))", "i"));
+  const match = tag.match(new RegExp("\\b" + name + "\\s*=\\s*(?:\\"([^\\"]*)\\"|'([^']*)'|([^\\s>]+))", "i"));
   return decodeHtmlEntities(match?.[1] ?? match?.[2] ?? match?.[3] ?? "");
 }
 
 function metaValue(head, key, value) {
-  const tags = [...head.matchAll(/<meta\\b[^>]*>/gi)].map((match) => match[0]);
+  const tags = [...head.matchAll(/<meta\b[^>]*>/gi)].map((match) => match[0]);
   const tag = tags.find((candidate) => readAttribute(candidate, key).toLowerCase() === value.toLowerCase());
   return tag ? readAttribute(tag, "content") : "";
 }
@@ -27,24 +27,28 @@ function collectSchemaTypes(value, target) {
     return;
   }
   const type = value["@type"];
-  if (Array.isArray(type)) for (const item of type) if (typeof item === "string") target.add(item);
-  else if (typeof type === "string") target.add(type);
+  if (Array.isArray(type)) {
+    for (const item of type) if (typeof item === "string") target.add(item);
+  } else if (typeof type === "string") {
+    target.add(type);
+  }
   for (const [key, item] of Object.entries(value)) {
     if (key !== "@type") collectSchemaTypes(item, target);
   }
 }
 
 export function inspectSeoHtml(html) {
-  const head = String(html).match(/<head\\b[^>]*>([\\s\\S]*?)<\\/head>/i)?.[1] ?? "";
+  const source = String(html);
+  const head = source.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i)?.[1] ?? "";
   const title = decodeHtmlEntities(
-    head.match(/<title\\b[^>]*>([\\s\\S]*?)<\\/title>/i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "",
+    head.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "",
   );
-  const canonicalTags = [...head.matchAll(/<link\\b[^>]*>/gi)]
+  const canonicalTags = [...head.matchAll(/<link\b[^>]*>/gi)]
     .map((match) => match[0])
-    .filter((tag) => readAttribute(tag, "rel").toLowerCase().split(/\\s+/).includes("canonical"));
+    .filter((tag) => readAttribute(tag, "rel").toLowerCase().split(/\s+/).includes("canonical"));
   const schemaTypes = new Set();
   const invalidJsonLdScripts = [];
-  const jsonLdScripts = [...head.matchAll(/<script\\b[^>]*type\\s*=\\s*["']application\\/ld\\+json["'][^>]*>([\\s\\S]*?)<\\/script>/gi)];
+  const jsonLdScripts = [...head.matchAll(/<script\b[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)];
   for (const [index, match] of jsonLdScripts.entries()) {
     try {
       collectSchemaTypes(JSON.parse(match[1]), schemaTypes);
@@ -52,10 +56,10 @@ export function inspectSeoHtml(html) {
       invalidJsonLdScripts.push(index);
     }
   }
-  const anchors = [...String(html).matchAll(/<a\\b[^>]*>/gi)]
+  const anchors = [...source.matchAll(/<a\b[^>]*>/gi)]
     .map((match) => readAttribute(match[0], "href"))
     .filter(Boolean);
-  const h1Count = [...String(html).matchAll(/<h1\\b[^>]*>/gi)].length;
+  const h1Count = [...source.matchAll(/<h1\b[^>]*>/gi)].length;
   return {
     title,
     description: metaValue(head, "name", "description"),
@@ -98,7 +102,7 @@ export function validateSeoRouteResponse({
     try {
       const final = new URL(finalUrl);
       const base = new URL(baseOrigin);
-      if (final.origin !== base.origin || (final.pathname.replace(/\\/$/, "") || "/") !== route.path) {
+      if (final.origin !== base.origin || (final.pathname.replace(/\/$/, "") || "/") !== route.path) {
         fail("request redirected away from the requested route (final URL " + finalUrl + ")");
       }
     } catch {
@@ -109,14 +113,14 @@ export function validateSeoRouteResponse({
   if (route.expectedTitle && facts.title !== route.expectedTitle) fail("title differs from the route's current peer-aware metadata (expected " + JSON.stringify(route.expectedTitle) + ", received " + JSON.stringify(facts.title) + ")");
   if (!facts.description || facts.description.length < 40 || facts.description.length > 170) fail("meta description missing or outside the 40-170 character range (" + facts.description.length + ")");
   if (route.expectedDescription && facts.description !== route.expectedDescription) fail("description differs from the current tool/article source");
-  if (!facts.robots || /(?:^|[,\\s])(?:noindex|none)(?:$|[,\\s])/.test(facts.robots)) fail("indexable route has missing or blocking robots metadata (" + facts.robots + ")");
+  if (!facts.robots || /(?:^|[,\s])(?:noindex|none)(?:$|[,\s])/.test(facts.robots)) fail("indexable route has missing or blocking robots metadata (" + facts.robots + ")");
   if (facts.canonicalCount !== 1) fail("expected exactly one canonical link, found " + facts.canonicalCount);
   if (facts.canonical !== expectedCanonical) fail("canonical mismatch (expected " + expectedCanonical + ", received " + facts.canonical + ")");
   if (facts.ogSiteName !== "enV") fail("Open Graph site name must be enV");
   if (facts.ogTitle !== facts.title) fail("Open Graph title does not match the page title");
   if (facts.ogDescription !== facts.description) fail("Open Graph description does not match the meta description");
   if (facts.ogUrl !== expectedCanonical) fail("Open Graph URL does not match the canonical URL");
-  if (!facts.ogImage.startsWith(CANONICAL_ORIGIN + "/")) fail("Open Graph image must use the canonical host");
+  if (typeof facts.ogImage !== "string" || !facts.ogImage.startsWith(CANONICAL_ORIGIN + "/")) fail("Open Graph image must use the canonical host");
   if (!facts.ogImageAlt || facts.ogImageAlt.length < 12) fail("Open Graph image is missing descriptive alternative text");
   if (facts.twitterCard !== "summary_large_image") fail("X/Twitter card must use summary_large_image");
   if (facts.twitterTitle !== facts.title) fail("X/Twitter title does not match the page title");
@@ -134,7 +138,7 @@ export function normalizeInternalHref(href, baseOrigin = "https://envtools.store
   try {
     const url = new URL(href, baseOrigin);
     if (url.origin !== baseOrigin && url.origin !== CANONICAL_ORIGIN) return null;
-    return url.pathname.replace(/\\/$/, "") || "/";
+    return url.pathname.replace(/\/$/, "") || "/";
   } catch {
     return null;
   }
