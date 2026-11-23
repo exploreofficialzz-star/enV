@@ -55,7 +55,9 @@ assert.match(docWeb, /const multiple = \/merger\|comparison\|splitter\/\.test\(o
 assert.match(docWeb, /multiple=\{multiple\}/);
 assert.match(android, /Regex\("merger\|comparison\|splitter"\)/);
 assert.match(ios, /merger\|comparison\|splitter/);
-assert.match(docWeb, /\.test\(op\).*pages/);
+assert.match(docWeb, /const needsPages = op\.includes\("page-"\) \|\| op\.endsWith\("splitter"\);/);
+assert.match(docWeb, /Pages \/ range/);
+assert.match(docWeb, /runLocalDocument\(op, files, pages\)/);
 assert.match(android, /operation\.contains\("page-"\).*operation\.endsWith\("splitter"\)/s);
 assert.match(ios, /operation\.contains\("page-"\).*operation\.hasSuffix\("splitter"\)/s);
 assert.match(docWeb, /watermark/);
