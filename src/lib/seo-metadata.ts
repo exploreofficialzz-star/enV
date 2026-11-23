@@ -258,6 +258,7 @@ function uniqueToolDescription(base: string, tool: ToolMeta, peers: readonly Too
   const baseBudget = 160 - discriminator.length;
   return cleanMetaDescription(base, baseBudget) + discriminator;
 }
+
 function toolSeoDescriptionBase(tool: ToolMeta): string {
   return cleanMetaDescription(toolDocumentationSummary(tool), 160);
 }
