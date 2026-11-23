@@ -526,10 +526,28 @@ export function canonicalSeoTools(tools: readonly ToolMeta[]): ToolMeta[] {
   });
 }
 
+export function createCanonicalSeoToolResolver(canonicalTools: readonly ToolMeta[]): (tool: ToolMeta) => ToolMeta | undefined {
+  const byId = new Map<string, ToolMeta>();
+  const byExpansionFingerprint = new Map<string, ToolMeta>();
+  for (const candidate of canonicalTools) {
+    // Preserve Array.find's original first-match behaviour for duplicate keys.
+    if (!byId.has(candidate.id)) byId.set(candidate.id, candidate);
+    const fingerprint = expansionSeoFingerprint(candidate);
+    if (fingerprint && !byExpansionFingerprint.has(fingerprint)) {
+      byExpansionFingerprint.set(fingerprint, candidate);
+    }
+  }
+
+  return (tool) => {
+    if (!isIndexableTool(tool) || isGenericExpansionPlaceholder(tool)) return undefined;
+    const fingerprint = expansionSeoFingerprint(tool);
+    return fingerprint
+      ? byExpansionFingerprint.get(fingerprint)
+      : byId.get(tool.id);
+  };
+}
+
 export function canonicalSeoToolFor(tool: ToolMeta, canonicalTools: readonly ToolMeta[]): ToolMeta | undefined {
-  if (!isIndexableTool(tool) || isGenericExpansionPlaceholder(tool)) return undefined;
-  const fingerprint = expansionSeoFingerprint(tool);
-  if (!fingerprint) return canonicalTools.find((candidate) => candidate.id === tool.id);
-  return canonicalTools.find((candidate) => expansionSeoFingerprint(candidate) === fingerprint);
+  return createCanonicalSeoToolResolver(canonicalTools)(tool);
 }
 
