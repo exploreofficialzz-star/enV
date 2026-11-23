@@ -34,7 +34,7 @@ function Search() {
               <div><h2 className="text-xl font-semibold">Results for “{q}”</h2><p className="mt-1 text-sm text-muted">{results.matchCount.toLocaleString()} matching tools</p></div>
               <SeeMoreLink to="/tools">Browse all tools</SeeMoreLink>
             </div>
-            {results.length === 0 ? <p className="mt-6 rounded-xl bg-surface p-5 text-sm text-muted shadow-[var(--shadow-border)]">No matching tools. Try a broader word such as “image”, “video”, or “calculator”.</p> : <>
+            {results.matchCount === 0 ? <p className="mt-6 rounded-xl bg-surface p-5 text-sm text-muted shadow-[var(--shadow-border)]">No matching tools. Try a broader word such as “image”, “video”, or “calculator”.</p> : <>
               <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{visible.map(({ tool, explanation }) => (
                 <div key={tool.id} className="min-w-0">
                   <ToolCard tool={tool} />
