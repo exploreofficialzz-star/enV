@@ -13,13 +13,14 @@ import { developerActionForLegacySlug, developerModeForLegacySlug, developerStud
 import { isToolUnderProduction } from "@/lib/production-notice";
 import { UnderProductionPage } from "@/components/tools/under-production";
 import { CATEGORY_MAP } from "@/data/categories";
-import { SITE_ORIGIN, seoPageHead, toolSchema, toolSeoTitle, toolSeoDescription, isIndexableTool, canonicalSeoTools, canonicalSeoToolFor, canonicalToolPath } from "@/lib/seo-metadata";
+import { SITE_ORIGIN, seoPageHead, toolSchema, toolSeoTitle, toolSeoDescription, isIndexableTool, canonicalSeoTools, createCanonicalSeoToolResolver, canonicalToolPath } from "@/lib/seo-metadata";
 import { toolSocialCard } from "@/lib/seo-social-cards";
 
 const seoToolCandidateMap = new Map(getSearchableTools().map((tool) => [tool.id, tool]));
 for (const tool of getToolsByCategory("accessibility")) seoToolCandidateMap.set(tool.id, tool);
 const CANONICAL_SEO_TOOL_PAGES = canonicalSeoTools([...seoToolCandidateMap.values()])
   .filter((tool) => tool.category !== "developer" || tool.tags.includes("developer-studio"));
+const resolveCanonicalSeoTool = createCanonicalSeoToolResolver(CANONICAL_SEO_TOOL_PAGES);
 
 export const Route = createFileRoute("/tools/$category/$slug")({
   loader: async ({ params }) => {
@@ -88,7 +89,7 @@ export const Route = createFileRoute("/tools/$category/$slug")({
         links: [{ rel: "canonical", href: SITE_ORIGIN + canonicalPath }]
       };
     }
-    const canonicalSeoTool = canonicalSeoToolFor(tool, CANONICAL_SEO_TOOL_PAGES);
+    const canonicalSeoTool = resolveCanonicalSeoTool(tool);
     if (!canonicalSeoTool) {
       return {
         meta: [
