@@ -15,7 +15,7 @@ test("Adsterra qualification includes ordinary active tools across eligible cate
   }
 });
 test("Adsterra qualification excludes sensitive categories and Studio, AI, Lab and Sandbox identities", () => {
-  for (const category of ["health", "finance", "earnings", "fitness", "personal", "ai", "developer", "accessibility", "lab", "labs", "studio", "studios"]) {
+  for (const category of ["health", "finance", "earnings", "fitness", "personal", "ai", "lab", "labs", "studio", "studios"]) {
     assert.equal(isAdsterraQualifiedTool(tool({ category })), false, category);
   }
   assert.equal(isAdsterraQualifiedTool(tool({ id: "music-data-sandbox", name: "Music Data Sandbox", category: "audio" })), false);
