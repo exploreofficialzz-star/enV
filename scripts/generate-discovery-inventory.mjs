@@ -300,6 +300,16 @@ function main() {
     return;
   }
 
+  if (args.has("--check") && fs.existsSync(inventoryPath)) {
+    // sourceCommit records when the generated inventory was written. The GitHub Actions
+    // merge SHA changes for every PR update, so it must not create structural drift during
+    // a read-only check of otherwise identical inventory data.
+    const committedInventory = JSON.parse(fs.readFileSync(inventoryPath, "utf8"));
+    if (inventory.provenance && committedInventory.provenance) {
+      inventory.provenance.sourceCommit = committedInventory.provenance.sourceCommit ?? null;
+    }
+  }
+
   const inventoryText = stableStringify(inventory);
   const reportText = renderReconciliationReport(inventory, validation);
 
