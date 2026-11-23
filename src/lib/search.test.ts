@@ -154,6 +154,10 @@ test("ordering is deterministic and explanations are grounded in indexed fields"
   assert.ok(popular.matches.length > 0);
   assert.ok(popular.matches.every((match) => match.explanation === "Popular tool"), "The generic popularity explanation is reserved for an empty query.");
 
+  const fillerOnly = searchToolResults(corpus, "the and to", 10);
+  assert.equal(fillerOnly.matches.length, 0, "A non-empty query containing only stop words must not become a popularity list.");
+  assert.equal(fillerOnly.matchCount, 0);
+
   const merged = searchToolResults(corpus, "merge pdf", 1).matches[0];
   assert.equal(merged.tool.id, "pdf-merger");
   assert.match(merged.explanation, /^Matched /);
