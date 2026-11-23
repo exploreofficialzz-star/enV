@@ -26,15 +26,16 @@ function collectSchemaTypes(value, target) {
     for (const item of value) collectSchemaTypes(item, target);
     return;
   }
+  // Count document-level entities and @graph entries, not nested mainEntity/about
+  // nodes. A WebPage that merely mentions a SoftwareApplication is not itself
+  // a SoftwareApplication landing page.
   const type = value["@type"];
   if (Array.isArray(type)) {
     for (const item of type) if (typeof item === "string") target.add(item);
   } else if (typeof type === "string") {
     target.add(type);
   }
-  for (const [key, item] of Object.entries(value)) {
-    if (key !== "@type") collectSchemaTypes(item, target);
-  }
+  if (Object.hasOwn(value, "@graph")) collectSchemaTypes(value["@graph"], target);
 }
 
 export function inspectSeoHtml(html) {

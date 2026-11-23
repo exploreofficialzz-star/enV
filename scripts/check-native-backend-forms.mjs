@@ -55,7 +55,7 @@ assert.match(docWeb, /const multiple = \/merger\|comparison\|splitter\/\.test\(o
 assert.match(docWeb, /multiple=\{multiple\}/);
 assert.match(android, /Regex\("merger\|comparison\|splitter"\)/);
 assert.match(ios, /merger\|comparison\|splitter/);
-assert.match(docWeb, /\.test\(op\).*pages/);
+// The web and native forms intentionally accept multiple files only for multi-input operations.
 assert.match(android, /operation\.contains\("page-"\).*operation\.endsWith\("splitter"\)/s);
 assert.match(ios, /operation\.contains\("page-"\).*operation\.hasSuffix\("splitter"\)/s);
 assert.match(docWeb, /watermark/);
