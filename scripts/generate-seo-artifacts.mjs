@@ -191,7 +191,7 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
     "- [" + tool.name + "](" + SITE_ORIGIN + toolPath(tool) + "): " + tool.description
   );
   const publicGuideLinks = guideTools.map((tool) =>
-    "- [" + tool.name + " guide](" + SITE_ORIGIN + "/blog/tool-" + tool.id + "): " + toolDocumentationSummary(tool)
+    "- [" + tool.name + " guide](" + SITE_ORIGIN + "/blog/tool-" + tool.id + "): " + toolGuideSeoDescription(tool)
   );
   const publicArticleLinks = BLOG_ARTICLES.map((article) =>
     "- [" + article.title + "](" + SITE_ORIGIN + "/blog/" + article.slug + "): " + article.summary
