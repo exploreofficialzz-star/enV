@@ -236,6 +236,22 @@ function BlogIndex() {
                 </button>
               </div>
             ) : null}
+            <details className="mt-8 rounded-xl border border-border bg-surface p-4">
+              <summary className="cursor-pointer text-sm font-semibold text-accent">
+                Browse all product articles ({BLOG_ARTICLES.length})
+              </summary>
+              <nav aria-label="All product articles" className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {BLOG_ARTICLES.map((article) => (
+                  <a
+                    key={article.slug}
+                    href={"/blog/" + article.slug}
+                    className="min-w-0 rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm font-medium text-accent transition-colors hover:border-accent/40"
+                  >
+                    {article.title}
+                  </a>
+                ))}
+              </nav>
+            </details>
           </section>
         ) : (
           <section id="articles-panel" aria-label="Articles and product guides" className="pt-6">
