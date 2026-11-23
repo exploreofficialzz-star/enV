@@ -5,25 +5,47 @@ import { buildIndexNowKeyArtifact } from "./indexnow-utils.mjs";
 import { SEO_CANONICAL_ORIGIN, SEO_REDIRECT_HOSTS } from "./seo-domain-policy.mjs";
 import { getAllTools, getToolByPath, getToolsByCategory } from "../src/lib/registry.ts";
 import { toolTaskGuidanceSource } from "../src/lib/tool-documentation.ts";
-import { toolSeoDescription, toolGuideSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema, toolSchema, organizationSchema, websiteSchema, boundedToolSeoTitle, canonicalSeoToolFor, createCanonicalSeoToolResolver } from "@/lib/seo-metadata";
+import { toolSeoDescription, toolGuideSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema, toolSchema, organizationSchema, websiteSchema, boundedToolSeoTitle, createCanonicalSeoToolResolver } from "@/lib/seo-metadata";
 
 const nativeInventory = JSON.parse(readFileSync(new URL("../apps/shared/native-engine-inventory.json", import.meta.url), "utf8"));
 const result = buildSeoArtifacts();
 
-// The inventory generator uses the indexed resolver for every stable ID. Compare
-// it with the original find-based helper on representative runtime tools to guard
-// canonical ID/fingerprint semantics while keeping the production inventory pass O(n).
+// The inventory generator and rendered route heads use this indexed resolver.
+// Verify canonical identity directly, then exercise the expansion-fingerprint alias path.
 const resolveCanonicalSeoTool = createCanonicalSeoToolResolver(result.guideTools);
-const canonicalResolverSamples = getAllTools()
-  .filter((tool) => tool.engine?.type === "calculator")
-  .slice(0, 40);
-for (const tool of canonicalResolverSamples) {
+for (const tool of result.guideTools.slice(0, 40)) {
   assert.equal(
     resolveCanonicalSeoTool(tool)?.id,
-    canonicalSeoToolFor(tool, result.guideTools)?.id,
-    "Indexed canonical SEO lookup must preserve the original canonical ID for " + tool.id,
+    tool.id,
+    "Each canonical public guide candidate must resolve to itself: " + tool.id,
   );
 }
+const expansionCanonicalFixture = {
+  ...result.tools[0],
+  id: "synthetic-expansion-canonical",
+  slug: "synthetic-expansion-canonical",
+  name: "Synthetic product relation",
+  description: "Calculate a product relation from two input values.",
+  category: "calculators",
+  status: "active",
+  engine: { type: "calculator", formula: "exp-product-synthetic-product-relation" },
+};
+const expansionAliasFixture = {
+  ...expansionCanonicalFixture,
+  id: "synthetic-expansion-legacy-alias",
+  slug: "synthetic-expansion-legacy-alias",
+};
+const expansionResolver = createCanonicalSeoToolResolver([expansionCanonicalFixture]);
+assert.equal(
+  expansionResolver(expansionAliasFixture)?.id,
+  expansionCanonicalFixture.id,
+  "A generated expansion variant must resolve to its matching canonical formula page.",
+);
+assert.equal(
+  expansionResolver({ ...expansionAliasFixture, description: "A different calculation." }),
+  undefined,
+  "A different generated description must not be incorrectly consolidated.",
+);
 
 // Accessibility Studio routing keeps legacy Design discovery aliases visible while
 // retaining one stable runtime/search identity and one canonical Accessibility URL.
