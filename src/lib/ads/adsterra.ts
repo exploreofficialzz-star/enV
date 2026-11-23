@@ -37,10 +37,10 @@ export const ADSTERRA_SMARTLINK_URL = "https://araplhn.org/4/ae13eae40d577a3e298
 export type AdsterraBannerFormat = keyof typeof ADSTERRA_BANNER_UNITS;
 
 /**
- * Ad requests require the production flag, an explicit advertising choice,
- * and an online browser. Qualified guest-tool access is enforced separately by
- * AdsterraGuestAccessGate: guests must allow ads, while signed-in users can
- * use those tools without ads. Offline-wallet policy is independent.
+ * Adsterra is a display placement only. A banner impression, click, or Smartlink
+ * never unlocks a tool or counts as a rewarded completion. The separate
+ * rewarded-access gate, when configured, verifies Google Ad Manager reward
+ * events and uses the server-priced token path. Offline allowance is separate.
  */
 export function canRequestAdsterraAds(
   enabled: boolean,
