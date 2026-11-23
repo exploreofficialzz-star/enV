@@ -18,13 +18,6 @@ extension EnvironmentValues {
 /// Native advertising is not shipped in this release.
 enum NativeAdsPolicy {
     private static let info = Bundle.main.infoDictionary ?? [:]
-    static var allowlistedToolIDs: Set<String> {
-        Set((info["ENV_HYBRID_TOOL_IDS"] as? String ?? "")
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { $0.range(of: "^[a-z0-9][a-z0-9-]{0,119}$", options: .regularExpression) != nil })
-    }
-
     private struct PricingIndex: Decodable {
         struct Profile: Decodable {
             let toolId: String
@@ -47,8 +40,7 @@ enum NativeAdsPolicy {
     static func isHybridTool(_ tool: Tool) -> Bool {
         let restrictedDisclaimers: Set<String> = ["health", "finance", "earnings"]
         let restrictedCategories: Set<String> = ["fitness", "personal"]
-        return allowlistedToolIDs.contains(tool.id) &&
-            crossPlatformMeteredIDs.contains(tool.id) &&
+        return crossPlatformMeteredIDs.contains(tool.id) &&
             tool.status == "active" &&
             tool.clientSide &&
             !tool.requiresBackend &&
