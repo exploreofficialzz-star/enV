@@ -13,7 +13,6 @@ export const Route = createFileRoute("/privacy")({
 });
 
 function Privacy() {
-  }) !== null;
   const adsterraAdvertisingEnabled = import.meta.env.VITE_ADSTERRA_ENABLED === "true";
   return (
     <InfoPage title="Privacy">
