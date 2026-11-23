@@ -10,7 +10,7 @@ function decodeHtmlEntities(value) {
 }
 
 function readAttribute(tag, name) {
-  const match = tag.match(new RegExp("\\b" + name + "\\s*=\\s*(?:\\"([^\\"]*)\\"|'([^']*)'|([^\\s>]+))", "i"));
+  const match = tag.match(new RegExp("\\b" + name + "\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s>]+))", "i"));
   return decodeHtmlEntities(match?.[1] ?? match?.[2] ?? match?.[3] ?? "");
 }
 
