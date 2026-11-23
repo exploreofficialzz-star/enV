@@ -2,12 +2,12 @@
   "schemaVersion": 4,
   "generatedBy": "scripts/export-native-execution-matrix.mjs",
   "stats": {
-    "total": 10014,
-    "active": 9754,
+    "total": 10015,
+    "active": 9755,
     "planned": 260,
     "offlineNative": 7910,
     "backendNative": 1566,
-    "webOnly": 278,
+    "webOnly": 279,
     "divergentActive": 0,
     "fullyExecutable": 9476
   },
@@ -90602,6 +90602,16 @@
       "engine": "custom",
       "android": "offline-native",
       "ios": "offline-native"
+    },
+    {
+      "id": "scene-studio",
+      "name": "Scene Studio",
+      "status": "active",
+      "category": "video",
+      "engine": "custom",
+      "android": "web-only",
+      "ios": "web-only",
+      "dispositionReason": "Scene Studio editing, preview and export are Web-only. Kotlin/Swift reader and render-math sources are not yet connected to complete native editing, GPU rendering or video export; do not wrap the Web editor in a native WebView."
     },
     {
       "id": "smartphone-prototype-lab",

@@ -68,6 +68,7 @@ const LAZY_ENGINE_COMPONENTS = new Set(
 
 const DIRECT_TOOL_RENDERERS: Record<string, string> = {
   "smartphone-prototype-lab": "SmartphonePrototypeLabEngine",
+  "scene-studio": "SceneStudioEngine",
   "camera-studio": "CameraStudioEngine",
   "a-book": "ABookEngine",
   "zip-any-file": "ZipArchiveEngine",
@@ -906,4 +907,14 @@ test("preserves Advanced CSS Minifier identity and operation through Markup & St
   const routeSource = readFileSync(new URL("../routes/tools/$category/$slug.tsx", import.meta.url), "utf8");
   assert.ok(routeSource.includes('const legacyEngineOp = "op" in tool.engine ? tool.engine.op : undefined;'));
   assert.ok(routeSource.includes("op: legacyEngineOp"), "Legacy redirect must forward the original engine operation to its Studio");
+});
+
+test("Scene Studio is searchable, indexable and has its own practical guide", () => {
+  const tool = getSearchableTools().find((candidate) => candidate.id === "scene-studio");
+  assert.ok(tool, "Scene Studio must appear in the searchable runtime registry");
+  assert.equal(tool.category, "video");
+  assert.equal(tool.status, "active");
+  assert.equal(isIndexableTool(tool), true);
+  assert.ok(canonicalSeoTools(getSearchableTools()).some((candidate) => candidate.id === "scene-studio"));
+  assert.equal(toolTaskGuidanceSource(tool), "operation-specific");
 });

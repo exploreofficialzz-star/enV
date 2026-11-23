@@ -1,0 +1,960 @@
+{
+  "description": "Every platform must reject these inputs with an error at the given JSON path and code. Warnings are listed separately and must not block.",
+  "cases": [
+    {
+      "name": "not an object",
+      "input": [
+        1,
+        2
+      ],
+      "errors": [
+        {
+          "code": "wrong-type",
+          "path": "$"
+        }
+      ]
+    },
+    {
+      "name": "major version too new",
+      "input": {
+        "version": "2.0"
+      },
+      "errors": [
+        {
+          "code": "unsupported-version",
+          "path": "$.version"
+        }
+      ]
+    },
+    {
+      "name": "fps out of range",
+      "input": {
+        "settings": {
+          "fps": 500
+        }
+      },
+      "errors": [
+        {
+          "code": "out-of-range",
+          "path": "$.settings.fps"
+        }
+      ]
+    },
+    {
+      "name": "duration over limit",
+      "input": {
+        "settings": {
+          "fps": 60,
+          "duration": 120.5
+        }
+      },
+      "errors": [
+        {
+          "code": "out-of-range",
+          "path": "$.settings.duration"
+        }
+      ]
+    },
+    {
+      "name": "maximum frame budget is allowed",
+      "input": {
+        "version": "1.0",
+        "settings": {
+          "fps": 60,
+          "duration": 120
+        }
+      },
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "name": "bad colour",
+      "input": {
+        "settings": {
+          "background": "red"
+        }
+      },
+      "errors": [
+        {
+          "code": "bad-color",
+          "path": "$.settings.background"
+        }
+      ]
+    },
+    {
+      "name": "object without id",
+      "input": {
+        "objects": [
+          {
+            "type": "box"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "missing-field",
+          "path": "$.objects[0].id"
+        }
+      ]
+    },
+    {
+      "name": "duplicate id",
+      "input": {
+        "objects": [
+          {
+            "id": "a",
+            "type": "box"
+          },
+          {
+            "id": "a",
+            "type": "box"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "duplicate-id",
+          "path": "$.objects[1].id"
+        }
+      ]
+    },
+    {
+      "name": "reserved id",
+      "input": {
+        "objects": [
+          {
+            "id": "camera",
+            "type": "box"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "reserved-id",
+          "path": "$.objects[0].id"
+        }
+      ]
+    },
+    {
+      "name": "position wrong length",
+      "input": {
+        "objects": [
+          {
+            "id": "a",
+            "type": "box",
+            "position": [
+              1,
+              2
+            ]
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "bad-vector",
+          "path": "$.objects[0].position"
+        }
+      ]
+    },
+    {
+      "name": "remote asset",
+      "input": {
+        "objects": [
+          {
+            "id": "a",
+            "type": "asset",
+            "asset": "https://evil.example/x.glb"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "remote-asset",
+          "path": "$.objects[0].asset"
+        }
+      ]
+    },
+    {
+      "name": "asset path traversal",
+      "input": {
+        "objects": [
+          {
+            "id": "a",
+            "type": "asset",
+            "asset": "../secret.glb"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "unsafe-asset-path",
+          "path": "$.objects[0].asset"
+        }
+      ]
+    },
+    {
+      "name": "parent missing",
+      "input": {
+        "objects": [
+          {
+            "id": "a",
+            "type": "box",
+            "parent": "nope"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "bad-parent",
+          "path": "$.objects[0].parent"
+        }
+      ]
+    },
+    {
+      "name": "parent loop",
+      "input": {
+        "objects": [
+          {
+            "id": "a",
+            "type": "box",
+            "parent": "b"
+          },
+          {
+            "id": "b",
+            "type": "box",
+            "parent": "a"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "parent-loop",
+          "path": "$.objects[0].parent"
+        }
+      ]
+    },
+    {
+      "name": "animation unknown target",
+      "input": {
+        "animations": [
+          {
+            "target": "ghost",
+            "property": "position",
+            "keyframes": [
+              {
+                "time": 0,
+                "value": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "unknown-target",
+          "path": "$.animations[0].target"
+        }
+      ]
+    },
+    {
+      "name": "camera cannot animate scale",
+      "input": {
+        "animations": [
+          {
+            "target": "camera",
+            "property": "scale",
+            "keyframes": [
+              {
+                "time": 0,
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "bad-property",
+          "path": "$.animations[0].property"
+        }
+      ]
+    },
+    {
+      "name": "keyframes unordered",
+      "input": {
+        "objects": [
+          {
+            "id": "a",
+            "type": "box"
+          }
+        ],
+        "animations": [
+          {
+            "target": "a",
+            "property": "opacity",
+            "keyframes": [
+              {
+                "time": 2,
+                "value": 1
+              },
+              {
+                "time": 1,
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "keyframes-unordered",
+          "path": "$.animations[0].keyframes[1].time"
+        }
+      ]
+    },
+    {
+      "name": "keyframe value wrong shape",
+      "input": {
+        "objects": [
+          {
+            "id": "a",
+            "type": "box"
+          }
+        ],
+        "animations": [
+          {
+            "target": "a",
+            "property": "position",
+            "keyframes": [
+              {
+                "time": 0,
+                "value": 5
+              }
+            ]
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "bad-vector",
+          "path": "$.animations[0].keyframes[0].value"
+        }
+      ]
+    },
+    {
+      "name": "dialogue without text",
+      "input": {
+        "dialogue": [
+          {
+            "speaker": "a",
+            "start": 1
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "missing-field",
+          "path": "$.dialogue[0].text"
+        }
+      ]
+    },
+    {
+      "name": "bad caption style",
+      "input": {
+        "captions": {
+          "style": "glitter"
+        }
+      },
+      "errors": [
+        {
+          "code": "bad-choice",
+          "path": "$.captions.style"
+        }
+      ]
+    },
+    {
+      "name": "camera degenerate",
+      "input": {
+        "camera": {
+          "position": [
+            0,
+            1,
+            0
+          ],
+          "lookAt": [
+            0,
+            1,
+            0
+          ]
+        }
+      },
+      "errors": [
+        {
+          "code": "camera-degenerate",
+          "path": "$.camera"
+        }
+      ]
+    },
+    {
+      "name": "unknown field only warns",
+      "input": {
+        "bogus": 1,
+        "objects": [
+          {
+            "id": "a",
+            "type": "box",
+            "wings": true
+          }
+        ]
+      },
+      "errors": [],
+      "warnings": [
+        {
+          "code": "unknown-field",
+          "path": "$.bogus"
+        },
+        {
+          "code": "unknown-field",
+          "path": "$.objects[0].wings"
+        },
+        {
+          "code": "missing-version",
+          "path": "$.version"
+        }
+      ]
+    },
+    {
+      "name": "keyframe past the end only warns",
+      "input": {
+        "version": "1.0",
+        "settings": {
+          "duration": 2
+        },
+        "objects": [
+          {
+            "id": "a",
+            "type": "box"
+          }
+        ],
+        "animations": [
+          {
+            "target": "a",
+            "property": "opacity",
+            "keyframes": [
+              {
+                "time": 0,
+                "value": 1
+              },
+              {
+                "time": 5,
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "errors": [],
+      "warnings": [
+        {
+          "code": "keyframe-after-end",
+          "path": "$.animations[0].keyframes[1].time"
+        }
+      ]
+    },
+    {
+      "name": "id shared by object and layer",
+      "input": {
+        "objects": [
+          {
+            "id": "a",
+            "type": "box"
+          }
+        ],
+        "layers": [
+          {
+            "id": "a",
+            "type": "solid"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "duplicate-id",
+          "path": "$.layers[0].id"
+        }
+      ]
+    },
+    {
+      "name": "shot id may not be camera",
+      "input": {
+        "shots": [
+          {
+            "id": "camera",
+            "start": 0
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "reserved-id",
+          "path": "$.shots[0].id"
+        }
+      ]
+    },
+    {
+      "name": "unknown rotation order",
+      "input": {
+        "objects": [
+          {
+            "id": "a",
+            "type": "box",
+            "rotationOrder": "ABC"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "bad-choice",
+          "path": "$.objects[0].rotationOrder"
+        }
+      ]
+    },
+    {
+      "name": "zero quaternion",
+      "input": {
+        "objects": [
+          {
+            "id": "a",
+            "type": "box",
+            "quaternion": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "bad-quaternion",
+          "path": "$.objects[0].quaternion"
+        }
+      ]
+    },
+    {
+      "name": "quaternion wrong length",
+      "input": {
+        "objects": [
+          {
+            "id": "a",
+            "type": "box",
+            "quaternion": [
+              0,
+              0,
+              1
+            ]
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "bad-vector",
+          "path": "$.objects[0].quaternion"
+        }
+      ]
+    },
+    {
+      "name": "both rotation and quaternion only warns",
+      "input": {
+        "version": "1.0",
+        "objects": [
+          {
+            "id": "a",
+            "type": "box",
+            "rotation": [
+              0,
+              10,
+              0
+            ],
+            "quaternion": [
+              0,
+              0,
+              0,
+              1
+            ]
+          }
+        ]
+      },
+      "errors": [],
+      "warnings": [
+        {
+          "code": "rotation-and-quaternion",
+          "path": "$.objects[0].rotation"
+        }
+      ]
+    },
+    {
+      "name": "bad environment preset",
+      "input": {
+        "environment": {
+          "preset": "disco"
+        }
+      },
+      "errors": [
+        {
+          "code": "bad-choice",
+          "path": "$.environment.preset"
+        }
+      ]
+    },
+    {
+      "name": "hdri cannot be a URL",
+      "input": {
+        "environment": {
+          "hdri": "https://x.example/sky.hdr"
+        }
+      },
+      "errors": [
+        {
+          "code": "remote-asset",
+          "path": "$.environment.hdri"
+        }
+      ]
+    },
+    {
+      "name": "bloom out of range",
+      "input": {
+        "post": {
+          "bloom": 9
+        }
+      },
+      "errors": [
+        {
+          "code": "out-of-range",
+          "path": "$.post.bloom"
+        }
+      ]
+    },
+    {
+      "name": "shake amount out of range",
+      "input": {
+        "camera": {
+          "shake": {
+            "amount": 5
+          }
+        }
+      },
+      "errors": [
+        {
+          "code": "out-of-range",
+          "path": "$.camera.shake.amount"
+        }
+      ]
+    },
+    {
+      "name": "material roughness out of range",
+      "input": {
+        "objects": [
+          {
+            "id": "a",
+            "type": "box",
+            "material": {
+              "roughness": 2
+            }
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "out-of-range",
+          "path": "$.objects[0].material.roughness"
+        }
+      ]
+    },
+    {
+      "name": "text layer without text",
+      "input": {
+        "layers": [
+          {
+            "id": "t",
+            "type": "text"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "missing-field",
+          "path": "$.layers[0].text"
+        }
+      ]
+    },
+    {
+      "name": "image layer without asset",
+      "input": {
+        "layers": [
+          {
+            "id": "i",
+            "type": "image"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "missing-field",
+          "path": "$.layers[0].asset"
+        }
+      ]
+    },
+    {
+      "name": "layer ends before it starts",
+      "input": {
+        "layers": [
+          {
+            "id": "s",
+            "type": "solid",
+            "start": 3,
+            "end": 2
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "bad-time-range",
+          "path": "$.layers[0].end"
+        }
+      ]
+    },
+    {
+      "name": "layer position needs two numbers",
+      "input": {
+        "layers": [
+          {
+            "id": "s",
+            "type": "solid",
+            "position": [
+              1,
+              2,
+              3
+            ]
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "bad-vector",
+          "path": "$.layers[0].position"
+        }
+      ]
+    },
+    {
+      "name": "layer cannot animate quaternion",
+      "input": {
+        "layers": [
+          {
+            "id": "s",
+            "type": "solid"
+          }
+        ],
+        "animations": [
+          {
+            "target": "s",
+            "property": "quaternion",
+            "keyframes": [
+              {
+                "time": 0,
+                "value": [
+                  0,
+                  0,
+                  0,
+                  1
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "bad-property",
+          "path": "$.animations[0].property"
+        }
+      ]
+    },
+    {
+      "name": "layer rotation keyframe must be a number",
+      "input": {
+        "layers": [
+          {
+            "id": "s",
+            "type": "solid"
+          }
+        ],
+        "animations": [
+          {
+            "target": "s",
+            "property": "rotation",
+            "keyframes": [
+              {
+                "time": 0,
+                "value": [
+                  0,
+                  0,
+                  0
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "wrong-type",
+          "path": "$.animations[0].keyframes[0].value"
+        }
+      ]
+    },
+    {
+      "name": "clip keyframe must be text",
+      "input": {
+        "objects": [
+          {
+            "id": "a",
+            "type": "character"
+          }
+        ],
+        "animations": [
+          {
+            "target": "a",
+            "property": "clip",
+            "keyframes": [
+              {
+                "time": 0,
+                "value": 5
+              }
+            ]
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "wrong-type",
+          "path": "$.animations[0].keyframes[0].value"
+        }
+      ]
+    },
+    {
+      "name": "shot can be animated, object property cannot",
+      "input": {
+        "shots": [
+          {
+            "id": "s1",
+            "start": 0
+          }
+        ],
+        "animations": [
+          {
+            "target": "s1",
+            "property": "opacity",
+            "keyframes": [
+              {
+                "time": 0,
+                "value": 1
+              }
+            ]
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "bad-property",
+          "path": "$.animations[0].property"
+        }
+      ]
+    },
+    {
+      "name": "audio asset cannot be a URL",
+      "input": {
+        "audio": [
+          {
+            "asset": "http://x.example/a.mp3"
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "remote-asset",
+          "path": "$.audio[0].asset"
+        }
+      ]
+    },
+    {
+      "name": "audio without asset",
+      "input": {
+        "audio": [
+          {
+            "volume": 1
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "missing-field",
+          "path": "$.audio[0].asset"
+        }
+      ]
+    },
+    {
+      "name": "shot after end only warns",
+      "input": {
+        "version": "1.0",
+        "settings": {
+          "duration": 2
+        },
+        "shots": [
+          {
+            "id": "late",
+            "start": 5
+          }
+        ]
+      },
+      "errors": [],
+      "warnings": [
+        {
+          "code": "shot-after-end",
+          "path": "$.shots[0].start"
+        }
+      ]
+    },
+    {
+      "name": "shot camera degenerate",
+      "input": {
+        "shots": [
+          {
+            "id": "s",
+            "position": [
+              1,
+              1,
+              1
+            ],
+            "lookAt": [
+              1,
+              1,
+              1
+            ]
+          }
+        ]
+      },
+      "errors": [
+        {
+          "code": "camera-degenerate",
+          "path": "$.shots[0]"
+        }
+      ]
+    }
+  ]
+}

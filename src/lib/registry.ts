@@ -205,6 +205,29 @@ const smartphonePrototypeLabTool: ToolMeta = {
 };
 
 
+const sceneStudioTool: ToolMeta = {
+  id: "scene-studio",
+  name: "Scene Studio",
+  slug: "scene-studio",
+  description: "Create local 2D and 3D animated scenes with structured scene data, validation, preview, captions, audio layers, project-bundle saving and MP4 export where browser support allows.",
+  category: "video",
+  subcategory: "Scene editing",
+  keywords: ["scene studio", "3d", "2d", "animation", "video maker", "scene", "ai video", "chatbot", "json scene", "captions", "subtitles", "mp4", "render", "export video", "cinematic", "no code", "motion graphics", "babylon"],
+  tags: ["3d", "2d", "animation", "video", "captions", "ai", "creator", "no code"],
+  icon: "Clapperboard",
+  iconBackground: "#171b1e",
+  iconAccent: "#f5b942",
+  popularity: 1250,
+  featured: false,
+  clientSide: true,
+  requiresBackend: false,
+  requiresAuth: false,
+  status: "active",
+  related: [],
+  engine: { type: "custom", id: "scene-studio" },
+  isNew: true,
+};
+
 const fileWorkspaceTools: ToolMeta[] = [
   {
     id: "file-to-txt", name: "File to TXT Converter", slug: "file-to-txt",
@@ -281,6 +304,7 @@ const catalogRuntimeTools: ToolMeta[] = [
       && presentedTool.status === "planned"
       ? { ...presentedTool, status: "active" }
       : presentedTool;
+    if (webTool.id === "scene-studio") return sceneStudioTool;
     if (webTool.id === "css-minifier-advanced") {
       return {
         ...webTool,
@@ -319,6 +343,7 @@ const catalogRuntimeTools: ToolMeta[] = [
   ...(!catalogTools.some((tool) => tool.id === aBookTool.id) ? [aBookTool] : []),
   ...(!catalogTools.some((tool) => tool.id === zipAnyFileTool.id) ? [zipAnyFileTool] : []),
   ...(!catalogTools.some((tool) => tool.id === cameraStudioTool.id) ? [cameraStudioTool] : []),
+  ...(!catalogTools.some((tool) => tool.id === sceneStudioTool.id) ? [sceneStudioTool] : []),
   ...(!catalogTools.some((tool) => tool.id === smartphonePrototypeLabTool.id) ? [smartphonePrototypeLabTool] : []),
   ...fileWorkspaceTools.filter((tool) => !catalogTools.some((catalogTool) => catalogTool.id === tool.id)),
 ];

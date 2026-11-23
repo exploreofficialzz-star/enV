@@ -1,0 +1,28 @@
+{
+  "version": "1.0",
+  "settings": { "width": 1920, "height": 1080, "fps": 24, "duration": 10, "background": "#cfe8ff", "seed": 7 },
+  "camera": { "position": [0, 2.5, 9], "lookAt": [0, 1, 0], "fov": 40 },
+  "lights": [
+    { "type": "ambient", "intensity": 0.4 },
+    { "type": "sun", "intensity": 1, "direction": [-0.3, -1, -0.5] }
+  ],
+  "objects": [
+    { "id": "ground", "type": "plane", "color": "#7bc47f", "size": [30, 30, 1], "rotation": [-90, 0, 0] },
+    { "id": "ana", "type": "character", "style": "simple", "color": "#e5484d", "position": [-2.5, 0, 0], "rotation": [0, 90, 0] },
+    { "id": "ben", "type": "character", "style": "simple", "color": "#3e63dd", "position": [2.5, 0, 0], "rotation": [0, -90, 0] },
+    { "id": "hat", "type": "cylinder", "parent": "ana", "color": "#222222", "position": [0, 1.9, 0], "size": [0.5, 0.3, 0.5] },
+    { "id": "ball", "type": "sphere", "color": "#ffffff", "position": [0, 0.3, 0], "params": { "radius": 0.3 } }
+  ],
+  "animations": [
+    { "target": "ball", "property": "position", "easing": "easeOut", "keyframes": [{ "time": 0, "value": [-2, 0.3, 0] }, { "time": 5, "value": [2, 0.3, 0] }] },
+    { "target": "camera", "property": "position", "easing": "easeInOut", "keyframes": [{ "time": 0, "value": [0, 2.5, 9] }, { "time": 10, "value": [0, 2.5, 6] }] },
+    { "target": "ben", "property": "color", "keyframes": [{ "time": 0, "value": "#3e63dd" }, { "time": 10, "value": "#30a46c" }] }
+  ],
+  "dialogue": [
+    { "speaker": "ana", "text": "Catch!", "start": 0.5 },
+    { "speaker": "ben", "text": "Nice throw, got it.", "start": 5.5 }
+  ],
+  "voices": { "ana": { "voice": "default", "speed": 1 }, "ben": { "voice": "default", "speed": 0.9 } },
+  "captions": { "style": "pop", "wordsPerGroup": 3, "speakerColors": { "ana": "#ff8a8a", "ben": "#8ab4ff" } },
+  "export": { "format": "mp4", "quality": "medium" }
+}

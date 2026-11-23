@@ -837,6 +837,14 @@ function toolSpecificGuidanceBase(tool: ToolMeta): ToolSpecificGuidance {
       validation: "The current sandbox limits an import batch to 50 songs, 600 ZIP entries, 80 MB per package and 160 MB expanded content; individual audio files are limited to 40 MB. Local audio analysis needs at least three seconds of readable audio, samples up to 45 seconds, and can reject a decode budget above 80 MB. Estimated tempo or key must not overwrite reviewed manual values, and an analysis marked unavailable is not evidence that a musical property is absent.",
     };
   }
+  if (id === "scene-studio") {
+    return {
+      source: "operation-specific",
+      overview: "Scene Studio is a local-first workspace for building structured 2D and 3D animated scenes. Validate a scene, preview its movement and camera work, add captions and supported audio, attach local assets, save a reusable project bundle and export an MP4 where the browser supports it.",
+      example: "Start with the built-in prompt and ask a chatbot to return one JSON scene. Paste it into Scene Studio, run validation and use the plain-language fix hints to correct problems. Add supported model, image or audio files as needed, play the preview and scrub through its frames, then save the project bundle before exporting an MP4. Play the exported file separately to verify duration, framing, captions and sound.",
+      validation: "The shared scene format is DRAFT revision 2 and still awaits product approval. No third-party 3D asset pack or speech model is bundled: the asset manifest currently has zero shipped packs and five planned packs, and speech falls back to silent timing so captions can still be reviewed. MP4 export relies on browser WebCodecs and rendering depends on the browser, GPU and available memory; logic tests do not establish compatibility across real devices and codecs. Android Kotlin and iOS Swift sources currently provide reader, animation and render-math conformance layers, not native editing screens, native 3D renderers or native video export. Use the Web Scene Studio for the full editing workflow until native implementations are separately completed and verified.",
+    };
+  }
   if (id === "camera-studio") {
     return {
       source: "operation-specific",

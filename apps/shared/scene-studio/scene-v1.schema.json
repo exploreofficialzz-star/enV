@@ -1,0 +1,878 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://envtools.store/schemas/scene-studio/scene-v1.schema.json",
+  "title": "Scene Studio scene, version 1.0 (DRAFT rev 2, awaiting owner approval)",
+  "description": "Declarative scene document read by the Web (Babylon.js), Android (Kotlin) and iOS (Swift) Scene Studio. One format for 1D (audio on the time axis), 2D (layers) and 3D (glTF-style objects). 3D coordinates follow glTF 2.0 / three.js: right-handed, +Y up, metres, cameras look down -Z, a model's front faces +Z. Rotation is a quaternion [x,y,z,w] (glTF native) or Euler degrees with an explicit rotationOrder (default XYZ, the Blender and three.js default). 2D layers follow Lottie/SVG/canvas: pixels, origin top-left, +y down, clockwise degrees. Every optional field has a default; unknown fields are ignored with a warning, so additionalProperties is deliberately not false. Objects, layers and shots share one id space.",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+$",
+      "default": "1.0"
+    },
+    "settings": {
+      "type": "object",
+      "properties": {
+        "width": {
+          "type": "integer",
+          "minimum": 64,
+          "maximum": 4096,
+          "default": 1080
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 64,
+          "maximum": 4096,
+          "default": 1920
+        },
+        "fps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60,
+          "default": 30
+        },
+        "duration": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 120,
+          "default": 8,
+          "description": "Seconds. fps \u00d7 duration must be at most 7200 frames."
+        },
+        "background": {
+          "$ref": "#/$defs/color",
+          "default": "#101826"
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295,
+          "default": 1
+        }
+      }
+    },
+    "camera": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "enum": [
+            "perspective",
+            "orthographic"
+          ],
+          "default": "perspective"
+        },
+        "position": {
+          "$ref": "#/$defs/vec3",
+          "default": [
+            0,
+            2,
+            8
+          ]
+        },
+        "lookAt": {
+          "$ref": "#/$defs/vec3",
+          "default": [
+            0,
+            1,
+            0
+          ]
+        },
+        "fov": {
+          "type": "number",
+          "minimum": 10,
+          "maximum": 120,
+          "default": 45
+        },
+        "shake": {
+          "$ref": "#/$defs/shake"
+        }
+      }
+    },
+    "lights": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "enum": [
+              "sun",
+              "ambient",
+              "point"
+            ],
+            "default": "sun"
+          },
+          "intensity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 20,
+            "default": 1
+          },
+          "color": {
+            "$ref": "#/$defs/color",
+            "default": "#ffffff"
+          },
+          "position": {
+            "$ref": "#/$defs/vec3",
+            "default": [
+              0,
+              5,
+              0
+            ]
+          },
+          "direction": {
+            "$ref": "#/$defs/vec3",
+            "default": [
+              -0.4,
+              -1,
+              -0.3
+            ]
+          }
+        }
+      }
+    },
+    "objects": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "type"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+            "maxLength": 64,
+            "not": {
+              "const": "camera"
+            }
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "Builder registry type. Unknown types fall back to a library asset, then a placeholder."
+          },
+          "asset": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Library name or uploaded file name. Never a URL, never a path containing '..'."
+          },
+          "style": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "color": {
+            "$ref": "#/$defs/color"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "size": {
+            "$ref": "#/$defs/scaleLike"
+          },
+          "params": {
+            "type": "object",
+            "maxProperties": 32,
+            "additionalProperties": {
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ]
+            }
+          },
+          "position": {
+            "$ref": "#/$defs/vec3",
+            "default": [
+              0,
+              0,
+              0
+            ]
+          },
+          "rotation": {
+            "$ref": "#/$defs/vec3",
+            "default": [
+              0,
+              0,
+              0
+            ]
+          },
+          "scale": {
+            "$ref": "#/$defs/scaleLike",
+            "default": 1
+          },
+          "visible": {
+            "type": "boolean",
+            "default": true
+          },
+          "opacity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 1
+          },
+          "parent": {
+            "type": "string",
+            "description": "Id of another object. Must exist and must not form a loop."
+          },
+          "rotationOrder": {
+            "enum": [
+              "XYZ",
+              "XZY",
+              "YXZ",
+              "YZX",
+              "ZXY",
+              "ZYX"
+            ],
+            "default": "XYZ"
+          },
+          "quaternion": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 4,
+            "maxItems": 4,
+            "description": "[x,y,z,w], normalised on load. Wins over `rotation`."
+          },
+          "material": {
+            "type": "object",
+            "properties": {
+              "metallic": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "default": 0
+              },
+              "roughness": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "default": 0.6
+              },
+              "emissive": {
+                "$ref": "#/$defs/color"
+              },
+              "emissiveIntensity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 20,
+                "default": 1
+              },
+              "texture": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "doubleSided": {
+                "type": "boolean",
+                "default": false
+              }
+            }
+          },
+          "clip": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "Initial animation clip name from a GLB."
+          },
+          "clipSpeed": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 10,
+            "default": 1
+          }
+        }
+      }
+    },
+    "animations": {
+      "type": "array",
+      "maxItems": 400,
+      "items": {
+        "type": "object",
+        "required": [
+          "target",
+          "property",
+          "keyframes"
+        ],
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "An object id, a layer id, a shot id, or \"camera\"."
+          },
+          "property": {
+            "enum": [
+              "position",
+              "rotation",
+              "quaternion",
+              "scale",
+              "color",
+              "opacity",
+              "visible",
+              "clip",
+              "lookAt",
+              "fov"
+            ],
+            "description": "Objects: position, rotation, quaternion, scale, color, opacity, visible, clip. Layers: position (x,y), scale, rotation (number), opacity, color, visible. Camera and shots: position, lookAt, fov."
+          },
+          "easing": {
+            "enum": [
+              "linear",
+              "easeIn",
+              "easeOut",
+              "easeInOut",
+              "step"
+            ],
+            "default": "linear"
+          },
+          "loop": {
+            "type": "boolean",
+            "default": false
+          },
+          "keyframes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 500,
+            "items": {
+              "type": "object",
+              "required": [
+                "time",
+                "value"
+              ],
+              "properties": {
+                "time": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "Seconds; must not decrease along the list."
+                },
+                "value": {},
+                "easing": {
+                  "enum": [
+                    "linear",
+                    "easeIn",
+                    "easeOut",
+                    "easeInOut",
+                    "step"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "dialogue": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "required": [
+          "speaker",
+          "text"
+        ],
+        "properties": {
+          "speaker": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "start": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 120,
+            "default": 0
+          }
+        }
+      }
+    },
+    "voices": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "voice": {
+            "type": "string",
+            "maxLength": 64,
+            "default": "default"
+          },
+          "speed": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 2,
+            "default": 1
+          }
+        }
+      }
+    },
+    "captions": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "style": {
+          "enum": [
+            "pop",
+            "classic"
+          ],
+          "default": "pop"
+        },
+        "placement": {
+          "enum": [
+            "belowSpeaker",
+            "bottomCenter"
+          ],
+          "default": "belowSpeaker"
+        },
+        "highlightColor": {
+          "$ref": "#/$defs/color",
+          "default": "#ffd400"
+        },
+        "wordsPerGroup": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6,
+          "default": 3
+        },
+        "speakerColors": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/color"
+          }
+        },
+        "anchorY": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 0.95,
+          "default": 0.78
+        },
+        "fontScale": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 2,
+          "default": 1
+        }
+      }
+    },
+    "export": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "enum": [
+            "mp4",
+            "webm"
+          ],
+          "default": "mp4"
+        },
+        "quality": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "default": "high"
+        }
+      }
+    },
+    "shots": {
+      "type": "array",
+      "maxItems": 50,
+      "description": "Cameras that take over from `start` until the next shot (hard cut). Animate a shot by using its id as an animation target.",
+      "items": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "perspective",
+              "orthographic"
+            ],
+            "default": "perspective"
+          },
+          "position": {
+            "$ref": "#/$defs/vec3",
+            "default": [
+              0,
+              2,
+              8
+            ]
+          },
+          "lookAt": {
+            "$ref": "#/$defs/vec3",
+            "default": [
+              0,
+              1,
+              0
+            ]
+          },
+          "fov": {
+            "type": "number",
+            "minimum": 10,
+            "maximum": 120,
+            "default": 45
+          },
+          "shake": {
+            "$ref": "#/$defs/shake"
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+            "maxLength": 64,
+            "not": {
+              "const": "camera"
+            }
+          },
+          "start": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 120,
+            "default": 0
+          }
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "properties": {
+        "preset": {
+          "enum": [
+            "studio",
+            "day",
+            "sunset",
+            "night",
+            "overcast",
+            "none"
+          ],
+          "default": "studio"
+        },
+        "intensity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5,
+          "default": 1
+        },
+        "hdri": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Library or uploaded HDRI name; never a URL."
+        },
+        "skybox": {
+          "type": "boolean",
+          "default": false
+        },
+        "fog": {
+          "type": "object",
+          "properties": {
+            "color": {
+              "$ref": "#/$defs/color",
+              "default": "#8a9bb0"
+            },
+            "density": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0
+            }
+          }
+        }
+      }
+    },
+    "post": {
+      "type": "object",
+      "properties": {
+        "bloom": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 3,
+          "default": 0
+        },
+        "bloomThreshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.8
+        },
+        "vignette": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0
+        },
+        "grain": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0
+        },
+        "depthOfField": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0
+        },
+        "focusDistance": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 1000,
+          "default": 8
+        },
+        "toneMapping": {
+          "enum": [
+            "aces",
+            "neutral",
+            "none"
+          ],
+          "default": "aces"
+        },
+        "exposure": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 4,
+          "default": 1
+        },
+        "contrast": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 2,
+          "default": 1
+        },
+        "saturation": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        }
+      }
+    },
+    "layers": {
+      "type": "array",
+      "maxItems": 100,
+      "description": "2D layers, drawn in array order (later on top). Pixels, origin top-left, +y down, clockwise degrees.",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "type"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]*$",
+            "maxLength": 64,
+            "not": {
+              "const": "camera"
+            }
+          },
+          "type": {
+            "enum": [
+              "solid",
+              "rect",
+              "ellipse",
+              "text",
+              "image"
+            ]
+          },
+          "plane": {
+            "enum": [
+              "front",
+              "back"
+            ],
+            "default": "front"
+          },
+          "position": {
+            "$ref": "#/$defs/vec2",
+            "default": [
+              0,
+              0
+            ]
+          },
+          "size": {
+            "$ref": "#/$defs/vec2"
+          },
+          "anchor": {
+            "$ref": "#/$defs/vec2",
+            "default": [
+              0.5,
+              0.5
+            ]
+          },
+          "scale": {
+            "oneOf": [
+              {
+                "type": "number"
+              },
+              {
+                "$ref": "#/$defs/vec2"
+              }
+            ],
+            "default": 1
+          },
+          "rotation": {
+            "type": "number",
+            "minimum": -36000,
+            "maximum": 36000,
+            "default": 0
+          },
+          "opacity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 1
+          },
+          "start": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 120,
+            "default": 0
+          },
+          "end": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 120,
+            "description": "Defaults to the scene duration; must be greater than start."
+          },
+          "visible": {
+            "type": "boolean",
+            "default": true
+          },
+          "color": {
+            "$ref": "#/$defs/color"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "font": {
+            "enum": [
+              "sans",
+              "serif",
+              "display",
+              "mono"
+            ],
+            "default": "sans"
+          },
+          "fontSize": {
+            "type": "number",
+            "minimum": 4,
+            "maximum": 1000,
+            "default": 64
+          },
+          "strokeColor": {
+            "$ref": "#/$defs/color"
+          },
+          "strokeWidth": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "default": 0
+          },
+          "asset": {
+            "type": "string",
+            "maxLength": 200
+          }
+        }
+      }
+    },
+    "audio": {
+      "type": "array",
+      "maxItems": 16,
+      "description": "1D content: sounds placed on the time axis.",
+      "items": {
+        "type": "object",
+        "required": [
+          "asset"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "asset": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "start": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 120,
+            "default": 0
+          },
+          "volume": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 1
+          },
+          "loop": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "color": {
+      "type": "string",
+      "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$"
+    },
+    "vec3": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "minimum": -10000,
+        "maximum": 10000
+      },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "scaleLike": {
+      "oneOf": [
+        {
+          "type": "number",
+          "minimum": -10000,
+          "maximum": 10000
+        },
+        {
+          "$ref": "#/$defs/vec3"
+        }
+      ]
+    },
+    "shake": {
+      "type": "object",
+      "properties": {
+        "amount": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0
+        },
+        "speed": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 20,
+          "default": 4
+        }
+      }
+    },
+    "vec2": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "minimum": -10000,
+        "maximum": 10000
+      },
+      "minItems": 2,
+      "maxItems": 2
+    }
+  }
+}

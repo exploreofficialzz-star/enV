@@ -1,0 +1,47 @@
+{
+  "version": "1.0",
+  "settings": { "width": 720, "height": 1280, "fps": 30, "duration": 12, "background": "#05070d", "seed": 42 },
+  "camera": { "position": [0, 1.6, 6], "lookAt": [0, 1.2, 0], "fov": 38, "shake": { "amount": 0.3, "speed": 5 } },
+  "shots": [
+    { "id": "wide", "start": 0, "position": [0, 2.2, 9], "lookAt": [0, 1, 0], "fov": 42, "shake": { "amount": 0.25, "speed": 4 } },
+    { "id": "pipe_closeup", "start": 4, "position": [0, 1, 2.5], "lookAt": [0, 1, 0], "fov": 32, "shake": { "amount": 0.4, "speed": 6 } },
+    { "id": "inside_pipe", "start": 8, "position": [0, 0.8, 4], "lookAt": [0, 0.8, 0], "fov": 50, "shake": { "amount": 0.5, "speed": 7 } }
+  ],
+  "lights": [
+    { "type": "sun", "intensity": 0.25, "color": "#9db4ff", "direction": [-0.3, -1, -0.4] },
+    { "type": "point", "intensity": 2.5, "color": "#ffb347", "position": [-4, 5, 2] }
+  ],
+  "environment": { "preset": "night", "intensity": 0.6, "skybox": true, "fog": { "color": "#0b1220", "density": 0.04 } },
+  "post": { "bloom": 0.7, "bloomThreshold": 0.7, "vignette": 0.45, "grain": 0.25, "depthOfField": 0.3, "focusDistance": 6, "toneMapping": "aces", "exposure": 0.9, "contrast": 1.15, "saturation": 0.85 },
+  "objects": [
+    { "id": "ground", "type": "plane", "color": "#2a2f38", "size": [60, 60, 1], "rotation": [-90, 0, 0], "material": { "roughness": 0.35, "metallic": 0.1 } },
+    { "id": "pipe", "type": "pipe", "position": [0, 0.8, -2], "params": { "radius": 0.9, "length": 12 }, "material": { "roughness": 0.9, "doubleSided": true } },
+    { "id": "hero", "type": "character", "asset": "library/character_casual", "style": "realistic", "position": [-1.5, 0, 1], "rotationOrder": "YXZ", "rotation": [0, 90, 0], "clip": "Run" },
+    { "id": "officer", "type": "character", "asset": "library/character_officer", "style": "realistic", "position": [3, 0, 2], "quaternion": [0, 0.7071067811865476, 0, 0.7071067811865476], "clip": "Idle" },
+    { "id": "rain", "type": "rain", "position": [0, 6, 0], "params": { "intensity": 0.8, "area": 20 } },
+    { "id": "flood", "type": "water", "position": [0, 0.15, 0], "color": "#1c2b3a", "size": [60, 1, 60], "material": { "roughness": 0.1, "metallic": 0.3 } }
+  ],
+  "layers": [
+    { "id": "vignette_tint", "type": "solid", "plane": "front", "color": "#000814", "opacity": 0.12 }
+  ],
+  "audio": [
+    { "id": "ambience", "asset": "library/rain_loop", "volume": 0.5, "loop": true },
+    { "id": "score", "asset": "library/tension_drone", "volume": 0.35, "loop": true }
+  ],
+  "animations": [
+    { "target": "hero", "property": "position", "easing": "easeIn", "keyframes": [{ "time": 0, "value": [-1.5, 0, 1] }, { "time": 4, "value": [0, 0.8, -1.2] }] },
+    { "target": "hero", "property": "clip", "keyframes": [{ "time": 0, "value": "Run" }, { "time": 3.5, "value": "Swim" }] },
+    { "target": "officer", "property": "clip", "keyframes": [{ "time": 0, "value": "Idle" }, { "time": 5, "value": "Run" }] },
+    { "target": "officer", "property": "quaternion", "easing": "easeInOut", "keyframes": [{ "time": 4, "value": [0, 0.7071067811865476, 0, 0.7071067811865476] }, { "time": 6, "value": [0, 1, 0, 0] }] },
+    { "target": "pipe_closeup", "property": "position", "easing": "easeOut", "keyframes": [{ "time": 4, "value": [0, 1, 2.5] }, { "time": 8, "value": [0, 1, 1.4] }] },
+    { "target": "flood", "property": "color", "keyframes": [{ "time": 0, "value": "#1c2b3a" }, { "time": 12, "value": "#0e1722" }] }
+  ],
+  "dialogue": [
+    { "speaker": "narrator", "text": "A man jumped into a drainpipe in a flood.", "start": 0.3 },
+    { "speaker": "narrator", "text": "A cop followed to help and got dragged in too.", "start": 4.2 },
+    { "speaker": "narrator", "text": "The current forced them both through a hundred feet of dark pipe.", "start": 7.6 }
+  ],
+  "voices": { "narrator": { "voice": "default", "speed": 1.15 } },
+  "captions": { "enabled": true, "style": "pop", "placement": "bottomCenter", "anchorY": 0.78, "fontScale": 1.1, "wordsPerGroup": 3, "highlightColor": "#ffffff" },
+  "export": { "format": "mp4", "quality": "high" }
+}

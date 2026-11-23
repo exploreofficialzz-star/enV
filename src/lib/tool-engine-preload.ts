@@ -13,6 +13,8 @@ export async function preloadToolEngine(tool: ToolMeta): Promise<void> {
 
   if (tool.id === "smartphone-prototype-lab") {
     pending = import("@/components/engines/smartphone-prototype-lab-engine");
+  } else if (tool.id === "scene-studio") {
+    pending = import("@/components/engines/scene-studio-engine");
   } else if (tool.id === "camera-studio") {
     pending = import("@/components/engines/camera-studio-engine");
   } else if (tool.category === "mockups") {
