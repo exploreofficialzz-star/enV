@@ -10,7 +10,7 @@ import { isToolUnderProduction } from "../src/lib/production-notice.ts";
 import { isGenericWorkflowPlaceholder } from "../src/lib/generic-workflow-policy.mjs";
 import { tools as sourceCatalogTools } from "../src/data/catalog.ts";
 import { createSocialCardArtifacts } from "./social-card-images.mjs";
-import { canonicalSeoTools, canonicalSeoToolFor, canonicalToolPath, isIndexableTool, toolSeoTitle, toolSeoDescription, toolGuideSeoTitle, toolGuideSeoDescription, toolSearchIntentTerms } from "../src/lib/seo-metadata.ts";
+import { canonicalSeoTools, createCanonicalSeoToolResolver, canonicalToolPath, isIndexableTool, toolSeoTitle, toolSeoDescription, toolGuideSeoTitle, toolGuideSeoDescription, toolSearchIntentTerms } from "../src/lib/seo-metadata.ts";
 import { toolTaskGuidanceSource, toolDocumentationSummary, toolStatusLabel } from "../src/lib/tool-documentation.ts";
 import { buildIndexNowKeyArtifact } from "./indexnow-utils.mjs";
 
@@ -108,6 +108,7 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
   for (const tool of getToolsByCategory("accessibility")) toolMap.set(tool.id, tool);
   const eligibleToolRecords = [...toolMap.values()].filter(isPublicTool);
   const guideTools = canonicalSeoTools(eligibleToolRecords).sort((a, b) => a.name.localeCompare(b.name));
+  const resolveCanonicalSeoTool = createCanonicalSeoToolResolver(guideTools);
   // Legacy Developer utility URLs canonicalize to one of the public Studio routes.
   // Keep their standalone task guides discoverable, but do not list the alias paths as canonical tools.
   const tools = guideTools.filter((tool) => tool.category !== "developer" || tool.tags.includes("developer-studio"));
@@ -273,7 +274,7 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
   };
   const runtimeInventoryRows = [...inventoryById.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([id, entry]) => {
     const tool = entry.runtimeTool ?? entry.sourceTool;
-    const canonical = canonicalSeoToolFor(tool, guideTools);
+    const canonical = resolveCanonicalSeoTool(tool);
     const registryRoutes = [...entry.routes].sort();
     let canonicalTarget = canonical ? canonicalToolPath(canonical) : "";
     let disposition = canonical
