@@ -60,6 +60,7 @@ const sharedSearchBoxSource = readFileSync(new URL("../src/components/tools/sear
 assert.ok(discoverySearchRouteSource.includes("searchToolResults"), "Search results must retain each ranked tool's grounded match record.");
 assert.ok(discoverySearchRouteSource.includes("results.matches"), "Search UI must render the ranked match records rather than losing their explanations.");
 assert.ok(discoverySearchRouteSource.includes("results.matchCount === 0"), "Search UI must preserve the empty state when no tools match.");
+assert.ok(discoverySearchRouteSource.includes("Math.min(count + PAGE_SIZE, results.matchCount)"), "Search UI must preserve pagination using the structured match count.");
 assert.ok(discoverySearchRouteSource.includes("{ tool, explanation }"), "Every discovery card must expose its own why-this-matched explanation.");
 assert.ok(sharedSearchBoxSource.includes("searchToolResults(searchable, q, 8).matches"), "The shared search dropdown must retain each ranked match record.");
 assert.ok(sharedSearchBoxSource.includes("match.explanation"), "The shared search dropdown must explain why each individual tool matched.");
