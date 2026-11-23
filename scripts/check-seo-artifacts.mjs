@@ -54,6 +54,10 @@ const assistantPromptSource = readFileSync(new URL("../src/lib/ai/server/tasks/a
 const catalogueGeneratorSource = readFileSync(new URL("./gen-catalog.mjs", import.meta.url), "utf8");
 const toolRouteSource = readFileSync(new URL("../src/routes/tools/$category/$slug.tsx", import.meta.url), "utf8");
 const guideRouteSource = readFileSync(new URL("../src/routes/blog.$slug.tsx", import.meta.url), "utf8");
+const discoverySearchRouteSource = readFileSync(new URL("../src/routes/search.tsx", import.meta.url), "utf8");
+assert.match(discoverySearchRouteSource, /searchToolResults/, "Search results must retain each ranked tool's grounded match record.");
+assert.match(discoverySearchRouteSource, /results\\.matches/, "Search UI must render the ranked match records rather than losing their explanations.");
+assert.match(discoverySearchRouteSource, /\\{ tool, explanation \\}/, "Every discovery card must expose its own why-this-matched explanation.");
 const renderedAuditWorkflowSource = readFileSync(new URL("../.github/workflows/accessibility-phase8.yml", import.meta.url), "utf8");
 const seoHeadSource = seoMetadataSource.slice(seoMetadataSource.indexOf("export function seoPageHead"), seoMetadataSource.indexOf("export function organizationSchema"));
 assert.ok(rootRouteSource.includes("...webmasterVerificationMeta()"), "Search Console verification must be emitted once from the root document.");
@@ -249,7 +253,7 @@ for (const article of result.articles) {
   assert.ok(result.urls.includes("/blog/" + article.slug), "Missing article sitemap entry for " + article.slug);
   assert.ok(result.llms.includes("https://envtools.store/blog/" + article.slug), "Missing article in llms.txt for " + article.slug);
 }
-const publicGuideDescriptions = result.guideTools.map((tool) => toolGuideSeoDescription(tool));
+const publicGuideDescriptions = result.guideTools.map((tool) => toolGuideSeoDescription(tool, result.guideTools));
 assert.equal(
   new Set(publicGuideDescriptions).size,
   publicGuideDescriptions.length,
@@ -268,7 +272,7 @@ for (const tool of result.guideTools) {
   const guideSolveForTarget = tool.name.match(/[—–-]\s*Solve for\s+(.+)$/i)?.[1]?.trim();
   if (guideSolveForTarget) assert.ok(guideTitle.toLowerCase().includes("solve for " + guideSolveForTarget.toLowerCase()), "Guide title must preserve its distinct formula target: " + tool.id);
   assert.ok(guideDescription.length >= 45 && guideDescription.length <= 160, "Guide SEO description must be 45-160 characters for " + tool.id);
-  assert.notEqual(guideDescription, toolSeoDescription(tool), "Tool and guide descriptions must be distinct for " + tool.id);
+  assert.notEqual(guideDescription, toolSeoDescription(tool, result.tools), "Tool and guide descriptions must be distinct for " + tool.id);
   assert.ok(result.inventory.includes(inventoryCell(guideTitle)), "Inventory misses guide title for " + tool.id);
   assert.ok(result.inventory.includes(inventoryCell(guideDescription)), "Inventory misses guide description for " + tool.id);
   const guide = "/blog/tool-" + tool.id;
