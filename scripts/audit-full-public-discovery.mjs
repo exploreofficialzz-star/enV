@@ -194,6 +194,7 @@ async function fetchRoute(route) {
         id: route.id ?? null,
         status: response.status,
         title: facts.title,
+        description: facts.description,
         descriptionLength: facts.description.length,
         canonical: facts.canonical,
         robots: facts.robots,
@@ -245,7 +246,7 @@ async function runWorkers(items, workerCount, worker) {
 function summarize(rows, routes) {
   const countsByKind = {};
   const titleGroups = new Map();
-  const descriptionGroups = new Map();
+  const descriptionsByKind = { tool: new Map(), guide: new Map() };
   const inbound = new Map(routes.map((route) => [route.path, 0]));
   for (const row of rows) {
     countsByKind[row.kind] = (countsByKind[row.kind] ?? 0) + 1;
@@ -255,7 +256,10 @@ function summarize(rows, routes) {
       titleGroups.set(row.title, group);
     }
     if (row.kind === "tool" || row.kind === "guide") {
-      const descKey = row.path + "\u0000" + row.descriptionLength;
+      const descriptions = descriptionsByKind[row.kind];
+      const group = descriptions.get(row.description) ?? [];
+      group.push(row.path);
+      descriptions.set(row.description, group);
       descriptionGroups.set(descKey, [row.path]);
     }
     for (const href of row.hrefs) {
@@ -283,6 +287,10 @@ function summarize(rows, routes) {
     })
   );
   const duplicateStatusCodes = rows.filter((row) => row.status !== 200).length;
+  const duplicateDescriptionGroups = Object.fromEntries(Object.entries(descriptionsByKind).map(([kind, groups]) => [
+    kind,
+    [...groups.entries()].filter(([, paths]) => paths.length > 1).map(([description, paths]) => ({ description, paths })),
+  ]));
   const routeErrors = rows.reduce((sum, row) => sum + row.errors.length, 0);
   const builtShas = [...new Set(rows.map((row) => row.buildSha).filter(Boolean))];
   return {
@@ -293,6 +301,9 @@ function summarize(rows, routes) {
     uniqueBuildShas: builtShas,
     titleCollisionGroups: titleCollisions.length,
     toolGuideTitleCollisionGroups: toolGuideTitleCollisions.length,
+    duplicateToolDescriptionGroups: duplicateDescriptionGroups.tool.length,
+    duplicateGuideDescriptionGroups: duplicateDescriptionGroups.guide.length,
+    duplicateDescriptionSamples: { tool: duplicateDescriptionGroups.tool.slice(0, 100), guide: duplicateDescriptionGroups.guide.slice(0, 100) },
     orphanToolAndGuideRoutes: orphanRoutes.length,
     orphanSamples: orphanRoutes.slice(0, 250),
     titleCollisionSamples: toolGuideTitleCollisions.slice(0, 100),
@@ -319,6 +330,9 @@ async function main() {
     addFailure("Duplicate rendered titles were found across tool/guide pages (" + summary.toolGuideTitleCollisionGroups + " group(s)).");
   }
 
+  if (summary.duplicateToolDescriptionGroups > 0 || summary.duplicateGuideDescriptionGroups > 0) {
+    addFailure("Duplicate meta descriptions were found among canonical tool or guide pages (tools " + summary.duplicateToolDescriptionGroups + ", guides " + summary.duplicateGuideDescriptionGroups + ").");
+  }
   const report = {
     schemaVersion: 1,
     auditType: "full-public-discovery-rendered-route-audit",
@@ -355,6 +369,8 @@ async function main() {
     failedRoutes: summary.failedRoutes,
     routeErrorCount: summary.routeErrorCount,
     toolGuideTitleCollisionGroups: summary.toolGuideTitleCollisionGroups,
+    duplicateToolDescriptionGroups: summary.duplicateToolDescriptionGroups,
+    duplicateGuideDescriptionGroups: summary.duplicateGuideDescriptionGroups,
     orphanToolAndGuideRoutes: summary.orphanToolAndGuideRoutes,
     uniqueBuildShas: summary.uniqueBuildShas,
     report: path.relative(root, reportPath),
