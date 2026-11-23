@@ -189,9 +189,45 @@ export function toolSearchIntentTerms(tool: ToolMeta): string[] {
   ].map((value) => value.replace(/\s+/g, " ").trim()).filter(Boolean))].slice(0, 24);
 }
 
+type SeoCollisionKey = (tool: ToolMeta) => string;
+type SeoCollisionIndex = Map<string, Map<string, number>>;
+
+// Peer lists are immutable after construction during SEO generation. Cache one
+// deterministic collision index per peer-list/key-function pair so rendering
+// thousands of public pages does not rescan the complete tool catalogue per page.
+const seoCollisionIndexes = new WeakMap<readonly ToolMeta[], Map<SeoCollisionKey, SeoCollisionIndex>>();
+
+function seoCollisionIndex(peers: readonly ToolMeta[], keyFor: SeoCollisionKey): SeoCollisionIndex {
+  let indexesByKey = seoCollisionIndexes.get(peers);
+  if (!indexesByKey) {
+    indexesByKey = new Map();
+    seoCollisionIndexes.set(peers, indexesByKey);
+  }
+  const cached = indexesByKey.get(keyFor);
+  if (cached) return cached;
+
+  const groups = new Map<string, ToolMeta[]>();
+  for (const candidate of peers) {
+    const key = keyFor(candidate);
+    const group = groups.get(key);
+    if (group) group.push(candidate);
+    else groups.set(key, [candidate]);
+  }
+
+  const index: SeoCollisionIndex = new Map();
+  for (const [key, group] of groups) {
+    group.sort((a, b) => canonicalToolPath(a).localeCompare(canonicalToolPath(b)) || a.id.localeCompare(b.id));
+    const positions = new Map<string, number>();
+    group.forEach((candidate, position) => positions.set(candidate.id, position + 1));
+    index.set(key, positions);
+  }
+  indexesByKey.set(keyFor, index);
+  return index;
+}
+
 function uniqueToolDescription(base: string, tool: ToolMeta, peers: readonly ToolMeta[], baseFor: (candidate: ToolMeta) => string): string {
-  const collisions = peers.filter((candidate) => baseFor(candidate) === base);
-  if (collisions.length <= 1) return base;
+  const collisions = seoCollisionIndex(peers, baseFor).get(base);
+  if (!collisions || collisions.size <= 1) return base;
 
   // Generated catalogue records can share the same engine-family summary and even
   // the same display name. Keep the visible task first, then add a stable ID only
@@ -262,16 +298,17 @@ function toolGuideSeoSuffix(tool: ToolMeta): string {
   return /[—–-]\s*Solve for\s+/i.test(tool.name) ? " guide | enV" : " documentation | enV";
 }
 
+function toolGuideSeoTitleBase(candidate: ToolMeta): string {
+  return boundedToolSeoTitle(candidate.name, toolGuideSeoSuffix(candidate));
+}
+
 export function toolGuideSeoTitle(tool: ToolMeta, peers: readonly ToolMeta[] = [tool]): string {
   const suffix = toolGuideSeoSuffix(tool);
-  const baseTitle = boundedToolSeoTitle(tool.name, suffix);
-  const collisions = peers
-    .filter((candidate) => boundedToolSeoTitle(candidate.name, toolGuideSeoSuffix(candidate)) === baseTitle)
-    .slice()
-    .sort((a, b) => canonicalToolPath(a).localeCompare(canonicalToolPath(b)) || a.id.localeCompare(b.id));
-  if (collisions.length <= 1) return baseTitle;
-  const position = collisions.findIndex((candidate) => candidate.id === tool.id) + 1;
-  return boundedToolSeoTitle(tool.name, " (" + position + "/" + collisions.length + ")" + suffix);
+  const baseTitle = toolGuideSeoTitleBase(tool);
+  const collisions = seoCollisionIndex(peers, toolGuideSeoTitleBase).get(baseTitle);
+  if (!collisions || collisions.size <= 1) return baseTitle;
+  const position = collisions.get(tool.id) ?? 0;
+  return boundedToolSeoTitle(tool.name, " (" + position + "/" + collisions.size + ")" + suffix);
 }
 
 export function canonicalToolPath(tool: ToolMeta): string {
@@ -297,15 +334,16 @@ export function canonicalToolName(tool: ToolMeta): string {
   return tool.name;
 }
 
+function toolSeoTitleBase(candidate: ToolMeta): string {
+  return boundedToolSeoTitle(candidate.name, " Online | enV");
+}
+
 export function toolSeoTitle(tool: ToolMeta, peers: readonly ToolMeta[] = [tool]): string {
-  const baseTitle = boundedToolSeoTitle(tool.name, " Online | enV");
-  const collisions = peers
-    .filter((candidate) => boundedToolSeoTitle(candidate.name, " Online | enV") === baseTitle)
-    .slice()
-    .sort((a, b) => canonicalToolPath(a).localeCompare(canonicalToolPath(b)) || a.id.localeCompare(b.id));
-  if (collisions.length <= 1) return baseTitle;
-  const position = collisions.findIndex((candidate) => candidate.id === tool.id) + 1;
-  return boundedToolSeoTitle(tool.name, " (" + position + "/" + collisions.length + ") | enV");
+  const baseTitle = toolSeoTitleBase(tool);
+  const collisions = seoCollisionIndex(peers, toolSeoTitleBase).get(baseTitle);
+  if (!collisions || collisions.size <= 1) return baseTitle;
+  const position = collisions.get(tool.id) ?? 0;
+  return boundedToolSeoTitle(tool.name, " (" + position + "/" + collisions.size + ") | enV");
 }
 
 export function toolSchema(tool: ToolMeta) {
