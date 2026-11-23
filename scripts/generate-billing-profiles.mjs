@@ -23,7 +23,11 @@ for (const id of new Set(nativeInventory.runtimeExtensionIds ?? [])) {
   if (!runtimeTool) throw new Error(`Native runtime extension "${id}" has no registered tool metadata.`);
   runtimeExtensionTools.push(runtimeTool);
 }
-const tools = catalogTools;
+const tools = catalogTools.map((tool) => {
+  if (tool.id !== "scene-studio") return tool;
+  const runtimeTool = registryTools.find((candidate) => candidate.id === tool.id);
+  return runtimeTool && ["active", "beta"].includes(runtimeTool.status) ? runtimeTool : tool;
+});
 const { METERED_OPERATION_RULES, PRICING_VERSION } = await import("../src/lib/billing/catalog.ts");
 const ruleById = new Map(METERED_OPERATION_RULES.map((rule) => [rule.id, rule]));
 
