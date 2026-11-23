@@ -50,6 +50,10 @@ enum NativeAdsPolicy {
             (tool.disclaimer.map { !restrictedDisclaimers.contains($0) } ?? true)
     }
 
+    /// Compatibility decision used by the existing native tool shell. This prelaunch
+    /// release has no native advertising provider, so no tool enters an ad gate.
+    static func isRewardedAccessTool(_ tool: Tool) -> Bool { false }
+
     static func isApplicationOnline() async -> Bool {
         guard let url = URL(string: "https://envtools.store/") else { return false }
         var request = URLRequest(url: url)
@@ -75,4 +79,23 @@ enum NativeHybridAccessError: LocalizedError {
     var errorDescription: String? {
         "Connect to use this tool online, or sign in and prepare an offline allowance in Wallet before disconnecting."
     }
+}
+
+
+/** No-op wrapper retained for existing SwiftUI tool-view call sites. */
+struct NativeRewardedToolAccessGate<Content: View>: View {
+    let tool: Tool
+    let onOpenWallet: () -> Void
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content()
+    }
+}
+
+/** Native ads are not launched in this release; the slot renders nothing. */
+struct NativeToolAdSlot: View {
+    let tool: Tool
+
+    var body: some View { EmptyView() }
 }
