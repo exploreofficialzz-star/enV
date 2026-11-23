@@ -196,7 +196,7 @@ function uniqueToolDescription(base: string, tool: ToolMeta, peers: readonly Too
   // Generated catalogue records can share the same engine-family summary and even
   // the same display name. Keep the visible task first, then add a stable ID only
   // for colliding pages so every canonical URL has its own accurate description.
-  const task = String(tool.description ?? "").replace(/\\s+/g, " ").trim()
+  const task = String(tool.description ?? "").replace(/\s+/g, " ").trim()
     || tool.engine.type + ("op" in tool.engine ? " " + String(tool.engine.op) : "");
   const discriminator = " · Task: " + cleanMetaDescription(task || tool.name, 38) + " · " + tool.id;
   return cleanMetaDescription(base, Math.max(35, 160 - discriminator.length)) + discriminator;
