@@ -43,7 +43,7 @@
       "files": [
         {
           "path": "src/components/engines/zip-archive-engine.tsx",
-          "gitBlobSha1": "11e1585cc9bd3f1cdeb5cee95d2f4a98bba28580"
+          "gitBlobSha1": "9b9b79bc87861caf2befdc87e55cef1f74fa3d28"
         },
         {
           "path": "src/lib/zip/archive-utils.ts",
@@ -57,9 +57,11 @@
       "reviewedAreas": [
         "ZIP creation and extraction workflows",
         "Archive path traversal guards, entry and expanded-size limits, compression-ratio protection, CRC checks, and destination collision handling",
-        "Runtime dispatch"
+        "Runtime dispatch",
+        "Direct user-gesture file-picker activation and bounded browser-download fallback when picker permission is denied"
       ],
-      "notes": "Reviewed the archive implementation and shared safety helpers. The browser audit separately tests representative create/extract round trips."
+      "notes": "Re-reviewed against main at 42ca10c63997bd9771d91ee01967a23245f76e3b. The save-file and extraction-folder pickers are requested synchronously by their respective button handlers. NotAllowedError/SecurityError uses the bounded 256 MiB browser-buffer/download fallback; larger archives fail with explicit guidance. Existing archive path, entry-count, expanded-size, compression-ratio, CRC and destination-collision safeguards and runtime dispatch were rechecked. The Production Check browser audit separately exercises picker activation, archive bytes/CRC, the blocked-picker fallback and extraction.",
+      "inspectedAgainstCommit": "42ca10c63997bd9771d91ee01967a23245f76e3b"
     },
     {
       "id": "file-to-txt-source-review",
