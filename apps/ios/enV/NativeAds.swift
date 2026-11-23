@@ -1,8 +1,22 @@
 import Foundation
+import SwiftUI
+
+typealias NativeToolAccessCompletion = @MainActor (Bool) -> Void
+
+private struct NativeToolAccessCompletionKey: EnvironmentKey {
+    static let defaultValue: NativeToolAccessCompletion = { _ in }
+}
+
+extension EnvironmentValues {
+    var nativeToolAccessCompletion: NativeToolAccessCompletion {
+        get { self[NativeToolAccessCompletionKey.self] }
+        set { self[NativeToolAccessCompletionKey.self] = newValue }
+    }
+}
 
 /// Native hybrid-tool access policy for the existing signed offline-wallet boundary.
 /// Native advertising is not shipped in this release.
-enum NativeToolAccessPolicy {
+enum NativeAdsPolicy {
     private static let info = Bundle.main.infoDictionary ?? [:]
     static var allowlistedToolIDs: Set<String> {
         Set((info["ENV_HYBRID_TOOL_IDS"] as? String ?? "")
@@ -59,5 +73,14 @@ enum NativeToolAccessPolicy {
         } catch {
             return false
         }
+    }
+}
+
+
+enum NativeHybridAccessError: LocalizedError {
+    case offlineAllowanceRequired
+
+    var errorDescription: String? {
+        "Connect to use this tool online, or sign in and prepare an offline allowance in Wallet before disconnecting."
     }
 }
