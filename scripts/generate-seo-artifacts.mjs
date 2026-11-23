@@ -191,7 +191,7 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
     "- [" + tool.name + "](" + SITE_ORIGIN + toolPath(tool) + "): " + tool.description
   );
   const publicGuideLinks = guideTools.map((tool) =>
-    "- [" + tool.name + " guide](" + SITE_ORIGIN + "/blog/tool-" + tool.id + "): " + toolGuideSeoDescription(tool)
+    "- [" + tool.name + " guide](" + SITE_ORIGIN + "/blog/tool-" + tool.id + "): " + toolGuideSeoDescription(tool, guideTools)
   );
   const publicArticleLinks = BLOG_ARTICLES.map((article) =>
     "- [" + article.title + "](" + SITE_ORIGIN + "/blog/" + article.slug + "): " + article.summary
@@ -209,7 +209,7 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
       tableCell(inventoryCatalogueFlags(tool)),
       tableCell(toolTaskGuidanceSource(tool)),
       tableCell(toolSeoTitle(tool, tools)),
-      tableCell(toolSeoDescription(tool)),
+      tableCell(toolSeoDescription(tool, tools)),
       tableCell(toolSearchIntentTerms(tool).join(", ")),
       "[Guide](" + guide + ") |",
     ].join(" | ");
@@ -223,7 +223,7 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
     tableCell(inventoryCatalogueFlags(tool)),
     tableCell(toolTaskGuidanceSource(tool)),
     tableCell(toolGuideSeoTitle(tool, guideTools)),
-    tableCell(toolGuideSeoDescription(tool)),
+    tableCell(toolGuideSeoDescription(tool, guideTools)),
     "[Open tool](" + SITE_ORIGIN + canonicalToolPath(tool) + ") |",
   ].join(" | "));
   // Inventory every source/runtime/search/category surface, not only canonical SEO pages.
