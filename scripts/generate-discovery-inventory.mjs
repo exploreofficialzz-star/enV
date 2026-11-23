@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 import { CATEGORIES } from "../src/data/categories.ts";
 import { tools as sourceCatalogTools } from "../src/data/catalog.ts";
 import { getAllTools, getSearchableTools, getToolById, getToolByPath, getToolsByCategory, toolPath } from "../src/lib/registry.ts";
-import { canonicalToolPath, canonicalSeoToolFor, isIndexableTool } from "../src/lib/seo-metadata.ts";
+import { canonicalToolPath, createCanonicalSeoToolResolver, isIndexableTool } from "../src/lib/seo-metadata.ts";
 import { isGenericWorkflowPlaceholder } from "../src/lib/generic-workflow-policy.mjs";
 import { isAccessibilityLegacyVariant, makeAccessibilityStudioTools, studioToolForLegacy } from "../src/lib/accessibility-studios.ts";
 import { makeDeveloperStudioTools } from "../src/lib/developer-studios-catalog.ts";
@@ -71,7 +71,8 @@ export function collectInventoryInputs() {
   const runtimeTools = getAllTools().slice();
   const searchableTools = getSearchableTools().slice();
   const runtimeById = new Map(runtimeTools.map((tool) => [tool.id, tool]));
-  const searchableIds = new Set(searchableTools.map((tool) => tool.id));
+  const searchableById = new Map(searchableTools.map((tool) => [tool.id, tool]));
+  const searchableIds = new Set(searchableById.keys());
   const { declared, retired } = parseRegistrySource();
 
   const virtualStudios = [...makeAccessibilityStudioTools(runtimeTools), ...makeDeveloperStudioTools(runtimeTools)];
@@ -94,14 +95,17 @@ export function collectInventoryInputs() {
   const seoArtifacts = buildSeoArtifacts({ indexNowKey: "" });
   const eligibleIds = new Set([...searchableTools, ...getToolsByCategory("accessibility")].filter(isIndexableTool).map((tool) => tool.id));
   const guideTools = seoArtifacts.guideTools;
+  // Build this once for the entire inventory. The per-record canonical lookup
+  // must be O(1), not a scan through thousands of guide pages for every ID.
+  const resolveCanonicalSeoTool = createCanonicalSeoToolResolver(guideTools);
   const seo = {
     eligibleIds,
     publicToolPageIds: new Set(seoArtifacts.tools.map((tool) => tool.id)),
     guideIds: new Set(guideTools.map((tool) => tool.id)),
     urlCount: seoArtifacts.sitemapUrlCount ?? seoArtifacts.urls.length,
     canonicalIdFor: (id) => {
-      const tool = runtimeById.get(id) ?? searchableTools.find((candidate) => candidate.id === id);
-      return tool ? canonicalSeoToolFor(tool, guideTools)?.id : undefined;
+      const tool = runtimeById.get(id) ?? searchableById.get(id);
+      return tool ? resolveCanonicalSeoTool(tool)?.id : undefined;
     },
   };
 
