@@ -75,7 +75,26 @@ export function textToDocx(text: string): Uint8Array {
 const MAX_LOCAL_DOCUMENT_TOTAL_BYTES = 200 * 1024 * 1024;
 const MAX_LOCAL_PDF_PAGES = 500;
 
-export async function runLocalDocument(op: string, files: File[]): Promise<LocalDocumentResult> {
+export type LocalDocumentOptions = { pages?: string };
+
+function parseLocalPdfPageRange(value: string, pageCount: number): number[] {
+  const tokens = value.split(",").map((token) => token.trim()).filter(Boolean);
+  if (!tokens.length) throw new Error("Enter at least one PDF page or range.");
+  const selected = new Set<number>();
+  for (const token of tokens) {
+    const match = /^(\\d+)(?:\\s*-\\s*(\\d+))?$/.exec(token);
+    if (!match) throw new Error("Use page numbers and ranges such as 1,3-5.");
+    const first = Number(match[1]);
+    const last = Number(match[2] ?? match[1]);
+    if (!Number.isSafeInteger(first) || !Number.isSafeInteger(last) || first < 1 || last < first || last > pageCount) {
+      throw new Error(`PDF pages must be between 1 and ${pageCount}; check the selected range.`);
+    }
+    for (let page = first; page <= last; page += 1) selected.add(page - 1);
+  }
+  return [...selected].sort((a, b) => a - b);
+}
+
+export async function runLocalDocument(op: string, files: File[], options: LocalDocumentOptions = {}): Promise<LocalDocumentResult> {
   if (!files.length) throw new Error("Choose a document first.");
   const totalBytes = files.reduce((total, file) => total + file.size, 0);
   if (totalBytes > MAX_LOCAL_DOCUMENT_TOTAL_BYTES) {
@@ -138,8 +157,8 @@ export async function runLocalDocument(op: string, files: File[]): Promise<Local
   if (op === "pdf-page-extractor" || op === "pdf-splitter") {
     const out = await PDFDocument.create();
     const pages = pdf.getPages();
-    const selected = pages.slice(0, Math.min(10, pages.length));
-    const copied = await out.copyPages(pdf, selected.map((_, i) => i));
+    const selectedPages = parseLocalPdfPageRange(options.pages ?? "1", pages.length);
+    const copied = await out.copyPages(pdf, selectedPages);
     copied.forEach(page => out.addPage(page));
     return {
       blob: new Blob([asArrayBuffer(await out.save())], { type: "application/pdf" }),
