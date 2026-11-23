@@ -83,7 +83,7 @@ function createRouteSpecs(artifacts) {
         name: tool.name,
         schema: "SoftwareApplication",
         expectedTitle: toolSeoTitle(tool, artifacts.tools),
-        expectedDescription: toolSeoDescription(tool),
+        expectedDescription: toolSeoDescription(tool, artifacts.tools),
       });
       continue;
     }
@@ -96,7 +96,7 @@ function createRouteSpecs(artifacts) {
         name: guide.name,
         schema: "TechArticle",
         expectedTitle: toolGuideSeoTitle(guide, artifacts.guideTools),
-        expectedDescription: toolGuideSeoDescription(guide),
+        expectedDescription: toolGuideSeoDescription(guide, artifacts.guideTools),
       });
       continue;
     }
