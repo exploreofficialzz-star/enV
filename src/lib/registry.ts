@@ -304,7 +304,23 @@ const catalogRuntimeTools: ToolMeta[] = [
       && presentedTool.status === "planned"
       ? { ...presentedTool, status: "active" }
       : presentedTool);
-    if (webTool.id === "css-minifier-advanced") {
+    if (webTool.id === "scene-studio") {
+      return {
+        ...webTool,
+        name: "Scene Studio",
+        slug: "scene-studio",
+        description: "Build short video scenes with a visual timeline, animated objects, camera moves, captions, audio layers and export controls. Validate the scene before rendering and review the exported video.",
+        category: "video" as const,
+        keywords: [...webTool.keywords, "scene studio", "scene editor", "timeline", "animation", "3d scene", "captions", "camera movement", "storyboard", "mp4 export", "scene json"],
+        tags: [...webTool.tags, "video", "scene", "editor", "timeline", "animation", "captions"],
+        status: "active" as const,
+        clientSide: true,
+        requiresBackend: false,
+        requiresAuth: false,
+        engine: { type: "custom" as const, id: "scene-studio" },
+      };
+    }
+        if (webTool.id === "css-minifier-advanced") {
       return {
         ...webTool,
         name: "Advanced CSS Minifier",
