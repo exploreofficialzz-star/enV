@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { buildSeoArtifacts } from "./generate-seo-artifacts.mjs";
 import { CATEGORIES } from "../src/data/categories.ts";
 import { toolPath } from "../src/lib/registry.ts";
-import { canonicalToolPath, toolSeoTitle, toolSeoDescription, toolGuideSeoTitle, SITE_ORIGIN } from "../src/lib/seo-metadata.ts";
+import { canonicalToolPath, toolSeoTitle, toolSeoDescription, toolGuideSeoTitle, toolGuideSeoDescription, SITE_ORIGIN } from "../src/lib/seo-metadata.ts";
 import { toolTaskGuidanceSource } from "../src/lib/tool-documentation.ts";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
@@ -66,7 +66,7 @@ export function validate() {
     notes.push(`${label}: ${rows.length} pages · duplicate titles ${dupTitles.length} groups · duplicate descriptions ${dupDescs.length} groups (${dupDescs.flat().length} pages) · short (<50) descriptions ${shortDesc.length}.`);
   };
   meta("TOOL_PAGE", a.tools.map((t) => ({ id: t.id, title: toolSeoTitle(t, a.tools), description: toolSeoDescription(t) })));
-  meta("GUIDE_PAGE", a.guideTools.map((t) => ({ id: t.id, title: toolGuideSeoTitle(t, a.guideTools), description: toolSeoDescription(t) })));
+  meta("GUIDE_PAGE", a.guideTools.map((t) => ({ id: t.id, title: toolGuideSeoTitle(t, a.guideTools), description: toolGuideSeoDescription(t) })));
 
   const guideSources = {};
   for (const t of a.guideTools) { const s = toolTaskGuidanceSource(t); guideSources[s] = (guideSources[s] ?? 0) + 1; }
