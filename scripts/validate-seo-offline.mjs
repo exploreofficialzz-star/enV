@@ -60,13 +60,16 @@ export function validate() {
     }
     const dupTitles = [...titles.values()].filter((l) => l.length > 1);
     const dupDescs = [...descs.values()].filter((l) => l.length > 1);
+    const longDesc = rows.filter(({ description }) => description.length > 160).map(({ id }) => id);
     if (dupTitles.length) fail(`${label}_DUPLICATE_TITLE`, `${label}: ${dupTitles.length} title(s) shared by several pages.`, dupTitles.flat());
+    if (dupDescs.length) fail(`${label}_DUPLICATE_DESCRIPTION`, `${label}: ${dupDescs.length} meta description group(s) are duplicated.`, dupDescs.flat());
     if (tooLong.length) fail(`${label}_TITLE_TOO_LONG`, `${label}: title over 70 characters.`, tooLong);
+    if (longDesc.length) fail(`${label}_DESCRIPTION_TOO_LONG`, `${label}: meta description over 160 characters.`, longDesc);
     if (emptyDesc.length) fail(`${label}_EMPTY_DESCRIPTION`, `${label}: empty meta description.`, emptyDesc);
     notes.push(`${label}: ${rows.length} pages · duplicate titles ${dupTitles.length} groups · duplicate descriptions ${dupDescs.length} groups (${dupDescs.flat().length} pages) · short (<50) descriptions ${shortDesc.length}.`);
   };
-  meta("TOOL_PAGE", a.tools.map((t) => ({ id: t.id, title: toolSeoTitle(t, a.tools), description: toolSeoDescription(t) })));
-  meta("GUIDE_PAGE", a.guideTools.map((t) => ({ id: t.id, title: toolGuideSeoTitle(t, a.guideTools), description: toolGuideSeoDescription(t) })));
+  meta("TOOL_PAGE", a.tools.map((t) => ({ id: t.id, title: toolSeoTitle(t, a.tools), description: toolSeoDescription(t, a.tools) })));
+  meta("GUIDE_PAGE", a.guideTools.map((t) => ({ id: t.id, title: toolGuideSeoTitle(t, a.guideTools), description: toolGuideSeoDescription(t, a.guideTools) })));
 
   const guideSources = {};
   for (const t of a.guideTools) { const s = toolTaskGuidanceSource(t); guideSources[s] = (guideSources[s] ?? 0) + 1; }
