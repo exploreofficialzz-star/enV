@@ -107,7 +107,17 @@ Record these outcomes separately: tool mentioned, exact canonical tool URL cited
 
 Repeat prompts verbatim over time. Do not combine neutral and branded results into one visibility score, and do not infer ranking or citation probability from crawler permissions, structured data, sitemap inclusion, or `llms.txt`.
 
-## 8. Release checklist
+## 8. Full public rendered-route audit
+
+Run `npm run audit:discovery:full` with the local enV SSR server available at `http://127.0.0.1:8080`. The audit regenerates the source-derived sitemap inventory, then fetches every URL from the canonical public route manifest: tool pages, usage guides, populated category pages, product articles, and public information pages.
+
+For each rendered page it checks HTTP 200, HTML delivery, one canonical URL on the .store host, indexable robots metadata, title and description quality, route-derived title/description consistency where known, Open Graph and X metadata, JSON-LD schema type, a rendered H1, and the current build SHA. It also reconciles the committed robots, sitemap, sitemap shards, and llms discovery files against the current generated registry. Internal incoming links are counted and zero-inlink tool/guide routes are reported for review; sitemap inclusion alone is not treated as proof of discoverability.
+
+The `Full public discovery audit` GitHub Actions workflow runs for relevant pull requests and main-branch changes, is scheduled weekly, and can be started manually. It uploads `full-public-discovery-audit/report.json` as a workflow artifact. The existing 30-minute production smoke remains a small live check and now tests page delivery under the Googlebot, Bingbot, OAI-SearchBot, Claude-SearchBot and PerplexityBot User-Agent strings. That User-Agent smoke does not authenticate the crawler's source IP or replace CDN/WAF provider-IP validation.
+
+This audit validates rendered page delivery and metadata, not that a human can complete every tool workflow. It does not prove Google/Bing indexing, AI citations, real crawler identity, mobile task acceptance, or that every tool has been independently functionally verified.
+
+## 9. Release checklist
 
 Before considering an SEO release complete:
 
@@ -122,7 +132,7 @@ Before considering an SEO release complete:
 
 This setup improves crawlability and clarity. It does not promise rankings, indexing, rich results, AI citations, or traffic.
 
-## 9. External release evidence still required
+## 10. External release evidence still required
 
 The repository can generate and test discovery files, route metadata, canonical URLs, and crawler policies. It cannot prove that the owner has completed external webmaster verification or that a search provider has accepted a sitemap. Record the following evidence before closing the SEO release:
 
