@@ -193,6 +193,10 @@ export function toolSeoDescription(tool: ToolMeta): string {
   return cleanMetaDescription(toolDocumentationSummary(tool), 160);
 }
 
+export function toolGuideSeoDescription(tool: ToolMeta): string {
+  return cleanMetaDescription("How to use " + tool.name + ": " + toolDocumentationSummary(tool), 160);
+}
+
 function boundedSeoTitle(name: string, suffix: string, maxTitleLength = 65): string {
   const rawName = name.trim();
   const maxNameLength = Math.max(12, maxTitleLength - suffix.length);
