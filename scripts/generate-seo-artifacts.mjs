@@ -188,7 +188,7 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
     "- [" + category.name + "](" + SITE_ORIGIN + "/tools/" + category.id + "): " + category.description
   );
   const publicToolLinks = tools.map((tool) =>
-    "- [" + tool.name + "](" + SITE_ORIGIN + toolPath(tool) + "): " + tool.description
+    "- [" + tool.name + "](" + SITE_ORIGIN + toolPath(tool) + "): " + toolSeoDescription(tool, tools)
   );
   const publicGuideLinks = guideTools.map((tool) =>
     "- [" + tool.name + " guide](" + SITE_ORIGIN + "/blog/tool-" + tool.id + "): " + toolGuideSeoDescription(tool, guideTools)
