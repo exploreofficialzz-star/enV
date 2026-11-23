@@ -3,6 +3,7 @@ name: One-time source-aligned discovery artifact regeneration
 on:
   push:
     branches:
+      - main
       - feat/full-public-discovery-audit-20261123
     paths:
       - .github/workflows/regenerate-discovery-artifacts.yml
@@ -164,7 +165,8 @@ jobs:
             public/robots.txt \
             public/sitemap.xml \
             public/llms.txt \
-            public/sitemaps
+            public/sitemaps \
+            public/og/cards
           git rm .github/workflows/regenerate-discovery-artifacts.yml
           git diff --cached --check
           git diff --cached --stat
