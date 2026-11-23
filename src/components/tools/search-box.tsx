@@ -2,7 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { ArrowRight, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { getAllTools, getSearchableTools, toolPath } from "@/lib/registry";
-import { searchTools } from "@/lib/search";
+import { searchToolResults } from "@/lib/search";
 import { cn } from "@/lib/utils";
 import type { ToolMeta } from "@/types/tool";
 import { isToolUnderProduction } from "@/lib/production-notice";
@@ -50,7 +50,7 @@ export function SearchBox({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const searchable = getSearchableTools();
-  const results = useMemo(() => (q.trim() ? searchTools(searchable, q, 8) : []), [q, searchable]);
+  const results = useMemo(() => (q.trim() ? searchToolResults(searchable, q, 8).matches : []), [q, searchable]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -93,9 +93,10 @@ export function SearchBox({
         if (e.key === "Enter") {
           e.preventDefault();
           if (onEnter) onEnter(q);
-          else if (results[0]) {
-            if (isToolUnderProduction(results[0])) setProductionTool(results[0]);
-            else nav({ to: toolPath(results[0]) });
+          else if (results[0]?.tool) {
+            const firstTool = results[0].tool;
+            if (isToolUnderProduction(firstTool)) setProductionTool(firstTool);
+            else nav({ to: toolPath(firstTool) });
           }
           else nav({ to: "/search", search: { q } });
           setOpen(false);
@@ -141,25 +142,29 @@ export function SearchBox({
           {results.length === 0 ? (
             <li className="px-4 py-3 text-sm text-muted">No matching tools. Try “json”, “bmi”, or “qr”.</li>
           ) : (
-            results.map((t) => (
-              <li key={t.id}>
-                <button
-                  type="button"
-                  className="flex w-full items-end gap-3 px-4 py-2.5 text-left hover:bg-surface-2"
-                  onClick={() => {
-                    if (isToolUnderProduction(t)) setProductionTool(t);
-                    else nav({ to: toolPath(t) });
-                    setOpen(false);
-                  }}
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2 text-sm font-medium">{t.name}{isToolUnderProduction(t) ? <span className="text-[10px] font-semibold uppercase tracking-wide text-subtle">Under production</span> : t.status === "planned" ? <span className="text-[10px] font-semibold uppercase tracking-wide text-subtle">Coming soon</span> : null}</span>
-                    <span className="line-clamp-1 text-xs text-muted">{t.description}</span>
-                  </span>
-                  <ArrowRight className="size-4 shrink-0" aria-hidden="true" />
-                </button>
-              </li>
-            ))
+            results.map((match) => {
+              const tool = match.tool;
+              return (
+                <li key={tool.id}>
+                  <button
+                    type="button"
+                    className="flex w-full items-end gap-3 px-4 py-2.5 text-left hover:bg-surface-2"
+                    onClick={() => {
+                      if (isToolUnderProduction(tool)) setProductionTool(tool);
+                      else nav({ to: toolPath(tool) });
+                      setOpen(false);
+                    }}
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-2 text-sm font-medium">{tool.name}{isToolUnderProduction(tool) ? <span className="text-[10px] font-semibold uppercase tracking-wide text-subtle">Under production</span> : tool.status === "planned" ? <span className="text-[10px] font-semibold uppercase tracking-wide text-subtle">Coming soon</span> : null}</span>
+                      <span className="line-clamp-1 text-xs text-muted">{tool.description}</span>
+                      <span className="mt-0.5 block line-clamp-1 text-[11px] leading-4 text-subtle" aria-label={"Why " + tool.name + " matched"}>{match.explanation}</span>
+                    </span>
+                    <ArrowRight className="size-4 shrink-0" aria-hidden="true" />
+                  </button>
+                </li>
+              );
+            })
           )}
           <li>
             <button

@@ -3,6 +3,7 @@ import { ArrowLeft, Search, X } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { ToolAppIcon } from "@/components/tools/tool-app-icon";
 import { toolPath } from "@/lib/registry";
+import { canonicalSeoTools, canonicalToolPath, isIndexableTool } from "@/lib/seo-metadata";
 import type { ToolMeta } from "@/types/tool";
 import "@/components/engines/creator-engine.css";
 
@@ -32,6 +33,10 @@ function familyFor(tool: ToolMeta) {
 export function CreatorCategoryLauncher({ tools, description, blurb }: { tools: ToolMeta[]; description: string; blurb?: string }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<(typeof FILTERS)[number][1]>("all");
+  const publicTools = useMemo(
+    () => canonicalSeoTools(tools.filter(isIndexableTool)),
+    [tools],
+  );
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
     return tools
@@ -78,6 +83,28 @@ export function CreatorCategoryLauncher({ tools, description, blurb }: { tools: 
         ))}
         {results.length === 0 ? <div className="env-creator-launcher__empty">No tools found</div> : null}
       </section>
+
+      <details className="mt-8 rounded-xl border border-border bg-surface p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-accent">
+          Browse all creator tool pages and guides ({publicTools.length})
+        </summary>
+        <h2 className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted">Tool pages</h2>
+        <nav aria-label="All creator tool pages" className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {publicTools.map((tool) => (
+            <a key={tool.id} href={canonicalToolPath(tool)} className="min-w-0 rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm font-medium text-accent">
+              {tool.name}
+            </a>
+          ))}
+        </nav>
+        <h2 className="mt-5 text-xs font-semibold uppercase tracking-wide text-muted">Usage guides</h2>
+        <nav aria-label="All creator usage guides" className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {publicTools.map((tool) => (
+            <a key={tool.id} href={"/blog/tool-" + tool.id} className="min-w-0 rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm font-medium text-accent">
+              {tool.name} guide
+            </a>
+          ))}
+        </nav>
+      </details>
     </main>
   );
 }

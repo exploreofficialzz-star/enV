@@ -54,7 +54,8 @@ for (const category of expectedWebExempt) assert.ok(categories.has(category), `c
 const restricted = tools.filter((tool) => !expectedWebExempt.includes(tool.category));
 assert.ok(restricted.length > 0, "catalog has tools outside the web-ready categories");
 assert.ok(webCard.includes("isToolUnderProduction(tool)"), "Web cards apply production policy");
-assert.ok(webSearch.includes("isToolUnderProduction(t)"), "Web search suggestions apply production policy");
+assert.ok(webSearch.includes("isToolUnderProduction(tool)"), "Web search suggestions apply production policy");
+assert.ok(webSearch.includes("match.explanation"), "Web search suggestions explain the individual result match");
 assert.ok(webHome.includes("isToolUnderProduction(tool)") && webHome.includes("UnderProductionDialog"), "Web most-used shortcuts label and intercept restricted tools");
 assert.ok(webToolShell.includes("isToolUnderProduction(r)") && webToolShell.includes("UnderProductionDialog"), "Web related-tool links label and intercept restricted tools");
 assert.ok(webRoute.includes("if (isToolUnderProduction(tool))"), "Web direct tool URLs cannot enter restricted engines");

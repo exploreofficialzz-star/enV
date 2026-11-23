@@ -106,7 +106,15 @@ function serialize(index) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const text = serialize(buildKnowledgeIndex());
+  let text = serialize(buildKnowledgeIndex());
+  if (process.argv.includes("--check") && fs.existsSync(outPath)) {
+    // Keep the recorded generation commit stable during read-only PR checks. The
+    // GitHub Actions merge SHA changes with each branch update and is not index content.
+    const generatedIndex = JSON.parse(text);
+    const committedIndex = JSON.parse(fs.readFileSync(outPath, "utf8"));
+    generatedIndex.sourceCommit = committedIndex.sourceCommit ?? null;
+    text = serialize(generatedIndex);
+  }
   if (process.argv.includes("--check")) {
     if (!fs.existsSync(outPath) || fs.readFileSync(outPath, "utf8") !== text) { console.error("STALE: audit/discovery/tool-knowledge-index.json. Run npm run discovery:knowledge-index."); process.exit(1); }
     console.log("Knowledge index OK.");

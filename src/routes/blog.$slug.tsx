@@ -25,12 +25,13 @@ import {
   toolStatusLabel,
 } from "@/lib/tool-documentation";
 import type { ToolMeta } from "@/types/tool";
-import { seoPageHead, articleSchema, technicalArticleSchema, isIndexableTool, articleSeoTitle, toolGuideSeoTitle, canonicalSeoTools, canonicalSeoToolFor } from "@/lib/seo-metadata";
+import { seoPageHead, articleSchema, technicalArticleSchema, isIndexableTool, articleSeoTitle, toolGuideSeoTitle, toolGuideSeoDescription, canonicalSeoTools, createCanonicalSeoToolResolver } from "@/lib/seo-metadata";
 import { toolSocialCard, articleSocialCard } from "@/lib/seo-social-cards";
 
 const seoGuideCandidateMap = new Map(getSearchableTools().map((tool) => [tool.id, tool]));
 for (const tool of getToolsByCategory("accessibility")) seoGuideCandidateMap.set(tool.id, tool);
 const CANONICAL_SEO_GUIDES = canonicalSeoTools([...seoGuideCandidateMap.values()]);
+const resolveCanonicalSeoGuide = createCanonicalSeoToolResolver(CANONICAL_SEO_GUIDES);
 
 export const Route = createFileRoute("/blog/$slug")({
   loader: ({ params }) => {
@@ -71,7 +72,7 @@ export const Route = createFileRoute("/blog/$slug")({
       });
     }
     const path = "/blog/tool-" + loaderData.tool.id;
-    const description = toolDocumentationSummary(loaderData.tool);
+    const description = toolGuideSeoDescription(loaderData.tool, CANONICAL_SEO_GUIDES);
     if (!isIndexableTool(loaderData.tool)) {
       return {
         meta: [
@@ -81,7 +82,7 @@ export const Route = createFileRoute("/blog/$slug")({
         ]
       };
     }
-    const canonicalGuideTool = canonicalSeoToolFor(loaderData.tool, CANONICAL_SEO_GUIDES);
+    const canonicalGuideTool = resolveCanonicalSeoGuide(loaderData.tool);
     if (!canonicalGuideTool) {
       return {
         meta: [
