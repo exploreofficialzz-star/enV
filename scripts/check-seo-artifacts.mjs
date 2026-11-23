@@ -252,6 +252,26 @@ const guideDescriptionCollisionGroup = firstCollisionGroup(
   result.guideTools,
   (tool) => toolGuideSeoDescription(tool, [tool]),
 );
+const longIdTemplate = result.tools[0];
+const longIdCollisionPeers = [
+  {
+    ...longIdTemplate,
+    id: "synthetic-long-tool-id-a-" + "x".repeat(92),
+    slug: "synthetic-long-tool-a",
+  },
+  {
+    ...longIdTemplate,
+    id: "synthetic-long-tool-id-b-" + "y".repeat(92),
+    slug: "synthetic-long-tool-b",
+  },
+];
+const longIdToolDescriptions = longIdCollisionPeers.map((tool) => toolSeoDescription(tool, longIdCollisionPeers));
+const longIdGuideDescriptions = longIdCollisionPeers.map((tool) => toolGuideSeoDescription(tool, longIdCollisionPeers));
+for (const description of [...longIdToolDescriptions, ...longIdGuideDescriptions]) {
+  assert.ok(description.length >= 45 && description.length <= 160, "Long-ID collision descriptions must stay within the 45-160 character metadata contract.");
+}
+assert.equal(new Set(longIdToolDescriptions).size, 2, "Long-ID tool descriptions must remain unique.");
+assert.equal(new Set(longIdGuideDescriptions).size, 2, "Long-ID guide descriptions must remain unique.");
 if (guideDescriptionCollisionGroup.length > 1) {
   const reorderedPeers = [...guideDescriptionCollisionGroup].reverse();
   for (const tool of guideDescriptionCollisionGroup) {
