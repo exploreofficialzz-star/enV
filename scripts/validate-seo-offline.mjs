@@ -56,7 +56,7 @@ export function validate() {
       (titles.get(title) ?? titles.set(title, []).get(title)).push(id);
       (descs.get(description) ?? descs.set(description, []).get(description)).push(id);
       if (title.length > 70) tooLong.push(id);
-      if (!description) emptyDesc.push(id); else if (description.length < 50) shortDesc.push(id);
+      if (!description) emptyDesc.push(id); else if (description.length < 45) shortDesc.push(id);
     }
     const dupTitles = [...titles.values()].filter((l) => l.length > 1);
     const dupDescs = [...descs.values()].filter((l) => l.length > 1);
@@ -65,6 +65,7 @@ export function validate() {
     if (dupDescs.length) fail(`${label}_DUPLICATE_DESCRIPTION`, `${label}: ${dupDescs.length} meta description group(s) are duplicated.`, dupDescs.flat());
     if (tooLong.length) fail(`${label}_TITLE_TOO_LONG`, `${label}: title over 70 characters.`, tooLong);
     if (longDesc.length) fail(`${label}_DESCRIPTION_TOO_LONG`, `${label}: meta description over 160 characters.`, longDesc);
+    if (shortDesc.length) fail(`${label}_DESCRIPTION_TOO_SHORT`, `${label}: meta description under 45 characters.`, shortDesc);
     if (emptyDesc.length) fail(`${label}_EMPTY_DESCRIPTION`, `${label}: empty meta description.`, emptyDesc);
     notes.push(`${label}: ${rows.length} pages · duplicate titles ${dupTitles.length} groups · duplicate descriptions ${dupDescs.length} groups (${dupDescs.flat().length} pages) · short (<50) descriptions ${shortDesc.length}.`);
   };
