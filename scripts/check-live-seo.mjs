@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { SEO_CANONICAL_ORIGIN, SEO_REDIRECT_HOSTS } from "./seo-domain-policy.mjs";
+import { DEPLOYMENT_WAIT_TIMEOUT_MS, waitForHomepageDeployment as waitForMatchingHomepageDeployment } from "./live-seo-deployment-wait.mjs";
 
 const ORIGIN = SEO_CANONICAL_ORIGIN;
 const EXPECTED_HOMEPAGE_TITLE = "enV | Tools for everyday tasks";
@@ -9,7 +10,10 @@ const USER_AGENT = "enV-production-seo-smoke/1.0";
 const failures = [];
 const checked = [];
 const privatePaths = [
-  "/wallet", "/account", "/settings", "/login", "/search", "/updates", "/3d-game-studio",
+  "/account", "/agent", "/assistant", "/favorites", "/feedback", "/forgot-password",
+  "/help-feedback", "/history", "/login", "/pair-native", "/report-bugs", "/reset-password",
+  "/search", "/settings", "/signup", "/suggest-tool", "/token-dashboard", "/tokens",
+  "/updates", "/userbehavior", "/wallet", "/3d-game-studio",
 ];
 
 function assert(condition, message) {
@@ -36,13 +40,13 @@ function xmlDecode(value) {
     .replaceAll("&apos;", "'");
 }
 
-async function get(url, label) {
+async function get(url, label, requestUserAgent = USER_AGENT) {
   let lastError;
   for (let attempt = 1; attempt <= 4; attempt += 1) {
     try {
       const response = await fetch(url, {
         redirect: "follow",
-        headers: { "user-agent": USER_AGENT },
+        headers: { "user-agent": requestUserAgent },
         signal: AbortSignal.timeout(30_000),
       });
       if (response.status >= 500 && attempt < 4) {
@@ -176,36 +180,60 @@ async function checkCanonicalHosts() {
   }
 }
 
-async function waitForHomepageDeployment() {
-  // The live smoke is triggered by a Git push while Vercel builds in parallel.
-  // Wait for a page-level build marker before evaluating production metadata,
-  // otherwise a fast smoke can accidentally inspect the previous deployment.
-  let last = { status: 0, title: "", url: ORIGIN + "/" };
-  for (let attempt = 1; attempt <= 36; attempt += 1) {
-    try {
-      const response = await fetch(ORIGIN + "/", {
-        redirect: "follow",
-        headers: { "user-agent": USER_AGENT },
-        signal: AbortSignal.timeout(10_000),
-      });
-      const html = await response.text();
-      const head = html.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i)?.[1] ?? "";
-      const title = head.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "";
-      const buildSha = metaContent(head, "name", "env-build-sha");
-      last = { status: response.status, title, buildSha, url: response.url };
-      const matchingBuild = EXPECTED_BUILD_SHA ? buildSha === EXPECTED_BUILD_SHA : title === EXPECTED_HOMEPAGE_TITLE;
-      if (response.status === 200 && title === EXPECTED_HOMEPAGE_TITLE && matchingBuild) {
-        checked.push({ path: "/", status: response.status, title, buildSha, deploymentVersionConfirmed: true });
-        return true;
+async function checkCrawlerAccess() {
+  // This verifies HTTP delivery under crawler User-Agent request paths only.
+  // It does not authenticate a genuine crawler or replace provider IP validation.
+  const agents = ["Googlebot", "Bingbot", "OAI-SearchBot", "Claude-SearchBot", "PerplexityBot"];
+  const paths = ["/", "/tools", "/tools/developer/json-studio"];
+  for (const agent of agents) {
+    for (const path of paths) {
+      try {
+        const response = await get(ORIGIN + path, agent + " " + path, agent);
+        const html = await response.text();
+        const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+        assert(response.status === 200, agent + " received HTTP " + response.status + " for " + path);
+        assert(contentType.includes("text/html"), agent + " received a non-HTML response for " + path + ": " + contentType);
+        const head = html.match(/<head\\b[^>]*>([\\s\\S]*?)<\\/head>/i)?.[1] ?? "";
+        const title = head.match(/<title\\b[^>]*>([\\s\\S]*?)<\\/title>/i)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "";
+        const buildSha = metaContent(head, "name", "env-build-sha");
+        assert(Boolean(title), agent + " received HTML without a page title for " + path);
+        if (EXPECTED_BUILD_SHA) assert(buildSha === EXPECTED_BUILD_SHA, agent + " received a stale deployment for " + path + " (build SHA " + buildSha + ")");
+        assert(!/challenge-platform|cf-chl-|just a moment\.\.\./i.test(html), agent + " received a bot challenge page for " + path);
+        checked.push({ path, crawlerUserAgent: agent, status: response.status, title, buildSha, contentType });
+      } catch (error) {
+        failures.push(agent + " could not fetch " + path + ": " + String(error));
       }
-    } catch (error) {
-      last = { status: 0, title: "", url: ORIGIN + "/", error: String(error) };
     }
-    if (attempt < 36) await new Promise((resolve) => setTimeout(resolve, 5_000));
+  }
+}
+
+async function waitForHomepageDeployment() {
+  // A Git push starts the production smoke and Vercel build in parallel.
+  // Match the exact commit before checking redirects or page metadata so the
+  // smoke cannot accidentally certify the previous production deployment.
+  const result = await waitForMatchingHomepageDeployment({
+    origin: ORIGIN,
+    expectedTitle: EXPECTED_HOMEPAGE_TITLE,
+    expectedSha: EXPECTED_BUILD_SHA,
+    fetchImpl: (url, options) => fetch(url, options),
+    requestHeaders: { "user-agent": USER_AGENT },
+  });
+  if (result.matched) {
+    checked.push({
+      path: "/",
+      status: result.last.status,
+      title: result.last.title,
+      buildSha: result.last.buildSha,
+      deploymentVersionConfirmed: true,
+      waitAttempts: result.attempts,
+      waitDurationMs: result.elapsedMs,
+    });
+    return true;
   }
   failures.push(
-    "production did not serve the current homepage build within 180 seconds (expected title="
-    + JSON.stringify(EXPECTED_HOMEPAGE_TITLE) + ", last response=" + JSON.stringify(last) + ")"
+    "production did not serve the current homepage build within "
+    + Math.round(DEPLOYMENT_WAIT_TIMEOUT_MS / 60_000) + " minutes (expected title="
+    + JSON.stringify(EXPECTED_HOMEPAGE_TITLE) + ", last response=" + JSON.stringify(result.last) + ")"
   );
   return false;
 }
@@ -277,6 +305,7 @@ async function main() {
     await waitForHomepageDeployment();
     await checkStaticAssets();
     await checkCanonicalHosts();
+    await checkCrawlerAccess();
     for (const [path, schema] of [
       ["/", "WebSite"],
       ["/tools", "CollectionPage"],
