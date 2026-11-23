@@ -156,6 +156,29 @@ const retiredDesignBuildCalculatorIds = new Set([
   "math-exp-sum-business-sum-design-effort-build-effort-delivery-effort-333-c",
 ]);
 
+const sceneStudioTool: ToolMeta = {
+  id: "scene-studio",
+  name: "Scene Studio",
+  slug: "scene-studio",
+  description: "Build short video scenes with a visual timeline, animated objects, camera moves, captions, audio layers and export controls. Validate the scene before rendering and review the exported video.",
+  category: "video",
+  subcategory: "Scene editing",
+  keywords: ["scene studio", "video scene editor", "scene editor", "video editor", "timeline", "animation", "3d scene", "3d animation", "captions", "subtitles", "camera movement", "storyboard", "mp4 export", "scene json"],
+  tags: ["video", "scene", "editor", "timeline", "animation", "captions", "3d"],
+  icon: "Clapperboard",
+  iconBackground: "#171b1e",
+  iconAccent: "#2ec4b6",
+  popularity: 1500,
+  featured: true,
+  clientSide: true,
+  requiresBackend: false,
+  requiresAuth: false,
+  status: "active",
+  related: [],
+  engine: { type: "custom", id: "scene-studio" },
+  isNew: true,
+};
+
 const cameraStudioTool: ToolMeta = {
   id: "camera-studio",
   name: "Camera Studio",
@@ -277,10 +300,10 @@ const catalogRuntimeTools: ToolMeta[] = [
   // without changing the independent Android/iOS catalogues in this browser task.
   ...catalogTools.filter((catalogTool) => !retiredDesignBuildCalculatorIds.has(catalogTool.id)).map((catalogTool) => {
     const presentedTool = presentGeneratedCalculator(catalogTool);
-    const webTool: ToolMeta = (presentedTool.category === "qr" || (presentedTool.category === "ecommerce" && presentedTool.engine.type === "custom"))
+    const webTool: ToolMeta = (presentedTool.id === "scene-studio" && presentedTool.status === "planned" ? { ...presentedTool, status: "active" } : (presentedTool.category === "qr" || (presentedTool.category === "ecommerce" && presentedTool.engine.type === "custom"))
       && presentedTool.status === "planned"
       ? { ...presentedTool, status: "active" }
-      : presentedTool;
+      : presentedTool);
     if (webTool.id === "css-minifier-advanced") {
       return {
         ...webTool,
@@ -319,6 +342,7 @@ const catalogRuntimeTools: ToolMeta[] = [
   ...(!catalogTools.some((tool) => tool.id === aBookTool.id) ? [aBookTool] : []),
   ...(!catalogTools.some((tool) => tool.id === zipAnyFileTool.id) ? [zipAnyFileTool] : []),
   ...(!catalogTools.some((tool) => tool.id === cameraStudioTool.id) ? [cameraStudioTool] : []),
+  ...(!catalogTools.some((tool) => tool.id === sceneStudioTool.id) ? [sceneStudioTool] : []),
   ...(!catalogTools.some((tool) => tool.id === smartphonePrototypeLabTool.id) ? [smartphonePrototypeLabTool] : []),
   ...fileWorkspaceTools.filter((tool) => !catalogTools.some((catalogTool) => catalogTool.id === tool.id)),
 ];
