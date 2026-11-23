@@ -243,6 +243,7 @@ for (const tool of result.tools) {
   assert.ok(result.urls.includes(route), "Missing sitemap entry for " + tool.id);
   assert.ok(result.urls.includes(guide), "Missing guide sitemap entry for " + tool.id);
   assert.ok(result.llms.includes("https://envtools.store" + route), "Missing llms.txt tool link for " + tool.id);
+  assert.ok(result.llms.includes(toolSeoDescription(tool, result.tools)), "llms.txt must retain the individual task description for " + tool.id);
   assert.ok(result.llms.includes("https://envtools.store" + guide), "Missing llms.txt guide link for " + tool.id);
 }
 assert.ok(renderedAuditWorkflowSource.includes("docs/seo-tool-inventory.md"), "Rendered SEO workflow must upload the generated per-tool review inventory as an artifact.");
