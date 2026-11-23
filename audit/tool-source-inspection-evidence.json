@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "evidenceSetId": "full-public-discovery-source-review-582bdea",
-  "inspectedAgainstCommit": "582bdea89ff8a7ad3dc5b0458bc1fd6024bfc4e1",
-  "note": "Content-pinned source review for the 17 Files/CSS tool IDs with browser evidence. The three changed source files were re-reviewed against the 23 November discovery branch head; every listed path is pinned to its exact Git blob SHA-1. Source inspection does not imply full functional, token, offline, backend, accessibility, or native verification.",
+  "evidenceSetId": "full-public-discovery-source-review-20261123",
+  "inspectedAgainstCommit": "58c2c6a285085248d9a32fbc776fa2421208bee4",
+  "note": "Content-pinned source review for the 17 Files/CSS tool IDs with browser evidence. Source implementation hashes were checked against the 23 November discovery head; the tool-route file was re-reviewed after its canonical SEO resolver was indexed, and all listed paths are pinned to their exact Git blob SHA-1. Source inspection does not imply full functional, token, offline, backend, accessibility, or native verification.",
   "records": [
     {
       "id": "files-workspace-six-source-review",
@@ -200,7 +200,7 @@
         },
         {
           "path": "src/routes/tools/$category/$slug.tsx",
-          "gitBlobSha1": "6e624815c82d33787aeb9664522d660c3fc0e517"
+          "gitBlobSha1": "c6654eb1fa2af7cc9ba543d50a64c640dfe7f58c"
         },
         {
           "path": "src/components/tools/tool-engine.tsx",
@@ -233,7 +233,7 @@
         "CSS comment, whitespace and trailing-semicolon handling",
         "Web execution dispatch"
       ],
-      "notes": "Reviewed the current Web source path. Separate browser evidence verifies representative execution and output; source review alone is not native or full functional acceptance."
+      "notes": "Reviewed the current Web source path at the discovery head. The route now uses a precomputed canonical SEO resolver; the legacy CSS minify route still preserves css-minify while redirecting into Markup & Style Studio. Separate browser evidence verifies representative execution and output; source review alone is not native or full functional acceptance."
     }
   ]
 }
