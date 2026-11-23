@@ -1,4 +1,4 @@
-name: Temporary discovery artifact regeneration
+name: One-time source-aligned discovery artifact regeneration
 
 on:
   push:
