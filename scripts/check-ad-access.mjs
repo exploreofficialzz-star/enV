@@ -112,18 +112,23 @@ assert.match(androidMain, /NativeToolAccessPolicy\.isApplicationOnline/, "Androi
 assert.match(androidMain, /journal\.beginOperation\(context, allowanceId, tool\.id\)/, "Android offline runs must be journalled against a signed allowance.");
 assert.doesNotMatch(androidMain, /NativeRewardedToolAccessGate|NativeToolAdSlot|NativeAdsPrivacyManager/, "Android tool screens must not render ad gates or placements before the native ad launch.");
 assert.doesNotMatch(androidGradle, /ads-mobile-sdk|user-messaging-platform|ENV_ADMOB|ENV_GAM_REWARDED|ENV_ADS_ENABLED/, "Android Gradle must not bundle Google Mobile Ads or UMP.");
-assert.match(androidGradle, /ENV_HYBRID_TOOL_IDS/, "Android build configuration must expose the prelaunch hybrid allowlist.");
+assert.doesNotMatch(androidGradle, /ENV_HYBRID_TOOL_IDS/, "Android build configuration must not use an ad-specific hybrid allowlist.");
+assert.match(androidGradle, /sourceSets\["main"\]\.assets\.srcDir\(file\("\.\.\/\.\.\/shared"\)\)/, "Android must bundle the shared offline registry as a native asset.");
+assert.match(androidAds, /profile\.billingKey\.startsWith\("local\."\)/, "Android hybrid access must use local billing profiles.");
+assert.match(androidAds, /hasAllPlatforms/, "Android hybrid access must require Web, Android and iOS coverage.");
 assert.doesNotMatch(androidManifest, /com\.google\.android\.gms\.ads\.APPLICATION_ID/, "Android manifest must not contain an AdMob app ID.");
 assert.doesNotMatch(androidInfo, /NativeAdsPrivacyDisclosure|NativeAdsPrivacyOptionsButton/, "Android Privacy screen must not expose unconfigured Google ad controls.");
 
 assert.doesNotMatch(iosAds, /GoogleMobileAds|UserMessagingPlatform|RewardedAd|AdManagerRequest|NativeRewardedToolAccessGate|NativeToolAdSlot/, "iOS must ship no Google ads SDK, consent manager, rewarded gate, or ad placement.");
-assert.match(iosAds, /NativeToolAccessPolicy/, "iOS must retain its native signed-wallet eligibility policy.");
-assert.match(iosAds, /ENV_HYBRID_TOOL_IDS/, "iOS hybrid access must use its native allowlist.");
+assert.match(iosAds, /enum NativeAdsPolicy/, "iOS must retain the native online/offline eligibility policy without an ad SDK.");
+assert.match(iosAds, /crossPlatformMeteredIDs/, "iOS hybrid access must derive its cohort from the shared cross-platform offline registry.");
+assert.match(iosAds, /billingKey\.hasPrefix\("local\."/ , "iOS hybrid access must include only locally metered profiles.");
 assert.match(iosAds, /isApplicationOnline\(\) async/, "iOS must verify enV origin reachability.");
 assert.doesNotMatch(iosApp, /NativeAdsPrivacyManager|refreshConsentAtLaunch/, "iOS app startup must not initialize a native advertising consent SDK.");
 assert.doesNotMatch(iosInfo, /NativeAdsPolicy|NativeAdsPrivacyManager|Advertising privacy options|Google Mobile Ads/, "iOS Privacy screen must not expose unconfigured native ad controls.");
 assert.doesNotMatch(iosInfoPlist, /GADApplicationIdentifier|ENV_ADMOB|ENV_GAM_REWARDED|ENV_ADS_ENABLED|ENV_AD_ACCESS/, "iOS Info.plist must not include Google advertising identifiers or access flags.");
-assert.match(iosInfoPlist, /ENV_HYBRID_TOOL_IDS/, "iOS Info.plist must expose only the native hybrid/offline cohort configuration.");
+assert.doesNotMatch(iosInfoPlist, /ENV_HYBRID_TOOL_IDS/, "iOS Info.plist must not use an ad-specific hybrid allowlist.");
+assert.match(iosProject, /offline-eligible-tools\.json in Resources/, "iOS must bundle the shared offline eligibility registry.");
 assert.doesNotMatch(iosProject, /GoogleMobileAds|GoogleUserMessagingPlatform|ENV_ADMOB|ENV_GAM_REWARDED|ENV_ADS_ENABLED/, "Xcode must not fetch Google advertising packages or retain their build flags.");
 assert.doesNotMatch(rollout, /AdSense|AdMob|Google Ad Manager|UMP/, "The Adsterra rollout guide must describe the single current Web provider and native prelaunch boundary.");
 
