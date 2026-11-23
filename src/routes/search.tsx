@@ -41,7 +41,7 @@ function Search() {
                   <p className="mt-2 px-1 text-xs leading-5 text-muted" aria-label={"Why " + tool.name + " matched"}>{explanation}</p>
                 </div>
               ))}</div>
-              {visibleCount < results.matchCount ? <button type="button" className="mt-8 rounded-md bg-surface px-4 py-2 text-sm font-medium shadow-[var(--shadow-border)] hover:text-accent" onClick={() => setVisibleCount((count) => Math.min(count + PAGE_SIZE, results.length))}>See more results</button> : null}
+              {visibleCount < results.matchCount ? <button type="button" className="mt-8 rounded-md bg-surface px-4 py-2 text-sm font-medium shadow-[var(--shadow-border)] hover:text-accent" onClick={() => setVisibleCount((count) => Math.min(count + PAGE_SIZE, results.matchCount))}>See more results</button> : null}
             </>}
           </div>
         ) : <p className="mt-8 text-sm text-muted">Start typing to see matching tools.</p>}
