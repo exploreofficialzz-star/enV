@@ -243,6 +243,12 @@ for (const article of result.articles) {
   assert.ok(result.urls.includes("/blog/" + article.slug), "Missing article sitemap entry for " + article.slug);
   assert.ok(result.llms.includes("https://envtools.store/blog/" + article.slug), "Missing article in llms.txt for " + article.slug);
 }
+const publicGuideDescriptions = result.guideTools.map((tool) => toolGuideSeoDescription(tool));
+assert.equal(
+  new Set(publicGuideDescriptions).size,
+  publicGuideDescriptions.length,
+  "Public tool guide meta descriptions must be unique across canonical guide routes.",
+);
 for (const tool of result.guideTools) {
   const taskGuidanceSource = toolTaskGuidanceSource(tool);
   const guideInventorySection = result.inventory.split("## Individual usage guide coverage")[1] ?? "";
