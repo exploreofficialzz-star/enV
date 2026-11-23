@@ -15,7 +15,7 @@ assert.match(registry, /scene-studio-tool|scene-studio/i);
 assert.match(toolEngine, /tool\.id\s*===\s*["']scene-studio["']/);
 assert.match(toolEngine, /SceneStudioEngine/);
 assert.match(preload, /tool\.id\s*===\s*["']scene-studio["']/);
-assert.ok(preload.includes(enginePath.replace(/^src\//, "@/")), "navigation preloader must resolve the same engine module");
+assert.ok(preload.includes(enginePath.replace(/^src\//, "@/").replace(/\.tsx$/, "")), "navigation preloader must resolve the same engine module");
 assert.match(documentation, /id\s*===\s*["']scene-studio["']/);
 const guideStart = documentation.indexOf('if (id === "scene-studio")');
 const guideEnd = documentation.indexOf('if (id === "camera-studio")', guideStart);
