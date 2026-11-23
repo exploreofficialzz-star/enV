@@ -23,8 +23,6 @@ on:
       - "public/llms.txt"
       - "vercel.json"
   workflow_dispatch:
-  schedule:
-    - cron: "*/30 * * * *"
 
 permissions:
   contents: read
