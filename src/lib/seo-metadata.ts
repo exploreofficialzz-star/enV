@@ -225,20 +225,39 @@ function seoCollisionIndex(peers: readonly ToolMeta[], keyFor: SeoCollisionKey):
   return index;
 }
 
+function compactSeoDescriptionId(id: string): string {
+  if (id.length <= 88) return id;
+
+  // Keep unusually long stable IDs distinct without allowing them to consume
+  // the entire search snippet. Two independent 32-bit rolling hashes provide a
+  // compact, deterministic suffix; the canonical URL still retains the full ID.
+  let firstHash = 2166136261;
+  let secondHash = 0x9e3779b9;
+  for (let index = 0; index < id.length; index += 1) {
+    const character = id.charCodeAt(index);
+    firstHash = Math.imul(firstHash ^ character, 16777619) >>> 0;
+    secondHash = Math.imul(secondHash ^ character, 2246822519) >>> 0;
+  }
+  const suffix = "-" + firstHash.toString(36) + secondHash.toString(36);
+  return id.slice(0, 88 - suffix.length) + suffix;
+}
+
 function uniqueToolDescription(base: string, tool: ToolMeta, peers: readonly ToolMeta[], baseFor: (candidate: ToolMeta) => string): string {
   const collisions = seoCollisionIndex(peers, baseFor).get(base);
   if (!collisions || collisions.size <= 1) return base;
 
   // Generated catalogue records can share the same engine-family summary and even
-  // the same display name. Keep the visible task first, then add a stable ID only
-  // for colliding pages so every canonical URL has its own accurate description.
+  // the same display name. Keep the visible task first, then add a compact stable
+  // ID only for colliding pages so every canonical URL has its own accurate description.
   const task = String(tool.description ?? "").replace(/\s+/g, " ").trim()
     || tool.engine.type + ("op" in tool.engine ? " " + String(tool.engine.op) : "");
-  const discriminator = " · Task: " + cleanMetaDescription(task || tool.name, 38) + " · " + tool.id;
-  const baseBudget = Math.max(1, 160 - discriminator.length);
+  const descriptionId = compactSeoDescriptionId(tool.id);
+  const taskBudget = Math.max(1, 160 - 45 - " · Task: ".length - " · ".length - descriptionId.length);
+  const taskSummary = cleanMetaDescription(task || tool.name, Math.min(38, taskBudget));
+  const discriminator = " · Task: " + taskSummary + " · " + descriptionId;
+  const baseBudget = 160 - discriminator.length;
   return cleanMetaDescription(base, baseBudget) + discriminator;
 }
-
 function toolSeoDescriptionBase(tool: ToolMeta): string {
   return cleanMetaDescription(toolDocumentationSummary(tool), 160);
 }
