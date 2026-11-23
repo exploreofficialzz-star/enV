@@ -1,0 +1,166 @@
+name: Import audited Scene Studio package
+
+on:
+  push:
+    branches:
+      - feat/scene-studio-package-integration-20261123
+    paths:
+      - .github/workflows/import-scene-studio-package.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: scene-studio-package-import
+  cancel-in-progress: false
+
+jobs:
+  import-package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out integration branch
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: true
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22"
+
+      - name: Fetch the staged package archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            refs/heads/feat/scene-studio-discovery-20261123:refs/remotes/origin/scene-studio-discovery-20261123
+          git fetch --no-tags origin \
+            refs/heads/feat/scene-studio-tool-discovery-20261123:refs/remotes/origin/scene-studio-tool-discovery-20261123
+          mkdir -p "$RUNNER_TEMP/scene-studio-import"
+
+      - name: Reconstruct and safely extract the uploaded ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/scene-studio-import"
+          encoded="$work/package.xz.b64"
+          compressed="$work/package.xz"
+          archive="$work/scene-studio-status-package.zip"
+          extracted="$work/extracted"
+          : > "$encoded"
+          for part in 00 01 02 03 04 05 06 07 08; do
+            git show "origin/scene-studio-discovery-20261123:.incoming/scene-studio-package-xz.$part" >> "$encoded"
+          done
+          base64 --decode "$encoded" > "$compressed"
+          xz --test "$compressed"
+          xz --decompress --stdout "$compressed" > "$archive"
+          unzip -tq "$archive"
+          python3 - "$archive" "$extracted" <<'PY'
+          import pathlib, sys, zipfile
+          archive, destination = sys.argv[1], pathlib.Path(sys.argv[2])
+          with zipfile.ZipFile(archive) as bundle:
+              entries = bundle.infolist()
+              for entry in entries:
+                  path = pathlib.PurePosixPath(entry.filename)
+                  if path.is_absolute() or ".." in path.parts or not path.parts:
+                      raise SystemExit(f"Unsafe ZIP path: {entry.filename!r}")
+              bundle.extractall(destination)
+          print(f"Extracted {len(entries)} verified package entries.")
+          PY
+
+      - name: Overlay the reviewed repository files and merge package scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import path from "node:path";
+
+          const root = process.cwd();
+          const extracted = path.join(process.env.RUNNER_TEMP, "scene-studio-import", "extracted");
+          const manifestPath = path.join(extracted, "FILE_LIST.txt");
+          const manifest = fs.readFileSync(manifestPath, "utf8").split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+          if (manifest.length !== 82 || manifest.includes("../") || manifest.some(x => path.isAbsolute(x))) {
+            throw new Error("Unexpected Scene Studio file manifest (" + manifest.length + " paths).");
+          }
+
+          for (const relative of manifest) {
+            if (relative === "package.json") continue;
+            const source = path.join(extracted, relative);
+            const target = path.join(root, relative);
+            if (!fs.existsSync(source) || !fs.statSync(source).isFile()) {
+              throw new Error("Package manifest file is missing: " + relative);
+            }
+            fs.mkdirSync(path.dirname(target), { recursive: true });
+            fs.copyFileSync(source, target);
+          }
+
+          const sourcePackage = JSON.parse(fs.readFileSync(path.join(extracted, "package.json"), "utf8"));
+          const currentPackagePath = path.join(root, "package.json");
+          const currentPackage = JSON.parse(fs.readFileSync(currentPackagePath, "utf8"));
+          const availableDependencies = { ...(currentPackage.dependencies || {}), ...(currentPackage.devDependencies || {}) };
+          const missingDependencies = Object.keys(sourcePackage.dependencies || {}).filter(name => !availableDependencies[name]);
+          if (missingDependencies.length) {
+            throw new Error("Uploaded package expects dependencies not present in current enV: " + missingDependencies.join(", "));
+          }
+
+          currentPackage.scripts ??= {};
+          currentPackage.scripts["check:scene-studio-assets"] =
+            "node --experimental-strip-types scripts/check-scene-studio-assets.mjs";
+          currentPackage.scripts["check:scene-studio-discovery"] =
+            "node scripts/check-scene-studio-discovery.mjs";
+          let testCommand = currentPackage.scripts.test || "npm run verify";
+          for (const command of [
+            "node --experimental-strip-types --test src/lib/scene-studio/*.test.ts",
+            "npm run check:scene-studio-assets",
+            "npm run check:scene-studio-discovery"
+          ]) {
+            if (!testCommand.includes(command)) testCommand += " && " + command;
+          }
+          currentPackage.scripts.test = testCommand;
+          fs.writeFileSync(currentPackagePath, JSON.stringify(currentPackage, null, 2) + "\n");
+          console.log("Overlayed " + (manifest.length - 1) + " Scene Studio source/documentation files and merged test scripts without replacing enV's package manifest.");
+          NODE
+
+          git show origin/feat/scene-studio-tool-discovery-20261123:scripts/check-scene-studio-discovery.mjs > scripts/check-scene-studio-discovery.mjs
+          git show origin/feat/scene-studio-tool-discovery-20261123:src/lib/tool-documentation.ts > "$RUNNER_TEMP/scene-studio-tool-documentation.ts"
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const source = fs.readFileSync(process.env.RUNNER_TEMP + "/scene-studio-tool-documentation.ts", "utf8");
+          const targetPath = "src/lib/tool-documentation.ts";
+          let target = fs.readFileSync(targetPath, "utf8");
+          if (!target.includes('if (id === "scene-studio")')) {
+            const start = source.indexOf('if (id === "scene-studio")');
+            const camera = source.indexOf('if (id === "camera-studio")', start);
+            const targetCamera = target.indexOf('if (id === "camera-studio")');
+            if (start < 0 || camera < 0 || targetCamera < 0) {
+              throw new Error("Could not locate the reviewed Scene Studio guide or current camera-guide insertion point.");
+            }
+            const blockStart = source.lastIndexOf("\n", start) + 1;
+            const blockEnd = source.lastIndexOf("\n", camera) + 1;
+            const targetStart = target.lastIndexOf("\n", targetCamera) + 1;
+            target = target.slice(0, targetStart) + source.slice(blockStart, blockEnd) + target.slice(targetStart);
+            fs.writeFileSync(targetPath, target);
+          }
+          console.log("Integrated the operation-specific Scene Studio in-app guide.");
+          NODE
+
+      - name: Run Scene Studio logic, asset and discovery checks
+        run: |
+          node --experimental-strip-types --test src/lib/scene-studio/*.test.ts
+          npm run check:scene-studio-assets
+          npm run check:scene-studio-discovery
+          git diff --check
+
+      - name: Remove one-time import workflow and commit the package
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/import-scene-studio-package.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(scene-studio): integrate audited full implementation"
+          git push origin HEAD:feat/scene-studio-package-integration-20261123
+          echo "Integrated commit: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
