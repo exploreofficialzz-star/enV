@@ -10,7 +10,7 @@ import { isToolUnderProduction } from "../src/lib/production-notice.ts";
 import { isGenericWorkflowPlaceholder } from "../src/lib/generic-workflow-policy.mjs";
 import { tools as sourceCatalogTools } from "../src/data/catalog.ts";
 import { createSocialCardArtifacts } from "./social-card-images.mjs";
-import { canonicalSeoTools, canonicalSeoToolFor, canonicalToolPath, isIndexableTool, toolSeoTitle, toolSeoDescription, toolGuideSeoTitle, toolSearchIntentTerms } from "../src/lib/seo-metadata.ts";
+import { canonicalSeoTools, canonicalSeoToolFor, canonicalToolPath, isIndexableTool, toolSeoTitle, toolSeoDescription, toolGuideSeoTitle, toolGuideSeoDescription, toolSearchIntentTerms } from "../src/lib/seo-metadata.ts";
 import { toolTaskGuidanceSource, toolDocumentationSummary, toolStatusLabel } from "../src/lib/tool-documentation.ts";
 import { buildIndexNowKeyArtifact } from "./indexnow-utils.mjs";
 
@@ -223,7 +223,7 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
     tableCell(inventoryCatalogueFlags(tool)),
     tableCell(toolTaskGuidanceSource(tool)),
     tableCell(toolGuideSeoTitle(tool, guideTools)),
-    tableCell(toolSeoDescription(tool)),
+    tableCell(toolGuideSeoDescription(tool)),
     "[Open tool](" + SITE_ORIGIN + canonicalToolPath(tool) + ") |",
   ].join(" | "));
   // Inventory every source/runtime/search/category surface, not only canonical SEO pages.
