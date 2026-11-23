@@ -547,7 +547,16 @@ export function createCanonicalSeoToolResolver(canonicalTools: readonly ToolMeta
   };
 }
 
+const canonicalSeoResolvers = new WeakMap<readonly ToolMeta[], (tool: ToolMeta) => ToolMeta | undefined>();
+
 export function canonicalSeoToolFor(tool: ToolMeta, canonicalTools: readonly ToolMeta[]): ToolMeta | undefined {
-  return createCanonicalSeoToolResolver(canonicalTools)(tool);
+  // Preserve the simple legacy API without rebuilding its ID/fingerprint indexes
+  // for every page request. Canonical candidate arrays are immutable per build.
+  let resolve = canonicalSeoResolvers.get(canonicalTools);
+  if (!resolve) {
+    resolve = createCanonicalSeoToolResolver(canonicalTools);
+    canonicalSeoResolvers.set(canonicalTools, resolve);
+  }
+  return resolve(tool);
 }
 
