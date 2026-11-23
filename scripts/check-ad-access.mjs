@@ -104,7 +104,7 @@ assert.match(adsTxt, /exact authorized-seller record from the Adsterra publisher
 
 assert.doesNotMatch(androidAds, /com\.google\.android\.libraries\.ads|com\.google\.android\.ump|MobileAds|RewardedAd/, "Android must ship no Google ad SDK or rewarded placement in the prelaunch build.");
 assert.match(androidAds, /NativeToolAccessPolicy/, "Android must retain a native tool/offline access policy.");
-assert.match(androidAds, /ENV_HYBRID_TOOL_IDS/, "Android hybrid access must use its native allowlist.");
+assert.match(androidAds, /crossPlatformMeteredIds/, "Android hybrid access must derive its cohort from the shared offline registry.");
 assert.match(androidAds, /hasValidatedInternet/, "Android must validate network reachability.");
 assert.match(androidMain, /NativeToolAccessContainer/, "Android tool screens must use the native prelaunch container.");
 assert.match(androidMain, /NativeToolAccessPolicy\.isHybridTool/, "Android calculator execution must retain the selected hybrid cohort decision.");
@@ -132,6 +132,8 @@ assert.doesNotMatch(iosInfoPlist, /GADApplicationIdentifier|ENV_ADMOB|ENV_GAM_RE
 assert.doesNotMatch(iosInfoPlist, /ENV_HYBRID_TOOL_IDS/, "iOS Info.plist must not use an ad-specific hybrid allowlist.");
 assert.match(iosProject, /offline-eligible-tools\.json in Resources/, "iOS must bundle the shared offline eligibility registry.");
 assert.doesNotMatch(iosProject, /GoogleMobileAds|GoogleUserMessagingPlatform|ENV_ADMOB|ENV_GAM_REWARDED|ENV_ADS_ENABLED/, "Xcode must not fetch Google advertising packages or retain their build flags.");
-assert.doesNotMatch(rollout, /AdSense|AdMob|Google Ad Manager|UMP/, "The Adsterra rollout guide must describe the single current Web provider and native prelaunch boundary.");
+assert.match(rollout, /Adsterra is the only advertising provider used by enV Web/, "The rollout guide must establish Adsterra as the single Web provider.");
+assert.match(rollout, /Android and iOS ship with no advertising SDK/, "The rollout guide must keep native ads deferred.");
+assert.match(rollout, /not a documented per-user rewarded-video completion callback/, "The rollout guide must not misrepresent Adsterra aggregate reporting as rewarded completion.");
 
 console.log("PASS: Adsterra-only Web placements and consent, honest three-visit offer, approved token reservations, signed offline-wallet enforcement, and Google-free native prelaunch builds.");
