@@ -210,7 +210,7 @@ async function checkCrawlerAccess() {
         const buildSha = metaContent(head, "name", "env-build-sha");
         assert(Boolean(title), agent + " received HTML without a page title for " + path);
         if (EXPECTED_BUILD_SHA) assert(buildSha === EXPECTED_BUILD_SHA, agent + " received a stale deployment for " + path + " (build SHA " + buildSha + ")");
-        assert(!/challenge-platform|cf-chl-|just a moment\\.\\.\\./i.test(html), agent + " received a bot challenge page for " + path);
+        assert(!/challenge-platform|cf-chl-|just a moment/i.test(html), agent + " received a bot challenge page for " + path);
         checked.push({ path, crawlerUserAgent: agent, status: response.status, title, buildSha, contentType });
       } catch (error) {
         failures.push(agent + " could not fetch " + path + ": " + String(error));
