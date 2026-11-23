@@ -71,6 +71,12 @@ jobs:
       - name: Run discovery, guide and SEO regression tests
         run: npm run test:discovery
 
+      - name: Run discovery relevance, phrasing and cross-link gates
+        run: npm run discovery:check
+
+      - name: Typecheck the application
+        run: npm run typecheck
+
       - name: Start local SSR server
         shell: bash
         run: |
