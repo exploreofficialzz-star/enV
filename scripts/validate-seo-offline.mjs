@@ -67,7 +67,7 @@ export function validate() {
     if (longDesc.length) fail(`${label}_DESCRIPTION_TOO_LONG`, `${label}: meta description over 160 characters.`, longDesc);
     if (shortDesc.length) fail(`${label}_DESCRIPTION_TOO_SHORT`, `${label}: meta description under 45 characters.`, shortDesc);
     if (emptyDesc.length) fail(`${label}_EMPTY_DESCRIPTION`, `${label}: empty meta description.`, emptyDesc);
-    notes.push(`${label}: ${rows.length} pages · duplicate titles ${dupTitles.length} groups · duplicate descriptions ${dupDescs.length} groups (${dupDescs.flat().length} pages) · short (<50) descriptions ${shortDesc.length}.`);
+    notes.push(`${label}: ${rows.length} pages · duplicate titles ${dupTitles.length} groups · duplicate descriptions ${dupDescs.length} groups (${dupDescs.flat().length} pages) · short (<45) descriptions ${shortDesc.length}.`);
   };
   meta("TOOL_PAGE", a.tools.map((t) => ({ id: t.id, title: toolSeoTitle(t, a.tools), description: toolSeoDescription(t, a.tools) })));
   meta("GUIDE_PAGE", a.guideTools.map((t) => ({ id: t.id, title: toolGuideSeoTitle(t, a.guideTools), description: toolGuideSeoDescription(t, a.guideTools) })));
