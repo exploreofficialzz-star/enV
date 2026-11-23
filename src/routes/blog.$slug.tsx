@@ -71,7 +71,7 @@ export const Route = createFileRoute("/blog/$slug")({
       });
     }
     const path = "/blog/tool-" + loaderData.tool.id;
-    const description = toolGuideSeoDescription(loaderData.tool);
+    const description = toolGuideSeoDescription(loaderData.tool, CANONICAL_SEO_GUIDES);
     if (!isIndexableTool(loaderData.tool)) {
       return {
         meta: [
