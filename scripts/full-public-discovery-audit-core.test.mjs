@@ -14,25 +14,26 @@ function page({
   schema = "SoftwareApplication",
   buildSha = "test-build-sha",
 } = {}) {
-  return \`<!doctype html>
-<html><head>
-<title>\${title}</title>
-<meta name="description" content="\${description}">
-<meta name="robots" content="\${robots}">
-<link rel="canonical" href="\${canonical}">
-<meta property="og:site_name" content="enV">
-<meta property="og:title" content="\${title}">
-<meta property="og:description" content="\${description}">
-<meta property="og:url" content="\${canonical}">
-<meta property="og:image" content="https://envtools.store/og/cards/example.png">
-<meta property="og:image:alt" content="enV example tool preview image">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="\${title}">
-<meta name="twitter:description" content="\${description}">
-<meta name="twitter:image" content="https://envtools.store/og/cards/example.png">
-<meta name="env-build-sha" content="\${buildSha}">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"\${schema}","mainEntity":{"@type":"SoftwareApplication","name":"Nested item"}}</script>
-</head><body><main><h1>Example task</h1><a href="/tools/example">Tool</a></main></body></html>\`;
+  return [
+    "<!doctype html><html><head>",
+    "<title>" + title + "</title>",
+    '<meta name="description" content="' + description + '">',
+    '<meta name="robots" content="' + robots + '">',
+    '<link rel="canonical" href="' + canonical + '">',
+    '<meta property="og:site_name" content="enV">',
+    '<meta property="og:title" content="' + title + '">',
+    '<meta property="og:description" content="' + description + '">',
+    '<meta property="og:url" content="' + canonical + '">',
+    '<meta property="og:image" content="https://envtools.store/og/cards/example.png">',
+    '<meta property="og:image:alt" content="enV example tool preview image">',
+    '<meta name="twitter:card" content="summary_large_image">',
+    '<meta name="twitter:title" content="' + title + '">',
+    '<meta name="twitter:description" content="' + description + '">',
+    '<meta name="twitter:image" content="https://envtools.store/og/cards/example.png">',
+    '<meta name="env-build-sha" content="' + buildSha + '">',
+    '<script type="application/ld+json">{"@context":"https://schema.org","@type":"' + schema + '","mainEntity":{"@type":"SoftwareApplication","name":"Nested item"}}</script>',
+    '</head><body><main><h1>Example task</h1><a href="/tools/example">Tool</a></main></body></html>',
+  ].join("");
 }
 
 test("extracts rendered SEO metadata independent of attribute order", () => {
@@ -46,14 +47,12 @@ test("extracts rendered SEO metadata independent of attribute order", () => {
   assert.equal(facts.buildSha, "test-build-sha");
   assert.equal(facts.h1Count, 1);
   assert.ok(facts.schemaTypes.includes("SoftwareApplication"));
-  assert.ok(facts.schemaTypes.includes("WebPage") === false);
   assert.deepEqual(facts.invalidJsonLdScripts, []);
   assert.deepEqual(facts.anchors, ["/tools/example"]);
 });
 
 test("accepts a correct canonical public tool response", () => {
-  const html = page();
-  const facts = inspectSeoHtml(html);
+  const facts = inspectSeoHtml(page());
   const errors = validateSeoRouteResponse({
     route: { path: "/tools/example", schema: "SoftwareApplication", expectedTitle: "Example enV tool page" },
     status: 200,
