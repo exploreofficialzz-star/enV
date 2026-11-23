@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { getAllTools } from "../src/lib/registry.ts";
+
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 const migration = await read("migrations/0002_billing.sql");
@@ -88,11 +88,7 @@ const { DATETIME_TOOL_EXTENSIONS } = await import("../src/lib/datetime/catalog-t
 const baseProfileIds = new Set(profiles.profiles.map((profile) => profile.toolId));
 const runtimeExtensionProfileIds = new Set(runtimeExtensionProfileIndex.profiles.map((profile) => profile.toolId));
 const profileIds = new Set([...baseProfileIds, ...runtimeExtensionProfileIds]);
-const runtimeExtensionIdsForCatalog = new Set([
-  ...(nativeInventory.runtimeExtensionIds ?? []),
-  ...DATETIME_TOOL_EXTENSIONS.map((tool) => tool.id),
-]);
-const runtimeCatalog = getAllTools().filter((tool) => !runtimeExtensionIdsForCatalog.has(tool.id));
+const { tools: runtimeCatalog } = await import("../src/data/catalog.ts");
 const expectedRuntimeToolIds = new Set(runtimeCatalog.map((tool) => tool.id));
 for (const id of nativeInventory.runtimeExtensionIds ?? []) expectedRuntimeToolIds.add(id);
 for (const tool of DATETIME_TOOL_EXTENSIONS) expectedRuntimeToolIds.add(tool.id);
