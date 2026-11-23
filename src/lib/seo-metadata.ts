@@ -189,12 +189,35 @@ export function toolSearchIntentTerms(tool: ToolMeta): string[] {
   ].map((value) => value.replace(/\s+/g, " ").trim()).filter(Boolean))].slice(0, 24);
 }
 
-export function toolSeoDescription(tool: ToolMeta): string {
+function uniqueToolDescription(base: string, tool: ToolMeta, peers: readonly ToolMeta[], baseFor: (candidate: ToolMeta) => string): string {
+  const collisions = peers.filter((candidate) => baseFor(candidate) === base);
+  if (collisions.length <= 1) return base;
+
+  // Generated catalogue records can share the same engine-family summary and even
+  // the same display name. Keep the visible task first, then add a stable ID only
+  // for colliding pages so every canonical URL has its own accurate description.
+  const task = String(tool.description ?? "").replace(/\\s+/g, " ").trim()
+    || tool.engine.type + ("op" in tool.engine ? " " + String(tool.engine.op) : "");
+  const discriminator = " · Task: " + cleanMetaDescription(task || tool.name, 38) + " · " + tool.id;
+  return cleanMetaDescription(base, Math.max(35, 160 - discriminator.length)) + discriminator;
+}
+
+function toolSeoDescriptionBase(tool: ToolMeta): string {
   return cleanMetaDescription(toolDocumentationSummary(tool), 160);
 }
 
-export function toolGuideSeoDescription(tool: ToolMeta): string {
+function toolGuideSeoDescriptionBase(tool: ToolMeta): string {
   return cleanMetaDescription("How to use " + tool.name + ": " + toolDocumentationSummary(tool), 160);
+}
+
+export function toolSeoDescription(tool: ToolMeta, peers: readonly ToolMeta[] = [tool]): string {
+  const base = toolSeoDescriptionBase(tool);
+  return uniqueToolDescription(base, tool, peers, toolSeoDescriptionBase);
+}
+
+export function toolGuideSeoDescription(tool: ToolMeta, peers: readonly ToolMeta[] = [tool]): string {
+  const base = toolGuideSeoDescriptionBase(tool);
+  return uniqueToolDescription(base, tool, peers, toolGuideSeoDescriptionBase);
 }
 
 function boundedSeoTitle(name: string, suffix: string, maxTitleLength = 65): string {
