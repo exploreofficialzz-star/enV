@@ -175,6 +175,12 @@ for (const title of [longTargetX, longTargetY, guideTargetX, guideTargetY]) {
 const publicToolTitles = result.tools.map((tool) => toolSeoTitle(tool, result.tools));
 const publicToolPaths = result.tools.map(canonicalToolPath);
 const publicGuideTitles = result.guideTools.map((tool) => toolGuideSeoTitle(tool, result.guideTools));
+const publicToolDescriptions = result.tools.map((tool) => toolSeoDescription(tool, result.tools));
+assert.equal(
+  new Set(publicToolDescriptions).size,
+  publicToolDescriptions.length,
+  "Canonical public tool meta descriptions must be unique.",
+);
 assert.equal(new Set(publicToolTitles).size, publicToolTitles.length, "Canonical public tool SEO titles must be unique.");
 assert.equal(new Set(publicToolPaths).size, publicToolPaths.length, "Canonical public tool URLs must be unique.");
 assert.equal(new Set(publicGuideTitles).size, publicGuideTitles.length, "Public tool guide SEO titles must be unique.");
@@ -189,7 +195,7 @@ assert.equal(result.urls.length, new Set(result.urls).size, "Sitemap routes must
 assert.ok(result.urls.every((path) => !["/wallet", "/account", "/settings", "/login", "/search"].includes(path)));
 for (const tool of result.tools) {
   const title = toolSeoTitle(tool, result.tools);
-  const description = toolSeoDescription(tool);
+  const description = toolSeoDescription(tool, result.tools);
   const terms = toolSearchIntentTerms(tool);
   assert.ok(title.length <= 65, "SEO title exceeds 65 characters for " + tool.id);
   const identifyingName = tool.name.trim().split(/\s+/)[0].toLowerCase();
@@ -255,7 +261,7 @@ for (const tool of result.guideTools) {
   const guideInventoryRow = guideInventorySection.split("\n").find((row) => row.startsWith("| " + tool.id + " |"));
   assert.ok(guideInventoryRow?.split(" | ").includes(taskGuidanceSource), "Guide inventory row has the wrong task-guidance source for " + tool.id);
   const guideTitle = toolGuideSeoTitle(tool, result.guideTools);
-  const guideDescription = toolGuideSeoDescription(tool);
+  const guideDescription = toolGuideSeoDescription(tool, result.guideTools);
   assert.ok(guideTitle.length <= 65, "Guide SEO title exceeds 65 characters for " + tool.id);
   const guideIdentifyingName = tool.name.trim().split(/\s+/)[0].toLowerCase();
   assert.ok(guideTitle.toLowerCase().startsWith(guideIdentifyingName), "Guide title must preserve the first identifying name token: " + tool.id + " (name=" + JSON.stringify(tool.name) + ", title=" + JSON.stringify(guideTitle) + ")");
