@@ -85,7 +85,7 @@ export function parsePdfPageSelection(selection: string, pageCount: number): num
   const selected = new Set<number>();
   for (const rawPart of value.split(",")) {
     const part = rawPart.trim();
-    const match = /^(\\d+)(?:-(\\d+))?$/.exec(part);
+    const match = /^(\d+)(?:-(\d+))?$/.exec(part);
     if (!match) throw new Error(`Invalid page selection "${part}". Use numbers and ranges such as 1,3-5.`);
     const first = Number(match[1]);
     const last = Number(match[2] ?? match[1]);
