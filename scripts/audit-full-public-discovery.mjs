@@ -267,15 +267,18 @@ function summarize(rows, routes) {
     }
   }
   const routeMap = new Map(rows.map((row) => [row.path, row]));
-  const orphanRoutes = [];
+  const orphanToolGuideRoutes = [];
+  const orphanArticleRoutes = [];
   for (const route of routes) {
     const row = routeMap.get(route.path);
     if (!row) continue;
     row.inboundLinks = inbound.get(route.path) ?? 0;
-    if ((route.kind === "tool" || route.kind === "guide") && row.inboundLinks === 0) {
-      orphanRoutes.push({ path: route.path, kind: route.kind, id: route.id ?? null });
-    }
+    if (row.inboundLinks !== 0) continue;
+    const orphan = { path: route.path, kind: route.kind, id: route.id ?? null };
+    if (route.kind === "tool" || route.kind === "guide") orphanToolGuideRoutes.push(orphan);
+    if (route.kind === "article") orphanArticleRoutes.push(orphan);
   }
+  const orphanRoutes = [...orphanToolGuideRoutes, ...orphanArticleRoutes];
   const titleCollisions = [...titleGroups.entries()]
     .filter(([, paths]) => paths.length > 1)
     .map(([title, paths]) => ({ title, paths }));
@@ -303,7 +306,9 @@ function summarize(rows, routes) {
     duplicateToolDescriptionGroups: duplicateDescriptionGroups.tool.length,
     duplicateGuideDescriptionGroups: duplicateDescriptionGroups.guide.length,
     duplicateDescriptionSamples: { tool: duplicateDescriptionGroups.tool.slice(0, 100), guide: duplicateDescriptionGroups.guide.slice(0, 100) },
-    orphanToolAndGuideRoutes: orphanRoutes.length,
+    orphanToolAndGuideRoutes: orphanToolGuideRoutes.length,
+    orphanArticleRoutes: orphanArticleRoutes.length,
+    orphanPublicContentRoutes: orphanRoutes.length,
     orphanSamples: orphanRoutes.slice(0, 250),
     titleCollisionSamples: toolGuideTitleCollisions.slice(0, 100),
   };
@@ -337,6 +342,13 @@ async function main() {
     addFailure(
       "Found " + summary.orphanToolAndGuideRoutes
       + " canonical tool/guide route(s) with no inbound internal HTML links. Examples: " + examples,
+    );
+  }
+  if (summary.orphanArticleRoutes > 0) {
+    const examples = summary.orphanSamples.filter((route) => route.kind === "article").slice(0, 12).map((route) => route.path).join(", ");
+    addFailure(
+      "Found " + summary.orphanArticleRoutes
+      + " canonical article route(s) with no inbound internal HTML links. Examples: " + examples,
     );
   }
   const report = {
@@ -378,6 +390,7 @@ async function main() {
     duplicateToolDescriptionGroups: summary.duplicateToolDescriptionGroups,
     duplicateGuideDescriptionGroups: summary.duplicateGuideDescriptionGroups,
     orphanToolAndGuideRoutes: summary.orphanToolAndGuideRoutes,
+    orphanArticleRoutes: summary.orphanArticleRoutes,
     uniqueBuildShas: summary.uniqueBuildShas,
     report: path.relative(root, reportPath),
   }, null, 2));
