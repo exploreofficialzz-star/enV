@@ -91,3 +91,33 @@ test("PDF merger rejects the combined page count above the local processing limi
     /500-page local processing limit/,
   );
 });
+
+
+test("PDF page extraction honours explicit comma-separated page ranges", async () => {
+  const source = await PDFDocument.create();
+  for (let index = 0; index < 6; index += 1) source.addPage();
+  const sourceBytes = await source.save();
+  const sourceBuffer = sourceBytes.buffer.slice(
+    sourceBytes.byteOffset,
+    sourceBytes.byteOffset + sourceBytes.byteLength,
+  ) as ArrayBuffer;
+  const file = new File([sourceBuffer], "selected-pages.pdf", { type: "application/pdf" });
+  const result = await runLocalDocument("pdf-page-extractor", [file], "1,3-4");
+  const output = await PDFDocument.load(new Uint8Array(await result.blob.arrayBuffer()));
+  assert.equal(output.getPageCount(), 3);
+});
+
+test("PDF page extraction rejects malformed, reversed and out-of-range selections", async () => {
+  const source = await PDFDocument.create();
+  source.addPage();
+  source.addPage();
+  const sourceBytes = await source.save();
+  const sourceBuffer = sourceBytes.buffer.slice(
+    sourceBytes.byteOffset,
+    sourceBytes.byteOffset + sourceBytes.byteLength,
+  ) as ArrayBuffer;
+  const file = new File([sourceBuffer], "two-pages.pdf", { type: "application/pdf" });
+  await assert.rejects(() => runLocalDocument("pdf-page-extractor", [file], "1,x"), /Invalid page selection/);
+  await assert.rejects(() => runLocalDocument("pdf-page-extractor", [file], "2-1"), /smaller page number/);
+  await assert.rejects(() => runLocalDocument("pdf-page-extractor", [file], "3"), /between 1 and 2/);
+});
