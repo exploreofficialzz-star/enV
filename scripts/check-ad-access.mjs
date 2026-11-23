@@ -67,7 +67,7 @@ assert.match(adsterraView, /href=\{ADSTERRA_SMARTLINK_URL\}/, "The Smartlink mus
 assert.match(adsterraView, /rel="nofollow sponsored noopener noreferrer"/, "The Smartlink must disclose its sponsored link relationship.");
 assert.match(progress, /AD_SUPPORTED_VISITS_BEFORE_AD_FREE_OFFER = 3/, "The local offer threshold must remain three ad-supported visits.");
 assert.match(progress, /30 \* 24 \* 60 \* 60 \* 1_000/, "The visit cadence must use a rolling 30-day window.");
-assert.match(progress, /not a publisher-confirmed impression,\\n? \\* click, or rewarded-video completion/, "Visit records must not be treated as verified publisher or billing evidence.");
+assert.match(progress, /not a publisher-confirmed impression,\s*\*\s*click, or rewarded-video completion/, "Visit records must not be treated as verified publisher or billing evidence.");
 assert.match(progress, /sessionStorage/, "The same tool must be counted at most once per browser tab session.");
 assert.match(progressTest, /three ad-supported visits/, "The three-visit cadence must have regression tests.");
 assert.match(policy, /function isAdsterraQualifiedTool/, "The Adsterra eligibility policy must remain a separate Web policy.");
