@@ -221,7 +221,7 @@ const guideTitleCollisionGroup = firstCollisionGroup(
   result.guideTools,
   (tool) => boundedToolSeoTitle(
     tool.name,
-    /[—–-]\\s*Solve for\\s+/i.test(tool.name) ? " guide | enV" : " documentation | enV",
+    /[—–-]\s*Solve for\s+/i.test(tool.name) ? " guide | enV" : " documentation | enV",
   ),
 );
 if (guideTitleCollisionGroup.length > 1) {
