@@ -136,7 +136,7 @@ jobs:
           const path = "audit/discovery/discovery-baseline.json";
           const baseline = JSON.parse(fs.readFileSync(path, "utf8"));
           baseline.note = "Reviewed 2026-11-23: the prior runtime extension video-link-screen-recording is the sole removed stable ID. The source-derived before/after ID sets, the three expected count reductions, and every registered gap ratchet were verified before accepting this baseline. This records inventory identity only; it is not per-tool functional acceptance evidence.";
-          fs.writeFileSync(path, JSON.stringify(baseline, null, 1) + "\\n");
+          fs.writeFileSync(path, JSON.stringify(baseline, null, 1) + "\n");
           NODE
           npm run discovery:inventory
           npm run discovery:knowledge-index
