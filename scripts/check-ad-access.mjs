@@ -119,7 +119,9 @@ assert.match(androidAds, /hasAllPlatforms/, "Android hybrid access must require 
 assert.doesNotMatch(androidManifest, /com\.google\.android\.gms\.ads\.APPLICATION_ID/, "Android manifest must not contain an AdMob app ID.");
 assert.doesNotMatch(androidInfo, /NativeAdsPrivacyDisclosure|NativeAdsPrivacyOptionsButton/, "Android Privacy screen must not expose unconfigured Google ad controls.");
 
-assert.doesNotMatch(iosAds, /GoogleMobileAds|UserMessagingPlatform|RewardedAd|AdManagerRequest|NativeRewardedToolAccessGate|NativeToolAdSlot/, "iOS must ship no Google ads SDK, consent manager, rewarded gate, or ad placement.");
+assert.doesNotMatch(iosAds, /GoogleMobileAds|UserMessagingPlatform|RewardedAd|AdManagerRequest|NativeAdsPrivacyManager/, "iOS must ship no Google ads SDK, consent manager, rewarded loader or ad privacy manager.");
+assert.match(iosAds, /struct NativeRewardedToolAccessGate<Content: View>/, "The existing SwiftUI tool wrapper must remain source-compatible without loading ads.");
+assert.match(iosAds, /struct NativeToolAdSlot: View[\\s\\S]*?var body: some View \\{ EmptyView\\(\\) \\}/, "The native ad slot must render nothing until the separate native launch.");
 assert.match(iosAds, /enum NativeAdsPolicy/, "iOS must retain the native online/offline eligibility policy without an ad SDK.");
 assert.match(iosAds, /crossPlatformMeteredIDs/, "iOS hybrid access must derive its cohort from the shared cross-platform offline registry.");
 assert.match(iosAds, /billingKey\.hasPrefix\("local\."/ , "iOS hybrid access must include only locally metered profiles.");
