@@ -95,6 +95,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.mapSaver
@@ -442,6 +443,14 @@ private fun EnVApp(
                         onCategory = { value -> detailStack = emptyList(); category = value; query = ""; tab = AppTab.Tools.name },
                         onRelatedTool = openRelatedTool,
                         onToggleFavorite = { favoriteIds = favorites.toggle(selected.id) },
+                        onOpenWallet = {
+                            informationReturnTab = tab
+                            informationPage = "wallet"
+                            tab = AppTab.Account.name
+                            detailStack = emptyList()
+                            showExchange = false
+                            showInformation = true
+                        },
                         isFullscreen = isToolFullscreen || isWorldLabTool,
                         onToggleFullscreen = { isToolFullscreen = !isToolFullscreen },
                     )
@@ -1116,6 +1125,7 @@ private fun ToolDetail(
     onCategory: (String) -> Unit,
     onRelatedTool: (String) -> Unit,
     onToggleFavorite: () -> Unit,
+    onOpenWallet: () -> Unit,
     isFullscreen: Boolean,
     onToggleFullscreen: () -> Unit,
 ) {
@@ -1175,13 +1185,15 @@ private fun ToolDetail(
                                 Modifier.weight(1f).fillMaxWidth().then(if (tool.id == "the-world-lab") Modifier else Modifier.verticalScroll(rememberScrollState())),
                                 verticalArrangement = Arrangement.spacedBy(0.dp),
                             ) {
-                                NativeToolInterfaceContent(
-                                    tool,
-                                    backend,
-                                    supported,
-                                    onRelatedTool,
-                                    startInWorkspace = true,
-                                )
+                                NativeRewardedToolAccessGate(tool, onOpenWallet) {
+                                    NativeToolInterfaceContent(
+                                        tool,
+                                        backend,
+                                        supported,
+                                        onRelatedTool,
+                                        startInWorkspace = true,
+                                    )
+                                }
                             }
                         }
                     }
@@ -1252,14 +1264,16 @@ private fun ToolDetail(
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
             ) {
                 Column(Modifier.fillMaxWidth().padding(if (compact) 16.dp else 24.dp)) {
-                    NativeToolInterfaceContent(
-                        tool,
-                        backend,
-                        supported,
-                        onRelatedTool,
-                    )
+                    NativeRewardedToolAccessGate(tool, onOpenWallet) {
+                        NativeToolInterfaceContent(
+                            tool,
+                            backend,
+                            supported,
+                            onRelatedTool,
+                        )
+                    }
                     if (!isFullscreen) NativeToolCommunityPanel(tool.id)
-                    if (!isFullscreen) NativeToolAdSlot(tool)
+                    if (!isFullscreen && !NativeAdsPolicy.isRewardedAccessTool(context, tool)) NativeToolAdSlot(tool)
                 }
             }
             if (!isFullscreen) {
@@ -1317,10 +1331,15 @@ private fun NativeToolInterfaceContent(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val completionCallback = LocalNativeToolAccessCompletion.current
+    val latestCompletionCallback by rememberUpdatedState(completionCallback)
     val telemetry = remember(tool.id) {
-        NativeToolExecutionTelemetry(context.applicationContext, tool.id) {
-            scope.launch { runCatching { NativeAnalytics.flush(context.applicationContext) } }
-        }
+        NativeToolExecutionTelemetry(
+            context.applicationContext,
+            tool.id,
+            flush = { scope.launch { runCatching { NativeAnalytics.flush(context.applicationContext) } } },
+            onFinished = { success -> latestCompletionCallback(success) },
+        )
     }
     DisposableEffect(telemetry) {
         onDispose { telemetry.abandon() }
@@ -3184,6 +3203,7 @@ internal class NativeToolExecutionTelemetry(
     private val context: Context,
     private val toolId: String,
     private val flush: () -> Unit,
+    private val onFinished: (Boolean) -> Unit = {},
 ) {
     private var startedAtMs: Long? = null
     private var resultRecorded = false
@@ -3209,6 +3229,7 @@ internal class NativeToolExecutionTelemetry(
             errorCode = if (success) null else "NATIVE_TOOL_FAILED",
         )
         flush()
+        onFinished(success)
     }
     @Synchronized fun abandon() {
         val start = startedAtMs ?: return
@@ -3224,6 +3245,7 @@ internal class NativeToolExecutionTelemetry(
             errorCode = "NATIVE_TOOL_LEFT_BEFORE_RESULT",
         )
         flush()
+        onFinished(false)
     }
 }
 

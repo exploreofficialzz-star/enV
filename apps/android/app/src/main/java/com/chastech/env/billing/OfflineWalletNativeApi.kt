@@ -213,6 +213,48 @@ object OfflineWalletNativeApi {
         return response.body.optJSONObject("data") ?: throw IllegalStateException("The offline wallet response was incomplete.")
     }
 
+    data class ToolAccessReservation(
+        val reservationId: String,
+        val toolId: String,
+        val reservedTokens: Double,
+        val unitLabel: String,
+    )
+
+    suspend fun reserveToolAccess(context: Context, toolId: String, sessionId: String): ToolAccessReservation = withContext(Dispatchers.IO) {
+        require(toolId.matches(Regex("[a-z0-9][a-z0-9-]{0,119}"))) { "The tool id is invalid." }
+        require(sessionId.matches(Regex("[0-9a-fA-F-]{36}"))) { "The tool access session is invalid." }
+        val bearer = sessionToken(context)
+            ?: throw IllegalStateException("Sign in and pair this device from your enV web Wallet to use tokens.")
+        val body = JSONObject().put("action", "reserve").put("toolId", toolId).put("sessionId", sessionId)
+        val data = requireData(request("/api/billing/tool-access", "POST", body, bearer))
+        val reservationId = data.optString("reservationId").takeIf { it.matches(Regex("[0-9a-fA-F-]{36}")) }
+            ?: throw IllegalStateException("The token reservation response was incomplete.")
+        val reservedSubunits = data.optDouble("reservedSubunits", Double.NaN)
+        require(reservedSubunits.isFinite() && reservedSubunits >= 1.0) { "The reviewed token price was invalid." }
+        ToolAccessReservation(
+            reservationId = reservationId,
+            toolId = toolId,
+            reservedTokens = reservedSubunits / 1_000.0,
+            unitLabel = data.optString("unitLabel", "per session"),
+        )
+    }
+
+    suspend fun settleToolAccess(context: Context, toolId: String, reservationId: String): Unit = withContext(Dispatchers.IO) {
+        completeToolAccess(context, toolId, reservationId, "settle")
+    }
+
+    suspend fun releaseToolAccess(context: Context, toolId: String, reservationId: String): Unit = withContext(Dispatchers.IO) {
+        completeToolAccess(context, toolId, reservationId, "release")
+    }
+
+    private fun completeToolAccess(context: Context, toolId: String, reservationId: String, action: String) {
+        require(action == "settle" || action == "release") { "The token action is invalid." }
+        val bearer = sessionToken(context)
+            ?: throw IllegalStateException("The paired account session is unavailable. Reconnect Wallet before settlement.")
+        val body = JSONObject().put("action", action).put("toolId", toolId).put("reservationId", reservationId)
+        requireData(request("/api/billing/tool-access", "POST", body, bearer))
+    }
+
     private fun parseActivityPage(data: JSONObject): ActivityPage {
         val rows = data.optJSONArray("activity")
         val items = (0 until (rows?.length() ?: 0)).mapNotNull { index ->

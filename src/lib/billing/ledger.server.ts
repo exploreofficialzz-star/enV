@@ -781,14 +781,51 @@ export async function settleReservation(input: { userId: string; reservationId: 
   });
 }
 
-export async function releaseReservation(input: { userId: string; reservationId: string; reason?: string }) {
+export async function settleReservationAtReservedAmount(input: {
+  userId: string;
+  reservationId: string;
+  expectedOperationId: string;
+}) {
+  if (!input.expectedOperationId || input.expectedOperationId.length > 160) {
+    throw new BillingError("INVALID_AMOUNT", "A valid expected billing operation is required.");
+  }
+  const sql = await getSql();
+  const rows = await sql.query<{ user_id: string; operation_id: string; reserved_subunits: number | string }>(
+    `select user_id, operation_id, reserved_subunits
+       from billing_reservations where id = $1 limit 1`,
+    [input.reservationId],
+  );
+  const reservation = rows[0];
+  if (!reservation || reservation.user_id !== input.userId) {
+    throw new BillingError("RESERVATION_NOT_FOUND", "The billing reservation was not found.");
+  }
+  if (reservation.operation_id !== input.expectedOperationId) {
+    throw new BillingError("RESERVATION_NOT_FOUND", "The billing reservation does not match this tool access session.");
+  }
+  // The amount comes from the immutable server-created reservation, never from a browser request.
+  return settleReservation({
+    userId: input.userId,
+    reservationId: input.reservationId,
+    actualSubunits: amount(reservation.reserved_subunits),
+  });
+}
+
+export async function releaseReservation(input: {
+  userId: string;
+  reservationId: string;
+  reason?: string;
+  expectedOperationId?: string;
+}) {
   const sql = await getSql();
   return sql.transaction(async (tx) => {
     const rows = await tx.query<{
       id: string; user_id: string; operation_id: string; reserved_subunits: number | string; status: ReservationStatus;
     }>(`select id, user_id, operation_id, reserved_subunits, status from billing_reservations where id = $1 for update`, [input.reservationId]);
     const reservation = rows[0];
-    if (!reservation || reservation.user_id !== input.userId) throw new BillingError("RESERVATION_NOT_FOUND", "The billing reservation was not found.");
+    if (!reservation || reservation.user_id !== input.userId ||
+        (input.expectedOperationId && reservation.operation_id !== input.expectedOperationId)) {
+      throw new BillingError("RESERVATION_NOT_FOUND", "The billing reservation was not found.");
+    }
     if (reservation.status === "released") return { id: reservation.id, status: reservation.status, idempotentReplay: true };
     if (reservation.status !== "reserved") throw new BillingError("RESERVATION_NOT_ACTIVE", "Only active reservations can be released.");
     const reservedSubunits = amount(reservation.reserved_subunits);

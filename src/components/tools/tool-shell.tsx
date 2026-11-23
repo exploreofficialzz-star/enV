@@ -1,7 +1,11 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, BookOpen, ChevronDown, Heart, Maximize2, Minimize2 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { disclaimerText } from "@/lib/content";
+import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { ToolAccessGate, AdFreeAfterThreeAdsDialog } from "@/components/tools/tool-access-gate";
+import { showGoogleRewardedAd } from "@/lib/ads/rewarded-google";
+import { getToolAccessPreference, setToolAccessPreference, type ToolAccessPreference } from "@/lib/ads/access-preference";
 import { recordAnalyticsEvent, recordToolExecutionResult } from "@/lib/analytics/client";
 import { toolDocumentationPath } from "@/lib/tool-documentation";
 import { getRelatedTools, toolPath } from "@/lib/registry";
@@ -20,7 +24,7 @@ import {
   AdsterraNativeBanner,
   AdsterraResponsiveBanner,
 } from "@/components/ads/adsterra-ad";
-import { isAdsterraQualifiedTool } from "@/lib/ads/policy";
+import { isAdsterraQualifiedTool, isPaidHybridAccessToolId } from "@/lib/ads/policy";
 import { ADSTERRA_CONSENT_STORAGE_KEY, getAdsterraConsent, openAdsterraSmartlinkFromOutput } from "@/lib/ads/adsterra";
 import type { PublicCommunityFeed } from "@/lib/community/public-feed.functions";
 import { ToolExecutionTelemetryContext, type ToolExecutionTelemetry, type ToolExecutionOutcome } from "@/components/tools/tool-execution-context";
@@ -41,9 +45,44 @@ export function ToolShell({
   const [visibleRelatedCount, setVisibleRelatedCount] = useState(6);
   const [productionTool, setProductionTool] = useState<ToolMeta | null>(null);
   const note = disclaimerText(tool);
-  const adsterraQualified =
-    import.meta.env.VITE_ADSTERRA_ENABLED === "true" && isAdsterraQualifiedTool(tool);
+  const toolAdEligible = isAdsterraQualifiedTool(tool);
+  const adsterraQualified = import.meta.env.VITE_ADSTERRA_ENABLED === "true" && toolAdEligible;
   const [adsterraConsent, setAdsterraConsentState] = useState(getAdsterraConsent);
+  const { user: accessUser, isPending: accessAuthPending } = useCurrentUserState();
+  const [accessPreferenceState, setAccessPreferenceState] = useState(() => ({
+    toolId: tool.id,
+    value: getToolAccessPreference(tool.id),
+  }));
+  const accessPreference = accessPreferenceState.toolId === tool.id
+    ? accessPreferenceState.value
+    : getToolAccessPreference(tool.id);
+  const rewardedUnitPath = String(import.meta.env.VITE_GAM_REWARDED_AD_UNIT_PATH ?? "").trim();
+  const accessToolIds = String(import.meta.env.VITE_AD_ACCESS_TOOL_IDS ?? "");
+  const adAccessGateEnabled =
+    import.meta.env.VITE_AD_ACCESS_GATE_ENABLED === "true" &&
+    toolAdEligible &&
+    isPaidHybridAccessToolId(tool.id, { toolIds: accessToolIds }, tool);
+  const rewardedAdsConfigured =
+    import.meta.env.VITE_ADSENSE_PRIVACY_CONFIGURED === "true" &&
+    Boolean(import.meta.env.VITE_ADSENSE_CLIENT_ID) &&
+    /^\/[A-Za-z0-9_./-]{2,180}$/.test(rewardedUnitPath);
+  const [toolAccessUnlocked, setToolAccessUnlocked] = useState(false);
+  const [showAdFreeOffer, setShowAdFreeOffer] = useState(false);
+  const [browserOnline, setBrowserOnline] = useState(() =>
+    typeof navigator === "undefined" ? true : navigator.onLine
+  );
+  useEffect(() => {
+    const syncOnline = () => setBrowserOnline(navigator.onLine);
+    syncOnline();
+    window.addEventListener("online", syncOnline);
+    window.addEventListener("offline", syncOnline);
+    return () => {
+      window.removeEventListener("online", syncOnline);
+      window.removeEventListener("offline", syncOnline);
+    };
+  }, []);
+  const tokenReservationRef = useRef<string | null>(null);
+  const tokenReservationFinalizedRef = useRef(false);
   useEffect(() => {
     const syncAdsterraConsent = () => setAdsterraConsentState(getAdsterraConsent());
     const syncFromStorage = (event: StorageEvent) => {
@@ -56,7 +95,102 @@ export function ToolShell({
       window.removeEventListener("storage", syncFromStorage);
     };
   }, []);
-  const adsterraAdsEnabled = adsterraQualified && adsterraConsent === "granted";
+  const adsterraAdsEnabled = adsterraQualified && adsterraConsent === "granted" &&
+    (!adAccessGateEnabled || accessPreference === "ads");
+  const saveAccessPreference = (value: ToolAccessPreference) => {
+    setAccessPreferenceState({ toolId: tool.id, value });
+    setToolAccessPreference(tool.id, value);
+  };
+
+  const tokenAccessRequest = async () => {
+    if (!accessUser) return { ok: false as const, message: "Sign in before using enV tokens.", errorCode: "AUTH_REQUIRED" };
+    if (tokenReservationRef.current) {
+      return { ok: false as const, message: "Your previous token session is still being reconciled. Reload this tool before starting another paid session.", errorCode: "RESERVATION_PENDING" };
+    }
+    const sessionId = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (character) => {
+          const random = Math.floor(Math.random() * 16);
+          return (character === "x" ? random : (random & 0x3) | 0x8).toString(16);
+        });
+    const response = await fetch("/api/billing/tool-access", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "reserve", toolId: tool.id, sessionId }),
+    });
+    const payload = await response.json().catch(() => null) as {
+      ok?: boolean;
+      data?: { reservationId?: string; reservedTokens?: number; unitLabel?: string };
+      error?: string;
+      message?: string;
+    } | null;
+    if (!response.ok || payload?.ok !== true || !payload.data?.reservationId) {
+      return {
+        ok: false as const,
+        message: payload?.message ?? "Token access could not be approved. No tokens were charged.",
+        errorCode: payload?.error,
+      };
+    }
+    tokenReservationRef.current = payload.data.reservationId;
+    tokenReservationFinalizedRef.current = false;
+    return {
+      ok: true as const,
+      reservationId: payload.data.reservationId,
+      reservedTokens: payload.data.reservedTokens ?? 0,
+      unitLabel: payload.data.unitLabel ?? "run",
+    };
+  };
+
+  const finalizeTokenReservation = useCallback(async (outcome: ToolExecutionOutcome) => {
+    const reservationId = tokenReservationRef.current;
+    if (!reservationId || tokenReservationFinalizedRef.current) return;
+    tokenReservationFinalizedRef.current = true;
+    const action = outcome === "success" ? "settle" : "release";
+    try {
+      const response = await fetch("/api/billing/tool-access", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action, toolId: tool.id, reservationId }),
+      });
+      if (response.ok) {
+        tokenReservationRef.current = null;
+        tokenReservationFinalizedRef.current = false;
+      } else {
+        // Fail closed: don't allow a second paid run while settlement is unresolved.
+        tokenReservationFinalizedRef.current = false;
+      }
+      setToolAccessUnlocked(false);
+    } catch {
+      // Keep the reservation attached until pagehide can attempt a release.
+      tokenReservationFinalizedRef.current = false;
+      setToolAccessUnlocked(false);
+    }
+  }, [tool.id]);
+
+  const grantToolAccess = (mode: "ads" | "tokens", reservationId?: string) => {
+    if (mode === "tokens" && reservationId && tokenReservationRef.current !== reservationId) {
+      tokenReservationRef.current = reservationId;
+      tokenReservationFinalizedRef.current = false;
+    }
+    setToolAccessUnlocked(true);
+  };
+
+  const releasePendingTokenAccess = (reservationId: string) => {
+    void fetch("/api/billing/tool-access", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "release", toolId: tool.id, reservationId }),
+    }).then((response) => {
+      if (response.ok && tokenReservationRef.current === reservationId) {
+        tokenReservationRef.current = null;
+        tokenReservationFinalizedRef.current = false;
+      }
+    }).catch(() => undefined);
+  };
+
   const toggleFavorite = usePrefs((s) => s.toggleFavorite);
   const favorites = usePrefs((s) => s.favorites);
   const prefsHydrated = usePrefs((s) => s.hydrated);
@@ -100,8 +234,9 @@ export function ToolShell({
       if (startedAt === null || executionFinishedRef.current) return;
       executionFinishedRef.current = true;
       recordToolExecutionResult(tool.id, outcome, Date.now() - startedAt, "shared_result", errorCode);
+      void finalizeTokenReservation(outcome);
     },
-  }), [tool.id]);
+  }), [tool.id, finalizeTokenReservation]);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isCssFullscreen, setIsCssFullscreen] = useState(false);
   const isMusicSandbox = ["song-metadata-analyzer", "audio-analyze-studio"].includes(tool.id);
@@ -132,7 +267,32 @@ export function ToolShell({
     executionFinishedRef.current = false;
     lastExecutionStartAtRef.current = 0;
     toolViewedAtRef.current = Date.now();
+    setToolAccessUnlocked(false);
+    setShowAdFreeOffer(false);
+    tokenReservationRef.current = null;
+    tokenReservationFinalizedRef.current = false;
   }, [tool.id, recordRecent]);
+
+  useEffect(() => {
+    const releaseUnusedReservation = () => {
+      const reservationId = tokenReservationRef.current;
+      if (!reservationId || tokenReservationFinalizedRef.current) return;
+      tokenReservationFinalizedRef.current = true;
+      tokenReservationRef.current = null;
+      void fetch("/api/billing/tool-access", {
+        method: "POST",
+        credentials: "same-origin",
+        keepalive: true,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "release", toolId: tool.id, reservationId }),
+      }).catch(() => undefined);
+    };
+    window.addEventListener("pagehide", releaseUnusedReservation);
+    return () => {
+      window.removeEventListener("pagehide", releaseUnusedReservation);
+      releaseUnusedReservation();
+    };
+  }, [tool.id]);
 
   useEffect(() => {
     const onExecutionResult = (event: Event) => {
@@ -140,6 +300,7 @@ export function ToolShell({
       if (detail?.toolId === tool.id && ["success", "failure", "cancelled"].includes(detail.outcome ?? "")) {
         toolFinishedRef.current = true;
         executionFinishedRef.current = true;
+        void finalizeTokenReservation(detail.outcome as ToolExecutionOutcome);
       }
     };
     const reportAbandoned = () => {
@@ -268,7 +429,7 @@ export function ToolShell({
               <button
                 type="button"
                 onClick={() => void toggleFullscreen()}
-                disabled={isMusicSandbox && !prefsHydrated}
+                disabled={(isMusicSandbox && !prefsHydrated) || (adAccessGateEnabled && browserOnline && !toolAccessUnlocked)}
                 className="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-border text-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 aria-label={isFullscreen ? `Exit full screen for ${tool.name}` : `View ${tool.name} in full screen`}
                 title={isFullscreen ? "Exit full screen" : "View tool in full screen"}
@@ -338,10 +499,26 @@ export function ToolShell({
           startToolExecution("form_submit");
         }}
       >
-        <ToolExecutionTelemetryContext.Provider value={executionTelemetry}>
-          {toolContent}
-        </ToolExecutionTelemetryContext.Provider>
-        {!isFullscreen && tool.category !== "creators" ? <ToolCommunityPanel toolId={tool.id} discussionHref={"/community" + toolPath(tool)} initialFeed={initialCommunityFeed} /> : null}
+        {adAccessGateEnabled && browserOnline && !toolAccessUnlocked ? (
+          <ToolAccessGate
+            toolName={tool.name}
+            user={accessUser}
+            authPending={accessAuthPending}
+            rewardedAdsConfigured={rewardedAdsConfigured}
+            preference={accessPreference}
+            onPreferenceChange={saveAccessPreference}
+            onWatchRewardedAd={() => showGoogleRewardedAd(rewardedUnitPath)}
+            onUseTokens={tokenAccessRequest}
+            onReleaseTokenAccess={releasePendingTokenAccess}
+            onUnlocked={grantToolAccess}
+            onAdFreeOfferReady={() => setShowAdFreeOffer(true)}
+          />
+        ) : (
+          <ToolExecutionTelemetryContext.Provider value={executionTelemetry}>
+            {toolContent}
+          </ToolExecutionTelemetryContext.Provider>
+        )}
+        {(!adAccessGateEnabled || !browserOnline || toolAccessUnlocked) && !isFullscreen && tool.category !== "creators" ? <ToolCommunityPanel toolId={tool.id} discussionHref={"/community" + toolPath(tool)} initialFeed={initialCommunityFeed} /> : null}
       </section>
 
       {!isFullscreen && adsterraAdsEnabled ? (
@@ -420,6 +597,16 @@ export function ToolShell({
       ) : null}
         </>
       ) : null}
+      <AdFreeAfterThreeAdsDialog
+        open={showAdFreeOffer}
+        signedIn={Boolean(accessUser)}
+        onClose={() => setShowAdFreeOffer(false)}
+        onChooseTokens={() => {
+          // This visit was already unlocked by the rewarded ad. Save the token preference for the next visit only.
+          saveAccessPreference("tokens");
+          setShowAdFreeOffer(false);
+        }}
+      />
       <UnderProductionDialog
         open={productionTool !== null}
         toolName={productionTool?.name ?? "This tool"}

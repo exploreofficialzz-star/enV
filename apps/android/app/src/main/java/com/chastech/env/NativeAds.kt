@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,6 +23,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.CompositionLocalProvider
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -32,32 +42,46 @@ import com.google.android.libraries.ads.mobile.sdk.banner.AdSize
 import com.google.android.libraries.ads.mobile.sdk.banner.AdView
 import com.google.android.libraries.ads.mobile.sdk.banner.BannerAd
 import com.google.android.libraries.ads.mobile.sdk.banner.BannerAdRequest
+import com.google.android.libraries.ads.mobile.sdk.common.AdRequest
 import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback
 import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 import com.google.android.libraries.ads.mobile.sdk.common.RequestConfiguration
 import com.chastech.env.data.ToolRecord
 import com.google.android.libraries.ads.mobile.sdk.initialization.InitializationConfig
+import com.google.android.libraries.ads.mobile.sdk.rewarded.RewardedAd
+import com.google.android.libraries.ads.mobile.sdk.rewarded.RewardedAdEventCallback
 import com.google.android.ump.ConsentInformation
 import com.google.android.ump.ConsentRequestParameters
 import com.google.android.ump.ConsentInformation.PrivacyOptionsRequirementStatus
 import com.google.android.ump.UserMessagingPlatform
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
+import org.json.JSONArray
 import org.json.JSONObject
+
+internal val LocalNativeToolAccessCompletion = staticCompositionLocalOf<(Boolean) -> Unit> { {} }
+private val NativeToolAccessCleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
 internal object NativeAdsPolicy {
     private val toolIdPattern = Regex("[a-z0-9][a-z0-9-]{0,119}")
     val adsSelectionEnabled: Boolean get() = BuildConfig.ENV_ADS_ENABLED
-    val adDisplayConfigured: Boolean get() = BuildConfig.ENV_ADS_ENABLED &&
+    val privacySetupConfigured: Boolean get() = BuildConfig.ENV_ADS_ENABLED &&
         BuildConfig.ENV_ADS_PRIVACY_CONFIGURED &&
-        BuildConfig.ENV_ADMOB_APP_ID.matches(Regex("ca-app-pub-[0-9]{16}~[0-9]{10}")) &&
+        BuildConfig.ENV_ADMOB_APP_ID.matches(Regex("ca-app-pub-[0-9]{16}~[0-9]{10}"))
+    val adDisplayConfigured: Boolean get() = privacySetupConfigured &&
         BuildConfig.ENV_ADMOB_BANNER_AD_UNIT_ID.matches(Regex("ca-app-pub-[0-9]{16}/[0-9]{10}"))
+    val rewardedUnitPath: String get() = BuildConfig.ENV_GAM_REWARDED_AD_UNIT_PATH.trim()
+    private val rewardedToolIds: Set<String> by lazy {
+        BuildConfig.ENV_AD_ACCESS_TOOL_IDS.split(",").map { it.trim() }.filter { toolIdPattern.matches(it) }.toSet()
+    }
+    val rewardedAccessConfigured: Boolean get() = BuildConfig.ENV_AD_ACCESS_GATE_ENABLED
+    val rewardedAdsConfigured: Boolean get() = rewardedAccessConfigured &&
+        privacySetupConfigured && rewardedUnitPath.matches(Regex("/[A-Za-z0-9_./-]{3,180}"))
+    fun isRewardedAccessTool(context: Context, tool: ToolRecord): Boolean =
+        rewardedAccessConfigured && tool.id in rewardedToolIds &&
+            isAdEligibleTool(tool) && isHybridTool(context, tool)
 
     private val allowlistedIds: Set<String> by lazy {
         BuildConfig.ENV_AD_SUPPORTED_TOOL_IDS.split(",").map { it.trim() }.filter { toolIdPattern.matches(it) }.toSet()
@@ -90,7 +114,8 @@ internal object NativeAdsPolicy {
     fun isHybridTool(context: Context, tool: ToolRecord): Boolean {
         val restrictedDisclaimers = setOf("health", "finance", "earnings")
         val restrictedCategories = setOf("fitness", "personal")
-        return tool.id in allowlistedIds &&
+        val rewardedAccessTool = rewardedAccessConfigured && tool.id in rewardedToolIds
+        return (tool.id in allowlistedIds || rewardedAccessTool) &&
             tool.id in crossPlatformMeteredIds(context) &&
             tool.status == "active" &&
             tool.clientSide &&
@@ -224,7 +249,7 @@ internal object NativeAdsPrivacyManager {
     private var refreshing = false
 
     fun refreshConsent(activity: Activity) {
-        if (!NativeAdsPolicy.adDisplayConfigured || refreshing) return
+        if (!NativeAdsPolicy.privacySetupConfigured || refreshing) return
         refreshing = true
         val information = UserMessagingPlatform.getConsentInformation(activity)
         val parameters = ConsentRequestParameters.Builder().build()
@@ -293,7 +318,7 @@ internal object NativeAdsPrivacyManager {
 internal fun NativeAdsPrivacyOptionsButton() {
     val context = LocalContext.current
     val activity = context as? Activity
-    if (!NativeAdsPolicy.adDisplayConfigured || !NativeAdsPrivacyManager.privacyOptionsRequired || activity == null) return
+    if (!NativeAdsPolicy.privacySetupConfigured || !NativeAdsPrivacyManager.privacyOptionsRequired || activity == null) return
     Button(onClick = { NativeAdsPrivacyManager.showPrivacyOptions(activity) }, modifier = Modifier.fillMaxWidth()) {
         Text("Advertising privacy options")
     }
@@ -344,6 +369,314 @@ internal fun NativeToolAdSlot(tool: ToolRecord) {
         AndroidView(
             modifier = Modifier.fillMaxWidth().wrapContentWidth(),
             factory = { adView },
+        )
+    }
+}
+
+private object NativeRewardedAdProgress {
+    private const val PREFS = "env_rewarded_ad_progress_v2"
+    private const val WINDOW_MS = 30L * 24L * 60L * 60L * 1_000L
+    private const val MAX_STORED_COMPLETIONS = 100
+
+    fun recordCompletion(context: Context, now: Long = System.currentTimeMillis()): Boolean {
+        val prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val cutoff = now - WINDOW_MS
+        val stored = runCatching {
+            val timestamps = JSONArray(prefs.getString("completion_timestamps", "[]") ?: "[]")
+            (0 until timestamps.length()).map { timestamps.optLong(it, 0L) }
+        }.getOrDefault(emptyList())
+        val completions = (stored.filter { it > cutoff && it <= now } + now)
+            .sorted()
+            .takeLast(MAX_STORED_COMPLETIONS)
+        val lastOfferAt = prefs.getLong("offer_shown_at", 0L)
+        val offerCooldownActive = lastOfferAt > cutoff && lastOfferAt <= now
+        val shouldShowOffer = completions.size >= 3 && !offerCooldownActive
+        val timestamps = JSONArray().apply { completions.forEach { put(it) } }
+        val editor = prefs.edit().putString("completion_timestamps", timestamps.toString())
+        if (shouldShowOffer) editor.putLong("offer_shown_at", now)
+        val saved = editor.commit()
+        return saved && shouldShowOffer
+    }
+}
+
+private object NativeToolAccessPreference {
+    private const val PREFS = "env_tool_access_preference_v1"
+
+    private fun key(toolId: String) = "tool:$toolId"
+
+    fun prefersTokens(context: Context, toolId: String): Boolean =
+        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(key(toolId), "ads") == "tokens"
+
+    fun setPrefersTokens(context: Context, toolId: String, prefersTokens: Boolean) {
+        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putString(key(toolId), if (prefersTokens) "tokens" else "ads")
+            .apply()
+    }
+}
+
+@Composable
+internal fun NativeRewardedToolAccessGate(
+    tool: ToolRecord,
+    onOpenWallet: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val context = LocalContext.current
+    val activity = context as? Activity
+    val preview = LocalInspectionMode.current
+    val scope = rememberCoroutineScope()
+    val consentReady = NativeAdsPrivacyManager.canRequestAds && NativeAdsPrivacyManager.sdkReady
+    val network = rememberValidatedAdNetwork(context)
+    var originReachable by remember(tool.id) { mutableStateOf(false) }
+    var originCheckComplete by remember(tool.id) { mutableStateOf(false) }
+    var unlocked by rememberSaveable(tool.id) { mutableStateOf(false) }
+    var busy by rememberSaveable(tool.id) { mutableStateOf(false) }
+    var feedback by rememberSaveable(tool.id) { mutableStateOf<String?>(null) }
+    var showAdFreeOffer by rememberSaveable(tool.id) { mutableStateOf(false) }
+    var preferTokens by rememberSaveable(tool.id) { mutableStateOf(NativeToolAccessPreference.prefersTokens(context, tool.id)) }
+    var pendingReservation by remember(tool.id) { mutableStateOf<com.chastech.env.billing.OfflineWalletNativeApi.ToolAccessReservation?>(null) }
+    var activeReservation by remember(tool.id) { mutableStateOf<com.chastech.env.billing.OfflineWalletNativeApi.ToolAccessReservation?>(null) }
+
+    LaunchedEffect(network, tool.id) {
+        originCheckComplete = false
+        originReachable = network && NativeAdsPolicy.isApplicationOnline(context)
+        originCheckComplete = true
+    }
+
+    // Offline or origin-unreachable runs remain governed by the existing
+    // signed allowance/journal path inside the native tool execution boundary.
+    if (preview || !NativeAdsPolicy.isRewardedAccessTool(context, tool) || !network) {
+        content()
+        return
+    }
+    if (!originCheckComplete) {
+        Column(Modifier.fillMaxWidth().padding(24.dp)) {
+            Text("Checking enV connection…", style = MaterialTheme.typography.bodyMedium)
+        }
+        return
+    }
+    if (!network || !originReachable) {
+        content()
+        return
+    }
+
+    suspend fun reserveTokenAccess() {
+        NativeToolAccessPreference.setPrefersTokens(context, tool.id, true)
+        preferTokens = true
+        if (busy) return
+        if (!com.chastech.env.billing.OfflineWalletNativeApi.isPaired(context)) {
+            feedback = "Sign in to enV and pair this device from your Web Wallet before using tokens."
+            onOpenWallet()
+            return
+        }
+        busy = true
+        feedback = null
+        try {
+            pendingReservation = com.chastech.env.billing.OfflineWalletNativeApi.reserveToolAccess(
+                context,
+                tool.id,
+                java.util.UUID.randomUUID().toString(),
+            )
+        } catch (failure: Exception) {
+            feedback = failure.message ?: "A reviewed token price is not available for this tool. No tokens were charged."
+        } finally {
+            busy = false
+        }
+    }
+
+    fun completeTokenSession(success: Boolean) {
+        val reservation = activeReservation ?: return
+        if (busy) return
+        busy = true
+        unlocked = false
+        scope.launch {
+            try {
+                if (success) {
+                    com.chastech.env.billing.OfflineWalletNativeApi.settleToolAccess(context, tool.id, reservation.reservationId)
+                } else {
+                    com.chastech.env.billing.OfflineWalletNativeApi.releaseToolAccess(context, tool.id, reservation.reservationId)
+                }
+                activeReservation = null
+                feedback = null
+            } catch (failure: Exception) {
+                feedback = "Token settlement could not be verified. Access is paused to prevent another charge. " +
+                    (failure.message ?: "Reconnect and contact support before retrying.")
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    DisposableEffect(tool.id) {
+        onDispose {
+            val reservation = activeReservation ?: pendingReservation
+            if (reservation != null && !busy) {
+                NativeToolAccessCleanupScope.launch {
+                    runCatching {
+                        com.chastech.env.billing.OfflineWalletNativeApi.releaseToolAccess(context, tool.id, reservation.reservationId)
+                    }
+                }
+            }
+        }
+    }
+
+    if (unlocked) {
+        CompositionLocalProvider(LocalNativeToolAccessCompletion provides ::completeTokenSession) {
+            content()
+        }
+    } else {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("Continue to " + tool.name, style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Watch a complete rewarded video to use this tool for this visit, or choose a reviewed token price for ad-free access.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (!preferTokens) {
+                Button(
+                    onClick = {
+                        if (activity == null || busy) return@Button
+                    NativeToolAccessPreference.setPrefersTokens(context, tool.id, false)
+                    preferTokens = false
+                    busy = true
+                    feedback = null
+                    RewardedAd.load(
+                        AdRequest.Builder(NativeAdsPolicy.rewardedUnitPath).build(),
+                        object : AdLoadCallback<RewardedAd> {
+                            override fun onAdLoaded(ad: RewardedAd) {
+                                var rewardEarned = false
+                                ad.adEventCallback = object : RewardedAdEventCallback {
+                                    override fun onAdDismissedFullScreenContent() {
+                                        Handler(Looper.getMainLooper()).post {
+                                            busy = false
+                                            if (!rewardEarned) feedback = "The rewarded ad was closed before completion. No access was unlocked."
+                                        }
+                                    }
+
+                                    override fun onAdFailedToShowFullScreenContent(error: com.google.android.libraries.ads.mobile.sdk.common.FullScreenContentError) {
+                                        Handler(Looper.getMainLooper()).post {
+                                            busy = false
+                                            feedback = "The rewarded ad could not be shown. Try again or use tokens."
+                                        }
+                                    }
+                                }
+                                runCatching {
+                                    ad.show(activity) {
+                                        rewardEarned = true
+                                        val offer = NativeRewardedAdProgress.recordCompletion(context)
+                                        Handler(Looper.getMainLooper()).post {
+                                            unlocked = true
+                                            busy = false
+                                            showAdFreeOffer = offer
+                                        }
+                                    }
+                                }.onFailure {
+                                    busy = false
+                                    feedback = "The rewarded ad could not be shown. Try again or use tokens."
+                                }
+                            }
+
+                            override fun onAdFailedToLoad(error: LoadAdError) {
+                                Handler(Looper.getMainLooper()).post {
+                                    busy = false
+                                    feedback = "A rewarded ad is unavailable. Check your connection or advertising settings, then try again."
+                                }
+                            }
+                        },
+                    )
+                },
+                enabled = !busy && activity != null && network && originReachable && consentReady && NativeAdsPolicy.rewardedAdsConfigured,
+                modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(if (busy) "Loading rewarded ad…" else "Watch an ad to continue")
+                }
+            } else {
+                TextButton(
+                    onClick = {
+                        NativeToolAccessPreference.setPrefersTokens(context, tool.id, false)
+                        preferTokens = false
+                    },
+                    enabled = !busy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Use rewarded ads instead") }
+            }
+            Button(
+                onClick = { scope.launch { reserveTokenAccess() } },
+                enabled = !busy && network && originReachable,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (busy) "Checking reviewed token price…" else "Use enV tokens (ad-free)")
+            }
+            Button(onClick = onOpenWallet, modifier = Modifier.fillMaxWidth()) {
+                Text("Open Wallet / sign in")
+            }
+            if (!consentReady) {
+                Text("Google advertising privacy choices must permit ads before a rewarded video can load.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            feedback?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+        }
+    }
+
+    pendingReservation?.let { reservation ->
+        AlertDialog(
+            onDismissRequest = {
+                pendingReservation = null
+                scope.launch {
+                    runCatching {
+                        com.chastech.env.billing.OfflineWalletNativeApi.releaseToolAccess(context, tool.id, reservation.reservationId)
+                    }
+                }
+            },
+            title = { Text("Confirm token access") },
+            text = {
+                Text("This tool costs " + reservation.reservedTokens.toString() + " enV tokens per " +
+                    reservation.unitLabel + ". Tokens are deducted only after a successful tool result.")
+            },
+            confirmButton = {
+                Button(onClick = {
+                    activeReservation = reservation
+                    pendingReservation = null
+                    unlocked = true
+                    feedback = null
+                }) { Text("Confirm and continue") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    pendingReservation = null
+                    scope.launch {
+                        runCatching {
+                            com.chastech.env.billing.OfflineWalletNativeApi.releaseToolAccess(context, tool.id, reservation.reservationId)
+                        }
+                    }
+                }) { Text("Cancel without charge") }
+            },
+        )
+    }
+
+    if (showAdFreeOffer) {
+        AlertDialog(
+            onDismissRequest = { showAdFreeOffer = false },
+            title = { Text("Ready to go ad-free?") },
+            text = { Text("You completed three rewarded ads in the last 30 days. Use the reviewed token price for individual tools.") },
+            confirmButton = {
+                Button(onClick = {
+                    // This visit was already unlocked by the rewarded ad. Save the token preference for the next visit only.
+                    NativeToolAccessPreference.setPrefersTokens(context, tool.id, true)
+                    preferTokens = true
+                    showAdFreeOffer = false
+                }) { Text("Use enV tokens") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    NativeToolAccessPreference.setPrefersTokens(context, tool.id, false)
+                    preferTokens = false
+                    showAdFreeOffer = false
+                }) { Text("Keep using ads") }
+            },
         )
     }
 }

@@ -28,7 +28,7 @@ test("generated family and cross-category entries explain their task", () => {
     ["file-csv-to-json-converter", /convert CSV to JSON/i],
     ["angle-quick-converter", /convert angle values/i],
     ["youtube-revenue-calculator", /youtube creator revenue/i],
-    ["youtube-image-resizer", /resize images for use on youtube/i],
+    ["youtube-image-resizer", /Frame and resize for YouTube: Community post image at 1080×1080 \(no official spec — closest documented shape\)/i],
     ["invoice-template", /reusable invoice template/i],
     ["birthday-rsvp-page", /rsvp page for a birthday event/i],
     ["ai-chat-chat-mockup", /clearly labeled fictional ai chat mockup/i],
@@ -48,6 +48,38 @@ test("human-reviewed descriptions are preserved exactly", () => {
     description: "Inspect a selected file and report its name, size and media type.",
   };
   assert.equal(refineGeneratedToolDescription(tool), tool.description);
+});
+
+test("short task descriptions keep their meaning and gain relevant usage guidance", () => {
+  const cone = {
+    id: "cone-calculator",
+    name: "Cone Calculator",
+    category: "calculators",
+    description: "Volume and surface area of a cone.",
+  };
+  const coneDescription = refineGeneratedToolDescription(cone);
+  assert.ok(coneDescription.startsWith(cone.description));
+  assert.match(coneDescription, /required values|units|formula assumptions/i);
+  assert.ok(coneDescription.length >= 35);
+
+  const bio = {
+    id: "bio-generator",
+    name: "Bio Generator",
+    category: "ai",
+    description: "Short bios from a role and tone.",
+  };
+  const bioDescription = refineGeneratedToolDescription(bio);
+  assert.ok(bioDescription.startsWith(bio.description));
+  assert.match(bioDescription, /audience and key details/i);
+  assert.ok(bioDescription.length >= 35);
+
+  const determinant = {
+    id: "math-matrix-2x2-determinant",
+    name: "2×2 Matrix Determinant Calculator",
+    category: "calculators",
+    description: "math matrix determinant",
+  };
+  assert.match(refineGeneratedToolDescription(determinant), /^Calculate 2×2 matrix determinant from the values you enter/i);
 });
 
 test("catalogue family placeholders are refined without an expanded product name", () => {

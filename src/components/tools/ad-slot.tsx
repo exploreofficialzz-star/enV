@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ToolMeta } from "@/types/tool";
 import { canShowAdForTool, isApplicationOnline, resolveAdConfig } from "@/lib/ads/policy";
-import { loadAdSenseScript, whenGooglePrivacyConsentDataReady } from "@/lib/ads/browser";
+import { loadAdSenseScript, whenGoogleAdsConsentReady, whenGooglePrivacyConsentDataReady } from "@/lib/ads/browser";
 
 const adConfig = resolveAdConfig({
   enabled: import.meta.env.VITE_ADS_ENABLED,
@@ -47,6 +47,9 @@ export function AdSlot({ tool }: { tool: ToolMeta }) {
     const queue = window.adsbygoogle ?? (window.adsbygoogle = []);
     // Do not let the publisher tag request an ad before CMP consent data is resolved.
     queue.pauseAdRequests = 1;
+    // Prime the rewarded-access consent decision while the CMP is still booting;
+    // a later user tap may happen after Google has already fired this callback.
+    whenGoogleAdsConsentReady(() => undefined);
     whenGooglePrivacyConsentDataReady(() => {
       if (!active || !slot.isConnected || slot.dataset.envAdRequested === "true") return;
       try {

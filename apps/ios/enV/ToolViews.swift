@@ -110,6 +110,7 @@ struct ToolList: View {
 
 struct ToolDetailView: View {
     @EnvironmentObject private var store: CatalogStore
+    @EnvironmentObject private var informationRouter: NativeInformationRouter
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @AppStorage("env.selectedTab") private var selectedTab = NativeTab.home.rawValue
     @AppStorage("env.homeNavigationReset") private var homeNavigationReset = 0
@@ -195,8 +196,16 @@ struct ToolDetailView: View {
                     .padding(.top, 16)
                 }
 
-                toolInterface.padding(.top, 24)
-                if !isToolFullscreen { NativeToolAdSlot(tool: tool).padding(.top, 12) }
+                NativeRewardedToolAccessGate(tool: tool, onOpenWallet: {
+                    informationRouter.open("wallet")
+                    selectedTab = NativeTab.account.rawValue
+                }) {
+                    toolInterface
+                }
+                .padding(.top, 24)
+                if !isToolFullscreen && !NativeAdsPolicy.isRewardedAccessTool(tool) {
+                    NativeToolAdSlot(tool: tool).padding(.top, 12)
+                }
 
                 if !isToolFullscreen {
                 if let assistFeature = NativeAiAssistFeatureRegistry.feature(toolID: tool.id) {
@@ -1024,6 +1033,7 @@ struct NativeFamilyToolView: View {
     let tool: Tool
     var initialDeveloperMode: String? = nil
     var initialDeveloperAction: String? = nil
+    @Environment(\.nativeToolAccessCompletion) private var nativeToolAccessCompletion
     @State private var executionTracker: NativeToolExecutionTracker
 
     init(tool: Tool, initialDeveloperMode: String? = nil, initialDeveloperAction: String? = nil) {
@@ -1057,6 +1067,7 @@ struct NativeFamilyToolView: View {
         }
         .environment(\.nativeToolExecutionTracker, executionTracker)
         .onAppear {
+            executionTracker.onFinished = nativeToolAccessCompletion
             NativeAnalyticsClient.record("tool_viewed", toolID: tool.id)
             Task { try? await NativeAnalyticsClient.flush() }
         }
@@ -6676,6 +6687,7 @@ final class NativeToolExecutionTracker {
     private let toolID: String
     private var startedAt: Date?
     private var resultRecorded = false
+    var onFinished: NativeToolAccessCompletion?
 
     init(toolID: String) { self.toolID = toolID }
 
@@ -6698,6 +6710,7 @@ final class NativeToolExecutionTracker {
             errorCode: success ? nil : "NATIVE_TOOL_FAILED"
         )
         Task { try? await NativeAnalyticsClient.flush() }
+        onFinished?(success)
     }
 
     func abandon() {
@@ -6712,6 +6725,7 @@ final class NativeToolExecutionTracker {
             errorCode: "NATIVE_TOOL_LEFT_BEFORE_RESULT"
         )
         Task { try? await NativeAnalyticsClient.flush() }
+        onFinished?(false)
     }
 }
 
