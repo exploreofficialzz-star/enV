@@ -260,7 +260,6 @@ function summarize(rows, routes) {
       const group = descriptions.get(row.description) ?? [];
       group.push(row.path);
       descriptions.set(row.description, group);
-      descriptionGroups.set(descKey, [row.path]);
     }
     for (const href of row.hrefs) {
       const internal = normalizeInternalHref(href, canonicalOrigin);
