@@ -836,6 +836,14 @@ function toolSpecificGuidanceBase(tool: ToolMeta): ToolSpecificGuidance {
       validation: "The current sandbox limits an import batch to 50 songs, 600 ZIP entries, 80 MB per package and 160 MB expanded content; individual audio files are limited to 40 MB. Local audio analysis needs at least three seconds of readable audio, samples up to 45 seconds, and can reject a decode budget above 80 MB. Estimated tempo or key must not overwrite reviewed manual values, and an analysis marked unavailable is not evidence that a musical property is absent.",
     };
   }
+  if (id === "scene-studio") {
+    return {
+      source: "operation-specific",
+      overview: "Scene Studio is a visual workspace for assembling short video scenes from a structured scene document. Use its timeline and scene controls to arrange objects, camera movement, captions and audio layers, then validate and preview the composition before export.",
+      example: "Start with a new scene or import a scene document. Add one object and one camera move, place a short caption on the timeline, and preview the result at normal speed and with the timeline scrubber. Run scene validation, export a short MP4, and play the exported file in a separate player to confirm duration, framing, captions and audio.",
+      validation: "The scene document is the source of truth for the editable project. Validation checks the structure and supported scene properties; it does not prove that every browser, GPU or codec will render identically. WebGL support, available memory and browser video codecs affect preview and export. The package does not include a complete downloaded asset library or an on-device voice model; use only assets and audio sources actually offered by the current interface. Keep the project file and inspect the finished MP4 before relying on it.",
+    };
+  }
   if (id === "camera-studio") {
     return {
       source: "operation-specific",
