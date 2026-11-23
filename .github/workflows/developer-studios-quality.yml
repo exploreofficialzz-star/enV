@@ -124,6 +124,8 @@ jobs:
             echo "No system Chrome found; installing the Playwright-managed Chromium build."
             npx playwright install --with-deps chromium
           fi
+      - name: Generate the TanStack route tree and verify the Web production build
+        run: npm run build
       - name: Start app and run payload privacy, output correctness, mobile and axe audit
         run: npm run audit:developer:browser:ci
       - name: Run reproducible local formatter baseline
