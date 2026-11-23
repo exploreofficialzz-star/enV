@@ -189,6 +189,80 @@ const publicToolTitles = result.tools.map((tool) => toolSeoTitle(tool, result.to
 const publicToolPaths = result.tools.map(canonicalToolPath);
 const publicGuideTitles = result.guideTools.map((tool) => toolGuideSeoTitle(tool, result.guideTools));
 const publicToolDescriptions = result.tools.map((tool) => toolSeoDescription(tool, result.tools));
+
+// Collision positions must remain identical when the same immutable peer list
+// arrives in a different order; this protects deterministic SEO output while the
+// generator uses cached per-list indexes instead of rescanning every peer per page.
+function firstCollisionGroup(tools, keyFor) {
+  const groups = new Map();
+  for (const tool of tools) {
+    const key = keyFor(tool);
+    const group = groups.get(key);
+    if (group) group.push(tool);
+    else groups.set(key, [tool]);
+  }
+  return [...groups.values()].find((group) => group.length > 1) ?? [];
+}
+const toolTitleCollisionGroup = firstCollisionGroup(
+  result.tools,
+  (tool) => boundedToolSeoTitle(tool.name, " Online | enV"),
+);
+if (toolTitleCollisionGroup.length > 1) {
+  const reorderedPeers = [...toolTitleCollisionGroup].reverse();
+  for (const tool of toolTitleCollisionGroup) {
+    assert.equal(
+      toolSeoTitle(tool, reorderedPeers),
+      toolSeoTitle(tool, toolTitleCollisionGroup),
+      "Tool title collision positions must not depend on peer input order.",
+    );
+  }
+}
+const guideTitleCollisionGroup = firstCollisionGroup(
+  result.guideTools,
+  (tool) => boundedToolSeoTitle(
+    tool.name,
+    /[—–-]\\s*Solve for\\s+/i.test(tool.name) ? " guide | enV" : " documentation | enV",
+  ),
+);
+if (guideTitleCollisionGroup.length > 1) {
+  const reorderedPeers = [...guideTitleCollisionGroup].reverse();
+  for (const tool of guideTitleCollisionGroup) {
+    assert.equal(
+      toolGuideSeoTitle(tool, reorderedPeers),
+      toolGuideSeoTitle(tool, guideTitleCollisionGroup),
+      "Guide title collision positions must not depend on peer input order.",
+    );
+  }
+}
+const toolDescriptionCollisionGroup = firstCollisionGroup(
+  result.tools,
+  (tool) => toolSeoDescription(tool, [tool]),
+);
+if (toolDescriptionCollisionGroup.length > 1) {
+  const reorderedPeers = [...toolDescriptionCollisionGroup].reverse();
+  for (const tool of toolDescriptionCollisionGroup) {
+    assert.equal(
+      toolSeoDescription(tool, reorderedPeers),
+      toolSeoDescription(tool, toolDescriptionCollisionGroup),
+      "Tool description collision output must not depend on peer input order.",
+    );
+  }
+}
+const guideDescriptionCollisionGroup = firstCollisionGroup(
+  result.guideTools,
+  (tool) => toolGuideSeoDescription(tool, [tool]),
+);
+if (guideDescriptionCollisionGroup.length > 1) {
+  const reorderedPeers = [...guideDescriptionCollisionGroup].reverse();
+  for (const tool of guideDescriptionCollisionGroup) {
+    assert.equal(
+      toolGuideSeoDescription(tool, reorderedPeers),
+      toolGuideSeoDescription(tool, guideDescriptionCollisionGroup),
+      "Guide description collision output must not depend on peer input order.",
+    );
+  }
+}
+
 assert.equal(
   new Set(publicToolDescriptions).size,
   publicToolDescriptions.length,
