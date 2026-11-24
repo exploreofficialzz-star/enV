@@ -90,10 +90,17 @@ jobs:
           // Scene Studio is an intentional Web-only runtime extension. Its Kotlin/Swift
           // reader and math conformance sources are not full native editing/render/export apps.
           const sceneStudio = currentInventory.records.find((record) => record.id === "scene-studio");
+          const expectedSceneRelated = ["video-trimmer", "video-compressor", "video-poster-generator"];
+          const sceneRelatedTargets = new Map(currentInventory.records.map((record) => [record.id, record]));
           if (!sceneStudio || sceneStudio.status !== "active" || sceneStudio.kind !== "runtime-extension" ||
               sceneStudio.nativeExecution?.android !== "web-only" || sceneStudio.nativeExecution?.ios !== "web-only" ||
-              !sceneStudio.reasons.includes("NATIVE_WEB_ONLY_ACTIVE")) {
-            throw new Error("Scene Studio is missing its reviewed active Web-only runtime classification.");
+              !sceneStudio.reasons.includes("NATIVE_WEB_ONLY_ACTIVE") ||
+              JSON.stringify(sceneStudio.related) !== JSON.stringify(expectedSceneRelated) ||
+              expectedSceneRelated.some((id) => {
+                const target = sceneRelatedTargets.get(id);
+                return !target || target.status === "planned" || !target.surfaces.searchable;
+              })) {
+            throw new Error("Scene Studio must be active/Web-only and link to the three verified searchable video workflows.");
           }
 
           // The removed and added IDs balance each other; all source/runtime/search counts
@@ -160,7 +167,7 @@ jobs:
           import fs from "node:fs";
           const path = "audit/discovery/discovery-baseline.json";
           const baseline = JSON.parse(fs.readFileSync(path, "utf8"));
-          baseline.note = "Reviewed 2026-11-23: video-link-screen-recording was removed and scene-studio was added as an active runtime extension. Scene Studio is explicitly Web-only until native Android/iOS editing, rendering and export exist; its inclusion explains the one-item increase in NATIVE_WEB_ONLY_ACTIVE. The source-derived ID sets, unchanged inventory totals, and every other registered gap were verified. This records inventory identity only; it is not per-tool functional acceptance evidence.";
+          baseline.note = "Reviewed 2026-11-24: video-link-screen-recording was removed and scene-studio was added as an active runtime extension. Scene Studio is explicitly Web-only until native Android/iOS editing, rendering and export exist; its inclusion explains the one-item increase in NATIVE_WEB_ONLY_ACTIVE. Its related links point to active, searchable video-trimming, compression and poster-generation workflows. The source-derived ID sets, unchanged inventory totals, and every other registered gap were verified. This records inventory identity only; it is not per-tool functional acceptance evidence.";
           fs.writeFileSync(path, JSON.stringify(baseline, null, 1) + "\n");
           NODE
           npm run discovery:inventory
