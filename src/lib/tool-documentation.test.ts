@@ -638,6 +638,27 @@ test("task-guidance source identifies the correct specificity layer", () => {
     "operation-specific",
     "A narrow tool/operation rule must be labelled operation-specific.",
   );
+  const percentage = makeTool(
+    "percentage-calculator",
+    "Percentage Calculator",
+    "calculators",
+    { type: "calculator", formula: "percentage" },
+  );
+  assert.equal(
+    toolTaskGuidanceSource(percentage),
+    "operation-specific",
+    "A registered calculator with a successful synthetic example must receive operation-specific guidance.",
+  );
+  const percentageGuide = getToolDocumentation(percentage).find((section) => section.id === "when-to-use");
+  assert.ok(percentageGuide, "Registered calculator guide must include its operation-specific section.");
+  assert.match(percentageGuide.paragraphs[0], /registered calculator operation "percentage"/);
+  assert.match(percentageGuide.paragraphs[0], /P% of A = A × P \\ 100|P% of A = A × P \/ 100/);
+  assert.match(percentageGuide.paragraphs[1], /synthetic registry test/);
+  assert.match(percentageGuide.paragraphs[1], /Amount: 3/);
+  assert.match(percentageGuide.paragraphs[1], /Percent: 7%/);
+  assert.match(percentageGuide.paragraphs[1], /0\\.21/);
+  assert.match(percentageGuide.paragraphs[2], /actual measured values|own correctly measured values/);
+
   assert.equal(
     toolTaskGuidanceSource(makeTool(
       "generic-calculation",
