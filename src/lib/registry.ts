@@ -7,6 +7,7 @@ import { makeAccessibilityStudioTools, studioToolForLegacy } from "@/lib/accessi
 import { makeDeveloperStudioTools } from "@/lib/developer-studios-catalog";
 import { presentGeneratedCalculator } from "@/lib/calc/generated-calculator-presentation";
 import { DATETIME_TOOL_EXTENSIONS } from "@/lib/datetime/catalog-tools";
+import { relatedToolsFor } from "@/lib/related-tools";
 
 // Apply reviewed, task-specific descriptions to legacy generated catalogue rows
 // before they reach category pages, search, tool details or SEO metadata.
@@ -456,13 +457,18 @@ export function getNewTools(limit = 8): ToolMeta[] {
 }
 
 export function getRelatedTools(tool: ToolMeta, limit = 6): ToolMeta[] {
+  if (limit <= 0) return [];
   if (tool.category === "accessibility") {
     return accessibilityStudios.filter((item) => item.id !== tool.id).slice(0, limit);
   }
-  const related = tool.related
-    .map((id) => byId.get(id))
-    .filter((t): t is ToolMeta => Boolean(t && isDiscoverable(t) && t.status !== "planned"));
+
+  // Resolve legacy IDs to their canonical Studio/tool record, and discard stale,
+  // hidden, planned, self and duplicate references before rendering any links.
+  const related = relatedToolsFor(tool, getToolById, isDiscoverable, limit);
   if (related.length >= limit) return related.slice(0, limit);
+
+  // Preserve the existing category-level fallback when a tool has fewer declared
+  // suggestions, without reintroducing any ID already shown above.
   const seen = new Set([tool.id, ...related.map((t) => t.id)]);
   const rest = getToolsByCategory(tool.category).filter(
     (t) => !seen.has(t.id) && t.status !== "planned",
