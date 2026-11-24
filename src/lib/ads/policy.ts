@@ -71,7 +71,7 @@ function isEligibleHybridToolRecord(toolId: string, tool: AdEligibleTool): boole
     !tool.requiresAuth &&
     !RESTRICTED_CATEGORIES.has(tool.category.toLowerCase()) &&
     !tool.id.startsWith("finance-") &&
-    !(tool.disclaimer && RESTRICTED_DISCLAIMERS.has(tool.disclaimer)) &&
+    !(tool.disclaimer && RESTRICTED_DISCLAIMERS.has(tool.disclaimer.toLowerCase())) &&
     classifyOfflineToolRecord(tool).execution === "device-local";
 }
 
