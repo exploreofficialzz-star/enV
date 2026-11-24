@@ -98,7 +98,7 @@ const aBookTool: ToolMeta = {
   requiresBackend: false,
   requiresAuth: false,
   status: "active",
-  related: ["pdf-merger", "pdf-splitter", "document-editor"],
+  related: ["pdf-merger", "pdf-splitter", "pdf-text-extractor"],
   engine: { type: "custom", id: "a-book" },
   isNew: true,
 };
