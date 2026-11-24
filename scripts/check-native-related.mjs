@@ -78,6 +78,14 @@ function nativeAlphabeticalKey(value) {
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 }
+function nativeAlphabeticalKey(value) {
+  return value
+    .normalize("NFKD")
+    .replace(/\p{M}+/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
 const codeUnitCompare = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
 
 function canonicalNativeTarget(id) {
