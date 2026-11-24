@@ -86,6 +86,7 @@ const inventoryCell = (value) => String(value ?? "").replace(/\s+/g, " ").replac
 const seoMetadataSource = readFileSync(new URL("../src/lib/seo-metadata.ts", import.meta.url), "utf8");
 const rootRouteSource = readFileSync(new URL("../src/routes/__root.tsx", import.meta.url), "utf8");
 const homepageRouteSource = readFileSync(new URL("../src/routes/index.tsx", import.meta.url), "utf8");
+const categoryRouteSource = readFileSync(new URL("../src/routes/tools/$category/index.tsx", import.meta.url), "utf8");
 const termsRouteSource = readFileSync(new URL("../src/routes/terms.tsx", import.meta.url), "utf8");
 const assistantPromptSource = readFileSync(new URL("../src/lib/ai/server/tasks/assistant.ts", import.meta.url), "utf8");
 const catalogueGeneratorSource = readFileSync(new URL("./gen-catalog.mjs", import.meta.url), "utf8");
@@ -111,6 +112,9 @@ assert.ok(rootRouteSource.includes('name: "env-build-sha", content: __ENV_BUILD_
 assert.doesNotMatch(seoHeadSource, /env-build-sha/, "The build revision marker must be emitted once by the root document.");
 assert.ok(homepageRouteSource.includes('title: "enV | Tools for everyday tasks"'), "Homepage title must use the enV product name without an appended product label.");
 assert.ok(homepageRouteSource.includes("Find a tool for the task you are working on."), "Homepage description must explain the user purpose in plain language.");
+assert.ok(homepageRouteSource.includes('<h1 className="sr-only">Tools for everyday tasks</h1>'), "Homepage must expose one primary H1 matching its purpose.");
+assert.ok(categoryRouteSource.includes("DEVELOPER_GUIDE_TOOLS"), "Developer category must expose legacy utility guides as crawlable links.");
+assert.ok(categoryRouteSource.includes('href={"/blog/tool-" + tool.id}'), "Every legacy Developer usage guide must have a direct HTML link from the Developer category.");
 assert.doesNotMatch(termsRouteSource, /the enV toolkit/i, "Terms structured data must use the canonical enV product name.");
 assert.doesNotMatch(assistantPromptSource, /inside enV Toolkit/i, "The AI Agent must identify itself as part of enV without expanding the platform name.");
 assert.doesNotMatch(catalogueGeneratorSource, /utility for the enV toolkit/i, "Catalogue generation must not seed expanded product-name filler.");
@@ -159,6 +163,14 @@ assert.ok(result.urls.includes("/tools"));
 assert.ok(result.urls.includes("/about"));
 assert.ok(result.urls.includes("/pricing"));
 assert.ok(result.urls.includes("/blog"));
+const breakEvenGuide = result.guideTools.find((tool) => tool.id === "break-even-calculator");
+assert.ok(breakEvenGuide, "The Break-Even task guide must remain indexable.");
+assert.ok(!result.tools.some((tool) => tool.id === "break-even-calculator"), "The legacy Break-Even redirect must not be published as a separate canonical tool page.");
+assert.ok(result.urls.includes("/blog/tool-break-even-calculator"), "The Break-Even usage guide must remain in the public route manifest.");
+assert.ok(!result.urls.includes("/tools/calculators/break-even-calculator"), "The client-side Break-Even compatibility redirect must not enter the sitemap.");
+assert.equal(canonicalToolPath(breakEvenGuide), "/tools/business/finance-studio", "Break-Even guide schema and inventory must point to Finance Metrics Studio.");
+assert.equal(canonicalToolName(breakEvenGuide), "Finance Metrics Studio", "Break-Even guide must identify its canonical Studio destination.");
+assert.match(toolRouteSource, /slug === "break-even-calculator"[\\s\\S]*?noindex,follow[\\s\\S]*?canonicalToolPath\\(matchedTool\\)/, "The legacy Break-Even URL must be noindex and canonicalize to Finance Metrics Studio.");
 for (const path of [
   "/contact", "/help", "/privacy", "/terms", "/disclaimer",
   "/responsible-use", "/platform/android", "/platform/ios", "/token-guide"
