@@ -376,8 +376,9 @@ internal class NativeCatalogSearchIndex(tools: List<ToolRecord>) {
 }
 
 /** The Web and assistant use the same pool; legacy related-reference records are included exactly once. */
-internal fun Catalog.searchableToolsForSearch(): List<ToolRecord> {
-    val general = (tools + relatedReferenceTools).filter {
+internal fun Catalog.searchableToolsForSearch(includeRelatedReferences: Boolean): List<ToolRecord> {
+    val source = if (includeRelatedReferences) tools + relatedReferenceTools else tools
+    val general = source.filter {
         it.category != "accessibility" &&
             "developer-studio" !in it.tags &&
             it.id != "audio-analyze-studio"
