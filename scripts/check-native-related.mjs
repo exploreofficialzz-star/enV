@@ -70,14 +70,7 @@ const nativeCandidates = [
   ...getAllTools().filter((tool) => tool.id === "song-metadata-analyzer"),
 ].filter((tool) => candidateIDs.add(tool.id));
 const nativeByID = new Map(nativeCandidates.map((tool) => [tool.id, tool]));
-function nativeAlphabeticalKey(value) {
-  return value
-    .normalize("NFKD")
-    .replace(/\\p{M}+/gu, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
+
 function nativeAlphabeticalKey(value) {
   return value
     .normalize("NFKD")
