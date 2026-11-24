@@ -31,6 +31,18 @@ test("hybrid online/offline access uses only the explicitly selected tool-ID lis
   assert.equal(isHybridAccessToolId("average-speed-calculator", selected, tool({ category: "fitness" })), false);
   assert.equal(isHybridAccessToolId("finance-apr-calculator", { toolIds: "finance-apr-calculator" }, tool({ id: "finance-apr-calculator" })), false);
 });
+test("sensitive categories and disclaimers are excluded case-insensitively", () => {
+  for (const category of ["Health", "FINANCE", "Earnings", "FITNESS", "Personal"]) {
+    const candidate = tool({ category });
+    assert.equal(isAdsterraQualifiedTool(candidate), false, category);
+    assert.equal(isHybridAccessToolId("average-speed-calculator", selected, candidate), false, category);
+    assert.equal(isPaidHybridAccessToolId("average-speed-calculator", selected, candidate), false, category);
+  }
+  const sensitiveDisclaimer = tool({ disclaimer: "HEALTH" });
+  assert.equal(isAdsterraQualifiedTool(sensitiveDisclaimer), false);
+  assert.equal(isHybridAccessToolId("average-speed-calculator", selected, sensitiveDisclaimer), false);
+  assert.equal(isPaidHybridAccessToolId("average-speed-calculator", selected, sensitiveDisclaimer), false);
+});
 test("paid access remains restricted to manual prices and the selected hybrid cohort", () => {
   assert.equal(isPaidHybridAccessToolId("json-formatter", selected, tool({ id: "json-formatter", engine: { type: "codec" } })), false);
   assert.equal(isPaidHybridAccessToolId("average-speed-calculator", { toolIds: "" }, tool()), false);
