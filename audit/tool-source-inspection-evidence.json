@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "evidenceSetId": "full-public-discovery-source-review-20261123",
-  "inspectedAgainstCommit": "6981920175cbf3dd195f1d834803add7a03d62ba",
-  "note": "Content-pinned source review for the 17 Files/CSS tool IDs with browser evidence. Source implementation hashes were revalidated against the 24 November main head after the Scene Studio integration. The registry and dispatcher diffs were checked: the registry adds Scene Studio, its three adjacent video-workflow links, and removes the retired video-link runtime extension; the 17 reviewed Files/CSS tool entries and their existing execution dispatch remain the same. All listed paths are pinned to their exact Git blob SHA-1. Source inspection does not imply full functional, token, offline, backend, accessibility, or native verification.",
+  "inspectedAgainstCommit": "b940b21eefa1146c253eb08ad4856f5f0a6e6b27",
+  "note": "Content-pinned source review for the 17 Files/CSS tool IDs with browser evidence. Source implementation hashes were revalidated against the 24 November discovery branch head. The registry adds Scene Studio and its three adjacent video-workflow links, removes the retired video-link runtime extension, and routes Web related-tool rendering through the canonical safe resolver while preserving same-category fallback. The 17 reviewed Files/CSS tool entries and their execution dispatch remain unchanged. All listed paths are pinned to their exact Git blob SHA-1. Source inspection does not imply full functional, token, offline, backend, accessibility, or native verification.",
   "records": [
     {
       "id": "files-workspace-six-source-review",
@@ -21,7 +21,7 @@
         },
         {
           "path": "src/lib/registry.ts",
-          "gitBlobSha1": "3207a33a69d3cee5b7bf3fbf27a075db253d61e0"
+          "gitBlobSha1": "e96ac3d739a7d8178854577f6fd35ed995afbc93"
         },
         {
           "path": "src/components/tools/tool-engine.tsx",
@@ -134,7 +134,7 @@
         },
         {
           "path": "src/lib/registry.ts",
-          "gitBlobSha1": "3207a33a69d3cee5b7bf3fbf27a075db253d61e0"
+          "gitBlobSha1": "e96ac3d739a7d8178854577f6fd35ed995afbc93"
         },
         {
           "path": "scripts/gen-catalog.mjs",
@@ -196,7 +196,7 @@
       "files": [
         {
           "path": "src/lib/registry.ts",
-          "gitBlobSha1": "3207a33a69d3cee5b7bf3fbf27a075db253d61e0"
+          "gitBlobSha1": "e96ac3d739a7d8178854577f6fd35ed995afbc93"
         },
         {
           "path": "src/routes/tools/$category/$slug.tsx",
