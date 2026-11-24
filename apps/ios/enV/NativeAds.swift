@@ -81,15 +81,15 @@ enum NativeAdsPolicy {
 
     static func isTokenAccessTool(_ tool: Tool) -> Bool {
         let restrictedDisclaimers: Set<String> = ["health", "finance", "earnings"]
-        let restrictedCategories: Set<String> = ["fitness", "personal"]
+        let restrictedCategories: Set<String> = ["health", "finance", "earnings", "fitness", "personal"]
         return crossPlatformMeteredIDs.contains(tool.id) &&
             tool.status == "active" &&
             tool.clientSide &&
             !tool.requiresBackend &&
             !tool.requiresAuth &&
-            !restrictedCategories.contains(tool.category) &&
+            !restrictedCategories.contains(tool.category.lowercased()) &&
             !tool.id.hasPrefix("finance-") &&
-            (tool.disclaimer.map { !restrictedDisclaimers.contains($0) } ?? true)
+            (tool.disclaimer.map { !restrictedDisclaimers.contains($0.lowercased()) } ?? true)
     }
 
     /// Offline token metering does not depend on native AdMob or GAM settings.
