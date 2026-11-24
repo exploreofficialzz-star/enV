@@ -16,6 +16,8 @@ export function relatedToolsFor(
   isDiscoverable: (tool: ToolMeta) => boolean,
   limit = 6,
 ): ToolMeta[] {
+  if (!Number.isFinite(limit) || limit <= 0) return [];
+  const cap = Math.floor(limit);
   const seen = new Set<string>([tool.id]);
   const out: ToolMeta[] = [];
   const own = resolve(tool.id);
@@ -26,7 +28,7 @@ export function relatedToolsFor(
     if (target.status === "planned" || !isDiscoverable(target)) continue;
     seen.add(target.id);
     out.push(target);
-    if (out.length >= limit) break;
+    if (out.length >= cap) break;
   }
   return out;
 }
