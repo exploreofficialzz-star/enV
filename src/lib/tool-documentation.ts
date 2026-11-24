@@ -596,9 +596,6 @@ function toolSpecificGuidanceBase(tool: ToolMeta): ToolSpecificGuidance {
   const name = tool.name.toLowerCase();
   const category = tool.category;
 
-  const registeredCalculator = registeredCalculatorGuidance(tool);
-  if (registeredCalculator) return registeredCalculator;
-
   if (category === "celebrations" && id.endsWith("-page-generator")) {
     return {
       source: "operation-specific",
@@ -945,6 +942,9 @@ function toolSpecificGuidanceBase(tool: ToolMeta): ToolSpecificGuidance {
     };
   }
   const engine = tool.engine;
+  const registeredCalculator = registeredCalculatorGuidance(tool);
+  if (registeredCalculator) return registeredCalculator;
+
   if (engine.type === "calculator") {
     return {
       source: "engine-specific",
