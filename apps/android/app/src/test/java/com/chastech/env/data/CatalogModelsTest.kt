@@ -26,7 +26,17 @@ class CatalogModelsTest {
         assertEquals("productivity", catalog.tools.single().category)
         assertEquals("custom", catalog.tools.single().engine.type)
         assertEquals("a-book", catalog.tools.single().engine.id)
+        assertEquals(listOf("pdf-merger", "pdf-splitter", "pdf-text-extractor"), catalog.tools.single().related)
         assertEquals(catalog, catalog.withABook())
+    }
+
+    @Test fun runtimeZipArchiveUsesOnlyResolvableRelatedTools() {
+        val base = Catalog(1, "test", CatalogCounts(0, 0, 0, 1), emptyList(), emptyList())
+        val catalog = base.withZipArchive()
+        val zip = catalog.tools.single { it.id == "zip-any-file" }
+        assertEquals(listOf("file-to-txt", "file-organizer", "file-compare"), zip.related)
+        assertTrue(zip.related.all { id -> catalog.displayTool(id) != null })
+        assertEquals(catalog, catalog.withZipArchive())
     }
 
     @Test fun runtimeCameraStudioAdditionIsUniqueAndSearchable() {
