@@ -3,9 +3,9 @@ import { readFileSync } from "node:fs";
 import { buildSeoArtifacts, buildSitemapArtifacts } from "./generate-seo-artifacts.mjs";
 import { buildIndexNowKeyArtifact } from "./indexnow-utils.mjs";
 import { SEO_CANONICAL_ORIGIN, SEO_REDIRECT_HOSTS } from "./seo-domain-policy.mjs";
-import { getAllTools, getToolByPath, getToolsByCategory } from "../src/lib/registry.ts";
+import { getAllTools, getSearchableTools, getToolByPath, getToolsByCategory } from "../src/lib/registry.ts";
 import { toolTaskGuidanceSource } from "../src/lib/tool-documentation.ts";
-import { toolSeoDescription, toolGuideSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema, toolSchema, organizationSchema, websiteSchema, boundedToolSeoTitle, createCanonicalSeoToolResolver } from "@/lib/seo-metadata";
+import { isIndexableTool, toolSeoDescription, toolGuideSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema, toolSchema, organizationSchema, websiteSchema, boundedToolSeoTitle, createCanonicalSeoToolResolver } from "@/lib/seo-metadata";
 
 const nativeInventory = JSON.parse(readFileSync(new URL("../apps/shared/native-engine-inventory.json", import.meta.url), "utf8"));
 const result = buildSeoArtifacts();
@@ -113,6 +113,21 @@ assert.doesNotMatch(seoHeadSource, /env-build-sha/, "The build revision marker m
 assert.ok(homepageRouteSource.includes('title: "enV | Tools for everyday tasks"'), "Homepage title must use the enV product name without an appended product label.");
 assert.ok(homepageRouteSource.includes("Find a tool for the task you are working on."), "Homepage description must explain the user purpose in plain language.");
 assert.ok(homepageRouteSource.includes('<h1 className="sr-only">Tools for everyday tasks</h1>'), "Homepage must expose one primary H1 matching its purpose.");
+const searchableLegacyDeveloperTools = getSearchableTools().filter((tool) =>
+  tool.category === "developer" && !tool.tags.includes("developer-studio")
+);
+const publicLegacyDeveloperTools = searchableLegacyDeveloperTools.filter(isIndexableTool);
+assert.equal(searchableLegacyDeveloperTools.length, 475, "All 475 legacy Developer utilities must remain searchable.");
+assert.equal(new Set(searchableLegacyDeveloperTools.map((tool) => tool.id)).size, 475, "Legacy Developer search entries must have unique stable IDs.");
+assert.equal(publicLegacyDeveloperTools.length, 427, "The category directory must expose all 427 active, indexable legacy Developer utilities while excluding non-indexable records.");
+assert.equal(new Set(publicLegacyDeveloperTools.map((tool) => tool.id)).size, 427, "Public legacy Developer directory entries must have unique stable IDs.");
+const publicLegacyDeveloperGuides = result.guideTools.filter((tool) =>
+  tool.category === "developer" && !tool.tags.includes("developer-studio")
+);
+assert.equal(publicLegacyDeveloperGuides.length, 427, "All 427 indexable legacy Developer guides must remain available.");
+assert.ok(categoryRouteSource.includes("DEVELOPER_LEGACY_TOOLS"), "Developer category must expose legacy utility routes as crawlable links.");
+assert.ok(categoryRouteSource.includes('href={"/tools/developer/" + tool.slug}'), "Every public legacy Developer tool must have a direct HTML link to its preserved route.");
+assert.ok(categoryRouteSource.includes(".filter(isIndexableTool)"), "The public Developer directory must exclude non-indexable records.");
 assert.ok(categoryRouteSource.includes("DEVELOPER_GUIDE_TOOLS"), "Developer category must expose legacy utility guides as crawlable links.");
 assert.ok(categoryRouteSource.includes('href={"/blog/tool-" + tool.id}'), "Every legacy Developer usage guide must have a direct HTML link from the Developer category.");
 assert.doesNotMatch(termsRouteSource, /the enV toolkit/i, "Terms structured data must use the canonical enV product name.");
