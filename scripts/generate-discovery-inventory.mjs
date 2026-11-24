@@ -275,7 +275,7 @@ export function renderReconciliationReport(inv, validation) {
   lines.push("| --- | ---: | ---: |");
   for (const [code, gap] of Object.entries(validation.gaps)) lines.push(`| \`${code}\` | ${gap.count} | ${gap.baseline ?? "—"} |`);
   lines.push("");
-  return lines.join("\n") + "\n";
+  return lines.join("\n").trimEnd() + "\n";
 }
 
 function stableStringify(value) {
