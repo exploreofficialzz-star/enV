@@ -381,6 +381,7 @@ function scoreDoc(pool: PoolIndex, doc: ToolDoc, terms: Term[], phrase: string, 
       matchedIdf += term.idfValue;
       if (bestStrong) strongMatch = true;
       if (bestReason) reasons.push(bestReason);
+      // Ranking boosts name/ID matches regardless of whether explanations were requested.
       if (bestField === "name" || bestField === "id") namedTerms += 1;
     }
   }
