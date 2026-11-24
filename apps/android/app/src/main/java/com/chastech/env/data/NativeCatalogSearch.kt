@@ -58,7 +58,6 @@ internal class NativeCatalogSearchIndex(tools: List<ToolRecord>) {
         val normalized = normalizeText(query)
         if (normalized.isEmpty()) {
             return docs.asSequence()
-                .filter { it.tool.status != "planned" || it.tool.status == "planned" }
                 .sortedWith(
                     compareBy<Doc>({ if (it.tool.status == "planned") 1 else 0 })
                         .thenByDescending { it.tool.popularity }
@@ -169,26 +168,26 @@ internal class NativeCatalogSearchIndex(tools: List<ToolRecord>) {
         var strongMatch = false
         var namedTerms = 0
 
-        terms.forEach { term ->
+        for (term in terms) {
             var best = 0.0
             var bestField = Field.DESCRIPTION
             var bestStrong = false
-            term.variants.forEach { variant ->
+            for (variant in term.variants) {
                 var weakestWeight = Int.MAX_VALUE
                 var weakestField = Field.DESCRIPTION
                 var matchedAll = true
-                variant.stems.forEach { key ->
+                for (key in variant.stems) {
                     val info = doc.stems[key]
                     if (info == null) {
                         matchedAll = false
-                        return@forEach
+                        break
                     }
                     if (info.weight < weakestWeight) {
                         weakestWeight = info.weight
                         weakestField = info.field
                     }
                 }
-                if (!matchedAll) return@forEach
+                if (!matchedAll) continue
                 val surfaceBonus = if (variant.kind == MatchKind.EXACT) {
                     if (term.surface in doc.surfaces) 1.0 else 0.92
                 } else 1.0
@@ -235,7 +234,6 @@ internal class NativeCatalogSearchIndex(tools: List<ToolRecord>) {
         score += popularityBonus(doc.tool.popularity)
         return round(score * 1_000_000.0) / 1_000_000.0
     }
-
     private fun buildDoc(tool: ToolRecord): Doc {
         val stems = LinkedHashMap<String, StemInfo>()
         val surfaces = LinkedHashSet<String>()
