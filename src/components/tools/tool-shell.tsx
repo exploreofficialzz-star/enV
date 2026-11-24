@@ -3,8 +3,8 @@ import { ArrowLeft, ArrowRight, BookOpen, ChevronDown, Heart, Maximize2, Minimiz
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { disclaimerText } from "@/lib/content";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
-import { ToolAccessGate, AdFreeAfterThreeAdsDialog } from "@/components/tools/tool-access-gate";
-import { showGoogleRewardedAd } from "@/lib/ads/rewarded-google";
+import { ToolAccessGate, AdFreeAfterThreeVisitsDialog } from "@/components/tools/tool-access-gate";
+import { recordBrowserAdSupportedVisit } from "@/lib/ads/ad-supported-progress";
 import { getToolAccessPreference, setToolAccessPreference, type ToolAccessPreference } from "@/lib/ads/access-preference";
 import { recordAnalyticsEvent, recordToolExecutionResult } from "@/lib/analytics/client";
 import { toolDocumentationPath } from "@/lib/tool-documentation";
@@ -18,14 +18,14 @@ import { ComingSoonBadge } from "@/components/tools/coming-soon";
 import { ToolAppIcon } from "@/components/tools/tool-app-icon";
 import { AiAssistPanel } from "@/components/ai/ai-assist-panel";
 import { ToolCommunityPanel } from "@/components/tools/tool-community-panel";
-import { AdSlot } from "@/components/tools/ad-slot";
 import {
   AdsterraBanner,
   AdsterraNativeBanner,
   AdsterraResponsiveBanner,
+  AdsterraSmartlink,
 } from "@/components/ads/adsterra-ad";
 import { isAdsterraQualifiedTool, isPaidHybridAccessToolId } from "@/lib/ads/policy";
-import { ADSTERRA_CONSENT_STORAGE_KEY, getAdsterraConsent, openAdsterraSmartlinkFromOutput } from "@/lib/ads/adsterra";
+import { ADSTERRA_CONSENT_STORAGE_KEY, getAdsterraConsent, setAdsterraConsent } from "@/lib/ads/adsterra";
 import type { PublicCommunityFeed } from "@/lib/community/public-feed.functions";
 import { ToolExecutionTelemetryContext, type ToolExecutionTelemetry, type ToolExecutionOutcome } from "@/components/tools/tool-execution-context";
 import { UnderProductionDialog } from "@/components/tools/under-production";
@@ -56,16 +56,11 @@ export function ToolShell({
   const accessPreference = accessPreferenceState.toolId === tool.id
     ? accessPreferenceState.value
     : getToolAccessPreference(tool.id);
-  const rewardedUnitPath = String(import.meta.env.VITE_GAM_REWARDED_AD_UNIT_PATH ?? "").trim();
   const accessToolIds = String(import.meta.env.VITE_AD_ACCESS_TOOL_IDS ?? "");
   const adAccessGateEnabled =
     import.meta.env.VITE_AD_ACCESS_GATE_ENABLED === "true" &&
     toolAdEligible &&
     isPaidHybridAccessToolId(tool.id, { toolIds: accessToolIds }, tool);
-  const rewardedAdsConfigured =
-    import.meta.env.VITE_ADSENSE_PRIVACY_CONFIGURED === "true" &&
-    Boolean(import.meta.env.VITE_ADSENSE_CLIENT_ID) &&
-    /^\/[A-Za-z0-9_./-]{2,180}$/.test(rewardedUnitPath);
   const [toolAccessUnlocked, setToolAccessUnlocked] = useState(false);
   const [showAdFreeOffer, setShowAdFreeOffer] = useState(false);
   const [browserOnline, setBrowserOnline] = useState(() =>
@@ -95,8 +90,25 @@ export function ToolShell({
       window.removeEventListener("storage", syncFromStorage);
     };
   }, []);
+  const adsterraAccessAvailable = adsterraQualified && browserOnline;
   const adsterraAdsEnabled = adsterraQualified && adsterraConsent === "granted" &&
     (!adAccessGateEnabled || accessPreference === "ads");
+  const continueWithAdsterra = () => {
+    if (!adsterraAccessAvailable) return false;
+    if (adsterraConsent !== "granted" && !setAdsterraConsent("granted")) return false;
+    setAdsterraConsentState("granted");
+    return true;
+  };
+  useEffect(() => {
+    if (!adAccessGateEnabled || !adsterraAdsEnabled) return;
+    const onPlacementLoaded = () => {
+      const progress = recordBrowserAdSupportedVisit(tool.id);
+      if (progress?.shouldShowAdFreeOffer) setShowAdFreeOffer(true);
+    };
+    window.addEventListener("env:adsterra-placement-loaded", onPlacementLoaded);
+    return () => window.removeEventListener("env:adsterra-placement-loaded", onPlacementLoaded);
+  }, [adsterraAdsEnabled, tool.id]);
+
   const saveAccessPreference = (value: ToolAccessPreference) => {
     setAccessPreferenceState({ toolId: tool.id, value });
     setToolAccessPreference(tool.id, value);
@@ -481,16 +493,6 @@ export function ToolShell({
           const action = target.closest("button,a,[role=button]");
           if (!action || (action instanceof HTMLButtonElement && action.disabled)) return;
           const label = [action.getAttribute("aria-label"), action.getAttribute("title"), action.textContent].filter(Boolean).join(" ");
-          const isFileDownload = action instanceof HTMLAnchorElement && action.hasAttribute("download");
-          const isOutputAction =
-            isFileDownload ||
-            /\b(copy|download|export|save|output|result|calculate|convert|generate|analy[sz]e|process|format|validate|inspect|scan|encode|decode|resize|compress|extract|transcribe|create|execute|compare|merge|split|apply|build|render)\b/i.test(label);
-          if (adsterraAdsEnabled && isOutputAction) {
-            // Open the supplied Smartlink synchronously within the visitor's
-            // explicit output-button gesture, before async generation can
-            // cause mobile browsers to block the new tab.
-            openAdsterraSmartlinkFromOutput();
-          }
           if (/\b(run|calculate|convert|generate|analy[sz]e|process|format|validate|inspect|scan|encode|decode|resize|compress|extract|transcribe|create|execute|search|lookup|compare|merge|split|apply|build|render|submit|start)\b/i.test(label)) {
             startToolExecution("action_button");
           }
@@ -504,14 +506,14 @@ export function ToolShell({
             toolName={tool.name}
             user={accessUser}
             authPending={accessAuthPending}
-            rewardedAdsConfigured={rewardedAdsConfigured}
             preference={accessPreference}
             onPreferenceChange={saveAccessPreference}
-            onWatchRewardedAd={() => showGoogleRewardedAd(rewardedUnitPath)}
+            adsterraAvailable={adsterraAccessAvailable}
+            advertisingConsent={adsterraConsent}
+            onContinueWithAdsterra={continueWithAdsterra}
             onUseTokens={tokenAccessRequest}
             onReleaseTokenAccess={releasePendingTokenAccess}
             onUnlocked={grantToolAccess}
-            onAdFreeOfferReady={() => setShowAdFreeOffer(true)}
           />
         ) : (
           <ToolExecutionTelemetryContext.Provider value={executionTelemetry}>
@@ -525,12 +527,12 @@ export function ToolShell({
         <>
           <AdsterraBanner format="300x250" />
           <AdsterraNativeBanner />
+          <AdsterraSmartlink />
         </>
       ) : null}
 
       {tool.category !== "creators" ? (
         <>
-      {!isFullscreen && import.meta.env.VITE_ADSTERRA_ENABLED !== "true" ? <AdSlot tool={tool} /> : null}
       <AiAssistPanel toolId={tool.id} />
 
       <section className="mt-10" aria-labelledby="tool-guide-heading">
@@ -597,7 +599,7 @@ export function ToolShell({
       ) : null}
         </>
       ) : null}
-      <AdFreeAfterThreeAdsDialog
+      <AdFreeAfterThreeVisitsDialog
         open={showAdFreeOffer}
         signedIn={Boolean(accessUser)}
         onClose={() => setShowAdFreeOffer(false)}

@@ -2,20 +2,8 @@ import { classifyOfflineToolRecord } from "../offline/policy.mjs";
 import offlineEligibleTools from "../../data/offline-eligible-tools.json" with { type: "json" };
 import approvedToolAccessPrices from "../../data/billing-tool-access-approvals.json" with { type: "json" };
 
-/** Public ad settings are deliberately independent from wallet and token-billing policy. */
-export type AdEnvironment = {
-  enabled?: string;
-  privacyConfigured?: string;
-  clientId?: string;
-  toolSlotId?: string;
-  toolIds?: string;
-};
-
-export type AdRuntimeConfig = {
-  clientId: string;
-  toolSlotId: string;
-  allowedToolIds: ReadonlySet<string>;
-};
+/** Tool-ID selection for the hybrid online-ad/offline-wallet boundary. */
+export type AdEnvironment = { toolIds?: string };
 
 export type AdEligibleTool = {
   id: string;
@@ -42,6 +30,7 @@ const OFFLINE_PROFILE_IDS = new Set(
     .filter((profile) => profile.billingKey.startsWith("local.") && ["web", "android", "ios"].every((platform) => profile.platforms.includes(platform)))
     .map((profile) => profile.toolId),
 );
+
 type ApprovedAccessPrices = {
   profiles: { toolId: string; subunitsPerSession: number; unitLabel: string; pricingVersion: string; adFreeAccessEnabled: boolean }[];
 };
@@ -54,33 +43,25 @@ const APPROVED_TOKEN_ACCESS_TOOL_IDS = new Set(
 );
 
 function parseAllowedToolIds(value?: string): Set<string> {
-  return new Set(
-    (value ?? "")
-      .split(",")
-      .map((entry) => entry.trim())
-      .filter((entry) => TOOL_ID_PATTERN.test(entry)),
-  );
+  return new Set((value ?? "").split(",").map((entry) => entry.trim()).filter((entry) => TOOL_ID_PATTERN.test(entry)));
 }
 
-/**
- * Ads stay off unless the operator enables the feature, supplies a real AdSense
- * client/slot, confirms AdSense privacy messaging is configured, and selects IDs.
- * Empty or malformed configuration never creates ad requests.
- */
-export function resolveAdConfig(env: AdEnvironment): AdRuntimeConfig | null {
-  if (env.enabled !== "true" || env.privacyConfigured !== "true") return null;
-  const clientId = env.clientId?.trim() ?? "";
-  const toolSlotId = env.toolSlotId?.trim() ?? "";
-  if (!/^ca-pub-\d{16}$/.test(clientId) || !/^\d{4,20}$/.test(toolSlotId)) return null;
-  const allowedToolIds = parseAllowedToolIds(env.toolIds);
-  if (allowedToolIds.size === 0) return null;
-  return { clientId, toolSlotId, allowedToolIds };
+/** Adsterra qualification is Web-only and separate from offline-wallet eligibility. */
+export function isAdsterraQualifiedTool(tool: AdEligibleTool): boolean {
+  const category = tool.category.toLowerCase();
+  const descriptiveIdentity = [
+    category, tool.id, tool.name ?? "", tool.subcategory ?? "", tool.engine.id ?? "",
+    ...(tool.tags ?? []), ...(tool.keywords ?? []),
+  ].join(" ").replace(/[-_]+/g, " ");
+  return tool.status === "active" &&
+    !ADSTERRA_EXCLUDED_CATEGORIES.has(category) &&
+    !RESTRICTED_CATEGORIES.has(category) &&
+    !tool.id.startsWith("finance-") &&
+    !(tool.disclaimer && RESTRICTED_DISCLAIMERS.has(tool.disclaimer.toLowerCase())) &&
+    tool.engine.type.toLowerCase() !== "ai" &&
+    !ADSTERRA_EXCLUDED_CONCEPTS.test(descriptiveIdentity);
 }
 
-/**
- * Only intentionally selected, active, public, device-local Web tools may show ads.
- * Backend/auth tools and sensitive finance/health/earnings experiences stay excluded.
- */
 function isEligibleHybridToolRecord(toolId: string, tool: AdEligibleTool): boolean {
   return tool.id === toolId &&
     OFFLINE_PROFILE_IDS.has(toolId) &&
@@ -94,51 +75,16 @@ function isEligibleHybridToolRecord(toolId: string, tool: AdEligibleTool): boole
     classifyOfflineToolRecord(tool).execution === "device-local";
 }
 
-/**
- * Adsterra qualification applies to active ordinary Web tool pages across categories.
- * It is independent of account state, backend/local execution and offline-wallet
- * metering. Studio, AI, Lab/Sandbox and sensitive-topic experiences remain excluded.
- */
-export function isAdsterraQualifiedTool(tool: AdEligibleTool): boolean {
-  const category = tool.category.toLowerCase();
-  const descriptiveIdentity = [
-    category,
-    tool.id,
-    tool.name ?? "",
-    tool.subcategory ?? "",
-    tool.engine.id ?? "",
-    ...(tool.tags ?? []),
-    ...(tool.keywords ?? []),
-  ].join(" ").replace(/[-_]+/g, " ");
-  return tool.status === "active" &&
-    !ADSTERRA_EXCLUDED_CATEGORIES.has(category) &&
-    !RESTRICTED_CATEGORIES.has(category) &&
-    !tool.id.startsWith("finance-") &&
-    !(tool.disclaimer && RESTRICTED_DISCLAIMERS.has(tool.disclaimer.toLowerCase())) &&
-    tool.engine.type.toLowerCase() !== "ai" &&
-    !ADSTERRA_EXCLUDED_CONCEPTS.test(descriptiveIdentity);
-}
-
-/** A selected hybrid tool must remain metered offline even while ad serving is disabled. */
+/** The selected Web cohort uses Adsterra online and the existing signed allowance offline. */
 export function isHybridAccessToolId(toolId: string, env: AdEnvironment, tool: AdEligibleTool): boolean {
   return parseAllowedToolIds(env.toolIds).has(toolId) && isEligibleHybridToolRecord(toolId, tool);
 }
 
-/**
- * Rewarded-ad access also offers token purchase, so only explicitly selected
- * tools with a reviewed static price and a cross-platform offline allowance may
- * enter this gate. Unpriced or unmetered tools remain outside the paid gate.
- */
+/** Paid access is limited to the exact manually approved token-price registry. */
 export function isPaidHybridAccessToolId(toolId: string, env: AdEnvironment, tool: AdEligibleTool): boolean {
   return APPROVED_TOKEN_ACCESS_TOOL_IDS.has(toolId) &&
     parseAllowedToolIds(env.toolIds).has(toolId) &&
     isEligibleHybridToolRecord(toolId, tool);
-}
-
-/** Ad rendering is a separate, stricter decision from the guest/offline access boundary. */
-export function isHybridAdSupportedToolId(toolId: string, env: AdEnvironment, tool: AdEligibleTool): boolean {
-  const config = resolveAdConfig(env);
-  return config !== null && config.allowedToolIds.has(toolId) && isHybridAccessToolId(toolId, env, tool);
 }
 
 /** Same-origin reachability check: browser online hints alone are not authoritative. */
@@ -153,13 +99,8 @@ export async function isApplicationOnline(): Promise<boolean> {
     } catch {
       // Fall through to a small same-origin asset request when HEAD is unsupported.
     }
-    // Some edge/cache configurations do not answer HEAD consistently. Verify
-    // the same origin with a tiny static asset before concluding the app is offline.
     const fallback = await fetch(window.location.origin + "/ads.txt", {
-      method: "GET",
-      cache: "no-store",
-      credentials: "same-origin",
-      signal: controller.signal,
+      method: "GET", cache: "no-store", credentials: "same-origin", signal: controller.signal,
     });
     return fallback.ok && new URL(fallback.url).origin === window.location.origin;
   } catch {
@@ -167,13 +108,4 @@ export async function isApplicationOnline(): Promise<boolean> {
   } finally {
     window.clearTimeout(timeout);
   }
-}
-
-export function canShowAdForTool(
-  tool: AdEligibleTool,
-  config: AdRuntimeConfig | null,
-): boolean {
-  return config !== null &&
-    config.allowedToolIds.has(tool.id) &&
-    isEligibleHybridToolRecord(tool.id, tool);
 }
