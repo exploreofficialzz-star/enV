@@ -514,7 +514,7 @@ const REGISTERED_CALCULATOR_GUIDANCE = new Map<string, ToolSpecificGuidance | nu
  */
 function registeredCalculatorGuidance(tool: ToolMeta): ToolSpecificGuidance | null {
   if (tool.engine.type !== "calculator") return null;
-  const cacheKey = tool.id + "\\0" + tool.engine.formula;
+  const cacheKey = tool.id + "\u0000" + tool.engine.formula;
   if (REGISTERED_CALCULATOR_GUIDANCE.has(cacheKey)) {
     return REGISTERED_CALCULATOR_GUIDANCE.get(cacheKey) ?? null;
   }
@@ -561,7 +561,7 @@ function registeredCalculatorGuidance(tool: ToolMeta): ToolSpecificGuidance | nu
     ].filter(Boolean);
     return field.label + (details.length ? " (" + details.join("; ") + ")" : "");
   });
-  const formulaText = String(definition.formula ?? "").replace(/\\s+/g, " ").trim();
+  const formulaText = String(definition.formula ?? "").replace(/\s+/g, " ").trim();
   const outputText = primary.label + ": " + primary.value + (primary.hint ? " (" + primary.hint + ")" : "");
   let explanation: string[] = [];
   if (definition.explain) {
