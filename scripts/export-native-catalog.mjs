@@ -21,6 +21,11 @@ const canonicalRuntimeTools = getAllTools();
 const publishedCatalogTools = applyGenericWorkflowPolicy(tools);
 const canonicalRuntimeById = new Map(canonicalRuntimeTools.map((tool) => [tool.id, tool]));
 const refinedCatalogTools = publishedCatalogTools.map((tool) => {
+  if (tool.id === "music-live-video-studio") {
+    const runtimeTool = canonicalRuntimeById.get(tool.id);
+    if (!runtimeTool) throw new Error("Canonical runtime record is missing for music-live-video-studio.");
+    return { ...tool, related: runtimeTool.related };
+  }
   if (tool.id === "css-minifier-advanced") {
     const runtimeTool = canonicalRuntimeById.get(tool.id);
     if (!runtimeTool) throw new Error("Canonical runtime record is missing for css-minifier-advanced.");
