@@ -583,13 +583,32 @@ private func relatedAlphabeticalKey(_ value: String) -> String {
 extension Catalog {
     /// Mirrors the web registry: preserve declared related IDs, then fill from the same category alphabetically.
     func relatedTools(for tool: Tool, limit: Int = 6) -> [Tool] {
-        let candidates = accessibilityDiscoveryTools() + developerStudioTools()
+        guard limit > 0 else { return [] }
+
+        // Include the complete native catalogue (including Web-only related references) and
+        // canonical Studio projections, while making the lookup safe for repeated IDs.
+        var candidateIDs = Set<String>()
+        let candidates = (accessibilityDiscoveryTools() + developerStudioTools())
+            .filter { candidateIDs.insert($0.id).inserted }
         let byID = Dictionary(uniqueKeysWithValues: candidates.map { ($0.id, $0) })
-        let related = tool.related.compactMap { byID[$0] }.filter { !$0.isPlanned }
+        var seen = Set([tool.id])
+        var related: [Tool] = []
+        for id in tool.related {
+            let target = id == "audio-analyze-studio"
+                ? byID["song-metadata-analyzer"]
+                : (accessibilityStudio(for: id) ?? byID[id])
+            guard let target, !target.isPlanned, seen.insert(target.id).inserted else { continue }
+            related.append(target)
+            if related.count >= limit { break }
+        }
         if related.count >= limit { return Array(related.prefix(limit)) }
-        let seen = Set([tool.id] + related.map(\.id))
-        let rest = candidates
-            .filter { $0.category == tool.category && !seen.contains($0.id) && !$0.isPlanned }
+
+        // Web exposes only Studio workspaces in the Developer category. Other categories
+        // use the full discoverable catalogue, with Accessibility variants canonicalized above.
+        let fallbackCandidates = tool.category == "developer" ? developerStudioTools() : candidates
+        var fallbackIDs = Set<String>()
+        let rest = fallbackCandidates
+            .filter { $0.category == tool.category && !seen.contains($0.id) && !$0.isPlanned && fallbackIDs.insert($0.id).inserted }
             .sorted {
                 let left = relatedAlphabeticalKey($0.name)
                 let right = relatedAlphabeticalKey($1.name)
