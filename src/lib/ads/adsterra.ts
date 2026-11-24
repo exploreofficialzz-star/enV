@@ -37,9 +37,10 @@ export const ADSTERRA_SMARTLINK_URL = "https://araplhn.org/4/ae13eae40d577a3e298
 export type AdsterraBannerFormat = keyof typeof ADSTERRA_BANNER_UNITS;
 
 /**
- * Adsterra is a display placement only. A banner impression, click, or Smartlink
- * never unlocks a tool or counts as a rewarded completion. The separate
- * per-user rewarded-video completion. The server-priced token path is separate. Offline allowance is separate.
+ * Adsterra Web placements are display advertising only. Banner loads, impressions,
+ * clicks, and Smartlink opens never prove a per-user rewarded completion or unlock a tool.
+ * Online token access uses server-priced reservations; offline access remains governed
+ * by the separate signed allowance protocol.
  */
 export function canRequestAdsterraAds(
   enabled: boolean,
