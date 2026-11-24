@@ -414,7 +414,7 @@ extension Catalog {
             requiresAuth: false,
             status: "active",
             disclaimer: nil,
-            related: ["file-converter", "pdf-merger", "document-editor"],
+            related: ["file-to-txt", "file-organizer", "file-compare"],
             engine: ToolEngine(type: "custom", id: "zip-any-file", op: "zip-any-file", configuration: [:])
         )
         let updated = tools + [tool]
