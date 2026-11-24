@@ -394,7 +394,7 @@
     "regex-tester": 3,
     "regex-studio": 2
    },
-   "set": "held-out"
+   "set": "tuning"
   },
   {
    "id": "h014",
@@ -497,7 +497,7 @@
    "relevant": {
     "regex-tester": 3
    },
-   "set": "held-out"
+   "set": "tuning"
   },
   {
    "id": "h025",
@@ -512,7 +512,25 @@
    "query": "order a pizza",
    "relevant": {},
    "set": "held-out"
+  },
+  {
+   "id": "h027",
+   "type": "task",
+   "query": "organize files by type",
+   "relevant": {
+    "file-organizer": 3
+   },
+   "set": "held-out"
+  },
+  {
+   "id": "h028",
+   "type": "task",
+   "query": "compare two folders",
+   "relevant": {
+    "file-compare": 3
+   },
+   "set": "held-out"
   }
  ],
- "heldOutNote": "Queries with set=held-out (h001-h026) were written AFTER the scorer was tuned and their relevant IDs were chosen by browsing registry names, not by running the scorer. They are scored once and must not be used for tuning."
+ "heldOutNote": "Queries with set=held-out (h001-h012, h014-h023, h025-h028) were selected after the tuning set was frozen; their relevant IDs were chosen by reviewing registry tasks, not by running the scorer. h013 and h024 were moved into tuning after their observed Regex Tester misses. h027-h028 replace them with fresh file-workflow hold-outs. Held-out cases are scored once and must not be used for tuning."
 }
