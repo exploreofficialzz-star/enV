@@ -120,6 +120,14 @@ function nativeRelated(tool, limit = 6) {
   return [...related, ...rest].slice(0, limit);
 }
 
+const liveVideo = getToolById("music-live-video-studio");
+assert.ok(liveVideo, "Live Video Singing Studio must remain in the runtime catalogue.");
+assert.deepEqual(
+  liveVideo.related,
+  ["video-compressor", "video-trimmer"],
+  "Live Video Singing Studio must point to canonical active video tool IDs.",
+);
+
 const androidResolver = read("apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt");
 const iosResolver = read("apps/ios/enV/CatalogCore.swift");
 assert.match(androidResolver, /fun Catalog\.relatedTools[\s\S]*?if \(limit <= 0\) return emptyList\(\)[\s\S]*?distinctBy \{ it\.id \}[\s\S]*?mutableSetOf\(tool\.id\)[\s\S]*?!seen\.add\(target\.id\)/,
