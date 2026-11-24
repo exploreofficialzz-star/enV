@@ -223,7 +223,8 @@ const sceneStudioTool: ToolMeta = {
   requiresBackend: false,
   requiresAuth: false,
   status: "active",
-  related: [],
+  // Adjacent output workflows: trim the exported clip, reduce its file size, or create a poster frame.
+  related: ["video-trimmer", "video-compressor", "video-poster-generator"],
   engine: { type: "custom", id: "scene-studio" },
   isNew: true,
 };
