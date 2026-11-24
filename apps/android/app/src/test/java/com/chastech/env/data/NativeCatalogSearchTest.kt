@@ -43,6 +43,29 @@ class NativeCatalogSearchTest {
         }
     }
 
+    @Test fun relatedReferencePoolIsIncludedOnlyWhenRequested() {
+        val root = repositoryRoot()
+        val catalog = Catalog.fromJson(File(root, "apps/shared/catalog.json").readText())
+            .withMusicDownloader()
+            .withSongMetadataAnalyzer()
+            .withABook()
+            .withZipArchive()
+            .withFileWorkspaceTools()
+            .withCameraStudio()
+            .withDateTimeExtensions()
+        val referenceOnly = catalog.relatedReferenceTools.firstOrNull {
+            it.category != "accessibility" &&
+                "developer-studio" !in it.tags &&
+                it.id != "audio-analyze-studio" &&
+                catalog.tools.none { base -> base.id == it.id }
+        } ?: error("Expected at least one Web-only related-reference record in the native catalog.")
+
+        val defaultIDs = catalog.webSearch("", Int.MAX_VALUE).map { it.id }.toSet()
+        val extendedIDs = catalog.webSearch("", Int.MAX_VALUE, includeRelatedReferences = true).map { it.id }.toSet()
+        assertEquals(false, referenceOnly.id in defaultIDs)
+        assertEquals(true, referenceOnly.id in extendedIDs)
+    }
+
     @Test fun nonPositiveSearchLimitsReturnNoTools() {
         val base = Catalog(1, "test", CatalogCounts(0, 0, 0, 0), emptyList(), emptyList())
         assertEquals(emptyList<ToolRecord>(), base.webSearch("anything", 0))
