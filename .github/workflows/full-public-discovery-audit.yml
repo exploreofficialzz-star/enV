@@ -122,4 +122,10 @@ jobs:
 
       - name: Show local SSR diagnostics on failure
         if: failure()
-        run: cat /tmp/env-full-discovery-audit.log
+        shell: bash
+        run: |
+          if [ -f /tmp/env-full-discovery-audit.log ]; then
+            cat /tmp/env-full-discovery-audit.log
+          else
+            echo "The failure occurred before the local SSR server was started; no SSR log exists."
+          fi
