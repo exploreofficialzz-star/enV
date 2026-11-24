@@ -4,6 +4,7 @@ import { buildSeoArtifacts, buildSitemapArtifacts } from "./generate-seo-artifac
 import { buildIndexNowKeyArtifact } from "./indexnow-utils.mjs";
 import { SEO_CANONICAL_ORIGIN, SEO_REDIRECT_HOSTS } from "./seo-domain-policy.mjs";
 import { getAllTools, getSearchableTools, getToolByPath, getToolsByCategory } from "../src/lib/registry.ts";
+import { developerModeForLegacySlug, developerStudioForLegacySlug } from "../src/lib/developer-studios-catalog.ts";
 import { toolTaskGuidanceSource } from "../src/lib/tool-documentation.ts";
 import { isIndexableTool, toolSeoDescription, toolGuideSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema, toolSchema, organizationSchema, websiteSchema, boundedToolSeoTitle, createCanonicalSeoToolResolver } from "@/lib/seo-metadata";
 
@@ -121,6 +122,13 @@ assert.equal(searchableLegacyDeveloperTools.length, 475, "All 475 legacy Develop
 assert.equal(new Set(searchableLegacyDeveloperTools.map((tool) => tool.id)).size, 475, "Legacy Developer search entries must have unique stable IDs.");
 assert.equal(publicLegacyDeveloperTools.length, 475, "The category directory must expose all 475 active, indexable legacy Developer utilities.");
 assert.equal(new Set(publicLegacyDeveloperTools.map((tool) => tool.id)).size, 475, "Public legacy Developer directory entries must have unique stable IDs.");
+for (const legacyTool of publicLegacyDeveloperTools) {
+  const routeTool = getToolByPath("developer", legacyTool.slug);
+  assert.equal(routeTool?.id, legacyTool.id, "Legacy Developer directory link must resolve to the matching registered tool: " + legacyTool.id);
+  const studio = developerStudioForLegacySlug(legacyTool.slug);
+  const mode = developerModeForLegacySlug(studio, legacyTool.slug);
+  assert.ok(studio.modes.some((candidate) => candidate.key === mode), "Legacy Developer route must resolve to a supported Studio mode: " + legacyTool.id);
+}
 const publicLegacyDeveloperGuides = result.guideTools.filter((tool) =>
   tool.category === "developer" && !tool.tags.includes("developer-studio")
 );
