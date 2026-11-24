@@ -126,7 +126,7 @@ assert.match(iosContent, /LazyVStack\(alignment: \.leading, spacing: 24\)/);
 assert.match(iosTools, /\.font\(\.envScaled\(size: 14, weight: \.semibold\)\)/);
 assert.match(iosTools, /\.font\(\.envScaled\(size: 10, weight: \.medium\)\)/);
 assert.match(iosAssistant, /\.font\(\.envScaled\(size: 14, weight: \.semibold\)\)/);
-assert.match(android, /screenWidth >= 640\) 36\.sp else 24\.sp/);
+assert.match(android, /tool\.name, style = MaterialTheme\.typography\.headlineSmall\.copy\(fontSize = if \(compact\) 24\.sp else 30\.sp, lineHeight = if \(compact\) 30\.sp else 36\.sp\)/, "Native tool detail headings must adapt between compact and regular layouts.");
 assert.match(android, /contentPadding = PaddingValues\(horizontal = 16\.dp, vertical = 40\.dp\),\s*verticalArrangement = Arrangement\.spacedBy\(24\.dp\)/);
 assert.match(android, /headlineSmall\.copy\(fontSize = 30\.sp\), fontWeight = FontWeight\.Normal, color = MaterialTheme\.colorScheme\.primary/);
 
