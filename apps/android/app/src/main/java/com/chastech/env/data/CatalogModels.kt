@@ -399,13 +399,33 @@ private fun relatedAlphabeticalKey(value: String): String =
 
 /** Mirrors the web registry: preserve declared related IDs, then fill from the same category alphabetically. */
 fun Catalog.relatedTools(tool: ToolRecord, limit: Int = 6): List<ToolRecord> {
-    val relatedCandidates = accessibilityDiscoveryTools() + developerStudioTools()
+    if (limit <= 0) return emptyList()
+
+    // Include the complete native catalogue (including Web-only related references) plus
+    // the canonical Studio projections. Some source records can appear in both projections.
+    val relatedCandidates = (accessibilityDiscoveryTools() + developerStudioTools()).distinctBy { it.id }
     val byId = relatedCandidates.associateBy { it.id }
-    val related = tool.related.mapNotNull { accessibilityStudioForId(it) ?: byId[it] }.filter { it.status != "planned" }
+    val seen = mutableSetOf(tool.id)
+    val related = buildList {
+        for (id in tool.related) {
+            val target = if (id == "audio-analyze-studio") {
+                byId["song-metadata-analyzer"]
+            } else {
+                accessibilityStudioForId(id) ?: byId[id]
+            } ?: continue
+            if (target.status == "planned" || !seen.add(target.id)) continue
+            add(target)
+            if (size >= limit) break
+        }
+    }
     if (related.size >= limit) return related.take(limit)
-    val seen = (setOf(tool.id) + related.map { it.id })
-    val rest = relatedCandidates.asSequence()
+
+    // Web exposes only Studio workspaces in the Developer category. Other categories
+    // use the full discoverable catalogue, with Accessibility variants canonicalized above.
+    val fallbackCandidates = if (tool.category == "developer") developerStudioTools() else relatedCandidates
+    val rest = fallbackCandidates.asSequence()
         .filter { it.category == tool.category && it.id !in seen && it.status != "planned" }
+        .distinctBy { it.id }
         .sortedWith(compareBy<ToolRecord>({ relatedAlphabeticalKey(it.name) }, { it.id }))
         .toList()
     return (related + rest).take(limit)
