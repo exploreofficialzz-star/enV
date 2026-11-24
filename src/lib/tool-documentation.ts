@@ -513,7 +513,11 @@ const REGISTERED_CALCULATOR_GUIDANCE = new Map<string, ToolSpecificGuidance | nu
  * and returns finite, displayable output; unsupported formulas fall back honestly.
  */
 function registeredCalculatorGuidance(tool: ToolMeta): ToolSpecificGuidance | null {
-  if (tool.engine.type !== "calculator") return null;
+  if (
+    tool.engine.type !== "calculator"
+    || (tool.status !== "active" && tool.status !== "beta")
+    || tool.requiresBackend
+  ) return null;
   const cacheKey = tool.id + "\u0000" + tool.engine.formula;
   if (REGISTERED_CALCULATOR_GUIDANCE.has(cacheKey)) {
     return REGISTERED_CALCULATOR_GUIDANCE.get(cacheKey) ?? null;
