@@ -117,6 +117,9 @@ jobs:
       - name: Run discovery, guide and SEO regression tests
         run: npm run test:discovery
 
+      - name: Run related-link metadata audit
+        run: npm run discovery:related-audit
+
       - name: Run discovery relevance, phrasing and cross-link gates
         run: npm run discovery:check
 
@@ -161,6 +164,8 @@ jobs:
             audit/discovery/discovery-inventory.json
             audit/discovery/DISCOVERY-RECONCILIATION-REPORT.md
             audit/discovery/tool-knowledge-index.json
+            audit/discovery/RELATED-TOOLS-AUDIT.md
+            audit/discovery/related-tools-baseline.json
           if-no-files-found: warn
           retention-days: 30
 
