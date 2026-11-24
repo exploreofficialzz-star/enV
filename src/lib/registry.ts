@@ -119,7 +119,7 @@ const zipAnyFileTool: ToolMeta = {
   requiresBackend: false,
   requiresAuth: false,
   status: "active",
-  related: ["file-converter", "pdf-merger", "document-editor"],
+  related: ["file-to-txt", "file-organizer", "file-compare"],
   engine: { type: "custom", id: "zip-any-file" },
   isNew: true,
 };
