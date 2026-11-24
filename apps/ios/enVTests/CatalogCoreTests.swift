@@ -169,6 +169,37 @@ final class CatalogCoreTests: XCTestCase {
         XCTAssertEqual(testCatalog.relatedTools(for: current).map(\.id), ["word-count", "case-converter"])
     }
 
+
+    func testRelatedToolsRemoveSelfAndDuplicatesAndCanonicalizeAccessibilityAliases() {
+        let source = Tool(
+            id: "contrast-checker", name: "Contrast Checker", slug: "contrast-checker",
+            description: "", category: "accessibility", subcategory: nil, keywords: [], tags: [],
+            icon: "Accessibility", popularity: 0, featured: false, clientSide: true,
+            requiresBackend: false, requiresAuth: false, status: "active", disclaimer: nil,
+            related: [], engine: ToolEngine(type: "custom", id: "contrast-checker", op: nil)
+        )
+        let current = Tool(
+            id: "current", name: "Current", slug: "current", description: "", category: "text",
+            subcategory: nil, keywords: [], tags: [], icon: "Type", popularity: 0, featured: false,
+            clientSide: true, requiresBackend: false, requiresAuth: false, status: "active",
+            disclaimer: nil,
+            related: ["current", "word-count", "word-count", "contrast-checker", "case-converter", "future-tool"],
+            engine: ToolEngine(type: "text", id: "current", op: nil)
+        )
+        let testCatalog = Catalog(
+            schemaVersion: 1, catalogVersion: "test", counts: catalog.counts,
+            categories: catalog.categories, tools: catalog.tools + [source, current],
+            relatedReferenceTools: nil
+        )
+
+        XCTAssertEqual(
+            testCatalog.relatedTools(for: current, limit: 10).map(\.id),
+            ["word-count", "contrast-checker", "case-converter"]
+        )
+        XCTAssertEqual(testCatalog.relatedTools(for: current, limit: 0), [])
+        XCTAssertEqual(testCatalog.relatedTools(for: current, limit: -1), [])
+    }
+
     func testToolEnginePreservesUnknownConfigurationValues() throws {
         let data = Data(#"{"type":"calculator","formula":"body-mass-index","precision":2,"options":["metric"]}"#.utf8)
         let engine = try JSONDecoder().decode(ToolEngine.self, from: data)
