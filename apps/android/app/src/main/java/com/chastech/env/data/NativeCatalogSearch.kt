@@ -132,9 +132,13 @@ internal class NativeCatalogSearchIndex(tools: List<ToolRecord>) {
                         )
                         consider(candidateStem, distance)
                     }
-                    // The reference implementation preserves surface-vocabulary insertion order
-                    // when selecting its best three candidates.
-                    best.entries.take(3).forEach { (candidate, value) ->
+                    // The Web contract selects candidates by edit distance, corpus frequency, then ID.
+                    bestOrder.sortedWith(
+                        compareBy<String> { best.getValue(it).first }
+                            .thenByDescending { best.getValue(it).second }
+                            .thenBy { it }
+                    ).take(3).forEach { candidate ->
+                        val value = best.getValue(candidate)
                         variants += Variant(
                             listOf(candidate),
                             if (value.first == 1) 0.55 else 0.4,
