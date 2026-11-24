@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "evidenceSetId": "full-public-discovery-source-review-20261123",
-  "inspectedAgainstCommit": "58c2c6a285085248d9a32fbc776fa2421208bee4",
-  "note": "Content-pinned source review for the 17 Files/CSS tool IDs with browser evidence. Source implementation hashes were checked against the 23 November discovery head; the tool-route file was re-reviewed after its canonical SEO resolver was indexed, and all listed paths are pinned to their exact Git blob SHA-1. Source inspection does not imply full functional, token, offline, backend, accessibility, or native verification.",
+  "inspectedAgainstCommit": "183feb1302616ae3d7d63e96b392edca7bc814a5",
+  "note": "Content-pinned source review for the 17 Files/CSS tool IDs with browser evidence. Source implementation hashes were revalidated against the 24 November main head after the Scene Studio integration. The registry and dispatcher diffs were checked: their changes add the separately documented Scene Studio registration and remove the retired video-link runtime extension; the 17 reviewed Files/CSS tool entries and their existing execution dispatch remain the same. All listed paths are pinned to their exact Git blob SHA-1. Source inspection does not imply full functional, token, offline, backend, accessibility, or native verification.",
   "records": [
     {
       "id": "files-workspace-six-source-review",
@@ -21,11 +21,11 @@
         },
         {
           "path": "src/lib/registry.ts",
-          "gitBlobSha1": "5ca60d720270b6b629017cddeb7c2d4adf12c906"
+          "gitBlobSha1": "78f401a597eb975b2d4bdf787ea85e26ab046f2b"
         },
         {
           "path": "src/components/tools/tool-engine.tsx",
-          "gitBlobSha1": "5d36829b9ab065319646e399c55e2d52365266d1"
+          "gitBlobSha1": "c5230b32e1672c0f6218ab84ef1f9501f58a3704"
         }
       ],
       "reviewedAreas": [
@@ -51,7 +51,7 @@
         },
         {
           "path": "src/components/tools/tool-engine.tsx",
-          "gitBlobSha1": "5d36829b9ab065319646e399c55e2d52365266d1"
+          "gitBlobSha1": "c5230b32e1672c0f6218ab84ef1f9501f58a3704"
         }
       ],
       "reviewedAreas": [
@@ -81,7 +81,7 @@
         },
         {
           "path": "src/components/tools/tool-engine.tsx",
-          "gitBlobSha1": "5d36829b9ab065319646e399c55e2d52365266d1"
+          "gitBlobSha1": "c5230b32e1672c0f6218ab84ef1f9501f58a3704"
         }
       ],
       "reviewedAreas": [
@@ -112,7 +112,7 @@
         },
         {
           "path": "src/components/tools/tool-engine.tsx",
-          "gitBlobSha1": "5d36829b9ab065319646e399c55e2d52365266d1"
+          "gitBlobSha1": "c5230b32e1672c0f6218ab84ef1f9501f58a3704"
         }
       ],
       "reviewedAreas": [
@@ -134,7 +134,7 @@
         },
         {
           "path": "src/lib/registry.ts",
-          "gitBlobSha1": "5ca60d720270b6b629017cddeb7c2d4adf12c906"
+          "gitBlobSha1": "78f401a597eb975b2d4bdf787ea85e26ab046f2b"
         },
         {
           "path": "scripts/gen-catalog.mjs",
@@ -142,7 +142,7 @@
         },
         {
           "path": "src/components/tools/tool-engine.tsx",
-          "gitBlobSha1": "5d36829b9ab065319646e399c55e2d52365266d1"
+          "gitBlobSha1": "c5230b32e1672c0f6218ab84ef1f9501f58a3704"
         }
       ],
       "reviewedAreas": [
@@ -177,7 +177,7 @@
         },
         {
           "path": "src/components/tools/tool-engine.tsx",
-          "gitBlobSha1": "5d36829b9ab065319646e399c55e2d52365266d1"
+          "gitBlobSha1": "c5230b32e1672c0f6218ab84ef1f9501f58a3704"
         }
       ],
       "reviewedAreas": [
@@ -196,7 +196,7 @@
       "files": [
         {
           "path": "src/lib/registry.ts",
-          "gitBlobSha1": "5ca60d720270b6b629017cddeb7c2d4adf12c906"
+          "gitBlobSha1": "78f401a597eb975b2d4bdf787ea85e26ab046f2b"
         },
         {
           "path": "src/routes/tools/$category/$slug.tsx",
@@ -204,7 +204,7 @@
         },
         {
           "path": "src/components/tools/tool-engine.tsx",
-          "gitBlobSha1": "5d36829b9ab065319646e399c55e2d52365266d1"
+          "gitBlobSha1": "c5230b32e1672c0f6218ab84ef1f9501f58a3704"
         },
         {
           "path": "src/components/engines/developer-engine.tsx",
