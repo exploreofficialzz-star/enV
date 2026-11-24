@@ -639,8 +639,8 @@ test("task-guidance source identifies the correct specificity layer", () => {
     "A narrow tool/operation rule must be labelled operation-specific.",
   );
   const percentage = makeTool(
-    "percentage-calculator",
-    "Percentage Calculator",
+    "registry-calculator-guidance",
+    "Registry Calculator Guidance",
     "calculators",
     { type: "calculator", formula: "percentage" },
   );
