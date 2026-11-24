@@ -119,8 +119,8 @@ const searchableLegacyDeveloperTools = getSearchableTools().filter((tool) =>
 const publicLegacyDeveloperTools = searchableLegacyDeveloperTools.filter(isIndexableTool);
 assert.equal(searchableLegacyDeveloperTools.length, 475, "All 475 legacy Developer utilities must remain searchable.");
 assert.equal(new Set(searchableLegacyDeveloperTools.map((tool) => tool.id)).size, 475, "Legacy Developer search entries must have unique stable IDs.");
-assert.equal(publicLegacyDeveloperTools.length, 427, "The category directory must expose all 427 active, indexable legacy Developer utilities while excluding non-indexable records.");
-assert.equal(new Set(publicLegacyDeveloperTools.map((tool) => tool.id)).size, 427, "Public legacy Developer directory entries must have unique stable IDs.");
+assert.equal(publicLegacyDeveloperTools.length, 475, "The category directory must expose all 475 active, indexable legacy Developer utilities.");
+assert.equal(new Set(publicLegacyDeveloperTools.map((tool) => tool.id)).size, 475, "Public legacy Developer directory entries must have unique stable IDs.");
 const publicLegacyDeveloperGuides = result.guideTools.filter((tool) =>
   tool.category === "developer" && !tool.tags.includes("developer-studio")
 );
