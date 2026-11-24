@@ -966,7 +966,10 @@ private final class NativeCatalogSearchIndex {
                 if !b.isEmpty {
                     for j in 1...b.count {
                         let cost = a[i - 1] == b[j - 1] ? 0 : 1
-                        var value = min(rows[i - 1][j] + 1, rows[i][j - 1] + 1, rows[i - 1][j - 1] + cost)
+                        var value = min(
+                            min(rows[i - 1][j] + 1, rows[i][j - 1] + 1),
+                            rows[i - 1][j - 1] + cost
+                        )
                         if i > 1 && j > 1 && a[i - 1] == b[j - 2] && a[i - 2] == b[j - 1] {
                             value = min(value, rows[i - 2][j - 2] + 1)
                         }
