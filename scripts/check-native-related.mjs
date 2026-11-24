@@ -64,7 +64,7 @@ assert.equal(nativeTools.length + relatedReferences.length, webTools.length);
 // substitute a hand-written Studio-only candidate list.
 const candidateIDs = new Set();
 const nativeCandidates = [
-  ...webTools.filter((tool) => tool.category !== "accessibility"),
+  ...webTools.filter((tool) => tool.category !== "accessibility" && tool.id !== "audio-analyze-studio"),
   ...getToolsByCategory("accessibility"),
   ...getToolsByCategory("developer"),
   ...getAllTools().filter((tool) => tool.id === "song-metadata-analyzer"),
