@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - feat/full-public-discovery-audit-20261123
+      - feat/discovery-reconcile-scene-studio-20261123
     paths:
       - .github/workflows/regenerate-discovery-artifacts.yml
       - scripts/generate-discovery-inventory.mjs
@@ -22,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - name: Check out discovery branch
+      - name: Check out reconciliation branch
         uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
@@ -78,22 +79,39 @@ jobs:
           const removed = [...beforeIds].filter((id) => !currentIds.has(id)).sort();
           const added = [...currentIds].filter((id) => !beforeIds.has(id)).sort();
           const expectedRemoved = ["video-link-screen-recording"];
+          const expectedAdded = ["scene-studio"];
 
-          if (JSON.stringify(removed) !== JSON.stringify(expectedRemoved) || added.length !== 0) {
-            throw new Error("Discovery identity change is not the reviewed one-record removal. Removed: "
+          if (JSON.stringify(removed) !== JSON.stringify(expectedRemoved) ||
+              JSON.stringify(added) !== JSON.stringify(expectedAdded)) {
+            throw new Error("Discovery identity delta differs from the reviewed source change. Removed: "
               + JSON.stringify(removed) + "; added: " + JSON.stringify(added));
           }
 
+          // Scene Studio is an intentional Web-only runtime extension. Its Kotlin/Swift
+          // reader and math conformance sources are not full native editing/render/export apps.
+          const sceneStudio = currentInventory.records.find((record) => record.id === "scene-studio");
+          if (!sceneStudio || sceneStudio.status !== "active" || sceneStudio.kind !== "runtime-extension" ||
+              sceneStudio.nativeExecution?.android !== "web-only" || sceneStudio.nativeExecution?.ios !== "web-only" ||
+              !sceneStudio.reasons.includes("NATIVE_WEB_ONLY_ACTIVE")) {
+            throw new Error("Scene Studio is missing its reviewed active Web-only runtime classification.");
+          }
+
+          // The removed and added IDs balance each other; all source/runtime/search counts
+          // remain stable. This is identity replacement, not a net inventory reduction.
           const expected = {
-            runtimeRecords: 10013,
-            searchableRecords: 9978,
-            runtimeExtensionRecords: 12
+            sourceRecords: 10001,
+            sharedCatalogueRecords: 10001,
+            runtimeRecords: 10014,
+            searchableRecords: 9979,
+            runtimeExtensionRecords: 13,
+            virtualStudioRecords: 14,
+            runtimePlanned: 260,
+            categoryDefinitions: 43
           };
           const changedCounts = Object.keys(beforeBaseline.counts)
             .filter((key) => beforeBaseline.counts[key] !== currentInventory.summary[key])
             .sort();
-          const expectedChangedCounts = ["runtimeExtensionRecords", "runtimeRecords", "searchableRecords"];
-          if (JSON.stringify(changedCounts) !== JSON.stringify(expectedChangedCounts)) {
+          if (changedCounts.length !== 0) {
             throw new Error("Unexpected discovery count fields changed: " + JSON.stringify(changedCounts));
           }
           for (const [key, value] of Object.entries(expected)) {
@@ -104,8 +122,7 @@ jobs:
 
           const validationSection = report.split("## 8. Validator result")[1]?.split("Registered gaps")[0] ?? "";
           const failures = [...validationSection.matchAll(/^- `([^`]+)`/gm)].map((match) => match[1]);
-          if (failures.length !== 0 &&
-              (failures.length !== 3 || failures.some((code) => code !== "COUNT_DRIFT"))) {
+          if (failures.length !== 1 || failures[0] !== "GAP_REGRESSION") {
             throw new Error("Unexpected inventory validator failures: " + JSON.stringify(failures));
           }
 
@@ -121,12 +138,19 @@ jobs:
           }
           for (const [code, prior] of Object.entries(beforeBaseline.gaps)) {
             const current = currentGaps.get(code);
-            if (current === undefined || current > prior) {
-              throw new Error("Registered gap grew or disappeared unexpectedly: " + code + " (before " + prior + ", current " + current + ")");
+            if (current === undefined) {
+              throw new Error("Registered gap disappeared unexpectedly: " + code);
+            }
+            if (code === "NATIVE_WEB_ONLY_ACTIVE") {
+              if (current !== prior + 1) {
+                throw new Error("Expected exactly one intentional Web-only addition for Scene Studio; got " + current + " from " + prior);
+              }
+            } else if (current !== prior) {
+              throw new Error("Unexpected registered gap change: " + code + " (before " + prior + ", current " + current + ")");
             }
           }
 
-          console.log("Verified exact removal: video-link-screen-recording; no added IDs; only the three expected counts decreased; all registered discovery gaps stayed level or improved.");
+          console.log("Verified the exact identity swap (removed video-link-screen-recording; added active Web-only scene-studio), unchanged inventory totals, and the single expected native Web-only count increase.");
           NODE
 
       - name: Accept reviewed counts and regenerate discovery artifacts
@@ -136,7 +160,7 @@ jobs:
           import fs from "node:fs";
           const path = "audit/discovery/discovery-baseline.json";
           const baseline = JSON.parse(fs.readFileSync(path, "utf8"));
-          baseline.note = "Reviewed 2026-11-23: the prior runtime extension video-link-screen-recording is the sole removed stable ID. The source-derived before/after ID sets, the three expected count reductions, and every registered gap ratchet were verified before accepting this baseline. This records inventory identity only; it is not per-tool functional acceptance evidence.";
+          baseline.note = "Reviewed 2026-11-23: video-link-screen-recording was removed and scene-studio was added as an active runtime extension. Scene Studio is explicitly Web-only until native Android/iOS editing, rendering and export exist; its inclusion explains the one-item increase in NATIVE_WEB_ONLY_ACTIVE. The source-derived ID sets, unchanged inventory totals, and every other registered gap were verified. This records inventory identity only; it is not per-tool functional acceptance evidence.";
           fs.writeFileSync(path, JSON.stringify(baseline, null, 1) + "\n");
           NODE
           npm run discovery:inventory
