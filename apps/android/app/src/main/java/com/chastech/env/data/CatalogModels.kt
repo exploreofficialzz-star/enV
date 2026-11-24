@@ -426,7 +426,10 @@ fun Catalog.relatedTools(tool: ToolRecord, limit: Int = 6): List<ToolRecord> {
     val rest = fallbackCandidates.asSequence()
         .filter { it.category == tool.category && it.id !in seen && it.status != "planned" }
         .distinctBy { it.id }
-        .sortedWith(compareBy<ToolRecord>({ relatedAlphabeticalKey(it.name) }, { it.id }))
+        .sortedWith(
+            if (tool.category == "developer") compareByDescending<ToolRecord> { it.popularity }.thenBy { it.id }
+            else compareBy<ToolRecord>({ relatedAlphabeticalKey(it.name) }, { it.id })
+        )
         .toList()
     return (related + rest).take(limit)
 }
