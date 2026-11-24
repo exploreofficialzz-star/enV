@@ -220,7 +220,8 @@ internal class NativeCatalogSearchIndex(tools: List<ToolRecord>) {
         }
         if (base == 0.0) return null
         val coverage = matchedIdf / totalIdf
-        if (terms.size >= 2 && (coverage < if (terms.size == 2) 0.75 else 0.6 || !strongMatch)) return null
+        val minimumCoverage = if (terms.size == 2) 0.75 else 0.6
+        if (terms.size >= 2 && (coverage < minimumCoverage || !strongMatch)) return null
 
         var score = base * (0.4 + 0.6 * coverage)
         if (terms.isNotEmpty() && namedTerms == terms.size) score += 30.0
