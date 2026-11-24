@@ -658,6 +658,18 @@ test("task-guidance source identifies the correct specificity layer", () => {
   assert.match(percentageGuide.paragraphs[1], /Percent: 7%/);
   assert.ok(percentageGuide.paragraphs[1].includes("0.21"));
   assert.match(percentageGuide.paragraphs[2], /actual measured values|own correctly measured values/);
+  const plannedPercentage = { ...percentage, id: "planned-registry-calculator", status: "planned" as const };
+  assert.equal(
+    toolTaskGuidanceSource(plannedPercentage),
+    "engine-specific",
+    "A planned calculator must not be presented as an available operation merely because a compute function exists.",
+  );
+  const backendPercentage = { ...percentage, id: "backend-registry-calculator", requiresBackend: true };
+  assert.equal(
+    toolTaskGuidanceSource(backendPercentage),
+    "engine-specific",
+    "A backend-required calculator must not be described as a locally executable registry operation.",
+  );
 
   assert.equal(
     toolTaskGuidanceSource(makeTool(
