@@ -170,7 +170,7 @@ assert.ok(result.urls.includes("/blog/tool-break-even-calculator"), "The Break-E
 assert.ok(!result.urls.includes("/tools/calculators/break-even-calculator"), "The client-side Break-Even compatibility redirect must not enter the sitemap.");
 assert.equal(canonicalToolPath(breakEvenGuide), "/tools/business/finance-studio", "Break-Even guide schema and inventory must point to Finance Metrics Studio.");
 assert.equal(canonicalToolName(breakEvenGuide), "Finance Metrics Studio", "Break-Even guide must identify its canonical Studio destination.");
-assert.match(toolRouteSource, /slug === "break-even-calculator"[\\s\\S]*?noindex,follow[\\s\\S]*?canonicalToolPath\\(matchedTool\\)/, "The legacy Break-Even URL must be noindex and canonicalize to Finance Metrics Studio.");
+assert.match(toolRouteSource, /slug === "break-even-calculator"[\s\S]*?noindex,follow[\s\S]*?canonicalToolPath\(matchedTool\)/, "The legacy Break-Even URL must be noindex and canonicalize to Finance Metrics Studio.");
 for (const path of [
   "/contact", "/help", "/privacy", "/terms", "/disclaimer",
   "/responsible-use", "/platform/android", "/platform/ios", "/token-guide"
