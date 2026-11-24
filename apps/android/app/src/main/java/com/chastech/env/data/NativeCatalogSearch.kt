@@ -118,7 +118,12 @@ internal class NativeCatalogSearchIndex(tools: List<ToolRecord>) {
                         if (distance > maxEdits) return
                         val candidateDf = vocabulary[candidateStem] ?: 0
                         val existing = best[candidateStem]
-                        if (existing == null || distance < existing.first) best[candidateStem] = distance to candidateDf
+                        if (existing == null) {
+                            bestOrder += candidateStem
+                            best[candidateStem] = distance to candidateDf
+                        } else if (distance < existing.first) {
+                            best[candidateStem] = distance to candidateDf
+                        }
                     }
                     surfaceVocabulary.forEach { (candidateSurface, candidateStem) ->
                         if (kotlin.math.abs(candidateSurface.length - surface.length) > maxEdits &&
