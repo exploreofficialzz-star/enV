@@ -307,6 +307,9 @@ const catalogRuntimeTools: ToolMeta[] = [
       ? { ...presentedTool, status: "active" }
       : presentedTool;
     if (webTool.id === "scene-studio") return sceneStudioTool;
+    if (webTool.id === "music-live-video-studio") {
+      return { ...webTool, related: ["video-compressor", "video-trimmer"] };
+    }
     if (webTool.id === "css-minifier-advanced") {
       return {
         ...webTool,
