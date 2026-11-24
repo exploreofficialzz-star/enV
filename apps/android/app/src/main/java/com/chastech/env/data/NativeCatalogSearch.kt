@@ -113,6 +113,7 @@ internal class NativeCatalogSearchIndex(tools: List<ToolRecord>) {
                 val maxEdits = maxEdits(key.length)
                 if (maxEdits > 0) {
                     val best = LinkedHashMap<String, Pair<Int, Int>>()
+                    val bestOrder = mutableListOf<String>()
                     fun consider(candidateStem: String, distance: Int) {
                         if (distance > maxEdits) return
                         val candidateDf = vocabulary[candidateStem] ?: 0
