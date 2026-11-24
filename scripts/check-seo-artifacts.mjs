@@ -132,7 +132,7 @@ for (const legacyTool of publicLegacyDeveloperTools) {
 const publicLegacyDeveloperGuides = result.guideTools.filter((tool) =>
   tool.category === "developer" && !tool.tags.includes("developer-studio")
 );
-assert.equal(publicLegacyDeveloperGuides.length, 427, "All 427 indexable legacy Developer guides must remain available.");
+assert.equal(publicLegacyDeveloperGuides.length, 475, "All 475 legacy Developer guides must remain available.");
 assert.ok(categoryRouteSource.includes("DEVELOPER_LEGACY_TOOLS"), "Developer category must expose legacy utility routes as crawlable links.");
 assert.ok(categoryRouteSource.includes('href={"/tools/developer/" + tool.slug}'), "Every public legacy Developer tool must have a direct HTML link to its preserved route.");
 assert.ok(categoryRouteSource.includes(".filter(isIndexableTool)"), "The public Developer directory must exclude non-indexable records.");
