@@ -139,8 +139,25 @@ final class CatalogCoreTests: XCTestCase {
         XCTAssertEqual(catalog.counts.active, 1)
         XCTAssertEqual(catalog.tools.first?.category, "productivity")
         XCTAssertEqual(catalog.tools.first?.engine.id, "a-book")
+        XCTAssertEqual(catalog.tools.first?.related, ["pdf-merger", "pdf-splitter", "pdf-text-extractor"])
         XCTAssertEqual(catalog.includingABook().tools.filter { $0.id == "a-book" }.count, 1)
         XCTAssertEqual(catalog.webSearch("A book").first?.id, "a-book")
+    }
+
+    func testZipArchiveRuntimeExtensionUsesOnlyResolvableRelatedTools() {
+        let base = Catalog(
+            schemaVersion: 1,
+            catalogVersion: "test",
+            counts: CatalogCounts(total: 0, active: 0, planned: 0, categories: 1),
+            categories: [],
+            tools: [],
+            relatedReferenceTools: nil
+        )
+        let catalog = base.includingZipArchive()
+        let zip = try! XCTUnwrap(catalog.tools.first { $0.id == "zip-any-file" })
+        XCTAssertEqual(zip.related, ["file-to-txt", "file-organizer", "file-compare"])
+        XCTAssertTrue(zip.related.allSatisfy { id in catalog.displayTool(for: id) != nil })
+        XCTAssertEqual(catalog.includingZipArchive().tools.filter { $0.id == "zip-any-file" }.count, 1)
     }
 
     func testCameraStudioRuntimeExtensionIsUniqueAndSearchable() {
