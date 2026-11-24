@@ -1209,15 +1209,8 @@ final class CatalogStore: ObservableObject {
     var popularTools: [Tool] { (catalog.accessibilityDiscoveryTools() + catalog.developerStudioTools()).sorted { $0.popularity == $1.popularity ? $0.name < $1.name : $0.popularity > $1.popularity } }
 
     func tools(matching query: String = "", category: String? = nil) -> [Tool] {
-        if category == nil || category == "accessibility" {
-            return catalog.webSearch(query, limit: Int.max, includeRelatedReferences: true).filter { category == nil || $0.category == category }
-        }
-        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let originals = catalog.tools + (catalog.relatedReferenceTools ?? [])
-        let source = originals + (category == "developer" ? catalog.developerStudioTools() : [])
-        return source.filter { tool in
-            (category == nil || tool.category == category) && (needle.isEmpty || tool.searchText.contains(needle))
-        }.sorted { $0.popularity == $1.popularity ? $0.name < $1.name : $0.popularity > $1.popularity }
+        catalog.webSearch(query, limit: Int.max, includeRelatedReferences: true)
+            .filter { category == nil || $0.category == category }
     }
 
     func toggleFavorite(_ tool: Tool) {
