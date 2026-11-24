@@ -122,6 +122,7 @@ assert.match(iosAds, /reserveTokenAccess\(\)/);
 assert.match(iosAds, /settleToolAccess/);
 assert.match(iosAds, /releaseToolAccess/);
 assert.match(iosToolDestination, /NativeRewardedToolAccessGate\(tool: tool, onOpenWallet:/);
+assert.match(iosToolDestination, /informationRouter\.open\("wallet"\)/, "iOS token access must open the native Wallet screen.");
 assert.match(iosAds, /crossPlatformMeteredIDs/);
 assert.match(iosAds, /isApplicationOnline\(\) async/);
 assert.match(rollout, /Adsterra is the only advertising provider used by enV Web/, "The rollout guide must establish Adsterra as the single Web provider.");
