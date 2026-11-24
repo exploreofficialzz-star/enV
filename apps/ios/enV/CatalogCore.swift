@@ -706,7 +706,13 @@ private final class NativeCatalogSearchIndex {
                             best[entry.stem] = (distance, vocabulary[entry.stem] ?? 0)
                         }
                     }
-                    for candidate in bestOrder.prefix(3) {
+                    let orderedCandidates = bestOrder.sorted {
+                        guard let left = best[$0], let right = best[$1] else { return $0 < $1 }
+                        if left.distance != right.distance { return left.distance < right.distance }
+                        if left.documentFrequency != right.documentFrequency { return left.documentFrequency > right.documentFrequency }
+                        return $0 < $1
+                    }
+                    for candidate in orderedCandidates.prefix(3) {
                         guard let item = best[candidate] else { continue }
                         variants.append(NativeSearchVariant(
                             stems: [candidate],
