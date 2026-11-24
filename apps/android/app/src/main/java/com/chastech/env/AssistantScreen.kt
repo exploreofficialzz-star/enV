@@ -1,5 +1,6 @@
 package com.chastech.env
 
+import com.chastech.env.data.webSearch
 import com.chastech.env.ui.CharacterSpacedText as Text
 
 import androidx.compose.foundation.BorderStroke
