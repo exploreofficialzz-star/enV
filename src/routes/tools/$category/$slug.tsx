@@ -80,7 +80,11 @@ export const Route = createFileRoute("/tools/$category/$slug")({
       };
     }
     let tool = matchedTool;
-    let canonicalPath = "/tools/" + tool.category + "/" + tool.slug;
+    // Business Studio URLs resolve through their registered anchor tool, but the
+    // Studio URL itself is the canonical public route—not the legacy anchor slug.
+    let canonicalPath = category === "business" && anchorSlug
+      ? "/tools/business/" + slug
+      : "/tools/" + tool.category + "/" + tool.slug;
     if (category === "developer" && !tool.tags.includes("developer-studio")) {
       const studio = developerStudioForLegacySlug(slug);
       const studioTool = getToolById(studio.id);
