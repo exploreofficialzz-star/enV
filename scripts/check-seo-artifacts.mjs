@@ -5,6 +5,7 @@ import { buildIndexNowKeyArtifact } from "./indexnow-utils.mjs";
 import { SEO_CANONICAL_ORIGIN, SEO_REDIRECT_HOSTS } from "./seo-domain-policy.mjs";
 import { getAllTools, getSearchableTools, getToolByPath, getToolsByCategory } from "../src/lib/registry.ts";
 import { developerModeForLegacySlug, developerStudioForLegacySlug } from "../src/lib/developer-studios-catalog.ts";
+import { businessStudioAnchorSlug } from "../src/lib/business-studios-catalog.ts";
 import { toolTaskGuidanceSource } from "../src/lib/tool-documentation.ts";
 import { isIndexableTool, toolSeoDescription, toolGuideSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema, toolSchema, organizationSchema, websiteSchema, boundedToolSeoTitle, createCanonicalSeoToolResolver } from "@/lib/seo-metadata";
 
@@ -193,6 +194,9 @@ assert.ok(result.urls.includes("/blog/tool-break-even-calculator"), "The Break-E
 assert.ok(!result.urls.includes("/tools/calculators/break-even-calculator"), "The client-side Break-Even compatibility redirect must not enter the sitemap.");
 assert.equal(canonicalToolPath(breakEvenGuide), "/tools/business/finance-studio", "Break-Even guide schema and inventory must point to Finance Metrics Studio.");
 assert.equal(canonicalToolName(breakEvenGuide), "Finance Metrics Studio", "Break-Even guide must identify its canonical Studio destination.");
+assert.equal(businessStudioAnchorSlug("finance-studio"), "break-even-estimator", "Finance Metrics Studio must resolve through its registered Business anchor tool.");
+assert.equal(getToolByPath("business", businessStudioAnchorSlug("finance-studio"))?.id, "break-even-estimator", "The canonical Finance Studio route must resolve to its actual registered anchor tool.");
+assert.match(toolRouteSource, /category === "business" && anchorSlug[\s\S]*?\/tools\/business\/" \+ slug/, "A dynamic Business Studio URL must remain canonical after resolving its anchor tool.");
 assert.match(toolRouteSource, /slug === "break-even-calculator"[\s\S]*?noindex,follow[\s\S]*?canonicalToolPath\(matchedTool\)/, "The legacy Break-Even URL must be noindex and canonicalize to Finance Metrics Studio.");
 for (const path of [
   "/contact", "/help", "/privacy", "/terms", "/disclaimer",
