@@ -53,6 +53,15 @@ test("the actual Web resolver canonicalizes and deduplicates declared related li
   assert.ok(visible.every((item) => discoverable.has(item.id)));
 });
 
+test("Live Video Singing Studio uses valid canonical video tool destinations", () => {
+  const studio = getToolById("music-live-video-studio");
+  assert.ok(studio);
+  assert.deepEqual(studio.related, ["video-compressor", "video-trimmer"]);
+  const displayed = getRelatedTools(studio, 2);
+  assert.deepEqual(displayed.map((item) => item.id), ["video-compressor", "video-trimmer"]);
+  assert.ok(displayed.every((item) => item.status !== "planned"));
+});
+
 test("Scene Studio exposes its reviewed, searchable adjacent video workflows first", () => {
   const sceneStudio = getToolById("scene-studio");
   assert.ok(sceneStudio);
