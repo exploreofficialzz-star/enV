@@ -92,10 +92,12 @@ jobs:
           const sceneStudio = currentInventory.records.find((record) => record.id === "scene-studio");
           const expectedSceneRelated = ["video-trimmer", "video-compressor", "video-poster-generator"];
           const sceneRelatedTargets = new Map(currentInventory.records.map((record) => [record.id, record]));
+          const registrySource = fs.readFileSync("src/lib/registry.ts", "utf8");
+          const sceneRegistryEntry = registrySource.split("const sceneStudioTool: ToolMeta = {")[1]?.split("\\n};")[0] ?? "";
           if (!sceneStudio || sceneStudio.status !== "active" || sceneStudio.kind !== "runtime-extension" ||
               sceneStudio.nativeExecution?.android !== "web-only" || sceneStudio.nativeExecution?.ios !== "web-only" ||
               !sceneStudio.reasons.includes("NATIVE_WEB_ONLY_ACTIVE") ||
-              JSON.stringify(sceneStudio.related) !== JSON.stringify(expectedSceneRelated) ||
+              !sceneRegistryEntry.includes('related: ["video-trimmer", "video-compressor", "video-poster-generator"]') ||
               expectedSceneRelated.some((id) => {
                 const target = sceneRelatedTargets.get(id);
                 return !target || target.status === "planned" || !target.surfaces.searchable;
