@@ -68,7 +68,11 @@ const nativeCandidates = [
   ...getToolsByCategory("accessibility"),
   ...getToolsByCategory("developer"),
   ...getAllTools().filter((tool) => tool.id === "song-metadata-analyzer"),
-].filter((tool) => candidateIDs.add(tool.id));
+].filter((tool) => {
+  if (candidateIDs.has(tool.id)) return false;
+  candidateIDs.add(tool.id);
+  return true;
+});
 const nativeByID = new Map(nativeCandidates.map((tool) => [tool.id, tool]));
 
 function nativeAlphabeticalKey(value) {
