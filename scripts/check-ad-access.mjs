@@ -106,6 +106,8 @@ assert.doesNotMatch(env, /VITE_ADSENSE_|VITE_ADS_ENABLED|VITE_GAM_REWARDED/, "Th
 assert.doesNotMatch(adsTxt, /google\.com/, "Obsolete AdSense seller records must not remain in the Adsterra-only ads.txt.");
 assert.match(adsTxt, /exact authorized-seller record from the Adsterra publisher dashboard/, "The Adsterra seller line must be copied from the publisher account, never guessed.");
 
+assert.match(androidAds, /restrictedCategories = setOf\("health", "finance", "earnings", "fitness", "personal"\)/, "Android token access must exclude sensitive categories just like Web.");
+assert.match(iosAds, /restrictedCategories: Set<String> = \["health", "finance", "earnings", "fitness", "personal"\]/, "iOS token access must exclude sensitive categories just like Web.");
 assert.match(androidAds, /fun isTokenAccessTool\(context: Context, tool: ToolRecord\)/);
 assert.match(androidAds, /isTokenAccessTool/);
 assert.match(androidAds, /NativeAdsPolicy\.isTokenAccessTool\(context, tool\)/);
