@@ -113,15 +113,15 @@ internal object NativeAdsPolicy {
 
     fun isTokenAccessTool(context: Context, tool: ToolRecord): Boolean {
         val restrictedDisclaimers = setOf("health", "finance", "earnings")
-        val restrictedCategories = setOf("fitness", "personal")
+        val restrictedCategories = setOf("health", "finance", "earnings", "fitness", "personal")
         return tool.id in crossPlatformMeteredIds(context) &&
             tool.status == "active" &&
             tool.clientSide &&
             !tool.requiresBackend &&
             !tool.requiresAuth &&
-            tool.category !in restrictedCategories &&
+            tool.category.lowercase() !in restrictedCategories &&
             !tool.id.startsWith("finance-") &&
-            (tool.disclaimer?.let { it !in restrictedDisclaimers } ?: true)
+            (tool.disclaimer?.lowercase()?.let { it !in restrictedDisclaimers } ?: true)
     }
 
     /** Offline metering is independent from the native AdMob/GAM launch flags. */
