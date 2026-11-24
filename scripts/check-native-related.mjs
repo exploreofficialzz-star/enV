@@ -62,13 +62,22 @@ assert.equal(nativeTools.length + relatedReferences.length, webTools.length);
 // relatedReferenceTools, then adds the canonical Accessibility and Developer Studio
 // projections. The audit constructs that same complete candidate surface; it does not
 // substitute a hand-written Studio-only candidate list.
+const candidateIDs = new Set();
 const nativeCandidates = [
   ...webTools.filter((tool) => tool.category !== "accessibility"),
   ...getToolsByCategory("accessibility"),
   ...getToolsByCategory("developer"),
   ...getAllTools().filter((tool) => tool.id === "song-metadata-analyzer"),
-];
+].filter((tool) => candidateIDs.add(tool.id));
 const nativeByID = new Map(nativeCandidates.map((tool) => [tool.id, tool]));
+function nativeAlphabeticalKey(value) {
+  return value
+    .normalize("NFKD")
+    .replace(/\\p{M}+/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
 const codeUnitCompare = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
 
 function canonicalNativeTarget(id) {
