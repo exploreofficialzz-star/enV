@@ -6,13 +6,11 @@ import CryptoKit
 
 struct NativeArchiveToolDestinationView: View {
     let tool: Tool
-    @Environment(\.openURL) private var openURL
+    @EnvironmentObject private var informationRouter: NativeInformationRouter
 
     var body: some View {
         NativeRewardedToolAccessGate(tool: tool, onOpenWallet: {
-            if let walletURL = URL(string: "https://envtools.store/wallet") {
-                openURL(walletURL)
-            }
+            informationRouter.open("wallet")
         }) {
             Group {
                 if tool.id == "zip-any-file" {
