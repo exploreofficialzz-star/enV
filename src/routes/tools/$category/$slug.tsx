@@ -69,6 +69,16 @@ export const Route = createFileRoute("/tools/$category/$slug")({
     const anchorSlug = category === "business" ? businessStudioAnchorSlug(slug) : undefined;
     const matchedTool = getToolByPath(category, slug) ?? (anchorSlug ? getToolByPath("business", anchorSlug) : undefined);
     if (!matchedTool) return { meta: [{ title: "Tool not found | enV" }, { name: "robots", content: "noindex,follow" }] };
+    if ((category === "business" || category === "calculators") && slug === "break-even-calculator") {
+      return {
+        meta: [
+          { title: "Break-Even Calculator | enV" },
+          { name: "description", content: matchedTool.description },
+          { name: "robots", content: "noindex,follow" },
+        ],
+        links: [{ rel: "canonical", href: SITE_ORIGIN + canonicalToolPath(matchedTool) }],
+      };
+    }
     let tool = matchedTool;
     let canonicalPath = "/tools/" + tool.category + "/" + tool.slug;
     if (category === "developer" && !tool.tags.includes("developer-studio")) {
