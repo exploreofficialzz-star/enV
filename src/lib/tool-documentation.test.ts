@@ -649,15 +649,19 @@ test("task-guidance source identifies the correct specificity layer", () => {
     "operation-specific",
     "A registered calculator with a successful synthetic example must receive operation-specific guidance.",
   );
-  const percentageGuide = getToolDocumentation(percentage).find((section) => section.id === "when-to-use");
+  const percentageSections = getToolDocumentation(percentage);
+  const percentageGuide = percentageSections.find((section) => section.id === "when-to-use");
+  const percentageInputs = percentageSections.find((section) => section.id === "inputs-and-options");
   assert.ok(percentageGuide, "Registered calculator guide must include its operation-specific section.");
+  assert.ok(percentageInputs, "Registered calculator guide must include its input and validation section.");
   assert.match(percentageGuide.paragraphs[0], /registered calculator operation "percentage"/);
   assert.ok(percentageGuide.paragraphs[0].includes("P% of A = A × P / 100"));
   assert.match(percentageGuide.paragraphs[1], /synthetic registry test/);
   assert.match(percentageGuide.paragraphs[1], /Amount: 3/);
   assert.match(percentageGuide.paragraphs[1], /Percent: 7%/);
   assert.ok(percentageGuide.paragraphs[1].includes("0.21"));
-  assert.match(percentageGuide.paragraphs[2], /actual measured values|own correctly measured values/);
+  assert.match(percentageInputs.paragraphs[2], /code-path check/);
+  assert.match(percentageInputs.paragraphs[2], /not an independent review of the formula/);
   const plannedPercentage = { ...percentage, id: "planned-registry-calculator", status: "planned" as const };
   assert.equal(
     toolTaskGuidanceSource(plannedPercentage),
