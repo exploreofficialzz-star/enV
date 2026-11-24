@@ -2,7 +2,7 @@
 
 ## Provider boundary
 
-Adsterra is the only advertising provider used by enV Web. AdSense, AdMob and Google Ad Manager are not part of the current advertising rollout. Android and iOS ship with no advertising SDK, publisher identifiers, ad requests, or advertising access gate; their native ad rollout is deferred until a separate launch decision.
+Adsterra is the only advertising provider used by enV Web. AdSense, AdMob and Google Ad Manager are not part of the current Web advertising rollout. Android and iOS retain optional native Google Mobile Ads/UMP integration code, but native ad requests, placements and rewarded-ad access remain disabled by their build flags. The native enV token-access gate is separate and remains available without enabling AdMob, GAM or UMP.
 
 The supplied Web placements are:
 
