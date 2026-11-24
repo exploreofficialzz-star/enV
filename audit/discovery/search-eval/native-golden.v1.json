@@ -69,7 +69,7 @@
  {"query":"qr","matchCount":71,"top10":["qr-generator","qr-svg-generator","qr-payload-encoder","qr-size-calculator","qr-capacity-helper","qr-version-helper","qr-data-url-generator","qr-payload-inspector","url-qr-generator","whatsapp-qr-generator"]},
  {"query":"converter","matchCount":274,"top10":["temperature-converter","length-converter","weight-converter","volume-converter","timezone-converter","cooking-converter","jpg-converter","png-converter","speed-converter","webp-converter"]},
  {"query":"image to pdf","matchCount":56,"top10":["images-to-pdf","pdf-image-extractor","document-image-extractor","image-merger","image-splitter","docx-image-extractor","image-comparison-tool","image-image-extractor","image-metadata-tool","image-page-extractor"]},
- {"query":"free online json tool","matchCount":43,"top10":["json-studio","json-formatter","json-validator","json-beautifier","json-minifier","json-converter","json-decoder","json-diff","json-encoder","json-explainer"]},
+ {"query":"free online json tool","matchCount":44,"top10":["json-studio","json-formatter","json-validator","json-beautifier","json-minifier","json-converter","json-decoder","json-diff","json-encoder","json-explainer"]},
  {"query":"Résumé","matchCount":7,"top10":["resume-builder","resume-calculator","resume-checker","resume-generator","resume-planner","resume-template","resume-bullet-generator"]},
  {"query":"c++","matchCount":0,"top10":[]},
  {"query":"100%","matchCount":1,"top10":["image-sharpen"]}
