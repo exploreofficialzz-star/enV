@@ -108,9 +108,10 @@ function nativeRelated(tool, limit = 6) {
   const rest = fallbackCandidates
     .filter((item) => item.category === canonical.category && !seen.has(item.id) && item.status !== "planned")
     .slice()
-    .sort((left, right) =>
-      codeUnitCompare(nativeAlphabeticalKey(left.name), nativeAlphabeticalKey(right.name)) ||
-      codeUnitCompare(left.id, right.id)
+    .sort((left, right) => canonical.category === "developer"
+      ? (right.popularity - left.popularity || codeUnitCompare(left.id, right.id))
+      : (codeUnitCompare(nativeAlphabeticalKey(left.name), nativeAlphabeticalKey(right.name)) ||
+        codeUnitCompare(left.id, right.id))
     );
   return [...related, ...rest].slice(0, limit);
 }
