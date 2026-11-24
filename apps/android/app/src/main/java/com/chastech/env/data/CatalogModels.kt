@@ -250,7 +250,7 @@ fun Catalog.withZipArchive(): Catalog {
         requiresBackend = false,
         requiresAuth = false,
         status = "active",
-        related = listOf("file-converter", "pdf-merger", "document-editor"),
+        related = listOf("file-to-txt", "file-organizer", "file-compare"),
         engine = EngineInfo("custom", "zip-any-file"),
         subcategory = "Archives & extraction",
     )
