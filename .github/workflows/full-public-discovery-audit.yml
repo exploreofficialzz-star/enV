@@ -74,10 +74,9 @@ jobs:
       - name: Run discovery relevance, phrasing and cross-link gates
         run: npm run discovery:check
 
-      - name: Typecheck the application
-        run: npm run typecheck
-
-      - name: Start local SSR server
+      # TanStack Start generates the ignored routeTree.gen.ts when Vite starts.
+      # Generate that source before tsc so file-route types are available in CI.
+      - name: Start local SSR server and generate route types
         shell: bash
         run: |
           set -euo pipefail
@@ -85,13 +84,16 @@ jobs:
           echo $! > /tmp/env-full-discovery-audit.pid
           for attempt in {1..120}; do
             if curl --fail --silent --show-error http://127.0.0.1:8080/ >/dev/null; then
-              echo "Local SSR server is ready."
+              echo "Local SSR server and generated route tree are ready."
               exit 0
             fi
             sleep 1
           done
           cat /tmp/env-full-discovery-audit.log
           exit 1
+
+      - name: Typecheck the application
+        run: npm run typecheck
 
       - name: Crawl all canonical tool, guide, category and article routes
         env:
