@@ -357,6 +357,7 @@ function scoreDoc(pool: PoolIndex, doc: ToolDoc, terms: Term[], phrase: string, 
     let best = 0;
     let bestReason: MatchReason | null = null;
     let bestStrong = false;
+    let bestField: SearchField = "description";
     for (const variant of term.variants) {
       const strength = variantStrength(doc, variant);
       if (!strength) continue;
@@ -366,6 +367,7 @@ function scoreDoc(pool: PoolIndex, doc: ToolDoc, terms: Term[], phrase: string, 
       if (value > best) {
         best = value;
         bestStrong = strength.weight >= FIELD_WEIGHT.tag;
+        bestField = strength.field;
         if (wantReasons) {
           const kind: MatchKind = variant.kind === "exact" && !doc.surfaces.has(term.surface) ? "stem" : variant.kind;
           bestReason = { field: strength.field, term: term.surface, matched: strength.matched, kind };
@@ -377,7 +379,7 @@ function scoreDoc(pool: PoolIndex, doc: ToolDoc, terms: Term[], phrase: string, 
       matchedIdf += term.idfValue;
       if (bestStrong) strongMatch = true;
       if (bestReason) reasons.push(bestReason);
-      if (bestReason?.field === "name" || bestReason?.field === "id") namedTerms += 1;
+      if (bestField === "name" || bestField === "id") namedTerms += 1;
     }
   }
   if (base === 0) return null;
