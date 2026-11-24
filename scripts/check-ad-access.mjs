@@ -126,7 +126,7 @@ assert.match(iosToolDestination, /informationRouter\.open\("wallet"\)/, "iOS tok
 assert.match(iosAds, /crossPlatformMeteredIDs/);
 assert.match(iosAds, /isApplicationOnline\(\) async/);
 assert.match(rollout, /Adsterra is the only advertising provider used by enV Web/, "The rollout guide must establish Adsterra as the single Web provider.");
-assert.match(rollout, /AdMob.*remain disabled/i, "The rollout guide must keep native AdMob disabled without disabling token access.");
+assert.match(rollout, /AdMob.*remains? disabled/i, "The rollout guide must keep native AdMob disabled without disabling token access.");
 assert.match(rollout, /native token-access gate/i, "The rollout guide must describe native token gates separately from advertising.");
 assert.match(rollout, /not a documented per-user rewarded-video completion callback/, "The rollout guide must not misrepresent Adsterra aggregate reporting as rewarded completion.");
 
