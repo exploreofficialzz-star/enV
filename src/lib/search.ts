@@ -301,7 +301,9 @@ function interpret(pool: PoolIndex, query: string) {
           if (candidateSurface[0] !== surface[0] && candidateStem[0] !== key[0]) continue;
           consider(candidateStem, Math.min(boundedDistance(surface, candidateSurface, limit), boundedDistance(key, candidateStem, limit)));
         }
-        const near = [...best.entries()].map(([candidate, value]) => ({ candidate, distance: value.distance, df: value.df }));
+        const near = [...best.entries()]
+          .map(([candidate, value]) => ({ candidate, distance: value.distance, df: value.df }))
+          .sort((a, b) => a.distance - b.distance || b.df - a.df || a.candidate.localeCompare(b.candidate));
         for (const item of near.slice(0, 3)) {
           variants.push({ stems: [item.candidate], weight: item.distance === 1 ? 0.55 : 0.4, kind: "fuzzy", label: item.candidate });
           corrections.push(item.candidate);
