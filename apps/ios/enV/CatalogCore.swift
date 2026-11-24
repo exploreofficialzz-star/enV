@@ -589,24 +589,27 @@ private final class NativeCatalogSearchIndex {
     private let surfaceVocabulary: [(surface: String, stem: String)]
 
     init(tools: [Tool]) {
-        documents = tools.map(Self.buildDocument)
+        let builtDocuments = tools.map(Self.buildDocument)
 
         var postingLists: [String: [Int]] = [:]
-        for (index, document) in documents.enumerated() {
+        for (index, document) in builtDocuments.enumerated() {
             for key in document.stems.keys {
                 postingLists[key, default: []].append(index)
             }
         }
-        postings = postingLists
-        vocabulary = postingLists.mapValues(\.count)
+        let builtVocabulary = postingLists.mapValues(\.count)
 
         var seenSurfaces = Set<String>()
         var orderedSurfaces: [(surface: String, stem: String)] = []
-        for document in documents {
+        for document in builtDocuments {
             for surface in document.surfaceOrder where seenSurfaces.insert(surface).inserted {
                 orderedSurfaces.append((surface, Self.stem(surface)))
             }
         }
+
+        documents = builtDocuments
+        postings = postingLists
+        vocabulary = builtVocabulary
         surfaceVocabulary = orderedSurfaces
     }
 
@@ -1011,11 +1014,13 @@ private final class NativeCatalogSearchIndex {
     ]
 }
 
-private enum NativeCatalogSearchCache {
-    private static let lock = NSLock()
-    private static var indexes: [String: NativeCatalogSearchIndex] = [:]
+private final class NativeCatalogSearchCache: @unchecked Sendable {
+    static let shared = NativeCatalogSearchCache()
 
-    static func search(catalog: Catalog, query: String, limit: Int, includeRelatedReferences: Bool) -> [Tool] {
+    private let lock = NSLock()
+    private var indexes: [String: NativeCatalogSearchIndex] = [:]
+
+    func search(catalog: Catalog, query: String, limit: Int, includeRelatedReferences: Bool) -> [Tool] {
         let source = includeRelatedReferences ? catalog.tools + (catalog.relatedReferenceTools ?? []) : catalog.tools
         let general = source.filter {
             $0.category != "accessibility" && !$0.tags.contains("developer-studio") && $0.id != "audio-analyze-studio"
@@ -1052,7 +1057,7 @@ private enum NativeCatalogSearchCache {
 
 extension Catalog {
     func webSearch(_ query: String, limit: Int = Int.max, includeRelatedReferences: Bool = false) -> [Tool] {
-        NativeCatalogSearchCache.search(
+        NativeCatalogSearchCache.shared.search(
             catalog: self,
             query: query,
             limit: limit,
