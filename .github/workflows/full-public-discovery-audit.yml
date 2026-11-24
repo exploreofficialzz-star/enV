@@ -66,6 +66,8 @@ jobs:
           npm run check:native-discovery
           npm run export:native-execution-matrix
           npm run generate:seo
+          npm run discovery:inventory
+          npm run discovery:knowledge-index
           npm run discovery:seo-offline
 
       - name: Run discovery, guide and SEO regression tests
@@ -112,6 +114,9 @@ jobs:
           path: |
             artifacts/full-discovery-audit/report.json
             audit/discovery/SEO-OFFLINE-VALIDATION.md
+            audit/discovery/discovery-inventory.json
+            audit/discovery/DISCOVERY-RECONCILIATION-REPORT.md
+            audit/discovery/tool-knowledge-index.json
           if-no-files-found: warn
           retention-days: 30
 
