@@ -112,7 +112,7 @@ assert.match(androidAds, /reserveToolAccess/);
 assert.match(androidAds, /settleToolAccess/);
 assert.match(androidAds, /releaseToolAccess/);
 assert.match(androidMain, /NativeRewardedToolAccessGate\(tool, onOpenWallet\)/);
-assert.match(androidMain, /NativeToolAccessPolicy\.isHybridTool/);
+assert.match(androidMain, /NativeAdsPolicy\.isHybridTool/);
 assert.match(androidMain, /journal\.beginOperation\(context, allowanceId, tool\.id\)/);
 assert.match(androidGradle, /ENV_ADS_ENABLED.*?: "false"/);
 assert.match(androidAds, /crossPlatformMeteredIds/);
