@@ -765,7 +765,8 @@ private final class NativeCatalogSearchIndex {
     ) -> Double? {
         var base = 0.0
         var matchedIDF = 0.0
-        let totalIDF = max(terms.reduce(0.0) { $0 + $1.idfValue }, 1.0)
+        let idfTotal = terms.reduce(0.0) { $0 + $1.idfValue }
+        let totalIDF = idfTotal > 0 ? idfTotal : 1.0
         var strongMatch = false
         var namedTerms = 0
 
