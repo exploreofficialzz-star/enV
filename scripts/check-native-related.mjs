@@ -5,7 +5,7 @@ import { dirname, resolve } from "node:path";
 import { tools as baseWebTools } from "../src/data/catalog.ts";
 import { applyGenericWorkflowPolicy } from "../src/lib/generic-workflow-policy.mjs";
 import { DATETIME_TOOL_EXTENSIONS } from "../src/lib/datetime/catalog-tools.ts";
-import { getAllTools } from "../src/lib/registry.ts";
+import { getAllTools, getRelatedTools, getToolById, getToolsByCategory } from "../src/lib/registry.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path) => readFileSync(resolve(root, path), "utf8");
@@ -57,55 +57,71 @@ const excluded = new Set(androidExcluded);
 const nativeTools = webTools.filter((tool) => !excluded.has(tool.id));
 const relatedReferences = webTools.filter((tool) => excluded.has(tool.id));
 assert.equal(nativeTools.length + relatedReferences.length, webTools.length);
-const nativeCandidates = [...nativeTools, ...relatedReferences];
-const webByID = new Map(webTools.map((tool) => [tool.id, tool]));
-const nativeByID = new Map(nativeCandidates.map((tool) => [tool.id, tool]));
 
-function webAlphabeticalKey(value) {
-  return value
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLocaleLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
-function nativeAlphabeticalKey(value) {
-  return value
-    .normalize("NFKD")
-    .replace(/\p{M}+/gu, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
+// Native Catalog.relatedTools() receives the full catalogue split across tools and
+// relatedReferenceTools, then adds the canonical Accessibility and Developer Studio
+// projections. The audit constructs that same complete candidate surface; it does not
+// substitute a hand-written Studio-only candidate list.
+const nativeCandidates = [
+  ...webTools.filter((tool) => tool.category !== "accessibility"),
+  ...getToolsByCategory("accessibility"),
+  ...getToolsByCategory("developer"),
+  ...getAllTools().filter((tool) => tool.id === "song-metadata-analyzer"),
+];
+const nativeByID = new Map(nativeCandidates.map((tool) => [tool.id, tool]));
 const codeUnitCompare = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
+
+function canonicalNativeTarget(id) {
+  if (id === "audio-analyze-studio") return getToolById("song-metadata-analyzer");
+  return getToolById(id) ?? nativeByID.get(id);
+}
 function webRelated(tool, limit = 6) {
-  const related = tool.related.map((id) => webByID.get(id)).filter((item) => item && item.status !== "planned");
-  if (related.length >= limit) return related.slice(0, limit);
-  const seen = new Set([tool.id, ...related.map((item) => item.id)]);
-  const rest = webTools
-    .filter((item) => item.category === tool.category && !seen.has(item.id) && item.status !== "planned")
-    .slice()
-    .sort((left, right) => webAlphabeticalKey(left.name).localeCompare(webAlphabeticalKey(right.name)) || left.id.localeCompare(right.id));
-  return [...related, ...rest].slice(0, limit);
+  const canonical = getToolById(tool.id) ?? tool;
+  return getRelatedTools(canonical, limit);
 }
 function nativeRelated(tool, limit = 6) {
-  const related = tool.related.map((id) => nativeByID.get(id)).filter((item) => item && item.status !== "planned");
+  if (limit <= 0) return [];
+  const canonical = getToolById(tool.id) ?? tool;
+  const seen = new Set([canonical.id]);
+  const related = [];
+  for (const id of canonical.related ?? []) {
+    const target = canonicalNativeTarget(id);
+    if (!target || target.status === "planned" || seen.has(target.id)) continue;
+    seen.add(target.id);
+    related.push(target);
+    if (related.length >= limit) break;
+  }
   if (related.length >= limit) return related.slice(0, limit);
-  const seen = new Set([tool.id, ...related.map((item) => item.id)]);
-  const rest = nativeCandidates
-    .filter((item) => item.category === tool.category && !seen.has(item.id) && item.status !== "planned")
+  const fallbackCandidates = canonical.category === "developer"
+    ? getToolsByCategory("developer")
+    : nativeCandidates;
+  const rest = fallbackCandidates
+    .filter((item) => item.category === canonical.category && !seen.has(item.id) && item.status !== "planned")
     .slice()
-    .sort((left, right) => codeUnitCompare(nativeAlphabeticalKey(left.name), nativeAlphabeticalKey(right.name)) || codeUnitCompare(left.id, right.id));
+    .sort((left, right) =>
+      codeUnitCompare(nativeAlphabeticalKey(left.name), nativeAlphabeticalKey(right.name)) ||
+      codeUnitCompare(left.id, right.id)
+    );
   return [...related, ...rest].slice(0, limit);
 }
+
+const androidResolver = read("apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt");
+const iosResolver = read("apps/ios/enV/CatalogCore.swift");
+assert.match(androidResolver, /fun Catalog\.relatedTools[\s\S]*?if \(limit <= 0\) return emptyList\(\)[\s\S]*?distinctBy \{ it\.id \}[\s\S]*?mutableSetOf\(tool\.id\)[\s\S]*?!seen\.add\(target\.id\)/,
+  "Android related resolver must guard limits and deduplicate canonical targets.");
+assert.match(iosResolver, /func relatedTools\(for tool: Tool, limit: Int = 6\)[\s\S]*?guard limit > 0[\s\S]*?candidateIDs\.insert\(\$0\.id\)\.inserted[\s\S]*?accessibilityStudio\(for: id\)[\s\S]*?seen\.insert\(target\.id\)\.inserted/,
+  "iOS related resolver must guard limits, deduplicate candidates and canonicalize Accessibility aliases.");
+
+const [currentWebIDs, currentNativeIDs] = [webRelated, nativeRelated];
 
 let fallbackCases = 0;
 let mismatches = 0;
 const examples = [];
 for (const tool of webTools) {
-  if (tool.related.map((id) => webByID.get(id)).filter((item) => item && item.status !== "planned").length < 6) fallbackCases += 1;
-  const webIDs = webRelated(tool).map((item) => item.id);
-  const nativeIDs = nativeRelated(tool).map((item) => item.id);
+  const canonical = getToolById(tool.id) ?? tool;
+  if (canonical.related.map(canonicalNativeTarget).filter((item) => item && item.status !== "planned").length < 6) fallbackCases += 1;
+  const webIDs = currentWebIDs(tool).map((item) => item.id);
+  const nativeIDs = currentNativeIDs(tool).map((item) => item.id);
   if (JSON.stringify(webIDs) !== JSON.stringify(nativeIDs)) {
     mismatches += 1;
     if (examples.length < 5) examples.push({ tool: tool.id, web: webIDs, native: nativeIDs });
