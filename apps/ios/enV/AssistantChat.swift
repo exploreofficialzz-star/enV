@@ -71,11 +71,6 @@ private struct PendingAssistantRequest {
     let candidates: [AssistantPayloadCandidate]
 }
 
-private struct ScoredAssistantTool {
-    let tool: Tool
-    let score: Int
-}
-
 /// Native iOS client. Provider keys never leave the server; URLSession handles the enV session cookie.
 private enum NativeAssistantClient {
     private static var baseURL: URL? {
@@ -138,17 +133,6 @@ struct AssistantChatView: View {
     private let historyLimit = 12_000
     private let contextMessageLimit = 12
     private let candidateLimit = 8
-    private let synonyms: [String: [String]] = [
-        "photo": ["image", "picture", "pic"], "picture": ["image", "photo"], "pic": ["image", "photo"],
-        "img": ["image"], "compress": ["minify", "shrink", "optimize", "size"],
-        "resize": ["scale", "dimensions", "size"], "json": ["javascript object"],
-        "pwd": ["password"], "pass": ["password"], "bmi": ["body mass", "weight"],
-        "percent": ["percentage", "%"], "qr": ["qrcode", "barcode"], "uuid": ["guid"],
-        "hash": ["checksum", "digest", "sha", "md5"], "color": ["colour", "hex", "rgb"],
-        "mockup": ["fake", "demo", "chat", "screenshot"], "invoice": ["bill", "receipt"],
-        "pdf": ["document"], "encode": ["encoding", "base64"], "decode": ["decoding"],
-    ]
-
     var body: some View {
         NavigationStack {
             VStack(spacing: 10) {
