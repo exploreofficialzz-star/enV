@@ -73,6 +73,7 @@ final class CatalogCoreTests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
+            .deletingLastPathComponent()
         let sharedCatalogURL = repositoryRoot.appendingPathComponent("apps/shared/catalog.json")
         let goldenURL = repositoryRoot.appendingPathComponent("audit/discovery/search-eval/native-golden.v1.json")
         let sharedData = try Data(contentsOf: sharedCatalogURL)
