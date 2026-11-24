@@ -133,6 +133,7 @@ internal class NativeCatalogSearchIndex(tools: List<ToolRecord>) {
                         consider(candidateStem, distance)
                     }
                     // The Web contract selects candidates by edit distance, corpus frequency, then ID.
+                    // Sorting is independent of native catalogue serialization order.
                     bestOrder.sortedWith(
                         compareBy<String> { best.getValue(it).first }
                             .thenByDescending { best.getValue(it).second }
