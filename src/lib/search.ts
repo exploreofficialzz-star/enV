@@ -62,6 +62,8 @@ export const SYNONYMS: Record<string, string[]> = {
   bmi: ["body mass", "weight"],
   percent: ["percentage", "%"],
   qr: ["qrcode", "barcode"],
+  regexp: ["regex"],
+  regular: ["regex"],
   uuid: ["guid"],
   hash: ["checksum", "digest", "sha", "md5"],
   color: ["colour", "hex", "rgb"],
