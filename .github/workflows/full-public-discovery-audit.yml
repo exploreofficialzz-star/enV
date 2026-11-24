@@ -92,15 +92,17 @@ jobs:
           cat /tmp/env-full-discovery-audit.log
           exit 1
 
-      - name: Typecheck the application
-        run: npm run typecheck
-
       - name: Crawl all canonical tool, guide, category and article routes
         env:
           SEO_AUDIT_BASE_URL: http://127.0.0.1:8080
           DISCOVERY_AUDIT_CONCURRENCY: "8"
           DISCOVERY_AUDIT_REQUEST_TIMEOUT_MS: "20000"
         run: npm run audit:discovery:full -- --report=artifacts/full-discovery-audit/report.json
+
+      # Keep strict app typechecking, but run it after the independent rendered-route
+      # audit so a compile error in an unrelated Studio does not suppress route evidence.
+      - name: Typecheck the application
+        run: npm run typecheck
 
       - name: Upload full discovery audit report
         if: always()
