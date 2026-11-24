@@ -195,11 +195,7 @@ jobs:
             audit/discovery/SEO-OFFLINE-VALIDATION.md \
             audit/discovery/tool-knowledge-index.json \
             audit/discovery/search-eval/native-golden.v1.json \
-            public/robots.txt \
-            public/sitemap.xml \
-            public/llms.txt \
-            public/sitemaps \
-            public/og/cards
+            public
           git rm .github/workflows/regenerate-discovery-artifacts.yml
           git diff --cached --check
           git diff --cached --stat
