@@ -610,6 +610,9 @@ extension Catalog {
         let rest = fallbackCandidates
             .filter { $0.category == tool.category && !seen.contains($0.id) && !$0.isPlanned && fallbackIDs.insert($0.id).inserted }
             .sorted {
+                if tool.category == "developer" {
+                    return $0.popularity == $1.popularity ? $0.id < $1.id : $0.popularity > $1.popularity
+                }
                 let left = relatedAlphabeticalKey($0.name)
                 let right = relatedAlphabeticalKey($1.name)
                 return left == right ? $0.id < $1.id : left < right
