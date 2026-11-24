@@ -68,6 +68,38 @@ final class CatalogCoreTests: XCTestCase {
         XCTAssertEqual(native.counts.planned, 1)
     }
 
+    func testNativeSearchMatchesTheCommittedWebGoldenQueries() throws {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let sharedCatalogURL = repositoryRoot.appendingPathComponent("apps/shared/catalog.json")
+        let goldenURL = repositoryRoot.appendingPathComponent("audit/discovery/search-eval/native-golden.v1.json")
+        let sharedData = try Data(contentsOf: sharedCatalogURL)
+        var nativeCatalog = try JSONDecoder().decode(Catalog.self, from: sharedData).nativeFacing()
+        nativeCatalog = nativeCatalog.includingMusicDownloader()
+            .includingSongMetadataAnalyzer()
+            .includingABook()
+            .includingZipArchive()
+            .includingFileWorkspaceTools()
+            .includingCameraStudio()
+            .includingDateTimeExtensions()
+
+        let fixtureData = try Data(contentsOf: goldenURL)
+        let fixture = try XCTUnwrap(JSONSerialization.jsonObject(with: fixtureData) as? [String: Any])
+        let expectedPoolSize = try XCTUnwrap(fixture["poolSize"] as? Int)
+        let actualPoolSize = nativeCatalog.webSearch("", limit: Int.max, includeRelatedReferences: true).count
+        XCTAssertEqual(actualPoolSize, expectedPoolSize, "iOS searchable pool must match the Web golden corpus.")
+
+        let cases = try XCTUnwrap(fixture["cases"] as? [[String: Any]])
+        for testCase in cases {
+            let query = try XCTUnwrap(testCase["query"] as? String)
+            let expected = try XCTUnwrap(testCase["top10"] as? [String])
+            let actual = nativeCatalog.webSearch(query, limit: 10, includeRelatedReferences: true).map(\\.id)
+            XCTAssertEqual(actual, expected, "Native/Web search mismatch for query: '\\(query)'")
+        }
+    }
+
     func testSearchIncludesDescriptionKeywordsAndTags() {
         let store = CatalogStore(catalog: catalog)
         XCTAssertEqual(store.tools(matching: "characters").first?.id, "word-count")
