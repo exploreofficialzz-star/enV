@@ -266,7 +266,7 @@ extension Catalog {
                     ? ($0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending)
                     : leftCategory < rightCategory
             },
-            relatedReferenceTools: relatedReferenceTools
+            relatedReferenceTools: withWorkspace.relatedReferenceTools
         )
     }
 }
@@ -338,12 +338,12 @@ extension Catalog {
             related: ["pdf-merger", "pdf-splitter", "pdf-text-extractor"],
             engine: ToolEngine(type: "custom", id: "a-book", op: "a-book", configuration: [:])
         )
-        let updated = tools + [tool]
+        let updated = withWorkspace.tools + [tool]
         return Catalog(
-            schemaVersion: schemaVersion,
-            catalogVersion: catalogVersion,
-            counts: CatalogCounts(total: updated.count, active: updated.filter { $0.status == "active" || $0.status == "beta" }.count, planned: counts.planned, categories: counts.categories),
-            categories: categories,
+            schemaVersion: withWorkspace.schemaVersion,
+            catalogVersion: withWorkspace.catalogVersion,
+            counts: CatalogCounts(total: updated.count, active: updated.filter { $0.status == "active" || $0.status == "beta" }.count, planned: withWorkspace.counts.planned, categories: withWorkspace.counts.categories),
+            categories: withWorkspace.categories,
             tools: updated.sorted {
                 let leftCategory = $0.category.lowercased()
                 let rightCategory = $1.category.lowercased()
@@ -396,7 +396,10 @@ extension Catalog {
 
     /// Registers local ZIP64 compression and extraction as a native tool.
     func includingZipArchive() -> Catalog {
-        guard !tools.contains(where: { $0.id == "zip-any-file" }) else { return self }
+        // ZIP declares File Workspace destinations; register them first so this extension
+        // is self-contained and every published related ID resolves immediately.
+        let withWorkspace = includingFileWorkspaceTools()
+        guard !withWorkspace.tools.contains(where: { $0.id == "zip-any-file" }) else { return withWorkspace }
         let tool = Tool(
             id: "zip-any-file",
             name: "Zip any file",
