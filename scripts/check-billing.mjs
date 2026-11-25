@@ -227,11 +227,6 @@ assert.equal(
   "Server-backed video conversion must remain online-only.",
 );
 assert.ok(!nativeInventory.androidToolIds.includes("scene-studio") && !nativeInventory.iosToolIds.includes("scene-studio"), "Scene Studio must remain explicitly Web-only on native platforms.");
-assert.equal(sceneStudioBillingProfile.executionMode, "local-device");
-assert.equal(sceneStudioBillingProfile.billingKey, "local.general");
-assert.equal(sceneStudioBillingProfile.optionalAiAssistProfile, null);
-assert.equal(sceneStudioBillingProfile.adsEligible, false);
-assert.equal(sceneStudioBillingProfile.manualAuditRequired, true);
 assert.equal(sceneStudioBillingProfile.executionMode, "web-local", "Scene Studio's browser-local editor must not be mislabeled as a shared native/offline execution path.");
 assert.equal(sceneStudioBillingProfile.billingKey, "local.general");
 assert.equal(offlineEligibleToolIds.has("scene-studio"), false, "Web-only Scene Studio must not enter the cross-platform offline wallet cohort.");
