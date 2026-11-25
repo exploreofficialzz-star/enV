@@ -25,4 +25,5 @@ export const SEARCH_ALIASES: Readonly<Record<string, SearchAliasEntry>> = {
   "heic-converter": { phrases: ["iphone photo to jpg", "heic to jpg"], source: "editorial-hypothesis", reviewed: false },
   "file-png-to-jpg-converter": { phrases: ["png to jpeg"], source: "editorial-hypothesis", reviewed: false },
   "lorem-ipsum-generator": { phrases: ["dummy text", "placeholder text"], source: "editorial-hypothesis", reviewed: false },
+  "regex-tester": { phrases: ["test regular expression", "regexp tester"], source: "editorial-hypothesis", reviewed: false },
 };

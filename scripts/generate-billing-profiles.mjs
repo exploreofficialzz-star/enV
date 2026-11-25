@@ -43,15 +43,7 @@ function profile(tool) {
   let meteringDimensions = ["operation-count"];
   let executionMode;
 
-  // Scene Studio is implemented as a browser-local Web editor, but its editing,
-  // GPU rendering and export are not implemented in native Kotlin/Swift. Keep this
-  // distinct from device-local/offline operations so it cannot enter the offline
-  // wallet cohort simply because the Web renderer runs on the client.
-  if (tool.id === "scene-studio") {
-    executionMode = "web-local";
-    billingKey = "local.general";
-    classificationReason = "Browser-local editor; native editing/rendering/export are Web-only, so this profile remains separate from the cross-platform offline token cohort pending verified native implementation.";
-  } else if (!local) {
+  if (!local) {
     executionMode = "cloud-or-remote";
     if (isTranscription(tool)) {
       billingKey = "cloud.transcription";

@@ -414,7 +414,7 @@ extension Catalog {
             requiresAuth: false,
             status: "active",
             disclaimer: nil,
-            related: ["file-converter", "pdf-merger", "document-editor"],
+            related: ["file-to-txt", "file-organizer", "file-compare"],
             engine: ToolEngine(type: "custom", id: "zip-any-file", op: "zip-any-file", configuration: [:])
         )
         let updated = tools + [tool]
@@ -519,56 +519,557 @@ extension Catalog {
 
 }
 
+private enum NativeSearchField {
+    case name, id, keyword, alias, tag, subcategory, category, description
+
+    var weight: Int {
+        switch self {
+        case .name: return 10
+        case .id: return 7
+        case .keyword: return 6
+        case .alias: return 5
+        case .tag, .subcategory: return 4
+        case .category: return 3
+        case .description: return 2
+        }
+    }
+}
+
+private enum NativeSearchMatchKind {
+    case exact, synonym, fuzzy, prefix
+}
+
+private struct NativeSearchStemInfo {
+    let weight: Int
+    let field: NativeSearchField
+    let surface: String
+}
+
+private struct NativeSearchVariant {
+    let stems: [String]
+    let weight: Double
+    let kind: NativeSearchMatchKind
+}
+
+private struct NativeSearchTerm {
+    let surface: String
+    let stem: String
+    let variants: [NativeSearchVariant]
+    let idfValue: Double
+}
+
+private struct NativeSearchDocument {
+    let tool: Tool
+    let stems: [String: NativeSearchStemInfo]
+    let surfaces: Set<String>
+    let surfaceOrder: [String]
+    let normalizedName: String
+    let normalizedID: String
+    let nameTokenCount: Int
+    let aliasPhrases: Set<String>
+    let stemmedName: String
+}
+
+private struct NativeSearchRanked {
+    let document: NativeSearchDocument
+    let score: Double
+}
+
+/**
+ * Deterministic native port of src/lib/search.ts.
+ *
+ * The same catalogue metadata, field weighting, IDF, synonym/alias handling,
+ * typo/prefix expansion, coverage gate and stable tie-breaks are used by Home,
+ * Search and assistant recommendations. Search ranks metadata only.
+ */
+private final class NativeCatalogSearchIndex {
+    private let documents: [NativeSearchDocument]
+    private let postings: [String: [Int]]
+    private let vocabulary: [String: Int]
+    private let surfaceVocabulary: [(surface: String, stem: String)]
+
+    init(tools: [Tool]) {
+        let builtDocuments = tools.map(Self.buildDocument)
+
+        var postingLists: [String: [Int]] = [:]
+        for (index, document) in builtDocuments.enumerated() {
+            for key in document.stems.keys {
+                postingLists[key, default: []].append(index)
+            }
+        }
+        let builtVocabulary = postingLists.mapValues(\.count)
+
+        var seenSurfaces = Set<String>()
+        var orderedSurfaces: [(surface: String, stem: String)] = []
+        for document in builtDocuments {
+            for surface in document.surfaceOrder where seenSurfaces.insert(surface).inserted {
+                orderedSurfaces.append((surface, Self.stem(surface)))
+            }
+        }
+
+        documents = builtDocuments
+        postings = postingLists
+        vocabulary = builtVocabulary
+        surfaceVocabulary = orderedSurfaces
+    }
+
+    func search(_ query: String, limit: Int) -> [Tool] {
+        guard limit > 0 else { return [] }
+        let normalized = Self.normalizeText(query)
+        if normalized.isEmpty {
+            return documents.sorted {
+                let leftTier = $0.tool.isPlanned ? 1 : 0
+                let rightTier = $1.tool.isPlanned ? 1 : 0
+                if leftTier != rightTier { return leftTier < rightTier }
+                if $0.tool.popularity != $1.tool.popularity { return $0.tool.popularity > $1.tool.popularity }
+                let leftName = Self.normalizeText($0.tool.name)
+                let rightName = Self.normalizeText($1.tool.name)
+                if leftName != rightName { return leftName < rightName }
+                return $0.tool.id < $1.tool.id
+            }.prefix(limit).map(\.tool)
+        }
+
+        let interpreted = interpret(normalized)
+        guard !interpreted.terms.isEmpty else { return [] }
+        var candidateIndices = Set<Int>()
+        for term in interpreted.terms {
+            for variant in term.variants {
+                for key in variant.stems {
+                    for index in postings[key] ?? [] { candidateIndices.insert(index) }
+                }
+            }
+        }
+
+        let ranked = candidateIndices.compactMap { index -> NativeSearchRanked? in
+            let document = documents[index]
+            guard let score = score(
+                document,
+                terms: interpreted.terms,
+                phrase: interpreted.phrase,
+                fullPhrase: interpreted.fullPhrase
+            ) else { return nil }
+            return NativeSearchRanked(document: document, score: score)
+        }
+        return ranked.sorted {
+            let leftTier = $0.document.tool.isPlanned ? 1 : 0
+            let rightTier = $1.document.tool.isPlanned ? 1 : 0
+            if leftTier != rightTier { return leftTier < rightTier }
+            if $0.score != $1.score { return $0.score > $1.score }
+            if $0.document.tool.popularity != $1.document.tool.popularity {
+                return $0.document.tool.popularity > $1.document.tool.popularity
+            }
+            let leftName = Self.normalizeText($0.document.tool.name)
+            let rightName = Self.normalizeText($1.document.tool.name)
+            if leftName != rightName { return leftName < rightName }
+            return $0.document.tool.id < $1.document.tool.id
+        }.prefix(limit).map { $0.document.tool }
+    }
+
+    private struct InterpretedQuery {
+        let terms: [NativeSearchTerm]
+        let phrase: String
+        let fullPhrase: String
+    }
+
+    private func interpret(_ normalized: String) -> InterpretedQuery {
+        let all = normalized.split(separator: " ").map(String.init).filter { $0.count > 1 || $0 == "%" }
+        let content = all.filter { !Self.stopWords.contains($0) }
+        let surfaces = content.isEmpty ? all : content
+        let terms = surfaces.enumerated().map { index, surface -> NativeSearchTerm in
+            let key = Self.stem(surface)
+            let documentFrequency = vocabulary[key] ?? 0
+            var variants = [NativeSearchVariant(stems: [key], weight: 1.0, kind: .exact)]
+
+            for synonym in Self.synonyms[surface] ?? [] {
+                let synonymStems = Self.tokenize(synonym).map(Self.stem)
+                if !synonymStems.isEmpty {
+                    variants.append(NativeSearchVariant(stems: synonymStems, weight: 0.7, kind: .synonym))
+                }
+            }
+
+            if documentFrequency == 0 && key.count >= 3 {
+                let editLimit = Self.maxEdits(key.count)
+                if editLimit > 0 {
+                    var best: [String: (distance: Int, documentFrequency: Int)] = [:]
+                    var bestOrder: [String] = []
+                    for entry in surfaceVocabulary {
+                        if abs(entry.surface.count - surface.count) > editLimit &&
+                            abs(entry.stem.count - key.count) > editLimit { continue }
+                        if entry.surface.first != surface.first && entry.stem.first != key.first { continue }
+                        let distance = min(
+                            Self.boundedDistance(surface, entry.surface, maximum: editLimit),
+                            Self.boundedDistance(key, entry.stem, maximum: editLimit)
+                        )
+                        if distance > editLimit { continue }
+                        let existing = best[entry.stem]
+                        if existing == nil {
+                            bestOrder.append(entry.stem)
+                            best[entry.stem] = (distance, vocabulary[entry.stem] ?? 0)
+                        } else if distance < existing!.distance {
+                            best[entry.stem] = (distance, vocabulary[entry.stem] ?? 0)
+                        }
+                    }
+                    let orderedCandidates = bestOrder.sorted {
+                        guard let left = best[$0], let right = best[$1] else { return $0 < $1 }
+                        if left.distance != right.distance { return left.distance < right.distance }
+                        if left.documentFrequency != right.documentFrequency { return left.documentFrequency > right.documentFrequency }
+                        return $0 < $1
+                    }
+                    for candidate in orderedCandidates.prefix(3) {
+                        guard let item = best[candidate] else { continue }
+                        variants.append(NativeSearchVariant(
+                            stems: [candidate],
+                            weight: item.distance == 1 ? 0.55 : 0.4,
+                            kind: .fuzzy
+                        ))
+                    }
+                }
+
+                if index == surfaces.count - 1 && surfaces.count <= 2 {
+                    let prefixes = vocabulary
+                        .filter { $0.key.count > key.count && $0.key.hasPrefix(key) }
+                        .sorted {
+                            if $0.value != $1.value { return $0.value > $1.value }
+                            return $0.key < $1.key
+                        }
+                    for item in prefixes.prefix(8) {
+                        variants.append(NativeSearchVariant(stems: [item.key], weight: 0.65, kind: .prefix))
+                    }
+                }
+            }
+
+            let idfSource: Int
+            if documentFrequency > 0 {
+                idfSource = documentFrequency
+            } else {
+                idfSource = variants.dropFirst()
+                    .compactMap { $0.stems.first.flatMap { vocabulary[$0] } }
+                    .first(where: { $0 > 0 }) ?? 0
+            }
+            return NativeSearchTerm(
+                surface: surface,
+                stem: key,
+                variants: variants,
+                idfValue: idf(idfSource)
+            )
+        }
+        return InterpretedQuery(
+            terms: terms,
+            phrase: surfaces.joined(separator: " "),
+            fullPhrase: all.joined(separator: " ")
+        )
+    }
+
+    private func score(
+        _ document: NativeSearchDocument,
+        terms: [NativeSearchTerm],
+        phrase: String,
+        fullPhrase: String
+    ) -> Double? {
+        var base = 0.0
+        var matchedIDF = 0.0
+        let idfTotal = terms.reduce(0.0) { $0 + $1.idfValue }
+        let totalIDF = idfTotal > 0 ? idfTotal : 1.0
+        var strongMatch = false
+        var namedTerms = 0
+
+        for term in terms {
+            var best = 0.0
+            var bestField = NativeSearchField.description
+            var bestStrong = false
+            for variant in term.variants {
+                var weakestWeight = Int.max
+                var weakestField = NativeSearchField.description
+                var matchedAll = true
+                for key in variant.stems {
+                    guard let info = document.stems[key] else {
+                        matchedAll = false
+                        break
+                    }
+                    if info.weight < weakestWeight {
+                        weakestWeight = info.weight
+                        weakestField = info.field
+                    }
+                }
+                guard matchedAll else { continue }
+                let surfaceBonus = variant.kind == .exact
+                    ? (document.surfaces.contains(term.surface) ? 1.0 : 0.92)
+                    : 1.0
+                let df = vocabulary[variant.stems[0]] ?? 0
+                let variantIDF = variant.kind == .exact ? term.idfValue : idf(df)
+                let value = variant.weight * surfaceBonus * Double(weakestWeight) * variantIDF
+                if value > best {
+                    best = value
+                    bestField = weakestField
+                    bestStrong = weakestWeight >= NativeSearchField.tag.weight
+                }
+            }
+            if best > 0 {
+                base += best
+                matchedIDF += term.idfValue
+                if bestStrong { strongMatch = true }
+                if bestField == .name || bestField == .id { namedTerms += 1 }
+            }
+        }
+
+        guard base > 0 else { return nil }
+        let coverage = matchedIDF / totalIDF
+        if terms.count >= 2 {
+            let threshold = terms.count == 2 ? 0.75 : 0.6
+            if coverage < threshold || !strongMatch { return nil }
+        }
+
+        var result = base * (0.4 + 0.6 * coverage)
+        if !terms.isEmpty && namedTerms == terms.count { result += 30 }
+        if !phrase.isEmpty && " \(document.normalizedName) ".contains(" \(phrase) ") { result += 40 }
+        if !phrase.isEmpty && document.normalizedName.hasPrefix(phrase) { result += 20 }
+        if document.aliasPhrases.contains(fullPhrase) || document.aliasPhrases.contains(phrase) { result += 250 }
+
+        let conversionInput = fullPhrase.replacingOccurrences(
+            of: "^(convert|change|turn|transform|save)\\s+",
+            with: "",
+            options: .regularExpression
+        )
+        if let match = conversionInput.range(of: "^(\\S+) to (\\S+)$", options: .regularExpression) {
+            let pieces = String(conversionInput[match]).components(separatedBy: " to ")
+            if pieces.count == 2 {
+                let padded = " \(document.stemmedName) "
+                if padded.contains(" \(Self.stemPhrase("\(pieces[0]) to \(pieces[1])")) ") {
+                    result += 60
+                } else if padded.contains(" \(Self.stemPhrase("\(pieces[1]) to \(pieces[0])")) ") {
+                    result -= 15
+                }
+            }
+        }
+
+        let normalizedFullID = fullPhrase.replacingOccurrences(of: " ", with: "-")
+        let normalizedPhraseID = phrase.replacingOccurrences(of: " ", with: "-")
+        if document.normalizedName == fullPhrase || document.normalizedName == phrase ||
+            document.normalizedID == normalizedFullID || document.normalizedID == normalizedPhraseID {
+            result += 400
+        }
+        result -= 0.6 * Double(min(4, max(0, document.nameTokenCount - namedTerms)))
+        return (result * 1_000_000).rounded() / 1_000_000
+    }
+
+    private static func buildDocument(_ tool: Tool) -> NativeSearchDocument {
+        var stems: [String: NativeSearchStemInfo] = [:]
+        var surfaces = Set<String>()
+        var surfaceOrder: [String] = []
+        func add(_ value: String, field: NativeSearchField) {
+            for surface in tokenize(value) {
+                if surfaces.insert(surface).inserted { surfaceOrder.append(surface) }
+                let key = stem(surface)
+                if stems[key] == nil || stems[key]!.weight < field.weight {
+                    stems[key] = NativeSearchStemInfo(weight: field.weight, field: field, surface: surface)
+                }
+            }
+        }
+
+        add(tool.name, field: .name)
+        let aliases = searchAliases[tool.id] ?? []
+        var aliasPhrases = Set<String>()
+        for alias in aliases {
+            aliasPhrases.insert(normalizeText(alias))
+            add(alias, field: .alias)
+        }
+        add(tool.id, field: .id)
+        for item in tool.keywords { add(item, field: .keyword) }
+        for item in tool.tags { add(item, field: .tag) }
+        add(tool.subcategory ?? "", field: .subcategory)
+        add(tool.category, field: .category)
+        add(tool.description, field: .description)
+
+        return NativeSearchDocument(
+            tool: tool,
+            stems: stems,
+            surfaces: surfaces,
+            surfaceOrder: surfaceOrder,
+            normalizedName: normalizeText(tool.name),
+            normalizedID: tool.id.lowercased(),
+            nameTokenCount: tokenize(tool.name).count,
+            aliasPhrases: aliasPhrases,
+            stemmedName: stemPhrase(tool.name)
+        )
+    }
+
+    private func idf(_ documentFrequency: Int) -> Double {
+        log(1 + Double(documents.count) / (1 + Double(documentFrequency)))
+    }
+
+    private static func normalizeText(_ value: String) -> String {
+        let decomposed = value.decomposedStringWithCompatibilityMapping
+        let filteredScalars = decomposed.unicodeScalars.filter { scalar in
+            let kind = scalar.properties.generalCategory
+            return kind != .nonspacingMark && kind != .spacingMark && kind != .enclosingMark
+        }
+        let filtered = String(String.UnicodeScalarView(filteredScalars))
+        return filtered.lowercased()
+            .replacingOccurrences(of: "&", with: " and ")
+            .replacingOccurrences(of: "[^a-z0-9%+#\\s]+", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func tokenize(_ value: String) -> [String] {
+        normalizeText(value).split(separator: " ").map(String.init).filter { $0.count > 1 || $0 == "%" }
+    }
+
+    private static func stemPhrase(_ value: String) -> String {
+        tokenize(formatNormalize(normalizeText(value))).map(stem).joined(separator: " ")
+    }
+
+    private static func formatNormalize(_ value: String) -> String {
+        value.replacingOccurrences(of: "\\bjpeg\\b", with: "jpg", options: .regularExpression)
+            .replacingOccurrences(of: "\\btif\\b", with: "tiff", options: .regularExpression)
+    }
+
+    private static func stem(_ token: String) -> String {
+        if token.count <= 3 || token.contains(where: { $0.isNumber }) { return token }
+        var result = token
+        if ["ses", "xes", "zes", "ches", "shes"].contains(where: { result.hasSuffix($0) }) {
+            result = String(result.dropLast(2))
+        } else if result.count > 4 && result.hasSuffix("ies") {
+            result = String(result.dropLast(3)) + "y"
+        } else if result.hasSuffix("s") && !result.hasSuffix("ss") && !result.hasSuffix("us") && !result.hasSuffix("is") {
+            result = String(result.dropLast())
+        }
+        for suffix in ["ion", "ing", "ers", "er", "or", "ed", "e"] {
+            if result.hasSuffix(suffix) && result.count - suffix.count >= 4 {
+                result = String(result.dropLast(suffix.count))
+                break
+            }
+        }
+        return result
+    }
+
+    private static func maxEdits(_ length: Int) -> Int {
+        if length >= 9 { return 2 }
+        if length >= 4 { return 1 }
+        return 0
+    }
+
+    private static func boundedDistance(_ lhs: String, _ rhs: String, maximum: Int) -> Int {
+        let a = Array(lhs)
+        let b = Array(rhs)
+        if a == b { return 0 }
+        if abs(a.count - b.count) > maximum { return maximum + 1 }
+        var rows = Array(repeating: Array(repeating: 0, count: b.count + 1), count: a.count + 1)
+        for i in 0...a.count { rows[i][0] = i }
+        for j in 0...b.count { rows[0][j] = j }
+        if !a.isEmpty {
+            for i in 1...a.count {
+                var best = maximum + 1
+                if !b.isEmpty {
+                    for j in 1...b.count {
+                        let cost = a[i - 1] == b[j - 1] ? 0 : 1
+                        var value = min(
+                            min(rows[i - 1][j] + 1, rows[i][j - 1] + 1),
+                            rows[i - 1][j - 1] + cost
+                        )
+                        if i > 1 && j > 1 && a[i - 1] == b[j - 2] && a[i - 2] == b[j - 1] {
+                            value = min(value, rows[i - 2][j - 2] + 1)
+                        }
+                        rows[i][j] = value
+                        best = min(best, value)
+                    }
+                }
+                if best > maximum { return maximum + 1 }
+            }
+        }
+        return rows[a.count][b.count]
+    }
+
+    private static let stopWords: Set<String> = [
+        "a", "an", "the", "to", "of", "for", "my", "me", "i", "do", "how", "can", "you", "what", "is", "are", "make",
+        "online", "free", "tool", "tools", "with", "from", "into", "in", "on", "and", "or", "it", "this", "that", "using",
+        "use", "want", "need", "please", "best", "app", "something", "some", "get", "be"
+    ]
+
+    private static let synonyms: [String: [String]] = [
+        "photo": ["image", "picture", "pic"], "picture": ["image", "photo"], "pic": ["image", "photo"],
+        "img": ["image"], "compress": ["minify", "shrink", "optimize", "size"], "smaller": ["compress", "shrink", "reduce"],
+        "shrink": ["compress", "reduce"], "reduce": ["compress", "shrink"], "resize": ["scale", "dimensions", "size"],
+        "json": ["javascript object"], "pwd": ["password"], "pass": ["password"], "bmi": ["body mass", "weight"],
+        "percent": ["percentage", "%"], "qr": ["qrcode", "barcode"], "regexp": ["regex"], "regular": ["regex"],
+        "uuid": ["guid"], "hash": ["checksum", "digest", "sha", "md5"], "color": ["colour", "hex", "rgb"],
+        "colour": ["color"], "mockup": ["fake", "demo", "chat", "screenshot"], "invoice": ["bill", "receipt"],
+        "pdf": ["document"], "encode": ["encoding", "base64"], "decode": ["decoding"],
+        "a11y": ["accessibility"], "contrast": ["color contrast", "wcag"], "alt": ["alt-text", "image description"],
+        "focus": ["focus ring", "focus state"], "aria": ["accessible name", "accessibility tree"],
+        "tab": ["keyboard navigation", "tab order"], "animation": ["motion", "reduced motion"],
+        "readability": ["plain language", "text spacing"], "merge": ["combine", "join"], "combine": ["merge", "join"],
+        "join": ["merge", "combine"], "split": ["separate", "divide"], "change": ["convert"], "transform": ["convert"],
+        "create": ["generate"], "scan": ["read", "reader"], "scanner": ["reader", "scan"], "calc": ["calculator"],
+        "jpeg": ["jpg"], "jpg": ["jpeg"], "tiff": ["tif"], "tif": ["tiff"]
+    ]
+
+    private static let searchAliases: [String: [String]] = [
+        "pdf-merger": ["pdf joiner"],
+        "image-compressor": ["image size reducer", "reduce image size"],
+        "image-resizer": ["change image size"],
+        "qr-generator": ["qr maker", "qr code maker"],
+        "json-formatter": ["json viewer", "format json online"],
+        "video-to-mp3": ["mp4 to mp3", "convert mp4 to mp3"],
+        "video-trimmer": ["trim mp4", "cut video", "video cutter"],
+        "video-to-gif": ["mp4 to gif"],
+        "exif-remover": ["strip exif", "remove metadata from photo"],
+        "heic-converter": ["iphone photo to jpg", "heic to jpg"],
+        "file-png-to-jpg-converter": ["png to jpeg"],
+        "lorem-ipsum-generator": ["dummy text", "placeholder text"],
+        "regex-tester": ["test regular expression", "regexp tester"]
+    ]
+}
+
+private final class NativeCatalogSearchCache: @unchecked Sendable {
+    static let shared = NativeCatalogSearchCache()
+
+    private let lock = NSLock()
+    private var indexes: [String: NativeCatalogSearchIndex] = [:]
+
+    func search(catalog: Catalog, query: String, limit: Int, includeRelatedReferences: Bool) -> [Tool] {
+        let source = includeRelatedReferences ? catalog.tools + (catalog.relatedReferenceTools ?? []) : catalog.tools
+        let general = source.filter {
+            $0.category != "accessibility" && !$0.tags.contains("developer-studio") && $0.id != "audio-analyze-studio"
+        }
+        let accessibility = catalog.accessibilityDiscoveryTools().filter { $0.category == "accessibility" }
+        let all = general + accessibility + catalog.developerStudioTools()
+        var seen = Set<String>()
+        let candidates = all.filter { seen.insert($0.id).inserted }
+
+        let fingerprint = [
+            catalog.catalogVersion,
+            String(catalog.schemaVersion),
+            String(includeRelatedReferences),
+            String(candidates.count),
+            candidates.first?.id ?? "",
+            candidates.first?.name ?? "",
+            candidates.last?.id ?? "",
+            candidates.last?.name ?? ""
+        ].joined(separator: "|")
+
+        lock.lock()
+        let index: NativeCatalogSearchIndex
+        if let existing = indexes[fingerprint] {
+            index = existing
+        } else {
+            index = NativeCatalogSearchIndex(tools: candidates)
+            if indexes.count >= 6 { indexes.removeAll(keepingCapacity: true) }
+            indexes[fingerprint] = index
+        }
+        lock.unlock()
+        return index.search(query, limit: limit)
+    }
+}
+
 extension Catalog {
     func webSearch(_ query: String, limit: Int = Int.max, includeRelatedReferences: Bool = false) -> [Tool] {
-        let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let sourceCandidates = includeRelatedReferences ? tools + (relatedReferenceTools ?? []) : tools
-        let candidates = sourceCandidates.filter { $0.category != "accessibility" && !$0.tags.contains("developer-studio") } + accessibilityDiscoveryTools().filter { $0.category == "accessibility" } + developerStudioTools()
-        if q.isEmpty {
-            return Array(candidates.enumerated().sorted {
-                $0.element.popularity == $1.element.popularity ? $0.offset < $1.offset : $0.element.popularity > $1.element.popularity
-            }.prefix(limit).map { $0.element })
-        }
-        let synonyms: [String: [String]] = [
-            "photo": ["image", "picture", "pic"], "picture": ["image", "photo"], "pic": ["image", "photo"],
-            "img": ["image"], "compress": ["minify", "shrink", "optimize", "size"], "resize": ["scale", "dimensions", "size"],
-            "json": ["javascript object"], "pwd": ["password"], "pass": ["password"], "bmi": ["body mass", "weight"],
-            "percent": ["percentage", "%"], "qr": ["qrcode", "barcode"], "uuid": ["guid"],
-            "hash": ["checksum", "digest", "sha", "md5"], "color": ["colour", "hex", "rgb"],
-            "mockup": ["fake", "demo", "chat", "screenshot"], "invoice": ["bill", "receipt"], "pdf": ["document"],
-            "encode": ["encoding", "base64"], "decode": ["decoding"],
-            "a11y": ["accessibility"], "contrast": ["color contrast", "wcag"],
-            "alt": ["alt-text", "image description"], "focus": ["focus ring", "focus state"],
-            "aria": ["accessible name", "accessibility tree"], "tab": ["keyboard navigation", "tab order"],
-            "animation": ["motion", "reduced motion"], "readability": ["plain language", "text spacing"],
-        ]
-        let tokens = q.unicodeScalars.split { scalar in
-            !((scalar.value >= 97 && scalar.value <= 122) || (scalar.value >= 48 && scalar.value <= 57) || scalar.value == 37 || scalar.value == 43)
-        }.map { String($0) }.filter { $0.count > 1 || $0 == "%" }
-        let expanded = Set(tokens + tokens.flatMap { synonyms[$0] ?? [] })
-        func score(_ tool: Tool) -> Int {
-            let name = tool.name.lowercased()
-            if name == q || tool.id == q { return 2000 + tool.popularity }
-            if name.hasPrefix(q) { return 1400 + tool.popularity }
-            if tool.id.contains(q) || name.contains(q) { return 1000 + tool.popularity }
-            let haystack = ([tool.name, tool.description, tool.category, tool.subcategory ?? "", tool.id] + tool.keywords + tool.tags).joined(separator: " ").lowercased()
-            var hits = 0
-            for token in expanded {
-                if name.contains(token) { hits += 8 }
-                else if tool.keywords.contains(where: { $0.lowercased().contains(token) }) { hits += 5 }
-                else if haystack.contains(token) { hits += 2 }
-            }
-            return hits == 0 ? 0 : hits * 40 + tool.popularity
-        }
-        let scoredTools: [(offset: Int, tool: Tool, score: Int)] = candidates.enumerated().map { entry in
-            (offset: entry.offset, tool: entry.element, score: score(entry.element))
-        }
-        let matchingTools = scoredTools.filter { $0.score > 0 }
-        let rankedTools = matchingTools.sorted { left, right in
-            if left.score == right.score { return left.offset < right.offset }
-            return left.score > right.score
-        }
-        return rankedTools.prefix(limit).map { $0.tool }
+        NativeCatalogSearchCache.shared.search(
+            catalog: self,
+            query: query,
+            limit: limit,
+            includeRelatedReferences: includeRelatedReferences
+        )
     }
 }
 
@@ -583,14 +1084,36 @@ private func relatedAlphabeticalKey(_ value: String) -> String {
 extension Catalog {
     /// Mirrors the web registry: preserve declared related IDs, then fill from the same category alphabetically.
     func relatedTools(for tool: Tool, limit: Int = 6) -> [Tool] {
-        let candidates = accessibilityDiscoveryTools() + developerStudioTools()
+        guard limit > 0 else { return [] }
+
+        // Include the complete native catalogue (including Web-only related references) and
+        // canonical Studio projections, while making the lookup safe for repeated IDs.
+        var candidateIDs = Set<String>()
+        let candidates = (accessibilityDiscoveryTools() + developerStudioTools())
+            .filter { candidateIDs.insert($0.id).inserted }
         let byID = Dictionary(uniqueKeysWithValues: candidates.map { ($0.id, $0) })
-        let related = tool.related.compactMap { byID[$0] }.filter { !$0.isPlanned }
+        var seen = Set([tool.id])
+        var related: [Tool] = []
+        for id in tool.related {
+            let target = id == "audio-analyze-studio"
+                ? byID["song-metadata-analyzer"]
+                : (accessibilityStudio(for: id) ?? byID[id])
+            guard let target, !target.isPlanned, seen.insert(target.id).inserted else { continue }
+            related.append(target)
+            if related.count >= limit { break }
+        }
         if related.count >= limit { return Array(related.prefix(limit)) }
-        let seen = Set([tool.id] + related.map(\.id))
-        let rest = candidates
-            .filter { $0.category == tool.category && !seen.contains($0.id) && !$0.isPlanned }
+
+        // Web exposes only Studio workspaces in the Developer category. Other categories
+        // use the full discoverable catalogue, with Accessibility variants canonicalized above.
+        let fallbackCandidates = tool.category == "developer" ? developerStudioTools() : candidates
+        var fallbackIDs = Set<String>()
+        let rest = fallbackCandidates
+            .filter { $0.category == tool.category && !seen.contains($0.id) && !$0.isPlanned && fallbackIDs.insert($0.id).inserted }
             .sorted {
+                if tool.category == "developer" {
+                    return $0.popularity == $1.popularity ? $0.id < $1.id : $0.popularity > $1.popularity
+                }
                 let left = relatedAlphabeticalKey($0.name)
                 let right = relatedAlphabeticalKey($1.name)
                 return left == right ? $0.id < $1.id : left < right
@@ -686,15 +1209,8 @@ final class CatalogStore: ObservableObject {
     var popularTools: [Tool] { (catalog.accessibilityDiscoveryTools() + catalog.developerStudioTools()).sorted { $0.popularity == $1.popularity ? $0.name < $1.name : $0.popularity > $1.popularity } }
 
     func tools(matching query: String = "", category: String? = nil) -> [Tool] {
-        if category == nil || category == "accessibility" {
-            return catalog.webSearch(query, limit: Int.max, includeRelatedReferences: true).filter { category == nil || $0.category == category }
-        }
-        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let originals = catalog.tools + (catalog.relatedReferenceTools ?? [])
-        let source = originals + (category == "developer" ? catalog.developerStudioTools() : [])
-        return source.filter { tool in
-            (category == nil || tool.category == category) && (needle.isEmpty || tool.searchText.contains(needle))
-        }.sorted { $0.popularity == $1.popularity ? $0.name < $1.name : $0.popularity > $1.popularity }
+        catalog.webSearch(query, limit: Int.max, includeRelatedReferences: true)
+            .filter { category == nil || $0.category == category }
     }
 
     func toggleFavorite(_ tool: Tool) {

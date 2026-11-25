@@ -385,15 +385,15 @@ class FakeEncoderBase {
 
 test("makeWebCodecsAdapters passes frames and settings through and maps chunks back", async () => {
   const closedFrames: any[] = [];
+  let encoder!: FakeVideoEncoder;
   class FakeVideoEncoder extends FakeEncoderBase {
-    static last: FakeVideoEncoder | null = null;
     static supported = true;
     static override async isConfigSupported() {
       return { supported: FakeVideoEncoder.supported };
     }
     constructor(h: any) {
       super(h);
-      FakeVideoEncoder.last = this;
+      encoder = this;
     }
     encode(frame: any, options: any) {
       this.seen.push({ frame, options });
@@ -425,14 +425,14 @@ test("makeWebCodecsAdapters passes frames and settings through and maps chunks b
   const got: { c: ChunkInfo; avcC?: Uint8Array }[] = [];
   adapters.video.onChunk((c, meta) => got.push({ c, avcC: meta.avcC }));
   await adapters.video.configure({ width: 320, height: 240, fps: 10, bitrate: 1_000_000, codec: "avc1.64001f" });
-  assert.equal(FakeVideoEncoder.last!.configuredWith.codec, "avc1.64001f");
-  assert.equal(FakeVideoEncoder.last!.configuredWith.avc.format, "avc");
-  assert.equal(FakeVideoEncoder.last!.configuredWith.framerate, 10);
+  assert.equal(encoder.configuredWith.codec, "avc1.64001f");
+  assert.equal(encoder.configuredWith.avc.format, "avc");
+  assert.equal(encoder.configuredWith.framerate, 10);
   const canvas = { fake: "canvas" };
   await adapters.video.encode(canvas, 0, true);
   await adapters.video.encode(canvas, 3, false);
   assert.equal(closedFrames.length, 2); // every VideoFrame is closed
-  assert.equal(FakeVideoEncoder.last!.seen[0].frame.image, canvas);
+  assert.equal(encoder.seen[0].frame.image, canvas);
   assert.equal(got[0].c.isKey, true);
   assert.equal(got[1].c.isKey, false);
   assert.deepEqual([...got[0].c.data], [9, 8, 7]);
@@ -442,7 +442,7 @@ test("makeWebCodecsAdapters passes frames and settings through and maps chunks b
   assert.equal(got[1].avcC, undefined);
   await adapters.video.flush();
   adapters.video.close();
-  assert.equal(FakeVideoEncoder.last!.state, "closed");
+  assert.equal(encoder.state, "closed");
   adapters.video.close(); // closing twice is harmless
 });
 

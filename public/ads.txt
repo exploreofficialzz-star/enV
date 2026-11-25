@@ -1,1 +1,1 @@
-# Add the exact authorized-seller record from the Adsterra publisher dashboard. Do not infer or fabricate it from placement IDs.
+google.com, pub-2492078126313994, DIRECT, f08c47fec0942fa0

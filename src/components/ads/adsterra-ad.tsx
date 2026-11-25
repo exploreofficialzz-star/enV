@@ -3,7 +3,6 @@ import { isApplicationOnline } from "@/lib/ads/policy";
 import {
   ADSTERRA_BANNER_UNITS,
   ADSTERRA_NATIVE_BANNER,
-  ADSTERRA_SMARTLINK_URL,
   canRequestAdsterraAds,
   getAdsterraConsent,
   isAdsterraEnabled,
@@ -98,9 +97,6 @@ function appendBannerScript(
     }, 15_000);
     script.addEventListener("load", () => {
       window.clearTimeout(loadTimeout);
-      window.dispatchEvent(new CustomEvent("env:adsterra-placement-loaded", {
-        detail: { placementId: unit.placementId },
-      }));
       resolve();
     }, { once: true });
     script.addEventListener("error", () => {
@@ -252,9 +248,6 @@ export function AdsterraNativeBanner() {
       window.clearTimeout(loadTimeout);
       if (failureHandled) return;
       failureHandled = true;
-      window.dispatchEvent(new CustomEvent("env:adsterra-placement-loaded", {
-        detail: { placementId: ADSTERRA_NATIVE_BANNER.placementId },
-      }));
       if (active) setFailed(false);
     }, { once: true });
     script.addEventListener("error", () => {
@@ -298,28 +291,3 @@ export function AdsterraNativeBanner() {
  * Load it only after explicit advertising consent and same-origin reachability.
  * Consent revocation reloads the document to clear provider-installed listeners.
  */
-
-
-/** Explicit Smartlink placement. It never opens from a tool output or execution action. */
-export function AdsterraSmartlink() {
-  const ready = useAdsterraReady();
-  if (!ready) return null;
-  return (
-    <aside
-      aria-label="Sponsored link"
-      data-adsterra-placement="smartlink"
-      className="mx-auto my-5 w-full max-w-3xl rounded-xl border border-border bg-surface/50 px-4 py-3"
-    >
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">Sponsored link</p>
-      <a
-        href={ADSTERRA_SMARTLINK_URL}
-        target="_blank"
-        rel="nofollow sponsored noopener noreferrer"
-        className="mt-1 inline-flex min-h-10 items-center text-sm font-medium text-fg underline underline-offset-4 hover:text-accent"
-      >
-        Visit sponsor offer
-      </a>
-      <p className="mt-1 text-xs text-muted">Opens an advertiser page in a new tab. This link does not unlock tools or count as a completed ad.</p>
-    </aside>
-  );
-}

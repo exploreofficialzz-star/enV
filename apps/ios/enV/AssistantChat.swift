@@ -71,11 +71,6 @@ private struct PendingAssistantRequest {
     let candidates: [AssistantPayloadCandidate]
 }
 
-private struct ScoredAssistantTool {
-    let tool: Tool
-    let score: Int
-}
-
 /// Native iOS client. Provider keys never leave the server; URLSession handles the enV session cookie.
 private enum NativeAssistantClient {
     private static var baseURL: URL? {
@@ -138,17 +133,6 @@ struct AssistantChatView: View {
     private let historyLimit = 12_000
     private let contextMessageLimit = 12
     private let candidateLimit = 8
-    private let synonyms: [String: [String]] = [
-        "photo": ["image", "picture", "pic"], "picture": ["image", "photo"], "pic": ["image", "photo"],
-        "img": ["image"], "compress": ["minify", "shrink", "optimize", "size"],
-        "resize": ["scale", "dimensions", "size"], "json": ["javascript object"],
-        "pwd": ["password"], "pass": ["password"], "bmi": ["body mass", "weight"],
-        "percent": ["percentage", "%"], "qr": ["qrcode", "barcode"], "uuid": ["guid"],
-        "hash": ["checksum", "digest", "sha", "md5"], "color": ["colour", "hex", "rgb"],
-        "mockup": ["fake", "demo", "chat", "screenshot"], "invoice": ["bill", "receipt"],
-        "pdf": ["document"], "encode": ["encoding", "base64"], "decode": ["decoding"],
-    ]
-
     var body: some View {
         NavigationStack {
             VStack(spacing: 10) {
@@ -324,38 +308,23 @@ struct AssistantChatView: View {
     }
 
     private func candidates(for conversation: [AssistantChatMessage]) -> [AssistantPayloadCandidate] {
-        let query = conversation.filter { $0.role == "user" }.suffix(3).map(\.content).joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let query = conversation.filter { $0.role == "user" }
+            .suffix(3)
+            .map(\.content)
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return [] }
-        let tokenSet = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "%+"))
-        let baseTokens = query.components(separatedBy: tokenSet.inverted).filter { $0.count > 1 || $0 == "%" }
-        let tokens = Array(Set(baseTokens + baseTokens.flatMap { synonyms[$0] ?? [] }))
-        let ranked = store.catalog.tools.filter { $0.status == "active" || $0.status == "beta" }.compactMap { tool -> ScoredAssistantTool? in
-            let name = tool.name.lowercased()
-            let id = tool.id.lowercased()
-            let score: Int
-            if name == query || id == query { score = 2_000 + tool.popularity }
-            else if name.hasPrefix(query) { score = 1_400 + tool.popularity }
-            else if name.contains(query) || id.contains(query) { score = 1_000 + tool.popularity }
-            else {
-                let haystack = tool.searchText
-                var hits = 0
-                for token in tokens {
-                    if name.contains(token) { hits += 8 }
-                    else if tool.keywords.contains(where: { $0.lowercased().contains(token) }) { hits += 5 }
-                    else if haystack.contains(token) { hits += 2 }
-                }
-                guard hits > 0 else { return nil }
-                score = hits * 40 + tool.popularity
+        return store.catalog.webSearch(query, limit: Int.max, includeRelatedReferences: true)
+            .filter { $0.status == "active" || $0.status == "beta" }
+            .prefix(candidateLimit)
+            .map { tool in
+                AssistantPayloadCandidate(
+                    id: tool.id,
+                    name: tool.name,
+                    description: tool.description,
+                    category: tool.category
+                )
             }
-            return ScoredAssistantTool(tool: tool, score: score)
-        }
-        return ranked.sorted {
-            if $0.score != $1.score { return $0.score > $1.score }
-            if $0.tool.popularity != $1.tool.popularity { return $0.tool.popularity > $1.tool.popularity }
-            return $0.tool.name < $1.tool.name
-        }.prefix(candidateLimit).map { tool in
-            AssistantPayloadCandidate(id: tool.tool.id, name: tool.tool.name, description: tool.tool.description, category: tool.tool.category)
-        }
     }
 
     private func sendDraft() {

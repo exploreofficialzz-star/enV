@@ -68,6 +68,39 @@ final class CatalogCoreTests: XCTestCase {
         XCTAssertEqual(native.counts.planned, 1)
     }
 
+    func testNativeSearchMatchesTheCommittedWebGoldenQueries() throws {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let sharedCatalogURL = repositoryRoot.appendingPathComponent("apps/shared/catalog.json")
+        let goldenURL = repositoryRoot.appendingPathComponent("audit/discovery/search-eval/native-golden.v1.json")
+        let sharedData = try Data(contentsOf: sharedCatalogURL)
+        var nativeCatalog = try JSONDecoder().decode(Catalog.self, from: sharedData).nativeFacing()
+        nativeCatalog = nativeCatalog.includingMusicDownloader()
+            .includingSongMetadataAnalyzer()
+            .includingABook()
+            .includingZipArchive()
+            .includingFileWorkspaceTools()
+            .includingCameraStudio()
+            .includingDateTimeExtensions()
+
+        let fixtureData = try Data(contentsOf: goldenURL)
+        let fixture = try XCTUnwrap(JSONSerialization.jsonObject(with: fixtureData) as? [String: Any])
+        let expectedPoolSize = try XCTUnwrap(fixture["poolSize"] as? Int)
+        let actualPoolSize = nativeCatalog.webSearch("", limit: Int.max, includeRelatedReferences: true).count
+        XCTAssertEqual(actualPoolSize, expectedPoolSize - 2, "iOS excludes Web-only Scene Studio and Smartphone Prototype Lab from native search.")
+
+        let cases = try XCTUnwrap(fixture["cases"] as? [[String: Any]])
+        for testCase in cases {
+            let query = try XCTUnwrap(testCase["query"] as? String)
+            let expected = try XCTUnwrap(testCase["top10"] as? [String])
+            let actual = nativeCatalog.webSearch(query, limit: 10, includeRelatedReferences: true).map(\.id)
+            XCTAssertEqual(actual, expected, "Native/Web search mismatch for query: '\(query)'")
+        }
+    }
+
     func testSearchIncludesDescriptionKeywordsAndTags() {
         let store = CatalogStore(catalog: catalog)
         XCTAssertEqual(store.tools(matching: "characters").first?.id, "word-count")
@@ -139,8 +172,25 @@ final class CatalogCoreTests: XCTestCase {
         XCTAssertEqual(catalog.counts.active, 1)
         XCTAssertEqual(catalog.tools.first?.category, "productivity")
         XCTAssertEqual(catalog.tools.first?.engine.id, "a-book")
+        XCTAssertEqual(catalog.tools.first?.related, ["pdf-merger", "pdf-splitter", "pdf-text-extractor"])
         XCTAssertEqual(catalog.includingABook().tools.filter { $0.id == "a-book" }.count, 1)
         XCTAssertEqual(catalog.webSearch("A book").first?.id, "a-book")
+    }
+
+    func testZipArchiveRuntimeExtensionUsesOnlyResolvableRelatedTools() {
+        let base = Catalog(
+            schemaVersion: 1,
+            catalogVersion: "test",
+            counts: CatalogCounts(total: 0, active: 0, planned: 0, categories: 1),
+            categories: [],
+            tools: [],
+            relatedReferenceTools: nil
+        )
+        let catalog = base.includingZipArchive()
+        let zip = try! XCTUnwrap(catalog.tools.first { $0.id == "zip-any-file" })
+        XCTAssertEqual(zip.related, ["file-to-txt", "file-organizer", "file-compare"])
+        XCTAssertTrue(zip.related.allSatisfy { id in catalog.displayTool(for: id) != nil })
+        XCTAssertEqual(catalog.includingZipArchive().tools.filter { $0.id == "zip-any-file" }.count, 1)
     }
 
     func testCameraStudioRuntimeExtensionIsUniqueAndSearchable() {
@@ -167,6 +217,37 @@ final class CatalogCoreTests: XCTestCase {
         let testCatalog = Catalog(schemaVersion: 1, catalogVersion: "test", counts: catalog.counts, categories: catalog.categories, tools: catalog.tools + [current], relatedReferenceTools: nil)
 
         XCTAssertEqual(testCatalog.relatedTools(for: current).map(\.id), ["word-count", "case-converter"])
+    }
+
+
+    func testRelatedToolsRemoveSelfAndDuplicatesAndCanonicalizeAccessibilityAliases() {
+        let source = Tool(
+            id: "contrast-checker", name: "Contrast Checker", slug: "contrast-checker",
+            description: "", category: "accessibility", subcategory: nil, keywords: [], tags: [],
+            icon: "Accessibility", popularity: 0, featured: false, clientSide: true,
+            requiresBackend: false, requiresAuth: false, status: "active", disclaimer: nil,
+            related: [], engine: ToolEngine(type: "custom", id: "contrast-checker", op: nil)
+        )
+        let current = Tool(
+            id: "current", name: "Current", slug: "current", description: "", category: "text",
+            subcategory: nil, keywords: [], tags: [], icon: "Type", popularity: 0, featured: false,
+            clientSide: true, requiresBackend: false, requiresAuth: false, status: "active",
+            disclaimer: nil,
+            related: ["current", "word-count", "word-count", "contrast-checker", "case-converter", "future-tool"],
+            engine: ToolEngine(type: "text", id: "current", op: nil)
+        )
+        let testCatalog = Catalog(
+            schemaVersion: 1, catalogVersion: "test", counts: catalog.counts,
+            categories: catalog.categories, tools: catalog.tools + [source, current],
+            relatedReferenceTools: nil
+        )
+
+        XCTAssertEqual(
+            testCatalog.relatedTools(for: current, limit: 10).map(\.id),
+            ["word-count", "contrast-checker", "case-converter"]
+        )
+        XCTAssertEqual(testCatalog.relatedTools(for: current, limit: 0), [])
+        XCTAssertEqual(testCatalog.relatedTools(for: current, limit: -1), [])
     }
 
     func testToolEnginePreservesUnknownConfigurationValues() throws {

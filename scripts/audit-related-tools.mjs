@@ -28,7 +28,7 @@ const lines = ["# Related-tool link audit", "", "Registry-level integrity of `re
   `- Active/beta tools audited: ${m.tools}; related links: ${m.total}.`,
   `- Tools with fewer than 3 related links: ${m.underThree}.`,
   `- **Dangling targets (ID not in registry): ${m.dangling.length}**${m.dangling.length ? " — e.g. " + m.dangling.slice(0, 5).join(", ") : ""}.`,
-  `- **Self-references: ${m.self.length}**; duplicate targets in one list: ${m.duplicateTargets.length}.`,
+  `- **Self-references: ${m.self.length}**${m.self.length ? " — " + m.self.slice(0, 8).join(", ") : ""}; duplicate targets in one list: ${m.duplicateTargets.length}${m.duplicateTargets.length ? " — " + m.duplicateTargets.slice(0, 8).join(", ") : ""}.`,
   `- **Links to planned tools: ${m.toPlanned.length}**${m.toPlanned.length ? " — e.g. " + m.toPlanned.slice(0, 5).join(", ") : ""}.`,
   `- Links to active tools hidden from discovery: ${m.toUndiscoverable.length}${m.toUndiscoverable.length ? " — e.g. " + m.toUndiscoverable.slice(0, 5).join(", ") : ""}.`,
   `- Reciprocal links: ${pct(m.reciprocal)}; same-category links: ${pct(m.sameCategory)}; cross-category links: ${pct(m.crossCategory)}.`, ""];

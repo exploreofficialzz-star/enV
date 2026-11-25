@@ -66,9 +66,8 @@ export class SceneRenderer {
     this.canvas.width = options.width;
     this.canvas.height = options.height;
     this.engine = new B.Engine(this.canvas, true, { preserveDrawingBuffer: true, stencil: true, alpha: options.transparent, premultipliedAlpha: true }, false);
-    // Babylon 9 compiles shaders asynchronously when the WebGL extension is available.
-    // prepare() warms the first frame, awaits scene.whenReadyAsync(), then renders again
-    // before the renderer is returned, so no incomplete frame is presented to the user.
+    // compile shaders at once, so the first frame that uses a material is never drawn without it
+    this.engine.disableParallelShaderCompile = true;
     this.engine.setSize(options.width, options.height);
     this.scene = new B.Scene(this.engine);
     this.scene.useRightHandedSystem = true;

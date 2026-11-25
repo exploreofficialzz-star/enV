@@ -126,6 +126,7 @@ function Home() {
     <AppShell>
       <section className="mx-auto flex max-w-6xl flex-col items-center px-4 pb-10 pt-1 text-center sm:px-6 sm:pt-1">
         <ProductUpdatesBanner />
+        <h1 className="sr-only">Tools for everyday tasks</h1>
         <Logo size="hero" />
         <SearchBox
           large

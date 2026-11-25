@@ -118,6 +118,14 @@ test("a single generic word does not satisfy a multi-word query", () => {
   assert.ok(!ids.includes("tip-split-calculator"));
 });
 
+test("regexp and regular-expression queries put the exact Regex Tester workflow first", async () => {
+  const { getSearchableTools } = await import("./registry.ts");
+  const pool = getSearchableTools();
+
+  assert.equal(searchTools(pool, "regexp tester", 5)[0]?.id, "regex-tester");
+  assert.equal(searchTools(pool, "test regular expression", 5)[0]?.id, "regex-tester");
+});
+
 test("unsupported tasks return an honest empty result rather than forced recommendations", () => {
   const results = searchToolResults(corpus, "zzzzqx", 10);
   assert.equal(results.matchCount, 0);

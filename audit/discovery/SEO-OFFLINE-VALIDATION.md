@@ -6,9 +6,9 @@ Sitemap URLs: 10270 (tool pages 4869, guides 5344, categories 38, articles 4, st
 
 ## Measurements
 
-- TOOL_PAGE: 4869 pages · duplicate titles 0 groups · duplicate descriptions 240 groups (848 pages) · short (<50) descriptions 0.
-- GUIDE_PAGE: 5344 pages · duplicate titles 0 groups · duplicate descriptions 320 groups (1008 pages) · short (<50) descriptions 0.
-- Guide specificity: {"engine-specific":3581,"operation-specific":259,"category-guidance":1504} of 5344; tool-specific 4.8%.
+- TOOL_PAGE: 4869 pages · duplicate titles 0 groups · duplicate descriptions 0 groups (0 pages) · short (<45) descriptions 0.
+- GUIDE_PAGE: 5344 pages · duplicate titles 0 groups · duplicate descriptions 0 groups (0 pages) · short (<45) descriptions 0.
+- Guide specificity: {"engine-specific":3581,"operation-specific":260,"category-guidance":1503} of 5344; tool-specific 4.9%.
 
 ## Result
 

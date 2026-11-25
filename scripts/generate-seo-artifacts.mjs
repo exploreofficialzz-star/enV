@@ -15,6 +15,9 @@ import { toolTaskGuidanceSource, toolDocumentationSummary, toolStatusLabel } fro
 import { buildIndexNowKeyArtifact } from "./indexnow-utils.mjs";
 
 const SITE_ORIGIN = "https://envtools.store";
+// Preserve the legacy Break-Even URL for bookmarks, but do not publish its
+// client-side redirect as a separate canonical SoftwareApplication page.
+const REDIRECT_ONLY_TOOL_IDS = new Set(["break-even-calculator"]);
 const SITEMAP_MAX_URLS = 40_000;
 const SITEMAP_MAX_BYTES = 48 * 1024 * 1024;
 const OUTPUTS = [
@@ -111,7 +114,10 @@ export function buildSeoArtifacts({ indexNowKey = (process.env.VERCEL_ENV === "p
   const resolveCanonicalSeoTool = createCanonicalSeoToolResolver(guideTools);
   // Legacy Developer utility URLs canonicalize to one of the public Studio routes.
   // Keep their standalone task guides discoverable, but do not list the alias paths as canonical tools.
-  const tools = guideTools.filter((tool) => tool.category !== "developer" || tool.tags.includes("developer-studio"));
+  const tools = guideTools.filter((tool) =>
+    (tool.category !== "developer" || tool.tags.includes("developer-studio"))
+    && !REDIRECT_ONLY_TOOL_IDS.has(tool.id)
+  );
   const categories = CATEGORIES
     .filter((category) => tools.some((tool) => tool.category === category.id))
     .sort((a, b) => a.name.localeCompare(b.name));

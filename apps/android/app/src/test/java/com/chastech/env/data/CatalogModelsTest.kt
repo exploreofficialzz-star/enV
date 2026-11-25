@@ -26,7 +26,17 @@ class CatalogModelsTest {
         assertEquals("productivity", catalog.tools.single().category)
         assertEquals("custom", catalog.tools.single().engine.type)
         assertEquals("a-book", catalog.tools.single().engine.id)
+        assertEquals(listOf("pdf-merger", "pdf-splitter", "pdf-text-extractor"), catalog.tools.single().related)
         assertEquals(catalog, catalog.withABook())
+    }
+
+    @Test fun runtimeZipArchiveUsesOnlyResolvableRelatedTools() {
+        val base = Catalog(1, "test", CatalogCounts(0, 0, 0, 1), emptyList(), emptyList())
+        val catalog = base.withZipArchive()
+        val zip = catalog.tools.single { it.id == "zip-any-file" }
+        assertEquals(listOf("file-to-txt", "file-organizer", "file-compare"), zip.related)
+        assertTrue(zip.related.all { id -> catalog.displayTool(id) != null })
+        assertEquals(catalog, catalog.withZipArchive())
     }
 
     @Test fun runtimeCameraStudioAdditionIsUniqueAndSearchable() {
@@ -156,5 +166,24 @@ class CatalogModelsTest {
         """.trimIndent())
 
         assertEquals(listOf("zeta", "alpha", "bravo"), catalog.relatedTools(catalog.tools.first()).map { it.id })
+    }
+ 
+    @Test fun relatedToolsRemoveSelfAndDuplicateLinksAndCanonicalizeAccessibilityAliases() {
+        val catalog = Catalog.fromJson("""
+            {"counts":{},"categories":[],"tools":[
+              {"id":"current","name":"Current","category":"text","related":["current","word-count","word-count","contrast-checker","case-converter","future-tool"],"status":"active"},
+              {"id":"word-count","name":"Word Count","category":"text","status":"active"},
+              {"id":"case-converter","name":"Case Converter","category":"text","status":"active"},
+              {"id":"contrast-checker","name":"Contrast Checker","category":"accessibility","status":"active"},
+              {"id":"future-tool","name":"Future Tool","category":"text","status":"planned"}]}
+        """.trimIndent())
+        val current = catalog.tools.first { it.id == "current" }
+
+        assertEquals(
+            listOf("word-count", "contrast-checker", "case-converter"),
+            catalog.relatedTools(current, 10).map { it.id },
+        )
+        assertEquals(emptyList<ToolRecord>(), catalog.relatedTools(current, 0))
+        assertEquals(emptyList<ToolRecord>(), catalog.relatedTools(current, -1))
     }
 }
