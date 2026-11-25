@@ -1,6 +1,7 @@
 import { defineHandler } from "nitro/h3";
 import { randomUUID } from "node:crypto";
-import { quoteOperation } from "../../../../src/lib/billing/catalog";
+import { quoteOperation, referenceUsdMicrosForSubunits, TOKEN_SUBUNITS_PER_TOKEN } from "../../../../src/lib/billing/catalog";
+import { getApprovedToolAccessPrice } from "../../../../src/lib/billing/tool-access-pricing.server";
 import { hasActiveEntitlement } from "../../../../src/lib/billing/ledger.server";
 import { getToolBillingProfile } from "../../../../src/lib/billing/tool-profiles.server";
 import { getOptionalBillingUserId, isSameOriginRequest, jsonResponse, readJsonObject } from "../../../../src/lib/billing/http.server";
@@ -38,7 +39,39 @@ export default defineHandler(async (event) => {
     // If entitlement storage is temporarily unavailable, keep premium access closed but still show
     // non-premium preview prices instead of making the public pricing preview unavailable.
     const hasPremium = userId ? await hasActiveEntitlement(userId, "premium").catch(() => false) : false;
-    const quote = quoteOperation(operationId, units, { hasPremium });
+    const approvedToolPrice = toolProfile ? getApprovedToolAccessPrice(toolProfile.toolId) : null;
+    const quote = toolProfile
+      ? approvedToolPrice
+        ? (() => {
+            const estimatedSubunits = approvedToolPrice.subunitsPerSession * units;
+            return {
+              operationId: toolProfile.toolId,
+              operationName: toolProfile.toolName,
+              status: "quoted" as const,
+              units,
+              unitLabel: approvedToolPrice.unitLabel,
+              estimatedSubunits,
+              estimatedTokens: estimatedSubunits / TOKEN_SUBUNITS_PER_TOKEN,
+              estimatedUsdMicros: referenceUsdMicrosForSubunits(estimatedSubunits),
+              premiumRequired: toolProfile.premiumRequired,
+              pricingVersion: approvedToolPrice.pricingVersion,
+              note: "This tool has an individually approved rate. The server uses the approved per-tool price for reservation and settlement.",
+            };
+          })()
+        : {
+            operationId: toolProfile.toolId,
+            operationName: toolProfile.toolName,
+            status: "requires-cost-measurement" as const,
+            units,
+            unitLabel: toolProfile.unitLabel,
+            estimatedSubunits: null,
+            estimatedTokens: null,
+            estimatedUsdMicros: null,
+            premiumRequired: toolProfile.premiumRequired,
+            pricingVersion: toolProfile.pricingVersion,
+            note: "This tool does not yet have an individually approved operation price. No generic category rate will be presented as its price.",
+          }
+      : quoteOperation(operationId, units, { hasPremium });
     const aiAssistQuote = toolProfile?.optionalAiAssistProfile
       ? quoteOperation(toolProfile.optionalAiAssistProfile, 1, { hasPremium })
       : null;
@@ -60,7 +93,7 @@ export default defineHandler(async (event) => {
         } : null,
         aiAssistQuote,
         billingActive: false,
-        priceStatus: "provisional",
+        priceStatus: toolProfile ? (approvedToolPrice ? "approved" : "requires-cost-measurement") : "provisional",
       },
     });
   } catch (error) {
