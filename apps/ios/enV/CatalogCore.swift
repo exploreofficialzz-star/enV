@@ -1021,7 +1021,7 @@ private final class NativeCatalogSearchIndex {
     ]
 }
 
-private let webOnlyNativeSearchReferenceIDs: Set<String> = ["scene-studio", "smartphone-prototype-lab"]
+let webOnlyNativeSearchReferenceIDs: Set<String> = ["scene-studio", "smartphone-prototype-lab"]
 
 private let webOnlyNativeSearchReferences: [Tool] = [
     Tool(
