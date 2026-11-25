@@ -7,7 +7,7 @@ import {
   settleReservationAtReservedAmount,
 } from "../../../../src/lib/billing/ledger.server";
 import { getToolBillingProfile } from "../../../../src/lib/billing/tool-profiles.server";
-import { getApprovedToolAccessPrice } from "../../../../src/lib/billing/tool-access-pricing.server";
+import { getApprovedToolAccessPrice, isToolAccessBillingEnabled } from "../../../../src/lib/billing/tool-access-pricing.server";
 import { isSameOriginRequest, jsonResponse, readJsonObject, requireOfflineBillingUser } from "../../../../src/lib/billing/http.server";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -55,6 +55,17 @@ export default defineHandler(async (event) => {
   }
   if (typeof toolId !== "string" || !TOOL_ID_PATTERN.test(toolId)) {
     return jsonResponse({ ok: false, error: "INVALID_TOOL", message: "The tool id is invalid." }, 400);
+  }
+
+  // New reservations obey the production launch controls. Settlement and release remain
+  // available during shutdown so existing reservations can be safely reconciled.
+  if (action === "reserve" && !isToolAccessBillingEnabled()) {
+    return jsonResponse({
+      ok: false,
+      error: "BILLING_NOT_ACTIVE",
+      message: "Token access is temporarily unavailable. No tokens were reserved.",
+      noTokensCharged: true,
+    }, 503);
   }
 
   const principal = await requireOfflineBillingUser(request);
