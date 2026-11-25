@@ -85,7 +85,7 @@ function Tools() {
     });
   };
 
-  const updateFilter = <K extends keyof DiscoveryFilters>(key: K, value: DiscoveryFilters[K] | "") => {
+  const updateFilter = <K extends keyof DiscoveryFilters,>(key: K, value: DiscoveryFilters[K] | "") => {
     const nextFilters = { ...filters };
     if (value === "") delete nextFilters[key];
     else nextFilters[key] = value as DiscoveryFilters[K];
