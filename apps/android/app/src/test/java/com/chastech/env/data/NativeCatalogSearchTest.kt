@@ -3,6 +3,7 @@ package com.chastech.env.data
 import java.io.File
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NativeCatalogSearchTest {
@@ -42,7 +43,7 @@ class NativeCatalogSearchTest {
                 .filterNot { it in webOnlySearchReferenceIds }
             val actual = catalog.webSearch(query, limit = 10, includeRelatedReferences = true).map { it.id }
             assertEquals("Native/Web search mismatch for query: '$query'", expected, actual.take(expected.size))
-            assertTrue("Native search must not expose Web-only tools for query '$query'.", actual.none { it.id in webOnlySearchReferenceIds })
+            assertTrue("Native search must not expose Web-only tools for query '$query'.", actual.none { it in webOnlySearchReferenceIds })
         }
     }
 
