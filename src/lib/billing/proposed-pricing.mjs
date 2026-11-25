@@ -419,6 +419,9 @@ export function calculateProposedToolUnits(unitLabel, measurements) {
       units = (inputCharacters ?? outputCharacters ?? 0) / 10_000;
       break;
     }
+    case "1k-generated-characters":
+      units = required("outputCharacters") / 1_000;
+      break;
     case "10k-output-characters":
       units = required("outputCharacters") / 10_000;
       break;
