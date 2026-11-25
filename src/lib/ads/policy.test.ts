@@ -48,3 +48,12 @@ test("paid access remains restricted to manual prices and the selected hybrid co
   assert.equal(isPaidHybridAccessToolId("average-speed-calculator", { toolIds: "" }, tool()), false);
   assert.equal(isPaidHybridAccessToolId("average-speed-calculator", selected, tool({ requiresBackend: true })), false);
 });
+
+test("Adsterra excludes high-end, premium and frontier tools by their reviewed identity tags", () => {
+  for (const tag of ["high-end", "premium", "frontier"]) {
+    assert.equal(isAdsterraQualifiedTool(tool({ tags: [tag] })), false, tag);
+  }
+  assert.equal(isAdsterraQualifiedTool(tool({ name: "High End Video Renderer" })), false);
+  assert.equal(isAdsterraQualifiedTool(tool({ keywords: ["frontier model"] })), false);
+  assert.equal(isAdsterraQualifiedTool(tool({ name: "AI Studio" })), false);
+});
