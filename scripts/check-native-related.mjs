@@ -19,8 +19,12 @@ assert.ok(canonicalCssMinifier, "Canonical runtime record is missing for css-min
 const webTools = [
   ...applyGenericWorkflowPolicy(baseWebTools).map((tool) => {
     if (tool.id === "css-minifier-advanced") return canonicalCssMinifier;
-    if (tool.id === "music-live-video-studio") return canonicalRuntimeById.get(tool.id) ?? tool;
-    return tool;
+    const runtimeTool = canonicalRuntimeById.get(tool.id);
+    if (!runtimeTool) return tool;
+    const related = runtimeTool.related ?? [];
+    return related.length === (tool.related ?? []).length && related.every((id, index) => id === tool.related?.[index])
+      ? tool
+      : { ...tool, related };
   }),
   ...DATETIME_TOOL_EXTENSIONS.filter((extension) => !baseWebTools.some((tool) => tool.id === extension.id)),
 ];
