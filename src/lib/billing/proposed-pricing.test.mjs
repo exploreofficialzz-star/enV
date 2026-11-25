@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  calculateProposedToolUnits,
   deriveLocalToolPriceProfile,
   proposedProviderPriceUsdMicros,
   proposedSubunitsFromProviderCostUsdMicros,
@@ -159,4 +160,30 @@ test("local media tools use duration and file-size workload units", () => {
   assert.equal(editor?.subunitsPerUnit, 250);
   assert.equal(transcoder?.unitLabel, "media-minute");
   assert.equal(transcoder?.subunitsPerUnit, 1_250);
+});
+
+test("measured preview units scale with characters, pixels, duration, pages and bytes", () => {
+  assert.equal(calculateProposedToolUnits("10k-characters", { inputCharacters: 12_500 }), 1.25);
+  assert.equal(calculateProposedToolUnits("10-pages", { pageCount: 15 }), 1.5);
+  assert.equal(calculateProposedToolUnits("100-MiB-archive-input", { inputBytes: 50 * 1_048_576 }), 0.5);
+  assert.equal(calculateProposedToolUnits("render-minute", { renderSeconds: 90 }), 1.5);
+  assert.equal(calculateProposedToolUnits("audio-minute", { audioSeconds: 90 }), 1.5);
+  assert.equal(calculateProposedToolUnits("megapixel-operation", { width: 1_280, height: 720 }), 0.9216);
+});
+
+test("video usage scales by duration, output resolution and frame rate", () => {
+  assert.equal(calculateProposedToolUnits("video-minute-720p", { videoSeconds: 60, width: 1_920, height: 1_080, framesPerSecond: 30 }), 2.25);
+  assert.equal(calculateProposedToolUnits("video-minute-720p", { videoSeconds: 30, width: 1_280, height: 720, framesPerSecond: 60 }), 1);
+});
+
+test("audio workload scales for sample rate and channel count", () => {
+  assert.equal(calculateProposedToolUnits("audio-minute", { audioSeconds: 60, sampleRate: 96_000, channels: 2 }), 2);
+  assert.equal(calculateProposedToolUnits("audio-minute", { audioSeconds: 60, sampleRate: 48_000, channels: 4 }), 2);
+});
+
+test("preview measurements reject unknown, invalid and oversized inputs", () => {
+  assert.throws(() => calculateProposedToolUnits("10-pages", { pageCount: -1 }), RangeError);
+  assert.throws(() => calculateProposedToolUnits("10-pages", { pageCount: "10" }), RangeError);
+  assert.throws(() => calculateProposedToolUnits("10-pages", { fileCount: 10 }), RangeError);
+  assert.throws(() => calculateProposedToolUnits("10-pages", { pageCount: 1_000_000_000_001 }), RangeError);
 });
