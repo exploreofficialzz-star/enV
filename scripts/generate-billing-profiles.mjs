@@ -166,9 +166,7 @@ for (const [platform, key] of [["Android", "androidToolIds"], ["iOS", "iosToolId
 const dataPath = join(root, "src/data/billing-profiles.json");
 await mkdir(dirname(dataPath), { recursive: true });
 await writeFile(dataPath, `${JSON.stringify({ pricingVersion: PRICING_VERSION, toolCount: profiles.length, profiles }, null, 2)}\n`);
-// Keep the complete tool-specific classification and cost-driver contract in the runtime index.
-// Do not collapse distinct tools into a shared billing-key-only quote profile.
-const indexProfiles = profiles.map((profile) => ({ ...profile }));
+const indexProfiles = profiles.map(({ toolId, billingKey, pricingMode, provisionalSubunitsPerUnit, unitLabel, optionalAiAssistProfile, premiumRequired }) => ({ toolId, billingKey, pricingMode, provisionalSubunitsPerUnit, unitLabel, optionalAiAssistProfile, premiumRequired }));
 await writeFile(join(root, "src/data/billing-profile-index.json"), `${JSON.stringify({ pricingVersion: PRICING_VERSION, toolCount: indexProfiles.length, profiles: indexProfiles })}\n`);
 await writeFile(join(root, "src/data/billing-profile-runtime-extensions.json"), `${JSON.stringify({ pricingVersion: PRICING_VERSION, toolCount: runtimeExtensionProfiles.length, profiles: runtimeExtensionProfiles }, null, 2)}\n`);
 
