@@ -1854,7 +1854,7 @@ private struct NativeTokenProfileDetails: View {
             }
             detailRow("Execution model", value: (profile["executionMode"] as? String ?? "tool-dependent").replacingOccurrences(of: "-", with: " "))
             detailRow("Measurement dimensions", value: (profile["meteringDimensions"] as? [String] ?? [unitLabel]).joined(separator: ", "))
-            detailRow("Pricing version", value: profile["pricingVersion"] as? String ?? "not specified")
+            detailRow("Pricing version", value: profile["toolPriceVersion"] as? String ?? profile["pricingVersion"] as? String ?? "not specified")
             if let reason = profile["classificationReason"] as? String {
                 Text(reason).font(.footnote).foregroundStyle(Color.envMuted).fixedSize(horizontal: false, vertical: true)
             }
