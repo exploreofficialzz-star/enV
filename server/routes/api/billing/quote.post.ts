@@ -47,7 +47,17 @@ export default defineHandler(async (event) => {
       data: {
         ...quote,
         toolId: toolProfile?.toolId ?? null,
-        billingProfile: toolProfile ? { billingKey: toolProfile.billingKey, pricingMode: toolProfile.pricingMode } : null,
+        billingProfile: toolProfile ? {
+          toolId: toolProfile.toolId,
+          billingKey: toolProfile.billingKey,
+          pricingMode: toolProfile.pricingMode,
+          executionMode: toolProfile.executionMode,
+          unitLabel: toolProfile.unitLabel,
+          meteringDimensions: toolProfile.meteringDimensions,
+          priceStatus: toolProfile.priceStatus,
+          manualAuditRequired: toolProfile.manualAuditRequired,
+          classificationReason: toolProfile.classificationReason,
+        } : null,
         aiAssistQuote,
         billingActive: false,
         priceStatus: "provisional",
