@@ -46,7 +46,7 @@ export function deriveLocalToolPriceProfile(tool, billingKey, executionMode) {
   let meteringDimensions = ["operation-count"];
 
   const batch = has(identity, /\b(batch|bulk|multiple files|folder|playlist|many items)\b/);
-  const heavy = has(identity, /\b(upscal|denois|noise removal|separat|stems|spectrogram|transcod|render|encoding|compress|compression|archive|merge|merger|extract|ocr|recognition|background remover|cutout|simulation|physics engine)\b/);
+  const heavy = has(identity, /\b(upscal|denois|noise removal|separat|stems|spectrogram|transcod|render|encoding|zip|compress|compression|archive|merge|merger|extract|ocr|recognition|background remover|cutout|simulation|physics engine)\b/);
   const explicitHighEnd = has(identity, /\b(high end|frontier|premium|advanced|professional|4k|8k|3d|ray tracing)\b/);
 
   if (id === "scene-studio" || (executionMode === "web-local" && has(identity, /\b(scene renderer|3d scene|world lab renderer)\b/))) {
