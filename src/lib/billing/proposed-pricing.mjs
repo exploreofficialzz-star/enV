@@ -160,7 +160,7 @@ export function deriveLocalToolPriceProfile(tool, billingKey, executionMode) {
   } else if (category === "ai") {
     unitLabel = "1k-generated-characters";
     meteringDimensions = ["input-characters", "output-characters", "template-count", "operation-count"];
-    subunitsPerUnit = has(identity, /\\b(long form|article|outline|script|lesson|story|report|multi[- ]step)\\b/) ? 250 : 150;
+    subunitsPerUnit = has(identity, /\b(long form|article|outline|script|lesson|story|report|multi[- ]step)\b/) ? 250 : 150;
     if (batch) subunitsPerUnit += 100;
     workloadTier = subunitsPerUnit >= 250 ? "standard" : "light";
     factors.push("generated output length and template/workflow complexity");
@@ -169,7 +169,7 @@ export function deriveLocalToolPriceProfile(tool, billingKey, executionMode) {
   } else if (category === "business" || category === "ecommerce") {
     unitLabel = "business-operation";
     meteringDimensions = ["record-count", "document-count", "input-size", "calculation-complexity", "output-size"];
-    subunitsPerUnit = has(identity, /\\b(invoice|quotation|quote|inventory|cash flow|payroll|report|reconciliation|catalogue|catalog)\\b/) ? 225 : 150;
+    subunitsPerUnit = has(identity, /\b(invoice|quotation|quote|inventory|cash flow|payroll|report|reconciliation|catalogue|catalog)\b/) ? 225 : 150;
     if (batch) subunitsPerUnit += 100;
     workloadTier = subunitsPerUnit >= 225 ? "standard" : "light";
     factors.push("number of business records and generated documents", "calculation or workflow complexity");
@@ -178,14 +178,14 @@ export function deriveLocalToolPriceProfile(tool, billingKey, executionMode) {
   } else if (category === "video") {
     unitLabel = "video-configuration";
     meteringDimensions = ["parameter-count", "comparison-count", "output-size"];
-    subunitsPerUnit = has(identity, /\\b(compare|benchmark|streaming profile|encoder|codec|quality analysis|compatibility)\\b/) ? 200 : 125;
+    subunitsPerUnit = has(identity, /\b(compare|benchmark|streaming profile|encoder|codec|quality analysis|compatibility)\b/) ? 200 : 125;
     if (batch) subunitsPerUnit += 75;
     workloadTier = subunitsPerUnit >= 200 ? "standard" : "light";
     factors.push("video configuration parameters and comparison count");
     if (batch) factors.push("multiple profiles or presets");
     pricingFormula = `${subunitsPerUnit} milli-tokens per video configuration or settings operation. Actual file processing uses duration and resolution-based media units.`;
   } else if (category === "developer") {
-    const codeHeavy = has(identity, /\\b(regex|regular expression|compiler|transpil|minif|benchmark|parser|parse|schema|validator)\\b/);
+    const codeHeavy = has(identity, /\b(regex|regular expression|compiler|transpil|minif|benchmark|parser|parse|schema|validator)\b/);
     unitLabel = "10k-characters";
     meteringDimensions = ["input-characters", "output-characters", "parse-complexity", "operation-count"];
     subunitsPerUnit = codeHeavy ? 250 : 125;
@@ -196,10 +196,10 @@ export function deriveLocalToolPriceProfile(tool, billingKey, executionMode) {
     if (batch) factors.push("batch payloads");
     pricingFormula = `${subunitsPerUnit} milli-tokens per 10,000 input characters; measured input/output text and parser complexity determine units.`;
   } else if (category === "security") {
-    const dataOperation = has(identity, /\\b(hash|checksum|digest|encrypt|decrypt|cipher|hmac|signature|file metadata|metadata cleaner)\\b/);
+    const dataOperation = has(identity, /\b(hash|checksum|digest|encrypt|decrypt|cipher|hmac|signature|file metadata|metadata cleaner)\b/);
     unitLabel = dataOperation ? "MiB-input" : "security-operation";
     meteringDimensions = dataOperation ? ["input-bytes", "algorithm", "file-count", "output-bytes"] : ["operation-count", "credential-count", "entropy-bits"];
-    subunitsPerUnit = dataOperation ? (has(identity, /\\b(encrypt|decrypt|cipher|hmac|signature)\\b/) ? 300 : 175) : 100;
+    subunitsPerUnit = dataOperation ? (has(identity, /\b(encrypt|decrypt|cipher|hmac|signature)\b/) ? 300 : 175) : 100;
     if (batch) subunitsPerUnit += 100;
     workloadTier = subunitsPerUnit >= 250 ? "standard" : "light";
     factors.push(dataOperation ? "bytes processed and cryptographic algorithm" : "credential count and generation/validation operation");
@@ -208,7 +208,7 @@ export function deriveLocalToolPriceProfile(tool, billingKey, executionMode) {
       ? `${subunitsPerUnit} milli-tokens per MiB processed; scale by input bytes and selected algorithm.`
       : `${subunitsPerUnit} milli-tokens per security operation; batch outputs are counted independently.`;
   } else if (category === "qr") {
-    const scanning = has(identity, /\\b(scan|reader|decode|camera)\\b/);
+    const scanning = has(identity, /\b(scan|reader|decode|camera)\b/);
     unitLabel = scanning ? "megapixel-scan" : "code-generated";
     meteringDimensions = scanning ? ["input-pixels", "scan-count", "decode-complexity"] : ["code-count", "payload-bytes", "error-correction-level"];
     subunitsPerUnit = scanning ? 250 : 100;
@@ -222,7 +222,7 @@ export function deriveLocalToolPriceProfile(tool, billingKey, executionMode) {
   } else if (["mockups", "screenshots", "photography"].includes(category)) {
     unitLabel = "rendered-asset";
     meteringDimensions = ["asset-count", "output-resolution", "input-pixels", "frame-complexity"];
-    subunitsPerUnit = has(identity, /\\b(device frame|browser frame|mockup|render|composite|annotation|contact sheet|collage)\\b/) ? 400 : 250;
+    subunitsPerUnit = has(identity, /\b(device frame|browser frame|mockup|render|composite|annotation|contact sheet|collage)\b/) ? 400 : 250;
     if (batch) subunitsPerUnit += 150;
     workloadTier = "standard";
     factors.push("rendered output resolution and asset count");
@@ -231,7 +231,7 @@ export function deriveLocalToolPriceProfile(tool, billingKey, executionMode) {
   } else if (category === "design" || category === "webdesign") {
     unitLabel = "design-operation";
     meteringDimensions = ["operation-count", "element-count", "output-bytes", "preview-resolution"];
-    subunitsPerUnit = has(identity, /\\b(layout|responsive|component|design system|template|wireframe|typography scale|grid)\\b/) ? 200 : 125;
+    subunitsPerUnit = has(identity, /\b(layout|responsive|component|design system|template|wireframe|typography scale|grid)\b/) ? 200 : 125;
     if (batch) subunitsPerUnit += 75;
     workloadTier = subunitsPerUnit >= 200 ? "standard" : "light";
     factors.push("number of design elements and generated output");
@@ -240,7 +240,7 @@ export function deriveLocalToolPriceProfile(tool, billingKey, executionMode) {
   } else if (["communication", "career", "marketing", "social", "relationships", "events", "gaming", "interactive", "celebrations", "creators", "personal", "food", "travel", "productivity", "education", "random", "testdata", "generators", "streaming", "seo", "accessibility"].includes(category)) {
     unitLabel = "10k-output-characters";
     meteringDimensions = ["input-characters", "output-characters", "item-count", "workflow-step-count"];
-    subunitsPerUnit = has(identity, /\\b(plan|planner|analysis|audit|report|campaign|workflow|schedule|itinerary|portfolio|resume|curriculum|generator)\\b/) ? 175 : 125;
+    subunitsPerUnit = has(identity, /\b(plan|planner|analysis|audit|report|campaign|workflow|schedule|itinerary|portfolio|resume|curriculum|generator)\b/) ? 175 : 125;
     if (batch) subunitsPerUnit += 75;
     workloadTier = subunitsPerUnit >= 175 ? "standard" : "light";
     factors.push("generated or transformed output length", "number of generated items and workflow steps");
