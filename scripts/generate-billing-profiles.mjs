@@ -56,7 +56,7 @@ function profile(tool) {
   } else if (tool.engine?.type === "ai") {
     // Direct AI execution is provider-metered even when legacy catalogue flags resemble a local tool.
     executionMode = "cloud-or-remote";
-    const frontier = /\\b(frontier|premium|high[- ]?end)\\b/.test(words(tool));
+    const frontier = /\b(frontier|premium|high[- ]?end)\b/.test(words(tool));
     billingKey = frontier ? "ai.frontier" : "ai.standard";
     premiumRequired = frontier;
     classificationReason = frontier
@@ -238,7 +238,7 @@ const proposalReport = [
   "- The separate 267-tool ad-free session access tariff is not an operation price and is not substituted for this per-tool schedule.",
   "- Advertising eligibility is a separate policy. Studio, Labs, Sandbox, AI and high-end tools remain outside Adsterra regardless of their billing profile.",
   "- All proposed rates are non-billable until their profile is audited and production billing is separately enabled.",
-].join("\\n");
+].join("\n");
 await writeFile(join(root, "docs/billing-proposed-prices-2026-11-25.md"), proposalReport);
 
 const countBy = (key) => Object.fromEntries([...profiles.reduce((map, p) => map.set(p[key], (map.get(p[key]) ?? 0) + 1), new Map())].sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
