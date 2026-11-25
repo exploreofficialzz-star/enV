@@ -46,7 +46,7 @@ export function deriveLocalToolPriceProfile(tool, billingKey, executionMode) {
   let meteringDimensions = ["operation-count"];
 
   const batch = has(identity, /\b(batch|bulk|multiple files|folder|playlist|many items)\b/);
-  const heavy = has(identity, /\b(upscal|denois|noise removal|separat|stems|spectrogram|transcod|render|encoding|zip|compress|compression|archive|merge|merger|extract|ocr|recognition|background remover|cutout|simulation|physics engine)\b/);
+  const heavy = has(identity, /\b(upscal\w*|denois\w*|noise removal|separat\w*|stems?\w*|spectrogram\w*|transcod\w*|render\w*|encod\w*|zip|compress\w*|archiv\w*|merg\w*|extract\w*|ocr|recognit\w*|background remover|cutout|simulat\w*|physics engine)\b/);
   const explicitHighEnd = has(identity, /\b(high end|frontier|premium|advanced|professional|4k|8k|3d|ray tracing)\b/);
 
   if (id === "scene-studio" || (executionMode === "web-local" && has(identity, /\b(scene renderer|3d scene|world lab renderer)\b/))) {
@@ -147,7 +147,7 @@ export function deriveLocalToolPriceProfile(tool, billingKey, executionMode) {
     factors.push("archive input size and compression level");
     if (batch) factors.push("many files or directory traversal");
     pricingFormula = `${subunitsPerUnit} milli-tokens per 100 MiB of input data; measure actual bytes and file count.`;
-  } else if (has(identity, /\b(studio|laboratory|laboratories|lab|sandbox)\b/)) {
+  } else if (category !== "developer" && has(identity, /\b(studio|laboratory|laboratories|lab|sandbox)\b/)) {
     unitLabel = "studio-operation";
     meteringDimensions = ["operation-count", "asset-count", "input-bytes", "render-duration", "output-bytes"];
     subunitsPerUnit = explicitHighEnd || heavy ? 1_000 : 500;
