@@ -18,8 +18,16 @@ export interface ToolBillingProfile {
   billingKey: string;
   pricingMode: ToolBillingPricingMode;
   provisionalSubunitsPerUnit: number | null;
+  proposedSubunitsPerUnit: number | null;
+  proposedTokensPerUnit: number | null;
+  proposedUsdMicrosPerUnit: number | null;
   unitLabel: string;
   meteringDimensions: string[];
+  workloadTier: string;
+  pricingBasis: string;
+  pricingFormula: string;
+  pricingFactors: string[];
+  toolPriceVersion: string;
   optionalAiAssistProfile: string | null;
   premiumRequired: boolean;
   /** Pricing is not chargeable while this flag remains true. */
