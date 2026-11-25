@@ -47,6 +47,11 @@ function Tools() {
   const search = Route.useSearch();
   const state = decodeDiscoveryState(search);
   const { q: query, filters, sort } = state;
+  const searchableCategoryIds = useMemo(() => new Set(all.map((tool) => tool.category)), [all]);
+  const availableCategories = useMemo(
+    () => CATEGORIES.filter((category) => searchableCategoryIds.has(category.id)),
+    [searchableCategoryIds],
+  );
   const [visibleByCategory, setVisibleByCategory] = useState<Record<string, number>>({});
   const eligibility = useMemo(
     () => buildEligibility(filters, discoveryAvailability),
@@ -130,7 +135,7 @@ function Tools() {
               Category
               <select className={SELECT_CLASS} value={filters.category ?? ""} onChange={(event) => updateFilter("category", event.target.value)}>
                 <option value="">All categories</option>
-                {CATEGORIES.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                {availableCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
               </select>
             </label>
             <label className="block min-w-0 text-xs font-medium text-muted">
