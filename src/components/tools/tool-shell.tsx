@@ -538,13 +538,22 @@ export function ToolShell({
       <section className="mt-10" aria-labelledby="tool-guide-heading">
         <h2 id="tool-guide-heading" className="text-lg font-semibold">What this tool does</h2>
         <p className="mt-3 text-sm leading-6 text-muted">{offlineAwareToolDescription(tool)}</p>
-        <a
-          href={toolDocumentationPath(tool)}
-          className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-accent underline underline-offset-4"
-        >
-          <BookOpen className="size-4" aria-hidden="true" />
-          Read the full guide
-        </a>
+        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
+          <a
+            href={toolDocumentationPath(tool)}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-accent underline underline-offset-4"
+          >
+            <BookOpen className="size-4" aria-hidden="true" />
+            Read the full guide
+          </a>
+          <Link
+            to="/tokens/$toolId"
+            params={{ toolId: tool.id }}
+            className="text-sm font-semibold text-muted underline underline-offset-4 hover:text-fg"
+          >
+            Token details
+          </Link>
+        </div>
 
 
       </section>
