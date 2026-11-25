@@ -5,6 +5,7 @@ import { disclaimerText } from "@/lib/content";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { ToolAccessGate, AdFreeAfterThreeVisitsDialog } from "@/components/tools/tool-access-gate";
 import { recordBrowserAdSupportedVisit } from "@/lib/ads/ad-supported-progress";
+import { waitForAdsterraPlacement } from "@/lib/ads/placement-access";
 import { getToolAccessPreference, setToolAccessPreference, type ToolAccessPreference } from "@/lib/ads/access-preference";
 import { recordAnalyticsEvent, recordToolExecutionResult } from "@/lib/analytics/client";
 import { toolDocumentationPath } from "@/lib/tool-documentation";
@@ -48,6 +49,7 @@ export function ToolShell({
   const toolAdEligible = isAdsterraQualifiedTool(tool);
   const adsterraQualified = import.meta.env.VITE_ADSTERRA_ENABLED === "true" && toolAdEligible;
   const [adsterraConsent, setAdsterraConsentState] = useState(getAdsterraConsent);
+  const [adsterraPlacementLoaded, setAdsterraPlacementLoaded] = useState(false);
   const { user: accessUser, isPending: accessAuthPending } = useCurrentUserState();
   const [accessPreferenceState, setAccessPreferenceState] = useState(() => ({
     toolId: tool.id,
@@ -93,21 +95,26 @@ export function ToolShell({
   const adsterraAccessAvailable = adsterraQualified && browserOnline;
   const adsterraAdsEnabled = adsterraQualified && adsterraConsent === "granted" &&
     (!adAccessGateEnabled || accessPreference === "ads");
-  const continueWithAdsterra = () => {
+  const continueWithAdsterra = async (): Promise<boolean> => {
     if (!adsterraAccessAvailable) return false;
     if (adsterraConsent !== "granted" && !setAdsterraConsent("granted")) return false;
     setAdsterraConsentState("granted");
-    return true;
+    if (adsterraPlacementLoaded) return true;
+    const loaded = await waitForAdsterraPlacement(window);
+    if (loaded) setAdsterraPlacementLoaded(true);
+    return loaded;
   };
   useEffect(() => {
+    setAdsterraPlacementLoaded(false);
     if (!adAccessGateEnabled || !adsterraAdsEnabled) return;
     const onPlacementLoaded = () => {
+      setAdsterraPlacementLoaded(true);
       const progress = recordBrowserAdSupportedVisit(tool.id);
       if (progress?.shouldShowAdFreeOffer) setShowAdFreeOffer(true);
     };
     window.addEventListener("env:adsterra-placement-loaded", onPlacementLoaded);
     return () => window.removeEventListener("env:adsterra-placement-loaded", onPlacementLoaded);
-  }, [adsterraAdsEnabled, tool.id]);
+  }, [adAccessGateEnabled, adsterraAdsEnabled, tool.id]);
 
   const saveAccessPreference = (value: ToolAccessPreference) => {
     setAccessPreferenceState({ toolId: tool.id, value });
@@ -471,7 +478,7 @@ export function ToolShell({
         {tool.category !== "creators" ? <p className="col-start-2 col-span-2 row-start-2 text-sm leading-6 text-muted sm:hidden">{offlineAwareToolDescription(tool)}</p> : null}
       </header>
 
-      {!isFullscreen && adsterraAdsEnabled ? <AdsterraResponsiveBanner /> : null}
+      {!isFullscreen && adsterraAdsEnabled ? <AdsterraResponsiveBanner key={tool.id} /> : null}
 
       {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
 
@@ -525,8 +532,8 @@ export function ToolShell({
 
       {!isFullscreen && adsterraAdsEnabled ? (
         <>
-          <AdsterraBanner format="300x250" />
-          <AdsterraNativeBanner />
+          <AdsterraBanner key={`${tool.id}-300x250`} format="300x250" />
+          <AdsterraNativeBanner key={tool.id} />
           <AdsterraSmartlink />
         </>
       ) : null}
