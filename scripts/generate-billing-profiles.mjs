@@ -268,7 +268,7 @@ const report = [
   "",
   "| Billing key | Tools |",
   "|---|---:|",
-  ...Object.entries(fullByRule).map(([key, count]) => "| \`" + key + "\` | " + count + " |"),
+  ...Object.entries(fullByRule).map(([key, count]) => "| " + key + " | " + count + " |"),
   "",
   "## Pricing interpretation",
   "",
