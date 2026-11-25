@@ -157,7 +157,34 @@ export function deriveLocalToolPriceProfile(tool, billingKey, executionMode) {
     if (heavy) factors.push("rendering, simulation or media processing");
     if (batch) factors.push("batch or multi-asset operation");
     pricingFormula = `${subunitsPerUnit} milli-tokens per studio operation; resource-heavy sub-operations are measured separately.`;
-  } else if (category === "developer") {
+  } else if (category === "ai") {
+    unitLabel = "1k-generated-characters";
+    meteringDimensions = ["input-characters", "output-characters", "template-count", "operation-count"];
+    subunitsPerUnit = has(identity, /\\b(long form|article|outline|script|lesson|story|report|multi[- ]step)\\b/) ? 250 : 150;
+    if (batch) subunitsPerUnit += 100;
+    workloadTier = subunitsPerUnit >= 250 ? "standard" : "light";
+    factors.push("generated output length and template/workflow complexity");
+    if (batch) factors.push("multiple generated items");
+    pricingFormula = `${subunitsPerUnit} milli-tokens per 1,000 generated characters for local/template AI-category tools. Direct model calls are metered separately from provider usage.`;
+  } else if (category === "business" || category === "ecommerce") {
+    unitLabel = "business-operation";
+    meteringDimensions = ["record-count", "document-count", "input-size", "calculation-complexity", "output-size"];
+    subunitsPerUnit = has(identity, /\\b(invoice|quotation|quote|inventory|cash flow|payroll|report|reconciliation|catalogue|catalog)\\b/) ? 225 : 150;
+    if (batch) subunitsPerUnit += 100;
+    workloadTier = subunitsPerUnit >= 225 ? "standard" : "light";
+    factors.push("number of business records and generated documents", "calculation or workflow complexity");
+    if (batch) factors.push("bulk record or multi-document work");
+    pricingFormula = `${subunitsPerUnit} milli-tokens per business operation; scale by records, documents and batch size.`;
+  } else if (category === "video") {
+    unitLabel = "video-configuration";
+    meteringDimensions = ["parameter-count", "comparison-count", "output-size"];
+    subunitsPerUnit = has(identity, /\\b(compare|benchmark|streaming profile|encoder|codec|quality analysis|compatibility)\\b/) ? 200 : 125;
+    if (batch) subunitsPerUnit += 75;
+    workloadTier = subunitsPerUnit >= 200 ? "standard" : "light";
+    factors.push("video configuration parameters and comparison count");
+    if (batch) factors.push("multiple profiles or presets");
+    pricingFormula = `${subunitsPerUnit} milli-tokens per video configuration or settings operation. Actual file processing uses duration and resolution-based media units.`;
+else if (category === "developer") {
     const codeHeavy = has(identity, /\\b(regex|regular expression|compiler|transpil|minif|benchmark|parser|parse|schema|validator)\\b/);
     unitLabel = "10k-characters";
     meteringDimensions = ["input-characters", "output-characters", "parse-complexity", "operation-count"];
