@@ -118,12 +118,20 @@ test("a single generic word does not satisfy a multi-word query", () => {
   assert.ok(!ids.includes("tip-split-calculator"));
 });
 
-test("regexp and regular-expression queries put the exact Regex Tester workflow first", async () => {
+test("task-level regex aliases route to Regex Studio while exact legacy intent remains available", async () => {
   const { getSearchableTools } = await import("./registry.ts");
   const pool = getSearchableTools();
 
-  assert.equal(searchTools(pool, "regexp tester", 5)[0]?.id, "regex-tester");
-  assert.equal(searchTools(pool, "test regular expression", 5)[0]?.id, "regex-tester");
+  assert.equal(searchTools(pool, "regexp tester", 5)[0]?.id, "regex-studio");
+  assert.equal(searchTools(pool, "test regular expression", 5)[0]?.id, "regex-studio");
+  assert.equal(searchTools(pool, "regex tester", 5)[0]?.id, "regex-tester");
+});
+
+test("the picture-resize phrase ranks Profile Picture Maker first in the real registry", async () => {
+  const { getSearchableTools } = await import("./registry.ts");
+  const pool = getSearchableTools();
+
+  assert.equal(searchTools(pool, "picture resize", 5)[0]?.id, "profile-picture-maker");
 });
 
 test("unsupported tasks return an honest empty result rather than forced recommendations", () => {
