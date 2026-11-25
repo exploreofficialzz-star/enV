@@ -187,7 +187,7 @@ export function deriveLocalToolPriceProfile(tool, billingKey, executionMode) {
   } else if (category === "fitness") {
     unitLabel = "fitness-calculation";
     meteringDimensions = ["calculation-count", "input-metrics", "training-duration", "distance", "output-metrics"];
-    subunitsPerUnit = has(identity, /\\b(training plan|workout plan|nutrition|macro|heart rate zone|vo2|body composition|periodization)\\b/) ? 200 : 125;
+    subunitsPerUnit = has(identity, /\b(training plan|workout plan|nutrition|macro|heart rate zone|vo2|body composition|periodization)\b/) ? 200 : 125;
     if (batch) subunitsPerUnit += 75;
     workloadTier = subunitsPerUnit >= 200 ? "standard" : "light";
     factors.push("number and complexity of user metrics", "training or activity duration where applicable");
@@ -196,7 +196,7 @@ export function deriveLocalToolPriceProfile(tool, billingKey, executionMode) {
   } else if (category === "datetime") {
     unitLabel = "date-time-operation";
     meteringDimensions = ["conversion-count", "timezone-count", "calendar-range", "recurrence-complexity"];
-    subunitsPerUnit = has(identity, /\\b(business days|working days|recurrence|calendar|schedule|multiple time zones|meeting planner)\\b/) ? 150 : 75;
+    subunitsPerUnit = has(identity, /\b(business days|working days|recurrence|calendar|schedule|multiple time zones|meeting planner)\b/) ? 150 : 75;
     if (batch) subunitsPerUnit += 50;
     workloadTier = subunitsPerUnit >= 150 ? "standard" : "light";
     factors.push("number of dates, time zones and recurrence rules");
@@ -205,7 +205,7 @@ export function deriveLocalToolPriceProfile(tool, billingKey, executionMode) {
   } else if (category === "network") {
     unitLabel = "network-operation";
     meteringDimensions = ["address-count", "prefix-length", "record-count", "lookup-count", "input-bytes"];
-    subunitsPerUnit = has(identity, /\\b(dns lookup|whois|http header|reachability|latency|port scan|route lookup)\\b/) ? 200 : 100;
+    subunitsPerUnit = has(identity, /\b(dns lookup|whois|http header|reachability|latency|port scan|route lookup)\b/) ? 200 : 100;
     if (batch) subunitsPerUnit += 75;
     workloadTier = subunitsPerUnit >= 200 ? "standard" : "light";
     factors.push("number of addresses, records or lookups");
@@ -214,7 +214,7 @@ export function deriveLocalToolPriceProfile(tool, billingKey, executionMode) {
   } else if (category === "streaming") {
     unitLabel = "stream-profile-operation";
     meteringDimensions = ["resolution", "frame-rate", "bitrate-count", "codec-count", "profile-count"];
-    subunitsPerUnit = has(identity, /\\b(compare|multiple|advanced|encoder|compatibility|simulator)\\b/) ? 200 : 125;
+    subunitsPerUnit = has(identity, /\b(compare|multiple|advanced|encoder|compatibility|simulator)\b/) ? 200 : 125;
     if (batch) subunitsPerUnit += 75;
     workloadTier = subunitsPerUnit >= 200 ? "standard" : "light";
     factors.push("stream profiles, codec combinations, resolution and frame-rate inputs");
