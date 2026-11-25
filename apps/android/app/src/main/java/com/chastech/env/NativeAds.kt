@@ -137,7 +137,8 @@ internal object NativeAdsPolicy {
         val restrictedDisclaimers = setOf("health", "finance", "earnings")
         val restrictedCategories = setOf(
             "health", "finance", "earnings", "fitness", "personal",
-            "ai", "developer", "accessibility", "lab", "labs",
+            "ai", "developer", "accessibility", "lab", "labs", "studio", "studios",
+            "laboratory", "laboratories", "sandbox",
         )
         val localEngineTypes = setOf(
             "calculator", "converter", "datetime", "text", "codec", "color", "qr",
@@ -183,14 +184,14 @@ internal object NativeAdsPolicy {
         val engineType = tool.engine.type.lowercase()
         val operation = tool.engine.extras["op"]?.lowercase().orEmpty()
         val identity = (
-            listOf(tool.id, tool.name, tool.subcategory.orEmpty(), engineType, tool.engine.id) +
+            listOf(tool.id, tool.name, tool.description, tool.category, tool.subcategory.orEmpty(), engineType, tool.engine.id) +
                 tool.tags + tool.keywords
             ).joinToString(" ")
             .lowercase()
             .replace('-', ' ')
             .replace('_', ' ')
         val excludedConcept = Regex(
-            """\b(studio|studios|lab|labs|laboratory|laboratories|sandbox|ai|artificial intelligence)\b"""
+            """\b(studio|studios|lab|labs|laboratory|laboratories|sandbox|ai|artificial intelligence|high[- ]?end|premium|frontier)\b"""
         ).containsMatchIn(identity)
         val localExecution = engineType in localEngineTypes ||
             (engineType == "custom" && tool.category in localCustomCategories) ||
