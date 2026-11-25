@@ -18,18 +18,24 @@ test("the limit is applied after filtering", () => {
   assert.equal(relatedToolsFor(t("z", { related: ["a", "b", "c", "d"] }), (id) => reg.get(id), () => true, 2).length, 2);
 });
 
-test("on the real registry no displayed related link is self, missing, planned or undiscoverable", () => {
-  const discoverable = new Set(getSearchableTools().map((x) => x.id));
+test("on the real searchable registry no displayed related link is self, missing, planned or undiscoverable", () => {
+  const discoverable = new Set(getSearchableTools().map((item) => item.id));
   let bad = 0;
-  for (const tool of getAllTools().filter((x) => x.status !== "planned")) {
-    const displayed = relatedToolsFor(tool, getToolById, (x) => discoverable.has(x.id), 6);
+  for (const tool of getSearchableTools().filter((item) => item.status === "active" || item.status === "beta")) {
+    const canonicalToolId = getToolById(tool.id)?.id ?? tool.id;
+    const displayed = getRelatedTools(tool, 6);
     const ids = displayed.map((item) => item.id);
     if (new Set(ids).size !== ids.length) bad += 1;
     for (const item of displayed) {
-      if (item.id === tool.id || item.status === "planned" || !discoverable.has(item.id)) bad += 1;
+      if (
+        item.id === tool.id
+        || item.id === canonicalToolId
+        || item.status === "planned"
+        || !discoverable.has(item.id)
+      ) bad += 1;
     }
   }
-  assert.equal(bad, 0, "Every active runtime tool must expose only unique, canonical, active, searchable related destinations.");
+  assert.equal(bad, 0, "Every active searchable tool, including virtual Studios, must expose only unique, canonical, active, searchable related destinations.");
 });
 
 test("every runtime related array contains only canonical active searchable targets", () => {
@@ -47,6 +53,7 @@ test("every runtime related array contains only canonical active searchable targ
         violations.push(tool.id + "->" + id + ": unresolved target");
         continue;
       }
+      if (target.id !== id) violations.push(tool.id + "->" + id + ": non-canonical alias, expected " + target.id);
       if (target.status === "planned") violations.push(tool.id + "->" + id + ": planned target");
       if (!searchable.has(target.id)) violations.push(tool.id + "->" + id + ": non-searchable canonical target " + target.id);
     }
