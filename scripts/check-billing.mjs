@@ -171,12 +171,10 @@ assert.match(quoteRoute, /getApprovedToolAccessPrice/, "tool quotes must use ind
 assert.match(quoteRoute, /requires-cost-measurement/, "unapproved tools must not receive a generic category-level price");
 assert.match(quoteRoute, /meteringDimensions: toolProfile\.meteringDimensions/, "tool quotes must expose their cost drivers");
 assert.match(quoteRoute, /executionMode: toolProfile\.executionMode/, "tool quotes must expose their execution mode");
-assert.match(toolProfileServer, /billing-profile-index\.json/, "the server must use the enriched per-tool runtime index");
 assert.match(toolProfileRoute, /approvedPrice/, "the per-tool profile endpoint must identify individually approved prices");
+assert.match(toolProfileRoute, /meteringDimensions/, "the per-tool profile endpoint must return cost dimensions");
 assert.match(toolProfileRoute, /priceApproved: approvedPrice !== null/, "an approved price must not imply production charging is active");
 assert.match(quoteRoute, /priceStatus: approvedToolPrice \? "approved"/, "quotes must distinguish approved rates from provisional cost classes");
-assert.match(quoteRoute, /meteringDimensions: toolProfile\.meteringDimensions/, "tool quotes must expose their own cost drivers");
-assert.match(quoteRoute, /executionMode: toolProfile\.executionMode/, "tool quotes must expose their own execution mode");
 assert.match(toolProfileServer, /billing-profiles\.json/, "the server must load full per-tool profiles, not only generic index rates");
 assert.match(quoteRoute, /billingActive: false/);
 assert.doesNotMatch(await read("scripts/generate-billing-profiles.mjs"), /adsEligible/, "billing profiles must not own advertising eligibility");
