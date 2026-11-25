@@ -151,3 +151,12 @@ test("fitness, date-time, network and streaming tools have dedicated workload un
   assert.equal(streaming?.unitLabel, "stream-profile-operation");
   assert.equal(streaming?.subunitsPerUnit, 125);
 });
+
+test("local media tools use duration and file-size workload units", () => {
+  const editor = deriveLocalToolPriceProfile(tool({ id: "media-converter", name: "Media Converter", category: "media" }), "local.general", "local-device");
+  const transcoder = deriveLocalToolPriceProfile(tool({ id: "media-transcoder", name: "Media Transcoder", category: "media" }), "local.general", "local-device");
+  assert.equal(editor?.unitLabel, "media-operation");
+  assert.equal(editor?.subunitsPerUnit, 250);
+  assert.equal(transcoder?.unitLabel, "media-minute");
+  assert.equal(transcoder?.subunitsPerUnit, 1_250);
+});
