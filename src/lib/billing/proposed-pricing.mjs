@@ -416,7 +416,7 @@ export function calculateProposedToolUnits(unitLabel, measurements) {
       const inputCharacters = metric("inputCharacters");
       const outputCharacters = metric("outputCharacters");
       if (inputCharacters === null && outputCharacters === null) throw new RangeError("Input or output character count is required.");
-      units = Math.max(inputCharacters ?? 0, outputCharacters ?? 0) / 10_000;
+      units = (inputCharacters ?? outputCharacters ?? 0) / 10_000;
       break;
     }
     case "10k-output-characters":
