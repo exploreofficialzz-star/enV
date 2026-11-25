@@ -1,7 +1,6 @@
 import { defineHandler } from "nitro/h3";
 import { randomUUID } from "node:crypto";
 import { quoteOperation, referenceUsdMicrosForSubunits, TOKEN_SUBUNITS_PER_TOKEN } from "../../../../src/lib/billing/catalog";
-import { getApprovedToolAccessPrice } from "../../../../src/lib/billing/tool-access-pricing.server";
 import { hasActiveEntitlement } from "../../../../src/lib/billing/ledger.server";
 import { getToolBillingProfile } from "../../../../src/lib/billing/tool-profiles.server";
 import { getOptionalBillingUserId, isSameOriginRequest, jsonResponse, readJsonObject } from "../../../../src/lib/billing/http.server";
@@ -17,10 +16,13 @@ export default defineHandler(async (event) => {
   if (hasToolId === hasOperationId) {
     return jsonResponse({ ok: false, error: "INVALID_OPERATION", message: "Provide exactly one of toolId or operationId." }, 400);
   }
+
   let operationId: string;
   let toolProfile: ReturnType<typeof getToolBillingProfile>;
   if (hasToolId) {
-    if ((body.toolId as string).length > 160) return jsonResponse({ ok: false, error: "INVALID_TOOL", message: "The tool id is invalid." }, 400);
+    if ((body.toolId as string).length > 160 || !/^[a-zA-Z0-9._-]+$/.test(body.toolId as string)) {
+      return jsonResponse({ ok: false, error: "INVALID_TOOL", message: "The tool id is invalid." }, 400);
+    }
     toolProfile = getToolBillingProfile(body.toolId as string);
     if (!toolProfile) return jsonResponse({ ok: false, error: "UNKNOWN_TOOL", message: "No billing profile exists for this tool." }, 404);
     operationId = toolProfile.billingKey;
@@ -29,36 +31,51 @@ export default defineHandler(async (event) => {
     operationId = body.operationId as string;
     toolProfile = undefined;
   }
+
   const units = body.units === undefined ? 1 : body.units;
   if (typeof units !== "number" || !Number.isInteger(units) || units < 1 || units > 1_000_000) {
     return jsonResponse({ ok: false, error: "INVALID_UNITS", message: "Units must be an integer from 1 to 1,000,000." }, 400);
   }
+
   try {
     const userId = await getOptionalBillingUserId(request);
-    // Never trust a client-supplied premium boolean; derive it from a verified account entitlement.
-    // If entitlement storage is temporarily unavailable, keep premium access closed but still show
-    // non-premium preview prices instead of making the public pricing preview unavailable.
+    // Never trust a client-supplied premium boolean. Read a verified account entitlement.
     const hasPremium = userId ? await hasActiveEntitlement(userId, "premium").catch(() => false) : false;
-    const approvedToolPrice = toolProfile ? getApprovedToolAccessPrice(toolProfile.toolId) : null;
+
     const quote = toolProfile
-      ? approvedToolPrice
-        ? (() => {
-            const estimatedSubunits = approvedToolPrice.subunitsPerSession * units;
+      ? (() => {
+          if (toolProfile.premiumRequired && !hasPremium) {
             return {
               operationId: toolProfile.toolId,
               operationName: toolProfile.toolName,
-              status: "quoted" as const,
+              status: "premium-required" as const,
               units,
-              unitLabel: approvedToolPrice.unitLabel,
+              unitLabel: toolProfile.unitLabel,
+              estimatedSubunits: null,
+              estimatedTokens: null,
+              estimatedUsdMicros: null,
+              premiumRequired: true,
+              pricingVersion: toolProfile.toolPriceVersion,
+              note: "This tool requires the premium entitlement. No usage price has been reserved or charged.",
+            };
+          }
+          if (Number.isSafeInteger(toolProfile.proposedSubunitsPerUnit) && (toolProfile.proposedSubunitsPerUnit ?? 0) > 0) {
+            const estimatedSubunits = (toolProfile.proposedSubunitsPerUnit as number) * units;
+            return {
+              operationId: toolProfile.toolId,
+              operationName: toolProfile.toolName,
+              status: "provisional" as const,
+              units,
+              unitLabel: toolProfile.unitLabel,
               estimatedSubunits,
               estimatedTokens: estimatedSubunits / TOKEN_SUBUNITS_PER_TOKEN,
               estimatedUsdMicros: referenceUsdMicrosForSubunits(estimatedSubunits),
               premiumRequired: toolProfile.premiumRequired,
-              pricingVersion: approvedToolPrice.pricingVersion,
-              note: "This tool has an individually approved rate. The server uses the approved per-tool price for reservation and settlement.",
+              pricingVersion: toolProfile.toolPriceVersion,
+              note: "This is a draft per-tool workload rate. The final measured workload may change the amount; no tokens were reserved or charged.",
             };
-          })()
-        : {
+          }
+          return {
             operationId: toolProfile.toolId,
             operationName: toolProfile.toolName,
             status: "requires-cost-measurement" as const,
@@ -68,13 +85,12 @@ export default defineHandler(async (event) => {
             estimatedTokens: null,
             estimatedUsdMicros: null,
             premiumRequired: toolProfile.premiumRequired,
-            pricingVersion: toolProfile.pricingVersion,
-            note: "This tool does not yet have an individually approved operation price. No generic category rate will be presented as its price.",
-          }
+            pricingVersion: toolProfile.toolPriceVersion,
+            note: "This operation is metered from the selected provider or infrastructure usage. A numeric quote is unavailable until actual cost drivers are measured.",
+          };
+        })()
       : quoteOperation(operationId, units, { hasPremium });
-    const aiAssistQuote = toolProfile?.optionalAiAssistProfile
-      ? quoteOperation(toolProfile.optionalAiAssistProfile, 1, { hasPremium })
-      : null;
+
     return jsonResponse({
       ok: true,
       data: {
@@ -87,18 +103,21 @@ export default defineHandler(async (event) => {
           executionMode: toolProfile.executionMode,
           unitLabel: toolProfile.unitLabel,
           meteringDimensions: toolProfile.meteringDimensions,
-          priceStatus: approvedToolPrice ? "approved" : toolProfile.priceStatus,
-          manualAuditRequired: approvedToolPrice ? false : toolProfile.manualAuditRequired,
-          approvedPrice: approvedToolPrice ? {
-            subunitsPerSession: approvedToolPrice.subunitsPerSession,
-            unitLabel: approvedToolPrice.unitLabel,
-            pricingVersion: approvedToolPrice.pricingVersion,
-          } : null,
-          classificationReason: toolProfile.classificationReason,
+          workloadTier: toolProfile.workloadTier,
+          pricingBasis: toolProfile.pricingBasis,
+          pricingFormula: toolProfile.pricingFormula,
+          pricingFactors: toolProfile.pricingFactors,
+          proposedSubunitsPerUnit: toolProfile.proposedSubunitsPerUnit,
+          proposedTokensPerUnit: toolProfile.proposedTokensPerUnit,
+          proposedUsdMicrosPerUnit: toolProfile.proposedUsdMicrosPerUnit,
+          priceStatus: toolProfile.priceStatus,
+          premiumRequired: toolProfile.premiumRequired,
+          manualAuditRequired: toolProfile.manualAuditRequired,
+          toolPriceVersion: toolProfile.toolPriceVersion,
         } : null,
-        aiAssistQuote,
         billingActive: false,
-        priceStatus: toolProfile ? (approvedToolPrice ? "approved" : "requires-cost-measurement") : "provisional",
+        priceStatus: toolProfile ? toolProfile.priceStatus : "provisional",
+        priceApproved: false,
       },
     });
   } catch (error) {
@@ -109,7 +128,7 @@ export default defineHandler(async (event) => {
     const message = isUnknownOperation
       ? "No usage estimate is available for that operation."
       : "We couldn't prepare this usage estimate right now. No tokens were charged.";
-    console.error(`[billing-quote] ${code} requestId=${requestId} causeType=${error instanceof Error ? error.name : "UnknownError"}`);
+    console.error("[billing-quote] " + code + " requestId=" + requestId + " causeType=" + (error instanceof Error ? error.name : "UnknownError"));
     return jsonResponse({ ok: false, error: code, message, requestId }, status);
   }
 });
