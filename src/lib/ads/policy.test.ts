@@ -55,5 +55,7 @@ test("Adsterra excludes high-end, premium and frontier tools by their reviewed i
   }
   assert.equal(isAdsterraQualifiedTool(tool({ name: "High End Video Renderer" })), false);
   assert.equal(isAdsterraQualifiedTool(tool({ keywords: ["frontier model"] })), false);
+  assert.equal(isAdsterraQualifiedTool(tool({ description: "Premium video rendering and advanced output quality." })), false);
+  assert.equal(isAdsterraQualifiedTool(tool({ description: "Uses a frontier AI model for generation." })), false);
   assert.equal(isAdsterraQualifiedTool(tool({ name: "AI Studio" })), false);
 });
