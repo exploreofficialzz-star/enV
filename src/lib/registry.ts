@@ -488,6 +488,16 @@ export function getNewTools(limit = 8): ToolMeta[] {
     .slice(0, limit);
 }
 
+const relatedFallbackByCategory = new Map<string, ToolMeta[]>();
+
+function relatedFallbackForCategory(category: string): ToolMeta[] {
+  const cached = relatedFallbackByCategory.get(category);
+  if (cached) return cached;
+  const tools = getToolsByCategory(category);
+  relatedFallbackByCategory.set(category, tools);
+  return tools;
+}
+
 export function getRelatedTools(tool: ToolMeta, limit = 6): ToolMeta[] {
   if (limit <= 0) return [];
   if (tool.category === "accessibility") {
@@ -502,7 +512,7 @@ export function getRelatedTools(tool: ToolMeta, limit = 6): ToolMeta[] {
   // Preserve the existing category-level fallback when a tool has fewer declared
   // suggestions, without reintroducing any ID already shown above.
   const seen = new Set([tool.id, ...related.map((t) => t.id)]);
-  const rest = getToolsByCategory(tool.category).filter(
+  const rest = relatedFallbackForCategory(tool.category).filter(
     (t) => !seen.has(t.id) && t.status !== "planned",
   );
   return [...related, ...rest].slice(0, limit);
