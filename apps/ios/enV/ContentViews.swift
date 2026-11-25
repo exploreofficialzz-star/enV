@@ -1837,6 +1837,21 @@ private struct NativeTokenProfileDetails: View {
                 Text("Numeric estimate: not available until the applicable cost can be measured").font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
             }
             detailRow("Pricing method", value: (profile["pricingMode"] as? String ?? "not specified").replacingOccurrences(of: "-", with: " "))
+            detailRow("Pricing basis", value: (profile["pricingBasis"] as? String ?? "measured-cost-required").replacingOccurrences(of: "-", with: " "))
+            detailRow("Workload tier", value: profile["workloadTier"] as? String ?? "provider-metered")
+            if let usdMicros = profile["proposedUsdMicrosPerUnit"] as? NSNumber, usdMicros.intValue > 0 {
+                Text("USD reference: $\(String(format: "%.6f", usdMicros.doubleValue / 1_000_000.0)) per unit").font(.footnote).foregroundStyle(Color.envMuted)
+            }
+            if let formula = profile["pricingFormula"] as? String {
+                Text(formula).font(.footnote).foregroundStyle(Color.envMuted).fixedSize(horizontal: false, vertical: true)
+            }
+            if let factors = profile["pricingFactors"] as? [String], !factors.isEmpty {
+                detailRow("Cost factors", value: factors.joined(separator: ", "))
+            }
+            if let access = profile["adFreeAccessPrice"] as? [String: Any],
+               let accessSubunits = access["subunitsPerSession"] as? NSNumber {
+                Text("Separate ad-free access fee: \(String(format: "%.3f", accessSubunits.doubleValue / 1000.0)) tokens per session. This is not the operation price.").font(.footnote).foregroundStyle(Color.envMuted)
+            }
             detailRow("Execution model", value: (profile["executionMode"] as? String ?? "tool-dependent").replacingOccurrences(of: "-", with: " "))
             detailRow("Measurement dimensions", value: (profile["meteringDimensions"] as? [String] ?? [unitLabel]).joined(separator: ", "))
             detailRow("Pricing version", value: profile["pricingVersion"] as? String ?? "not specified")
