@@ -339,6 +339,143 @@ export function deriveLocalToolPriceProfile(tool, billingKey, executionMode) {
  * @param {number} costUsdMicros
  * @param {number} marginBps
  */
+
+/**
+ * Calculate preview workload units from untrusted, client-supplied measurements.
+ * This function is for quotes only; production settlement must use measurements
+ * captured by the actual execution handler or a trusted platform attestation.
+ *
+ * Metric values are finite, non-negative numbers. Duration and size units are
+ * explicit in their field names to prevent seconds and bytes from being confused.
+ *
+ * @param {string} unitLabel
+ * @param {Record<string, number>} measurements
+ * @returns {number}
+ */
+export function calculateProposedToolUnits(unitLabel, measurements) {
+  if (!measurements || typeof measurements !== "object" || Array.isArray(measurements)) {
+    throw new TypeError("Tool measurements must be an object.");
+  }
+
+  const metric = (...keys) => {
+    for (const key of keys) {
+      if (!Object.prototype.hasOwnProperty.call(measurements, key)) continue;
+      const value = measurements[key];
+      if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1_000_000_000_000) {
+        throw new RangeError("Measurement '" + key + "' must be a finite non-negative number.");
+      }
+      return value;
+    }
+    return null;
+  };
+  const required = (...keys) => {
+    const value = metric(...keys);
+    if (value === null) throw new RangeError("A required measurement is missing: " + keys.join(" or ") + ".");
+    return value;
+  };
+  const operationCount = () => metric("operationCount", "count", "itemCount") ?? 1;
+  const pixels = () => {
+    const direct = metric("pixelCount", "inputPixels", "processedPixels");
+    if (direct !== null) return direct;
+    const width = required("width", "imageWidth");
+    const height = required("height", "imageHeight");
+    return width * height * (metric("imageCount", "fileCount") ?? 1);
+  };
+  const durationMinutes = (...keys) => required(...keys) / 60;
+  let units;
+
+  switch (unitLabel) {
+    case "calculation":
+    case "fitness-calculation":
+      units = metric("calculationCount", "operationCount", "count") ?? 1;
+      break;
+    case "conversion":
+      units = metric("conversionCount", "operationCount", "count") ?? 1;
+      break;
+    case "file-conversion":
+    case "file-operation":
+      units = metric("fileCount", "itemCount", "operationCount") ?? 1;
+      break;
+    case "10k-characters":
+      units = Math.max(required("inputCharacters"), metric("outputCharacters") ?? 0) / 10_000;
+      break;
+    case "10k-output-characters":
+      units = required("outputCharacters") / 10_000;
+      break;
+    case "megapixel-operation":
+    case "megapixel-scan":
+      units = pixels() / 1_000_000;
+      break;
+    case "audio-minute":
+      units = durationMinutes("audioSeconds", "durationSeconds");
+      break;
+    case "video-minute-720p": {
+      const minutes = durationMinutes("videoSeconds", "durationSeconds");
+      const width = metric("width", "videoWidth");
+      const height = metric("height", "videoHeight");
+      const pixelMultiplier = width !== null && height !== null ? Math.max(1, (width * height) / (1_280 * 720)) : 1;
+      const fps = metric("framesPerSecond", "fps");
+      const frameMultiplier = fps !== null ? Math.max(1, fps / 30) : 1;
+      units = minutes * pixelMultiplier * frameMultiplier;
+      break;
+    }
+    case "10-pages":
+      units = required("pageCount", "pages") / 10;
+      break;
+    case "100-MiB-archive-input":
+      units = required("inputBytes", "archiveBytes") / (100 * 1_048_576);
+      break;
+    case "MiB-input":
+      units = required("inputBytes", "processedBytes") / 1_048_576;
+      break;
+    case "render-minute":
+      units = durationMinutes("renderSeconds", "durationSeconds");
+      break;
+    case "rendered-asset":
+      units = metric("assetCount", "outputCount", "imageCount") ?? 1;
+      break;
+    case "code-generated":
+      units = metric("codeCount", "outputCount") ?? 1;
+      break;
+    case "business-operation":
+      units = metric("recordCount", "documentCount", "operationCount") ?? 1;
+      break;
+    case "security-operation":
+      units = metric("credentialCount", "operationCount", "count") ?? 1;
+      break;
+    case "network-operation":
+      units = metric("lookupCount", "requestCount", "operationCount") ?? 1;
+      break;
+    case "stream-profile-operation":
+    case "video-configuration":
+      units = metric("profileCount", "comparisonCount", "operationCount") ?? 1;
+      break;
+    case "date-time-operation":
+      units = metric("conversionCount", "timezoneCount", "operationCount") ?? 1;
+      break;
+    case "design-operation":
+      units = metric("designOperationCount", "operationCount", "componentCount") ?? 1;
+      break;
+    case "studio-operation":
+      units = metric("workflowCount", "operationCount", "projectCount") ?? 1;
+      break;
+    case "media-minute":
+      units = durationMinutes("mediaSeconds", "durationSeconds");
+      break;
+    case "media-operation":
+      units = operationCount();
+      break;
+    default:
+      units = operationCount();
+      break;
+  }
+
+  if (!Number.isFinite(units) || units < 0 || units > 1_000_000) {
+    throw new RangeError("Calculated tool usage is outside the supported preview range.");
+  }
+  return units;
+}
+
 export function proposedProviderPriceUsdMicros(costUsdMicros, marginBps) {
   if (!Number.isSafeInteger(costUsdMicros) || costUsdMicros < 0) throw new RangeError("Provider cost must be non-negative integer USD micros.");
   if (!Number.isSafeInteger(marginBps) || marginBps < 0 || marginBps >= 10_000) throw new RangeError("Gross margin must be an integer from 0 to 9,999 basis points.");
