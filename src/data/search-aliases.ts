@@ -16,6 +16,7 @@ export const SEARCH_ALIASES: Readonly<Record<string, SearchAliasEntry>> = {
   "pdf-merger": { phrases: ["pdf joiner"], source: "editorial-hypothesis", reviewed: false },
   "image-compressor": { phrases: ["image size reducer", "reduce image size"], source: "editorial-hypothesis", reviewed: false },
   "image-resizer": { phrases: ["change image size"], source: "editorial-hypothesis", reviewed: false },
+  "profile-picture-maker": { phrases: ["picture resize", "profile picture resize", "avatar resize"], source: "editorial-hypothesis", reviewed: false },
   "qr-generator": { phrases: ["qr maker", "qr code maker"], source: "editorial-hypothesis", reviewed: false },
   "json-formatter": { phrases: ["json viewer", "format json online"], source: "editorial-hypothesis", reviewed: false },
   "video-to-mp3": { phrases: ["mp4 to mp3", "convert mp4 to mp3"], source: "editorial-hypothesis", reviewed: false },
@@ -25,5 +26,5 @@ export const SEARCH_ALIASES: Readonly<Record<string, SearchAliasEntry>> = {
   "heic-converter": { phrases: ["iphone photo to jpg", "heic to jpg"], source: "editorial-hypothesis", reviewed: false },
   "file-png-to-jpg-converter": { phrases: ["png to jpeg"], source: "editorial-hypothesis", reviewed: false },
   "lorem-ipsum-generator": { phrases: ["dummy text", "placeholder text"], source: "editorial-hypothesis", reviewed: false },
-  "regex-tester": { phrases: ["test regular expression", "regexp tester"], source: "editorial-hypothesis", reviewed: false },
+  "regex-studio": { phrases: ["test regular expression", "regexp tester"], source: "editorial-hypothesis", reviewed: false },
 };
