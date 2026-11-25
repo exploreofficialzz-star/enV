@@ -273,7 +273,7 @@ private fun NativeTokenGuide(catalog: com.chastech.env.data.Catalog) {
                                 }
                                 Text("Execution model: ${details.optString("executionMode", "tool-dependent").replace('-', ' ')}", style = MaterialTheme.typography.bodySmall)
                                 Text("Measurement dimensions: ${details.optJSONArray("meteringDimensions")?.let { array -> (0 until array.length()).joinToString(", ") { array.optString(it) } } ?: unit}", style = MaterialTheme.typography.bodySmall)
-                                Text("Pricing version: ${details.optString("pricingVersion", "not specified")}", style = MaterialTheme.typography.bodySmall)
+                                Text("Pricing version: ${details.optString("toolPriceVersion", details.optString("pricingVersion", "not specified"))}", style = MaterialTheme.typography.bodySmall)
                                 Text(details.optString("classificationReason", "Generated from catalogue metadata; actual costs have not necessarily been measured."), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 if (details.optBoolean("premiumRequired")) Text("Catalogued premium flag: enabled", style = MaterialTheme.typography.labelSmall)
                                 val aiProfile = details.optString("optionalAiAssistProfile", "")
