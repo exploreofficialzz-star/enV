@@ -1,6 +1,7 @@
 import { defineHandler } from "nitro/h3";
 import { randomUUID } from "node:crypto";
 import { quoteOperation, referenceUsdMicrosForSubunits, TOKEN_SUBUNITS_PER_TOKEN } from "../../../../src/lib/billing/catalog";
+import { calculateProposedToolUnits } from "../../../../src/lib/billing/proposed-pricing.mjs";
 import { hasActiveEntitlement } from "../../../../src/lib/billing/ledger.server";
 import { getToolBillingProfile } from "../../../../src/lib/billing/tool-profiles.server";
 import { getOptionalBillingUserId, isSameOriginRequest, jsonResponse, readJsonObject } from "../../../../src/lib/billing/http.server";
@@ -32,9 +33,24 @@ export default defineHandler(async (event) => {
     toolProfile = undefined;
   }
 
-  const units = body.units === undefined ? 1 : body.units;
-  if (typeof units !== "number" || !Number.isInteger(units) || units < 1 || units > 1_000_000) {
-    return jsonResponse({ ok: false, error: "INVALID_UNITS", message: "Units must be an integer from 1 to 1,000,000." }, 400);
+  let units: number;
+  if (body.measurements !== undefined) {
+    if (!toolProfile || body.units !== undefined) {
+      return jsonResponse({ ok: false, error: "INVALID_MEASUREMENTS", message: "Measurements are supported for a single tool quote; do not combine them with manual units." }, 400);
+    }
+    try {
+      units = calculateProposedToolUnits(toolProfile.unitLabel, body.measurements as Record<string, number>);
+    } catch {
+      return jsonResponse({ ok: false, error: "INVALID_MEASUREMENTS", message: "Provide valid numeric measurements for this tool's stated unit." }, 400);
+    }
+    if (!Number.isFinite(units) || units <= 0 || units > 1_000_000) {
+      return jsonResponse({ ok: false, error: "INVALID_MEASUREMENTS", message: "Measured workload must be greater than zero and within the supported preview range." }, 400);
+    }
+  } else {
+    units = body.units === undefined ? 1 : body.units as number;
+    if (typeof units !== "number" || !Number.isInteger(units) || units < 1 || units > 1_000_000) {
+      return jsonResponse({ ok: false, error: "INVALID_UNITS", message: "Units must be an integer from 1 to 1,000,000." }, 400);
+    }
   }
 
   try {
@@ -60,7 +76,7 @@ export default defineHandler(async (event) => {
             };
           }
           if (Number.isSafeInteger(toolProfile.proposedSubunitsPerUnit) && (toolProfile.proposedSubunitsPerUnit ?? 0) > 0) {
-            const estimatedSubunits = (toolProfile.proposedSubunitsPerUnit as number) * units;
+            const estimatedSubunits = Math.ceil((toolProfile.proposedSubunitsPerUnit as number) * units);
             return {
               operationId: toolProfile.toolId,
               operationName: toolProfile.toolName,
@@ -72,7 +88,8 @@ export default defineHandler(async (event) => {
               estimatedUsdMicros: referenceUsdMicrosForSubunits(estimatedSubunits),
               premiumRequired: toolProfile.premiumRequired,
               pricingVersion: toolProfile.toolPriceVersion,
-              note: "This is a draft per-tool workload rate. The final measured workload may change the amount; no tokens were reserved or charged.",
+              note: body.measurements !== undefined ? "This preview uses client-supplied measurements. Actual settlement must use measurements captured by enV during execution; no tokens were reserved or charged." : "This is a draft per-tool workload rate for one or more stated units. No tokens were reserved or charged.",
+              measurementStatus: body.measurements !== undefined ? "client-supplied-preview" : "unit-count-preview",
             };
           }
           return {
