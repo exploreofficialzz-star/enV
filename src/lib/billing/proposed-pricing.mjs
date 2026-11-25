@@ -184,7 +184,7 @@ export function deriveLocalToolPriceProfile(tool, billingKey, executionMode) {
     factors.push("video configuration parameters and comparison count");
     if (batch) factors.push("multiple profiles or presets");
     pricingFormula = `${subunitsPerUnit} milli-tokens per video configuration or settings operation. Actual file processing uses duration and resolution-based media units.`;
-else if (category === "developer") {
+  } else if (category === "developer") {
     const codeHeavy = has(identity, /\\b(regex|regular expression|compiler|transpil|minif|benchmark|parser|parse|schema|validator)\\b/);
     unitLabel = "10k-characters";
     meteringDimensions = ["input-characters", "output-characters", "parse-complexity", "operation-count"];
