@@ -29,7 +29,8 @@ export default defineHandler((event) => {
       } : null,
       // Return this tool's actual generated resource dimensions and execution class.
       // Shared billing-key estimates remain provisional and must not become charges.
-      billable: approvedPrice !== null,
+      priceApproved: approvedPrice !== null,
+      billingActive: false,
     },
   });
 });
