@@ -87,7 +87,7 @@ Judgments remain AI-authored and unreviewed by a human.
 
 | Phase | Item | Why |
 | --- | --- | --- |
-| 2 | Filters (platform/format/offline/AI/auth), sorting, URL query-state, autocomplete a11y, collections, related-tool rework, no-result UI | UI work; needs the app running (no `node_modules`, no build) |
+| 2 | Discovery filters, sorting and URL query-state were previously implemented only as an isolated helper; per-tool format/offline/AI filters and collections remain unsupported without reliable data | `src/lib/discovery-filters.ts`, `src/lib/discovery-availability.ts`, `src/routes/tools/index.tsx`, `src/routes/__root.tsx` | **PARTLY DONE — pending current CI** — the real `/tools` page now applies category, platform, native-vs-browser-handoff, declared processing, declared sign-in and status filters before search ranking; supports best-match/name/new-labelled-first sorting; encodes/decodes bounded URL state; and marks query/filter/sort states `noindex,follow`. Platform availability derives from the native-execution matrix (classification, not per-tool test proof); virtual Developer Studios use their explicit native projection. Exact format filters, verified-offline filters, AI-assisted filters, collections UI and dedicated autocomplete keyboard/accessibility audits remain open until their data and evidence exist |
 | 2 | Android/iOS parity | G-04 |
 | 2 | Unified Tool Knowledge Index (§2), capability/evidence fields | Needs per-tool source review; the inventory is its identity layer only |
 | 3 | Per-tool guide audit and exact-ID browser/unit/native tests | Needs browsers/devices; physical-device testing is mandatory for camera/Bluetooth/file APIs |
