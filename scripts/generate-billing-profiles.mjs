@@ -241,10 +241,6 @@ const proposalReport = [
 ].join("\n");
 await writeFile(join(root, "docs/billing-proposed-prices-2026-11-25.md"), proposalReport);
 
-const countBy = (key) => Object.fromEntries([...profiles.reduce((map, p) => map.set(p[key], (map.get(p[key]) ?? 0) + 1), new Map())].sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
-const byRule = countBy("billingKey");
-const byExecution = countBy("executionMode");
-const byStatus = countBy("toolStatus");
 const fullCountBy = (key) => Object.fromEntries([...allGeneratedProfiles.reduce((map, profile) => map.set(profile[key], (map.get(profile[key]) ?? 0) + 1), new Map())].sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
 const fullByRule = fullCountBy("billingKey");
 const fullByExecution = fullCountBy("executionMode");
