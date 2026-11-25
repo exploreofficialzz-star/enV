@@ -86,3 +86,41 @@ test("provider cost and margin inputs fail closed when invalid", () => {
   assert.throws(() => proposedProviderPriceUsdMicros(1_000, 10_000), RangeError);
   assert.throws(() => proposedProviderPriceUsdMicros(1.5, 6_000), RangeError);
 });
+
+test("developer tools scale by input text and parser complexity", () => {
+  const formatter = deriveLocalToolPriceProfile(tool({ id: "json-formatter", name: "JSON Formatter", category: "developer" }), "local.general", "local-device");
+  const regex = deriveLocalToolPriceProfile(tool({ id: "regex-studio", name: "Regular Expression Tester", category: "developer" }), "local.general", "local-device");
+  assert.equal(formatter?.unitLabel, "10k-characters");
+  assert.equal(formatter?.subunitsPerUnit, 125);
+  assert.equal(regex?.subunitsPerUnit, 250);
+});
+
+test("security tools distinguish credential tasks from cryptographic data processing", () => {
+  const password = deriveLocalToolPriceProfile(tool({ id: "password-generator", name: "Password Generator", category: "security" }), "local.general", "local-device");
+  const hmac = deriveLocalToolPriceProfile(tool({ id: "hmac-generator", name: "HMAC Signature Generator", category: "security" }), "local.general", "local-device");
+  assert.equal(password?.unitLabel, "security-operation");
+  assert.equal(password?.subunitsPerUnit, 100);
+  assert.equal(hmac?.unitLabel, "MiB-input");
+  assert.equal(hmac?.subunitsPerUnit, 300);
+});
+
+test("QR generation and image scanning use different workload units", () => {
+  const qr = deriveLocalToolPriceProfile(tool({ id: "qr-code-generator", name: "QR Code Generator", category: "qr" }), "local.general", "local-device");
+  const reader = deriveLocalToolPriceProfile(tool({ id: "qr-code-reader", name: "QR Code Reader", category: "qr" }), "local.general", "local-device");
+  assert.equal(qr?.unitLabel, "code-generated");
+  assert.equal(qr?.subunitsPerUnit, 100);
+  assert.equal(reader?.unitLabel, "megapixel-scan");
+  assert.equal(reader?.subunitsPerUnit, 250);
+});
+
+test("mockup, design and content tools have their own output-based units", () => {
+  const mockup = deriveLocalToolPriceProfile(tool({ id: "device-mockup-generator", name: "Device Frame Mockup Generator", category: "mockups" }), "local.general", "local-device");
+  const design = deriveLocalToolPriceProfile(tool({ id: "responsive-layout-builder", name: "Responsive Layout Builder", category: "webdesign" }), "local.general", "local-device");
+  const planner = deriveLocalToolPriceProfile(tool({ id: "travel-itinerary-planner", name: "Travel Itinerary Planner", category: "travel" }), "local.general", "local-device");
+  assert.equal(mockup?.unitLabel, "rendered-asset");
+  assert.equal(mockup?.subunitsPerUnit, 400);
+  assert.equal(design?.unitLabel, "design-operation");
+  assert.equal(design?.subunitsPerUnit, 200);
+  assert.equal(planner?.unitLabel, "10k-output-characters");
+  assert.equal(planner?.subunitsPerUnit, 175);
+});
