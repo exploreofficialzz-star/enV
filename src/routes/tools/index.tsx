@@ -169,9 +169,10 @@ function Tools() {
             <label className="block min-w-0 text-xs font-medium text-muted">
               Status
               <select className={SELECT_CLASS} value={filters.status ?? ""} onChange={(event) => updateFilter("status", event.target.value as DiscoveryFilters["status"] | "")}>
-                <option value="">Active and beta</option>
+                <option value="">Any status</option>
                 <option value="active">Active</option>
                 <option value="beta">Beta</option>
+                <option value="planned">Planned / coming soon</option>
               </select>
             </label>
             <label className="block min-w-0 text-xs font-medium text-muted sm:col-span-2 lg:col-span-1">
