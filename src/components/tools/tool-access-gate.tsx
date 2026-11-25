@@ -27,34 +27,42 @@ export function ToolAccessGate({
   advertisingConsent: "granted" | "denied" | "unset";
   preference: ToolAccessPreference;
   onPreferenceChange: (value: ToolAccessPreference) => void;
-  onContinueWithAdsterra: () => boolean;
+  onContinueWithAdsterra: () => Promise<boolean>;
   onUseTokens: () => Promise<ToolAccessResult>;
   onReleaseTokenAccess: (reservationId: string) => void;
   onUnlocked: (mode: "ads" | "tokens", reservationId?: string) => void;
 }) {
-  const [busy, setBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState<"ads" | "tokens" | null>(null);
+  const busy = busyAction !== null;
   const [feedback, setFeedback] = useState<string | null>(null);
   const [tokenShortage, setTokenShortage] = useState(false);
   const [pendingTokenAccess, setPendingTokenAccess] = useState<Extract<ToolAccessResult, { ok: true }> | null>(null);
 
-  function continueWithAdsterra() {
+  async function continueWithAdsterra() {
     if (busy) return;
     setFeedback(null);
     if (!adsterraAvailable) {
       setFeedback("Adsterra-supported access is unavailable right now. Sign in to check an approved token option.");
       return;
     }
-    if (!onContinueWithAdsterra()) {
-      setFeedback("Your advertising choice could not be saved in this browser. Check site storage and try again.");
-      return;
-    }
     onPreferenceChange("ads");
-    onUnlocked("ads");
+    setBusyAction("ads");
+    try {
+      if (!await onContinueWithAdsterra()) {
+        setFeedback("An Adsterra placement could not load. This tool remains locked. Try again or sign in to use approved tokens.");
+        return;
+      }
+      onUnlocked("ads");
+    } catch {
+      setFeedback("An Adsterra placement could not be verified as loaded. This tool remains locked. Try again or sign in to use approved tokens.");
+    } finally {
+      setBusyAction(null);
+    }
   }
 
   async function useTokens() {
     if (!user || busy) return;
-    setBusy(true);
+    setBusyAction("tokens");
     setFeedback(null);
     setTokenShortage(false);
     try {
@@ -67,7 +75,7 @@ export function ToolAccessGate({
     } catch {
       setFeedback("Token access could not be verified. No tokens were charged.");
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
@@ -78,7 +86,7 @@ export function ToolAccessGate({
         <h2 className="text-lg font-semibold text-fg">Continue to {toolName}</h2>
         <p className="text-sm leading-6 text-muted">
           Continue free with Adsterra-supported access, or sign in to use an approved enV token price.
-          Adsterra does not provide enV with a per-user rewarded-video completion signal. The optional ad-free offer is based on ad-supported visits where a placement script loads, not on verified impressions or videos watched.
+          This tool unlocks only after an Adsterra placement script loads. A successful script load is not a verified impression or video completion.
         </p>
       </div>
 
@@ -93,7 +101,7 @@ export function ToolAccessGate({
               disabled={busy}
               className="min-h-11 rounded-lg bg-fg px-4 py-2 text-sm font-semibold text-bg disabled:cursor-wait disabled:opacity-60"
             >
-              {advertisingConsent === "granted" ? "Continue with Adsterra" : "Allow Adsterra and continue"}
+              {busyAction === "ads" ? "Loading Adsterra placement…" : advertisingConsent === "granted" ? "Continue with Adsterra" : "Allow Adsterra and continue"}
             </button>
           ) : null}
 
@@ -113,7 +121,7 @@ export function ToolAccessGate({
               disabled={busy}
               className="min-h-11 rounded-lg border border-border px-4 py-2 text-sm font-semibold text-fg hover:bg-surface-2 disabled:cursor-wait disabled:opacity-60"
             >
-              {busy ? "Checking token balance…" : "Continue with enV tokens"}
+              {busyAction === "tokens" ? "Checking token balance…" : "Continue with enV tokens"}
             </button>
           ) : (
             <>
