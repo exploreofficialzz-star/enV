@@ -8,6 +8,7 @@ export type AdEnvironment = { toolIds?: string };
 export type AdEligibleTool = {
   id: string;
   name?: string;
+  description?: string;
   category: string;
   subcategory?: string;
   keywords?: string[];
@@ -50,7 +51,7 @@ function parseAllowedToolIds(value?: string): Set<string> {
 export function isAdsterraQualifiedTool(tool: AdEligibleTool): boolean {
   const category = tool.category.toLowerCase();
   const descriptiveIdentity = [
-    category, tool.id, tool.name ?? "", tool.subcategory ?? "", tool.engine.id ?? "",
+    category, tool.id, tool.name ?? "", tool.description ?? "", tool.subcategory ?? "", tool.engine.id ?? "",
     ...(tool.tags ?? []), ...(tool.keywords ?? []),
   ].join(" ").replace(/[-_]+/g, " ");
   return tool.status === "active" &&
