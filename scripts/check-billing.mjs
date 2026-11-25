@@ -213,6 +213,8 @@ assert.match(toolShell, /What this tool does/, "tool purpose section must remain
 assert.doesNotMatch(toolShell, /section\.steps\?\.length/, "tool detail pages must not render guide steps inline");
 assert.doesNotMatch(toolShell, /section\.bullets\?\.length/, "tool detail pages must not render guide lists inline");
 assert.match(toolShell, /href=\{toolDocumentationPath\(tool\)\}[\s\S]*?Read the full guide/, "tool purpose section must link to the separate full guide");
+assert.match(toolShell, /to="\\/tokens\\/\\$toolId"[\\s\\S]*?Token details/, "every tool detail page must link to its own per-tool token profile");
+assert.match(tokenGuidePage, /Tool-by-tool token explanations/, "the individual per-tool billing guide must remain discoverable.");
 assert.ok(toolShell.indexOf("Read the full guide") > toolShell.indexOf("{tool.description}"), "the guide link must follow the tool description");
 assert.match(androidToolScreens, /padding\(start = if \(compact\) 56\.dp else 0\.dp\)/, "Android mobile descriptions should align beneath the tool title");
 assert.match(iosToolScreens, /\.padding\(\.leading, compact \? 56 : 0\)/, "iOS mobile descriptions should align beneath the tool title");
