@@ -57,7 +57,7 @@ Before live billing is enabled, each chargeable handler must:
 6. Settle using recorded actual cost and the published margin rule, releasing unused reservation. Pause for explicit approval if work would exceed the authorized reservation.
 7. Refund or release tokens under explicit failed-job and cancellation rules; reconcile ledger totals against provider and store reports.
 
-The quote endpoint deliberately accepts `toolId` or `operationId` and not a client-provided provider cost. For local tools it returns the selected tool ID’s own proposed unit/rate and a provisional estimate; variable remote/AI work is never given a guessed generic category amount. Premium access is derived from server-side entitlement state when auth is configured; a client-supplied premium flag is never trusted. The current response always marks `billingActive: false`.
+The quote endpoint deliberately accepts `toolId` or `operationId` and not a client-provided provider cost. For local tools it returns the selected tool ID’s own proposed unit/rate and a provisional estimate; variable remote/AI work is never given a guessed generic category amount. It may accept numeric input measurements for a preview, but these are explicitly marked client-supplied and must never be used as settlement evidence. The actual execution handler must capture the completed workload and pass trusted measurements to the server ledger. Premium access is derived from server-side entitlement state when auth is configured; a client-supplied premium flag is never trusted. The current response always marks `billingActive: false`.
 
 ## Security and accounting requirements
 
