@@ -57,7 +57,7 @@ assert.match(gate, /onReleaseTokenAccess/, "The access gate must release an unco
 assert.match(gate, /Continue with Adsterra/, "Visitors must receive an explicit Adsterra continue action.");
 assert.match(gate, /Create an enV account/, "Guests without the ad-supported route must be able to create an account.");
 assert.match(gate, /Sign in/, "Guests without the ad-supported route must be able to sign in.");
-assert.match(gate, /Adsterra does not provide enV with a per-user rewarded-video completion signal/, "The Web gate must not misrepresent Adsterra events as rewarded-video completion.");
+assert.match(gate, /This tool unlocks only after an Adsterra placement script loads/, "The Web gate must state its placement-load requirement.");
 assert.match(gate, /3 ad-supported visits/, "The token offer must be labelled as three ad-supported visits.");
 assert.match(gate, /not a verified impression or video completion/, "The access gate must not misrepresent a loaded placement as a verified impression or reward.");
 assert.match(gate, /current visit stays free/, "Choosing tokens from the offer must not charge the already-unlocked visit.");
