@@ -37,10 +37,11 @@ test("every runtime related array contains only canonical active searchable targ
   const violations: string[] = [];
   for (const tool of getAllTools()) {
     if (tool.status === "planned") continue;
+    const canonicalToolId = getToolById(tool.id)?.id ?? tool.id;
     const ids = tool.related ?? [];
     if (new Set(ids).size !== ids.length) violations.push(tool.id + ": duplicate related IDs");
     for (const id of ids) {
-      if (id === tool.id) violations.push(tool.id + ": self-reference");
+      if (id === tool.id || id === canonicalToolId) violations.push(tool.id + ": self-reference");
       const target = getToolById(id);
       if (!target) {
         violations.push(tool.id + "->" + id + ": unresolved target");
