@@ -172,7 +172,7 @@ assert.match(quoteRoute, /requires-cost-measurement/, "unapproved tools must not
 assert.match(quoteRoute, /meteringDimensions: toolProfile\.meteringDimensions/, "tool quotes must expose their cost drivers");
 assert.match(quoteRoute, /executionMode: toolProfile\.executionMode/, "tool quotes must expose their execution mode");
 assert.match(toolProfileRoute, /approvedPrice/, "the per-tool profile endpoint must identify individually approved prices");
-assert.match(toolProfileRoute, /meteringDimensions/, "the per-tool profile endpoint must return cost dimensions");
+assert.match(toolProfileRoute, /\.\.\.toolBillingProfile/, "the per-tool profile endpoint must return the complete per-tool profile, including cost dimensions");
 assert.match(toolProfileRoute, /priceApproved: approvedPrice !== null/, "an approved price must not imply production charging is active");
 assert.match(quoteRoute, /priceStatus: approvedToolPrice \? "approved"/, "quotes must distinguish approved rates from provisional cost classes");
 assert.match(toolProfileServer, /billing-profiles\.json/, "the server must load full per-tool profiles, not only generic index rates");
