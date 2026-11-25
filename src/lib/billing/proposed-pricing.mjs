@@ -219,7 +219,7 @@ export function deriveLocalToolPriceProfile(tool, billingKey, executionMode) {
     factors.push("generated or transformed output length", "number of generated items and workflow steps");
     if (batch) factors.push("multi-item output batch");
     pricingFormula = `${subunitsPerUnit} milli-tokens per 10,000 output characters; item count and workflow steps scale the workload.`;
-else if (category === "files") {
+  } else if (category === "files") {
     unitLabel = "file-operation";
     meteringDimensions = ["input-bytes", "file-count", "output-bytes"];
     subunitsPerUnit = heavy ? 350 : 150;
