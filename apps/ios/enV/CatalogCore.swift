@@ -1158,10 +1158,15 @@ extension Catalog {
     func relatedTools(for tool: Tool, limit: Int = 6) -> [Tool] {
         guard limit > 0 else { return [] }
 
-        // Include the complete native catalogue (including Web-only related references) and
-        // canonical Studio projections, while making the lookup safe for repeated IDs.
+        // Resolve ordinary catalogue destinations as well as Studio projections. Web-only
+        // references are stored separately for native catalogues and must remain resolvable here.
+        // Legacy Accessibility variants are represented by their canonical Studio projection;
+        // the retired audio alias resolves to the canonical Song Metadata Analyzer below.
+        let catalogueCandidates = (tools + (relatedReferenceTools ?? [])).filter {
+            $0.category != "accessibility" && $0.id != "audio-analyze-studio"
+        }
         var candidateIDs = Set<String>()
-        let candidates = (accessibilityDiscoveryTools() + developerStudioTools())
+        let candidates = (catalogueCandidates + accessibilityDiscoveryTools() + developerStudioTools())
             .filter { candidateIDs.insert($0.id).inserted }
         let byID = Dictionary(uniqueKeysWithValues: candidates.map { ($0.id, $0) })
         var seen = Set([tool.id])
