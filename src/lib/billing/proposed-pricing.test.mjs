@@ -124,3 +124,15 @@ test("mockup, design and content tools have their own output-based units", () =>
   assert.equal(planner?.unitLabel, "10k-output-characters");
   assert.equal(planner?.subunitsPerUnit, 175);
 });
+
+test("local AI-category templates, business operations and video settings have distinct tariffs", () => {
+  const aiTemplate = deriveLocalToolPriceProfile(tool({ id: "caption-generator", name: "Caption Generator", category: "ai" }), "local.general", "local-device");
+  const business = deriveLocalToolPriceProfile(tool({ id: "invoice-generator", name: "Invoice Generator", category: "business" }), "local.general", "local-device");
+  const videoSettings = deriveLocalToolPriceProfile(tool({ id: "video-codec-lookup", name: "Video Codec Lookup", category: "video" }), "local.general", "local-device");
+  assert.equal(aiTemplate?.unitLabel, "1k-generated-characters");
+  assert.equal(aiTemplate?.subunitsPerUnit, 150);
+  assert.equal(business?.unitLabel, "business-operation");
+  assert.equal(business?.subunitsPerUnit, 225);
+  assert.equal(videoSettings?.unitLabel, "video-configuration");
+  assert.equal(videoSettings?.subunitsPerUnit, 125);
+});
