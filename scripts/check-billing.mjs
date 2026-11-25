@@ -198,7 +198,7 @@ assert.equal(runtimeExtensionProfileIndex.toolCount, runtimeExtensionProfileInde
 assert.equal(runtimeExtensionProfileIds.size, runtimeExtensionProfileIndex.profiles.length, "runtime-extension profile IDs must be unique");
 const expectedExtensionIds = [...new Set([...(nativeInventory.runtimeExtensionIds ?? []), ...DATETIME_TOOL_EXTENSIONS.map((tool) => tool.id)])].filter((id) => !new Set(runtimeCatalog.map((tool) => tool.id)).has(id)).sort();
 assert.deepEqual([...runtimeExtensionProfileIds].sort(), expectedExtensionIds, "supplemental billing profiles must exactly cover native runtime extensions missing from the catalogue");
-assert.ok(runtimeExtensionProfileIndex.profiles.every((profile) => profile.billingKey && profile.pricingMode && profile.manualAuditRequired === true && profile.priceStatus === "provisional"), "runtime extensions require explicit, provisional, ad-free billing profiles");
+assert.ok(runtimeExtensionProfileIndex.profiles.every((profile) => profile.billingKey && profile.pricingMode && profile.manualAuditRequired === true && profile.priceStatus === "provisional"), "runtime extensions require explicit provisional billing profiles");
 const sceneStudioBillingProfile = runtimeExtensionProfileIndex.profiles.find((profile) => profile.toolId === "scene-studio");
 assert.ok(sceneStudioBillingProfile, "Scene Studio must have a runtime-extension billing profile");
 assert.equal(sceneStudioBillingProfile.toolStatus, "active");
@@ -217,7 +217,9 @@ assert.equal(aBookBillingProfile.premiumRequired, false, "A book's local notes a
 
 assert.equal(profiles.profiles.length, profiles.toolCount, "profile count must match generated header");
 assert.equal(new Set(profiles.profiles.map((profile) => profile.toolId)).size, profiles.toolCount, "tool billing profiles must have unique IDs");
-assert.ok(profiles.profiles.every((profile) => profile.manualAuditRequired === true && profile.adsEligible === false && profile.priceStatus === "provisional"), "every generated row must be provisional, manually audited and ad-free");
+assert.ok(profiles.profiles.every((profile) => profile.manualAuditRequired === true && profile.priceStatus === "provisional"), "every generated row must be provisional and manually audited");
+assert.ok(profiles.profiles.every((profile) => Array.isArray(profile.meteringDimensions) && profile.meteringDimensions.length > 0), "every catalogue tool needs its own explicit cost-driver dimensions");
+assert.ok(runtimeExtensionProfileIndex.profiles.every((profile) => Array.isArray(profile.meteringDimensions) && profile.meteringDimensions.length > 0), "every runtime extension needs its own explicit cost-driver dimensions");
 assert.equal(profileIndex.toolCount, profiles.toolCount, "runtime index count must match full audit");
 assert.equal(profileIndex.profiles.length, profiles.toolCount, "base runtime index must include every base-catalogue tool");
 assert.equal(new Set(profileIndex.profiles.map((profile) => profile.toolId)).size, profileIndex.toolCount, "runtime tool profile IDs must be unique");
@@ -621,7 +623,7 @@ assert.match(tokenUsageService, /where user_id = \$1 and entry_type = 'settlemen
 assert.match(tokenUsageService, /ue\.billing_key = r\.operation_id/, "confirmed deduction records must resolve tool identity through billing-operation metadata where necessary");
 assert.match(androidPricing, /"token-dashboard" -> NativeTokenDashboard\(onOpenWallet\)/, "Android token dashboard wallet navigation must remain native");
 assert.match(iosPricing, /case "token-dashboard": NativeTokenDashboardView\(\)/, "iOS Home shortcut must open its native token dashboard");
-assert.match(pricingPage, /No advertising/);
+assert.match(pricingPage, /Adsterra appears only on eligible standard tools/);
 assert.match(pricingPage, /100 tokens = \$1\.00/);
 assert.match(androidPricing, /100 tokens ≈ \$1\.00 USD/);
 assert.match(iosPricing, /100 tokens ≈ \$1\.00 USD/);
