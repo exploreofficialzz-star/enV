@@ -167,6 +167,14 @@ assert.match(iosWalletApi, /fetchWalletHistoryPage/);
 assert.match(iosPricing, /case "history": NativeWalletHistoryView\(\)/);
 assert.match(iosPricing, /View full transaction history/);
 assert.match(quoteRoute, /getToolBillingProfile/);
+assert.match(quoteRoute, /getApprovedToolAccessPrice/, "tool quotes must use individually approved prices");
+assert.match(quoteRoute, /requires-cost-measurement/, "unapproved tools must not receive a generic category-level price");
+assert.match(quoteRoute, /meteringDimensions: toolProfile\.meteringDimensions/, "tool quotes must expose their cost drivers");
+assert.match(quoteRoute, /executionMode: toolProfile\.executionMode/, "tool quotes must expose their execution mode");
+assert.match(toolProfileServer, /billing-profile-index\.json/, "the server must use the enriched per-tool runtime index");
+assert.match(toolProfileRoute, /meteringDimensions/, "the per-tool profile endpoint must return cost dimensions");
+assert.match(toolProfileRoute, /approvedPrice/, "the per-tool profile endpoint must identify individually approved prices");
+assert.match(toolProfileRoute, /adsEligible: _legacyAdsEligible/, "advertising eligibility must remain outside the billing profile");
 assert.match(quoteRoute, /meteringDimensions: toolProfile\.meteringDimensions/, "tool quotes must expose their own cost drivers");
 assert.match(quoteRoute, /executionMode: toolProfile\.executionMode/, "tool quotes must expose their own execution mode");
 assert.match(toolProfileServer, /billing-profiles\.json/, "the server must load full per-tool profiles, not only generic index rates");
@@ -231,6 +239,7 @@ assert.equal(profileIndex.toolCount, profiles.toolCount, "runtime index count mu
 assert.equal(profileIndex.profiles.length, profiles.toolCount, "base runtime index must include every base-catalogue tool");
 assert.equal(new Set(profileIndex.profiles.map((profile) => profile.toolId)).size, profileIndex.toolCount, "runtime tool profile IDs must be unique");
 assert.ok(profileIndex.profiles.every((profile) => profile.billingKey && profile.pricingMode), "all runtime profiles require billing classification");
+assert.ok(profileIndex.profiles.every((profile) => profile.toolName && Array.isArray(profile.meteringDimensions) && profile.meteringDimensions.length > 0 && profile.executionMode && profile.priceStatus), "runtime index must preserve per-tool cost drivers and execution class");
 for (const [platform, ids] of [["Android", nativeInventory.androidToolIds], ["iOS", nativeInventory.iosToolIds]]) {
   assert.ok(Array.isArray(ids) && ids.length > 0, `${platform} native inventory must be present`);
   assert.equal(new Set(ids).size, ids.length, `${platform} tool IDs must be unique`);
