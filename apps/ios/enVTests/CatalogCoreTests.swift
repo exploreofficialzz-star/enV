@@ -309,4 +309,33 @@ final class CatalogCoreTests: XCTestCase {
         XCTAssertTrue(ics.contains("UID:8734b83babcc1f0d@envtools.store"))
     }
 
+
+    func testNativeAdEligibilityExcludesStudioLabSandboxAndPremiumFrontierTools() {
+        func adTool(
+            id: String = "video-settings",
+            name: String = "Video Settings",
+            description: String = "Configure local playback settings.",
+            category: String = "video",
+            tags: [String] = [],
+            keywords: [String] = []
+        ) -> Tool {
+            Tool(
+                id: id, name: name, slug: id, description: description, category: category,
+                subcategory: nil, keywords: keywords, tags: tags, icon: "Video",
+                popularity: 0, featured: false, clientSide: true, requiresBackend: false,
+                requiresAuth: false, status: "active", disclaimer: nil, related: [],
+                engine: ToolEngine(type: "video", id: id, op: nil)
+            )
+        }
+
+        XCTAssertTrue(NativeAdsPolicy.isAdEligibleTool(adTool()))
+        XCTAssertFalse(NativeAdsPolicy.isAdEligibleTool(adTool(category: "studio")))
+        XCTAssertFalse(NativeAdsPolicy.isAdEligibleTool(adTool(category: "labs")))
+        XCTAssertFalse(NativeAdsPolicy.isAdEligibleTool(adTool(description: "A sandbox for local experiments.")))
+        XCTAssertFalse(NativeAdsPolicy.isAdEligibleTool(adTool(description: "A high-end video renderer.")))
+        XCTAssertFalse(NativeAdsPolicy.isAdEligibleTool(adTool(description: "Premium video processing.")))
+        XCTAssertFalse(NativeAdsPolicy.isAdEligibleTool(adTool(tags: ["frontier"])))
+        XCTAssertFalse(NativeAdsPolicy.isAdEligibleTool(adTool(keywords: ["frontier model"])))
+    }
+
 }
