@@ -131,7 +131,20 @@ function profile(tool) {
   }
 
   const rule = ruleById.get(billingKey);
-  if (!rule) throw new Error(`No metering rule '${billingKey}' for tool ${tool.id}`);
+  if (!rule) throw new Error("No metering rule: " + billingKey + " for tool " + tool.id);
+  const localPrice = deriveLocalToolPriceProfile(tool, billingKey, executionMode);
+  const isDirectAi = tool.engine?.type === "ai";
+  const priceStatus = localPrice ? "provisional" : "requires-cost-measurement";
+  const pricingBasis = localPrice
+    ? localPrice.pricingBasis
+    : isDirectAi ? "provider-model-rate-card" : "provider-invoice-and-infrastructure-cost";
+  const pricingFormula = localPrice
+    ? localPrice.pricingFormula
+    : isDirectAi
+      ? "Measured input/output tokens, audio seconds or compute seconds multiplied by the selected model rate; include retries and fallbacks. The draft sell price uses the provisional margin."
+      : "Measured processor invoice plus allocated CPU, memory, processing time, storage and bandwidth; no fixed fee before cost capture.";
+  const profileDimensions = localPrice?.meteringDimensions ?? meteringDimensions;
+  const proposedSubunitsPerUnit = localPrice?.subunitsPerUnit ?? null;
   return {
     toolId: tool.id,
     toolName: tool.name,
@@ -143,15 +156,25 @@ function profile(tool) {
     executionMode,
     billingKey,
     pricingMode: rule.pricingMode,
-    provisionalSubunitsPerUnit: rule.subunitsPerUnit ?? null,
-    unitLabel: rule.unitLabel,
-    meteringDimensions,
-    optionalAiAssistProfile: tool.engine?.type === "ai" ? "ai.standard" : null,
-    premiumRequired: false,
-    priceStatus: "provisional",
+    provisionalSubunitsPerUnit: proposedSubunitsPerUnit,
+    proposedSubunitsPerUnit,
+    proposedTokensPerUnit: localPrice?.tokensPerUnit ?? null,
+    proposedUsdMicrosPerUnit: localPrice?.usdMicrosPerUnit ?? null,
+    unitLabel: localPrice?.unitLabel ?? rule.unitLabel,
+    meteringDimensions: profileDimensions,
+    workloadTier: localPrice?.workloadTier ?? (isDirectAi ? "provider-metered" : "infrastructure-metered"),
+    pricingBasis,
+    pricingFormula,
+    pricingFactors: localPrice?.pricingFactors ?? (isDirectAi
+      ? ["provider/model input-output rates", "audio/compute usage when applicable", "attempts, retries and fallbacks"]
+      : ["provider/infrastructure invoice", "measured CPU and memory allocation", "input/output bytes, elapsed time, storage and egress"]),
+    optionalAiAssistProfile: null,
+    premiumRequired: premiumRequired || rule.premiumRequired === true,
+    priceStatus,
     manualAuditRequired: true,
     classificationReason,
     pricingVersion: PRICING_VERSION,
+    toolPriceVersion: TOOL_PRICE_PROPOSAL_VERSION,
   };
 }
 
