@@ -379,7 +379,8 @@ for (const tool of virtualStudios) canonicalRelatedTargets.set(tool.id, tool);
 canonicalRelatedTargets.set("audio-analyze-studio", songMetadataAnalyzerTool);
 
 const allTools: ToolMeta[] = canonicalRuntimeTools.map((tool) => {
-  const seen = new Set<string>([tool.id]);
+  const canonicalToolId = canonicalRelatedTargets.get(tool.id)?.id ?? tool.id;
+  const seen = new Set<string>([tool.id, canonicalToolId]);
   const related: string[] = [];
   for (const relatedId of tool.related ?? []) {
     const target = canonicalRelatedTargets.get(relatedId);
