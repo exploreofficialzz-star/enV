@@ -282,6 +282,18 @@ export function deriveLocalToolPriceProfile(tool, billingKey, executionMode) {
     factors.push("generated or transformed output length", "number of generated items and workflow steps");
     if (batch) factors.push("multi-item output batch");
     pricingFormula = `${subunitsPerUnit} milli-tokens per 10,000 output characters; item count and workflow steps scale the workload.`;
+  } else if (category === "media" || category === "media-tools") {
+    unitLabel = heavy ? "media-minute" : "media-operation";
+    meteringDimensions = ["duration-seconds", "input-bytes", "output-bytes", "resolution-if-relevant", "operation-count"];
+    subunitsPerUnit = heavy ? 1_250 : 250;
+    if (batch) subunitsPerUnit += 250;
+    workloadTier = heavy || batch ? "intensive" : "standard";
+    factors.push("media duration and input/output size");
+    if (heavy) factors.push("resource-intensive processing or encoding");
+    if (batch) factors.push("batch or multi-file processing");
+    pricingFormula = heavy
+      ? `${subunitsPerUnit} milli-tokens per media-minute; actual duration, resolution and codec determine the total units.`
+      : `${subunitsPerUnit} milli-tokens per media operation; large files and measured duration increase the workload.`;
   } else if (category === "files") {
     unitLabel = "file-operation";
     meteringDimensions = ["input-bytes", "file-count", "output-bytes"];
