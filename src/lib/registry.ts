@@ -359,10 +359,38 @@ const catalogRuntimeTools: ToolMeta[] = [
 // its single canonical discovery destination is the Accessibility Studio.
 const accessibilityStudios = makeAccessibilityStudioTools(catalogRuntimeTools);
 const accessibilityStudioById = new Map(accessibilityStudios.map((tool) => [tool.id, tool] as const));
-const allTools: ToolMeta[] = catalogRuntimeTools.map((tool) => accessibilityStudioById.get(tool.id) ?? tool);
-const byId = new Map(allTools.map((t) => [t.id, t]));
-const developerStudios = makeDeveloperStudioTools(allTools);
+const canonicalRuntimeTools = catalogRuntimeTools.map((tool) => accessibilityStudioById.get(tool.id) ?? tool);
+const developerStudios = makeDeveloperStudioTools(canonicalRuntimeTools);
 const virtualStudios = [...accessibilityStudios, ...developerStudios];
+
+// Normalize declared related IDs once for every Web runtime tool. A related link is
+// retained only when its destination resolves to a unique, active, searchable canonical
+// record. Legacy Accessibility IDs and the retired audio-analyze-studio alias are
+// translated before validation so native exports can consume the same destinations.
+const canonicalRelatedTargets = new Map<string, ToolMeta>();
+for (const tool of catalogRuntimeTools) {
+  const canonical = tool.category === "accessibility"
+    ? studioToolForLegacy(tool, catalogRuntimeTools)
+    : tool;
+  canonicalRelatedTargets.set(tool.id, canonical);
+  canonicalRelatedTargets.set(canonical.id, canonical);
+}
+for (const tool of virtualStudios) canonicalRelatedTargets.set(tool.id, tool);
+canonicalRelatedTargets.set("audio-analyze-studio", songMetadataAnalyzerTool);
+
+const allTools: ToolMeta[] = canonicalRuntimeTools.map((tool) => {
+  const seen = new Set<string>([tool.id]);
+  const related: string[] = [];
+  for (const relatedId of tool.related ?? []) {
+    const target = canonicalRelatedTargets.get(relatedId);
+    if (!target || target.status === "planned" || target.id === "audio-analyze-studio" || seen.has(target.id)) continue;
+    seen.add(target.id);
+    related.push(target.id);
+  }
+  if (related.length === (tool.related ?? []).length && related.every((id, index) => id === tool.related?.[index])) return tool;
+  return { ...tool, related };
+});
+const byId = new Map(allTools.map((t) => [t.id, t]));
 // Keep every former category/slug URL as an alias to the one canonical Studio
 // record. Aliases are routes, not additional tool identities or search records.
 const legacyAccessibilityRoutes = catalogRuntimeTools.filter((tool) => accessibilityStudioById.has(tool.id));
