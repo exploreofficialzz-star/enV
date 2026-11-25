@@ -82,6 +82,8 @@ assert.match(progressTest, /three ad-supported visits/, "The three-visit cadence
 assert.match(policy, /function isAdsterraQualifiedTool/, "The Adsterra eligibility policy must remain a separate Web policy.");
 assert.match(policy, /RESTRICTED_CATEGORIES/, "The shared ad policy must exclude sensitive categories.");
 assert.match(policy, /ADSTERRA_EXCLUDED_CONCEPTS/, "The shared ad policy must exclude Studio/AI/Lab/Sandbox experiences.");
+assert.match(policy, /tool\.description \?\? ""/, "Web ad exclusions must inspect full tool descriptions.");
+assert.match(policyTests, /description: "Premium video rendering/, "Web ad exclusions need a description-only premium regression test.");
 assert.match(policy, /high\[- \]\?end\|premium\|frontier/, "High-end, premium and frontier tools must remain excluded from Adsterra.");
 assert.match(policy, /isHybridAccessToolId/, "The selected hybrid cohort must retain its independent offline allowance boundary.");
 assert.match(policy, /isPaidHybridAccessToolId/, "The paid token cohort must remain separate from ad rendering.");
