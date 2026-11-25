@@ -1590,6 +1590,7 @@ struct NativeInformationPageView: View {
 
     private var pageTitle: String {
         switch pageID {
+        case let id where id.hasPrefix("token-tool:"): return "Token details"
         case "about": return "About enV"
         case "pricing": return "Pricing"
         case "contact": return "Contact"
@@ -1674,6 +1675,11 @@ struct NativeInformationPageView: View {
         case "report-bugs": NativeFeedbackRequestView(isBugReport: true)
         case "suggest-tool": NativeFeedbackRequestView(isBugReport: false)
         case "help": NativeInfoSectionView(title: "enV Help Center", paragraphs: ["Browse the tool catalog or use Search tools to find an action by name or task.", "Open a tool to see its inputs, permissions, and available outputs. Some tools run on-device; AI and hosted processors require a configured connection.", "For account, access, or product questions, use Contact from More options."])
+        case let id where id.hasPrefix("token-tool:"):
+            NativeTokenGuideView(
+                tools: store.catalog.tools + (store.catalog.relatedReferenceTools ?? []),
+                initialToolID: String(id.dropFirst("token-tool:".count))
+            )
         case "token-guide": NativeTokenGuideView(tools: store.catalog.tools + (store.catalog.relatedReferenceTools ?? []))
         case "token-dashboard": NativeTokenDashboardView()
         case "account": VStack(alignment: .leading, spacing: 14) {
@@ -1703,10 +1709,15 @@ private struct NativeTokenGuideView: View {
     @State private var isLoadingProfile = false
     @State private var profileError: String?
 
-    init(tools: [Tool]) {
+    init(tools: [Tool], initialToolID: String? = nil) {
         var unique: [String: Tool] = [:]
         for tool in tools where unique[tool.id] == nil { unique[tool.id] = tool }
-        self.tools = unique.values.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        let sortedTools = unique.values.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        self.tools = sortedTools
+        let initialToolName = initialToolID.flatMap { id in sortedTools.first(where: { $0.id == id })?.name } ?? ""
+        _query = State(initialValue: initialToolName)
+        _selectedToolID = State(initialValue: initialToolID)
+        _visibleCount = State(initialValue: initialToolID == nil ? 36 : 1)
     }
 
     private var categories: [String] {
