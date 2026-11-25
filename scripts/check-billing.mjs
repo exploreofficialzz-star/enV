@@ -179,6 +179,7 @@ assert.match(quoteRoute, /getToolBillingProfile/);
 assert.match(quoteRoute, /proposedSubunitsPerUnit/, "tool quotes must use per-tool operation tariffs rather than the access-session registry");
 assert.match(quoteRoute, /calculateProposedToolUnits/, "tool quotes must convert measured preview inputs into the selected tool billing unit");
 assert.match(quoteRoute, /client-supplied-preview/, "client-supplied measurements must remain preview-only, not settlement evidence");
+assert.match(quoteRoute, /Math\.ceil\(/, "fractional measured units must round up to integer milli-token subunits");
 assert.match(quoteRoute, /Math\.ceil\(\(toolProfile\.proposedSubunitsPerUnit as number\) \* units\)/, "fractional measured units must round up to integer milli-token subunits");
 assert.match(quoteRoute, /status: "provisional"/, "local workload quotes must be clearly provisional");
 assert.match(toolProfileRoute, /proposedPrice/, "the profile endpoint must return the tool-specific proposed tariff");
