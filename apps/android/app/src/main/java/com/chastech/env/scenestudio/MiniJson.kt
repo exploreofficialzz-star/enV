@@ -23,7 +23,7 @@ object MiniJson {
     }
 
     private class Parser(private val s: String) {
-        private var i = if (s.startsWith("﻿")) 1 else 0
+        private var i = if (s.startsWith("\uFEFF")) 1 else 0
 
         fun atEnd() = i >= s.length
 
