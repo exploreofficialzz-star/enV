@@ -150,6 +150,7 @@ import com.chastech.env.data.withZipArchive
 import com.chastech.env.data.withFileWorkspaceTools
 import com.chastech.env.data.withDateTimeExtensions
 import com.chastech.env.data.search
+import com.chastech.env.data.webSearch
 import com.chastech.env.engine.NativeAudioEngine
 import com.chastech.env.engine.NativeAudioWavProcessor
 import com.chastech.env.engine.NativeCalculatorEngine

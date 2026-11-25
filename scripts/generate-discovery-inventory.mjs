@@ -19,6 +19,7 @@ import { CATEGORIES } from "../src/data/categories.ts";
 import { tools as sourceCatalogTools } from "../src/data/catalog.ts";
 import { getAllTools, getSearchableTools, getToolById, getToolByPath, getToolsByCategory, toolPath } from "../src/lib/registry.ts";
 import { canonicalToolPath, createCanonicalSeoToolResolver, isIndexableTool } from "../src/lib/seo-metadata.ts";
+import { businessStudioAnchorSlug } from "../src/lib/business-studios-catalog.ts";
 import { isGenericWorkflowPlaceholder } from "../src/lib/generic-workflow-policy.mjs";
 import { isAccessibilityLegacyVariant, makeAccessibilityStudioTools, studioToolForLegacy } from "../src/lib/accessibility-studios.ts";
 import { makeDeveloperStudioTools } from "../src/lib/developer-studios-catalog.ts";
@@ -109,9 +110,17 @@ export function collectInventoryInputs() {
     },
   };
 
+  // Mirror the actual route loader: Business Studio paths are dynamic router
+  // aliases whose visible page is backed by that Studio's registered anchor tool.
+  // Treating them as unresolved here would incorrectly reject valid canonicals
+  // such as /tools/business/finance-studio.
   const resolveRoutePath = (routePath) => {
     const [, , category, slug] = routePath.split("/");
-    return category && slug ? getToolByPath(category, slug)?.id ?? null : null;
+    if (!category || !slug) return null;
+    const direct = getToolByPath(category, slug);
+    if (direct) return direct.id;
+    const anchorSlug = category === "business" ? businessStudioAnchorSlug(slug) : undefined;
+    return anchorSlug ? getToolByPath("business", anchorSlug)?.id ?? null : null;
   };
   const routeSubjects = [...runtimeTools, ...virtualStudios.filter((tool) => !runtimeById.has(tool.id))];
   const routes = routeSubjects.map((tool) => ({
@@ -275,7 +284,7 @@ export function renderReconciliationReport(inv, validation) {
   lines.push("| --- | ---: | ---: |");
   for (const [code, gap] of Object.entries(validation.gaps)) lines.push(`| \`${code}\` | ${gap.count} | ${gap.baseline ?? "—"} |`);
   lines.push("");
-  return lines.join("\n") + "\n";
+  return lines.join("\n").trimEnd() + "\n";
 }
 
 function stableStringify(value) {

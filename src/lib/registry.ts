@@ -7,6 +7,7 @@ import { makeAccessibilityStudioTools, studioToolForLegacy } from "@/lib/accessi
 import { makeDeveloperStudioTools } from "@/lib/developer-studios-catalog";
 import { presentGeneratedCalculator } from "@/lib/calc/generated-calculator-presentation";
 import { DATETIME_TOOL_EXTENSIONS } from "@/lib/datetime/catalog-tools";
+import { relatedToolsFor } from "@/lib/related-tools";
 
 // Apply reviewed, task-specific descriptions to legacy generated catalogue rows
 // before they reach category pages, search, tool details or SEO metadata.
@@ -97,7 +98,7 @@ const aBookTool: ToolMeta = {
   requiresBackend: false,
   requiresAuth: false,
   status: "active",
-  related: ["pdf-merger", "pdf-splitter", "document-editor"],
+  related: ["pdf-merger", "pdf-splitter", "pdf-text-extractor"],
   engine: { type: "custom", id: "a-book" },
   isNew: true,
 };
@@ -118,7 +119,7 @@ const zipAnyFileTool: ToolMeta = {
   requiresBackend: false,
   requiresAuth: false,
   status: "active",
-  related: ["file-converter", "pdf-merger", "document-editor"],
+  related: ["file-to-txt", "file-organizer", "file-compare"],
   engine: { type: "custom", id: "zip-any-file" },
   isNew: true,
 };
@@ -223,7 +224,8 @@ const sceneStudioTool: ToolMeta = {
   requiresBackend: false,
   requiresAuth: false,
   status: "active",
-  related: [],
+  // Adjacent output workflows: trim the exported clip, reduce its file size, or create a poster frame.
+  related: ["video-trimmer", "video-compressor", "video-poster-generator"],
   engine: { type: "custom", id: "scene-studio" },
   isNew: true,
 };
@@ -305,6 +307,9 @@ const catalogRuntimeTools: ToolMeta[] = [
       ? { ...presentedTool, status: "active" }
       : presentedTool;
     if (webTool.id === "scene-studio") return sceneStudioTool;
+    if (webTool.id === "music-live-video-studio") {
+      return { ...webTool, related: ["video-compressor", "video-trimmer"] };
+    }
     if (webTool.id === "css-minifier-advanced") {
       return {
         ...webTool,
@@ -455,13 +460,18 @@ export function getNewTools(limit = 8): ToolMeta[] {
 }
 
 export function getRelatedTools(tool: ToolMeta, limit = 6): ToolMeta[] {
+  if (limit <= 0) return [];
   if (tool.category === "accessibility") {
     return accessibilityStudios.filter((item) => item.id !== tool.id).slice(0, limit);
   }
-  const related = tool.related
-    .map((id) => byId.get(id))
-    .filter((t): t is ToolMeta => Boolean(t && isDiscoverable(t) && t.status !== "planned"));
+
+  // Resolve legacy IDs to their canonical Studio/tool record, and discard stale,
+  // hidden, planned, self and duplicate references before rendering any links.
+  const related = relatedToolsFor(tool, getToolById, isDiscoverable, limit);
   if (related.length >= limit) return related.slice(0, limit);
+
+  // Preserve the existing category-level fallback when a tool has fewer declared
+  // suggestions, without reintroducing any ID already shown above.
   const seen = new Set([tool.id, ...related.map((t) => t.id)]);
   const rest = getToolsByCategory(tool.category).filter(
     (t) => !seen.has(t.id) && t.status !== "planned",

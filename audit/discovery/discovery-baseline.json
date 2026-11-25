@@ -1,5 +1,5 @@
 {
- "note": "Snapshot recorded by --update-baseline. It has NOT been reviewed by a human owner yet: review the difference lists in DISCOVERY-RECONCILIATION-REPORT.md before treating it as accepted. Counts must match exactly; gap values may only shrink.",
+ "note": "Reviewed 2026-11-24: video-link-screen-recording was removed and scene-studio was added as an active runtime extension. Scene Studio is explicitly Web-only until native Android/iOS editing, rendering and export exist; its inclusion explains the one-item increase in NATIVE_WEB_ONLY_ACTIVE. Its related links point to active, searchable video-trimming, compression and poster-generation workflows. The source-derived ID sets, unchanged inventory totals, and every other registered gap were verified. This records inventory identity only; it is not per-tool functional acceptance evidence.",
  "counts": {
   "sourceRecords": 10001,
   "sharedCatalogueRecords": 10001,
@@ -14,7 +14,7 @@
   "PLANNED_IN_SEARCHABLE": 260,
   "EMPTY_CATEGORY": 1,
   "NATIVE_MATRIX_NAME_DRIFT": 0,
-  "NATIVE_WEB_ONLY_ACTIVE": 278,
+  "NATIVE_WEB_ONLY_ACTIVE": 279,
   "DUPLICATE_DISPLAY_NAMES": 654,
   "UNDIFFERENTIATED_POPULARITY": 1,
   "SEARCHABLE_NOT_ON_ANY_CATEGORY_ROUTE": 475,

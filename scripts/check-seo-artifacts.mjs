@@ -3,9 +3,11 @@ import { readFileSync } from "node:fs";
 import { buildSeoArtifacts, buildSitemapArtifacts } from "./generate-seo-artifacts.mjs";
 import { buildIndexNowKeyArtifact } from "./indexnow-utils.mjs";
 import { SEO_CANONICAL_ORIGIN, SEO_REDIRECT_HOSTS } from "./seo-domain-policy.mjs";
-import { getAllTools, getToolByPath, getToolsByCategory } from "../src/lib/registry.ts";
+import { getAllTools, getSearchableTools, getToolByPath, getToolsByCategory } from "../src/lib/registry.ts";
+import { developerModeForLegacySlug, developerStudioForLegacySlug } from "../src/lib/developer-studios-catalog.ts";
+import { businessStudioAnchorSlug } from "../src/lib/business-studios-catalog.ts";
 import { toolTaskGuidanceSource } from "../src/lib/tool-documentation.ts";
-import { toolSeoDescription, toolGuideSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema, toolSchema, organizationSchema, websiteSchema, boundedToolSeoTitle, createCanonicalSeoToolResolver } from "@/lib/seo-metadata";
+import { isIndexableTool, toolSeoDescription, toolGuideSeoDescription, toolSeoTitle, toolGuideSeoTitle, toolSearchIntentTerms, categorySeoTitle, articleSeoTitle, canonicalToolPath, canonicalToolName, categorySchema, technicalArticleSchema, toolSchema, organizationSchema, websiteSchema, boundedToolSeoTitle, createCanonicalSeoToolResolver } from "@/lib/seo-metadata";
 
 const nativeInventory = JSON.parse(readFileSync(new URL("../apps/shared/native-engine-inventory.json", import.meta.url), "utf8"));
 const result = buildSeoArtifacts();
@@ -86,6 +88,7 @@ const inventoryCell = (value) => String(value ?? "").replace(/\s+/g, " ").replac
 const seoMetadataSource = readFileSync(new URL("../src/lib/seo-metadata.ts", import.meta.url), "utf8");
 const rootRouteSource = readFileSync(new URL("../src/routes/__root.tsx", import.meta.url), "utf8");
 const homepageRouteSource = readFileSync(new URL("../src/routes/index.tsx", import.meta.url), "utf8");
+const categoryRouteSource = readFileSync(new URL("../src/routes/tools/$category/index.tsx", import.meta.url), "utf8");
 const termsRouteSource = readFileSync(new URL("../src/routes/terms.tsx", import.meta.url), "utf8");
 const assistantPromptSource = readFileSync(new URL("../src/lib/ai/server/tasks/assistant.ts", import.meta.url), "utf8");
 const catalogueGeneratorSource = readFileSync(new URL("./gen-catalog.mjs", import.meta.url), "utf8");
@@ -111,6 +114,31 @@ assert.ok(rootRouteSource.includes('name: "env-build-sha", content: __ENV_BUILD_
 assert.doesNotMatch(seoHeadSource, /env-build-sha/, "The build revision marker must be emitted once by the root document.");
 assert.ok(homepageRouteSource.includes('title: "enV | Tools for everyday tasks"'), "Homepage title must use the enV product name without an appended product label.");
 assert.ok(homepageRouteSource.includes("Find a tool for the task you are working on."), "Homepage description must explain the user purpose in plain language.");
+assert.ok(homepageRouteSource.includes('<h1 className="sr-only">Tools for everyday tasks</h1>'), "Homepage must expose one primary H1 matching its purpose.");
+const searchableLegacyDeveloperTools = getSearchableTools().filter((tool) =>
+  tool.category === "developer" && !tool.tags.includes("developer-studio")
+);
+const publicLegacyDeveloperTools = searchableLegacyDeveloperTools.filter(isIndexableTool);
+assert.equal(searchableLegacyDeveloperTools.length, 475, "All 475 legacy Developer utilities must remain searchable.");
+assert.equal(new Set(searchableLegacyDeveloperTools.map((tool) => tool.id)).size, 475, "Legacy Developer search entries must have unique stable IDs.");
+assert.equal(publicLegacyDeveloperTools.length, 475, "The category directory must expose all 475 active, indexable legacy Developer utilities.");
+assert.equal(new Set(publicLegacyDeveloperTools.map((tool) => tool.id)).size, 475, "Public legacy Developer directory entries must have unique stable IDs.");
+for (const legacyTool of publicLegacyDeveloperTools) {
+  const routeTool = getToolByPath("developer", legacyTool.slug);
+  assert.equal(routeTool?.id, legacyTool.id, "Legacy Developer directory link must resolve to the matching registered tool: " + legacyTool.id);
+  const studio = developerStudioForLegacySlug(legacyTool.slug);
+  const mode = developerModeForLegacySlug(studio, legacyTool.slug);
+  assert.ok(studio.modes.some((candidate) => candidate.key === mode), "Legacy Developer route must resolve to a supported Studio mode: " + legacyTool.id);
+}
+const publicLegacyDeveloperGuides = result.guideTools.filter((tool) =>
+  tool.category === "developer" && !tool.tags.includes("developer-studio")
+);
+assert.equal(publicLegacyDeveloperGuides.length, 475, "All 475 legacy Developer guides must remain available.");
+assert.ok(categoryRouteSource.includes("DEVELOPER_LEGACY_TOOLS"), "Developer category must expose legacy utility routes as crawlable links.");
+assert.ok(categoryRouteSource.includes('href={"/tools/developer/" + tool.slug}'), "Every public legacy Developer tool must have a direct HTML link to its preserved route.");
+assert.ok(categoryRouteSource.includes(".filter(isIndexableTool)"), "The public Developer directory must exclude non-indexable records.");
+assert.ok(categoryRouteSource.includes("DEVELOPER_GUIDE_TOOLS"), "Developer category must expose legacy utility guides as crawlable links.");
+assert.ok(categoryRouteSource.includes('href={"/blog/tool-" + tool.id}'), "Every legacy Developer usage guide must have a direct HTML link from the Developer category.");
 assert.doesNotMatch(termsRouteSource, /the enV toolkit/i, "Terms structured data must use the canonical enV product name.");
 assert.doesNotMatch(assistantPromptSource, /inside enV Toolkit/i, "The AI Agent must identify itself as part of enV without expanding the platform name.");
 assert.doesNotMatch(catalogueGeneratorSource, /utility for the enV toolkit/i, "Catalogue generation must not seed expanded product-name filler.");
@@ -159,6 +187,17 @@ assert.ok(result.urls.includes("/tools"));
 assert.ok(result.urls.includes("/about"));
 assert.ok(result.urls.includes("/pricing"));
 assert.ok(result.urls.includes("/blog"));
+const breakEvenGuide = result.guideTools.find((tool) => tool.id === "break-even-calculator");
+assert.ok(breakEvenGuide, "The Break-Even task guide must remain indexable.");
+assert.ok(!result.tools.some((tool) => tool.id === "break-even-calculator"), "The legacy Break-Even redirect must not be published as a separate canonical tool page.");
+assert.ok(result.urls.includes("/blog/tool-break-even-calculator"), "The Break-Even usage guide must remain in the public route manifest.");
+assert.ok(!result.urls.includes("/tools/calculators/break-even-calculator"), "The client-side Break-Even compatibility redirect must not enter the sitemap.");
+assert.equal(canonicalToolPath(breakEvenGuide), "/tools/business/finance-studio", "Break-Even guide schema and inventory must point to Finance Metrics Studio.");
+assert.equal(canonicalToolName(breakEvenGuide), "Finance Metrics Studio", "Break-Even guide must identify its canonical Studio destination.");
+assert.equal(businessStudioAnchorSlug("finance-studio"), "break-even-estimator", "Finance Metrics Studio must resolve through its registered Business anchor tool.");
+assert.equal(getToolByPath("business", businessStudioAnchorSlug("finance-studio"))?.id, "break-even-estimator", "The canonical Finance Studio route must resolve to its actual registered anchor tool.");
+assert.match(toolRouteSource, /category === "business" && anchorSlug[\s\S]*?\/tools\/business\/" \+ slug/, "A dynamic Business Studio URL must remain canonical after resolving its anchor tool.");
+assert.match(toolRouteSource, /slug === "break-even-calculator"[\s\S]*?noindex,follow[\s\S]*?canonicalToolPath\(matchedTool\)/, "The legacy Break-Even URL must be noindex and canonicalize to Finance Metrics Studio.");
 for (const path of [
   "/contact", "/help", "/privacy", "/terms", "/disclaimer",
   "/responsible-use", "/platform/android", "/platform/ios", "/token-guide"

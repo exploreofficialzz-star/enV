@@ -1,4 +1,6 @@
 import { CATEGORIES } from "@/data/categories";
+import { calculators } from "@/lib/engines/formulas";
+import { BAD_VALUE, computeExample } from "@/lib/calc/audit-support.mjs";
 import type { CategoryId, ToolMeta } from "@/types/tool";
 
 export type ToolDocumentationSection = {
@@ -503,6 +505,96 @@ function withCatalogueTask(tool: ToolMeta, guidance: ToolSpecificGuidance): Tool
   };
 }
 
+const REGISTERED_CALCULATOR_GUIDANCE = new Map<string, ToolSpecificGuidance | null>();
+
+/**
+ * Build calculator guidance only from the live calculation registry. The example
+ * is retained only when the actual compute function accepts generated test inputs
+ * and returns finite, displayable output; unsupported formulas fall back honestly.
+ */
+function registeredCalculatorGuidance(tool: ToolMeta): ToolSpecificGuidance | null {
+  if (
+    tool.engine.type !== "calculator"
+    || (tool.status !== "active" && tool.status !== "beta")
+    || tool.requiresBackend
+  ) return null;
+  const cacheKey = tool.id + "\u0000" + tool.engine.formula;
+  if (REGISTERED_CALCULATOR_GUIDANCE.has(cacheKey)) {
+    return REGISTERED_CALCULATOR_GUIDANCE.get(cacheKey) ?? null;
+  }
+
+  const definition = calculators[tool.engine.formula];
+  if (!definition || !Array.isArray(definition.fields) || definition.fields.length === 0) {
+    REGISTERED_CALCULATOR_GUIDANCE.set(cacheKey, null);
+    return null;
+  }
+
+  const sample = computeExample(definition, tool.id);
+  if (!("outputs" in sample) || !Array.isArray(sample.outputs) || sample.outputs.length === 0) {
+    REGISTERED_CALCULATOR_GUIDANCE.set(cacheKey, null);
+    return null;
+  }
+
+  const primary = sample.outputs.find((output) => output.primary) ?? sample.outputs[0];
+  if (!primary || typeof primary.value !== "string" || BAD_VALUE.test(primary.value)) {
+    REGISTERED_CALCULATOR_GUIDANCE.set(cacheKey, null);
+    return null;
+  }
+
+  const inputExamples = definition.fields.flatMap((field) => {
+    const rawValue = sample.inputs[field.name];
+    if (rawValue === undefined || String(rawValue).trim() === "") return [];
+    const selected = field.type === "select"
+      ? field.options?.find((option) => option.value === rawValue)?.label ?? rawValue
+      : rawValue;
+    const suffix = field.suffix ? field.suffix : "";
+    return [field.label + ": " + String(selected) + suffix];
+  });
+  if (inputExamples.length === 0) {
+    REGISTERED_CALCULATOR_GUIDANCE.set(cacheKey, null);
+    return null;
+  }
+
+  const fieldDescriptions = definition.fields.map((field) => {
+    const details = [
+      field.min !== undefined ? "minimum " + field.min : "",
+      field.max !== undefined ? "maximum " + field.max : "",
+      field.step !== undefined ? "step " + field.step : "",
+      field.options?.length ? "choices " + field.options.map((option) => option.label).join(", ") : "",
+      field.hint ? field.hint : "",
+    ].filter(Boolean);
+    return field.label + (details.length ? " (" + details.join("; ") + ")" : "");
+  });
+  const formulaText = String(definition.formula ?? "").replace(/\s+/g, " ").trim();
+  const outputText = primary.label + ": " + primary.value + (primary.hint ? " (" + primary.hint + ")" : "");
+  let explanation: string[] = [];
+  if (definition.explain) {
+    try {
+      explanation = definition.explain(sample.inputs).filter((line) => typeof line === "string" && line.trim()).slice(0, 4);
+    } catch {
+      explanation = [];
+    }
+  }
+
+  const guidance: ToolSpecificGuidance = {
+    source: "operation-specific",
+    overview: tool.name + " is connected to the registered calculator operation \"" + tool.engine.formula + "\". "
+      + (formulaText
+        ? "Its registered formula or calculation relationship is: " + formulaText + ". "
+        : "Its calculation is defined by its registered input fields and compute function. ")
+      + "The field names and available constraints below are read from that calculator definition, rather than inferred from the tool title.",
+    example: "For a synthetic registry test, enter " + inputExamples.join("; ") + ". "
+      + "The current calculation function returns " + outputText + ". "
+      + "This example is generated to demonstrate the registered operation; replace it with your own correctly measured values when using the calculator.",
+    validation: "The registered inputs are " + fieldDescriptions.join("; ") + ". "
+      + (formulaText ? "Calculation note: " + formulaText + ". " : "")
+      + (explanation.length ? "For the synthetic example, the calculation steps are: " + explanation.join("; ") + ". " : "")
+      + "Respect the field labels, units, choices and stated limits. A successful synthetic example is a code-path check, not an independent review of the formula or a guarantee that the result is suitable for a real decision.",
+  };
+  REGISTERED_CALCULATOR_GUIDANCE.set(cacheKey, guidance);
+  return guidance;
+}
+
 function toolSpecificGuidanceBase(tool: ToolMeta): ToolSpecificGuidance {
   const id = tool.id.toLowerCase();
   const name = tool.name.toLowerCase();
@@ -854,6 +946,9 @@ function toolSpecificGuidanceBase(tool: ToolMeta): ToolSpecificGuidance {
     };
   }
   const engine = tool.engine;
+  const registeredCalculator = registeredCalculatorGuidance(tool);
+  if (registeredCalculator) return registeredCalculator;
+
   if (engine.type === "calculator") {
     return {
       source: "engine-specific",
