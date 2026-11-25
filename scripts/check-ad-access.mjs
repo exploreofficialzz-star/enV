@@ -39,7 +39,7 @@ const rollout = read("docs/adsterra-web-rollout.md");
 assert.doesNotMatch(root, /google-adsense-account|ca-pub-\\d{16}/, "The Web document head must not publish AdSense verification metadata.");
 assert.doesNotMatch(shell, /AdSlot|showGoogleRewardedAd|rewardedUnitPath|rewardedAdsConfigured|openAdsterraSmartlinkFromOutput/, "Web tool access must not depend on AdSense/GAM or automatic Smartlink redirects.");
 assert.match(shell, /AdsterraResponsiveBanner/, "Qualified Web tools must mount Adsterra responsive banners.");
-assert.match(shell, /AdsterraBanner format="300x250"/, "Qualified Web tools must mount the supplied medium-rectangle banner.");
+assert.match(shell, /AdsterraBanner key=\{`\$\{tool\.id\}-300x250`\} format="300x250"/, "Qualified Web tools must mount the supplied medium-rectangle banner with a tool-scoped placement lifecycle.");
 assert.match(shell, /AdsterraNativeBanner/, "Qualified Web tools must mount the supplied native banner.");
 assert.match(shell, /AdsterraSmartlink/, "Qualified Web tools must expose the Smartlink as an explicit placement.");
 assert.match(shell, /recordBrowserAdSupportedVisit\(tool\.id\)/, "The local visit cadence must be recorded against the current tool.");
