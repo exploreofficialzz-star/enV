@@ -204,6 +204,42 @@ await writeFile(dataPath, `${JSON.stringify({ pricingVersion: PRICING_VERSION, t
 const indexProfiles = profiles.map(({ toolId, billingKey, pricingMode, provisionalSubunitsPerUnit, unitLabel, optionalAiAssistProfile, premiumRequired }) => ({ toolId, billingKey, pricingMode, provisionalSubunitsPerUnit, unitLabel, optionalAiAssistProfile, premiumRequired }));
 await writeFile(join(root, "src/data/billing-profile-index.json"), `${JSON.stringify({ pricingVersion: PRICING_VERSION, toolCount: indexProfiles.length, profiles: indexProfiles })}\n`);
 await writeFile(join(root, "src/data/billing-profile-runtime-extensions.json"), `${JSON.stringify({ pricingVersion: PRICING_VERSION, toolCount: runtimeExtensionProfiles.length, profiles: runtimeExtensionProfiles }, null, 2)}\n`);
+const localProposals = allGeneratedProfiles.filter((profile) => Number.isSafeInteger(profile.proposedSubunitsPerUnit) && profile.proposedSubunitsPerUnit > 0);
+const aiProposals = allGeneratedProfiles.filter((profile) => profile.pricingBasis === "provider-model-rate-card");
+const infrastructurePending = allGeneratedProfiles.filter((profile) => profile.pricingBasis === "provider-invoice-and-infrastructure-cost");
+const rateDistribution = Object.fromEntries([...localProposals.reduce((map, profile) => {
+  const rate = profile.proposedSubunitsPerUnit;
+  map.set(rate, (map.get(rate) ?? 0) + 1);
+  return map;
+}, new Map())].sort((a, b) => Number(a[0]) - Number(b[0])));
+const proposalReport = [
+  "# enV per-tool proposed workload rates — 2026-11-25",
+  "",
+  "Version: " + TOOL_PRICE_PROPOSAL_VERSION,
+  "",
+  "This is the generated draft rate schedule for every tool profile. Local rates are workload-based prices, not a claim about measured handset CPU bills. AI rates are calculated from the selected provider/model and actual returned usage. Cloud/media/document rates remain tied to measured processor and infrastructure cost.",
+  "",
+  "- Numeric local tool rates: " + localProposals.length.toLocaleString("en-US"),
+  "- AI tools with provider/model metering: " + aiProposals.length.toLocaleString("en-US"),
+  "- Cloud/remote tools awaiting invoice and infrastructure allocation: " + infrastructurePending.length.toLocaleString("en-US"),
+  "- Total generated profiles: " + allGeneratedProfiles.length.toLocaleString("en-US"),
+  "",
+  "## Proposed local rate distribution",
+  "",
+  "| Milli-tokens per unit | enV Tokens | USD reference per unit | Tools |",
+  "|---:|---:|---:|---:|",
+  ...Object.entries(rateDistribution).map(([rate, count]) => "| " + rate + " | " + (Number(rate) / 1000).toFixed(3) + " | $" + (Number(rate) / 100000).toFixed(5) + " | " + count + " |"),
+  "",
+  "## Metering rules",
+  "",
+  "- Each local profile contains its own tool ID, unit, proposed milli-token rate, cost-driver dimensions, formula and factors. Rates are calculated from the operation type and workload metadata; they remain provisional pending benchmarks and approval.",
+  "- AI operations use provider-specific input/output-token, audio-second or compute-second prices. The selected model and usage record determine the proposed amount. Model registry estimates are not provider invoices.",
+  "- Remote media, document and processor operations use measured provider invoices and allocated infrastructure cost. They receive no invented fixed fee while invoice-level cost is missing.",
+  "- The separate 267-tool ad-free session access tariff is not an operation price and is not substituted for this per-tool schedule.",
+  "- Advertising eligibility is a separate policy. Studio, Labs, Sandbox, AI and high-end tools remain outside Adsterra regardless of their billing profile.",
+  "- All proposed rates are non-billable until their profile is audited and production billing is separately enabled.",
+].join("\\n");
+await writeFile(join(root, "docs/billing-proposed-prices-2026-11-25.md"), proposalReport);
 
 const countBy = (key) => Object.fromEntries([...profiles.reduce((map, p) => map.set(p[key], (map.get(p[key]) ?? 0) + 1), new Map())].sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
 const byRule = countBy("billingKey");
