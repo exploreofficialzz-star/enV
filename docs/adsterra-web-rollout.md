@@ -1,43 +1,51 @@
-# Adsterra Web rollout
+# Adsterra Web advertising and access rollout
 
-## Selected placements
+## Provider boundary
 
-Adsterra is restricted to qualified Web tool pages. Home, the All tools directory, Blog index, and Blog article pages never render advertising. A tool qualifies when its Web tool record is active and it is outside restricted health/finance/earnings/personal/fitness topics. Eligibility applies across ordinary categories and does not depend on local versus backend execution, account state or the offline-wallet allowlist. Studio workspaces, AI-related tools, Labs and Sandbox experiences are excluded by category and tool metadata.
+Adsterra is the only advertising provider used by enV Web. AdSense, AdMob and Google Ad Manager are not part of the current Web advertising rollout. Android and iOS retain optional native Google Mobile Ads/UMP integration code, but native ad requests, placements and rewarded-ad access remain disabled by their build flags. The native enV token-access gate is separate and remains available without enabling AdMob, GAM or UMP.
 
-| Qualified tool surface | Format | Publisher placement | Purpose |
-|---|---|---:|---|
-| Tool page, above the tool interface | Responsive 320x50 mobile / 728x90 desktop | 32202130 / 32202131 | Responsive banner |
-| Tool page, below the tool interface | 300x250 | 32202127 | Medium-rectangle display unit |
-| Tool page, below the tool interface | Native Banner | 32202120 | Contextual native placement |
-| Qualified tool page | Popunder | Publisher script | Loads only after consent and same-origin reachability; may open a separate tab after an interaction |
-| Qualified tool output action | Smartlink | Publisher URL | Opens from the user's direct copy/download/export action, without delaying or gating the tool output |
+The supplied Web placements are:
 
-Each Adsterra placement is labelled as an advertisement and is requested only when the production flag is enabled, the visitor has explicitly allowed advertising, and the same-origin page is reachable. Adsterra placements are not rewarded video and do not unlock tools. A separate, explicitly allowlisted Google Publisher Tag rewarded flow can gate selected tools when its own deployment flag, rewarded unit and Google privacy messaging are configured. Guests who decline or cannot complete that rewarded ad must sign in; signed-in users can choose ad-free access only at a manually approved per-tool token price. The rewarded access gate is off by default and does not gate non-allowlisted tools. No ad script is requested while offline.
+| Web placement | Publisher placement ID | Use |
+|---|---:|---|
+| Responsive mobile 320x50 | 32202130 | Above the tool interface |
+| Responsive desktop 728x90 | 32202131 | Above the tool interface |
+| 300x250 banner | 32202127 | Below the tool interface |
+| Native banner | 32202120 | Below the tool interface |
+| Smartlink | Publisher-supplied URL in `src/lib/ads/adsterra.ts` | Explicit user click only; never opened automatically by copy, download, or execution actions |
 
-## Production boundaries
+Adsterra publicly offers banner, native, social-bar, popunder and Smartlink formats. The current enV rollout uses the supplied banner/native units and Smartlink URL; no popunder or social-bar script is enabled. https://adsterra.com/publishers/
 
-- Do not load Adsterra scripts before the visitor's advertising choice in Cookie preferences. The supplied tags may process network/device information and use cookies or similar storage. The privacy notice must keep clear Allow and Decline choices and provide a way to withdraw consent.
-- Declining advertising stops Adsterra requests. For a tool explicitly included in the separate rewarded-access allowlist, guests must then sign in and signed-in users can only unlock ad-free access through the approved price for that specific tool. Consent remains optional and is never changed automatically.
-- Ads are only a funding mechanism for the service; a visitor's privacy choice does not turn off enV's monetization configuration for other visitors.
-- Adsterra scripts and publisher URLs are Web-only. Android Kotlin and iOS Swift use native Google Mobile Ads integrations: AdMob app/banner IDs are separate from the Google Ad Manager rewarded unit path. Native rewarded access remains fail-closed until the production GAM path, AdMob app/banner configuration and UMP privacy setup are supplied.
-- Google AdSense's Privacy & Messaging readiness is required before the Web rewarded flow loads GPT. Google Ad Manager rewarded events are separate from AdSense display units.
-- The new access-gate settings default off: VITE_AD_ACCESS_GATE_ENABLED=false, VITE_AD_ACCESS_TOOL_IDS=, and VITE_GAM_REWARDED_AD_UNIT_PATH=. Enable only after a publisher-generated rewarded unit exists and the privacy/CMP path has been validated.
-- An ad counts only when GPT reports both rewardedSlotGranted and rewardedSlotVideoCompleted for the same slot. Before requesting one, enV requires resolved consent-mode values for ad storage, ad user data and ad personalization, no applicable US opt-out, and Google's ad-blocker status to explicitly report no blocker. Unknown or denied states fail closed. Rewarded completions are counted locally on the browser/device in a rolling 30-day window; the ad-free token offer appears once after three completed ads. The per-tool ads-versus-tokens preference is also stored on that device, but never bypasses sign-in, approved-price checks or explicit token confirmation. Choosing tokens in the offer sets the preference for the next visit; the active rewarded visit stays free and is not charged.
-- Per-tool token access is backed by `src/data/billing-tool-access-approvals.json`. The current registry approves 267 cross-platform local calculators at 100 subunits (0.1 enV token) per calculation, version `env-tool-access-local-calculator-v1`. All other tools remain unpriced until explicitly approved; generated provisional profiles never trigger deductions. The server reserves and settles only that approved per-tool amount after a successful result.
-- The checked-in build flag `VITE_ADSTERRA_ENABLED` defaults to false. Vercel sets it to `true` for the `envtools.store` **Production** target only; Preview and Development targets are intentionally unset so test traffic does not create publisher impressions.
+## Placement and consent rules
 
-## Deliberately not enabled yet
+- `VITE_ADSTERRA_ENABLED` controls Web ad loading. It is enabled only on the production Web deployment.
+- A visitor's advertising choice is explicit and stored separately from optional analytics consent. No ad script is requested before advertising consent is granted.
+- Placements load only on eligible active Web tool pages while the same-origin enV site is reachable. Home, the All tools directory, and Blog pages do not render these placements.
+- AI, Studio, Labs/Sandbox and restricted sensitive topics remain excluded by the shared tool eligibility policy.
+- Withdrawing advertising consent reloads the page so provider-installed scripts and listeners from the previous consent state are not reused.
+- Smartlink navigation is never attached to unrelated tool actions. It may only be opened by a labelled link the visitor chooses.
 
-- 468x60, 160x300 and 160x600 banners: not included in the current tool-page layout; the responsive, 300x250 and native placements cover qualified tools without repeating large formats.
-- Social Bar: a persistent floating overlay is too intrusive for the toolkit interface.
-- Popunder is mounted only on a qualified tool page and may react to eligible page interactions. It is not a verified rewarded-ad callback and is not proof that a tool output was completed; never gate, replace or delay downloads and exports behind it.
-- Smartlink: the publisher-supplied destination opens synchronously from an explicit output-action click on a qualified tool page. It is gated by the same production flag, explicit advertising consent and online state. The output action continues independently; browsers may still block an additional tab. Smartlink is not a verified rewarded-ad completion callback and does not unlock or gate tool output.
-- `ads.txt`: the existing file contains the Google seller line. Add Adsterra only from the exact seller record shown for this publisher/site in the Adsterra dashboard; do not manufacture a seller record from a placement ID.
+## Selected tool access and the three-visit offer
 
-## Verification
+The access gate is separate from general ad display. It applies only when the deployment enables `VITE_AD_ACCESS_GATE_ENABLED`, the exact tool ID appears in `VITE_AD_ACCESS_TOOL_IDS`, the tool is eligible for Adsterra, and the same tool has a manually approved token price plus a cross-platform offline profile.
 
-- `src/lib/ads/adsterra.test.ts` checks the selected provider placements and the deployment, consent and online-state requirements before ad requests.
-- `src/lib/ads/policy.test.ts` verifies ordinary active tools across categories are eligible while Studio, AI, Lab/Sandbox and restricted sensitive topics remain excluded; eligibility is independent of account state and execution type.
-- `AdsterraResponsiveBanner`, `AdsterraBanner` and `AdsterraNativeBanner` mount on qualified tool pages, outside fullscreen, independently of sign-in state. The responsive unit is above the tool interface; the 300x250 and native units are below it.
-- Native placement cleanup removes the injected script and rendered creative when consent is withdrawn or the component unmounts, allowing a later re-grant to load the placement again.
-- The tool-scoped Popunder script is loaded only on qualified tool pages after explicit consent and same-origin reachability; it is Web-only and does not gate tool output actions. Banner and Popunder script failures receive bounded retries instead of remaining permanently disabled after one failed request.
+A guest can choose Adsterra-supported access for the current visit or create/sign in to an enV account. A signed-in user can choose tokens only for the exact tool's approved price. The server reserves the price before access and settles that reservation only after a successful tool result; a failed or cancelled run releases it. Unapproved tools remain unpriced and cannot be charged.
+
+Adsterra's publisher reporting API exposes aggregate reporting such as impressions, clicks, CTR, CPM and revenue. It is not a documented per-user rewarded-video completion callback. https://adsterra.com/blog/how-to-use-adsterra-publishers-api/ Therefore enV does **not** describe Adsterra banners, clicks, Smartlink opens or script loads as completed rewarded videos. The local ad-free offer is labelled **three ad-supported visits** and is counted only after an eligible Adsterra placement script loads during a tool visit. That local cadence is a preference prompt only; it is not billing evidence, a verified impression, or a server reward.
+
+After three such visits within the rolling 30-day window, the offer lets a signed-in visitor choose tokens as the default for future visits. The already-unlocked visit remains free. Guests are offered account creation/sign-in. Token prices are still shown and confirmed per tool before a reservation is made.
+
+## Native Android and iOS pre-launch posture
+
+Android remains Kotlin and iOS remains Swift. AdMob / Google Mobile Ads and UMP remain optional native provider integrations, but are disabled in current builds:
+- Android ENV_ADS_ENABLED and ENV_ADS_PRIVACY_CONFIGURED default to false; no production banner unit or rewarded GAM path is enabled.
+- iOS Debug and Release build settings keep ENV_ADS_ENABLED = NO and ENV_ADS_PRIVACY_CONFIGURED = NO; banner and rewarded unit settings remain empty.
+- Native AdMob remains disabled. No AdMob or Google rewarded ad is requested while those settings remain false. Do not enable them as part of the Adsterra Web rollout.
+
+The native token-access gate is independent from AdMob. Android and iOS gate the same reviewed, cross-platform local-tool cohort using native UI and the shared offline eligibility registry. When online, the user signs in and pairs the device with the enV Wallet, the server checks the exact approved tool price, the user confirms the reservation, and the native execution callback settles successful runs or releases failed/cancelled runs. When AdMob is disabled, the native gate offers token access; it does not wait for UMP, a GAM rewarded path, or an AdMob banner.
+
+Offline execution remains a separate signed-allowance flow. Production offline allowance issuance and spending remain fail-closed pending independent device-integrity, pricing, and finalization reviews. Adsterra scripts and Smartlink URLs are Web-only and must never be copied into Kotlin or Swift.
+
+## Publisher-side release requirement
+
+The exact Adsterra authorized-seller/ads.txt record must be copied from the publisher account's own dashboard. It is not derivable from the zone or placement IDs and must not be fabricated. Until the exact line is available, `public/ads.txt` contains an instruction comment rather than a guessed seller record.

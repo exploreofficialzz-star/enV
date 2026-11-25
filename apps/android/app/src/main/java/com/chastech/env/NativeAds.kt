@@ -111,20 +111,22 @@ internal object NativeAdsPolicy {
         return loaded
     }
 
-    fun isHybridTool(context: Context, tool: ToolRecord): Boolean {
+    fun isTokenAccessTool(context: Context, tool: ToolRecord): Boolean {
         val restrictedDisclaimers = setOf("health", "finance", "earnings")
-        val restrictedCategories = setOf("fitness", "personal")
-        val rewardedAccessTool = rewardedAccessConfigured && tool.id in rewardedToolIds
-        return (tool.id in allowlistedIds || rewardedAccessTool) &&
-            tool.id in crossPlatformMeteredIds(context) &&
+        val restrictedCategories = setOf("health", "finance", "earnings", "fitness", "personal")
+        return tool.id in crossPlatformMeteredIds(context) &&
             tool.status == "active" &&
             tool.clientSide &&
             !tool.requiresBackend &&
             !tool.requiresAuth &&
-            tool.category !in restrictedCategories &&
+            tool.category.lowercase() !in restrictedCategories &&
             !tool.id.startsWith("finance-") &&
-            (tool.disclaimer?.let { it !in restrictedDisclaimers } ?: true)
+            (tool.disclaimer?.lowercase()?.let { it !in restrictedDisclaimers } ?: true)
     }
+
+    /** Offline metering is independent from the native AdMob/GAM launch flags. */
+    fun isHybridTool(context: Context, tool: ToolRecord): Boolean =
+        isTokenAccessTool(context, tool)
 
     /**
      * Native advertising eligibility is separate from the offline-wallet cohort.
@@ -434,7 +436,9 @@ internal fun NativeRewardedToolAccessGate(
     var busy by rememberSaveable(tool.id) { mutableStateOf(false) }
     var feedback by rememberSaveable(tool.id) { mutableStateOf<String?>(null) }
     var showAdFreeOffer by rememberSaveable(tool.id) { mutableStateOf(false) }
-    var preferTokens by rememberSaveable(tool.id) { mutableStateOf(NativeToolAccessPreference.prefersTokens(context, tool.id)) }
+    var preferTokens by rememberSaveable(tool.id) { mutableStateOf(
+        NativeToolAccessPreference.prefersTokens(context, tool.id) || !NativeAdsPolicy.rewardedAdsConfigured
+    ) }
     var pendingReservation by remember(tool.id) { mutableStateOf<com.chastech.env.billing.OfflineWalletNativeApi.ToolAccessReservation?>(null) }
     var activeReservation by remember(tool.id) { mutableStateOf<com.chastech.env.billing.OfflineWalletNativeApi.ToolAccessReservation?>(null) }
 
@@ -446,7 +450,7 @@ internal fun NativeRewardedToolAccessGate(
 
     // Offline or origin-unreachable runs remain governed by the existing
     // signed allowance/journal path inside the native tool execution boundary.
-    if (preview || !NativeAdsPolicy.isRewardedAccessTool(context, tool) || !network) {
+    if (preview || !NativeAdsPolicy.isTokenAccessTool(context, tool) || !network) {
         content()
         return
     }
@@ -532,11 +536,14 @@ internal fun NativeRewardedToolAccessGate(
         ) {
             Text("Continue to " + tool.name, style = MaterialTheme.typography.titleMedium)
             Text(
-                "Watch a complete rewarded video to use this tool for this visit, or choose a reviewed token price for ad-free access.",
+                if (NativeAdsPolicy.rewardedAdsConfigured)
+                    "Watch a complete rewarded video to use this tool for this visit, or choose the reviewed enV token price for ad-free access."
+                else
+                    "Use the reviewed enV token price for online access. Sign in and pair this device from your Wallet before reserving tokens.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (!preferTokens) {
+            if (NativeAdsPolicy.rewardedAdsConfigured && !preferTokens) {
                 Button(
                     onClick = {
                         if (activity == null || busy) return@Button
@@ -594,7 +601,7 @@ internal fun NativeRewardedToolAccessGate(
                 ) {
                     Text(if (busy) "Loading rewarded ad…" else "Watch an ad to continue")
                 }
-            } else {
+            } else if (NativeAdsPolicy.rewardedAdsConfigured) {
                 TextButton(
                     onClick = {
                         NativeToolAccessPreference.setPrefersTokens(context, tool.id, false)
@@ -614,7 +621,7 @@ internal fun NativeRewardedToolAccessGate(
             Button(onClick = onOpenWallet, modifier = Modifier.fillMaxWidth()) {
                 Text("Open Wallet / sign in")
             }
-            if (!consentReady) {
+            if (NativeAdsPolicy.rewardedAdsConfigured && !consentReady) {
                 Text("Google advertising privacy choices must permit ads before a rewarded video can load.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             feedback?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }

@@ -6,16 +6,23 @@ import CryptoKit
 
 struct NativeArchiveToolDestinationView: View {
     let tool: Tool
+    @EnvironmentObject private var informationRouter: NativeInformationRouter
 
     var body: some View {
-        if tool.id == "zip-any-file" {
-            NativeZipArchiveScreen()
-        } else if tool.id == "file-to-txt" {
-            NativeFileToTextScreen()
-        } else if tool.category == "files" && tool.engine.type == "custom" {
-            NativeFileWorkspaceScreen(toolID: tool.id)
-        } else {
-            ToolDestinationView(tool: tool)
+        NativeRewardedToolAccessGate(tool: tool, onOpenWallet: {
+            informationRouter.open("wallet")
+        }) {
+            Group {
+                if tool.id == "zip-any-file" {
+                    NativeZipArchiveScreen()
+                } else if tool.id == "file-to-txt" {
+                    NativeFileToTextScreen()
+                } else if tool.category == "files" && tool.engine.type == "custom" {
+                    NativeFileWorkspaceScreen(toolID: tool.id)
+                } else {
+                    ToolDestinationView(tool: tool)
+                }
+            }
         }
     }
 }

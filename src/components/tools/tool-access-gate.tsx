@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import type { AppUser } from "@/lib/auth/use-current-user";
-import type { RewardedAdResult } from "@/lib/ads/rewarded-google";
-import { recordBrowserRewardedAdCompletion } from "@/lib/ads/rewarded-progress";
 import type { ToolAccessPreference } from "@/lib/ads/access-preference";
 
 type ToolAccessResult =
@@ -13,53 +11,45 @@ export function ToolAccessGate({
   toolName,
   user,
   authPending,
-  rewardedAdsConfigured,
+  adsterraAvailable,
+  advertisingConsent,
   preference,
   onPreferenceChange,
-  onWatchRewardedAd,
+  onContinueWithAdsterra,
   onUseTokens,
   onReleaseTokenAccess,
   onUnlocked,
-  onAdFreeOfferReady,
 }: {
   toolName: string;
   user: AppUser | null;
   authPending: boolean;
-  rewardedAdsConfigured: boolean;
+  adsterraAvailable: boolean;
+  advertisingConsent: "granted" | "denied" | "unset";
   preference: ToolAccessPreference;
   onPreferenceChange: (value: ToolAccessPreference) => void;
-  onWatchRewardedAd: () => Promise<RewardedAdResult>;
+  onContinueWithAdsterra: () => boolean;
   onUseTokens: () => Promise<ToolAccessResult>;
   onReleaseTokenAccess: (reservationId: string) => void;
   onUnlocked: (mode: "ads" | "tokens", reservationId?: string) => void;
-  onAdFreeOfferReady: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [tokenShortage, setTokenShortage] = useState(false);
   const [pendingTokenAccess, setPendingTokenAccess] = useState<Extract<ToolAccessResult, { ok: true }> | null>(null);
-  const canWatchRewardedAd = rewardedAdsConfigured;
 
-  async function watchAd() {
+  function continueWithAdsterra() {
     if (busy) return;
-    setBusy(true);
     setFeedback(null);
-    try {
-      const result = await onWatchRewardedAd();
-      if (result !== "completed") {
-        setFeedback(result === "dismissed"
-          ? "The ad was closed before it finished. Complete the full ad or choose token access."
-          : "A rewarded ad could not be loaded. Check your connection and ad-blocking settings, or use account access.");
-        return;
-      }
-      const progress = recordBrowserRewardedAdCompletion();
-      onUnlocked("ads");
-      if (progress?.shouldShowAdFreeOffer) onAdFreeOfferReady();
-    } catch {
-      setFeedback("The rewarded ad could not be completed. No ad view was counted.");
-    } finally {
-      setBusy(false);
+    if (!adsterraAvailable) {
+      setFeedback("Adsterra-supported access is unavailable right now. Sign in to check an approved token option.");
+      return;
     }
+    if (!onContinueWithAdsterra()) {
+      setFeedback("Your advertising choice could not be saved in this browser. Check site storage and try again.");
+      return;
+    }
+    onPreferenceChange("ads");
+    onUnlocked("ads");
   }
 
   async function useTokens() {
@@ -69,9 +59,8 @@ export function ToolAccessGate({
     setTokenShortage(false);
     try {
       const result = await onUseTokens();
-      if (result.ok) {
-        setPendingTokenAccess(result);
-      } else {
+      if (result.ok) setPendingTokenAccess(result);
+      else {
         setFeedback(result.message);
         setTokenShortage(result.errorCode === "INSUFFICIENT_CREDITS");
       }
@@ -88,8 +77,8 @@ export function ToolAccessGate({
       <div className="space-y-2">
         <h2 className="text-lg font-semibold text-fg">Continue to {toolName}</h2>
         <p className="text-sm leading-6 text-muted">
-          Keep this selected tool free by watching a rewarded ad, or use enV tokens for ad-free access.
-          A banner view, ad click or Smartlink opening never counts as a completed watch.
+          Continue free with Adsterra-supported access, or sign in to use an approved enV token price.
+          Adsterra does not provide enV with a per-user rewarded-video completion signal. The optional ad-free offer is based on ad-supported visits where a placement script loads, not on verified impressions or videos watched.
         </p>
       </div>
 
@@ -97,20 +86,20 @@ export function ToolAccessGate({
         <p className="text-sm text-muted" role="status">Checking your account…</p>
       ) : (
         <div className="flex w-full max-w-sm flex-col gap-2">
-          {preference === "ads" && canWatchRewardedAd ? (
+          {preference === "ads" && adsterraAvailable ? (
             <button
               type="button"
-              onClick={() => void watchAd()}
+              onClick={continueWithAdsterra}
               disabled={busy}
               className="min-h-11 rounded-lg bg-fg px-4 py-2 text-sm font-semibold text-bg disabled:cursor-wait disabled:opacity-60"
             >
-              {busy ? "Preparing access…" : "Watch an ad to continue"}
+              {advertisingConsent === "granted" ? "Continue with Adsterra" : "Allow Adsterra and continue"}
             </button>
           ) : null}
 
-          {preference === "ads" && !rewardedAdsConfigured ? (
+          {preference === "ads" && !adsterraAvailable ? (
             <p className="text-xs leading-5 text-muted">
-              Rewarded ads are not available for this tool right now. Sign in to use an approved token option.
+              Adsterra-supported access is unavailable right now. You can sign in and check whether this tool has an approved token price.
             </p>
           ) : null}
 
@@ -147,10 +136,9 @@ export function ToolAccessGate({
               disabled={busy}
               className="py-1 text-xs font-medium text-muted underline underline-offset-4"
             >
-              Use the ad-supported option instead
+              Use Adsterra-supported access instead
             </button>
           ) : null}
-
         </div>
       )}
 
@@ -207,7 +195,7 @@ export function ToolAccessGate({
   );
 }
 
-export function AdFreeAfterThreeAdsDialog({
+export function AdFreeAfterThreeVisitsDialog({
   open,
   signedIn,
   onClose,
@@ -228,12 +216,12 @@ export function AdFreeAfterThreeAdsDialog({
         className="w-full max-w-md rounded-2xl border border-border bg-surface p-5 text-fg shadow-2xl"
       >
         <div className="mb-3 flex items-center justify-between gap-3">
-          <span className="rounded-full border border-border px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted">3 completed ads</span>
+          <span className="rounded-full border border-border px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted">3 ad-supported visits</span>
           <button type="button" onClick={onClose} className="rounded-md px-2 py-1 text-sm text-muted hover:bg-surface-2" aria-label="Close ad-free offer">Close</button>
         </div>
         <h2 id="env-ad-free-offer-title" className="text-xl font-semibold">Ready to go ad-free?</h2>
         <p className="mt-2 text-sm leading-6 text-muted">
-          Your rewarded visit stays free. Choose enV tokens as the default for future visits; the reviewed price will be shown for confirmation before any token-backed use. Unapproved tools are never charged.
+          Adsterra placement scripts loaded during three separate tool visits. This is a local visit count, not a verified ad impression or video completion. Your current visit stays free. Choose enV tokens as the default for future visits; the reviewed price will be shown for confirmation before any token-backed use.
         </p>
         <div className="mt-5 flex flex-col gap-2">
           {signedIn ? (
@@ -251,7 +239,7 @@ export function AdFreeAfterThreeAdsDialog({
             </>
           )}
           <button type="button" onClick={onClose} className="min-h-10 rounded-lg border border-border px-4 py-2 text-sm font-medium text-fg hover:bg-surface-2">
-            Keep using ads
+            Keep using Adsterra
           </button>
         </div>
       </section>

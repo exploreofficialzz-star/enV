@@ -79,19 +79,22 @@ enum NativeAdsPolicy {
         }.map(\.toolId))
     }()
 
-    static func isHybridTool(_ tool: Tool) -> Bool {
+    static func isTokenAccessTool(_ tool: Tool) -> Bool {
         let restrictedDisclaimers: Set<String> = ["health", "finance", "earnings"]
-        let restrictedCategories: Set<String> = ["fitness", "personal"]
-        let rewardedAccessTool = rewardedAccessEnabled && rewardedToolIDs.contains(tool.id)
-        return (allowlistedToolIDs.contains(tool.id) || rewardedAccessTool) &&
-            crossPlatformMeteredIDs.contains(tool.id) &&
+        let restrictedCategories: Set<String> = ["health", "finance", "earnings", "fitness", "personal"]
+        return crossPlatformMeteredIDs.contains(tool.id) &&
             tool.status == "active" &&
             tool.clientSide &&
             !tool.requiresBackend &&
             !tool.requiresAuth &&
-            !restrictedCategories.contains(tool.category) &&
+            !restrictedCategories.contains(tool.category.lowercased()) &&
             !tool.id.hasPrefix("finance-") &&
-            (tool.disclaimer.map { !restrictedDisclaimers.contains($0) } ?? true)
+            (tool.disclaimer.map { !restrictedDisclaimers.contains($0.lowercased()) } ?? true)
+    }
+
+    /// Offline token metering does not depend on native AdMob or GAM settings.
+    static func isHybridTool(_ tool: Tool) -> Bool {
+        isTokenAccessTool(tool)
     }
 
     /// Native ad eligibility is separate from offline-wallet qualification.
@@ -340,7 +343,7 @@ struct NativeRewardedToolAccessGate<Content: View>: View {
     @State private var activeReservation: OfflineWalletNativeAPI.ToolAccessReservation?
     @State private var adDelegate: NativeRewardedAdDelegate?
 
-    private var isConfigured: Bool { NativeAdsPolicy.isRewardedAccessTool(tool) }
+    private var isConfigured: Bool { NativeAdsPolicy.isTokenAccessTool(tool) }
     private var canWatch: Bool {
         isConfigured && NativeAdsPolicy.rewardedAdsConfigured && reachability.hasNetwork && originReachable && consent.canRequestAds && consent.sdkReady && !busy
     }
@@ -361,11 +364,13 @@ struct NativeRewardedToolAccessGate<Content: View>: View {
                     Text("Continue to " + tool.name)
                         .font(.envScaled(size: 19, weight: .semibold))
                         .foregroundStyle(Color.envInk)
-                    Text("Watch a complete rewarded video to use this tool for this visit, or use a reviewed enV token price for ad-free access.")
+                    Text(NativeAdsPolicy.rewardedAdsConfigured
+                        ? "Watch a complete rewarded video to use this tool for this visit, or use the reviewed enV token price for ad-free access."
+                        : "Use the reviewed enV token price for online access. Sign in and pair this device from your Wallet before reserving tokens.")
                         .font(.envScaled(size: 14, weight: .regular))
                         .foregroundStyle(Color.envMuted)
                         .fixedSize(horizontal: false, vertical: true)
-                    if !preferTokens {
+                    if NativeAdsPolicy.rewardedAdsConfigured && !preferTokens {
                         Button(action: { Task { await watchRewardedAd() } }) {
                             HStack(spacing: 8) {
                                 if busy { ProgressView().tint(.white) }
@@ -379,7 +384,7 @@ struct NativeRewardedToolAccessGate<Content: View>: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(!canWatch)
-                    } else {
+                    } else if NativeAdsPolicy.rewardedAdsConfigured {
                         Button("Use rewarded ads instead") {
                             NativeToolAccessPreference.setPrefersTokens(false, for: tool.id)
                             preferTokens = false
@@ -409,7 +414,7 @@ struct NativeRewardedToolAccessGate<Content: View>: View {
                     }
                     .buttonStyle(.plain)
 
-                    if !consent.canRequestAds {
+                    if NativeAdsPolicy.rewardedAdsConfigured && !consent.canRequestAds {
                         Text("Google advertising privacy settings must permit ads before a rewarded video can load.")
                             .font(.envScaled(size: 12, weight: .regular))
                             .foregroundStyle(Color.envMuted)
@@ -441,7 +446,7 @@ struct NativeRewardedToolAccessGate<Content: View>: View {
             originCheckComplete = true
         }
         .onAppear {
-            preferTokens = NativeToolAccessPreference.prefersTokens(for: tool.id)
+            preferTokens = NativeToolAccessPreference.prefersTokens(for: tool.id) || !NativeAdsPolicy.rewardedAdsConfigured
         }
         .confirmationDialog(
             "Confirm token access",
