@@ -206,11 +206,22 @@ test("alias phrases reach their tool, rank below an exact name match, and are ex
 
 test("alias table: normalized phrases are unique, non-empty, and never hijack another tool's exact name", async () => {
   const { getAllTools, getSearchableTools } = await import("./registry.ts");
-  const names = new Map(getSearchableTools().map((t) => [normalizeText(t.name), t.id]));
+  const searchableTools = getSearchableTools();
+  const names = new Map(searchableTools.map((t) => [normalizeText(t.name), t.id]));
+  const searchableById = new Map(searchableTools.map((tool) => [tool.id, tool]));
+  const activeRuntimeIds = new Set(
+    getAllTools()
+      .filter((tool) => tool.status === "active" || tool.status === "beta")
+      .map((tool) => tool.id),
+  );
   const owner = new Map();
   const problems = [];
   for (const [id, entry] of Object.entries(SEARCH_ALIASES)) {
-    if (!getAllTools().some((t) => t.id === id && t.status !== "planned")) problems.push(`${id} is not an active tool`);
+    const searchableTool = searchableById.get(id);
+    const isActiveRuntime = activeRuntimeIds.has(id);
+    const isActiveVirtualStudio = searchableTool?.status !== "planned"
+      && searchableTool?.tags?.includes("developer-studio") === true;
+    if (!isActiveRuntime && !isActiveVirtualStudio) problems.push(`${id} is not an active searchable tool`);
     if (!entry.phrases.length) problems.push(`${id} has no phrases`);
     for (const phrase of entry.phrases) {
       const key = normalizeText(phrase);
