@@ -412,9 +412,13 @@ export function calculateProposedToolUnits(unitLabel, measurements) {
     case "file-operation":
       units = metric("fileCount", "itemCount", "operationCount") ?? 1;
       break;
-    case "10k-characters":
-      units = Math.max(required("inputCharacters"), metric("outputCharacters") ?? 0) / 10_000;
+    case "10k-characters": {
+      const inputCharacters = metric("inputCharacters");
+      const outputCharacters = metric("outputCharacters");
+      if (inputCharacters === null && outputCharacters === null) throw new RangeError("Input or output character count is required.");
+      units = Math.max(inputCharacters ?? 0, outputCharacters ?? 0) / 10_000;
       break;
+    }
     case "10k-output-characters":
       units = required("outputCharacters") / 10_000;
       break;
