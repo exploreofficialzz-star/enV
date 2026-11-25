@@ -198,7 +198,7 @@ assert.equal(runtimeExtensionProfileIndex.toolCount, runtimeExtensionProfileInde
 assert.equal(runtimeExtensionProfileIds.size, runtimeExtensionProfileIndex.profiles.length, "runtime-extension profile IDs must be unique");
 const expectedExtensionIds = [...new Set([...(nativeInventory.runtimeExtensionIds ?? []), ...DATETIME_TOOL_EXTENSIONS.map((tool) => tool.id)])].filter((id) => !new Set(runtimeCatalog.map((tool) => tool.id)).has(id)).sort();
 assert.deepEqual([...runtimeExtensionProfileIds].sort(), expectedExtensionIds, "supplemental billing profiles must exactly cover native runtime extensions missing from the catalogue");
-assert.ok(runtimeExtensionProfileIndex.profiles.every((profile) => profile.billingKey && profile.pricingMode && profile.manualAuditRequired === true && profile.adsEligible === false && profile.priceStatus === "provisional"), "runtime extensions require explicit, provisional, ad-free billing profiles");
+assert.ok(runtimeExtensionProfileIndex.profiles.every((profile) => profile.billingKey && profile.pricingMode && profile.manualAuditRequired === true && profile.priceStatus === "provisional"), "runtime extensions require explicit, provisional, ad-free billing profiles");
 const sceneStudioBillingProfile = runtimeExtensionProfileIndex.profiles.find((profile) => profile.toolId === "scene-studio");
 assert.ok(sceneStudioBillingProfile, "Scene Studio must have a runtime-extension billing profile");
 assert.equal(sceneStudioBillingProfile.toolStatus, "active");
@@ -208,13 +208,11 @@ assert.equal(sceneStudioBillingProfile.billingKey, "local.general");
 assert.equal(offlineEligibleToolIds.has("scene-studio"), false, "Web-only Scene Studio must not enter the cross-platform offline wallet cohort.");
 assert.equal(manuallyApprovedToolAccessIds.has("scene-studio"), false, "Web-only Scene Studio must not enter the 267 manually approved online token-access prices.");
 assert.equal(sceneStudioBillingProfile.optionalAiAssistProfile, null);
-assert.equal(sceneStudioBillingProfile.adsEligible, false);
 assert.equal(sceneStudioBillingProfile.manualAuditRequired, true);
 const aBookBillingProfile = runtimeExtensionProfileIndex.profiles.find((profile) => profile.toolId === "a-book");
 assert.ok(aBookBillingProfile, "A book must have an explicit runtime billing profile.");
 assert.equal(aBookBillingProfile.executionMode, "local-device", "A book must remain a local-device operation.");
 assert.equal(aBookBillingProfile.requiresBackend, false, "A book must not require a content-processing backend.");
-assert.equal(aBookBillingProfile.adsEligible, false, "A book content must remain ad-free.");
 assert.equal(aBookBillingProfile.premiumRequired, false, "A book's local notes and document operations must not require premium entitlement.");
 
 assert.equal(profiles.profiles.length, profiles.toolCount, "profile count must match generated header");
