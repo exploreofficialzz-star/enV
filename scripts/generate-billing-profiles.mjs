@@ -126,7 +126,7 @@ function profile(tool) {
       billingKey = "local.general";
       classificationReason = OFFLINE_LOCAL_DOCUMENT_TOOL_IDS.has(tool.id)
         ? "Explicitly implemented local document operation in DocumentToolsEngine; the legacy tool-level backend flag is retained for hybrid routing."
-        : "Local execution metadata; general local utility fallback pending individual review.";
+        : "Local execution metadata; an individual workload-based rate is generated from this tool identifier, its category, operation description and measured cost-driver dimensions; benchmark and manual review remain required.";
     }
   }
 
