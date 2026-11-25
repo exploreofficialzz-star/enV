@@ -222,6 +222,37 @@ final class CatalogCoreTests: XCTestCase {
     }
 
 
+    func testRelatedToolsResolveOrdinaryAndWebOnlyCatalogDestinations() {
+        func makeTool(_ id: String, _ category: String, related: [String] = []) -> Tool {
+            Tool(
+                id: id, name: id, slug: id, description: "", category: category,
+                subcategory: nil, keywords: [], tags: [], icon: "Network", popularity: 10,
+                featured: false, clientSide: true, requiresBackend: false, requiresAuth: false,
+                status: "active", disclaimer: nil, related: related,
+                engine: ToolEngine(type: "custom", id: id, op: nil)
+            )
+        }
+        let current = makeTool("current", "network", related: ["connection-info", "word-count"])
+        let connectionInfo = makeTool("connection-info", "network")
+        let wordCount = makeTool("word-count", "network")
+        let source = Catalog(
+            schemaVersion: 1, catalogVersion: "test",
+            counts: CatalogCounts(total: 3, active: 3, planned: 0, categories: 1),
+            categories: [],
+            tools: [current, connectionInfo, wordCount],
+            relatedReferenceTools: nil
+        )
+        let native = source.nativeFacing()
+        let nativeCurrent = try! XCTUnwrap(native.tools.first { $0.id == "current" })
+
+        XCTAssertFalse(native.tools.contains { $0.id == "connection-info" })
+        XCTAssertTrue((native.relatedReferenceTools ?? []).contains { $0.id == "connection-info" })
+        XCTAssertEqual(
+            native.relatedTools(for: nativeCurrent, limit: 2).map(\\.id),
+            ["connection-info", "word-count"]
+        )
+    }
+
     func testRelatedToolsRemoveSelfAndDuplicatesAndCanonicalizeAccessibilityAliases() {
         let source = Tool(
             id: "contrast-checker", name: "Contrast Checker", slug: "contrast-checker",
