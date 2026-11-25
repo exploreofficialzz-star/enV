@@ -295,8 +295,12 @@ fun Catalog.withFileWorkspaceTools(): Catalog {
             slug = id,
             description = description,
             category = "files",
-            keywords = if (id == "file-to-txt") listOf("file to txt", "text extraction", "docx to txt", "pdf to txt", "plain text", "text converter", "extract text") else listOf("files", "folder", "local", "mobile", "offline", "storage", "organize", "search", "compare", "rename", "checksum"),
-            tags = if (id == "file-to-txt") listOf("files", "text", "extract", "converter", "local", "mobile") else listOf("files", "local", "mobile", "offline", "file-workspace"),
+            keywords = when (id) {
+                "file-to-txt" -> listOf("file to txt", "text extraction", "docx to txt", "pdf to txt", "plain text", "text converter", "extract text")
+                "file-compare" -> listOf("compare folders", "compare files", "directory diff", "diff", "file comparison", "backup compare", "rsync dry run", "sha256", "hash", "checksum")
+                else -> listOf("files", "folder", "local", "mobile", "offline", "storage", "organize", "search", "compare", "rename", "checksum")
+            },
+            tags = if (id == "file-to-txt") listOf("files", "text", "extract", "converter", "local", "mobile") else listOf("files", "local", "mobile", "offline", "file-workspace") + if (id == "file-compare") listOf("sha256", "hash", "checksum") else emptyList(),
             icon = when (id) {
                 "file-to-txt" -> "FileText"
                 "file-organizer" -> "FolderTree"
