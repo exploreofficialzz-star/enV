@@ -455,7 +455,6 @@ private fun EnVApp(
                             informationReturnTab = tab
                             informationPage = "token-tool:$toolId"
                             tab = AppTab.Account.name
-                            detailStack = emptyList()
                             showExchange = false
                             showInformation = true
                         },
