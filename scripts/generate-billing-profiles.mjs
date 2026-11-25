@@ -289,6 +289,6 @@ const report = [
   "- \`src/data/billing-profile-runtime-extensions.json\`: additional native/runtime tools.",
   "- \`src/lib/billing/proposed-pricing.mjs\`: deterministic draft workload calculator.",
   "- \`docs/billing-proposed-prices-2026-11-25.md\`: local rate distribution and per-tool pricing policy.",
-].join("\\n");
+].join("\n");
 await writeFile(join(root, "docs/billing-tool-audit-2026-10-18.md"), report);
-console.log(`[billing-profile] generated ${profiles.length} Web tool profiles; native coverage Android=${nativeToolCoverage.Android}, iOS=${nativeToolCoverage.iOS}. Local=${byExecution["local-device"] ?? 0}; remote=${byExecution["cloud-or-remote"] ?? 0}; rules=${JSON.stringify(byRule)}`);
+console.log(`[billing-profile] generated ${profiles.length} Web tool profiles; native coverage Android=${nativeToolCoverage.Android}, iOS=${nativeToolCoverage.iOS}. Local=${fullByExecution["local-device"] ?? 0}; remote=${fullByExecution["cloud-or-remote"] ?? 0}; rules=${JSON.stringify(fullByRule)}`);
