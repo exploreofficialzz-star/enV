@@ -136,7 +136,6 @@ function profile(tool) {
     meteringDimensions,
     optionalAiAssistProfile: tool.engine?.type === "ai" ? "ai.standard" : null,
     premiumRequired: false,
-    adsEligible: false,
     priceStatus: "provisional",
     manualAuditRequired: true,
     classificationReason,
