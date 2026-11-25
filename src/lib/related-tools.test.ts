@@ -21,12 +21,15 @@ test("the limit is applied after filtering", () => {
 test("on the real registry no displayed related link is self, missing, planned or undiscoverable", () => {
   const discoverable = new Set(getSearchableTools().map((x) => x.id));
   let bad = 0;
-  for (const tool of getAllTools().filter((x) => x.status !== "planned").slice(0, 3000)) {
-    for (const r of relatedToolsFor(tool, getToolById, (x) => discoverable.has(x.id), 6)) {
-      if (r.id === tool.id || r.status === "planned" || !discoverable.has(r.id)) bad += 1;
+  for (const tool of getAllTools().filter((x) => x.status !== "planned")) {
+    const displayed = relatedToolsFor(tool, getToolById, (x) => discoverable.has(x.id), 6);
+    const ids = displayed.map((item) => item.id);
+    if (new Set(ids).size !== ids.length) bad += 1;
+    for (const item of displayed) {
+      if (item.id === tool.id || item.status === "planned" || !discoverable.has(item.id)) bad += 1;
     }
   }
-  assert.equal(bad, 0);
+  assert.equal(bad, 0, "Every active runtime tool must expose only unique, canonical, active, searchable related destinations.");
 });
 
 test("zero or negative display limits return no related tools", () => {
@@ -51,6 +54,21 @@ test("the actual Web resolver canonicalizes and deduplicates declared related li
   assert.ok(visible.every((item) => item.status !== "planned"));
   const discoverable = new Set(getSearchableTools().map((item) => item.id));
   assert.ok(visible.every((item) => discoverable.has(item.id)));
+});
+
+test("A book and Zip any file resolve their file/document workflows without stale aliases", () => {
+  const aBook = getToolById("a-book");
+  const zip = getToolById("zip-any-file");
+  assert.ok(aBook);
+  assert.ok(zip);
+  assert.deepEqual(
+    getRelatedTools(aBook, 3).map((item) => item.id),
+    ["pdf-merger", "pdf-splitter", "pdf-text-extractor"],
+  );
+  assert.deepEqual(
+    getRelatedTools(zip, 3).map((item) => item.id),
+    ["file-to-txt", "file-organizer", "file-compare"],
+  );
 });
 
 test("Live Video Singing Studio uses valid canonical video tool destinations", () => {
