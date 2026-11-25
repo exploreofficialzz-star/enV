@@ -17,9 +17,11 @@ const canonicalRuntimeById = new Map(getAllTools().map((tool) => [tool.id, tool]
 const canonicalCssMinifier = canonicalRuntimeById.get("css-minifier-advanced");
 assert.ok(canonicalCssMinifier, "Canonical runtime record is missing for css-minifier-advanced.");
 const webTools = [
-  ...applyGenericWorkflowPolicy(baseWebTools).map((tool) =>
-    tool.id === "css-minifier-advanced" ? canonicalCssMinifier : tool
-  ),
+  ...applyGenericWorkflowPolicy(baseWebTools).map((tool) => {
+    if (tool.id === "css-minifier-advanced") return canonicalCssMinifier;
+    if (tool.id === "music-live-video-studio") return canonicalRuntimeById.get(tool.id) ?? tool;
+    return tool;
+  }),
   ...DATETIME_TOOL_EXTENSIONS.filter((extension) => !baseWebTools.some((tool) => tool.id === extension.id)),
 ];
 const sharedBaseTools = JSON.parse(read("apps/shared/catalog.json")).tools;
