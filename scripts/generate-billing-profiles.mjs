@@ -233,6 +233,7 @@ const proposalReport = [
   "## Metering rules",
   "",
   "- Each local profile contains its own tool ID, unit, proposed milli-token rate, cost-driver dimensions, formula and factors. Rates are calculated from the operation type and workload metadata; they remain provisional pending benchmarks and approval.",
+  "- Quote previews may convert client-supplied measurements (characters, pixels, duration, pages, bytes, assets or records) into fractional workload units. These inputs are labelled preview-only; settlement must use measurements captured by the actual execution handler.",
   "- AI operations use provider-specific input/output-token, audio-second or compute-second prices. The selected model and usage record determine the proposed amount. Model registry estimates are not provider invoices.",
   "- Remote media, document and processor operations use measured provider invoices and allocated infrastructure cost. They receive no invented fixed fee while invoice-level cost is missing.",
   "- The separate 267-tool ad-free session access tariff is not an operation price and is not substituted for this per-tool schedule.",
