@@ -25,6 +25,7 @@ test("processing, sign-in, category and status filters use declared flags only",
   assert.deepEqual(run({ signIn: "required" }), ["c"]);
   assert.deepEqual(run({ category: "pdf" }), ["c"]);
   assert.deepEqual(run({ status: "beta" }), ["d"]);
+  assert.deepEqual(run({ status: "planned" }), []);
 });
 
 test("platform availability uses matrix classifications and explicit native Studio projections", () => {
@@ -43,6 +44,7 @@ test("URL state round-trips and drops unknown or malformed values", () => {
   assert.equal(hostile.q.length, 200);
   assert.deepEqual(hostile.filters, {});
   assert.equal(hostile.sort, "best-match");
+  assert.equal(decodeDiscoveryState({ status: "planned" }).filters.status, "planned");
   assert.deepEqual(
     decodeDiscoveryState({ platform: "web", execution: "native" }).filters,
     { platform: "web" },
