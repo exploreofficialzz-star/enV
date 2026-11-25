@@ -22,7 +22,7 @@ const compactRows = rows
     seen.add(row.id);
     return [row.id, encode(row.android), encode(row.ios)];
   })
-  .sort((left, right) => left[0].localeCompare(right[0]));
+  .sort((left, right) => left[0] < right[0] ? -1 : left[0] > right[0] ? 1 : 0);
 
 const document = {
   schemaVersion: 1,
