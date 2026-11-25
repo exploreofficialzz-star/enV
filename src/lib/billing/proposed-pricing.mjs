@@ -508,7 +508,11 @@ export function calculateProposedToolUnits(unitLabel, measurements) {
 export function proposedProviderPriceUsdMicros(costUsdMicros, marginBps) {
   if (!Number.isSafeInteger(costUsdMicros) || costUsdMicros < 0) throw new RangeError("Provider cost must be non-negative integer USD micros.");
   if (!Number.isSafeInteger(marginBps) || marginBps < 0 || marginBps >= 10_000) throw new RangeError("Gross margin must be an integer from 0 to 9,999 basis points.");
-  return Math.ceil(costUsdMicros * 10_000 / (10_000 - marginBps));
+  const numerator = BigInt(costUsdMicros) * 10_000n;
+  const denominator = BigInt(10_000 - marginBps);
+  const proposed = (numerator + denominator - 1n) / denominator;
+  if (proposed > BigInt(Number.MAX_SAFE_INTEGER)) throw new RangeError("Proposed provider price exceeds the supported USD-micros range.");
+  return Number(proposed);
 }
 
 /** One enV milli-token represents USD 10 micros at the current token reference rate. */
