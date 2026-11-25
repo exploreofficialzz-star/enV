@@ -6,7 +6,7 @@
 
 ## Decisions locked for this release
 
-1. No advertising in this monetization plan. The policy sets `adsEligible: false` for every catalogue profile. Tool screens remain focused; revenue comes from token usage and optional premium capability access.
+1. Advertising eligibility is governed separately from billing profiles. Adsterra may be shown only on approved standard tools; Studios, Labs, Sandbox, AI, high-end, premium/frontier and restricted topics are excluded. A tool's ad eligibility never determines its token price or premium entitlement.
 2. A shared enV token wallet meters tool work and AI-agent workflows. The visible enV Token is a prepaid accounting unit, not an AI model token.
 3. The global reference value is fixed at 1 enV Token = USD $0.01 (100 enV Tokens = USD $1.00). This is a non-cash accounting reference, not withdrawable or transferable value. Paystack and Flutterwave local settlement amounts are derived server-side from a dated USD FX snapshot; local token-price overrides are not used.
 4. The ledger stores integer milli-tokens: 1 visible token = 1,000 subunits. This permits very small usage prices without floating-point arithmetic.
@@ -21,7 +21,7 @@
 - `src/lib/billing/catalog.ts`: central operation rules, reference-value conversions, quote logic and the public billing status.
 - `scripts/generate-billing-profiles.mjs`: classifies each tool from the authoritative catalogue fields. Re-run with `npm run generate:billing-profiles` when the catalogue changes.
 - `src/data/billing-profiles.json`: full generated profile and audit reason for each tool.
-- `src/data/billing-profile-index.json`: compact runtime lookup by tool ID.
+- `src/data/billing-profile-index.json`: compact catalogue lookup by tool ID. The per-tool profile API reads full generated `billing-profiles.json` rows so actual operation-specific cost dimensions are preserved.
 - `docs/billing-tool-audit-2026-10-18.md`: profile counts, assumptions and required audit steps.
 - `migrations/0002_billing.sql`: wallet accounts, append-only token ledger, reservations, purchase intents, shared premium entitlement state, idempotent event records and per-operation usage events.
 - `src/lib/billing/ledger.server.ts`: server-only wallet mutations with transactions, locking, idempotency and budget reservation/settlement/release primitives.
@@ -34,7 +34,7 @@
 
 ## Per-tool profile rules
 
-The generator uses catalogue execution metadata, category, engine type and descriptive signals to assign a draft billing key, and it fails if any native Android/iOS tool ID is missing from the shared registry. It creates a profile for every catalogue tool and marks every row `manualAuditRequired: true`. This is a classification and pricing hypothesis, **not a measurement of each tool's real compute cost**.
+The generator uses catalogue execution metadata, category, engine type and descriptive signals to assign a first-pass cost model to each tool, and it fails if any native Android/iOS tool ID is missing from the shared registry. Every tool receives its own profile, unit label, execution classification, cost-driver dimensions and audit reason. Shared billing keys are classification groups only; they are not final per-tool prices. Every row remains `manualAuditRequired: true` until that tool's operations and actual cost drivers have been verified. This is a classification framework, **not a measurement of each tool's real compute cost**.
 
 Current generated distribution:
 
