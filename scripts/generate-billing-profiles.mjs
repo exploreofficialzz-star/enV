@@ -245,32 +245,50 @@ const countBy = (key) => Object.fromEntries([...profiles.reduce((map, p) => map.
 const byRule = countBy("billingKey");
 const byExecution = countBy("executionMode");
 const byStatus = countBy("toolStatus");
-const report = `# enV tool-by-tool monetization profile audit — 2026-10-18\n\n` +
-  `## Scope\n\n` +
-  `Generated from the authoritative Web catalogue metadata. This is a first-pass classification, not a claim that each operation's real compute cost has been measured. Every profile is marked provisional and requires a manual cost/pricing audit before live charging.\n\n` +
-  `- Catalogue tools profiled: **${profiles.length.toLocaleString("en-US")}**\n` +
-  `- Local-device profiles: **${byExecution["local-device"] ?? 0}**\n` +
-  `- Cloud/remote profiles: **${byExecution["cloud-or-remote"] ?? 0}**\n` +
-  `- Profiles requiring manual audit: **${profiles.filter((p) => p.manualAuditRequired).length.toLocaleString("en-US")}**\n` +
-  `- Android native tool IDs covered by this registry: **${nativeToolCoverage.Android.toLocaleString("en-US")} / ${nativeToolCoverage.Android.toLocaleString("en-US")}**\n` +
-  `- iOS native tool IDs covered by this registry: **${nativeToolCoverage.iOS.toLocaleString("en-US")} / ${nativeToolCoverage.iOS.toLocaleString("en-US")}**\n` +
-  `- Advertising eligible in this monetization plan: **0**\n\n` +
-  `## Count by billing rule\n\n| Billing rule | Tools |\n|---|---:|\n` +
-  Object.entries(byRule).map(([key, value]) => `| \`${key}\` | ${value} |`).join("\n") + `\n\n` +
-  `## Count by catalogue status\n\n| Status | Tools |\n|---|---:|\n` +
-  Object.entries(byStatus).map(([key, value]) => `| ${key} | ${value} |`).join("\n") + `\n\n` +
-  `## Reading these profiles\n\n` +
-  `- \`local.*\` rules are pricing hypotheses for small, standard or intensive local work. They are not evidence of direct server cost, and should be validated with user research and value/effort tests.\n` +
-  `- \`cloud.*\` rules require measured provider/infrastructure cost, retry/fallback accounting and margin calculations before a quote can be charged.\n` +
-  `- Tools whose \`engineType\` is \`ai\` may expose an optional AI-assist path; their normal deterministic/local path must not automatically be charged as an AI request. The AI operation should be metered separately when invoked.\n` +
-  `- Usage-sensitive tools require their handler to supply measurements (for example audio duration, image pixel count, document pages, video duration/resolution). The registry lists the dimensions that must be captured. Do not bill them with a guessed number of units.\n` +
-  `- \`src/data/billing-profiles.json\` is generated; change \`scripts/generate-billing-profiles.mjs\` then re-run generation rather than editing profile rows by hand.\n\n` +
-  `## Required next audit actions\n\n` +
-  `1. Sample each billing rule and verify the actual entry point and whether it runs locally, remotely or through an optional remote assist.\n` +
-  `2. Instrument input/output dimensions and measure representative light, normal and heavy workloads.\n` +
-  `3. Capture provider invoices/rates, retries, cache hits, failed jobs, storage and bandwidth costs.\n` +
-  `4. Calculate margins after provider fees, app-store fees, refunds and promotional credits.\n` +
-  `5. Remove pricing for any tool that cannot show a credible estimate before execution; ship it as free or premium capability until measured.\n` +
-  `6. Turn on billing only after entitlement enforcement, ledger settlement and production tests are complete.\n`;
+const fullCountBy = (key) => Object.fromEntries([...allGeneratedProfiles.reduce((map, profile) => map.set(profile[key], (map.get(profile[key]) ?? 0) + 1), new Map())].sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
+const fullByRule = fullCountBy("billingKey");
+const fullByExecution = fullCountBy("executionMode");
+const report = [
+  "# enV catalogue-wide per-tool billing audit — 2026-11-25",
+  "",
+  "Generated from the authoritative Web catalogue and native runtime-extension registry. Every tool ID receives an individually addressable profile. Local workload rates are draft value/usage estimates, not measured handset CPU costs. Variable AI/provider and remote infrastructure work remain usage/invoice-driven. No profile in this report is approved for live token deductions.",
+  "",
+  "- Base catalogue tools: " + profiles.length.toLocaleString("en-US"),
+  "- Runtime extension tools: " + runtimeExtensionProfiles.length.toLocaleString("en-US"),
+  "- Total profiles: " + allGeneratedProfiles.length.toLocaleString("en-US"),
+  "- Local/web-local profiles with numeric workload tariffs: " + localProposals.length.toLocaleString("en-US"),
+  "- Direct AI profiles with model-rate metering: " + aiProposals.length.toLocaleString("en-US"),
+  "- Remote profiles awaiting provider/infrastructure allocation: " + infrastructurePending.length.toLocaleString("en-US"),
+  "- Android native inventory IDs covered: " + nativeToolCoverage.Android.toLocaleString("en-US"),
+  "- iOS native inventory IDs covered: " + nativeToolCoverage.iOS.toLocaleString("en-US"),
+  "",
+  "## Execution distribution",
+  "",
+  "| Execution mode | Tools |",
+  "|---|---:|",
+  ...Object.entries(fullByExecution).map(([key, count]) => "| " + key + " | " + count + " |"),
+  "",
+  "## Billing classification distribution",
+  "",
+  "| Billing key | Tools |",
+  "|---|---:|",
+  ...Object.entries(fullByRule).map(([key, count]) => "| \`" + key + "\` | " + count + " |"),
+  "",
+  "## Pricing interpretation",
+  "",
+  "- Local/web-local tools receive an individual numeric draft rate, tool-specific unit, workload tier, formula, factors and metering dimensions. The selected unit must be calculated from the operation actually completed.",
+  "- Direct AI tools are priced from the selected provider/model's input/output tokens, audio seconds or compute seconds. Returned usage is recorded with model-registry estimated cost, retries/fallback indicators and a provisional margin. This is not a final provider invoice.",
+  "- Other cloud/remote tools remain unpriced until per-tool provider invoices and infrastructure allocations can be recorded. Do not divide Render service-wide graphs across tools as though they were tool-level invoices.",
+  "- The separate 267-tool ad-free access/session rate is not an operation price and does not replace the per-tool workload schedule.",
+  "- Ad eligibility is determined by the separate Adsterra policy; a billing profile never grants ad eligibility.",
+  "- Every row remains manual-audit-required and non-billable until benchmarks, exact measurement wiring, finance approval, reservations, settlement and production tests are complete.",
+  "",
+  "## Generated source of truth",
+  "",
+  "- \`src/data/billing-profiles.json\`: full profile for each base catalogue tool.",
+  "- \`src/data/billing-profile-runtime-extensions.json\`: additional native/runtime tools.",
+  "- \`src/lib/billing/proposed-pricing.mjs\`: deterministic draft workload calculator.",
+  "- \`docs/billing-proposed-prices-2026-11-25.md\`: local rate distribution and per-tool pricing policy.",
+].join("\\n");
 await writeFile(join(root, "docs/billing-tool-audit-2026-10-18.md"), report);
 console.log(`[billing-profile] generated ${profiles.length} Web tool profiles; native coverage Android=${nativeToolCoverage.Android}, iOS=${nativeToolCoverage.iOS}. Local=${byExecution["local-device"] ?? 0}; remote=${byExecution["cloud-or-remote"] ?? 0}; rules=${JSON.stringify(byRule)}`);
