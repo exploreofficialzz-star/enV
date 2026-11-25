@@ -381,6 +381,52 @@ internal class NativeCatalogSearchIndex(tools: List<ToolRecord>) {
     }
 }
 
+/** Web-only records retained in the native search corpus solely to preserve Web IDF and ranking parity.
+ * They are removed from returned results and are not added to the native catalogue or route registry.
+ */
+internal val webOnlySearchReferenceIds = setOf("scene-studio", "smartphone-prototype-lab")
+
+private val webOnlySearchReferenceTools = listOf(
+    ToolRecord(
+        id = "scene-studio",
+        name = "Scene Studio",
+        slug = "scene-studio",
+        description = "Create local 2D and 3D animated scenes with structured scene data, validation, preview, captions, audio layers, project-bundle saving and MP4 export where browser support allows.",
+        category = "video",
+        keywords = listOf("scene studio", "3d", "2d", "animation", "video maker", "scene", "ai video", "chatbot", "json scene", "captions", "subtitles", "mp4", "render", "export video", "cinematic", "no code", "motion graphics", "babylon"),
+        tags = listOf("3d", "2d", "animation", "video", "captions", "ai", "creator", "no code"),
+        icon = "Clapperboard",
+        popularity = 1250,
+        featured = false,
+        clientSide = true,
+        requiresBackend = false,
+        requiresAuth = false,
+        status = "active",
+        related = listOf("video-trimmer", "video-compressor", "video-poster-generator"),
+        engine = EngineInfo("custom", "scene-studio"),
+        subcategory = "Scene editing",
+    ),
+    ToolRecord(
+        id = "smartphone-prototype-lab",
+        name = "Smartphone Prototype Lab",
+        slug = "smartphone-prototype-lab",
+        description = "Explore a generic smartphone as an interactive 3D production model. Inspect the display stack, motherboard packages, cameras, power systems, materials and factory assembly sequence.",
+        category = "design",
+        keywords = listOf("smartphone", "phone", "prototype", "3d", "3d model", "product engineering", "manufacturing", "production", "hardware", "electronics", "motherboard", "pcb", "soc", "cpu", "gpu", "npu", "ram", "storage", "display", "oled", "lcd", "camera", "battery", "assembly"),
+        tags = listOf("smartphone", "3d", "engineering", "manufacturing", "hardware", "electronics", "product design"),
+        icon = "Smartphone",
+        popularity = 1350,
+        featured = false,
+        clientSide = true,
+        requiresBackend = false,
+        requiresAuth = false,
+        status = "active",
+        related = emptyList(),
+        engine = EngineInfo("custom", "smartphone-prototype-lab"),
+        subcategory = "Product engineering",
+    ),
+)
+
 /** The Web and assistant use the same pool; legacy related-reference records are included exactly once. */
 internal fun Catalog.searchableToolsForSearch(includeRelatedReferences: Boolean): List<ToolRecord> {
     val source = if (includeRelatedReferences) tools + relatedReferenceTools else tools
@@ -390,5 +436,7 @@ internal fun Catalog.searchableToolsForSearch(includeRelatedReferences: Boolean)
             it.id != "audio-analyze-studio"
     }
     val accessibility = accessibilityDiscoveryTools().filter { it.category == "accessibility" }
-    return (general + accessibility + developerStudioTools()).distinctBy { it.id }
+    // Preserve the exact Web corpus for IDF/ranking, while the public native search wrapper
+    // filters these Web-only references from every returned result.
+    return (general + accessibility + developerStudioTools() + webOnlySearchReferenceTools).distinctBy { it.id }
 }

@@ -30,12 +30,8 @@ class NativeCatalogSearchTest {
         val searchable = catalog.searchableToolsForSearch(includeRelatedReferences = true)
         val fixture = JSONObject(File(root, "audit/discovery/search-eval/native-golden.v1.json").readText())
         val expectedPoolSize = fixture.getInt("poolSize")
-        assertEquals(
-            "Android excludes Web-only Scene Studio and Smartphone Prototype Lab from native search.",
-            expectedPoolSize - 2,
-            searchable.size,
-        )
-        assertEquals(false, searchable.any { it.id == "scene-studio" || it.id == "smartphone-prototype-lab" })
+        assertEquals("Android ranking corpus must retain the complete Web golden corpus.", expectedPoolSize, searchable.size)
+        assertTrue(catalog.webSearch("scene studio", limit = Int.MAX_VALUE, includeRelatedReferences = true).none { it.id in webOnlySearchReferenceIds })
 
         val cases = fixture.getJSONArray("cases")
         for (index in 0 until cases.length()) {
@@ -43,8 +39,10 @@ class NativeCatalogSearchTest {
             val query = testCase.getString("query")
             val expectedJson = testCase.getJSONArray("top10")
             val expected = (0 until expectedJson.length()).map { expectedJson.getString(it) }
+                .filterNot { it in webOnlySearchReferenceIds }
             val actual = catalog.webSearch(query, limit = 10, includeRelatedReferences = true).map { it.id }
-            assertEquals("Native/Web search mismatch for query: '$query'", expected, actual)
+            assertEquals("Native/Web search mismatch for query: '$query'", expected, actual.take(expected.size))
+            assertTrue("Native search must not expose Web-only tools for query '$query'.", actual.none { it.id in webOnlySearchReferenceIds })
         }
     }
 

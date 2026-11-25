@@ -365,7 +365,13 @@ fun Catalog.withCameraStudio(): Catalog {
 }
 
 fun Catalog.webSearch(query: String, limit: Int = Int.MAX_VALUE, includeRelatedReferences: Boolean = false): List<ToolRecord> {
-    return webSearchIndex(includeRelatedReferences).search(query, limit)
+    if (limit <= 0) return emptyList()
+    val expandedLimit = if (limit > Int.MAX_VALUE - webOnlySearchReferenceIds.size) Int.MAX_VALUE else limit + webOnlySearchReferenceIds.size
+    return webSearchIndex(includeRelatedReferences).search(query, expandedLimit)
+        .asSequence()
+        .filterNot { it.id in webOnlySearchReferenceIds }
+        .take(limit)
+        .toList()
 }
 
 fun Catalog.search(query: String, categoryId: String? = null): List<ToolRecord> {

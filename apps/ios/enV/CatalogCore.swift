@@ -1021,6 +1021,51 @@ private final class NativeCatalogSearchIndex {
     ]
 }
 
+private let webOnlyNativeSearchReferenceIDs: Set<String> = ["scene-studio", "smartphone-prototype-lab"]
+
+private let webOnlyNativeSearchReferences: [Tool] = [
+    Tool(
+        id: "scene-studio",
+        name: "Scene Studio",
+        slug: "scene-studio",
+        description: "Create local 2D and 3D animated scenes with structured scene data, validation, preview, captions, audio layers, project-bundle saving and MP4 export where browser support allows.",
+        category: "video",
+        subcategory: "Scene editing",
+        keywords: ["scene studio", "3d", "2d", "animation", "video maker", "scene", "ai video", "chatbot", "json scene", "captions", "subtitles", "mp4", "render", "export video", "cinematic", "no code", "motion graphics", "babylon"],
+        tags: ["3d", "2d", "animation", "video", "captions", "ai", "creator", "no code"],
+        icon: "Clapperboard",
+        popularity: 1250,
+        featured: false,
+        clientSide: true,
+        requiresBackend: false,
+        requiresAuth: false,
+        status: "active",
+        disclaimer: nil,
+        related: ["video-trimmer", "video-compressor", "video-poster-generator"],
+        engine: ToolEngine(type: "custom", id: "scene-studio", op: nil)
+    ),
+    Tool(
+        id: "smartphone-prototype-lab",
+        name: "Smartphone Prototype Lab",
+        slug: "smartphone-prototype-lab",
+        description: "Explore a generic smartphone as an interactive 3D production model. Inspect the display stack, motherboard packages, cameras, power systems, materials and factory assembly sequence.",
+        category: "design",
+        subcategory: "Product engineering",
+        keywords: ["smartphone", "phone", "prototype", "3d", "3d model", "product engineering", "manufacturing", "production", "hardware", "electronics", "motherboard", "pcb", "soc", "cpu", "gpu", "npu", "ram", "storage", "display", "oled", "lcd", "camera", "battery", "assembly"],
+        tags: ["smartphone", "3d", "engineering", "manufacturing", "hardware", "electronics", "product design"],
+        icon: "Smartphone",
+        popularity: 1350,
+        featured: false,
+        clientSide: true,
+        requiresBackend: false,
+        requiresAuth: false,
+        status: "active",
+        disclaimer: nil,
+        related: [],
+        engine: ToolEngine(type: "custom", id: "smartphone-prototype-lab", op: nil)
+    )
+]
+
 private final class NativeCatalogSearchCache: @unchecked Sendable {
     static let shared = NativeCatalogSearchCache()
 
@@ -1033,7 +1078,9 @@ private final class NativeCatalogSearchCache: @unchecked Sendable {
             $0.category != "accessibility" && !$0.tags.contains("developer-studio") && $0.id != "audio-analyze-studio"
         }
         let accessibility = catalog.accessibilityDiscoveryTools().filter { $0.category == "accessibility" }
-        let all = general + accessibility + catalog.developerStudioTools()
+        // These Web-only records participate in corpus IDF/ranking but are never returned
+        // to native callers and are not registered in either native tool catalogue.
+        let all = general + accessibility + catalog.developerStudioTools() + webOnlyNativeSearchReferences
         var seen = Set<String>()
         let candidates = all.filter { seen.insert($0.id).inserted }
 
@@ -1058,7 +1105,14 @@ private final class NativeCatalogSearchCache: @unchecked Sendable {
             indexes[fingerprint] = index
         }
         lock.unlock()
-        return index.search(query, limit: limit)
+        guard limit > 0 else { return [] }
+        let expandedLimit = limit > Int.max - webOnlyNativeSearchReferenceIDs.count
+            ? Int.max
+            : limit + webOnlyNativeSearchReferenceIDs.count
+        return index.search(query, limit: expandedLimit)
+            .filter { !webOnlyNativeSearchReferenceIDs.contains($0.id) }
+            .prefix(limit)
+            .map { $0 }
     }
 }
 

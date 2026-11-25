@@ -96,8 +96,10 @@ final class CatalogCoreTests: XCTestCase {
         for testCase in cases {
             let query = try XCTUnwrap(testCase["query"] as? String)
             let expected = try XCTUnwrap(testCase["top10"] as? [String])
+                .filter { !webOnlyNativeSearchReferenceIDs.contains($0) }
             let actual = nativeCatalog.webSearch(query, limit: 10, includeRelatedReferences: true).map(\.id)
-            XCTAssertEqual(actual, expected, "Native/Web search mismatch for query: '\(query)'")
+            XCTAssertEqual(Array(actual.prefix(expected.count)), expected, "Native/Web search mismatch for query: '\(query)'")
+            XCTAssertFalse(actual.contains(where: { webOnlyNativeSearchReferenceIDs.contains($0) }), "Native search must not return Web-only tools for query: '\(query)'")
         }
     }
 
