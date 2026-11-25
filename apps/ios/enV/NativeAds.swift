@@ -104,7 +104,8 @@ enum NativeAdsPolicy {
         let restrictedDisclaimers: Set<String> = ["health", "finance", "earnings"]
         let restrictedCategories: Set<String> = [
             "health", "finance", "earnings", "fitness", "personal",
-            "ai", "developer", "accessibility", "lab", "labs"
+            "ai", "developer", "accessibility", "lab", "labs",
+            "studio", "studios", "laboratory", "laboratories", "sandbox"
         ]
         let localEngineTypes: Set<String> = [
             "calculator", "converter", "datetime", "text", "codec", "color", "qr",
@@ -149,14 +150,14 @@ enum NativeAdsPolicy {
 
         let engineType = (tool.engine.type ?? "").lowercased()
         let operation = (tool.engine.op ?? "").lowercased()
-        let identity = ([tool.id, tool.name, tool.subcategory ?? "", engineType, tool.engine.id ?? ""] +
+        let identity = ([tool.id, tool.name, tool.description, tool.category, tool.subcategory ?? "", engineType, tool.engine.id ?? ""] +
                         tool.tags + tool.keywords)
             .joined(separator: " ")
             .replacingOccurrences(of: "-", with: " ")
             .replacingOccurrences(of: "_", with: " ")
             .lowercased()
         let excludedConcept = identity.range(
-            of: #"\b(studio|studios|lab|labs|laboratory|laboratories|sandbox|ai|artificial intelligence)\b"#,
+            of: #"\b(studio|studios|lab|labs|laboratory|laboratories|sandbox|ai|artificial intelligence|high[- ]?end|premium|frontier)\b"#,
             options: .regularExpression
         ) != nil
         let localExecution = localEngineTypes.contains(engineType) ||
