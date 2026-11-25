@@ -11,10 +11,11 @@ export default defineHandler((event) => {
   const profile = getToolBillingProfile(toolId);
   if (!profile) return jsonResponse({ ok: false, error: "UNKNOWN_TOOL", message: "No billing profile exists for this tool." }, 404);
   const { pricingVersion } = getBillingProfileIndexSummary();
+  const { adsEligible: _legacyAdsEligible, ...toolBillingProfile } = profile as typeof profile & { adsEligible?: boolean };
   return jsonResponse({
     ok: true,
     data: {
-      ...profile,
+      ...toolBillingProfile,
       pricingVersion,
       // Return this tool's actual generated resource dimensions and execution class.
       // Shared billing-key estimates remain provisional and must not become charges.
