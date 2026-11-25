@@ -1011,6 +1011,7 @@ private final class NativeCatalogSearchIndex {
         "pdf-merger": ["pdf joiner"],
         "image-compressor": ["image size reducer", "reduce image size"],
         "image-resizer": ["change image size"],
+        "profile-picture-maker": ["picture resize", "profile picture resize", "avatar resize"],
         "qr-generator": ["qr maker", "qr code maker"],
         "json-formatter": ["json viewer", "format json online"],
         "video-to-mp3": ["mp4 to mp3", "convert mp4 to mp3"],
@@ -1020,7 +1021,7 @@ private final class NativeCatalogSearchIndex {
         "heic-converter": ["iphone photo to jpg", "heic to jpg"],
         "file-png-to-jpg-converter": ["png to jpeg"],
         "lorem-ipsum-generator": ["dummy text", "placeholder text"],
-        "regex-tester": ["test regular expression", "regexp tester"]
+        "regex-studio": ["test regular expression", "regexp tester"]
     ]
 }
 
