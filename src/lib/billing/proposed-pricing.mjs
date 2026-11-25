@@ -363,7 +363,7 @@ export function calculateProposedToolUnits(unitLabel, measurements) {
     "audioSeconds", "durationSeconds", "videoSeconds", "videoWidth", "videoHeight",
     "framesPerSecond", "fps", "pageCount", "pages", "inputBytes", "archiveBytes",
     "processedBytes", "renderSeconds", "assetCount", "outputCount", "codeCount",
-    "recordCount", "documentCount", "credentialCount", "lookupCount", "requestCount",
+    "recordCount", "documentCount", "credentialCount", "lookupCount", "requestCount", "sampleRate", "channels",
     "profileCount", "comparisonCount", "timezoneCount", "designOperationCount",
     "componentCount", "workflowCount", "projectCount", "mediaSeconds",
   ]);
@@ -389,8 +389,10 @@ export function calculateProposedToolUnits(unitLabel, measurements) {
   };
   const operationCount = () => metric("operationCount", "count", "itemCount") ?? 1;
   const pixels = () => {
-    const direct = metric("pixelCount", "inputPixels", "processedPixels");
-    if (direct !== null) return direct;
+    const totalPixels = metric("pixelCount");
+    if (totalPixels !== null) return totalPixels;
+    const perImagePixels = metric("inputPixels", "processedPixels");
+    if (perImagePixels !== null) return perImagePixels * (metric("imageCount", "fileCount") ?? 1);
     const width = required("width", "imageWidth");
     const height = required("height", "imageHeight");
     return width * height * (metric("imageCount", "fileCount") ?? 1);
@@ -420,9 +422,15 @@ export function calculateProposedToolUnits(unitLabel, measurements) {
     case "megapixel-scan":
       units = pixels() / 1_000_000;
       break;
-    case "audio-minute":
-      units = durationMinutes("audioSeconds", "durationSeconds");
+    case "audio-minute": {
+      const minutes = durationMinutes("audioSeconds", "durationSeconds");
+      const sampleRate = metric("sampleRate");
+      const channels = metric("channels");
+      const sampleMultiplier = sampleRate !== null ? Math.max(1, sampleRate / 48_000) : 1;
+      const channelMultiplier = channels !== null ? Math.max(1, channels / 2) : 1;
+      units = minutes * sampleMultiplier * channelMultiplier;
       break;
+    }
     case "video-minute-720p": {
       const minutes = durationMinutes("videoSeconds", "durationSeconds");
       const width = metric("width", "videoWidth");
