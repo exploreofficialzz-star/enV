@@ -58,6 +58,7 @@ const androidToolScreens = await read("apps/android/app/src/main/java/com/chaste
 const iosPricing = await read("apps/ios/enV/ContentViews.swift");
 const iosToolScreens = await read("apps/ios/enV/ToolViews.swift");
 const quoteRoute = await read("server/routes/api/billing/quote.post.ts");
+const toolAccessRoute = await read("server/routes/api/billing/tool-access.post.ts");
 const toolProfileServer = await read("src/lib/billing/tool-profiles.server.ts");
 const toolProfileRoute = await read("server/routes/api/billing/tool.get.ts");
 const ledger = await read("src/lib/billing/ledger.server.ts");
@@ -141,6 +142,8 @@ for (const route of [localDocumentRoute, localImageRoute, localPdfRoute, localSc
 }
 assert.doesNotMatch(adminUsageRoute, /select[^;]*user_id/i, "admin aggregate report must not query user identities");
 assert.match(quoteRoute, /hasActiveEntitlement\(userId, "premium"\)/, "premium access must come from server-side entitlement state");
+assert.match(toolAccessRoute, /action === "reserve" && !isToolAccessBillingEnabled\(\)/, "the server must enforce launch controls before reserving tokens");
+assert.match(toolAccessRoute, /BILLING_NOT_ACTIVE/, "new reservations must fail closed when billing launch controls are not approved");
 assert.match(catalog, /TOKEN_SUBUNITS_PER_TOKEN = 1_000/);
 assert.match(catalog, /realPaymentsEnabled: false/);
 assert.match(walletRoute, /requireBillingUser/);
