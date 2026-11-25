@@ -1,5 +1,5 @@
 /** Server-only index of per-tool billing profiles generated from the master catalogue. */
-import profileIndex from "../../data/billing-profile-index.json";
+import profileIndex from "../../data/billing-profiles.json";
 import runtimeExtensionIndex from "../../data/billing-profile-runtime-extensions.json";
 
 export type ToolBillingPricingMode = "per-unit-hypothesis" | "measured-provider-cost";
