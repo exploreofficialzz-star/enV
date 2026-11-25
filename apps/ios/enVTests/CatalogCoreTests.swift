@@ -248,7 +248,7 @@ final class CatalogCoreTests: XCTestCase {
         XCTAssertFalse(native.tools.contains { $0.id == "connection-info" })
         XCTAssertTrue((native.relatedReferenceTools ?? []).contains { $0.id == "connection-info" })
         XCTAssertEqual(
-            native.relatedTools(for: nativeCurrent, limit: 2).map(\\.id),
+            native.relatedTools(for: nativeCurrent, limit: 2).map(\.id),
             ["connection-info", "word-count"]
         )
     }
