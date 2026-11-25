@@ -4,6 +4,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { refineGeneratedToolDescription } from "../src/lib/generated-tool-copy.mjs";
 import { applyGenericWorkflowPolicy } from "../src/lib/generic-workflow-policy.mjs";
+import { presentGeneratedCalculator } from "../src/lib/calc/generated-calculator-presentation.ts";
 
 const root = new URL("../", import.meta.url);
 const catalogSource = readFileSync(new URL("../src/data/catalog.ts", import.meta.url), "utf8");
@@ -18,7 +19,7 @@ const [{ tools }, { CATEGORIES: categories }, { DATETIME_TOOL_EXTENSIONS }, { ge
 // The shipped native catalog remains separately assembled below with its intentional extensions.
 const canonicalRuntimeTools = getAllTools();
 
-const publishedCatalogTools = applyGenericWorkflowPolicy(tools);
+const publishedCatalogTools = applyGenericWorkflowPolicy(tools).map(presentGeneratedCalculator);
 const canonicalRuntimeById = new Map(canonicalRuntimeTools.map((tool) => [tool.id, tool]));
 const refinedCatalogTools = publishedCatalogTools.map((tool) => {
   if (tool.id === "music-live-video-studio") {
