@@ -92,7 +92,7 @@ function profile(tool) {
     }
   } else {
     executionMode = "local-device";
-    if (tool.category === "calculators" || (tool.category === "business" && isCalculatorLike(tool)) || (tool.category === "video" && isCalculatorLike(tool))) {
+    if (tool.engine?.type === "calculator" || tool.category === "calculators" || (tool.category === "business" && isCalculatorLike(tool)) || (tool.category === "video" && isCalculatorLike(tool))) {
       billingKey = "local.calculator";
       classificationReason = "Local execution metadata plus calculator/formula intent.";
     } else if (tool.category === "converters" || tool.engine?.type === "converter" || tool.engine?.type === "file-converter") {
