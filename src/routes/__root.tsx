@@ -8,6 +8,7 @@ import { webmasterVerificationMeta, websiteSchema, isIndexableTool } from "@/lib
 import { getToolByPath, getToolsByCategory } from "@/lib/registry";
 import type { CategoryId } from "@/types/tool";
 import { businessStudioAnchorSlug } from "@/lib/business-studios-catalog";
+import { decodeDiscoveryState, isIndexableDiscoveryState } from "@/lib/discovery-filters";
 import { VIEW_MODE_BOOTSTRAP_SCRIPT } from "@/lib/view-mode";
 
 const APP_NAME = "enV";
@@ -19,12 +20,23 @@ const NON_INDEXABLE_PATHS = [
   "/token-dashboard", "/tokens", "/wallet", "/userbehavior", "/updates", "/3d-game-studio",
 ];
 
-function routeRobotsPolicy(matches?: Array<{ pathname: string; routeId?: string }>) {
+function routeRobotsPolicy(matches?: Array<{
+  pathname: string;
+  routeId?: string;
+  search?: Record<string, unknown>;
+}>) {
   const pathname = matches?.[matches.length - 1]?.pathname ?? "/";
   const path = pathname.replace(/\/+$/, "") || "/";
   const hasPageRoute = matches?.some((match) => Boolean(match.routeId) && match.routeId !== "__root__") ?? false;
   const notFoundRoute = matches?.some((match) => /not.?found/i.test(match.routeId ?? "")) ?? false;
   const privateRoute = NON_INDEXABLE_PATHS.some((prefix) => path === prefix || path.startsWith(prefix + "/"));
+  if (path === "/tools") {
+    const toolsIndexMatch = [...(matches ?? [])].reverse().find(
+      (match) => (match.pathname.replace(/\/+$/, "") || "/") === "/tools",
+    );
+    const discoveryState = decodeDiscoveryState(toolsIndexMatch?.search ?? {});
+    if (!isIndexableDiscoveryState(discoveryState)) return "noindex,follow";
+  }
   const toolRoute = path.match(/^\/tools\/([^/]+)\/([^/]+)$/);
   const categoryRoute = path.match(/^\/tools\/([^/]+)$/);
   if (!hasPageRoute || notFoundRoute || path === "/search" || privateRoute) return "noindex,nofollow";
