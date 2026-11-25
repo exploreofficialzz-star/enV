@@ -48,6 +48,12 @@ const refinedCatalogTools = publishedCatalogTools.map((tool) => {
   }
   const description = refineGeneratedToolDescription(tool);
   return description === tool.description ? tool : { ...tool, description };
+}).map((tool) => {
+  const runtimeTool = canonicalRuntimeById.get(tool.id);
+  if (!runtimeTool) return tool;
+  const related = runtimeTool.related ?? [];
+  if (related.length === (tool.related ?? []).length && related.every((id, index) => id === tool.related?.[index])) return tool;
+  return { ...tool, related };
 });
 
 const exportedCssMinifier = refinedCatalogTools.find((tool) => tool.id === "css-minifier-advanced");
