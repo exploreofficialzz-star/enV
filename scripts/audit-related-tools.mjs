@@ -1,51 +1,118 @@
-// Related-tool link audit (requirements §3.7). Registry-level; does not judge semantic usefulness.
+// Related-tool audit (requirements §3.7). Measures destinations actually rendered by the canonical resolvers.
 //   node --experimental-strip-types --import ./scripts/register-ts-alias.mjs scripts/audit-related-tools.mjs [--write]
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
-import { getAllTools, getSearchableTools } from "../src/lib/registry.ts";
+import { getAllTools, getSearchableTools, getRelatedTools } from "../src/lib/registry.ts";
 import { evaluateRelatedToolsBaseline } from "./related-tools-baseline.mjs";
 
-const all = getAllTools(); const byId = new Map(all.map((t) => [t.id, t])); const searchable = new Map(getSearchableTools().map((t) => [t.id, t]));
-const active = all.filter((t) => t.status !== "planned");
-const m = { tools: active.length, withNoRelated: [], underThree: 0, dangling: [], self: [], duplicateTargets: [], toPlanned: [], toUndiscoverable: [], total: 0, reciprocal: 0, sameCategory: 0, crossCategory: 0 };
-for (const t of active) {
-  const rel = t.related ?? [];
-  if (!rel.length) m.withNoRelated.push(t.id); else if (rel.length < 3) m.underThree += 1;
-  if (new Set(rel).size !== rel.length) m.duplicateTargets.push(t.id);
-  for (const id of rel) {
-    m.total += 1;
-    const target = byId.get(id);
-    if (id === t.id) m.self.push(t.id);
-    if (!target) { m.dangling.push(`${t.id}->${id}`); continue; }
-    if (target.status === "planned") m.toPlanned.push(`${t.id}->${id}`);
-    if (!searchable.has(id) && target.status !== "planned") m.toUndiscoverable.push(`${t.id}->${id}`);
-    if ((target.related ?? []).includes(t.id)) m.reciprocal += 1;
-    if (target.category === t.category) m.sameCategory += 1; else m.crossCategory += 1;
+const runtime = getAllTools();
+const searchable = new Map(getSearchableTools().map((tool) => [tool.id, tool]));
+const active = [...searchable.values()].filter((tool) => tool.status === "active" || tool.status === "beta");
+const displayById = new Map(active.map((tool) => [tool.id, getRelatedTools(tool, 6)]));
+const displayIdSets = new Map(
+  [...displayById].map(([id, tools]) => [id, new Set(tools.map((tool) => tool.id))]),
+);
+const metrics = {
+  tools: active.length,
+  noRelated: [],
+  underThree: 0,
+  dangling: [],
+  self: [],
+  duplicateTargets: [],
+  toPlanned: [],
+  toUndiscoverable: [],
+  total: 0,
+  reciprocal: 0,
+  sameCategory: 0,
+  crossCategory: 0,
+};
+const declared = {
+  toolsWithNoDeclaredLinks: runtime.filter((tool) => (tool.related ?? []).length === 0).map((tool) => tool.id),
+  rawLinkCount: runtime.reduce((sum, tool) => sum + (tool.related ?? []).length, 0),
+  rawSelfReferences: [],
+  rawDuplicates: [],
+};
+
+for (const tool of runtime) {
+  const ids = tool.related ?? [];
+  if (ids.includes(tool.id)) declared.rawSelfReferences.push(tool.id);
+  if (new Set(ids).size !== ids.length) declared.rawDuplicates.push(tool.id);
+}
+
+for (const tool of active) {
+  const related = displayById.get(tool.id) ?? [];
+  const ids = related.map((item) => item.id);
+  if (ids.length === 0) metrics.noRelated.push(tool.id);
+  else if (ids.length < 3) metrics.underThree += 1;
+  if (new Set(ids).size !== ids.length) metrics.duplicateTargets.push(tool.id);
+
+  for (const target of related) {
+    metrics.total += 1;
+    if (!searchable.has(target.id)) metrics.dangling.push(`${tool.id}->${target.id}`);
+    if (target.id === tool.id) metrics.self.push(tool.id);
+    if (target.status === "planned") metrics.toPlanned.push(`${tool.id}->${target.id}`);
+    if (!searchable.has(target.id) && target.status !== "planned") {
+      metrics.toUndiscoverable.push(`${tool.id}->${target.id}`);
+    }
+    if (displayIdSets.get(target.id)?.has(tool.id)) metrics.reciprocal += 1;
+    if (target.category === tool.category) metrics.sameCategory += 1;
+    else metrics.crossCategory += 1;
   }
 }
-const pct = (n) => (100 * n / Math.max(1, m.total)).toFixed(1) + "%";
-const lines = ["# Related-tool link audit", "", "Registry-level integrity of `related` links among non-planned tools. It does not judge whether a suggestion is semantically useful.", "",
-  `- Active/beta tools audited: ${m.tools}; related links: ${m.total}.`,
-  `- Tools with fewer than 3 related links: ${m.underThree}.`,
-  `- **Dangling targets (ID not in registry): ${m.dangling.length}**${m.dangling.length ? " — e.g. " + m.dangling.slice(0, 5).join(", ") : ""}.`,
-  `- **Self-references: ${m.self.length}**${m.self.length ? " — " + m.self.slice(0, 8).join(", ") : ""}; duplicate targets in one list: ${m.duplicateTargets.length}${m.duplicateTargets.length ? " — " + m.duplicateTargets.slice(0, 8).join(", ") : ""}.`,
-  `- **Links to planned tools: ${m.toPlanned.length}**${m.toPlanned.length ? " — e.g. " + m.toPlanned.slice(0, 5).join(", ") : ""}.`,
-  `- Links to active tools hidden from discovery: ${m.toUndiscoverable.length}${m.toUndiscoverable.length ? " — e.g. " + m.toUndiscoverable.slice(0, 5).join(", ") : ""}.`,
-  `- Reciprocal links: ${pct(m.reciprocal)}; same-category links: ${pct(m.sameCategory)}; cross-category links: ${pct(m.crossCategory)}.`, ""];
-const observedCounts = { dangling: m.dangling.length, self: m.self.length, toPlanned: m.toPlanned.length, toUndiscoverable: m.toUndiscoverable.length, noRelated: m.withNoRelated.length };
+
+const pct = (value) => (100 * value / Math.max(1, metrics.total)).toFixed(1) + "%";
+const lines = [
+  "# Related-tool audit",
+  "",
+  "This audit measures the canonical related-tool lists actually rendered by Web. Legacy IDs are resolved first; self, missing, duplicate, planned and non-searchable destinations are checked after canonicalization.",
+  "",
+  `- Active/searchable tools audited: ${metrics.tools}; rendered related destinations: ${metrics.total}.`,
+  `- Tools with fewer than 3 rendered suggestions: ${metrics.underThree}.`,
+  `- **Unresolved rendered targets: ${metrics.dangling.length}**${metrics.dangling.length ? " — " + metrics.dangling.slice(0, 5).join(", ") : ""}.`,
+  `- **Rendered self-references: ${metrics.self.length}**${metrics.self.length ? " — " + metrics.self.slice(0, 8).join(", ") : ""}; duplicate target lists: ${metrics.duplicateTargets.length}.`,
+  `- **Rendered links to planned tools: ${metrics.toPlanned.length}**.`,
+  `- Rendered links to non-searchable targets: ${metrics.toUndiscoverable.length}.`,
+  `- Reciprocal rendered links: ${pct(metrics.reciprocal)}; same-category links: ${pct(metrics.sameCategory)}; cross-category links: ${pct(metrics.crossCategory)}.`,
+  "",
+  "## Catalogue metadata coverage",
+  "",
+  `- Runtime records with no declared related IDs: ${declared.toolsWithNoDeclaredLinks.length}.`,
+  `- Declared raw related IDs: ${declared.rawLinkCount}; raw self-referencing records: ${declared.rawSelfReferences.length}; raw duplicate lists: ${declared.rawDuplicates.length}.`,
+  "- Empty declarations are not treated as broken links when the category resolver supplies valid adjacent tools. The runtime resolver remains the source of truth for what users can open.",
+  "",
+];
+const observedCounts = {
+  dangling: metrics.dangling.length,
+  self: metrics.self.length,
+  toPlanned: metrics.toPlanned.length,
+  toUndiscoverable: metrics.toUndiscoverable.length,
+  noRelated: metrics.noRelated.length,
+};
 const baselineUrl = new URL("../audit/discovery/related-tools-baseline.json", import.meta.url);
-const baselineDocument = fs.existsSync(fileURLToPath(baselineUrl)) ? JSON.parse(fs.readFileSync(fileURLToPath(baselineUrl), "utf8")) : null;
+const baselineDocument = fs.existsSync(fileURLToPath(baselineUrl))
+  ? JSON.parse(fs.readFileSync(fileURLToPath(baselineUrl), "utf8"))
+  : null;
 if (process.argv.includes("--update-baseline")) {
-  fs.writeFileSync(fileURLToPath(baselineUrl), JSON.stringify({ note: "Registered legacy link defects. Counts may shrink, never grow. Explicit noRelatedExceptions document intentional isolated tools and are validated against the live registry.", counts: observedCounts, noRelatedExceptions: baselineDocument?.noRelatedExceptions ?? [] }, null, 1) + "\n");
+  fs.writeFileSync(
+    fileURLToPath(baselineUrl),
+    JSON.stringify({
+      note: "Rendered resolver defects. Counts may shrink, never grow. Explicit noRelatedExceptions document only active tools for which no usable same-category fallback exists.",
+      counts: observedCounts,
+      noRelatedExceptions: baselineDocument?.noRelatedExceptions ?? [],
+    }, null, 1) + "\n",
+  );
 }
-const baseline = baselineDocument ? { ...baselineDocument, counts: baselineDocument.counts } : null;
-const comparison = evaluateRelatedToolsBaseline(observedCounts, baseline, byId);
-const allowed = comparison.exceptionIds;
-lines.push(`- Tools with no related links: ${m.withNoRelated.length}; documented intentional exceptions: ${allowed.length}${allowed.length ? " — " + allowed.join(", ") : ""}.`);
+const comparison = evaluateRelatedToolsBaseline(observedCounts, baselineDocument, new Map(runtime.map((tool) => [tool.id, tool])));
+lines.push(`- Tools with no rendered related suggestions: ${metrics.noRelated.length}; documented intentional exceptions: ${comparison.exceptionIds.length}${comparison.exceptionIds.length ? " — " + comparison.exceptionIds.join(", ") : ""}.`);
 if (comparison.errors.length) lines.push(`- **Invalid exception records:** ${comparison.errors.join("; ")}.`);
 lines.push("");
-lines.push(comparison.passed ? baseline ? "**PASS** — no unexplained category grew beyond the registered baseline (legacy defects remain; see counts)." : "**PASS** — no dangling, self or planned-target links." : `**FAIL** — ${comparison.violations.length} category(ies) grew beyond the registered baseline and ${comparison.errors.length} exception record(s) are invalid.`);
+lines.push(comparison.passed
+  ? "**PASS** — the rendered resolver has no unexplained broken related destinations (see catalogue metadata coverage above)."
+  : `**FAIL** — ${comparison.violations.length} rendered integrity category(ies) exceed the reviewed baseline and ${comparison.errors.length} exception record(s) are invalid.`);
 lines.push("");
-const text = lines.join("\n");
-if (process.argv.includes("--write")) fs.writeFileSync(fileURLToPath(new URL("../audit/discovery/RELATED-TOOLS-AUDIT.md", import.meta.url)), text);
-console.log(text); if (!comparison.passed) process.exitCode = 1;
+const report = lines.join("\n");
+if (process.argv.includes("--write")) {
+  fs.writeFileSync(fileURLToPath(new URL("../audit/discovery/RELATED-TOOLS-AUDIT.md", import.meta.url)), report);
+}
+console.log(report);
+if (!comparison.passed) process.exitCode = 1;
