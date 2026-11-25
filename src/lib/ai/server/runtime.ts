@@ -11,7 +11,7 @@ import { createConsoleLogger } from "./observability.ts";
 import { createAdapters } from "./providers/index.ts";
 import { createSessionLookup } from "./session.ts";
 import { recordUsageEvent } from "../../billing/ledger.server";
-import { PRICING_VERSION } from "../../billing/catalog";
+import { DEFAULT_GROSS_MARGIN_BPS, PRICING_VERSION, providerCostToSubunits, referenceUsdMicrosForSubunits } from "../../billing/catalog";
 
 export interface AiRuntime {
   core: AiCore;
@@ -40,6 +40,12 @@ export function getAiRuntime(): AiRuntime {
           if (estimatedCostUsdMicros !== null && (!Number.isSafeInteger(estimatedCostUsdMicros) || estimatedCostUsdMicros < 0)) {
             throw new Error("AI usage cost estimate was outside the supported accounting range.");
           }
+          const proposedBilledSubunits = estimatedCostUsdMicros === null
+            ? null
+            : providerCostToSubunits(estimatedCostUsdMicros, DEFAULT_GROSS_MARGIN_BPS);
+          const proposedSellUsdMicros = proposedBilledSubunits === null
+            ? null
+            : referenceUsdMicrosForSubunits(proposedBilledSubunits);
           await recordUsageEvent({
             userId: event.userId,
             executionId: event.requestId,
@@ -69,6 +75,11 @@ export function getAiRuntime(): AiRuntime {
               executionStatus: event.executionStatus,
               failedExecutionMayIncurProviderCost: event.executionStatus === "failed",
               providerCostCoverage: event.costBasis === "unknown" ? "unmeasured" : "model-registry-estimate",
+              proposedBilledSubunits,
+              proposedSellUsdMicros,
+              proposedGrossMarginBps: DEFAULT_GROSS_MARGIN_BPS,
+              proposedPriceStatus: estimatedCostUsdMicros === null ? "requires-cost-measurement" : "provisional",
+              proposedPriceBasis: "model-registry-estimate-not-provider-invoice",
               fallbackOrRetryCostsMayBeUnmeasured: event.executionStatus === "succeeded" && ((event.attempts ?? 0) > 1 || event.fallbackUsed),
               billingActive: false,
             },
