@@ -9,20 +9,32 @@ struct NativeArchiveToolDestinationView: View {
     @EnvironmentObject private var informationRouter: NativeInformationRouter
 
     var body: some View {
-        NativeRewardedToolAccessGate(tool: tool, onOpenWallet: {
-            informationRouter.open("wallet")
-        }) {
-            Group {
-                if tool.id == "zip-any-file" {
-                    NativeZipArchiveScreen()
-                } else if tool.id == "file-to-txt" {
-                    NativeFileToTextScreen()
-                } else if tool.category == "files" && tool.engine.type == "custom" {
-                    NativeFileWorkspaceScreen(toolID: tool.id)
-                } else {
-                    ToolDestinationView(tool: tool)
+        VStack(alignment: .leading, spacing: 12) {
+            NativeRewardedToolAccessGate(tool: tool, onOpenWallet: {
+                informationRouter.open("wallet")
+            }) {
+                Group {
+                    if tool.id == "zip-any-file" {
+                        NativeZipArchiveScreen()
+                    } else if tool.id == "file-to-txt" {
+                        NativeFileToTextScreen()
+                    } else if tool.category == "files" && tool.engine.type == "custom" {
+                        NativeFileWorkspaceScreen(toolID: tool.id)
+                    } else {
+                        ToolDestinationView(tool: tool)
+                    }
                 }
             }
+            Button {
+                informationRouter.open("token-tool:\(tool.id)")
+            } label: {
+                Label("Token details", systemImage: "coins")
+                    .font(.subheadline.weight(.medium))
+                    .frame(minHeight: 44)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Color.envMuted)
+            .accessibilityHint("Opens this tool's provisional workload rate and billing measurements")
         }
     }
 }
