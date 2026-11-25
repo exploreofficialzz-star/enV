@@ -25,14 +25,14 @@ export type DiscoveryFilters = {
   execution?: "native" | "handoff";
   processing?: "declared-client-side" | "declared-backend";
   signIn?: "required" | "not-required";
-  status?: "active" | "beta";
+  status?: "active" | "beta" | "planned";
 };
 
 const PLATFORMS: readonly string[] = ["web", "android", "ios"];
 const EXECUTIONS: readonly string[] = ["native", "handoff"];
 const PROCESSING: readonly string[] = ["declared-client-side", "declared-backend"];
 const SIGN_IN: readonly string[] = ["required", "not-required"];
-const STATUSES: readonly string[] = ["active", "beta"];
+const STATUSES: readonly string[] = ["active", "beta", "planned"];
 const CATEGORY_PATTERN = /^[a-z0-9-]{1,40}$/;
 
 /** Build an eligibility predicate. Applied BEFORE ranking so filters never reorder, only remove. */
