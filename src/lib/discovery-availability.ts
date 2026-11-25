@@ -10,7 +10,7 @@ type CompactAvailabilityIndex = {
 };
 
 const executionByToolId = new Map(
-  ((availabilityIndex as CompactAvailabilityIndex).rows ?? []).map(
+  ((availabilityIndex as unknown as CompactAvailabilityIndex).rows ?? []).map(
     ([id, android, ios]) => [id, { android, ios }] as const,
   ),
 );
