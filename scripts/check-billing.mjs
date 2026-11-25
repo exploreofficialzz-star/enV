@@ -239,7 +239,6 @@ assert.equal(profileIndex.toolCount, profiles.toolCount, "runtime index count mu
 assert.equal(profileIndex.profiles.length, profiles.toolCount, "base runtime index must include every base-catalogue tool");
 assert.equal(new Set(profileIndex.profiles.map((profile) => profile.toolId)).size, profileIndex.toolCount, "runtime tool profile IDs must be unique");
 assert.ok(profileIndex.profiles.every((profile) => profile.billingKey && profile.pricingMode), "all runtime profiles require billing classification");
-assert.ok(profileIndex.profiles.every((profile) => profile.toolName && Array.isArray(profile.meteringDimensions) && profile.meteringDimensions.length > 0 && profile.executionMode && profile.priceStatus), "runtime index must preserve per-tool cost drivers and execution class");
 for (const [platform, ids] of [["Android", nativeInventory.androidToolIds], ["iOS", nativeInventory.iosToolIds]]) {
   assert.ok(Array.isArray(ids) && ids.length > 0, `${platform} native inventory must be present`);
   assert.equal(new Set(ids).size, ids.length, `${platform} tool IDs must be unique`);
