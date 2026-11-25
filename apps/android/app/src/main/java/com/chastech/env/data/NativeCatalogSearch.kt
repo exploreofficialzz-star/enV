@@ -367,6 +367,7 @@ internal class NativeCatalogSearchIndex(tools: List<ToolRecord>) {
             "pdf-merger" to listOf("pdf joiner"),
             "image-compressor" to listOf("image size reducer", "reduce image size"),
             "image-resizer" to listOf("change image size"),
+            "profile-picture-maker" to listOf("picture resize", "profile picture resize", "avatar resize"),
             "qr-generator" to listOf("qr maker", "qr code maker"),
             "json-formatter" to listOf("json viewer", "format json online"),
             "video-to-mp3" to listOf("mp4 to mp3", "convert mp4 to mp3"),
@@ -376,7 +377,7 @@ internal class NativeCatalogSearchIndex(tools: List<ToolRecord>) {
             "heic-converter" to listOf("iphone photo to jpg", "heic to jpg"),
             "file-png-to-jpg-converter" to listOf("png to jpeg"),
             "lorem-ipsum-generator" to listOf("dummy text", "placeholder text"),
-            "regex-tester" to listOf("test regular expression", "regexp tester")
+            "regex-studio" to listOf("test regular expression", "regexp tester")
         )
     }
 }
