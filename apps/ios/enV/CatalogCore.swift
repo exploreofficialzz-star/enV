@@ -266,7 +266,7 @@ extension Catalog {
                     ? ($0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending)
                     : leftCategory < rightCategory
             },
-            relatedReferenceTools: withWorkspace.relatedReferenceTools
+            relatedReferenceTools: relatedReferenceTools
         )
     }
 }
@@ -338,12 +338,12 @@ extension Catalog {
             related: ["pdf-merger", "pdf-splitter", "pdf-text-extractor"],
             engine: ToolEngine(type: "custom", id: "a-book", op: "a-book", configuration: [:])
         )
-        let updated = withWorkspace.tools + [tool]
+        let updated = tools + [tool]
         return Catalog(
-            schemaVersion: withWorkspace.schemaVersion,
-            catalogVersion: withWorkspace.catalogVersion,
-            counts: CatalogCounts(total: updated.count, active: updated.filter { $0.status == "active" || $0.status == "beta" }.count, planned: withWorkspace.counts.planned, categories: withWorkspace.counts.categories),
-            categories: withWorkspace.categories,
+            schemaVersion: schemaVersion,
+            catalogVersion: catalogVersion,
+            counts: CatalogCounts(total: updated.count, active: updated.filter { $0.status == "active" || $0.status == "beta" }.count, planned: counts.planned, categories: counts.categories),
+            categories: categories,
             tools: updated.sorted {
                 let leftCategory = $0.category.lowercased()
                 let rightCategory = $1.category.lowercased()
@@ -420,12 +420,12 @@ extension Catalog {
             related: ["file-to-txt", "file-organizer", "file-compare"],
             engine: ToolEngine(type: "custom", id: "zip-any-file", op: "zip-any-file", configuration: [:])
         )
-        let updated = tools + [tool]
+        let updated = withWorkspace.tools + [tool]
         return Catalog(
-            schemaVersion: schemaVersion,
-            catalogVersion: catalogVersion,
-            counts: CatalogCounts(total: updated.count, active: updated.filter { $0.status == "active" || $0.status == "beta" }.count, planned: counts.planned, categories: counts.categories),
-            categories: categories,
+            schemaVersion: withWorkspace.schemaVersion,
+            catalogVersion: withWorkspace.catalogVersion,
+            counts: CatalogCounts(total: updated.count, active: updated.filter { $0.status == "active" || $0.status == "beta" }.count, planned: withWorkspace.counts.planned, categories: withWorkspace.counts.categories),
+            categories: withWorkspace.categories,
             tools: updated.sorted {
                 let leftCategory = $0.category.lowercased()
                 let rightCategory = $1.category.lowercased()
@@ -433,7 +433,7 @@ extension Catalog {
                     ? ($0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending)
                     : leftCategory < rightCategory
             },
-            relatedReferenceTools: relatedReferenceTools
+            relatedReferenceTools: withWorkspace.relatedReferenceTools
         )
     }
 
