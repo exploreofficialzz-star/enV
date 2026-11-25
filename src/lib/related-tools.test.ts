@@ -32,6 +32,27 @@ test("on the real registry no displayed related link is self, missing, planned o
   assert.equal(bad, 0, "Every active runtime tool must expose only unique, canonical, active, searchable related destinations.");
 });
 
+test("every runtime related array contains only canonical active searchable targets", () => {
+  const searchable = new Set(getSearchableTools().map((item) => item.id));
+  const violations: string[] = [];
+  for (const tool of getAllTools()) {
+    if (tool.status === "planned") continue;
+    const ids = tool.related ?? [];
+    if (new Set(ids).size !== ids.length) violations.push(tool.id + ": duplicate related IDs");
+    for (const id of ids) {
+      if (id === tool.id) violations.push(tool.id + ": self-reference");
+      const target = getToolById(id);
+      if (!target) {
+        violations.push(tool.id + "->" + id + ": unresolved target");
+        continue;
+      }
+      if (target.status === "planned") violations.push(tool.id + "->" + id + ": planned target");
+      if (!searchable.has(target.id)) violations.push(tool.id + "->" + id + ": non-searchable canonical target " + target.id);
+    }
+  }
+  assert.deepEqual(violations, []);
+});
+
 test("zero or negative display limits return no related tools", () => {
   const source = t("a", { related: ["b"] });
   const registry = new Map([["a", source], ["b", t("b")]]);
