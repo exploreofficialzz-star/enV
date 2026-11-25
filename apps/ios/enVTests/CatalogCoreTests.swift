@@ -114,7 +114,7 @@ final class CatalogCoreTests: XCTestCase {
     func testWebSearchUsesExactAndSynonymRankedMatches() {
         XCTAssertEqual(catalog.webSearch("case-converter").first?.id, "case-converter")
         XCTAssertEqual(catalog.webSearch("words").first?.id, "word-count")
-        XCTAssertEqual(catalog.webSearch("").map(\.id), ["future-tool", "case-converter", "word-count"])
+        XCTAssertEqual(catalog.webSearch("").map(\.id), ["case-converter", "word-count", "future-tool"])
     }
 
     func testAccessibilityDiscoveryUsesEightStudiosAndPreservesLegacyIDs() {
@@ -268,7 +268,7 @@ final class CatalogCoreTests: XCTestCase {
 
     func testCategoryFilterAndPopularityOrdering() {
         let store = CatalogStore(catalog: catalog)
-        XCTAssertEqual(store.tools(category: "text").map(\.id), ["future-tool", "case-converter", "word-count"])
+        XCTAssertEqual(store.tools(category: "text").map(\.id), ["case-converter", "word-count", "future-tool"])
         XCTAssertTrue(store.tools(category: "missing").isEmpty)
     }
 
