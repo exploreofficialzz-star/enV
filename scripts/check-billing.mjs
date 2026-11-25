@@ -172,17 +172,14 @@ assert.match(quoteRoute, /requires-cost-measurement/, "unapproved tools must not
 assert.match(quoteRoute, /meteringDimensions: toolProfile\.meteringDimensions/, "tool quotes must expose their cost drivers");
 assert.match(quoteRoute, /executionMode: toolProfile\.executionMode/, "tool quotes must expose their execution mode");
 assert.match(toolProfileServer, /billing-profile-index\.json/, "the server must use the enriched per-tool runtime index");
-assert.match(toolProfileRoute, /meteringDimensions/, "the per-tool profile endpoint must return cost dimensions");
 assert.match(toolProfileRoute, /approvedPrice/, "the per-tool profile endpoint must identify individually approved prices");
 assert.match(toolProfileRoute, /priceApproved: approvedPrice !== null/, "an approved price must not imply production charging is active");
 assert.match(quoteRoute, /priceStatus: approvedToolPrice \? "approved"/, "quotes must distinguish approved rates from provisional cost classes");
-assert.match(toolProfileRoute, /adsEligible: _legacyAdsEligible/, "advertising eligibility must remain outside the billing profile");
 assert.match(quoteRoute, /meteringDimensions: toolProfile\.meteringDimensions/, "tool quotes must expose their own cost drivers");
 assert.match(quoteRoute, /executionMode: toolProfile\.executionMode/, "tool quotes must expose their own execution mode");
 assert.match(toolProfileServer, /billing-profiles\.json/, "the server must load full per-tool profiles, not only generic index rates");
-assert.match(toolProfileRoute, /meteringDimensions/, "the per-tool profile endpoint must return cost dimensions");
-assert.match(toolProfileRoute, /adsEligible: _legacyAdsEligible/, "advertising eligibility must not leak from the billing profile");
 assert.match(quoteRoute, /billingActive: false/);
+assert.doesNotMatch(await read("scripts/generate-billing-profiles.mjs"), /adsEligible/, "billing profiles must not own advertising eligibility");
 assert.doesNotMatch(toolShell, /ToolTokenEstimate|draft token estimate|Checking this tool/, "tool detail screens must not show a token-estimate card");
 assert.doesNotMatch(androidToolScreens, /NativeToolGuideContent/, "Android tool pages must not render the long guide inline");
 assert.match(androidToolScreens, /Text\("Read the full guide"\)/, "Android tool pages must retain the separate full-guide link");
