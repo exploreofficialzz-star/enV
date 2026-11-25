@@ -1,11 +1,11 @@
 {
-  "note": "Registered legacy link defects. Counts may shrink, never grow. Explicit noRelatedExceptions document intentional isolated tools and are validated against the live registry.",
-  "counts": {
-    "dangling": 5,
-    "self": 4,
-    "toPlanned": 106,
-    "toUndiscoverable": 287,
-    "noRelated": 495
-  },
-  "noRelatedExceptions": []
+ "note": "Reviewed upper bounds for canonical rendered related-link integrity after destination resolution and category fallback. Counts may shrink, never grow. Empty-render exceptions require a reason and must remain genuinely unresolved in the runtime resolver.",
+ "counts": {
+  "dangling": 5,
+  "self": 4,
+  "toPlanned": 106,
+  "toUndiscoverable": 287,
+  "noRelated": 495
+ },
+ "noRelatedExceptions": []
 }
