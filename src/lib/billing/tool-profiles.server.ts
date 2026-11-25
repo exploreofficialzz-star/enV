@@ -35,7 +35,6 @@ export interface ToolBillingProfile {
   priceStatus: ToolBillingPriceStatus;
   classificationReason: string;
   pricingVersion: string;
-  toolPriceVersion: string;
 }
 
 type ProfileIndex = {
