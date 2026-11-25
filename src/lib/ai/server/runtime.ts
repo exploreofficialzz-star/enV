@@ -75,6 +75,7 @@ export function getAiRuntime(): AiRuntime {
               executionStatus: event.executionStatus,
               failedExecutionMayIncurProviderCost: event.executionStatus === "failed",
               providerCostCoverage: event.costBasis === "unknown" ? "unmeasured" : "model-registry-estimate",
+              modelId: event.model,
               proposedBilledSubunits,
               proposedSellUsdMicros,
               proposedGrossMarginBps: DEFAULT_GROSS_MARGIN_BPS,
