@@ -12,6 +12,7 @@ export default defineHandler((event) => {
   if (!profile) return jsonResponse({ ok: false, error: "UNKNOWN_TOOL", message: "No billing profile exists for this tool." }, 404);
   const { pricingVersion } = getBillingProfileIndexSummary();
   const { adsEligible: _legacyAdsEligible, ...toolBillingProfile } = profile as typeof profile & { adsEligible?: boolean };
+  void _legacyAdsEligible;
   return jsonResponse({
     ok: true,
     data: {
