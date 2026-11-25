@@ -86,6 +86,7 @@ test("provider cost and margin inputs fail closed when invalid", () => {
   assert.throws(() => proposedProviderPriceUsdMicros(-1, 6_000), RangeError);
   assert.throws(() => proposedProviderPriceUsdMicros(1_000, 10_000), RangeError);
   assert.throws(() => proposedProviderPriceUsdMicros(1.5, 6_000), RangeError);
+  assert.throws(() => proposedProviderPriceUsdMicros(Number.MAX_SAFE_INTEGER, 6_000), RangeError);
 });
 
 test("developer tools scale by input text and parser complexity", () => {
