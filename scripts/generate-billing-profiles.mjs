@@ -4,6 +4,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isOfflineLocalToolRecord, OFFLINE_LOCAL_DOCUMENT_TOOL_IDS } from "../src/lib/offline/local-operation-policy.mjs";
+import { deriveLocalToolPriceProfile, TOOL_PRICE_PROPOSAL_VERSION } from "../src/lib/billing/proposed-pricing.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const { tools: catalogTools } = await import("../src/data/catalog.ts");
@@ -42,6 +43,7 @@ function profile(tool) {
   let classificationReason;
   let meteringDimensions = ["operation-count"];
   let executionMode;
+  let premiumRequired = false;
 
   // Scene Studio is implemented as a browser-local Web editor, but its editing,
   // GPU rendering and export are not implemented in native Kotlin/Swift. Keep this
@@ -51,6 +53,16 @@ function profile(tool) {
     executionMode = "web-local";
     billingKey = "local.general";
     classificationReason = "Browser-local editor; native editing/rendering/export are Web-only, so this profile remains separate from the cross-platform offline token cohort pending verified native implementation.";
+  } else if (tool.engine?.type === "ai") {
+    // Direct AI execution is provider-metered even when legacy catalogue flags resemble a local tool.
+    executionMode = "cloud-or-remote";
+    const frontier = /\\b(frontier|premium|high[- ]?end)\\b/.test(words(tool));
+    billingKey = frontier ? "ai.frontier" : "ai.standard";
+    premiumRequired = frontier;
+    classificationReason = frontier
+      ? "Direct frontier AI execution; metering follows the selected model rate card, actual usage and verified entitlement."
+      : "Direct AI execution; metering follows the selected model rate card, actual usage, attempts and fallbacks.";
+    meteringDimensions = ["provider", "model", "input-tokens", "output-tokens", "audio-seconds", "compute-seconds", "attempt-count", "fallback-count"];
   } else if (!local) {
     executionMode = "cloud-or-remote";
     if (isTranscription(tool)) {
