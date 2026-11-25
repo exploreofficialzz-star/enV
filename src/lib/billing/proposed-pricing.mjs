@@ -1,3 +1,5 @@
+export const TOOL_PRICE_PROPOSAL_VERSION = "env-per-tool-rate-proposal-2026-11-25-v1";
+
 /**
  * Deterministic draft tariff calculator for device-local enV tools.
  *
@@ -191,4 +193,22 @@ export function deriveLocalToolPriceProfile(tool, billingKey, executionMode) {
     pricingFactors: factors,
     meteringDimensions,
   };
+}
+
+
+/**
+ * Convert a provider's measured/model-registry cost estimate into a proposed sell amount.
+ * The margin is provisional; it is not a finance-approved production setting.
+ * @param {number} costUsdMicros
+ * @param {number} marginBps
+ */
+export function proposedProviderPriceUsdMicros(costUsdMicros, marginBps) {
+  if (!Number.isSafeInteger(costUsdMicros) || costUsdMicros < 0) throw new RangeError("Provider cost must be non-negative integer USD micros.");
+  if (!Number.isSafeInteger(marginBps) || marginBps < 0 || marginBps >= 10_000) throw new RangeError("Gross margin must be an integer from 0 to 9,999 basis points.");
+  return Math.ceil(costUsdMicros * 10_000 / (10_000 - marginBps));
+}
+
+/** One enV milli-token represents USD 10 micros at the current token reference rate. */
+export function proposedSubunitsFromProviderCostUsdMicros(costUsdMicros, marginBps) {
+  return Math.ceil(proposedProviderPriceUsdMicros(costUsdMicros, marginBps) / 10);
 }
