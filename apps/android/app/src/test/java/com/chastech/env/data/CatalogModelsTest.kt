@@ -168,6 +168,23 @@ class CatalogModelsTest {
         assertEquals(listOf("zeta", "alpha", "bravo"), catalog.relatedTools(catalog.tools.first()).map { it.id })
     }
  
+    @Test fun relatedToolsResolveOrdinaryAndWebOnlyCatalogDestinations() {
+        val catalog = Catalog.fromJson("""
+            {"counts":{},"categories":[],"tools":[
+              {"id":"current","name":"Current","category":"network","related":["connection-info","word-count"],"status":"active"},
+              {"id":"connection-info","name":"Connection Info","category":"network","status":"active"},
+              {"id":"word-count","name":"Word Count","category":"network","status":"active"}
+            ]}
+        """.trimIndent())
+        val current = catalog.tools.single { it.id == "current" }
+
+        assertTrue(catalog.relatedReferenceTools.any { it.id == "connection-info" })
+        assertEquals(
+            listOf("connection-info", "word-count"),
+            catalog.relatedTools(current, 2).map { it.id },
+        )
+    }
+
     @Test fun relatedToolsRemoveSelfAndDuplicateLinksAndCanonicalizeAccessibilityAliases() {
         val catalog = Catalog.fromJson("""
             {"counts":{},"categories":[],"tools":[
