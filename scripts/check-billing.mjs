@@ -52,6 +52,7 @@ const iosWalletApi = await read("apps/ios/enV/OfflineWalletNativeAPI.swift");
 const purchasesRoute = await read("server/routes/api/billing/purchases.post.ts");
 const pricingPage = await read("src/routes/pricing.tsx");
 const pricingProposalReport = await read("docs/billing-proposed-prices-2026-11-25.md");
+const perToolPricingHelper = await read("src/lib/billing/proposed-pricing.mjs");
 const toolAuditReport = await read("docs/billing-tool-audit-2026-10-18.md");
 const androidPricing = await read("apps/android/app/src/main/java/com/chastech/env/NativeInformationScreen.kt");
 const androidToolScreens = await read("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt");
@@ -261,6 +262,11 @@ const aiRateProfiles = remoteRateProfiles.filter((profile) => profile.engineType
 assert.ok(aiRateProfiles.every((profile) => ["ai.standard", "ai.frontier"].includes(profile.billingKey) && profile.pricingBasis === "provider-model-rate-card"), "direct AI tools must use model/provider metering");
 assert.ok(aiRateProfiles.filter((profile) => profile.billingKey === "ai.frontier").every((profile) => profile.premiumRequired === true), "frontier AI profiles must require premium entitlement");
 assert.ok(profiles.profiles.every((profile) => Array.isArray(profile.meteringDimensions) && profile.meteringDimensions.length > 0), "every catalogue tool needs its own explicit cost-driver dimensions");
+const allBillingProfiles = [...profiles.profiles, ...runtimeExtensionProfileIndex.profiles];
+for (const unitLabel of new Set(allBillingProfiles.map((profile) => profile.unitLabel))) {
+  if (unitLabel === "operation") continue;
+  assert.ok(perToolPricingHelper.includes(`case "${unitLabel}"`), `measured quote calculator must support generated unit ${unitLabel}`);
+}
 assert.ok(runtimeExtensionProfileIndex.profiles.every((profile) => Array.isArray(profile.meteringDimensions) && profile.meteringDimensions.length > 0), "every runtime extension needs its own explicit cost-driver dimensions");
 assert.equal(profileIndex.toolCount, profiles.toolCount, "runtime index count must match full audit");
 assert.equal(profileIndex.profiles.length, profiles.toolCount, "base runtime index must include every base-catalogue tool");
