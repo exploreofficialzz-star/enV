@@ -21,7 +21,7 @@
 - `src/lib/billing/catalog.ts`: central operation rules, reference-value conversions, quote logic and the public billing status.
 - `scripts/generate-billing-profiles.mjs`: classifies each tool from the authoritative catalogue fields. Re-run with `npm run generate:billing-profiles` when the catalogue changes.
 - `src/data/billing-profiles.json`: full generated profile and audit reason for each tool.
-- `src/data/billing-profile-index.json`: compact catalogue lookup by tool ID. The per-tool profile API reads full generated `billing-profiles.json` rows so actual operation-specific cost dimensions are preserved.
+- `src/data/billing-profile-index.json`: compact catalogue lookup by tool ID. The runtime index includes each tool's execution classification and actual cost-driver dimensions, while keeping the full audit reasons in `billing-profiles.json`.
 - `docs/billing-tool-audit-2026-10-18.md`: profile counts, assumptions and required audit steps.
 - `migrations/0002_billing.sql`: wallet accounts, append-only token ledger, reservations, purchase intents, shared premium entitlement state, idempotent event records and per-operation usage events.
 - `src/lib/billing/ledger.server.ts`: server-only wallet mutations with transactions, locking, idempotency and budget reservation/settlement/release primitives.
