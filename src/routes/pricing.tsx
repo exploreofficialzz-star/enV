@@ -26,7 +26,7 @@ function Pricing() {
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
         <header className="max-w-3xl">
           <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-border bg-surface-2 px-3 py-1 text-xs font-medium text-muted">
-            <ShieldCheck size={14} aria-hidden="true" /> No advertising
+            <ShieldCheck size={14} aria-hidden="true" /> Ads only on eligible tools
           </div>
           <h1 className="text-3xl font-semibold tracking-tight text-fg sm:text-4xl">Clear, usage-based pricing</h1>
           <p className="mt-4 max-w-2xl text-base leading-7 text-muted">
@@ -42,7 +42,7 @@ function Pricing() {
           <article className="rounded-2xl border border-border bg-surface p-4">
             <span className="mb-3 grid size-10 place-items-center rounded-xl bg-surface-2 text-fg"><Calculator size={20} aria-hidden="true" /></span>
             <h2 className="font-semibold text-fg">Local utilities</h2>
-            <p className="mt-2 text-sm leading-6 text-muted">Straightforward usage rules for calculations, text tools, and conversions, with no ad interruptions.</p>
+            <p className="mt-2 text-sm leading-6 text-muted">Tool-specific pricing follows the work performed. Adsterra appears only on eligible standard tools.</p>
           </article>
           <article className="rounded-2xl border border-border bg-surface p-4">
             <span className="mb-3 grid size-10 place-items-center rounded-xl bg-surface-2 text-fg"><FileCog size={20} aria-hidden="true" /></span>
