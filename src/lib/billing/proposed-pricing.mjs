@@ -184,6 +184,42 @@ export function deriveLocalToolPriceProfile(tool, billingKey, executionMode) {
     factors.push("video configuration parameters and comparison count");
     if (batch) factors.push("multiple profiles or presets");
     pricingFormula = `${subunitsPerUnit} milli-tokens per video configuration or settings operation. Actual file processing uses duration and resolution-based media units.`;
+  } else if (category === "fitness") {
+    unitLabel = "fitness-calculation";
+    meteringDimensions = ["calculation-count", "input-metrics", "training-duration", "distance", "output-metrics"];
+    subunitsPerUnit = has(identity, /\\b(training plan|workout plan|nutrition|macro|heart rate zone|vo2|body composition|periodization)\\b/) ? 200 : 125;
+    if (batch) subunitsPerUnit += 75;
+    workloadTier = subunitsPerUnit >= 200 ? "standard" : "light";
+    factors.push("number and complexity of user metrics", "training or activity duration where applicable");
+    if (batch) factors.push("multiple measurements or training sessions");
+    pricingFormula = `${subunitsPerUnit} milli-tokens per fitness calculation; multi-session plans and derived metrics scale the workload.`;
+  } else if (category === "datetime") {
+    unitLabel = "date-time-operation";
+    meteringDimensions = ["conversion-count", "timezone-count", "calendar-range", "recurrence-complexity"];
+    subunitsPerUnit = has(identity, /\\b(business days|working days|recurrence|calendar|schedule|multiple time zones|meeting planner)\\b/) ? 150 : 75;
+    if (batch) subunitsPerUnit += 50;
+    workloadTier = subunitsPerUnit >= 150 ? "standard" : "light";
+    factors.push("number of dates, time zones and recurrence rules");
+    if (batch) factors.push("multiple date-time conversions");
+    pricingFormula = `${subunitsPerUnit} milli-tokens per date/time operation; scale by timezone count and recurrence complexity.`;
+  } else if (category === "network") {
+    unitLabel = "network-operation";
+    meteringDimensions = ["address-count", "prefix-length", "record-count", "lookup-count", "input-bytes"];
+    subunitsPerUnit = has(identity, /\\b(dns lookup|whois|http header|reachability|latency|port scan|route lookup)\\b/) ? 200 : 100;
+    if (batch) subunitsPerUnit += 75;
+    workloadTier = subunitsPerUnit >= 200 ? "standard" : "light";
+    factors.push("number of addresses, records or lookups");
+    if (batch) factors.push("bulk lookup or address list");
+    pricingFormula = `${subunitsPerUnit} milli-tokens per local network calculation or lookup item; remote requests are separately costed from provider/infrastructure usage.`;
+  } else if (category === "streaming") {
+    unitLabel = "stream-profile-operation";
+    meteringDimensions = ["resolution", "frame-rate", "bitrate-count", "codec-count", "profile-count"];
+    subunitsPerUnit = has(identity, /\\b(compare|multiple|advanced|encoder|compatibility|simulator)\\b/) ? 200 : 125;
+    if (batch) subunitsPerUnit += 75;
+    workloadTier = subunitsPerUnit >= 200 ? "standard" : "light";
+    factors.push("stream profiles, codec combinations, resolution and frame-rate inputs");
+    if (batch) factors.push("multiple stream presets or output profiles");
+    pricingFormula = `${subunitsPerUnit} milli-tokens per stream-profile calculation; count profiles and comparisons.`;
   } else if (category === "developer") {
     const codeHeavy = has(identity, /\b(regex|regular expression|compiler|transpil|minif|benchmark|parser|parse|schema|validator)\b/);
     unitLabel = "10k-characters";
