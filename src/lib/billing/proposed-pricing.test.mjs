@@ -134,7 +134,7 @@ test("local AI-category templates, business operations and video settings have d
   assert.equal(business?.unitLabel, "business-operation");
   assert.equal(business?.subunitsPerUnit, 225);
   assert.equal(videoSettings?.unitLabel, "video-configuration");
-  assert.equal(videoSettings?.subunitsPerUnit, 125);
+  assert.equal(videoSettings?.subunitsPerUnit, 200);
 });
 
 test("fitness, date-time, network and streaming tools have dedicated workload units", () => {
