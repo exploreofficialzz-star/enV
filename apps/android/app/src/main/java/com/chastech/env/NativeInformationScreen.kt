@@ -160,15 +160,16 @@ private fun NativeTokenGuideSection(heading: String, paragraphs: List<String>) {
 }
 
 @Composable
-private fun NativeTokenGuide(catalog: com.chastech.env.data.Catalog) {
+private fun NativeTokenGuide(catalog: com.chastech.env.data.Catalog, initialToolId: String? = null) {
     val allTools = remember(catalog) {
         (catalog.tools + catalog.relatedReferenceTools).distinctBy { it.id }.sortedBy { it.name.lowercase(Locale.ROOT) }
     }
     val categories = remember(allTools) { listOf("all") + allTools.map { it.category }.distinct().sorted() }
-    var query by remember { mutableStateOf("") }
+    val initialToolName = remember(allTools, initialToolId) { allTools.firstOrNull { it.id == initialToolId }?.name.orEmpty() }
+    var query by remember(initialToolId) { mutableStateOf(initialToolName) }
     var category by remember { mutableStateOf("all") }
-    var visibleCount by remember { mutableStateOf(36) }
-    var selectedToolId by remember { mutableStateOf<String?>(null) }
+    var visibleCount by remember(initialToolId) { mutableStateOf(if (initialToolId == null) 36 else 1) }
+    var selectedToolId by remember(initialToolId) { mutableStateOf(initialToolId) }
     var profile by remember { mutableStateOf<JSONObject?>(null) }
     var profileError by remember { mutableStateOf<String?>(null) }
     var loadingProfile by remember { mutableStateOf(false) }
@@ -292,23 +293,26 @@ private fun NativeTokenGuide(catalog: com.chastech.env.data.Catalog) {
 @Composable
 fun NativeInformationScreen(pageId: String, catalog: com.chastech.env.data.Catalog, onBack: () -> Unit, onOpenWallet: () -> Unit, onOpenHistory: () -> Unit) {
     val context = LocalContext.current
-    val title = when (pageId) {
-        "about" -> "About enV"
-        "help" -> "Help center"
-        "token-guide" -> "Token guide"
-        "token-dashboard" -> "Token dashboard"
-        "wallet" -> "Wallet"
-        "pricing" -> "Pricing"
-        "contact" -> "Contact"
-        "report-bugs" -> "Report bugs"
-        "suggest-tool" -> "Suggest a tool"
-        "account" -> "Account"
-        "history" -> "History"
-        "privacy" -> "Privacy"
-        "terms" -> "Terms of Use"
-        "disclaimer" -> "Disclaimer"
-        "responsible-use" -> "Responsible Use"
-        else -> "About enV"
+    val title = when {
+        pageId.startsWith("token-tool:") -> "Token details"
+        else -> when (pageId) {
+            "about" -> "About enV"
+            "help" -> "Help center"
+            "token-guide" -> "Token guide"
+            "token-dashboard" -> "Token dashboard"
+            "wallet" -> "Wallet"
+            "pricing" -> "Pricing"
+            "contact" -> "Contact"
+            "report-bugs" -> "Report bugs"
+            "suggest-tool" -> "Suggest a tool"
+            "account" -> "Account"
+            "history" -> "History"
+            "privacy" -> "Privacy"
+            "terms" -> "Terms of Use"
+            "disclaimer" -> "Disclaimer"
+            "responsible-use" -> "Responsible Use"
+            else -> "About enV"
+        }
     }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 40.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -340,30 +344,33 @@ fun NativeInformationScreen(pageId: String, catalog: com.chastech.env.data.Catal
                 }
             }
 
-            when (pageId) {
-                "about" -> AboutInformation()
-                "help" -> InformationSection("enV Help Center", listOf("Browse the tool catalog or use Search tools to find an action by name or task.", "Open a tool to see its required inputs, permissions, and available outputs. Some tools work entirely on-device; AI and hosted processors require a configured connection.", "For account, access, or product questions, use Contact from More options."))
-                "token-guide" -> NativeTokenGuide(catalog)
-                "token-dashboard" -> NativeTokenDashboard(onOpenWallet)
-                "pricing" -> PricingInformation(onOpenWallet)
-                "contact" -> ContactInformation()
-                "report-bugs" -> NativeFeedbackRequestPage(isBugReport = true)
-                "suggest-tool" -> NativeFeedbackRequestPage(isBugReport = false)
-                "account" -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    InformationSection("Welcome back to enV", listOf("Sign in or create an account from the enV sign-in page."))
-                    Button(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/account"))) }, modifier = Modifier.fillMaxWidth()) { Text("Continue to sign in") }
+            when {
+                pageId.startsWith("token-tool:") -> NativeTokenGuide(catalog, pageId.removePrefix("token-tool:"))
+                else -> when (pageId) {
+                    "about" -> AboutInformation()
+                    "help" -> InformationSection("enV Help Center", listOf("Browse the tool catalog or use Search tools to find an action by name or task.", "Open a tool to see its required inputs, permissions, and available outputs. Some tools work entirely on-device; AI and hosted processors require a configured connection.", "For account, access, or product questions, use Contact from More options."))
+                    "token-guide" -> NativeTokenGuide(catalog)
+                    "token-dashboard" -> NativeTokenDashboard(onOpenWallet)
+                    "pricing" -> PricingInformation(onOpenWallet)
+                    "contact" -> ContactInformation()
+                    "report-bugs" -> NativeFeedbackRequestPage(isBugReport = true)
+                    "suggest-tool" -> NativeFeedbackRequestPage(isBugReport = false)
+                    "account" -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        InformationSection("Welcome back to enV", listOf("Sign in or create an account from the enV sign-in page."))
+                        Button(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/account"))) }, modifier = Modifier.fillMaxWidth()) { Text("Continue to sign in") }
+                    }
+                    "wallet" -> NativeWalletDashboard(onOpenHistory)
+                    "history" -> NativeWalletHistory()
+                    "privacy" -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        PrivacyInformation()
+                        NativeAdsPrivacyDisclosure()
+                        NativeAdsPrivacyOptionsButton()
+                    }
+                    "terms" -> TermsInformation()
+                    "disclaimer" -> DisclaimerInformation()
+                    "responsible-use" -> ResponsibleUseInformation()
+                    else -> AboutInformation()
                 }
-                "wallet" -> NativeWalletDashboard(onOpenHistory)
-                "history" -> NativeWalletHistory()
-                "privacy" -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    PrivacyInformation()
-                    NativeAdsPrivacyDisclosure()
-                    NativeAdsPrivacyOptionsButton()
-                }
-                "terms" -> TermsInformation()
-                "disclaimer" -> DisclaimerInformation()
-                "responsible-use" -> ResponsibleUseInformation()
-                else -> AboutInformation()
             }
             Spacer(Modifier.height(8.dp))
         }
