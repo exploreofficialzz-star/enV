@@ -82,9 +82,9 @@ assert.match(progressTest, /three ad-supported visits/, "The three-visit cadence
 assert.match(policy, /function isAdsterraQualifiedTool/, "The Adsterra eligibility policy must remain a separate Web policy.");
 assert.match(policy, /RESTRICTED_CATEGORIES/, "The shared ad policy must exclude sensitive categories.");
 assert.match(policy, /ADSTERRA_EXCLUDED_CONCEPTS/, "The shared ad policy must exclude Studio/AI/Lab/Sandbox experiences.");
-assert.match(policy, /tool\.description \?\? ""/, "Web ad exclusions must inspect full tool descriptions.");
+assert.ok(policy.includes("tool.description ?? \"\""), "Web ad exclusions must inspect full tool descriptions.");
 assert.match(policyTests, /description: "Premium video rendering/, "Web ad exclusions need a description-only premium regression test.");
-assert.match(policy, /high\[- \]\?end\|premium\|frontier/, "High-end, premium and frontier tools must remain excluded from Adsterra.");
+assert.ok(policy.includes("high[- ]?end|premium|frontier"), "High-end, premium and frontier tools must remain excluded from Adsterra.");
 assert.match(policy, /isHybridAccessToolId/, "The selected hybrid cohort must retain its independent offline allowance boundary.");
 assert.match(policy, /isPaidHybridAccessToolId/, "The paid token cohort must remain separate from ad rendering.");
 assert.match(policyTests, /Adsterra qualification excludes sensitive categories/, "Sensitive-topic ad exclusions must be regression-tested.");
@@ -141,10 +141,10 @@ assert.match(iosToolDestination, /informationRouter\.open\("wallet"\)/, "iOS tok
 assert.match(iosAds, /crossPlatformMeteredIDs/);
 assert.match(androidAds, /tool\.description/, "Android ad exclusions must inspect tool descriptions.");
 assert.match(androidAds, /tool\.category/, "Android ad exclusions must inspect tool categories.");
-assert.match(androidAds, /high\[- \]\?end\|premium\|frontier/, "Android must exclude high-end, premium and frontier tools from ads.");
+assert.ok(androidAds.includes("high[- ]?end|premium|frontier"), "Android must exclude high-end, premium and frontier tools from ads.");
 assert.match(iosAds, /tool\.description/, "iOS ad exclusions must inspect tool descriptions.");
 assert.match(iosAds, /tool\.category/, "iOS ad exclusions must inspect tool categories.");
-assert.match(iosAds, /high\[- \]\?end\|premium\|frontier/, "iOS must exclude high-end, premium and frontier tools from ads.");
+assert.ok(iosAds.includes("high[- ]?end|premium|frontier"), "iOS must exclude high-end, premium and frontier tools from ads.");
 assert.match(androidAdsPolicyTests, /premiumAndFrontierClassificationsAreCheckedAcrossMetadata/, "Android native ad exclusions need unit coverage.");
 assert.match(iosAdsPolicyTests, /testNativeAdEligibilityExcludesStudioLabSandboxAndPremiumFrontierTools/, "iOS native ad exclusions need unit coverage.");
 assert.match(iosAds, /isApplicationOnline\(\) async/);
