@@ -43,6 +43,21 @@ test("URL state round-trips and drops unknown or malformed values", () => {
   assert.equal(hostile.q.length, 200);
   assert.deepEqual(hostile.filters, {});
   assert.equal(hostile.sort, "best-match");
+  assert.deepEqual(
+    decodeDiscoveryState({ platform: "web", execution: "native" }).filters,
+    { platform: "web" },
+    "browser execution cannot be filtered as native-app execution",
+  );
+  assert.deepEqual(
+    decodeDiscoveryState({ execution: "handoff" }).filters,
+    {},
+    "execution path requires an explicit Android or iOS platform",
+  );
+  assert.deepEqual(
+    encodeDiscoveryState({ filters: { platform: "web", execution: "native" } }),
+    { platform: "web" },
+    "serialization drops execution filters that do not apply to Web",
+  );
   assert.deepEqual(encodeDiscoveryState({ q: "  ", filters: {}, sort: "best-match" }), {});
 });
 
