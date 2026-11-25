@@ -136,3 +136,18 @@ test("local AI-category templates, business operations and video settings have d
   assert.equal(videoSettings?.unitLabel, "video-configuration");
   assert.equal(videoSettings?.subunitsPerUnit, 125);
 });
+
+test("fitness, date-time, network and streaming tools have dedicated workload units", () => {
+  const fitness = deriveLocalToolPriceProfile(tool({ id: "workout-planner", name: "Workout Plan", category: "fitness", engine: { type: "custom" } }), "local.general", "local-device");
+  const dateTime = deriveLocalToolPriceProfile(tool({ id: "date-difference", name: "Date Difference", category: "datetime", engine: { type: "datetime" } }), "local.general", "local-device");
+  const network = deriveLocalToolPriceProfile(tool({ id: "subnet-range", name: "Subnet Range Calculator", category: "network", engine: { type: "network" } }), "local.general", "local-device");
+  const streaming = deriveLocalToolPriceProfile(tool({ id: "stream-profile-calculator", name: "Stream Profile Calculator", category: "streaming", engine: { type: "custom" } }), "local.general", "local-device");
+  assert.equal(fitness?.unitLabel, "fitness-calculation");
+  assert.equal(fitness?.subunitsPerUnit, 200);
+  assert.equal(dateTime?.unitLabel, "date-time-operation");
+  assert.equal(dateTime?.subunitsPerUnit, 75);
+  assert.equal(network?.unitLabel, "network-operation");
+  assert.equal(network?.subunitsPerUnit, 100);
+  assert.equal(streaming?.unitLabel, "stream-profile-operation");
+  assert.equal(streaming?.subunitsPerUnit, 125);
+});
