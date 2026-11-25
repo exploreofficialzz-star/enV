@@ -34,8 +34,13 @@ function routeRobotsPolicy(matches?: Array<{
     const toolsIndexMatch = [...(matches ?? [])].reverse().find(
       (match) => (match.pathname.replace(/\/+$/, "") || "/") === "/tools",
     );
-    const discoveryState = decodeDiscoveryState(toolsIndexMatch?.search ?? {});
-    if (!isIndexableDiscoveryState(discoveryState)) return "noindex,follow";
+    const rawSearch = toolsIndexMatch?.search ?? {};
+    const discoveryState = decodeDiscoveryState(rawSearch);
+    // The clean base URL is the only indexable catalogue state. This also
+    // catches empty/default and unknown query keys that decode to no filters.
+    if (Object.keys(rawSearch).length > 0 || !isIndexableDiscoveryState(discoveryState)) {
+      return "noindex,follow";
+    }
   }
   const toolRoute = path.match(/^\/tools\/([^/]+)\/([^/]+)$/);
   const categoryRoute = path.match(/^\/tools\/([^/]+)$/);
