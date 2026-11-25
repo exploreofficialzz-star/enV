@@ -6,6 +6,7 @@ const read = (path) => readFileSync(resolve(path), "utf8");
 const root = read("src/routes/__root.tsx");
 const shell = read("src/components/tools/tool-shell.tsx");
 const gate = read("src/components/tools/tool-access-gate.tsx");
+const placementAccess = read("src/lib/ads/placement-access.ts");
 const adsterra = read("src/lib/ads/adsterra.ts");
 const adsterraView = read("src/components/ads/adsterra-ad.tsx");
 const progress = read("src/lib/ads/ad-supported-progress.ts");
@@ -47,6 +48,10 @@ assert.match(shell, /window\.addEventListener\("env:adsterra-placement-loaded"/,
 assert.match(shell, /setAdsterraConsent\("granted"\)/, "Adsterra access must follow an explicit advertising choice.");
 assert.match(shell, /isAdsterraQualifiedTool\(tool\)/, "Adsterra eligibility must use the shared sensitive-topic exclusion policy.");
 assert.match(gate, /onContinueWithAdsterra/, "The access gate must use the Adsterra-supported route.");
+assert.match(gate, /await onContinueWithAdsterra\(\)/, "The access gate must await a successful Adsterra placement load before unlocking.");
+assert.match(placementAccess, /ADSTERRA_ACCESS_LOAD_TIMEOUT_MS = 15_000/, "Adsterra access must use a bounded placement-load timeout.");
+assert.match(placementAccess, /removeEventListener/, "The placement-load waiter must remove its listener after success or timeout.");
+assert.match(shell, /waitForAdsterraPlacement\(window\)/, "The Web tool shell must keep access locked until a placement reports load.");
 assert.match(gate, /onUseTokens/, "The access gate must preserve the approved token route.");
 assert.match(gate, /onReleaseTokenAccess/, "The access gate must release an unconfirmed reservation.");
 assert.match(gate, /Continue with Adsterra/, "Visitors must receive an explicit Adsterra continue action.");
@@ -54,7 +59,7 @@ assert.match(gate, /Create an enV account/, "Guests without the ad-supported rou
 assert.match(gate, /Sign in/, "Guests without the ad-supported route must be able to sign in.");
 assert.match(gate, /Adsterra does not provide enV with a per-user rewarded-video completion signal/, "The Web gate must not misrepresent Adsterra events as rewarded-video completion.");
 assert.match(gate, /3 ad-supported visits/, "The token offer must be labelled as three ad-supported visits.");
-assert.match(gate, /not a verified ad impression or video completion/, "The token offer must disclose that its local cadence is not verified impression/reward evidence.");
+assert.match(gate, /not a verified impression or video completion/, "The access gate must not misrepresent a loaded placement as a verified impression or reward.");
 assert.match(gate, /current visit stays free/, "Choosing tokens from the offer must not charge the already-unlocked visit.");
 
 assert.match(adsterra, /32202127/, "The publisher-supplied 300x250 placement must be retained.");
