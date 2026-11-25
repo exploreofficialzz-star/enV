@@ -174,6 +174,8 @@ assert.match(quoteRoute, /executionMode: toolProfile\.executionMode/, "tool quot
 assert.match(toolProfileServer, /billing-profile-index\.json/, "the server must use the enriched per-tool runtime index");
 assert.match(toolProfileRoute, /meteringDimensions/, "the per-tool profile endpoint must return cost dimensions");
 assert.match(toolProfileRoute, /approvedPrice/, "the per-tool profile endpoint must identify individually approved prices");
+assert.match(toolProfileRoute, /priceApproved: approvedPrice !== null/, "an approved price must not imply production charging is active");
+assert.match(quoteRoute, /priceStatus: approvedToolPrice \? "approved"/, "quotes must distinguish approved rates from provisional cost classes");
 assert.match(toolProfileRoute, /adsEligible: _legacyAdsEligible/, "advertising eligibility must remain outside the billing profile");
 assert.match(quoteRoute, /meteringDimensions: toolProfile\.meteringDimensions/, "tool quotes must expose their own cost drivers");
 assert.match(quoteRoute, /executionMode: toolProfile\.executionMode/, "tool quotes must expose their own execution mode");
