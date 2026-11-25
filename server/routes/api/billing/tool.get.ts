@@ -16,10 +16,9 @@ export default defineHandler((event) => {
     data: {
       ...profile,
       pricingVersion,
-      priceStatus: "provisional",
-      executionMode: profile.billingKey.startsWith("cloud.") ? "cloud-or-remote" : "local-or-tool-dependent",
-      meteringDimensions: [profile.unitLabel],
-      classificationReason: "Generated from catalogue metadata. This profile is a provisional classification, not proof that the operation's real cost has been measured.",
+      // Return this tool's actual generated resource dimensions and execution class.
+      // Shared billing-key estimates remain provisional and must not become charges.
+      billable: profile.priceStatus === "approved" && profile.manualAuditRequired === false,
     },
   });
 });
