@@ -51,6 +51,7 @@ const androidWalletApi = await read("apps/android/app/src/main/java/com/chastech
 const iosWalletApi = await read("apps/ios/enV/OfflineWalletNativeAPI.swift");
 const purchasesRoute = await read("server/routes/api/billing/purchases.post.ts");
 const pricingPage = await read("src/routes/pricing.tsx");
+const pricingProposalReport = await read("docs/billing-proposed-prices-2026-11-25.md");
 const androidPricing = await read("apps/android/app/src/main/java/com/chastech/env/NativeInformationScreen.kt");
 const androidToolScreens = await read("apps/android/app/src/main/java/com/chastech/env/MainActivity.kt");
 const iosPricing = await read("apps/ios/enV/ContentViews.swift");
@@ -172,6 +173,8 @@ assert.match(quoteRoute, /status: "provisional"/, "local workload quotes must be
 assert.match(toolProfileRoute, /proposedPrice/, "the profile endpoint must return the tool-specific proposed tariff");
 assert.match(toolProfileRoute, /adFreeAccessPrice/, "the legacy ad-free session fee must remain separate from operation pricing");
 assert.match(toolProfileRoute, /priceApproved: false/, "draft workload rates must not imply a production-approved price");
+assert.match(toolProfileRoute, /adFreeAccessPrice/);
+assert.match(toolProfileRoute, /manualAuditRequired: true/);
 assert.match(quoteRoute, /billingActive: false/);
 assert.match(toolProfileRoute, /billingActive: false/);
 assert.match(quoteRoute, /requires-cost-measurement/, "unapproved tools must not receive a generic category-level price");
@@ -222,6 +225,7 @@ assert.equal(sceneStudioBillingProfile.executionMode, "web-local", "Scene Studio
 assert.equal(sceneStudioBillingProfile.billingKey, "local.general");
 assert.equal(sceneStudioBillingProfile.unitLabel, "render-minute");
 assert.equal(sceneStudioBillingProfile.proposedSubunitsPerUnit, 1_500);
+assert.equal(sceneStudioBillingProfile.proposedUsdMicrosPerUnit, 15_000);
 assert.equal(offlineEligibleToolIds.has("scene-studio"), false, "Web-only Scene Studio must not enter the cross-platform offline wallet cohort.");
 assert.equal(manuallyApprovedToolAccessIds.has("scene-studio"), false, "Web-only Scene Studio must not enter the 267 manually approved online token-access prices.");
 assert.equal(sceneStudioBillingProfile.optionalAiAssistProfile, null);
@@ -650,6 +654,8 @@ assert.match(tokenUsageService, /ue\.billing_key = r\.operation_id/, "confirmed 
 assert.match(androidPricing, /"token-dashboard" -> NativeTokenDashboard\(onOpenWallet\)/, "Android token dashboard wallet navigation must remain native");
 assert.match(iosPricing, /case "token-dashboard": NativeTokenDashboardView\(\)/, "iOS Home shortcut must open its native token dashboard");
 assert.match(pricingPage, /Adsterra appears only on eligible standard tools/);
+assert.match(pricingProposalReport, /per-tool proposed workload rates/);
+assert.match(pricingProposalReport, /ad-free session access tariff is not an operation price/);
 assert.match(pricingPage, /100 tokens = \$1\.00/);
 assert.match(androidPricing, /100 tokens ≈ \$1\.00 USD/);
 assert.match(iosPricing, /100 tokens ≈ \$1\.00 USD/);
