@@ -2,7 +2,7 @@
 
 **Status:** foundation implemented; live purchases and token enforcement remain disabled.  
 **Pricing version:** `env-metering-preview-2026-10-18-v1`  
-**Catalogue coverage:** 10,025 Web catalogue tool entries at the time of profile generation. All 7,782 Android and 7,782 iOS native-engine inventory IDs also resolve to the shared profile registry.
+**Catalogue coverage:** Generated from the current canonical Web catalogue and native runtime-extension inventory. The current exact counts are emitted by the billing profile generator and its generated catalogue-wide audit report.
 
 ## Decisions locked for this release
 
