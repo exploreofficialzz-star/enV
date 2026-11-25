@@ -18,6 +18,11 @@ on:
       - "scripts/audit-related-tools.mjs"
       - "scripts/related-tools-baseline.mjs"
       - "scripts/export-native-catalog.mjs"
+      - "scripts/export-discovery-availability.mjs"
+      - "src/data/discovery-availability.json"
+      - "src/lib/discovery-availability.ts"
+      - "src/lib/discovery-filters.ts"
+      - "src/lib/discovery-filters.test.ts"
       - "scripts/check-native-related.mjs"
       - "src/lib/related-tools.ts"
       - "src/lib/related-tools.test.ts"
@@ -58,8 +63,18 @@ on:
       - "scripts/audit-related-tools.mjs"
       - "scripts/related-tools-baseline.mjs"
       - "scripts/export-native-catalog.mjs"
+      - "scripts/export-discovery-availability.mjs"
+      - "src/data/discovery-availability.json"
+      - "src/lib/discovery-availability.ts"
+      - "src/lib/discovery-filters.ts"
+      - "src/lib/discovery-filters.test.ts"
       - "scripts/check-native-related.mjs"
       - "scripts/export-native-catalog.mjs"
+      - "scripts/export-discovery-availability.mjs"
+      - "src/data/discovery-availability.json"
+      - "src/lib/discovery-availability.ts"
+      - "src/lib/discovery-filters.ts"
+      - "src/lib/discovery-filters.test.ts"
       - "src/lib/related-tools.ts"
       - "src/lib/related-tools.test.ts"
       - "apps/shared/catalog.json"
@@ -119,6 +134,7 @@ jobs:
           npm run generate:billing-profiles
           npm run check:native-discovery
           npm run export:native-execution-matrix
+          npm run export:discovery-availability
           npm run generate:seo
           npm run discovery:inventory
           npm run discovery:knowledge-index
