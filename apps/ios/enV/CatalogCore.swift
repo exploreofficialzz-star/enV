@@ -1087,15 +1087,29 @@ private final class NativeCatalogSearchCache: @unchecked Sendable {
         var seen = Set<String>()
         let candidates = all.filter { seen.insert($0.id).inserted }
 
+        // A catalogue version and boundary IDs are not sufficient cache identity:
+        // native extensions and generated search metadata can change while those values stay
+        // the same. Include every field consumed by buildDocument and ranking.
+        var candidateHasher = Hasher()
+        for tool in candidates {
+            candidateHasher.combine(tool.id)
+            candidateHasher.combine(tool.name)
+            candidateHasher.combine(tool.description)
+            candidateHasher.combine(tool.category)
+            candidateHasher.combine(tool.subcategory ?? "")
+            candidateHasher.combine(tool.popularity)
+            candidateHasher.combine(tool.status)
+            for keyword in tool.keywords { candidateHasher.combine(keyword) }
+            candidateHasher.combine("tool-keywords-end")
+            for tag in tool.tags { candidateHasher.combine(tag) }
+            candidateHasher.combine("tool-tags-end")
+        }
         let fingerprint = [
             catalog.catalogVersion,
             String(catalog.schemaVersion),
             String(includeRelatedReferences),
             String(candidates.count),
-            candidates.first?.id ?? "",
-            candidates.first?.name ?? "",
-            candidates.last?.id ?? "",
-            candidates.last?.name ?? ""
+            String(candidateHasher.finalize())
         ].joined(separator: "|")
 
         lock.lock()
