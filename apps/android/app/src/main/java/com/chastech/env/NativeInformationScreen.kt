@@ -254,9 +254,23 @@ private fun NativeTokenGuide(catalog: com.chastech.env.data.Catalog) {
                                 val subunits = details.optDouble("provisionalSubunitsPerUnit", Double.NaN)
                                 Text("Pricing status: ${details.optString("priceStatus", "provisional")}", style = MaterialTheme.typography.labelMedium)
                                 if (!details.isNull("provisionalSubunitsPerUnit") && subunits.isFinite()) {
+                                    val usdMicros = details.optLong("proposedUsdMicrosPerUnit", 0L)
                                     Text("Provisional rate: ${"%.3f".format(Locale.US, subunits / 1000.0)} tokens per $unit", style = MaterialTheme.typography.titleSmall)
+                                    if (usdMicros > 0L) Text("USD reference: ${"%.6f".format(Locale.US, usdMicros / 1_000_000.0)} per unit", style = MaterialTheme.typography.bodySmall)
                                 } else Text("Numeric estimate: not available until the applicable cost can be measured", style = MaterialTheme.typography.titleSmall)
                                 Text("Pricing method: ${details.optString("pricingMode", "not specified").replace('-', ' ')}", style = MaterialTheme.typography.bodySmall)
+                                Text("Pricing basis: ${details.optString("pricingBasis", "measured-cost-required").replace('-', ' ')} · ${details.optString("workloadTier", "provider-metered").replace('-', ' ')}", style = MaterialTheme.typography.bodySmall)
+                                val pricingFormula = details.optString("pricingFormula", "")
+                                if (pricingFormula.isNotBlank()) Text(pricingFormula, style = MaterialTheme.typography.bodySmall)
+                                val pricingFactors = details.optJSONArray("pricingFactors")
+                                if (pricingFactors != null && pricingFactors.length() > 0) {
+                                    Text("Cost factors: ${(0 until pricingFactors.length()).joinToString(", ") { pricingFactors.optString(it) }}", style = MaterialTheme.typography.bodySmall)
+                                }
+                                val adFreeAccessPrice = details.optJSONObject("adFreeAccessPrice")
+                                if (adFreeAccessPrice != null) {
+                                    val accessSubunits = adFreeAccessPrice.optInt("subunitsPerSession", 0)
+                                    if (accessSubunits > 0) Text("Separate ad-free access fee: ${"%.3f".format(Locale.US, accessSubunits / 1000.0)} tokens per session. This is not the operation price.", style = MaterialTheme.typography.bodySmall)
+                                }
                                 Text("Execution model: ${details.optString("executionMode", "tool-dependent").replace('-', ' ')}", style = MaterialTheme.typography.bodySmall)
                                 Text("Measurement dimensions: ${details.optJSONArray("meteringDimensions")?.let { array -> (0 until array.length()).joinToString(", ") { array.optString(it) } } ?: unit}", style = MaterialTheme.typography.bodySmall)
                                 Text("Pricing version: ${details.optString("pricingVersion", "not specified")}", style = MaterialTheme.typography.bodySmall)
