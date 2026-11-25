@@ -12,7 +12,8 @@ export default defineHandler((event) => {
   const profile = getToolBillingProfile(toolId);
   if (!profile) return jsonResponse({ ok: false, error: "UNKNOWN_TOOL", message: "No billing profile exists for this tool." }, 404);
   const { pricingVersion } = getBillingProfileIndexSummary();
-  const approvedPrice = getApprovedToolAccessPrice(toolId);
+  // This is the existing alternative ad-free session access price, not the tool's operation tariff.
+  const adFreeAccessPrice = getApprovedToolAccessPrice(toolId);
   const { adsEligible: _legacyAdsEligible, ...toolBillingProfile } = profile as typeof profile & { adsEligible?: boolean };
   void _legacyAdsEligible;
   return jsonResponse({
@@ -20,16 +21,24 @@ export default defineHandler((event) => {
     data: {
       ...toolBillingProfile,
       pricingVersion,
-      priceStatus: approvedPrice ? "approved" : profile.priceStatus,
-      manualAuditRequired: approvedPrice ? false : profile.manualAuditRequired,
-      approvedPrice: approvedPrice ? {
-        subunitsPerSession: approvedPrice.subunitsPerSession,
-        unitLabel: approvedPrice.unitLabel,
-        pricingVersion: approvedPrice.pricingVersion,
+      proposedPrice: profile.proposedSubunitsPerUnit !== null ? {
+        subunitsPerUnit: profile.proposedSubunitsPerUnit,
+        tokensPerUnit: profile.proposedTokensPerUnit,
+        usdMicrosPerUnit: profile.proposedUsdMicrosPerUnit,
+        unitLabel: profile.unitLabel,
+        workloadTier: profile.workloadTier,
+        formula: profile.pricingFormula,
+        factors: profile.pricingFactors,
+        pricingVersion: profile.toolPriceVersion,
       } : null,
-      // Return this tool's actual generated resource dimensions and execution class.
-      // Shared billing-key estimates remain provisional and must not become charges.
-      priceApproved: approvedPrice !== null,
+      // Kept separate so a 267-tool access fee is never mistaken for the operation price.
+      adFreeAccessPrice: adFreeAccessPrice ? {
+        subunitsPerSession: adFreeAccessPrice.subunitsPerSession,
+        unitLabel: adFreeAccessPrice.unitLabel,
+        pricingVersion: adFreeAccessPrice.pricingVersion,
+      } : null,
+      priceApproved: false,
+      manualAuditRequired: true,
       billingActive: false,
     },
   });
