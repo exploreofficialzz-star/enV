@@ -30,7 +30,7 @@
 - `server/routes/api/billing/wallet.get.ts`: authenticated wallet and ledger activity endpoint; requires configured account auth.
 - `server/routes/api/billing/purchases.post.ts`: server-side dispatch to Paystack only for customers in the configured Paystack merchant country, independently selected Flutterwave V4 methods only for non-Nigerian enabled country/currency profiles, or the existing Cryptomus adapter. Flutterwave is never a Paystack fallback. All routes remain fail-closed behind merchant approval, pricing and refund/dispute gates. See `docs/payment-provider-routing.md`.
 - `src/components/billing/tool-token-estimate.tsx`: Web tool-detail estimate, explicitly marked provisional and non-billable in this release.
-- Android/iOS/Web pricing and legal copy: aligned on token reference value, no disruptive ads, premium-vs-usage distinction and inactive purchases.
+- Android/iOS/Web pricing and legal copy: aligned on token reference value, eligible-only advertising, premium-vs-usage distinction and inactive purchases.
 
 ## Per-tool profile rules
 
