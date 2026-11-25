@@ -157,7 +157,69 @@ export function deriveLocalToolPriceProfile(tool, billingKey, executionMode) {
     if (heavy) factors.push("rendering, simulation or media processing");
     if (batch) factors.push("batch or multi-asset operation");
     pricingFormula = `${subunitsPerUnit} milli-tokens per studio operation; resource-heavy sub-operations are measured separately.`;
-  } else if (category === "files") {
+  } else if (category === "developer") {
+    const codeHeavy = has(identity, /\\b(regex|regular expression|compiler|transpil|minif|benchmark|parser|parse|schema|validator)\\b/);
+    unitLabel = "10k-characters";
+    meteringDimensions = ["input-characters", "output-characters", "parse-complexity", "operation-count"];
+    subunitsPerUnit = codeHeavy ? 250 : 125;
+    if (batch) subunitsPerUnit += 75;
+    workloadTier = subunitsPerUnit >= 250 ? "standard" : "light";
+    factors.push("developer text/data size", "syntax and parsing complexity");
+    if (codeHeavy) factors.push("regular-expression, schema, parser or code transformation work");
+    if (batch) factors.push("batch payloads");
+    pricingFormula = `${subunitsPerUnit} milli-tokens per 10,000 input characters; measured input/output text and parser complexity determine units.`;
+  } else if (category === "security") {
+    const dataOperation = has(identity, /\\b(hash|checksum|digest|encrypt|decrypt|cipher|hmac|signature|file metadata|metadata cleaner)\\b/);
+    unitLabel = dataOperation ? "MiB-input" : "security-operation";
+    meteringDimensions = dataOperation ? ["input-bytes", "algorithm", "file-count", "output-bytes"] : ["operation-count", "credential-count", "entropy-bits"];
+    subunitsPerUnit = dataOperation ? (has(identity, /\\b(encrypt|decrypt|cipher|hmac|signature)\\b/) ? 300 : 175) : 100;
+    if (batch) subunitsPerUnit += 100;
+    workloadTier = subunitsPerUnit >= 250 ? "standard" : "light";
+    factors.push(dataOperation ? "bytes processed and cryptographic algorithm" : "credential count and generation/validation operation");
+    if (batch) factors.push("batch or multi-file security checks");
+    pricingFormula = dataOperation
+      ? `${subunitsPerUnit} milli-tokens per MiB processed; scale by input bytes and selected algorithm.`
+      : `${subunitsPerUnit} milli-tokens per security operation; batch outputs are counted independently.`;
+  } else if (category === "qr") {
+    const scanning = has(identity, /\\b(scan|reader|decode|camera)\\b/);
+    unitLabel = scanning ? "megapixel-scan" : "code-generated";
+    meteringDimensions = scanning ? ["input-pixels", "scan-count", "decode-complexity"] : ["code-count", "payload-bytes", "error-correction-level"];
+    subunitsPerUnit = scanning ? 250 : 100;
+    if (batch) subunitsPerUnit += 100;
+    workloadTier = scanning ? "standard" : "light";
+    factors.push(scanning ? "image pixels and decode attempts" : "code payload size and error-correction level");
+    if (batch) factors.push("batch code generation or scanning");
+    pricingFormula = scanning
+      ? `${subunitsPerUnit} milli-tokens per megapixel scanned; multiply by measured image size and scan count.`
+      : `${subunitsPerUnit} milli-tokens per generated code; batch outputs are counted independently.`;
+  } else if (["mockups", "screenshots", "photography"].includes(category)) {
+    unitLabel = "rendered-asset";
+    meteringDimensions = ["asset-count", "output-resolution", "input-pixels", "frame-complexity"];
+    subunitsPerUnit = has(identity, /\\b(device frame|browser frame|mockup|render|composite|annotation|contact sheet|collage)\\b/) ? 400 : 250;
+    if (batch) subunitsPerUnit += 150;
+    workloadTier = "standard";
+    factors.push("rendered output resolution and asset count");
+    if (batch) factors.push("multi-asset batch or contact sheet");
+    pricingFormula = `${subunitsPerUnit} milli-tokens per rendered asset; resolution and batch count determine total units.`;
+  } else if (category === "design" || category === "webdesign") {
+    unitLabel = "design-operation";
+    meteringDimensions = ["operation-count", "element-count", "output-bytes", "preview-resolution"];
+    subunitsPerUnit = has(identity, /\\b(layout|responsive|component|design system|template|wireframe|typography scale|grid)\\b/) ? 200 : 125;
+    if (batch) subunitsPerUnit += 75;
+    workloadTier = subunitsPerUnit >= 200 ? "standard" : "light";
+    factors.push("number of design elements and generated output");
+    if (batch) factors.push("multiple layouts or exports");
+    pricingFormula = `${subunitsPerUnit} milli-tokens per design operation; count generated components and exports.`;
+  } else if (["communication", "career", "marketing", "social", "relationships", "events", "gaming", "interactive", "celebrations", "creators", "personal", "food", "travel", "productivity", "education", "random", "testdata", "generators", "streaming", "seo", "accessibility"].includes(category)) {
+    unitLabel = "10k-output-characters";
+    meteringDimensions = ["input-characters", "output-characters", "item-count", "workflow-step-count"];
+    subunitsPerUnit = has(identity, /\\b(plan|planner|analysis|audit|report|campaign|workflow|schedule|itinerary|portfolio|resume|curriculum|generator)\\b/) ? 175 : 125;
+    if (batch) subunitsPerUnit += 75;
+    workloadTier = subunitsPerUnit >= 175 ? "standard" : "light";
+    factors.push("generated or transformed output length", "number of generated items and workflow steps");
+    if (batch) factors.push("multi-item output batch");
+    pricingFormula = `${subunitsPerUnit} milli-tokens per 10,000 output characters; item count and workflow steps scale the workload.`;
+else if (category === "files") {
     unitLabel = "file-operation";
     meteringDimensions = ["input-bytes", "file-count", "output-bytes"];
     subunitsPerUnit = heavy ? 350 : 150;
