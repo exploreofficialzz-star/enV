@@ -356,6 +356,20 @@ export function calculateProposedToolUnits(unitLabel, measurements) {
   if (!measurements || typeof measurements !== "object" || Array.isArray(measurements)) {
     throw new TypeError("Tool measurements must be an object.");
   }
+  const allowedKeys = new Set([
+    "operationCount", "count", "itemCount", "calculationCount", "conversionCount",
+    "fileCount", "inputCharacters", "outputCharacters", "pixelCount", "inputPixels",
+    "processedPixels", "width", "imageWidth", "height", "imageHeight", "imageCount",
+    "audioSeconds", "durationSeconds", "videoSeconds", "videoWidth", "videoHeight",
+    "framesPerSecond", "fps", "pageCount", "pages", "inputBytes", "archiveBytes",
+    "processedBytes", "renderSeconds", "assetCount", "outputCount", "codeCount",
+    "recordCount", "documentCount", "credentialCount", "lookupCount", "requestCount",
+    "profileCount", "comparisonCount", "timezoneCount", "designOperationCount",
+    "componentCount", "workflowCount", "projectCount", "mediaSeconds",
+  ]);
+  for (const key of Object.keys(measurements)) {
+    if (!allowedKeys.has(key)) throw new RangeError("Unsupported measurement field: " + key + ".");
+  }
 
   const metric = (...keys) => {
     for (const key of keys) {
