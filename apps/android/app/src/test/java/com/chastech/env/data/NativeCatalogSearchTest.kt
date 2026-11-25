@@ -42,7 +42,17 @@ class NativeCatalogSearchTest {
             val expected = (0 until expectedJson.length()).map { expectedJson.getString(it) }
                 .filterNot { it in webOnlySearchReferenceIds }
             val actual = catalog.webSearch(query, limit = 10, includeRelatedReferences = true).map { it.id }
-            assertEquals("Native/Web search mismatch for query: '$query'", expected, actual.take(expected.size))
+            if (expected != actual.take(expected.size)) {
+                System.err.println(
+                    "Native/Web search mismatch for query '$query' at golden case $index. " +
+                        "Expected=$expected Actual=$actual"
+                )
+            }
+            assertEquals(
+                "Native/Web search mismatch for query: '$query' (golden case $index). Expected=$expected Actual=$actual",
+                expected,
+                actual.take(expected.size),
+            )
             assertTrue("Native search must not expose Web-only tools for query '$query'.", actual.none { it in webOnlySearchReferenceIds })
         }
     }
