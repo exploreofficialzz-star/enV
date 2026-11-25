@@ -393,9 +393,16 @@ private fun relatedAlphabeticalKey(value: String): String =
 fun Catalog.relatedTools(tool: ToolRecord, limit: Int = 6): List<ToolRecord> {
     if (limit <= 0) return emptyList()
 
-    // Include the complete native catalogue (including Web-only related references) plus
-    // the canonical Studio projections. Some source records can appear in both projections.
-    val relatedCandidates = (accessibilityDiscoveryTools() + developerStudioTools()).distinctBy { it.id }
+    // Resolve ordinary catalogue destinations as well as Studio projections. Web-only
+    // references are stored separately for native catalogues and must remain resolvable here.
+    // Legacy Accessibility variants are represented by their canonical Studio projection;
+    // the retired audio alias resolves to the canonical Song Metadata Analyzer below.
+    val catalogueCandidates = (tools + relatedReferenceTools).filter {
+        it.category != "accessibility" && it.id != "audio-analyze-studio"
+    }
+    val relatedCandidates = (
+        catalogueCandidates + accessibilityDiscoveryTools() + developerStudioTools()
+    ).distinctBy { it.id }
     val byId = relatedCandidates.associateBy { it.id }
     val seen = mutableSetOf(tool.id)
     val related = buildList {
