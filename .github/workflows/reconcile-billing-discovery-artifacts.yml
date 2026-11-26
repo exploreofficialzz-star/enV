@@ -145,6 +145,7 @@ jobs:
             + "No other existing tool changed platform/status classification, and no other registered gap grew.");
           NODE
 
+# Re-run this one-time job after Scene Studio's active video-related links are reconciled.
       - name: Accept only the reviewed discovery baseline and refresh generated records
         run: |
           npm run discovery:inventory -- --update-baseline
