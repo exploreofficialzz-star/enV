@@ -63,6 +63,8 @@
  {"query":"regexp tester","matchCount":2,"top10":["regex-studio","regex-tester"]},
  {"query":"cure my cough","matchCount":0,"top10":[]},
  {"query":"order a pizza","matchCount":0,"top10":[]},
+ {"query":"organize files by type","matchCount":1,"top10":["file-organizer"]},
+ {"query":"compare two folders","matchCount":1,"top10":["file-compare"]},
  {"query":"","matchCount":9979,"top10":["the-world-lab","json-studio","jwt-studio","regex-studio","hash-studio","encoding-studio","time-cron-studio","uuid-studio","sql-studio","markup-studio"]},
  {"query":"pdf","matchCount":158,"top10":["pdf-merger","pdf-splitter","pdf-rotator","pdf-compressor","pdf-page-extractor","pdf-metadata-viewer","pdf-to-word","pdf-comparison-tool","pdf-image-extractor","pdf-metadata-tool"]},
  {"query":"calculator","matchCount":6853,"top10":["percentage-calculator","tip-calculator","bmi-calculator","mortgage-calculator","basic-calculator","loan-calculator","calorie-calculator","area-calculator","discount-calculator","gpa-calculator"]},
@@ -72,8 +74,6 @@
  {"query":"free online json tool","matchCount":44,"top10":["json-studio","json-formatter","json-validator","json-beautifier","json-minifier","json-converter","json-decoder","json-diff","json-encoder","json-explainer"]},
  {"query":"Résumé","matchCount":7,"top10":["resume-builder","resume-calculator","resume-checker","resume-generator","resume-planner","resume-template","resume-bullet-generator"]},
  {"query":"c++","matchCount":0,"top10":[]},
- {"query":"100%","matchCount":1,"top10":["image-sharpen"]},
- {"query":"organize files by type","matchCount":1,"top10":["file-organizer"]},
- {"query":"compare two folders","matchCount":1,"top10":["file-compare"]}
+ {"query":"100%","matchCount":1,"top10":["image-sharpen"]}
  ]
 }
