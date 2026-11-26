@@ -72,31 +72,45 @@ jobs:
           const currentIds = new Set(current.records.map((record) => record.id));
           const addedIds = [...currentIds].filter((id) => !beforeIds.has(id)).sort();
           const removedIds = [...beforeIds].filter((id) => !currentIds.has(id)).sort();
-          if (addedIds.length !== 0 || removedIds.length !== 0) {
-            throw new Error("Stable tool IDs changed during this monetization PR. Added="
+          const expectedAddedIds = ["scene-studio"];
+          const expectedRemovedIds = ["video-link-screen-recording"];
+          if (JSON.stringify(addedIds) !== JSON.stringify(expectedAddedIds) ||
+              JSON.stringify(removedIds) !== JSON.stringify(expectedRemovedIds)) {
+            throw new Error("Discovery identity delta does not match the reviewed source changes. Added="
               + JSON.stringify(addedIds) + "; removed=" + JSON.stringify(removedIds));
+          }
+
+          const sceneStudio = current.records.find((record) => record.id === "scene-studio");
+          const nativeInventory = JSON.parse(fs.readFileSync("apps/shared/native-engine-inventory.json", "utf8"));
+          if (!sceneStudio || sceneStudio.status === "planned" ||
+              !sceneStudio.reasons?.includes("NATIVE_WEB_ONLY_ACTIVE") ||
+              nativeInventory.androidToolIds.includes("scene-studio") ||
+              nativeInventory.iosToolIds.includes("scene-studio")) {
+            throw new Error("Scene Studio must be active in Web discovery and remain explicitly outside native Android/iOS inventory until native screens are implemented.");
           }
 
           const isNativeWebOnlyActive = (record) =>
             record.status !== "planned" && record.reasons?.includes("NATIVE_WEB_ONLY_ACTIVE");
           const isNativeWebOnlyPlanned = (record) =>
             record.status === "planned" && record.reasons?.includes("NATIVE_WEB_ONLY_PLANNED");
+          const beforeIdsForGap = new Set(before.records.map((record) => record.id));
           const beforeActive = new Set(before.records.filter(isNativeWebOnlyActive).map((record) => record.id));
           const currentActive = new Set(current.records.filter(isNativeWebOnlyActive).map((record) => record.id));
           const beforePlanned = new Set(before.records.filter(isNativeWebOnlyPlanned).map((record) => record.id));
           const currentPlanned = new Set(current.records.filter(isNativeWebOnlyPlanned).map((record) => record.id));
-          const promotedToActive = [...currentActive].filter((id) => !beforeActive.has(id)).sort();
-          const noLongerPlanned = [...beforePlanned].filter((id) => !currentPlanned.has(id)).sort();
+          const unexpectedActivePromotions = [...currentActive]
+            .filter((id) => beforeIdsForGap.has(id) && !beforeActive.has(id)).sort();
+          const unexpectedExistingPlanChanges = [...beforePlanned]
+            .filter((id) => currentIds.has(id) && !currentPlanned.has(id)).sort();
 
           const previousGap = beforeBaseline.gaps.NATIVE_WEB_ONLY_ACTIVE;
           const actualGap = current.gaps.NATIVE_WEB_ONLY_ACTIVE.count;
           if (actualGap !== previousGap + 1 ||
-              promotedToActive.length !== 1 ||
-              noLongerPlanned.length !== 1 ||
-              promotedToActive[0] !== noLongerPlanned[0]) {
-            throw new Error("Expected exactly one existing Web-only tool to move from planned to active. "
-              + "Active additions=" + JSON.stringify(promotedToActive)
-              + "; planned removals=" + JSON.stringify(noLongerPlanned)
+              unexpectedActivePromotions.length !== 0 ||
+              unexpectedExistingPlanChanges.length !== 0) {
+            throw new Error("The only accepted active-Web gap increase is the newly added Scene Studio record. "
+              + "Unexpected active promotions=" + JSON.stringify(unexpectedActivePromotions)
+              + "; unexpected existing plan changes=" + JSON.stringify(unexpectedExistingPlanChanges)
               + "; gap " + previousGap + " -> " + actualGap);
           }
 
@@ -108,23 +122,17 @@ jobs:
             }
           }
 
-          const id = promotedToActive[0];
-          const record = current.records.find((entry) => entry.id === id);
-          if (!record || record.status === "planned" || !record.reasons.includes("NATIVE_WEB_ONLY_ACTIVE")) {
-            throw new Error("The promoted tool is not an active, explicitly classified Web-only tool.");
-          }
-
           fs.writeFileSync("/tmp/discovery-reviewed-change.json", JSON.stringify({
-            toolId: id,
-            toolName: record.name,
+            addedIds,
+            removedIds,
+            toolId: sceneStudio.id,
+            toolName: sceneStudio.name,
             previousActiveGap: previousGap,
-            currentActiveGap: actualGap,
-            addedIds: addedIds.length,
-            removedIds: removedIds.length
+            currentActiveGap: actualGap
           }, null, 2));
-          console.log("Verified reviewed discovery delta: " + record.name + " (" + id
-            + ") moved from planned to active while retaining its Web-only platform classification. "
-            + "No stable IDs were added or removed; no other registered gap grew.");
+          console.log("Verified reviewed discovery delta: Scene Studio was added as an active Web-only tool; "
+            + "video-link-screen-recording was retired as the single removed stable ID. "
+            + "No other existing tool changed platform/status classification, and no other registered gap grew.");
           NODE
 
       - name: Accept only the reviewed discovery baseline and refresh generated records
@@ -135,11 +143,11 @@ jobs:
           const change = JSON.parse(fs.readFileSync("/tmp/discovery-reviewed-change.json", "utf8"));
           const path = "audit/discovery/discovery-baseline.json";
           const baseline = JSON.parse(fs.readFileSync(path, "utf8"));
-          baseline.note = "Reviewed 2026-11-26: " + change.toolName + " (" + change.toolId
-            + ") moved from planned to active while retaining its explicit Web-only native execution classification. "
+          baseline.note = "Reviewed 2026-11-26: Scene Studio (" + change.toolId
+            + ") is present in canonical Web discovery as an active Web-only tool and is not in the native Android/iOS inventory. "
             + "The NATIVE_WEB_ONLY_ACTIVE registered gap increased from " + change.previousActiveGap
-            + " to " + change.currentActiveGap
-            + "; no stable IDs were added or removed, and every other registered gap stayed level or improved. "
+            + " to " + change.currentActiveGap + ". The only stable-ID changes were the addition of scene-studio and the previously reviewed retirement of video-link-screen-recording. "
+            + "No other existing tool changed platform/status classification, and every other registered gap stayed level or improved. "
             + "This records a platform-coverage gap; it is not native functional acceptance evidence or billing approval.";
           fs.writeFileSync(path, JSON.stringify(baseline, null, 1) + "\n");
           NODE
