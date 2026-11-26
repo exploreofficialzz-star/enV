@@ -1,5 +1,5 @@
 {
- "note": "Snapshot recorded by --update-baseline. It has NOT been reviewed by a human owner yet: review the difference lists in DISCOVERY-RECONCILIATION-REPORT.md before treating it as accepted. Counts must match exactly; gap values may only shrink.",
+ "note": "Reviewed 2026-11-26: Scene Studio (scene-studio) is present in canonical Web discovery as an active Web-only tool and is not in the native Android/iOS inventory. The NATIVE_WEB_ONLY_ACTIVE registered gap increased from 278 to 279. The only stable-ID changes were the addition of scene-studio and the reviewed retirement of video-link-screen-recording. No other existing tool changed platform/status classification, and every other registered gap stayed level or improved. This records a platform-coverage gap; it is not native functional acceptance evidence or billing approval.",
  "counts": {
   "sourceRecords": 10001,
   "sharedCatalogueRecords": 10001,
@@ -14,7 +14,7 @@
   "PLANNED_IN_SEARCHABLE": 260,
   "EMPTY_CATEGORY": 1,
   "NATIVE_MATRIX_NAME_DRIFT": 0,
-  "NATIVE_WEB_ONLY_ACTIVE": 278,
+  "NATIVE_WEB_ONLY_ACTIVE": 279,
   "DUPLICATE_DISPLAY_NAMES": 654,
   "UNDIFFERENTIATED_POPULARITY": 1,
   "SEARCHABLE_NOT_ON_ANY_CATEGORY_ROUTE": 475,
