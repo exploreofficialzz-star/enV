@@ -22,6 +22,12 @@ test("Adsterra qualification excludes sensitive categories and Studio, AI, Lab a
   assert.equal(isAdsterraQualifiedTool(tool({ status: "planned" })), false);
   assert.equal(isAdsterraQualifiedTool(tool({ disclaimer: "finance" })), false);
 });
+test("ordinary ad-eligible tools do not need an approved token price to enter the Adsterra cohort", () => {
+  const unpricedTool = tool({ id: "json-formatter", name: "JSON Formatter", engine: { type: "codec", id: "json-formatter" } });
+  assert.equal(isAdsterraQualifiedTool(unpricedTool), true);
+  assert.equal(isPaidHybridAccessToolId("json-formatter", selected, unpricedTool), false);
+});
+
 test("hybrid online/offline access uses only the explicitly selected tool-ID list", () => {
   assert.equal(isHybridAccessToolId("average-speed-calculator", selected, tool()), true);
   assert.equal(isHybridAccessToolId("json-formatter", selected, tool({ id: "json-formatter", engine: { type: "codec" } })), false);
