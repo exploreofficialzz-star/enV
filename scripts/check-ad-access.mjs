@@ -49,6 +49,17 @@ assert.match(shell, /if \(!adAccessGateEnabled \|\| !adsterraAdsEnabled\) return
 assert.match(shell, /window\.addEventListener\("env:adsterra-placement-loaded"/, "The visit counter must wait for a successful placement script load.");
 assert.match(shell, /setAdsterraConsent\("granted"\)/, "Adsterra access must follow an explicit advertising choice.");
 assert.match(shell, /isAdsterraQualifiedTool\(tool\)/, "Adsterra eligibility must use the shared sensitive-topic exclusion policy.");
+assert.match(shell, /const adAccessGateEnabled =\s*import\.meta\.env\.VITE_AD_ACCESS_GATE_ENABLED === "true" && toolAdEligible;/, "Every ad-qualified active Web tool must use the Adsterra gate, regardless of token-price approval.");
+assert.match(shell, /const tokenAccessAvailable = isPaidHybridAccessToolId/, "Token access must remain limited to separately approved tool prices.");
+assert.doesNotMatch(shell, /adAccessGateEnabled =\s*import\.meta\.env\.VITE_AD_ACCESS_GATE_ENABLED === "true" &&\s*toolAdEligible &&\s*isPaidHybridAccessToolId/, "An approved token-price list must never narrow the Adsterra access gate.");
+assert.match(shell, /adAccessGateEnabled && !toolAccessCurrentlyUnlocked/, "Ad-eligible tools must remain gated when offline or not yet unlocked.");
+assert.match(shell, /online=\{browserOnline\}/, "The access gate must receive connection state.");
+assert.match(shell, /tokenAccessAvailable=\{tokenAccessAvailable\}/, "The access gate must receive the independent approved-price state.");
+assert.match(gate, /online: boolean/, "The access gate must model online state explicitly.");
+assert.match(gate, /tokenAccessAvailable: boolean/, "The access gate must model approved token availability explicitly.");
+assert.match(gate, /This tool stays locked while you are offline/, "Offline access must remain locked until the separate allowance system is approved.");
+assert.match(gate, /user && tokenAccessAvailable/, "The token action must only appear for a signed-in user with an approved tool price.");
+assert.match(gate, /This tool does not yet have an approved token price/, "Unpriced tools must explain why token access is unavailable.");
 assert.match(gate, /onContinueWithAdsterra/, "The access gate must use the Adsterra-supported route.");
 assert.match(gate, /await onContinueWithAdsterra\(\)/, "The access gate must await a successful Adsterra placement load before unlocking.");
 assert.match(placementAccess, /ADSTERRA_ACCESS_LOAD_TIMEOUT_MS = 15_000/, "Adsterra access must use a bounded placement-load timeout.");
