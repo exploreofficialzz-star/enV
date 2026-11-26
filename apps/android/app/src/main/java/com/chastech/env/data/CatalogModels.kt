@@ -281,10 +281,10 @@ fun Catalog.withFileWorkspaceTools(): Catalog {
         Triple("file-to-txt", "File to TXT Converter", "Extract readable text from supported text files, DOCX documents and selectable-text PDFs, or enter text directly and save a UTF-8 TXT file."),
         Triple("file-organizer", "File Organizer", "Sort selected files into type-based folders and copy them into a destination you choose. Original files are never deleted."),
         Triple("batch-file-renamer", "Batch File Renamer", "Preview consistent filename prefixes, suffixes, numbering and replacements before exporting renamed copies."),
-        Triple("duplicate-file-finder", "Duplicate File Finder", "Find identical files using size filtering and streaming SHA-256 verification."),
+        Triple("duplicate-file-finder", "Duplicate File Finder", "Find identical files using SHA-256 content verification after size filtering; filenames alone are never treated as proof."),
         Triple("folder-size-analyzer", "Folder Size Analyzer", "Review folder size, file-type breakdowns and the largest files on this device."),
         Triple("file-search", "File Search", "Search filenames and supported text file contents without a terminal."),
-        Triple("file-compare", "File & Folder Compare", "Compare two folders and verify identical files using SHA-256 checksums."),
+        Triple("file-compare", "File & Folder Compare", "Compare two selected file sets to identify added, missing, changed and SHA-256-verified identical files."),
     )
     val existing = tools.mapTo(mutableSetOf()) { it.id }
     val additions = definitions.filterNot { it.first in existing }.mapIndexed { index, item ->
@@ -296,11 +296,25 @@ fun Catalog.withFileWorkspaceTools(): Catalog {
             description = description,
             category = "files",
             keywords = when (id) {
-                "file-to-txt" -> listOf("file to txt", "text extraction", "docx to txt", "pdf to txt", "plain text", "text converter", "extract text")
-                "file-compare" -> listOf("compare folders", "compare files", "directory diff", "diff", "file comparison", "backup compare", "rsync dry run", "sha256", "hash", "checksum")
-                else -> listOf("files", "folder", "local", "mobile", "offline", "storage", "organize", "search", "compare", "rename", "checksum")
+                "file-to-txt" -> listOf("file to txt", "convert to text", "extract text", "docx to txt", "pdf to txt", "plain text", "text extractor")
+                "file-organizer" -> listOf("organize files", "sort files", "file manager", "file organizer", "folders", "move files", "documents", "phone storage")
+                "batch-file-renamer" -> listOf("batch rename", "bulk rename", "rename files", "filename pattern", "number files", "prefix", "suffix")
+                "duplicate-file-finder" -> listOf("duplicate finder", "find duplicates", "identical files", "same files", "free storage", "checksum")
+                "folder-size-analyzer" -> listOf("folder size", "storage analyzer", "disk usage", "du", "largest files", "folder inventory", "storage usage")
+                "file-search" -> listOf("find files", "search files", "grep", "search in files", "file finder", "text search", "folder search")
+                "file-compare" -> listOf("compare folders", "compare files", "directory diff", "diff", "file comparison", "backup compare", "rsync dry run")
+                else -> emptyList()
             },
-            tags = if (id == "file-to-txt") listOf("files", "text", "extract", "converter", "local", "mobile") else listOf("files", "local", "mobile", "offline", "file-workspace") + if (id == "file-compare") listOf("sha256", "hash", "checksum") else emptyList(),
+            tags = when (id) {
+                "file-to-txt" -> listOf("files", "text", "extract", "converter", "local")
+                "file-organizer" -> listOf("files", "organize", "folders", "local", "mobile")
+                "batch-file-renamer" -> listOf("files", "rename", "batch", "local", "mobile")
+                "duplicate-file-finder" -> listOf("files", "duplicates", "sha256", "verify", "local")
+                "folder-size-analyzer" -> listOf("files", "storage", "folder", "analysis", "local", "mobile")
+                "file-search" -> listOf("files", "search", "find", "grep", "local", "mobile")
+                "file-compare" -> listOf("files", "compare", "diff", "backup", "sha256", "local")
+                else -> emptyList()
+            },
             icon = when (id) {
                 "file-to-txt" -> "FileText"
                 "file-organizer" -> "FolderTree"
@@ -310,7 +324,16 @@ fun Catalog.withFileWorkspaceTools(): Catalog {
                 "file-search" -> "FileSearch"
                 else -> "GitCompareArrows"
             },
-            popularity = 1120 - index * 10,
+            popularity = when (id) {
+                "file-organizer" -> 1120
+                "duplicate-file-finder" -> 1100
+                "file-search" -> 1090
+                "file-to-txt" -> 1080
+                "folder-size-analyzer" -> 1060
+                "batch-file-renamer" -> 1050
+                "file-compare" -> 1030
+                else -> 0
+            },
             featured = true,
             clientSide = true,
             requiresBackend = false,
