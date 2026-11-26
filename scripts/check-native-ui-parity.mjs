@@ -306,8 +306,8 @@ assert.ok(!/HomeMostUsedToolsTray\(tools: mostUsedTools\)[\s\S]{0,120}\.padding\
 const webAiAgentAction = webHome.indexOf('aria-label="Open AI Agent"');
 const webTokenDashboardAction = webHome.indexOf('aria-label="Open token dashboard"');
 const webPersonalTray = webHome.indexOf("<MostUsedToolsTray");
-const webHeroHeadline = webHome.indexOf('<h1 className="mt-6');
-assert.ok(webAiAgentAction >= 0 && webTokenDashboardAction > webAiAgentAction && webPersonalTray > webTokenDashboardAction && webHeroHeadline > webPersonalTray, "Web home order should be AI Agent/token dashboard, personal tray, then the hero headline");
+const webTrendingSection = webHome.indexOf('<ToolSection title="Trending tools"');
+assert.ok(webAiAgentAction >= 0 && webTokenDashboardAction > webAiAgentAction && webPersonalTray > webTokenDashboardAction && webTrendingSection > webPersonalTray, "Web home order should be AI Agent/token dashboard, personal tray, then Trending tools");
 assert.ok(androidHome.indexOf('HomePreviewBar("Total token = 100"') < androidHome.indexOf("MostUsedToolsTray(mostUsed") && androidHome.indexOf("MostUsedToolsTray(mostUsed") < androidHome.indexOf('Text("A focused toolkit'), "Android home order should be AI/token, personal tray, then the hero headline");
 assert.ok(iosHome.indexOf('HomePreviewBar(title: "Total token = 100")') < iosHome.indexOf("HomeMostUsedToolsTray(tools: mostUsedTools)") && iosHome.indexOf("HomeMostUsedToolsTray(tools: mostUsedTools)") < iosHome.indexOf('Text("A focused toolkit'), "iOS home order should be AI/token, personal tray, then the hero headline");
 assert.match(webHome, /h-\[112px\].*min-h-\[112px\].*w-full.*max-w-3xl.*shrink-0.*rounded-\[28px\]/, "Web personal shortcuts tray must retain its full fixed size when shortcuts are sparse");
