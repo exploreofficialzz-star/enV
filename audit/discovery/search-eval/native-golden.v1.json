@@ -23,7 +23,7 @@
  {"query":"a11y focus ring","matchCount":2,"top10":["focus-state-checker","keyboard-navigation-checker"]},
  {"query":"pdf mrge","matchCount":6,"top10":["pdf-merger","document-merger","docx-merger","image-merger","presentation-merger","spreadsheet-merger"]},
  {"query":"passwrod generator","matchCount":2,"top10":["password-generator","md5-hash"]},
- {"query":"imge resizer","matchCount":123,"top10":["image-resizer","x-image-resizer","instagram-image-resizer","tiktok-image-resizer","linkedin-image-resizer","facebook-image-resizer","pinterest-image-resizer","discord-image-resizer","reddit-image-resizer","snapchat-image-resizer"]},
+ {"query":"imge resizer","matchCount":124,"top10":["image-resizer","x-image-resizer","instagram-image-resizer","tiktok-image-resizer","linkedin-image-resizer","facebook-image-resizer","pinterest-image-resizer","discord-image-resizer","reddit-image-resizer","snapchat-image-resizer"]},
  {"query":"passw","matchCount":4,"top10":["password-generator","password-strength-checker","md5-hash","voice-noise-reducer"]},
  {"query":"png to jpg","matchCount":5,"top10":["file-png-to-jpg-converter","file-jpg-to-png-converter","image-compressor","images-to-pdf","heic-converter"]},
  {"query":"jpg to png","matchCount":5,"top10":["file-jpg-to-png-converter","file-png-to-jpg-converter","image-compressor","images-to-pdf","heic-converter"]},
@@ -49,7 +49,7 @@
  {"query":"add watermark to pdf","matchCount":7,"top10":["pdf-watermark-tool","document-watermark-tool","docx-watermark-tool","image-watermark-tool","presentation-watermark-tool","spreadsheet-watermark-tool","image-watermark"]},
  {"query":"video to mp3","matchCount":1,"top10":["video-to-mp3"]},
  {"query":"trim video","matchCount":2,"top10":["video-trimmer","video-crop"]},
- {"query":"test regular expression","matchCount":2,"top10":["regex-studio","regex-tester"]},
+ {"query":"test regular expression","matchCount":3,"top10":["regex-studio","regex-tester","regex-replace"]},
  {"query":"convert text to title case","matchCount":5,"top10":["title-case-converter","kebab-case-converter","camel-case-converter","snake-case-converter","sentence-case-converter"]},
  {"query":"make a url slug","matchCount":1,"top10":["slug-generator"]},
  {"query":"generate meta tags","matchCount":3,"top10":["meta-tag-generator","meta-robots-generator","twitter-card-generator"]},
@@ -60,7 +60,7 @@
  {"query":"view exif data","matchCount":1,"top10":["exif-viewer"]},
  {"query":"remove exif metadata","matchCount":3,"top10":["exif-remover","exif-viewer","image-image-metadata-cleaner"]},
  {"query":"pomodro timer","matchCount":1,"top10":["pomodoro-timer"]},
- {"query":"regexp tester","matchCount":1,"top10":["regex-studio"]},
+ {"query":"regexp tester","matchCount":2,"top10":["regex-studio","regex-tester"]},
  {"query":"cure my cough","matchCount":0,"top10":[]},
  {"query":"order a pizza","matchCount":0,"top10":[]},
  {"query":"","matchCount":9979,"top10":["the-world-lab","json-studio","jwt-studio","regex-studio","hash-studio","encoding-studio","time-cron-studio","uuid-studio","sql-studio","markup-studio"]},
@@ -72,6 +72,8 @@
  {"query":"free online json tool","matchCount":44,"top10":["json-studio","json-formatter","json-validator","json-beautifier","json-minifier","json-converter","json-decoder","json-diff","json-encoder","json-explainer"]},
  {"query":"Résumé","matchCount":7,"top10":["resume-builder","resume-calculator","resume-checker","resume-generator","resume-planner","resume-template","resume-bullet-generator"]},
  {"query":"c++","matchCount":0,"top10":[]},
- {"query":"100%","matchCount":1,"top10":["image-sharpen"]}
+ {"query":"100%","matchCount":1,"top10":["image-sharpen"]},
+ {"query":"organize files by type","matchCount":1,"top10":["file-organizer"]},
+ {"query":"compare two folders","matchCount":1,"top10":["file-compare"]}
  ]
 }
