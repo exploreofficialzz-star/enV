@@ -278,12 +278,12 @@ fun Catalog.withZipArchive(): Catalog {
 /** Registers the native local File workspace tools without changing the generated base catalogue. */
 fun Catalog.withFileWorkspaceTools(): Catalog {
     val definitions = listOf(
-        Triple("file-to-txt", "File to TXT Converter", "Extract readable text from supported text files, DOCX documents and selectable-text PDFs, or enter text directly and save a UTF-8 TXT file."),
-        Triple("file-organizer", "File Organizer", "Sort selected files into type-based folders and copy them into a destination you choose. Original files are never deleted."),
-        Triple("batch-file-renamer", "Batch File Renamer", "Preview consistent filename prefixes, suffixes, numbering and replacements before exporting renamed copies."),
+        Triple("file-to-txt", "File to TXT Converter", "Type or paste plain text, or extract readable text from supported files and save it as a TXT file."),
+        Triple("file-organizer", "File Organizer", "Sort selected files into clear folders by type and export an organized copy without moving or deleting originals."),
+        Triple("batch-file-renamer", "Batch File Renamer", "Preview and apply consistent prefixes, suffixes, numbering and literal replacements to many filenames in one operation."),
         Triple("duplicate-file-finder", "Duplicate File Finder", "Find identical files using SHA-256 content verification after size filtering; filenames alone are never treated as proof."),
-        Triple("folder-size-analyzer", "Folder Size Analyzer", "Review folder size, file-type breakdowns and the largest files on this device."),
-        Triple("file-search", "File Search", "Search filenames and supported text file contents without a terminal."),
+        Triple("folder-size-analyzer", "Folder Size Analyzer", "Inspect folder contents, total storage, file-type breakdowns and the largest files without opening a terminal."),
+        Triple("file-search", "File Search", "Find files by name and search inside supported text files with clear file and line references."),
         Triple("file-compare", "File & Folder Compare", "Compare two selected file sets to identify added, missing, changed and SHA-256-verified identical files."),
     )
     val existing = tools.mapTo(mutableSetOf()) { it.id }
