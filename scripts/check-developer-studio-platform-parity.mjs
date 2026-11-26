@@ -51,7 +51,12 @@ const webRegistry = readFileSync('src/lib/registry.ts', 'utf8');
 const androidMain = readFileSync('apps/android/app/src/main/java/com/chastech/env/MainActivity.kt', 'utf8');
 const androidUx = readFileSync('apps/android/app/src/main/java/com/chastech/env/NativeUxUiStudio.kt', 'utf8');
 const iosTools = readFileSync('apps/ios/enV/ToolViews.swift', 'utf8');
-assert.ok(webRegistry.includes('makeDeveloperStudioTools(allTools)'), 'UX/UI Studio must enter the searchable virtual tool registry');
+assert.ok(
+  webRegistry.includes('makeDeveloperStudioTools(canonicalRuntimeTools)') &&
+    webRegistry.includes('const virtualStudios = [...accessibilityStudios, ...developerStudios]') &&
+    webRegistry.includes('const searchableTools = [...allTools.filter((tool) => tool.category !== "accessibility" && isDiscoverable(tool)), ...virtualStudios]'),
+  'UX/UI Studio must be built from canonical runtime tools, added to the virtual registry, and included in searchable discovery',
+);
 assert.ok(webRoute.includes('getToolByPath(category, slug)'), 'The public tools route must resolve the Studio slug');
 assert.ok(webDispatcher.includes('tool.slug === "ux-ui-studio" ? <UxUiStudioEngine />'), 'Web route must launch the dedicated UX/UI editor');
 assert.ok(androidMain.includes('"ux-ui-studio" -> NativeUxUiStudioForm()'), 'Android route must launch the native Kotlin UX/UI editor');
