@@ -43,8 +43,8 @@ type ProfileIndex = {
   profiles: ToolBillingProfile[];
 };
 
-const data = profileIndex as ProfileIndex;
-const runtimeExtensions = runtimeExtensionIndex as ProfileIndex;
+const data = profileIndex as unknown as ProfileIndex;
+const runtimeExtensions = runtimeExtensionIndex as unknown as ProfileIndex;
 const combinedProfiles = [...data.profiles, ...runtimeExtensions.profiles];
 const profilesByToolId = new Map(combinedProfiles.map((profile) => [profile.toolId, profile]));
 
