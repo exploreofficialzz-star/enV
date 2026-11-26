@@ -138,7 +138,8 @@ jobs:
           baseline.note = "Reviewed 2026-11-26: " + change.toolName + " (" + change.toolId
             + ") moved from planned to active while retaining its explicit Web-only native execution classification. "
             + "The NATIVE_WEB_ONLY_ACTIVE registered gap increased from " + change.previousActiveGap
-            + " to " + change.currentActiveGap; no stable IDs were added or removed, and every other registered gap stayed level or improved. "
+            + " to " + change.currentActiveGap
+            + "; no stable IDs were added or removed, and every other registered gap stayed level or improved. "
             + "This records a platform-coverage gap; it is not native functional acceptance evidence or billing approval.";
           fs.writeFileSync(path, JSON.stringify(baseline, null, 1) + "\n");
           NODE
