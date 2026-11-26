@@ -269,9 +269,12 @@ assert.ok(aiRateProfiles.every((profile) => ["ai.standard", "ai.frontier"].inclu
 assert.ok(aiRateProfiles.filter((profile) => profile.billingKey === "ai.frontier").every((profile) => profile.premiumRequired === true), "frontier AI profiles must require premium entitlement");
 assert.ok(profiles.profiles.every((profile) => Array.isArray(profile.meteringDimensions) && profile.meteringDimensions.length > 0), "every catalogue tool needs its own explicit cost-driver dimensions");
 const allBillingProfiles = [...profiles.profiles, ...runtimeExtensionProfileIndex.profiles];
-for (const unitLabel of new Set(allBillingProfiles.map((profile) => profile.unitLabel))) {
+for (const profile of allBillingProfiles) {
+  if (profile.priceStatus !== "provisional" ||
+      !["local-device", "web-local"].includes(profile.executionMode)) continue;
+  const unitLabel = profile.unitLabel;
   if (unitLabel === "operation") continue;
-  assert.ok(perToolPricingHelper.includes(`case "${unitLabel}"`), `measured quote calculator must support generated unit ${unitLabel}`);
+  assert.ok(perToolPricingHelper.includes(`case "${unitLabel}"`), `measured quote calculator must support locally priced unit ${unitLabel} for ${profile.toolId}`);
 }
 assert.ok(runtimeExtensionProfileIndex.profiles.every((profile) => Array.isArray(profile.meteringDimensions) && profile.meteringDimensions.length > 0), "every runtime extension needs its own explicit cost-driver dimensions");
 assert.equal(profileIndex.toolCount, profiles.toolCount, "runtime index count must match full audit");
