@@ -49,6 +49,7 @@ class CatalogModelsTest {
         assertEquals("photography", catalog.tools.single().category)
         assertEquals("custom", catalog.tools.single().engine.type)
         assertEquals("camera-studio", catalog.tools.single().engine.id)
+        assertEquals(listOf("image-cropper", "image-resizer", "image-compressor", "image-sharpen", "image-watermark"), catalog.tools.single().related)
         assertEquals(catalog, catalog.withCameraStudio())
     }
 
