@@ -357,7 +357,7 @@ fun Catalog.withCameraStudio(): Catalog {
         requiresBackend = false,
         requiresAuth = false,
         status = "active",
-        related = emptyList(),
+        related = listOf("image-cropper", "image-resizer", "image-compressor", "image-sharpen", "image-watermark"),
         engine = EngineInfo("custom", "camera-studio"),
         subcategory = "Camera",
     )
