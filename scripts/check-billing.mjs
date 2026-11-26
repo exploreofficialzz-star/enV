@@ -232,7 +232,10 @@ assert.equal(runtimeExtensionProfileIndex.toolCount, runtimeExtensionProfileInde
 assert.equal(runtimeExtensionProfileIds.size, runtimeExtensionProfileIndex.profiles.length, "runtime-extension profile IDs must be unique");
 const expectedExtensionIds = [...new Set([...(nativeInventory.runtimeExtensionIds ?? []), ...DATETIME_TOOL_EXTENSIONS.map((tool) => tool.id)])].filter((id) => !new Set(runtimeCatalog.map((tool) => tool.id)).has(id)).sort();
 assert.deepEqual([...runtimeExtensionProfileIds].sort(), expectedExtensionIds, "supplemental billing profiles must exactly cover native runtime extensions missing from the catalogue");
-assert.ok(runtimeExtensionProfileIndex.profiles.every((profile) => profile.billingKey && profile.pricingMode && profile.manualAuditRequired === true && profile.priceStatus === "provisional" && Number.isSafeInteger(profile.proposedSubunitsPerUnit) && profile.proposedSubunitsPerUnit > 0), "every local runtime extension must have an individually calculated draft tariff");
+const localRuntimeExtensions = runtimeExtensionProfileIndex.profiles.filter((profile) => ["local-device", "web-local"].includes(profile.executionMode));
+const remoteRuntimeExtensions = runtimeExtensionProfileIndex.profiles.filter((profile) => profile.executionMode === "cloud-or-remote");
+assert.ok(localRuntimeExtensions.every((profile) => profile.billingKey && profile.pricingMode && profile.manualAuditRequired === true && profile.priceStatus === "provisional" && Number.isSafeInteger(profile.proposedSubunitsPerUnit) && profile.proposedSubunitsPerUnit > 0), "every local runtime extension must have an individually calculated draft tariff");
+assert.ok(remoteRuntimeExtensions.every((profile) => profile.manualAuditRequired === true && profile.priceStatus === "requires-cost-measurement" && profile.proposedSubunitsPerUnit === null), "remote runtime extensions must remain unpriced until provider and infrastructure costs are measured");
 const sceneStudioBillingProfile = runtimeExtensionProfileIndex.profiles.find((profile) => profile.toolId === "scene-studio");
 assert.ok(sceneStudioBillingProfile, "Scene Studio must have a runtime-extension billing profile");
 assert.equal(sceneStudioBillingProfile.toolStatus, "active");
