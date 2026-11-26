@@ -488,9 +488,9 @@ export function getNewTools(limit = 8): ToolMeta[] {
     .slice(0, limit);
 }
 
-const relatedFallbackByCategory = new Map<string, ToolMeta[]>();
+const relatedFallbackByCategory = new Map<CategoryId, ToolMeta[]>();
 
-function relatedFallbackForCategory(category: string): ToolMeta[] {
+function relatedFallbackForCategory(category: CategoryId): ToolMeta[] {
   const cached = relatedFallbackByCategory.get(category);
   if (cached) return cached;
   const tools = getToolsByCategory(category);
