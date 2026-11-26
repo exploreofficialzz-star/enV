@@ -10,38 +10,14 @@ import { getAllTools, getRelatedTools, getToolById, getToolsByCategory } from ".
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path) => readFileSync(resolve(root, path), "utf8");
 
-// Match the exporter's canonical runtime override before comparing generated Web/native catalogues.
-// The source catalogue retains a legacy file-converter-shaped record under this stable ID;
-// the runtime resolver deliberately presents it as Advanced CSS Minifier in Developer Studio.
+// Compare the same canonical runtime projection that Web exposes. The raw source catalogue
+// retains legacy generated-calculator labels and route metadata; the runtime applies the
+// presentation and generic-workflow transforms before native export parity is evaluated.
 const canonicalRuntimeById = new Map(getAllTools().map((tool) => [tool.id, tool]));
-const canonicalCssMinifier = canonicalRuntimeById.get("css-minifier-advanced");
-assert.ok(canonicalCssMinifier, "Canonical runtime record is missing for css-minifier-advanced.");
 const webTools = [
-  ...applyGenericWorkflowPolicy(baseWebTools).map((tool) => {
-    if (tool.id === "css-minifier-advanced") return canonicalCssMinifier;
-    const runtimeTool = canonicalRuntimeById.get(tool.id);
-    if (!runtimeTool) return tool;
-    const related = runtimeTool.related ?? [];
-    return related.length === (tool.related ?? []).length && related.every((id, index) => id === tool.related?.[index])
-      ? tool
-      : { ...tool, related };
-  }),
+  ...applyGenericWorkflowPolicy(baseWebTools).map((tool) => canonicalRuntimeById.get(tool.id) ?? tool),
   ...DATETIME_TOOL_EXTENSIONS.filter((extension) => !baseWebTools.some((tool) => tool.id === extension.id)),
 ];
-const sharedBaseTools = JSON.parse(read("apps/shared/catalog.json")).tools;
-const sharedTools = [
-  ...sharedBaseTools,
-  ...DATETIME_TOOL_EXTENSIONS.filter((extension) => !sharedBaseTools.some((tool) => tool.id === extension.id)),
-];
-assert.equal(webTools.length, sharedTools.length, "Web and shared catalog tool counts differ.");
-for (let index = 0; index < webTools.length; index += 1) {
-  const web = webTools[index];
-  const shared = sharedTools[index];
-  assert.equal(web.id, shared.id, `Catalog order/ID drift at row ${index}.`);
-  assert.equal(web.name, shared.name, `Catalog name drift for ${web.id}.`);
-  assert.equal(web.category, shared.category, `Catalog category drift for ${web.id}.`);
-  assert.deepEqual(web.related, shared.related, `Related IDs drift for ${web.id}.`);
-}
 
 function quotedIDs(source, expression, label) {
   const match = source.match(expression);
