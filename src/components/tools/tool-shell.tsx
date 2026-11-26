@@ -59,10 +59,9 @@ export function ToolShell({
     ? accessPreferenceState.value
     : getToolAccessPreference(tool.id);
   const accessToolIds = String(import.meta.env.VITE_AD_ACCESS_TOOL_IDS ?? "");
+  const tokenAccessAvailable = isPaidHybridAccessToolId(tool.id, { toolIds: accessToolIds }, tool);
   const adAccessGateEnabled =
-    import.meta.env.VITE_AD_ACCESS_GATE_ENABLED === "true" &&
-    toolAdEligible &&
-    isPaidHybridAccessToolId(tool.id, { toolIds: accessToolIds }, tool);
+    import.meta.env.VITE_AD_ACCESS_GATE_ENABLED === "true" && toolAdEligible;
   const [toolAccessUnlocked, setToolAccessUnlocked] = useState(false);
   const [showAdFreeOffer, setShowAdFreeOffer] = useState(false);
   const [browserOnline, setBrowserOnline] = useState(() =>
@@ -93,6 +92,7 @@ export function ToolShell({
     };
   }, []);
   const adsterraAccessAvailable = adsterraQualified && browserOnline;
+  const toolAccessCurrentlyUnlocked = !adAccessGateEnabled || (browserOnline && toolAccessUnlocked);
   const adsterraAdsEnabled = adsterraQualified && adsterraConsent === "granted" &&
     (!adAccessGateEnabled || accessPreference === "ads");
   const continueWithAdsterra = async (): Promise<boolean> => {
@@ -448,7 +448,7 @@ export function ToolShell({
               <button
                 type="button"
                 onClick={() => void toggleFullscreen()}
-                disabled={(isMusicSandbox && !prefsHydrated) || (adAccessGateEnabled && browserOnline && !toolAccessUnlocked)}
+                disabled={(isMusicSandbox && !prefsHydrated) || (adAccessGateEnabled && !toolAccessCurrentlyUnlocked)}
                 className="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-border text-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 aria-label={isFullscreen ? `Exit full screen for ${tool.name}` : `View ${tool.name} in full screen`}
                 title={isFullscreen ? "Exit full screen" : "View tool in full screen"}
@@ -508,11 +508,13 @@ export function ToolShell({
           startToolExecution("form_submit");
         }}
       >
-        {adAccessGateEnabled && browserOnline && !toolAccessUnlocked ? (
+        {adAccessGateEnabled && !toolAccessCurrentlyUnlocked ? (
           <ToolAccessGate
             toolName={tool.name}
             user={accessUser}
             authPending={accessAuthPending}
+            online={browserOnline}
+            tokenAccessAvailable={tokenAccessAvailable}
             preference={accessPreference}
             onPreferenceChange={saveAccessPreference}
             adsterraAvailable={adsterraAccessAvailable}
@@ -527,7 +529,7 @@ export function ToolShell({
             {toolContent}
           </ToolExecutionTelemetryContext.Provider>
         )}
-        {(!adAccessGateEnabled || !browserOnline || toolAccessUnlocked) && !isFullscreen && tool.category !== "creators" ? <ToolCommunityPanel toolId={tool.id} discussionHref={"/community" + toolPath(tool)} initialFeed={initialCommunityFeed} /> : null}
+        {(!adAccessGateEnabled || toolAccessCurrentlyUnlocked) && !isFullscreen && tool.category !== "creators" ? <ToolCommunityPanel toolId={tool.id} discussionHref={"/community" + toolPath(tool)} initialFeed={initialCommunityFeed} /> : null}
       </section>
 
       {!isFullscreen && adsterraAdsEnabled ? (
