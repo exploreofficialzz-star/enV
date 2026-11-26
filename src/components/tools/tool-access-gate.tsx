@@ -46,19 +46,19 @@ export function ToolAccessGate({
     if (busy) return;
     setFeedback(null);
     if (!adsterraAvailable) {
-      setFeedback("Adsterra-supported access is unavailable right now. Sign in to check an approved token option.");
+      setFeedback("Adsterra-supported access is unavailable right now. Try again when an online placement can load.");
       return;
     }
     onPreferenceChange("ads");
     setBusyAction("ads");
     try {
       if (!await onContinueWithAdsterra()) {
-        setFeedback("An Adsterra placement could not load. This tool remains locked. Try again or sign in to use approved tokens.");
+        setFeedback("An Adsterra placement could not load. This tool remains locked. Try again; token access appears only when a reviewed price is available.");
         return;
       }
       onUnlocked("ads");
     } catch {
-      setFeedback("An Adsterra placement could not be verified as loaded. This tool remains locked. Try again or sign in to use approved tokens.");
+      setFeedback("An Adsterra placement could not be verified as loaded. This tool remains locked. Try again; token access appears only when a reviewed price is available.");
     } finally {
       setBusyAction(null);
     }
@@ -115,7 +115,7 @@ export function ToolAccessGate({
 
           {preference === "ads" && !adsterraAvailable ? (
             <p className="text-xs leading-5 text-muted">
-              Adsterra-supported access is unavailable right now. You can sign in and check whether this tool has an approved token price.
+              Adsterra-supported access is unavailable right now. Retry when a placement can load, or use the approved token option when one is listed.
             </p>
           ) : null}
 
