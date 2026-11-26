@@ -223,7 +223,7 @@ const sceneStudioTool: ToolMeta = {
   requiresBackend: false,
   requiresAuth: false,
   status: "active",
-  related: [],
+  related: ["video-file-inspector", "video-frame-preview", "video-thumbnail-extractor", "media-capability-checker", "video-duration-tool"],
   engine: { type: "custom", id: "scene-studio" },
   isNew: true,
 };
