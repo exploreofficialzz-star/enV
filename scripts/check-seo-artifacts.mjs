@@ -105,7 +105,11 @@ assert.ok(discoverySearchRouteSource.includes("{ tool, explanation }"), "Every d
 assert.ok(sharedSearchBoxSource.includes("searchToolResults(searchable, q, 8).matches"), "The shared search dropdown must retain each ranked match record.");
 assert.ok(sharedSearchBoxSource.includes("match.explanation"), "The shared search dropdown must explain why each individual tool matched.");
 assert.ok(sharedSearchBoxSource.includes("aria-label=") && sharedSearchBoxSource.includes("Why "), "The shared search dropdown must expose an accessible per-tool match label.");
-assert.ok(allToolsDirectorySource.includes("searchToolResults(all, query, all.length).matches"), "The All tools directory must preserve individual ranked match records.");
+assert.ok(
+  allToolsDirectorySource.includes("searchToolResults(all, query, all.length, { filter: eligibility })")
+    && allToolsDirectorySource.includes("sortMatches(resultSet.matches, sort)"),
+  "The All tools directory must preserve and sort the structured ranked match records after declared-eligibility filtering.",
+);
 assert.ok(allToolsDirectorySource.includes("{ tool, explanation }"), "The All tools directory must show an explanation next to every queried tool result.");
 const renderedAuditWorkflowSource = readFileSync(new URL("../.github/workflows/accessibility-phase8.yml", import.meta.url), "utf8");
 const seoHeadSource = seoMetadataSource.slice(seoMetadataSource.indexOf("export function seoPageHead"), seoMetadataSource.indexOf("export function organizationSchema"));
