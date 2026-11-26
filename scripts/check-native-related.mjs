@@ -164,4 +164,24 @@ assert.match(read("apps/android/app/src/main/java/com/chastech/env/data/Accessib
 assert.match(read("apps/ios/enV/CatalogCore.swift"), /tools\s*\+\s*\(relatedReferenceTools\s*\?\?\s*\[\]\)/,
   "iOS related selection must include related-only tools.");
 
+const cameraStudio = getToolById("camera-studio");
+const cameraRelatedIDs = ["image-cropper","image-resizer","image-compressor","image-sharpen","image-watermark"];
+assert.ok(cameraStudio, "Camera Studio must remain in the active runtime registry.");
+assert.deepEqual(cameraStudio.related, cameraRelatedIDs, "Camera Studio must use explicit image-workflow recommendations.");
+assert.deepEqual(
+  getRelatedTools(cameraStudio, cameraRelatedIDs.length).map((tool) => tool.id),
+  cameraRelatedIDs,
+  "Camera Studio must not fall back to an empty photography-category list.",
+);
+assert.match(
+  read("apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt"),
+  /fun Catalog\.withCameraStudio\(\): Catalog[\s\S]*?related = listOf\("image-cropper", "image-resizer", "image-compressor", "image-sharpen", "image-watermark"\)/,
+  "Android Camera Studio must preserve the canonical related image workflows.",
+);
+assert.match(
+  read("apps/ios/enV/CatalogCore.swift"),
+  /func includingCameraStudio\(\) -> Catalog[\s\S]*?related: \["image-cropper", "image-resizer", "image-compressor", "image-sharpen", "image-watermark"\]/,
+  "iOS Camera Studio must preserve the canonical related image workflows.",
+);
+
 console.log(`PASS: ${webTools.length} detail routes match web related IDs/order; ${relatedReferences.length} Web-runtime records remain related-only; ${fallbackCases} category fallback cases checked.`);
