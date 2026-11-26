@@ -440,28 +440,42 @@ extension Catalog {
 
     /// Registers the native local File workspace tools alongside the shared catalogue.
     func includingFileWorkspaceTools() -> Catalog {
+        let searchTags: [String: [String]] = [
+            "file-to-txt": ["files", "text", "extract", "converter", "local"],
+            "file-organizer": ["files", "organize", "folders", "local", "mobile"],
+            "batch-file-renamer": ["files", "rename", "batch", "local", "mobile"],
+            "duplicate-file-finder": ["files", "duplicates", "sha256", "verify", "local"],
+            "folder-size-analyzer": ["files", "storage", "folder", "analysis", "local", "mobile"],
+            "file-search": ["files", "search", "find", "grep", "local", "mobile"],
+            "file-compare": ["files", "compare", "diff", "backup", "sha256", "local"]
+        ]
+        let searchPopularity: [String: Int] = [
+            "file-to-txt": 1080, "file-organizer": 1120, "batch-file-renamer": 1050,
+            "duplicate-file-finder": 1100, "folder-size-analyzer": 1060,
+            "file-search": 1090, "file-compare": 1030
+        ]
         let definitions: [(String, String, String, String, [String], String)] = [
             ("file-to-txt", "File to TXT Converter", "Text extraction",
-             "Extract readable text locally from supported text files, DOCX documents and selectable-text PDFs.",
-             ["file to txt", "extract text", "docx to txt", "pdf to txt", "plain text"], "file-converter"),
+             "Type or paste plain text, or extract readable text from supported files and save it as a TXT file.",
+             ["file to txt", "convert to text", "extract text", "docx to txt", "pdf to txt", "plain text", "text extractor"], "file-converter"),
             ("file-organizer", "File Organizer", "Organization",
-             "Copy selected files into clearly named type folders without moving or deleting originals.",
-             ["organize files", "sort files", "folders", "file manager", "phone storage"], "custom"),
+             "Sort selected files into clear folders by type and export an organized copy without moving or deleting originals.",
+             ["organize files", "sort files", "file manager", "file organizer", "folders", "move files", "documents", "phone storage"], "custom"),
             ("batch-file-renamer", "Batch File Renamer", "Organization",
-             "Preview filename numbering, prefixes, suffixes and replacements before exporting renamed copies.",
-             ["batch rename", "bulk rename", "filename pattern", "prefix", "suffix"], "custom"),
+             "Preview and apply consistent prefixes, suffixes, numbering and literal replacements to many filenames in one operation.",
+             ["batch rename", "bulk rename", "rename files", "filename pattern", "number files", "prefix", "suffix"], "custom"),
             ("duplicate-file-finder", "Duplicate File Finder", "Verification",
-             "Find identical files using streaming SHA-256 verification after a file-size prefilter.",
-             ["duplicate finder", "identical files", "sha256", "checksum", "free storage"], "custom"),
+             "Find identical files using SHA-256 content verification after size filtering; filenames alone are never treated as proof.",
+             ["duplicate finder", "find duplicates", "identical files", "same files", "free storage", "checksum"], "custom"),
             ("folder-size-analyzer", "Folder Size Analyzer", "Analysis",
-             "Inspect folder totals, file-type breakdowns and the largest files on this device.",
-             ["folder size", "disk usage", "du", "largest files", "storage analyzer"], "custom"),
+             "Inspect folder size, total storage, file-type breakdowns and the largest files without opening a terminal.",
+             ["folder size", "storage analyzer", "disk usage", "du", "largest files", "folder inventory", "storage usage"], "custom"),
             ("file-search", "File Search", "Search",
-             "Search filenames and supported text file contents without typing terminal commands.",
-             ["find files", "grep", "search in files", "file finder", "text search"], "custom"),
+             "Find files by name and search inside supported text files with clear file and line references.",
+             ["find files", "search files", "grep", "search in files", "file finder", "text search", "folder search"], "custom"),
             ("file-compare", "File & Folder Compare", "Verification",
-             "Compare two folder selections and verify same-size files with SHA-256 checksums.",
-             ["compare folders", "compare files", "directory diff", "diff", "file comparison", "backup compare", "rsync dry run", "sha256", "hash", "checksum"], "custom")
+             "Compare two selected file sets to identify added, missing, changed and SHA-256-verified identical files.",
+             ["compare folders", "compare files", "directory diff", "diff", "file comparison", "backup compare", "rsync dry run"], "custom")
         ]
         let existing = Set(tools.map(\.id))
         let additions = definitions.filter { !existing.contains($0.0) }.map { definition -> Tool in
@@ -473,15 +487,15 @@ extension Catalog {
                 description: description,
                 category: "files",
                 subcategory: subcategory,
-                keywords: keywords + ["files", "local", "mobile", "offline"],
-                tags: ["files", "local", "mobile", "offline", "file-workspace"] + (id == "file-compare" ? ["sha256", "hash", "checksum"] : []),
+                keywords: keywords,
+                tags: searchTags[id] ?? [],
                 icon: id == "file-organizer" ? "FolderTree" :
                     id == "batch-file-renamer" ? "FilePenLine" :
                     id == "duplicate-file-finder" ? "Files" :
                     id == "folder-size-analyzer" ? "HardDrive" :
                     id == "file-search" ? "FileSearch" :
                     id == "file-compare" ? "GitCompareArrows" : "FileText",
-                popularity: id == "file-organizer" ? 1120 : 1040,
+                popularity: searchPopularity[id] ?? 0,
                 featured: true,
                 clientSide: true,
                 requiresBackend: false,
@@ -1078,10 +1092,16 @@ private final class NativeCatalogSearchCache: @unchecked Sendable {
 
     func search(catalog: Catalog, query: String, limit: Int, includeRelatedReferences: Bool) -> [Tool] {
         let source = includeRelatedReferences ? catalog.tools + (catalog.relatedReferenceTools ?? []) : catalog.tools
-        let general = source.filter {
-            $0.category != "accessibility" && !$0.tags.contains("developer-studio") && $0.id != "audio-analyze-studio"
-        }
         let accessibility = catalog.accessibilityDiscoveryTools().filter { $0.category == "accessibility" }
+        let accessibilityIDs = Set(accessibility.map(\.id))
+        // The raw catalogue keeps these Studio IDs under legacy categories. Exclude
+        // those rows so the canonical Accessibility projection wins before deduplication.
+        let general = source.filter {
+            $0.category != "accessibility" &&
+                !accessibilityIDs.contains($0.id) &&
+                !$0.tags.contains("developer-studio") &&
+                $0.id != "audio-analyze-studio"
+        }
         // These Web-only records participate in corpus IDF/ranking but are never returned
         // to native callers and are not registered in either native tool catalogue.
         let all = general + accessibility + catalog.developerStudioTools() + webOnlyNativeSearchReferences
