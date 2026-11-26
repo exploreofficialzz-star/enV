@@ -152,7 +152,7 @@ const runtimeCatalogExtensions = [
     requiresBackend: false,
     requiresAuth: false,
     status: "active",
-    related: [],
+    related: ["image-cropper","image-resizer","image-compressor","image-sharpen","image-watermark"],
     engine: { type: "custom", id: "camera-studio" },
     platformRuntimeExtension: true,
   },
