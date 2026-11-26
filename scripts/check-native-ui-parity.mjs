@@ -303,7 +303,11 @@ assert.match(themeHook, /useIsomorphicLayoutEffect\(\(\) => \{\s*if \(!hydrated\
 assert.match(webHome, /className="mx-auto mt-4 h-\[112px\] min-h-\[112px\] w-full max-w-3xl shrink-0/);
 assert.match(androidHome, /MostUsedToolsTray\(mostUsed, onTool, homeSurface2, Modifier\.fillMaxWidth\(\)\)/);
 assert.ok(!/HomeMostUsedToolsTray\(tools: mostUsedTools\)[\s\S]{0,120}\.padding\(\.horizontal, 8\)/.test(iosHome), "iOS personal tray should not have an extra inset relative to search");
-assert.ok(webHome.indexOf("Total token = 100") < webHome.indexOf("<MostUsedToolsTray") && webHome.indexOf("<MostUsedToolsTray") < webHome.indexOf('<h1 className="mt-6'), "Web home order should be AI/token, personal tray, then the hero headline");
+const webAiAgentAction = webHome.indexOf('aria-label="Open AI Agent"');
+const webTokenDashboardAction = webHome.indexOf('aria-label="Open token dashboard"');
+const webPersonalTray = webHome.indexOf("<MostUsedToolsTray");
+const webHeroHeadline = webHome.indexOf('<h1 className="mt-6');
+assert.ok(webAiAgentAction >= 0 && webTokenDashboardAction > webAiAgentAction && webPersonalTray > webTokenDashboardAction && webHeroHeadline > webPersonalTray, "Web home order should be AI Agent/token dashboard, personal tray, then the hero headline");
 assert.ok(androidHome.indexOf('HomePreviewBar("Total token = 100"') < androidHome.indexOf("MostUsedToolsTray(mostUsed") && androidHome.indexOf("MostUsedToolsTray(mostUsed") < androidHome.indexOf('Text("A focused toolkit'), "Android home order should be AI/token, personal tray, then the hero headline");
 assert.ok(iosHome.indexOf('HomePreviewBar(title: "Total token = 100")') < iosHome.indexOf("HomeMostUsedToolsTray(tools: mostUsedTools)") && iosHome.indexOf("HomeMostUsedToolsTray(tools: mostUsedTools)") < iosHome.indexOf('Text("A focused toolkit'), "iOS home order should be AI/token, personal tray, then the hero headline");
 assert.match(webHome, /h-\[112px\].*min-h-\[112px\].*w-full.*max-w-3xl.*shrink-0.*rounded-\[28px\]/, "Web personal shortcuts tray must retain its full fixed size when shortcuts are sparse");
