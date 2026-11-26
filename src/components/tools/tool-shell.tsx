@@ -5,6 +5,7 @@ import { disclaimerText } from "@/lib/content";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { ToolAccessGate, AdFreeAfterThreeVisitsDialog } from "@/components/tools/tool-access-gate";
 import { recordBrowserAdSupportedVisit } from "@/lib/ads/ad-supported-progress";
+import { waitForAdsterraPlacement } from "@/lib/ads/placement-access";
 import { getToolAccessPreference, setToolAccessPreference, type ToolAccessPreference } from "@/lib/ads/access-preference";
 import { recordAnalyticsEvent, recordToolExecutionResult } from "@/lib/analytics/client";
 import { toolDocumentationPath } from "@/lib/tool-documentation";
@@ -48,6 +49,7 @@ export function ToolShell({
   const toolAdEligible = isAdsterraQualifiedTool(tool);
   const adsterraQualified = import.meta.env.VITE_ADSTERRA_ENABLED === "true" && toolAdEligible;
   const [adsterraConsent, setAdsterraConsentState] = useState(getAdsterraConsent);
+  const [adsterraPlacementLoaded, setAdsterraPlacementLoaded] = useState(false);
   const { user: accessUser, isPending: accessAuthPending } = useCurrentUserState();
   const [accessPreferenceState, setAccessPreferenceState] = useState(() => ({
     toolId: tool.id,
@@ -57,10 +59,9 @@ export function ToolShell({
     ? accessPreferenceState.value
     : getToolAccessPreference(tool.id);
   const accessToolIds = String(import.meta.env.VITE_AD_ACCESS_TOOL_IDS ?? "");
+  const tokenAccessAvailable = isPaidHybridAccessToolId(tool.id, { toolIds: accessToolIds }, tool);
   const adAccessGateEnabled =
-    import.meta.env.VITE_AD_ACCESS_GATE_ENABLED === "true" &&
-    toolAdEligible &&
-    isPaidHybridAccessToolId(tool.id, { toolIds: accessToolIds }, tool);
+    import.meta.env.VITE_AD_ACCESS_GATE_ENABLED === "true" && toolAdEligible;
   const [toolAccessUnlocked, setToolAccessUnlocked] = useState(false);
   const [showAdFreeOffer, setShowAdFreeOffer] = useState(false);
   const [browserOnline, setBrowserOnline] = useState(() =>
@@ -91,23 +92,29 @@ export function ToolShell({
     };
   }, []);
   const adsterraAccessAvailable = adsterraQualified && browserOnline;
+  const toolAccessCurrentlyUnlocked = !adAccessGateEnabled || (browserOnline && toolAccessUnlocked);
   const adsterraAdsEnabled = adsterraQualified && adsterraConsent === "granted" &&
     (!adAccessGateEnabled || accessPreference === "ads");
-  const continueWithAdsterra = () => {
+  const continueWithAdsterra = async (): Promise<boolean> => {
     if (!adsterraAccessAvailable) return false;
     if (adsterraConsent !== "granted" && !setAdsterraConsent("granted")) return false;
     setAdsterraConsentState("granted");
-    return true;
+    if (adsterraPlacementLoaded) return true;
+    const loaded = await waitForAdsterraPlacement(window);
+    if (loaded) setAdsterraPlacementLoaded(true);
+    return loaded;
   };
   useEffect(() => {
+    setAdsterraPlacementLoaded(false);
     if (!adAccessGateEnabled || !adsterraAdsEnabled) return;
     const onPlacementLoaded = () => {
+      setAdsterraPlacementLoaded(true);
       const progress = recordBrowserAdSupportedVisit(tool.id);
       if (progress?.shouldShowAdFreeOffer) setShowAdFreeOffer(true);
     };
     window.addEventListener("env:adsterra-placement-loaded", onPlacementLoaded);
     return () => window.removeEventListener("env:adsterra-placement-loaded", onPlacementLoaded);
-  }, [adsterraAdsEnabled, tool.id]);
+  }, [adAccessGateEnabled, adsterraAdsEnabled, tool.id]);
 
   const saveAccessPreference = (value: ToolAccessPreference) => {
     setAccessPreferenceState({ toolId: tool.id, value });
@@ -441,7 +448,7 @@ export function ToolShell({
               <button
                 type="button"
                 onClick={() => void toggleFullscreen()}
-                disabled={(isMusicSandbox && !prefsHydrated) || (adAccessGateEnabled && browserOnline && !toolAccessUnlocked)}
+                disabled={(isMusicSandbox && !prefsHydrated) || (adAccessGateEnabled && !toolAccessCurrentlyUnlocked)}
                 className="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-border text-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 aria-label={isFullscreen ? `Exit full screen for ${tool.name}` : `View ${tool.name} in full screen`}
                 title={isFullscreen ? "Exit full screen" : "View tool in full screen"}
@@ -471,7 +478,7 @@ export function ToolShell({
         {tool.category !== "creators" ? <p className="col-start-2 col-span-2 row-start-2 text-sm leading-6 text-muted sm:hidden">{offlineAwareToolDescription(tool)}</p> : null}
       </header>
 
-      {!isFullscreen && adsterraAdsEnabled ? <AdsterraResponsiveBanner /> : null}
+      {!isFullscreen && adsterraAdsEnabled ? <AdsterraResponsiveBanner key={tool.id} /> : null}
 
       {storageError ? <p className="mt-3 text-sm text-danger" role="status">{storageError}</p> : null}
 
@@ -501,11 +508,13 @@ export function ToolShell({
           startToolExecution("form_submit");
         }}
       >
-        {adAccessGateEnabled && browserOnline && !toolAccessUnlocked ? (
+        {adAccessGateEnabled && !toolAccessCurrentlyUnlocked ? (
           <ToolAccessGate
             toolName={tool.name}
             user={accessUser}
             authPending={accessAuthPending}
+            online={browserOnline}
+            tokenAccessAvailable={tokenAccessAvailable}
             preference={accessPreference}
             onPreferenceChange={saveAccessPreference}
             adsterraAvailable={adsterraAccessAvailable}
@@ -520,13 +529,13 @@ export function ToolShell({
             {toolContent}
           </ToolExecutionTelemetryContext.Provider>
         )}
-        {(!adAccessGateEnabled || !browserOnline || toolAccessUnlocked) && !isFullscreen && tool.category !== "creators" ? <ToolCommunityPanel toolId={tool.id} discussionHref={"/community" + toolPath(tool)} initialFeed={initialCommunityFeed} /> : null}
+        {(!adAccessGateEnabled || toolAccessCurrentlyUnlocked) && !isFullscreen && tool.category !== "creators" ? <ToolCommunityPanel toolId={tool.id} discussionHref={"/community" + toolPath(tool)} initialFeed={initialCommunityFeed} /> : null}
       </section>
 
       {!isFullscreen && adsterraAdsEnabled ? (
         <>
-          <AdsterraBanner format="300x250" />
-          <AdsterraNativeBanner />
+          <AdsterraBanner key={`${tool.id}-300x250`} format="300x250" />
+          <AdsterraNativeBanner key={tool.id} />
           <AdsterraSmartlink />
         </>
       ) : null}

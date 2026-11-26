@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { ADSTERRA_PLACEMENT_LOADED_EVENT, waitForAdsterraPlacement } from "./placement-access.ts";
 import {
   ADSTERRA_BANNER_UNITS,
   ADSTERRA_NATIVE_BANNER,
@@ -31,4 +32,16 @@ test("Adsterra requests require deployment enablement, explicit advertising cons
 
 test("Smartlink URL is kept exactly as supplied by the publisher", () => {
   assert.equal(ADSTERRA_SMARTLINK_URL, "https://araplhn.org/4/ae13eae40d577a3e29863b4ca80a9f2e");
+});
+
+test("Adsterra-supported access waits for a placement load event", async () => {
+  const target = new EventTarget();
+  const pending = waitForAdsterraPlacement(target, 100);
+  target.dispatchEvent(new Event(ADSTERRA_PLACEMENT_LOADED_EVENT));
+  assert.equal(await pending, true);
+});
+
+test("Adsterra-supported access stays locked when no placement loads", async () => {
+  const target = new EventTarget();
+  assert.equal(await waitForAdsterraPlacement(target, 5), false);
 });

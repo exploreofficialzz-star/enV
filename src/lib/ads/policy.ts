@@ -8,6 +8,7 @@ export type AdEnvironment = { toolIds?: string };
 export type AdEligibleTool = {
   id: string;
   name?: string;
+  description?: string;
   category: string;
   subcategory?: string;
   keywords?: string[];
@@ -24,7 +25,7 @@ const TOOL_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,119}$/;
 const RESTRICTED_DISCLAIMERS = new Set(["health", "finance", "earnings"]);
 const RESTRICTED_CATEGORIES = new Set(["health", "finance", "earnings", "fitness", "personal"]);
 const ADSTERRA_EXCLUDED_CATEGORIES = new Set(["ai", "lab", "labs", "studio", "studios"]);
-const ADSTERRA_EXCLUDED_CONCEPTS = /\b(?:studio|studios|lab|labs|laboratory|laboratories|sandbox|ai|artificial intelligence)\b/i;
+const ADSTERRA_EXCLUDED_CONCEPTS = /\b(?:studio|studios|lab|labs|laboratory|laboratories|sandbox|ai|artificial intelligence|high[- ]?end|premium|frontier)\b/i;
 const OFFLINE_PROFILE_IDS = new Set(
   offlineEligibleTools.profiles
     .filter((profile) => profile.billingKey.startsWith("local.") && ["web", "android", "ios"].every((platform) => profile.platforms.includes(platform)))
@@ -50,7 +51,7 @@ function parseAllowedToolIds(value?: string): Set<string> {
 export function isAdsterraQualifiedTool(tool: AdEligibleTool): boolean {
   const category = tool.category.toLowerCase();
   const descriptiveIdentity = [
-    category, tool.id, tool.name ?? "", tool.subcategory ?? "", tool.engine.id ?? "",
+    category, tool.id, tool.name ?? "", tool.description ?? "", tool.subcategory ?? "", tool.engine.id ?? "",
     ...(tool.tags ?? []), ...(tool.keywords ?? []),
   ].join(" ").replace(/[-_]+/g, " ");
   return tool.status === "active" &&

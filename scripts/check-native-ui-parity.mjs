@@ -195,7 +195,7 @@ assert.ok(
   "Web fullscreen must target only the working interface and use a safe-area-aware viewport layout."
 );
 assert.ok(
-  androidFullscreenBranch.includes("NativeToolInterfaceContent(tool, backend, supported, onRelatedTool, startInWorkspace = true)") &&
+  /NativeToolInterfaceContent\(\s*tool,\s*backend,\s*supported,\s*onRelatedTool,\s*startInWorkspace\s*=\s*true,\s*\)/.test(androidFullscreenBranch) &&
   androidFullscreenBranch.includes("Exit full screen for ${tool.name}") &&
   !androidFullscreenBranch.includes("NativeToolHeader") &&
   !androidFullscreenBranch.includes("tool.description") &&
@@ -303,9 +303,13 @@ assert.match(themeHook, /useIsomorphicLayoutEffect\(\(\) => \{\s*if \(!hydrated\
 assert.match(webHome, /className="mx-auto mt-4 h-\[112px\] min-h-\[112px\] w-full max-w-3xl shrink-0/);
 assert.match(androidHome, /MostUsedToolsTray\(mostUsed, onTool, homeSurface2, Modifier\.fillMaxWidth\(\)\)/);
 assert.ok(!/HomeMostUsedToolsTray\(tools: mostUsedTools\)[\s\S]{0,120}\.padding\(\.horizontal, 8\)/.test(iosHome), "iOS personal tray should not have an extra inset relative to search");
-assert.ok(webHome.indexOf("Total token = 100") < webHome.indexOf("<MostUsedToolsTray") && webHome.indexOf("<MostUsedToolsTray") < webHome.indexOf('<h1 className="mt-6'), "Web home order should be AI/token, personal tray, then the hero headline");
-assert.ok(androidHome.indexOf('HomePreviewBar("Total token = 100"') < androidHome.indexOf("MostUsedToolsTray(mostUsed") && androidHome.indexOf("MostUsedToolsTray(mostUsed") < androidHome.indexOf('Text("A focused toolkit'), "Android home order should be AI/token, personal tray, then the hero headline");
-assert.ok(iosHome.indexOf('HomePreviewBar(title: "Total token = 100")') < iosHome.indexOf("HomeMostUsedToolsTray(tools: mostUsedTools)") && iosHome.indexOf("HomeMostUsedToolsTray(tools: mostUsedTools)") < iosHome.indexOf('Text("A focused toolkit'), "iOS home order should be AI/token, personal tray, then the hero headline");
+const webAiAgentAction = webHome.indexOf('aria-label="Open AI Agent"');
+const webTokenDashboardAction = webHome.indexOf('aria-label="Open token dashboard"');
+const webPersonalTray = webHome.indexOf("<MostUsedToolsTray");
+const webTrendingSection = webHome.indexOf('<ToolSection title="Trending tools"');
+assert.ok(webAiAgentAction >= 0 && webTokenDashboardAction > webAiAgentAction && webPersonalTray > webTokenDashboardAction && webTrendingSection > webPersonalTray, "Web home order should be AI Agent/token dashboard, personal tray, then Trending tools");
+assert.ok(androidHome.indexOf('HomePreviewBar("Total token"') < androidHome.indexOf("MostUsedToolsTray(mostUsed") && androidHome.indexOf("MostUsedToolsTray(mostUsed") < androidHome.indexOf('SectionTitle("Trending tools"'), "Android home order should be AI/token, personal tray, then Trending tools");
+assert.ok(iosHome.indexOf('HomePreviewBar(title: "Total token"') < iosHome.indexOf("HomeMostUsedToolsTray(tools: mostUsedTools)") && iosHome.indexOf("HomeMostUsedToolsTray(tools: mostUsedTools)") < iosHome.indexOf('enVCharacterSpacedText("Trending tools")'), "iOS home order should be AI/token, personal tray, then Trending tools");
 assert.match(webHome, /h-\[112px\].*min-h-\[112px\].*w-full.*max-w-3xl.*shrink-0.*rounded-\[28px\]/, "Web personal shortcuts tray must retain its full fixed size when shortcuts are sparse");
 assert.match(androidHome, /MostUsedToolsTray[\s\S]*?height\(112\.dp\)/);
 assert.match(webHome, /tools\.map\(\(tool, index\) => <ToolCard key=\{tool\.id\} tool=\{tool\} className=\{index >= 6 \? "hidden sm:flex" : ""\} \/>\)/, "Web Home should show six Trending cards on mobile and twelve at tablet/desktop widths");

@@ -22,6 +22,12 @@ test("Adsterra qualification excludes sensitive categories and Studio, AI, Lab a
   assert.equal(isAdsterraQualifiedTool(tool({ status: "planned" })), false);
   assert.equal(isAdsterraQualifiedTool(tool({ disclaimer: "finance" })), false);
 });
+test("ordinary ad-eligible tools do not need an approved token price to enter the Adsterra cohort", () => {
+  const unpricedTool = tool({ id: "json-formatter", name: "JSON Formatter", engine: { type: "codec", id: "json-formatter" } });
+  assert.equal(isAdsterraQualifiedTool(unpricedTool), true);
+  assert.equal(isPaidHybridAccessToolId("json-formatter", selected, unpricedTool), false);
+});
+
 test("hybrid online/offline access uses only the explicitly selected tool-ID list", () => {
   assert.equal(isHybridAccessToolId("average-speed-calculator", selected, tool()), true);
   assert.equal(isHybridAccessToolId("json-formatter", selected, tool({ id: "json-formatter", engine: { type: "codec" } })), false);
@@ -47,4 +53,15 @@ test("paid access remains restricted to manual prices and the selected hybrid co
   assert.equal(isPaidHybridAccessToolId("json-formatter", selected, tool({ id: "json-formatter", engine: { type: "codec" } })), false);
   assert.equal(isPaidHybridAccessToolId("average-speed-calculator", { toolIds: "" }, tool()), false);
   assert.equal(isPaidHybridAccessToolId("average-speed-calculator", selected, tool({ requiresBackend: true })), false);
+});
+
+test("Adsterra excludes high-end, premium and frontier tools by their reviewed identity tags", () => {
+  for (const tag of ["high-end", "premium", "frontier"]) {
+    assert.equal(isAdsterraQualifiedTool(tool({ tags: [tag] })), false, tag);
+  }
+  assert.equal(isAdsterraQualifiedTool(tool({ name: "High End Video Renderer" })), false);
+  assert.equal(isAdsterraQualifiedTool(tool({ keywords: ["frontier model"] })), false);
+  assert.equal(isAdsterraQualifiedTool(tool({ description: "Premium video rendering and advanced output quality." })), false);
+  assert.equal(isAdsterraQualifiedTool(tool({ description: "Uses a frontier AI model for generation." })), false);
+  assert.equal(isAdsterraQualifiedTool(tool({ name: "AI Studio" })), false);
 });

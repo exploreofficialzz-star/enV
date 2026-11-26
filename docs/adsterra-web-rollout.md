@@ -2,7 +2,7 @@
 
 ## Provider boundary
 
-Adsterra is the only advertising provider used by enV Web. AdSense, AdMob and Google Ad Manager are not part of the current Web advertising rollout. Android and iOS retain optional native Google Mobile Ads/UMP integration code, but native ad requests, placements and rewarded-ad access remain disabled by their build flags. The native enV token-access gate is separate and remains available without enabling AdMob, GAM or UMP.
+Adsterra is the only advertising provider used by enV Web. Studio, Labs, Sandbox, AI, premium/frontier and high-end tools are excluded from Adsterra; the advertising policy is independent from the per-tool token-pricing policy. AdSense, AdMob and Google Ad Manager are not part of the current Web advertising rollout. Android and iOS retain optional native Google Mobile Ads/UMP integration code, but native ad requests, placements and rewarded-ad access remain disabled by their build flags. The native enV token-access gate is separate and remains available without enabling AdMob, GAM or UMP.
 
 The supplied Web placements are:
 
@@ -29,7 +29,7 @@ Adsterra publicly offers banner, native, social-bar, popunder and Smartlink form
 
 The access gate is separate from general ad display. It applies only when the deployment enables `VITE_AD_ACCESS_GATE_ENABLED`, the exact tool ID appears in `VITE_AD_ACCESS_TOOL_IDS`, the tool is eligible for Adsterra, and the same tool has a manually approved token price plus a cross-platform offline profile.
 
-A guest can choose Adsterra-supported access for the current visit or create/sign in to an enV account. A signed-in user can choose tokens only for the exact tool's approved price. The server reserves the price before access and settles that reservation only after a successful tool result; a failed or cancelled run releases it. Unapproved tools remain unpriced and cannot be charged.
+A guest can choose Adsterra-supported access for the current visit or create/sign in to an enV account. The Web gate remains locked until an Adsterra placement script emits its successful-load event; a timeout or script error does not unlock the tool. A script-load event is not a verified impression, click, or rewarded-video completion. A signed-in user can choose tokens only for the exact tool's approved price. The server reserves the price before access and settles that reservation only after a successful tool result; a failed or cancelled run releases it. Unapproved tools remain unpriced and cannot be charged.
 
 Adsterra's publisher reporting API exposes aggregate reporting such as impressions, clicks, CTR, CPM and revenue. It is not a documented per-user rewarded-video completion callback. https://adsterra.com/blog/how-to-use-adsterra-publishers-api/ Therefore enV does **not** describe Adsterra banners, clicks, Smartlink opens or script loads as completed rewarded videos. The local ad-free offer is labelled **three ad-supported visits** and is counted only after an eligible Adsterra placement script loads during a tool visit. That local cadence is a preference prompt only; it is not billing evidence, a verified impression, or a server reward.
 
