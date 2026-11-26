@@ -468,7 +468,7 @@ extension Catalog {
              "Find identical files using SHA-256 content verification after size filtering; filenames alone are never treated as proof.",
              ["duplicate finder", "find duplicates", "identical files", "same files", "free storage", "checksum"], "custom"),
             ("folder-size-analyzer", "Folder Size Analyzer", "Analysis",
-             "Inspect folder size, total storage, file-type breakdowns and the largest files without opening a terminal.",
+             "Inspect folder contents, total storage, file-type breakdowns and the largest files without opening a terminal.",
              ["folder size", "storage analyzer", "disk usage", "du", "largest files", "folder inventory", "storage usage"], "custom"),
             ("file-search", "File Search", "Search",
              "Find files by name and search inside supported text files with clear file and line references.",
