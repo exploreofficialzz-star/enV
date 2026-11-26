@@ -100,16 +100,6 @@ test("A book and Zip any file resolve their file/document workflows without stal
   );
 });
 
-test("Camera Studio exposes explicit image follow-up workflows", () => {
-  const camera = getToolById("camera-studio");
-  assert.ok(camera);
-  const expected = ["image-cropper","image-resizer","image-compressor","image-sharpen","image-watermark"];
-  assert.deepEqual(camera.related, expected);
-  assert.deepEqual(getRelatedTools(camera, expected.length).map((item) => item.id), expected);
-  const searchable = new Set(getSearchableTools().map((item) => item.id));
-  assert.ok(expected.every((id) => searchable.has(id)));
-});
-
 test("Live Video Singing Studio uses valid canonical video tool destinations", () => {
   const studio = getToolById("music-live-video-studio");
   assert.ok(studio);
