@@ -104,7 +104,17 @@ jobs:
             .filter((id) => currentIds.has(id) && !currentPlanned.has(id)).sort();
 
           const previousGap = beforeBaseline.gaps.NATIVE_WEB_ONLY_ACTIVE;
-          const actualGap = current.gaps.NATIVE_WEB_ONLY_ACTIVE.count;
+          const currentGapCounts = {
+            PLANNED_IN_SEARCHABLE: current.lifecycle.plannedInSearchable.length,
+            EMPTY_CATEGORY: current.categories.emptyCategoryIds.length,
+            NATIVE_MATRIX_NAME_DRIFT: current.native.matrix.rowsWithNameDrift.length,
+            NATIVE_WEB_ONLY_ACTIVE: currentActive.size,
+            DUPLICATE_DISPLAY_NAMES: current.ranking.duplicateNameGroupCount,
+            UNDIFFERENTIATED_POPULARITY: current.ranking.topPopularityValueShare >= 0.4 ? 1 : 0,
+            SEARCHABLE_NOT_ON_ANY_CATEGORY_ROUTE: current.categories.uncategorizedSearchableIds.length,
+            TOOLS_IN_MULTIPLE_CATEGORY_ROUTES: current.categories.toolsInMultipleCategoryRoutes.length
+          };
+          const actualGap = currentGapCounts.NATIVE_WEB_ONLY_ACTIVE;
           if (actualGap !== previousGap + 1 ||
               unexpectedActivePromotions.length !== 0 ||
               unexpectedExistingPlanChanges.length !== 0) {
@@ -115,7 +125,7 @@ jobs:
           }
 
           for (const [code, previous] of Object.entries(beforeBaseline.gaps)) {
-            const actual = current.gaps[code]?.count;
+            const actual = currentGapCounts[code];
             if (actual === undefined || (code !== "NATIVE_WEB_ONLY_ACTIVE" && actual > previous)) {
               throw new Error("Unexpected discovery gap increase for " + code
                 + ": previous=" + previous + "; actual=" + actual);
