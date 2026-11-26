@@ -377,7 +377,7 @@ extension Catalog {
             requiresAuth: false,
             status: "active",
             disclaimer: nil,
-            related: [],
+            related: ["image-cropper","image-resizer","image-compressor","image-sharpen","image-watermark"],
             engine: ToolEngine(type: "custom", id: "camera-studio", op: nil, configuration: [:])
         )
         return Catalog(
