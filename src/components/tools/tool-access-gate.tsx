@@ -11,6 +11,8 @@ export function ToolAccessGate({
   toolName,
   user,
   authPending,
+  online,
+  tokenAccessAvailable,
   adsterraAvailable,
   advertisingConsent,
   preference,
@@ -23,6 +25,8 @@ export function ToolAccessGate({
   toolName: string;
   user: AppUser | null;
   authPending: boolean;
+  online: boolean;
+  tokenAccessAvailable: boolean;
   adsterraAvailable: boolean;
   advertisingConsent: "granted" | "denied" | "unset";
   preference: ToolAccessPreference;
@@ -61,7 +65,7 @@ export function ToolAccessGate({
   }
 
   async function useTokens() {
-    if (!user || busy) return;
+    if (!user || !tokenAccessAvailable || !online || busy) return;
     setBusyAction("tokens");
     setFeedback(null);
     setTokenShortage(false);
@@ -85,12 +89,16 @@ export function ToolAccessGate({
       <div className="space-y-2">
         <h2 className="text-lg font-semibold text-fg">Continue to {toolName}</h2>
         <p className="text-sm leading-6 text-muted">
-          Continue free with Adsterra-supported access, or sign in to use an approved enV token price.
+          Continue with Adsterra-supported access, or use enV tokens where this tool has an individually reviewed price.
           This tool unlocks only after an Adsterra placement script loads. A successful script load is not a verified impression or video completion.
         </p>
       </div>
 
-      {authPending ? (
+      {!online ? (
+        <p className="max-w-sm text-sm leading-6 text-muted" role="status">
+          This tool stays locked while you are offline. Offline token allowances are paused until independent device-integrity and settlement checks are approved. Reconnect to verify access.
+        </p>
+      ) : authPending ? (
         <p className="text-sm text-muted" role="status">Checking your account…</p>
       ) : (
         <div className="flex w-full max-w-sm flex-col gap-2">
@@ -111,7 +119,7 @@ export function ToolAccessGate({
             </p>
           ) : null}
 
-          {user ? (
+          {user && tokenAccessAvailable ? (
             <button
               type="button"
               onClick={() => {
@@ -123,6 +131,10 @@ export function ToolAccessGate({
             >
               {busyAction === "tokens" ? "Checking token balance…" : "Continue with enV tokens"}
             </button>
+          ) : user ? (
+            <p className="text-xs leading-5 text-muted" role="status">
+              This tool does not yet have an approved token price. Its price will appear here after workload costs are measured and reviewed.
+            </p>
           ) : (
             <>
               <Link
@@ -150,7 +162,7 @@ export function ToolAccessGate({
         </div>
       )}
 
-      {pendingTokenAccess ? (
+      {online && pendingTokenAccess ? (
         <div className="w-full max-w-sm space-y-3 rounded-lg border border-border p-3 text-left" role="group" aria-label="Confirm token access">
           <p className="text-sm font-semibold text-fg">
             This tool costs {pendingTokenAccess.reservedTokens.toLocaleString(undefined, { maximumFractionDigits: 3 })} enV tokens per {pendingTokenAccess.unitLabel}.
