@@ -431,12 +431,16 @@ private val webOnlySearchReferenceTools = listOf(
 /** The Web and assistant use the same pool; legacy related-reference records are included exactly once. */
 internal fun Catalog.searchableToolsForSearch(includeRelatedReferences: Boolean): List<ToolRecord> {
     val source = if (includeRelatedReferences) tools + relatedReferenceTools else tools
+    val accessibility = accessibilityDiscoveryTools().filter { it.category == "accessibility" }
+    val accessibilityIDs = accessibility.mapTo(mutableSetOf()) { it.id }
+    // The raw catalogue still stores the eight Studio source IDs under legacy categories.
+    // Exclude those raw rows so the canonical Accessibility projection wins before ID deduplication.
     val general = source.filter {
         it.category != "accessibility" &&
+            it.id !in accessibilityIDs &&
             "developer-studio" !in it.tags &&
             it.id != "audio-analyze-studio"
     }
-    val accessibility = accessibilityDiscoveryTools().filter { it.category == "accessibility" }
     // Preserve the exact Web corpus for IDF/ranking, while the public native search wrapper
     // filters these Web-only references from every returned result.
     return (general + accessibility + developerStudioTools() + webOnlySearchReferenceTools).distinctBy { it.id }
