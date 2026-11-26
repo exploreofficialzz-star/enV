@@ -19,6 +19,22 @@ const webTools = [
   ...DATETIME_TOOL_EXTENSIONS.filter((extension) => !baseWebTools.some((tool) => tool.id === extension.id)),
 ];
 
+const sharedBaseTools = JSON.parse(read("apps/shared/catalog.json")).tools;
+const sharedTools = [
+  ...sharedBaseTools,
+  ...DATETIME_TOOL_EXTENSIONS.filter((extension) => !sharedBaseTools.some((tool) => tool.id === extension.id)),
+];
+assert.equal(webTools.length, sharedTools.length, "Web and shared catalog tool counts differ.");
+for (let index = 0; index < webTools.length; index += 1) {
+  const web = webTools[index];
+  const shared = sharedTools[index];
+  assert.equal(web.id, shared.id, `Catalog order/ID drift at row ${index}.`);
+  assert.equal(web.name, shared.name, `Catalog name drift for ${web.id}.`);
+  assert.equal(web.category, shared.category, `Catalog category drift for ${web.id}.`);
+  assert.deepEqual(web.related, shared.related, `Related IDs drift for ${web.id}.`);
+}
+
+
 function quotedIDs(source, expression, label) {
   const match = source.match(expression);
   assert.ok(match, `Could not find ${label} in its source file.`);
