@@ -175,7 +175,7 @@ const cameraStudioTool: ToolMeta = {
   requiresBackend: false,
   requiresAuth: false,
   status: "active",
-  related: ["image-cropper","image-resizer","image-compressor","image-sharpen","image-watermark"],
+  related: [],
   engine: { type: "custom", id: "camera-studio" },
   isNew: true,
 };
