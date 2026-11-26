@@ -210,6 +210,7 @@ final class CatalogCoreTests: XCTestCase {
         XCTAssertEqual(catalog.counts.active, 1)
         XCTAssertEqual(catalog.tools.first?.category, "photography")
         XCTAssertEqual(catalog.tools.first?.engine.type, "custom")
+        XCTAssertEqual(catalog.tools.first?.related, ["image-cropper","image-resizer","image-compressor","image-sharpen","image-watermark"])
         XCTAssertEqual(catalog.includingCameraStudio().tools.filter { $0.id == "camera-studio" }.count, 1)
         XCTAssertEqual(catalog.webSearch("camera studio").first?.id, "camera-studio")
     }
