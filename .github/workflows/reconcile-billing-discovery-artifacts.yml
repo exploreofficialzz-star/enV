@@ -174,23 +174,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            apps/shared/catalog.json \
-            apps/shared/native-engine-inventory.json \
-            apps/shared/native-execution-matrix.json \
-            src/data/billing-profiles.json \
-            src/data/billing-profile-index.json \
-            src/data/billing-profile-runtime-extensions.json \
-            audit/discovery/discovery-baseline.json \
-            audit/discovery/discovery-inventory.json \
-            audit/discovery/DISCOVERY-RECONCILIATION-REPORT.md \
-            audit/discovery/SEO-OFFLINE-VALIDATION.md \
-            audit/discovery/tool-knowledge-index.json \
-            audit/discovery/search-eval/native-golden.v1.json \
-            public/robots.txt \
-            public/sitemap.xml \
-            public/llms.txt \
-            public/og/cards
+          git add -A
           git rm .github/workflows/reconcile-billing-discovery-artifacts.yml
           git diff --cached --check
           git diff --cached --stat
