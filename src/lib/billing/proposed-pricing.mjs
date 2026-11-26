@@ -7,16 +7,30 @@ export const TOOL_PRICE_PROPOSAL_VERSION = "env-per-tool-rate-proposal-2026-11-2
  * prices. Remote provider work is deliberately excluded and priced from metered
  * provider/infrastructure cost instead.
  */
+/**
+ * @typedef {object} BillingTool
+ * @property {string} [id]
+ * @property {string} [name]
+ * @property {string} [description]
+ * @property {string} [category]
+ * @property {string} [subcategory]
+ * @property {{type?: string, op?: string, id?: string} | null} [engine]
+ * @property {string[]} [tags]
+ * @property {string[]} [keywords]
+ */
+
+/** @param {BillingTool} tool @returns {string} */
 const textOf = (tool) => [
   tool.id, tool.name, tool.description, tool.category, tool.subcategory,
   tool.engine?.type, tool.engine?.op, tool.engine?.id,
   ...(tool.tags ?? []), ...(tool.keywords ?? []),
 ].filter(Boolean).join(" ").toLowerCase().replace(/[-_]+/g, " ");
 
+/** @param {string} value @param {RegExp} pattern @returns {boolean} */
 const has = (value, pattern) => pattern.test(value);
 
 /**
- * @param {object} tool
+ * @param {BillingTool} tool
  * @param {string} billingKey
  * @param {string} executionMode
  * @returns {{
@@ -38,9 +52,11 @@ export function deriveLocalToolPriceProfile(tool, billingKey, executionMode) {
   const category = String(tool.category ?? "").toLowerCase();
   const engine = String(tool.engine?.type ?? "").toLowerCase();
   const identity = textOf(tool);
+  /** @type {string[]} */
   const factors = [];
   let unitLabel = "operation";
   let subunitsPerUnit = 120;
+  /** @type {"light" | "standard" | "intensive" | "studio"} */
   let workloadTier = "light";
   let pricingFormula = "120 milli-tokens per completed local operation.";
   let meteringDimensions = ["operation-count"];
@@ -349,7 +365,7 @@ export function deriveLocalToolPriceProfile(tool, billingKey, executionMode) {
  * explicit in their field names to prevent seconds and bytes from being confused.
  *
  * @param {string} unitLabel
- * @param {Record<string, number>} measurements
+ * @param {Record<string, unknown>} measurements
  * @returns {number}
  */
 export function calculateProposedToolUnits(unitLabel, measurements) {
@@ -371,6 +387,7 @@ export function calculateProposedToolUnits(unitLabel, measurements) {
     if (!allowedKeys.has(key)) throw new RangeError("Unsupported measurement field: " + key + ".");
   }
 
+  /** @param {...string} keys @returns {number | null} */
   const metric = (...keys) => {
     for (const key of keys) {
       if (!Object.prototype.hasOwnProperty.call(measurements, key)) continue;
@@ -382,6 +399,7 @@ export function calculateProposedToolUnits(unitLabel, measurements) {
     }
     return null;
   };
+  /** @param {...string} keys @returns {number} */
   const required = (...keys) => {
     const value = metric(...keys);
     if (value === null) throw new RangeError("A required measurement is missing: " + keys.join(" or ") + ".");
@@ -397,6 +415,7 @@ export function calculateProposedToolUnits(unitLabel, measurements) {
     const height = required("height", "imageHeight");
     return width * height * (metric("imageCount", "fileCount") ?? 1);
   };
+  /** @param {...string} keys @returns {number} */
   const durationMinutes = (...keys) => required(...keys) / 60;
   let units;
 
@@ -505,6 +524,11 @@ export function calculateProposedToolUnits(unitLabel, measurements) {
   return units;
 }
 
+/**
+ * @param {number} costUsdMicros
+ * @param {number} marginBps
+ * @returns {number}
+ */
 export function proposedProviderPriceUsdMicros(costUsdMicros, marginBps) {
   if (!Number.isSafeInteger(costUsdMicros) || costUsdMicros < 0) throw new RangeError("Provider cost must be non-negative integer USD micros.");
   if (!Number.isSafeInteger(marginBps) || marginBps < 0 || marginBps >= 10_000) throw new RangeError("Gross margin must be an integer from 0 to 9,999 basis points.");
@@ -516,6 +540,11 @@ export function proposedProviderPriceUsdMicros(costUsdMicros, marginBps) {
 }
 
 /** One enV milli-token represents USD 10 micros at the current token reference rate. */
+/**
+ * @param {number} costUsdMicros
+ * @param {number} marginBps
+ * @returns {number}
+ */
 export function proposedSubunitsFromProviderCostUsdMicros(costUsdMicros, marginBps) {
   return Math.ceil(proposedProviderPriceUsdMicros(costUsdMicros, marginBps) / 10);
 }
