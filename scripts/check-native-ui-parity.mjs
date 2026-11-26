@@ -305,8 +305,28 @@ assert.match(webHome, /className="mx-auto mt-4 h-\[112px\] min-h-\[112px\] w-ful
 assert.match(androidHome, /MostUsedToolsTray\(mostUsed, onTool, homeSurface2, Modifier\.fillMaxWidth\(\)\)/);
 assert.ok(!/HomeMostUsedToolsTray\(tools: mostUsedTools\)[\s\S]{0,120}\.padding\(\.horizontal, 8\)/.test(iosHome), "iOS personal tray should not have an extra inset relative to search");
 assert.ok(webHome.indexOf("Total token = 100") < webHome.indexOf("<MostUsedToolsTray") && webHome.indexOf("<MostUsedToolsTray") < webHome.indexOf('<h1 className="mt-6'), "Web home order should be AI/token, personal tray, then the hero headline");
-assert.ok(androidHome.indexOf('HomePreviewBar("Total token = 100"') < androidHome.indexOf("MostUsedToolsTray(mostUsed") && androidHome.indexOf("MostUsedToolsTray(mostUsed") < androidHome.indexOf('Text("A focused toolkit'), "Android home order should be AI/token, personal tray, then the hero headline");
-assert.ok(iosHome.indexOf('HomePreviewBar(title: "Total token = 100")') < iosHome.indexOf("HomeMostUsedToolsTray(tools: mostUsedTools)") && iosHome.indexOf("HomeMostUsedToolsTray(tools: mostUsedTools)") < iosHome.indexOf('Text("A focused toolkit'), "iOS home order should be AI/token, personal tray, then the hero headline");
+const androidAiAgent = androidHome.indexOf('HomePreviewBar("AI Agent"');
+const androidTokenDashboard = androidHome.indexOf('HomePreviewBar("Total token"');
+const androidPersonalTray = androidHome.indexOf("MostUsedToolsTray(mostUsed");
+const androidTrendingSection = androidHome.indexOf('SectionTitle("Trending tools"');
+assert.ok(
+  androidAiAgent >= 0 &&
+    androidTokenDashboard > androidAiAgent &&
+    androidPersonalTray > androidTokenDashboard &&
+    androidTrendingSection > androidPersonalTray,
+  "Android home order should be AI Agent, token dashboard, personal tray, then Trending tools",
+);
+const iosAiAgent = iosHome.indexOf('HomePreviewBar(title: "AI Agent"');
+const iosTokenDashboard = iosHome.indexOf('HomePreviewBar(title: "Total token"');
+const iosPersonalTray = iosHome.indexOf("HomeMostUsedToolsTray(tools: mostUsedTools)");
+const iosTrendingSection = iosHome.indexOf('enVCharacterSpacedText("Trending tools")');
+assert.ok(
+  iosAiAgent >= 0 &&
+    iosTokenDashboard > iosAiAgent &&
+    iosPersonalTray > iosTokenDashboard &&
+    iosTrendingSection > iosPersonalTray,
+  "iOS home order should be AI Agent, token dashboard, personal tray, then Trending tools",
+);
 assert.match(webHome, /h-\[112px\].*min-h-\[112px\].*w-full.*max-w-3xl.*shrink-0.*rounded-\[28px\]/, "Web personal shortcuts tray must retain its full fixed size when shortcuts are sparse");
 assert.match(androidHome, /MostUsedToolsTray[\s\S]*?height\(112\.dp\)/);
 assert.match(webHome, /tools\.map\(\(tool, index\) => <ToolCard key=\{tool\.id\} tool=\{tool\} className=\{index >= 6 \? "hidden sm:flex" : ""\} \/>\)/, "Web Home should show six Trending cards on mobile and twelve at tablet/desktop widths");
