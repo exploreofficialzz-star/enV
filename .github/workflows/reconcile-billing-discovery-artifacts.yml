@@ -72,8 +72,8 @@ jobs:
           const currentIds = new Set(current.records.map((record) => record.id));
           const addedIds = [...currentIds].filter((id) => !beforeIds.has(id)).sort();
           const removedIds = [...beforeIds].filter((id) => !currentIds.has(id)).sort();
-          const expectedAddedIds = [];
-          const expectedRemovedIds = [];
+          const expectedAddedIds = ["scene-studio"];
+          const expectedRemovedIds = ["video-link-screen-recording"];
           if (JSON.stringify(addedIds) !== JSON.stringify(expectedAddedIds) ||
               JSON.stringify(removedIds) !== JSON.stringify(expectedRemovedIds)) {
             throw new Error("Discovery identity delta does not match the reviewed source changes. Added="
@@ -117,9 +117,9 @@ jobs:
           const actualGap = currentGapCounts.NATIVE_WEB_ONLY_ACTIVE;
           const expectedActivePromotions = ["scene-studio"];
           if (actualGap !== previousGap + 1 ||
-              JSON.stringify(unexpectedActivePromotions) !== JSON.stringify(expectedActivePromotions) ||
+              unexpectedActivePromotions.length !== 0 ||
               unexpectedExistingPlanChanges.length !== 0) {
-            throw new Error("The only accepted active-Web classification change is Scene Studio becoming explicitly Web-only. "
+            throw new Error("The only accepted active-Web gap increase is the new Scene Studio inventory record. "
               + "Unexpected active promotions=" + JSON.stringify(unexpectedActivePromotions)
               + "; unexpected existing plan changes=" + JSON.stringify(unexpectedExistingPlanChanges)
               + "; gap " + previousGap + " -> " + actualGap);
@@ -141,12 +141,11 @@ jobs:
             previousActiveGap: previousGap,
             currentActiveGap: actualGap
           }, null, 2));
-          console.log("Verified reviewed discovery delta: no stable IDs were added or removed; "
-            + "the only active Web-only classification change is Scene Studio. "
-            + "No planned tool changed status, and no other registered gap grew.");
+          console.log("Verified reviewed discovery delta: Scene Studio is the single added stable ID and "
+            + "video-link-screen-recording is the single retired stable ID. No existing tool changed platform/status classification, "
+            + "and no other registered gap grew.");
           NODE
 
-# Re-run this one-time job after Scene Studio's active video-related links are reconciled.
       - name: Accept only the reviewed discovery baseline and refresh generated records
         run: |
           npm run discovery:inventory -- --update-baseline
@@ -158,7 +157,7 @@ jobs:
           baseline.note = "Reviewed 2026-11-26: Scene Studio (" + change.toolId
             + ") is present in canonical Web discovery as an active Web-only tool and is not in the native Android/iOS inventory. "
             + "The NATIVE_WEB_ONLY_ACTIVE registered gap increased from " + change.previousActiveGap
-            + " to " + change.currentActiveGap + ". No stable tool IDs were added or removed; Scene Studio received the single new active-Web-only classification. "
+            + " to " + change.currentActiveGap + ". The only stable-ID changes were the addition of scene-studio and the reviewed retirement of video-link-screen-recording. "
             + "No other existing tool changed platform/status classification, and every other registered gap stayed level or improved. "
             + "This records a platform-coverage gap; it is not native functional acceptance evidence or billing approval.";
           fs.writeFileSync(path, JSON.stringify(baseline, null, 1) + "\n");
@@ -191,7 +190,6 @@ jobs:
             public/robots.txt \
             public/sitemap.xml \
             public/llms.txt \
-            public/sitemaps \
             public/og/cards
           git rm .github/workflows/reconcile-billing-discovery-artifacts.yml
           git diff --cached --check
