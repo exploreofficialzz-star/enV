@@ -6,6 +6,7 @@ import { tools as baseWebTools } from "../src/data/catalog.ts";
 import { applyGenericWorkflowPolicy } from "../src/lib/generic-workflow-policy.mjs";
 import { DATETIME_TOOL_EXTENSIONS } from "../src/lib/datetime/catalog-tools.ts";
 import { getAllTools, getRelatedTools, getToolById, getToolsByCategory } from "../src/lib/registry.ts";
+import { makeAccessibilityStudioTools } from "../src/lib/accessibility-studios.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path) => readFileSync(resolve(root, path), "utf8");
@@ -20,8 +21,15 @@ const webTools = [
 ];
 
 const sharedBaseTools = JSON.parse(read("apps/shared/catalog.json")).tools;
+// Native and Web discovery both project the eight legacy Accessibility IDs to the
+// canonical Studio records. Apply that same projection to the shared source rows
+// before parity assertions; comparing canonical Web labels to raw legacy names
+// would report intentional presentation changes as source-catalogue drift.
+const sharedAccessibilityById = new Map(
+  makeAccessibilityStudioTools(sharedBaseTools).map((tool) => [tool.id, tool]),
+);
 const sharedTools = [
-  ...sharedBaseTools,
+  ...sharedBaseTools.map((tool) => sharedAccessibilityById.get(tool.id) ?? tool),
   ...DATETIME_TOOL_EXTENSIONS.filter((extension) => !sharedBaseTools.some((tool) => tool.id === extension.id)),
 ];
 assert.equal(webTools.length, sharedTools.length, "Web and shared catalog tool counts differ.");
