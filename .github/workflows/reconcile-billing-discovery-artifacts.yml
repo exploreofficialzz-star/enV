@@ -1,0 +1,179 @@
+name: One-time billing and discovery artifact reconciliation
+
+on:
+  push:
+    branches:
+      - feat/per-tool-cost-profiles-20261125
+    paths:
+      - .github/workflows/reconcile-billing-discovery-artifacts.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: enV-billing-discovery-artifact-reconciliation
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out the billing branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Regenerate native inventories and per-tool billing profiles
+        run: |
+          npm run export:native-catalog
+          npm run generate:billing-profiles
+          npm run check:native-discovery
+          npm run export:native-execution-matrix
+          npm run generate:seo
+          npm run discovery:seo-offline
+
+      - name: Inspect the candidate discovery delta before accepting a new baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp audit/discovery/discovery-baseline.json /tmp/discovery-baseline-before.json
+          cp audit/discovery/discovery-inventory.json /tmp/discovery-inventory-before.json
+
+          # The inventory and report are written even when the ratchet reports the
+          # expected one-count regression. Do not accept it until the exact delta is checked.
+          set +e
+          npm run discovery:inventory
+          inventory_status=$?
+          set -e
+          if [ "$inventory_status" -gt 1 ]; then
+            echo "Discovery inventory generation failed."
+            exit "$inventory_status"
+          fi
+
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+
+          const beforeBaseline = JSON.parse(fs.readFileSync("/tmp/discovery-baseline-before.json", "utf8"));
+          const before = JSON.parse(fs.readFileSync("/tmp/discovery-inventory-before.json", "utf8"));
+          const current = JSON.parse(fs.readFileSync("audit/discovery/discovery-inventory.json", "utf8"));
+
+          const beforeIds = new Set(before.records.map((record) => record.id));
+          const currentIds = new Set(current.records.map((record) => record.id));
+          const addedIds = [...currentIds].filter((id) => !beforeIds.has(id)).sort();
+          const removedIds = [...beforeIds].filter((id) => !currentIds.has(id)).sort();
+          if (addedIds.length !== 0 || removedIds.length !== 0) {
+            throw new Error("Stable tool IDs changed during this monetization PR. Added="
+              + JSON.stringify(addedIds) + "; removed=" + JSON.stringify(removedIds));
+          }
+
+          const isNativeWebOnlyActive = (record) =>
+            record.status !== "planned" && record.reasons?.includes("NATIVE_WEB_ONLY_ACTIVE");
+          const isNativeWebOnlyPlanned = (record) =>
+            record.status === "planned" && record.reasons?.includes("NATIVE_WEB_ONLY_PLANNED");
+          const beforeActive = new Set(before.records.filter(isNativeWebOnlyActive).map((record) => record.id));
+          const currentActive = new Set(current.records.filter(isNativeWebOnlyActive).map((record) => record.id));
+          const beforePlanned = new Set(before.records.filter(isNativeWebOnlyPlanned).map((record) => record.id));
+          const currentPlanned = new Set(current.records.filter(isNativeWebOnlyPlanned).map((record) => record.id));
+          const promotedToActive = [...currentActive].filter((id) => !beforeActive.has(id)).sort();
+          const noLongerPlanned = [...beforePlanned].filter((id) => !currentPlanned.has(id)).sort();
+
+          const previousGap = beforeBaseline.gaps.NATIVE_WEB_ONLY_ACTIVE;
+          const actualGap = current.gaps.NATIVE_WEB_ONLY_ACTIVE.count;
+          if (actualGap !== previousGap + 1 ||
+              promotedToActive.length !== 1 ||
+              noLongerPlanned.length !== 1 ||
+              promotedToActive[0] !== noLongerPlanned[0]) {
+            throw new Error("Expected exactly one existing Web-only tool to move from planned to active. "
+              + "Active additions=" + JSON.stringify(promotedToActive)
+              + "; planned removals=" + JSON.stringify(noLongerPlanned)
+              + "; gap " + previousGap + " -> " + actualGap);
+          }
+
+          for (const [code, previous] of Object.entries(beforeBaseline.gaps)) {
+            const actual = current.gaps[code]?.count;
+            if (actual === undefined || (code !== "NATIVE_WEB_ONLY_ACTIVE" && actual > previous)) {
+              throw new Error("Unexpected discovery gap increase for " + code
+                + ": previous=" + previous + "; actual=" + actual);
+            }
+          }
+
+          const id = promotedToActive[0];
+          const record = current.records.find((entry) => entry.id === id);
+          if (!record || record.status === "planned" || !record.reasons.includes("NATIVE_WEB_ONLY_ACTIVE")) {
+            throw new Error("The promoted tool is not an active, explicitly classified Web-only tool.");
+          }
+
+          fs.writeFileSync("/tmp/discovery-reviewed-change.json", JSON.stringify({
+            toolId: id,
+            toolName: record.name,
+            previousActiveGap: previousGap,
+            currentActiveGap: actualGap,
+            addedIds: addedIds.length,
+            removedIds: removedIds.length
+          }, null, 2));
+          console.log("Verified reviewed discovery delta: " + record.name + " (" + id
+            + ") moved from planned to active while retaining its Web-only platform classification. "
+            + "No stable IDs were added or removed; no other registered gap grew.");
+          NODE
+
+      - name: Accept only the reviewed discovery baseline and refresh generated records
+        run: |
+          npm run discovery:inventory -- --update-baseline
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const change = JSON.parse(fs.readFileSync("/tmp/discovery-reviewed-change.json", "utf8"));
+          const path = "audit/discovery/discovery-baseline.json";
+          const baseline = JSON.parse(fs.readFileSync(path, "utf8"));
+          baseline.note = "Reviewed 2026-11-26: " + change.toolName + " (" + change.toolId
+            + ") moved from planned to active while retaining its explicit Web-only native execution classification. "
+            + "The NATIVE_WEB_ONLY_ACTIVE registered gap increased from " + change.previousActiveGap
+            + " to " + change.currentActiveGap; no stable IDs were added or removed, and every other registered gap stayed level or improved. "
+            + "This records a platform-coverage gap; it is not native functional acceptance evidence or billing approval.";
+          fs.writeFileSync(path, JSON.stringify(baseline, null, 1) + "\n");
+          NODE
+          npm run discovery:inventory
+          npm run discovery:knowledge-index
+          npm run discovery:search-golden
+          npm run discovery:seo-offline
+          npm run discovery:check
+
+      - name: Commit generated artifacts and remove this one-time workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            apps/shared/catalog.json \
+            apps/shared/native-engine-inventory.json \
+            apps/shared/native-execution-matrix.json \
+            src/data/billing-profiles.json \
+            src/data/billing-profile-index.json \
+            src/data/billing-profile-runtime-extensions.json \
+            audit/discovery/discovery-baseline.json \
+            audit/discovery/discovery-inventory.json \
+            audit/discovery/DISCOVERY-RECONCILIATION-REPORT.md \
+            audit/discovery/SEO-OFFLINE-VALIDATION.md \
+            audit/discovery/tool-knowledge-index.json \
+            audit/discovery/search-eval/native-golden.v1.json \
+            public/robots.txt \
+            public/sitemap.xml \
+            public/llms.txt \
+            public/sitemaps \
+            public/og/cards
+          git rm .github/workflows/reconcile-billing-discovery-artifacts.yml
+          git diff --cached --check
+          git diff --cached --stat
+          git commit -m "chore(billing): refresh generated pricing and discovery records"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
