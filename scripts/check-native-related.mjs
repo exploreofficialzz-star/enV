@@ -83,6 +83,19 @@ const nativeCandidates = [
 });
 const nativeByID = new Map(nativeCandidates.map((tool) => [tool.id, tool]));
 const relatedSearchPool = getSearchableTools();
+const androidSearchReferenceIDs = quotedIDs(
+  read("apps/android/app/src/main/java/com/chastech/env/data/NativeCatalogSearch.kt"),
+  /webOnlySearchReferenceIds\\s*=\\s*setOf\\(([\\s\\S]*?)\\)/,
+  "Android native-search parity references",
+);
+const iosSearchReferenceIDs = quotedIDs(
+  read("apps/ios/enV/CatalogCore.swift"),
+  /webOnlyNativeSearchReferenceIDs:\\s*Set<String>\\s*=\\s*\\[([\\s\\S]*?)\\]/,
+  "iOS native-search parity references",
+);
+assert.deepEqual([...androidSearchReferenceIDs].sort(), [...iosSearchReferenceIDs].sort(),
+  "Android and iOS Web-only search-parity reference sets differ.");
+const nativeSearchReferenceIDs = new Set(androidSearchReferenceIDs);
 
 function nativeAlphabeticalKey(value) {
   return value
@@ -120,7 +133,12 @@ function nativeRelated(tool, limit = 6) {
   if (related.length >= limit) return related.slice(0, limit);
   const semantic = relatedToolsBySearch(
     canonical,
-    (query, searchLimit) => searchToolResults(relatedSearchPool, query, searchLimit, { includePlanned: false }).tools,
+    (query, searchLimit) => searchToolResults(
+      relatedSearchPool,
+      query,
+      searchLimit + nativeSearchReferenceIDs.size,
+      { includePlanned: false },
+    ).tools.filter((item) => !nativeSearchReferenceIDs.has(item.id)).slice(0, searchLimit),
     limit - related.length,
     seen,
     (candidate) => canonical.category !== "developer" || candidate.category === "developer",
