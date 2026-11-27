@@ -140,7 +140,7 @@ test("semantic related ranking rewards agreement across multiple task terms and 
     (query) => {
       if (query === "file") return [source, close, planned, weaker];
       if (query === "search") return [source, planned, curated];
-      if (query === "folder") return [close, planned];
+      if (query === "folders") return [close, planned];
       if (query === "documents") return [close, weaker];
       return [];
     },
