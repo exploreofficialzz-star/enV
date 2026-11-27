@@ -203,4 +203,19 @@ class CatalogModelsTest {
         assertEquals(emptyList<ToolRecord>(), catalog.relatedTools(current, 0))
         assertEquals(emptyList<ToolRecord>(), catalog.relatedTools(current, -1))
     }
+
+    @Test fun relatedToolsPreferTaskMatchesAcrossNameKeywordsAndSubcategory() {
+        val catalog = Catalog.fromJson("""
+            {"counts":{"total":4,"active":4,"planned":0,"categories":1},"categories":[],"tools":[
+              {"id":"file-search","name":"File Search","slug":"file-search","description":"Find files and search supported text content.","category":"files","subcategory":"File workspace","keywords":["search files","find folders","documents"],"tags":["search","files","local"],"status":"active","related":[],"engine":{"type":"custom","id":"file-search"}},
+              {"id":"file-compare","name":"File & Folder Compare","slug":"file-compare","description":"Compare files and folders.","category":"files","subcategory":"File workspace","keywords":["compare files","folders","documents"],"tags":["files","folders","compare"],"status":"active","related":[],"engine":{"type":"custom","id":"file-compare"}},
+              {"id":"file-organizer","name":"File Organizer","slug":"file-organizer","description":"Organize files into folders.","category":"files","subcategory":"File workspace","keywords":["organize files","folders","documents"],"tags":["files","folders","organize"],"status":"active","related":[],"engine":{"type":"custom","id":"file-organizer"}},
+              {"id":"text-counter","name":"Text Counter","slug":"text-counter","description":"Count words and characters.","category":"text","subcategory":"Text analysis","keywords":["documents"],"tags":["text"],"status":"active","related":[],"engine":{"type":"custom","id":"text-counter"}}
+            ]}
+        """.trimIndent())
+        val source = catalog.tools.single { it.id == "file-search" }
+        val recommendations = catalog.relatedTools(source, 2).map { it.id }.toSet()
+        assertEquals(setOf("file-compare", "file-organizer"), recommendations)
+    }
+
 }
