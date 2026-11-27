@@ -1173,8 +1173,92 @@ private func relatedAlphabeticalKey(_ value: String) -> String {
         .trimmingCharacters(in: .whitespacesAndNewlines)
 }
 
+private struct RelatedSearchTerm {
+    let value: String
+    let weight: Double
+    let order: Int
+}
+
+private struct RelatedSearchScore {
+    let tool: Tool
+    var matches = 0
+    var score = 0.0
+}
+
+private let relatedSearchStopWords: Set<String> = [
+    "a", "an", "and", "are", "as", "at", "by", "for", "from", "in", "into", "is", "it", "of", "on", "or", "the", "to", "with",
+    "app", "apps", "best", "create", "created", "creating", "free", "generate", "generated", "generating", "generator", "online",
+    "simple", "studio", "tool", "tools", "utility", "utilities", "use", "using", "web", "env", "calculator", "converter"
+]
+
+private func relatedSearchTerms(_ tool: Tool) -> [RelatedSearchTerm] {
+    var weights: [String: Double] = [:]
+    var order: [String] = []
+    func add(_ value: String, weight: Double) {
+        let normalized = value.decomposedStringWithCompatibilityMapping
+            .replacingOccurrences(of: "\\p{M}+", with: "", options: .regularExpression)
+            .lowercased()
+        let tokens = normalized.components(separatedBy: CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789").inverted)
+        for token in tokens where token.count >= 2 && !relatedSearchStopWords.contains(token) {
+            if weights[token] == nil { order.append(token) }
+            weights[token] = max(weights[token] ?? 0, weight)
+        }
+    }
+    add(tool.name, weight: 2.0)
+    add(tool.subcategory ?? "", weight: 1.35)
+    tool.keywords.forEach { add($0, weight: 1.15) }
+    tool.tags.forEach { add($0, weight: 0.8) }
+    return order.enumerated()
+        .map { RelatedSearchTerm(value: $0.element, weight: weights[$0.element] ?? 0, order: $0.offset) }
+        .sorted {
+            if $0.weight != $1.weight { return $0.weight > $1.weight }
+            return $0.order < $1.order
+        }
+        .prefix(8)
+        .map { $0 }
+}
+
 extension Catalog {
-    /// Mirrors the web registry: preserve declared related IDs, then fill from the same category alphabetically.
+    private func relatedSearchTools(
+        for tool: Tool,
+        candidatesByID: [String: Tool],
+        excludedIDs: Set<String>,
+        limit: Int
+    ) -> [Tool] {
+        guard limit > 0 else { return [] }
+        var scores: [String: RelatedSearchScore] = [:]
+        for term in relatedSearchTerms(tool) {
+            for (index, result) in webSearch(term.value, limit: 48, includeRelatedReferences: false).enumerated() {
+                guard
+                    let candidate = candidatesByID[result.id],
+                    candidate.id != tool.id,
+                    !excludedIDs.contains(candidate.id),
+                    !candidate.isPlanned,
+                    tool.category != "developer" || candidate.category == "developer"
+                else { continue }
+                var current = scores[candidate.id] ?? RelatedSearchScore(tool: candidate)
+                current.matches += 1
+                current.score += term.weight / Double(12 + index)
+                scores[candidate.id] = current
+            }
+        }
+        let sourceSubcategory = relatedAlphabeticalKey(tool.subcategory ?? "")
+        return scores.values.sorted {
+            if $0.matches != $1.matches { return $0.matches > $1.matches }
+            if $0.score != $1.score { return $0.score > $1.score }
+            let leftSubcategory = !sourceSubcategory.isEmpty && relatedAlphabeticalKey($0.tool.subcategory ?? "") == sourceSubcategory
+            let rightSubcategory = !sourceSubcategory.isEmpty && relatedAlphabeticalKey($1.tool.subcategory ?? "") == sourceSubcategory
+            if leftSubcategory != rightSubcategory { return leftSubcategory }
+            let leftCategory = $0.tool.category == tool.category
+            let rightCategory = $1.tool.category == tool.category
+            if leftCategory != rightCategory { return leftCategory }
+            let leftName = relatedAlphabeticalKey($0.tool.name)
+            let rightName = relatedAlphabeticalKey($1.tool.name)
+            return leftName == rightName ? $0.tool.id < $1.tool.id : leftName < rightName
+        }.prefix(limit).map { $0.tool }
+    }
+
+    /// Preserve declared links, then task-ranked search matches, then same-category fallback.
     func relatedTools(for tool: Tool, limit: Int = 6) -> [Tool] {
         guard limit > 0 else { return [] }
 
@@ -1201,8 +1285,18 @@ extension Catalog {
         }
         if related.count >= limit { return Array(related.prefix(limit)) }
 
-        // Web exposes only Studio workspaces in the Developer category. Other categories
-        // use the full discoverable catalogue, with Accessibility variants canonicalized above.
+        let semantic = relatedSearchTools(
+            for: tool,
+            candidatesByID: byID,
+            excludedIDs: seen,
+            limit: limit - related.count
+        )
+        semantic.forEach { seen.insert($0.id) }
+        let withSemantic = related + semantic
+        if withSemantic.count >= limit { return Array(withSemantic.prefix(limit)) }
+
+        // Category ordering is retained only as the final fallback if task search
+        // cannot supply enough distinct, active destinations.
         let fallbackCandidates = tool.category == "developer" ? developerStudioTools() : candidates
         var fallbackIDs = Set<String>()
         let rest = fallbackCandidates
@@ -1215,7 +1309,7 @@ extension Catalog {
                 let right = relatedAlphabeticalKey($1.name)
                 return left == right ? $0.id < $1.id : left < right
             }
-        return Array((related + rest).prefix(limit))
+        return Array((withSemantic + rest).prefix(limit))
     }
 }
 
