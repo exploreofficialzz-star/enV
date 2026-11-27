@@ -175,9 +175,9 @@ assert.match(androidResolver, /fun Catalog\.relatedTools[\s\S]*?if \(limit <= 0\
 assert.match(iosResolver, /func relatedTools\(for tool: Tool, limit: Int = 6\)[\s\S]*?guard limit > 0[\s\S]*?candidateIDs\.insert\(\$0\.id\)\.inserted[\s\S]*?accessibilityStudio\(for: id\)[\s\S]*?seen\.insert\(target\.id\)\.inserted/,
   "iOS related resolver must guard limits, deduplicate candidates and canonicalize Accessibility aliases.");
 
-assert.match(androidResolver, /private fun relatedSearchTerms[\s\S]*?webSearch\(term\.value, 48, includeRelatedReferences = false\)/,
+assert.match(androidResolver, /private fun relatedSearchTerms[\s\S]*?webSearch\(term\.value, 48, includeRelatedReferences = true\)/,
   "Android related recommendations must use metadata-derived terms and its canonical search index.");
-assert.match(iosResolver, /private func relatedSearchTerms[\s\S]*?webSearch\(term\.value, limit: 48, includeRelatedReferences: false\)/,
+assert.match(iosResolver, /private func relatedSearchTerms[\s\S]*?webSearch\(term\.value, limit: 48, includeRelatedReferences: true\)/,
   "iOS related recommendations must use metadata-derived terms and its canonical search index.");
 
 const [currentWebIDs, currentNativeIDs] = [webRelated, nativeRelated];
