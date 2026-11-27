@@ -450,7 +450,7 @@ private fun Catalog.relatedSearchTools(
     if (limit <= 0) return emptyList()
     val scores = linkedMapOf<String, RelatedSearchScore>()
     for (term in relatedSearchTerms(tool)) {
-        webSearch(term.value, 48, includeRelatedReferences = false).forEachIndexed { index, result ->
+        webSearch(term.value, 48, includeRelatedReferences = true).forEachIndexed { index, result ->
             val candidate = candidatesById[result.id] ?: return@forEachIndexed
             if (
                 candidate.id == tool.id || candidate.id in excludedIds || candidate.status == "planned" ||
