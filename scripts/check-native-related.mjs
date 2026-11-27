@@ -123,8 +123,12 @@ function nativeAlphabeticalKey(value) {
 const codeUnitCompare = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
 
 function canonicalNativeTarget(id) {
-  if (id === "audio-analyze-studio") return getToolById("song-metadata-analyzer");
-  return getToolById(id) ?? nativeByID.get(id);
+  if (id === "audio-analyze-studio") return nativeByID.get("song-metadata-analyzer");
+  // The native resolver can only resolve records in its actual catalogue/projection map.
+  // getToolById() alone is the Web registry and also returns Web-only virtual workspaces
+  // (for example Camera Studio) which Android/iOS cannot navigate to.
+  const canonicalID = getToolById(id)?.id ?? id;
+  return nativeByID.get(canonicalID);
 }
 function webRelated(tool, limit = 6) {
   const canonical = getToolById(tool.id) ?? tool;
@@ -159,7 +163,11 @@ function nativeRelated(tool, limit = 6) {
       query,
       searchLimit + nativeSearchReferenceIDs.size,
       { includePlanned: false },
-    ).tools.filter((item) => !nativeSearchReferenceIDs.has(item.id)).slice(0, searchLimit),
+    ).tools
+      .filter((item) => !nativeSearchReferenceIDs.has(item.id))
+      .map((item) => canonicalNativeTarget(item.id))
+      .filter(Boolean)
+      .slice(0, searchLimit),
     limit - related.length,
     seen,
     (candidate) => canonical.category !== "developer" || candidate.category === "developer",
