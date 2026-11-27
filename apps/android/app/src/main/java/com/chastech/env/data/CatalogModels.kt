@@ -412,7 +412,69 @@ private fun relatedAlphabeticalKey(value: String): String =
         .replace(Regex("[^a-z0-9]+"), " ")
         .trim()
 
-/** Mirrors the web registry: preserve declared related IDs, then fill from the same category alphabetically. */
+private data class RelatedSearchTerm(val value: String, val weight: Double, val order: Int)
+private data class RelatedSearchScore(val tool: ToolRecord, var matches: Int = 0, var score: Double = 0.0)
+
+private val relatedSearchStopWords = setOf(
+    "a", "an", "and", "are", "as", "at", "by", "for", "from", "in", "into", "is", "it", "of", "on", "or", "the", "to", "with",
+    "app", "apps", "best", "create", "created", "creating", "free", "generate", "generated", "generating", "generator", "online",
+    "simple", "studio", "tool", "tools", "utility", "utilities", "use", "using", "web", "env", "calculator", "converter",
+)
+
+private fun relatedSearchTerms(tool: ToolRecord): List<RelatedSearchTerm> {
+    val weights = linkedMapOf<String, Double>()
+    fun add(value: String, weight: Double) {
+        Normalizer.normalize(value, Normalizer.Form.NFKD)
+            .replace(Regex("\\p{M}+"), "")
+            .lowercase(Locale.ROOT)
+            .split(Regex("[^a-z0-9]+"))
+            .filter { it.length >= 2 && it !in relatedSearchStopWords }
+            .forEach { token -> weights[token] = maxOf(weights[token] ?: 0.0, weight) }
+    }
+    add(tool.name, 2.0)
+    add(tool.subcategory.orEmpty(), 1.35)
+    tool.keywords.forEach { add(it, 1.15) }
+    tool.tags.forEach { add(it, 0.8) }
+    return weights.entries.mapIndexed { order, entry -> RelatedSearchTerm(entry.key, entry.value, order) }
+        .sortedWith(compareByDescending<RelatedSearchTerm> { it.weight }.thenBy { it.order })
+        .take(8)
+}
+
+/** Mirrors Web's search-backed task-neighbour ranking before any category-only fallback. */
+private fun Catalog.relatedSearchTools(
+    tool: ToolRecord,
+    candidatesById: Map<String, ToolRecord>,
+    excludedIds: Set<String>,
+    limit: Int,
+): List<ToolRecord> {
+    if (limit <= 0) return emptyList()
+    val scores = linkedMapOf<String, RelatedSearchScore>()
+    for (term in relatedSearchTerms(tool)) {
+        webSearch(term.value, 48, includeRelatedReferences = false).forEachIndexed { index, result ->
+            val candidate = candidatesById[result.id] ?: return@forEachIndexed
+            if (
+                candidate.id == tool.id || candidate.id in excludedIds || candidate.status == "planned" ||
+                (tool.category == "developer" && candidate.category != "developer")
+            ) return@forEachIndexed
+            val current = scores.getOrPut(candidate.id) { RelatedSearchScore(candidate) }
+            current.matches += 1
+            current.score += term.weight / (12 + index)
+        }
+    }
+    val sourceSubcategory = relatedAlphabeticalKey(tool.subcategory.orEmpty())
+    return scores.values.sortedWith(
+        compareByDescending<RelatedSearchScore> { it.matches }
+            .thenByDescending { it.score }
+            .thenByDescending {
+                sourceSubcategory.isNotEmpty() && relatedAlphabeticalKey(it.tool.subcategory.orEmpty()) == sourceSubcategory
+            }
+            .thenByDescending { it.tool.category == tool.category }
+            .thenBy { relatedAlphabeticalKey(it.tool.name) }
+            .thenBy { it.tool.id }
+    ).take(limit).map { it.tool }
+}
+
+/** Preserve declared links, then use the canonical search ranking before the category fallback. */
 fun Catalog.relatedTools(tool: ToolRecord, limit: Int = 6): List<ToolRecord> {
     if (limit <= 0) return emptyList()
 
@@ -442,8 +504,13 @@ fun Catalog.relatedTools(tool: ToolRecord, limit: Int = 6): List<ToolRecord> {
     }
     if (related.size >= limit) return related.take(limit)
 
-    // Web exposes only Studio workspaces in the Developer category. Other categories
-    // use the full discoverable catalogue, with Accessibility variants canonicalized above.
+    val semantic = relatedSearchTools(tool, byId, seen, limit - related.size)
+    semantic.forEach { seen.add(it.id) }
+    val withSemantic = related + semantic
+    if (withSemantic.size >= limit) return withSemantic.take(limit)
+
+    // Web exposes only Studio workspaces in the Developer category. Category ordering
+    // is retained only as a final fallback when task search has too few candidates.
     val fallbackCandidates = if (tool.category == "developer") developerStudioTools() else relatedCandidates
     val rest = fallbackCandidates.asSequence()
         .filter { it.category == tool.category && it.id !in seen && it.status != "planned" }
@@ -453,7 +520,7 @@ fun Catalog.relatedTools(tool: ToolRecord, limit: Int = 6): List<ToolRecord> {
             else compareBy<ToolRecord>({ relatedAlphabeticalKey(it.name) }, { it.id })
         )
         .toList()
-    return (related + rest).take(limit)
+    return (withSemantic + rest).take(limit)
 }
 
 fun ToolRecord.nativeDisclaimerText(): String? = when (disclaimer) {
