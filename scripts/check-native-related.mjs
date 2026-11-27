@@ -35,12 +35,16 @@ const sharedTools = [
   ...DATETIME_TOOL_EXTENSIONS.filter((extension) => !sharedBaseTools.some((tool) => tool.id === extension.id)),
 ];
 assert.equal(webTools.length, sharedTools.length, "Web and shared catalog tool counts differ.");
-// The runtime intentionally brands this legacy audio engine as AI Music Data Sandbox,
-// while the shared source record retains its original Song Metadata Analyzer name.
-// Keep that one documented presentation exception explicit rather than masking other
-// platform name drift.
+// These are explicit runtime presentation transforms, not source-ID changes:
+// - Song Metadata Analyzer is branded AI Music Data Sandbox.
+// - QR Payload Inspector is presented as QR & Barcode Reader.
+// - The legacy Audio Analyze Studio route is canonicalized to the same Music Data Sandbox.
+// Keep only these exact, source-verified display aliases exempt; IDs, categories and
+// related-link arrays remain compared strictly for every catalogue row.
 const approvedRuntimeDisplayNames = new Map([
   ["song-metadata-analyzer", "AI Music Data Sandbox"],
+  ["qr-payload-inspector", "QR & Barcode Reader"],
+  ["audio-analyze-studio", "AI Music Data Sandbox"],
 ]);
 for (let index = 0; index < webTools.length; index += 1) {
   const web = webTools[index];
