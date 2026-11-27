@@ -869,7 +869,52 @@ private final class NativeCatalogSearchIndex {
         return (result * 1_000_000).rounded() / 1_000_000
     }
 
+    /// Mirrors Web's generated expansion-calculator presentation before indexing search fields.
+    private static func searchPresentation(for tool: Tool) -> Tool {
+        guard tool.engine.type == "calculator",
+              let formulaValue = tool.engine.configuration["formula"],
+              case let .string(formula) = formulaValue else { return tool }
+
+        let parts = formula.split(separator: "-").map(String.init)
+        guard parts.count >= 4, parts[0] == "exp",
+              ["product", "sum", "ratio"].contains(parts[1]),
+              let target = parts.last, ["a", "b", "c"].contains(target) else { return tool }
+        let key = parts[2..<(parts.count - 1)].joined(separator: "-")
+        guard !key.isEmpty else { return tool }
+
+        let prefix = "Formula exercise calculator: "
+        let marker = ". Solve for "
+        guard tool.description.hasPrefix(prefix),
+              let solveRange = tool.description.range(of: marker),
+              tool.description.hasSuffix(").") else { return tool }
+        let relation = String(tool.description[prefix.endIndex..<solveRange.lowerBound])
+        let afterSolve = tool.description[solveRange.upperBound...]
+        guard let open = afterSolve.firstIndex(of: "("),
+              let close = afterSolve.lastIndex(of: ")"), open < close,
+              String(afterSolve[..<open]).trimmingCharacters(in: .whitespaces) == target else { return tool }
+        let targetLabel = String(afterSolve[afterSolve.index(after: open)..<close]).trimmingCharacters(in: .whitespaces)
+        guard !targetLabel.isEmpty else { return tool }
+
+        let oldHeading = tool.name.components(separatedBy: " — Solve for ").first ?? tool.name
+        let titleRange = oldHeading.range(of: ": ")
+        let title = titleRange.map { String(oldHeading[..<$0.lowerBound]) }
+        let displayName = "\(title.map { "\($0): " } ?? "")\(relation) — Solve for \(targetLabel)"
+        let displayDescription = "Formula exercise calculator: \(relation). Solve for \(targetLabel). Enter the other two values to calculate the missing value."
+        let labelWords = targetLabel.lowercased().split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        let titleWords = title?.lowercased().split(whereSeparator: { $0.isWhitespace }).map(String.init) ?? []
+        let generatedKeywords = ["math", "exercise", "formula", parts[1], key] + labelWords + titleWords
+        let keywords = Array(NSOrderedSet(array: tool.keywords + generatedKeywords)) as? [String] ?? tool.keywords
+
+        return Tool(
+            id: tool.id, name: displayName, slug: tool.slug, description: displayDescription,
+            category: tool.category, subcategory: tool.subcategory, keywords: keywords, tags: tool.tags,
+            icon: tool.icon, popularity: tool.popularity, featured: tool.featured, clientSide: tool.clientSide,
+            requiresBackend: tool.requiresBackend, requiresAuth: tool.requiresAuth, status: tool.status,
+            disclaimer: tool.disclaimer, related: tool.related, engine: tool.engine
+        )
+    }
     private static func buildDocument(_ tool: Tool) -> NativeSearchDocument {
+        let indexedTool = searchPresentation(for: tool)
         var stems: [String: NativeSearchStemInfo] = [:]
         var surfaces = Set<String>()
         var surfaceOrder: [String] = []
@@ -883,30 +928,30 @@ private final class NativeCatalogSearchIndex {
             }
         }
 
-        add(tool.name, field: .name)
-        let aliases = searchAliases[tool.id] ?? []
+        add(indexedTool.name, field: .name)
+        let aliases = searchAliases[indexedTool.id] ?? []
         var aliasPhrases = Set<String>()
         for alias in aliases {
             aliasPhrases.insert(normalizeText(alias))
             add(alias, field: .alias)
         }
-        add(tool.id, field: .id)
-        for item in tool.keywords { add(item, field: .keyword) }
-        for item in tool.tags { add(item, field: .tag) }
-        add(tool.subcategory ?? "", field: .subcategory)
-        add(tool.category, field: .category)
-        add(tool.description, field: .description)
+        add(indexedTool.id, field: .id)
+        for item in indexedTool.keywords { add(item, field: .keyword) }
+        for item in indexedTool.tags { add(item, field: .tag) }
+        add(indexedTool.subcategory ?? "", field: .subcategory)
+        add(indexedTool.category, field: .category)
+        add(indexedTool.description, field: .description)
 
         return NativeSearchDocument(
-            tool: tool,
+            tool: indexedTool,
             stems: stems,
             surfaces: surfaces,
             surfaceOrder: surfaceOrder,
-            normalizedName: normalizeText(tool.name),
-            normalizedID: tool.id.lowercased(),
-            nameTokenCount: tokenize(tool.name).count,
+            normalizedName: normalizeText(indexedTool.name),
+            normalizedID: indexedTool.id.lowercased(),
+            nameTokenCount: tokenize(indexedTool.name).count,
             aliasPhrases: aliasPhrases,
-            stemmedName: stemPhrase(tool.name)
+            stemmedName: stemPhrase(indexedTool.name)
         )
     }
 

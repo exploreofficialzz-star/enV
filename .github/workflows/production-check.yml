@@ -240,6 +240,8 @@ jobs:
 
       - name: Generate per-tool functional audit ledger
         if: always()
+        env:
+          BROWSER_AUDIT_SAMPLE: 250
         run: npm run audit:tool-ledger -- --output=audit/tool-functional-audit-ledger.json
 
       - name: Upload per-tool functional audit ledger

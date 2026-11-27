@@ -14,6 +14,43 @@ import kotlin.math.round
  * field weights, IDF, coverage gate, aliases, typo/prefix expansion and stable ranking.
  * This is lexical metadata retrieval only; it does not claim a tool is functionally verified.
  */
+private fun ToolRecord.searchPresentationForDiscovery(): ToolRecord {
+    val formula = engine.extras["formula"] ?: return this
+    val parts = formula.split('-')
+    if (parts.size < 4 || parts[0] != "exp" || parts[1] !in setOf("product", "sum", "ratio")) return this
+    val target = parts.last()
+    if (target !in setOf("a", "b", "c")) return this
+    val key = parts.subList(2, parts.lastIndex).joinToString("-")
+    if (key.isBlank()) return this
+
+    val prefix = "Formula exercise calculator: "
+    val marker = ". Solve for "
+    if (!description.startsWith(prefix) || !description.endsWith(").")) return this
+    val solveStart = description.indexOf(marker, prefix.length)
+    if (solveStart < 0) return this
+    val relation = description.substring(prefix.length, solveStart)
+    val afterSolve = description.substring(solveStart + marker.length)
+    val open = afterSolve.indexOf('(')
+    val close = afterSolve.lastIndexOf(')')
+    if (open <= 0 || close <= open || afterSolve.substring(0, open).trim() != target) return this
+    val targetLabel = afterSolve.substring(open + 1, close).trim()
+    if (targetLabel.isBlank()) return this
+
+    val oldHeading = name.substringBefore(" — Solve for ", name)
+    val title = oldHeading.substringBefore(": ").takeIf { ": " in oldHeading }
+    val displayName = (title?.let { "$it: " } ?: "") + "$relation — Solve for $targetLabel"
+    val displayDescription = "Formula exercise calculator: $relation. Solve for $targetLabel. Enter the other two values to calculate the missing value."
+    val generatedKeywords = buildList {
+        addAll(listOf("math", "exercise", "formula", parts[1], key))
+        addAll(targetLabel.lowercase(Locale.ROOT).split(Regex("\\s+")))
+        title?.let { addAll(it.lowercase(Locale.ROOT).split(Regex("\\s+"))) }
+    }
+    return copy(
+        name = displayName,
+        description = displayDescription,
+        keywords = (keywords + generatedKeywords).distinct(),
+    )
+}
 internal class NativeCatalogSearchIndex(tools: List<ToolRecord>) {
     private enum class Field(val weight: Int) {
         NAME(10), ID(7), KEYWORD(6), ALIAS(5), TAG(4), SUBCATEGORY(4), CATEGORY(3), DESCRIPTION(2)
@@ -246,6 +283,7 @@ internal class NativeCatalogSearchIndex(tools: List<ToolRecord>) {
         return round(score * 1_000_000.0) / 1_000_000.0
     }
     private fun buildDoc(tool: ToolRecord): Doc {
+        val indexedTool = indexedTool.searchPresentationForDiscovery()
         val stems = LinkedHashMap<String, StemInfo>()
         val surfaces = LinkedHashSet<String>()
         fun add(value: String, field: Field) {
@@ -256,27 +294,27 @@ internal class NativeCatalogSearchIndex(tools: List<ToolRecord>) {
                 if (existing == null || existing.weight < field.weight) stems[key] = StemInfo(field.weight, field, surface)
             }
         }
-        add(tool.name, Field.NAME)
+        add(indexedTool.name, Field.NAME)
         val aliasPhrases = LinkedHashSet<String>()
-        SEARCH_ALIASES[tool.id].orEmpty().forEach { phrase ->
+        SEARCH_ALIASES[indexedTool.id].orEmpty().forEach { phrase ->
             aliasPhrases += normalizeText(phrase)
             add(phrase, Field.ALIAS)
         }
-        add(tool.id, Field.ID)
-        tool.keywords.forEach { add(it, Field.KEYWORD) }
-        tool.tags.forEach { add(it, Field.TAG) }
-        add(tool.subcategory.orEmpty(), Field.SUBCATEGORY)
-        add(tool.category, Field.CATEGORY)
-        add(tool.description, Field.DESCRIPTION)
+        add(indexedTool.id, Field.ID)
+        indexedTool.keywords.forEach { add(it, Field.KEYWORD) }
+        indexedTool.tags.forEach { add(it, Field.TAG) }
+        add(indexedTool.subcategory.orEmpty(), Field.SUBCATEGORY)
+        add(indexedTool.category, Field.CATEGORY)
+        add(indexedTool.description, Field.DESCRIPTION)
         return Doc(
-            tool = tool,
+            tool = indexedTool,
             stems = stems,
             surfaces = surfaces,
-            normalizedName = normalizeText(tool.name),
-            normalizedId = tool.id.lowercase(Locale.ROOT),
-            nameTokenCount = tokenize(tool.name).size,
+            normalizedName = normalizeText(indexedTool.name),
+            normalizedId = indexedTool.id.lowercase(Locale.ROOT),
+            nameTokenCount = tokenize(indexedTool.name).size,
             aliasPhrases = aliasPhrases,
-            stemmedName = stemPhrase(tool.name),
+            stemmedName = stemPhrase(indexedTool.name),
         )
     }
 
