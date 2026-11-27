@@ -85,12 +85,12 @@ const nativeByID = new Map(nativeCandidates.map((tool) => [tool.id, tool]));
 const relatedSearchPool = getSearchableTools();
 const androidSearchReferenceIDs = quotedIDs(
   read("apps/android/app/src/main/java/com/chastech/env/data/NativeCatalogSearch.kt"),
-  /webOnlySearchReferenceIds\\s*=\\s*setOf\\(([\\s\\S]*?)\\)/,
+  /webOnlySearchReferenceIds\s*=\s*setOf\(([\s\S]*?)\)/,
   "Android native-search parity references",
 );
 const iosSearchReferenceIDs = quotedIDs(
   read("apps/ios/enV/CatalogCore.swift"),
-  /webOnlyNativeSearchReferenceIDs:\\s*Set<String>\\s*=\\s*\\[([\\s\\S]*?)\\]/,
+  /webOnlyNativeSearchReferenceIDs:\s*Set<String>\s*=\s*\[([\s\S]*?)\]/,
   "iOS native-search parity references",
 );
 assert.deepEqual([...androidSearchReferenceIDs].sort(), [...iosSearchReferenceIDs].sort(),
