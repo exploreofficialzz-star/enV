@@ -1261,6 +1261,9 @@ extension Catalog {
     /// Preserve declared links, then task-ranked search matches, then same-category fallback.
     func relatedTools(for tool: Tool, limit: Int = 6) -> [Tool] {
         guard limit > 0 else { return [] }
+        if tool.category == "accessibility" {
+            return Array(accessibilityDiscoveryTools().filter { $0.id != tool.id }.prefix(limit))
+        }
 
         // Resolve ordinary catalogue destinations as well as Studio projections. Web-only
         // references are stored separately for native catalogues and must remain resolvable here.
