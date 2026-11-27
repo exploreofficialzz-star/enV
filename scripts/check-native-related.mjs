@@ -105,6 +105,9 @@ function webRelated(tool, limit = 6) {
 function nativeRelated(tool, limit = 6) {
   if (limit <= 0) return [];
   const canonical = getToolById(tool.id) ?? tool;
+  if (canonical.category === "accessibility") {
+    return getToolsByCategory("accessibility").filter((item) => item.id !== canonical.id).slice(0, limit);
+  }
   const seen = new Set([canonical.id]);
   const related = [];
   for (const id of canonical.related ?? []) {
