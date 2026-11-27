@@ -105,10 +105,13 @@ const nativeCandidateIDs = new Set([...nativeBaseIDs, ...nativeRuntimeExtensionI
 const candidateIDs = new Set();
 const nativeCandidates = [
   ...webTools.filter((tool) =>
-    nativeCandidateIDs.has(tool.id) &&
+    nativeBaseIDs.has(tool.id) &&
     tool.category !== "accessibility" &&
     tool.id !== "audio-analyze-studio"
   ),
+  ...[...nativeRuntimeExtensionIDs]
+    .map((id) => canonicalRuntimeById.get(id))
+    .filter(Boolean),
   ...getToolsByCategory("accessibility"),
   ...getToolsByCategory("developer"),
 ].filter((tool) => {
