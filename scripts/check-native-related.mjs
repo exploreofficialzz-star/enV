@@ -130,6 +130,11 @@ function canonicalNativeTarget(id) {
   const canonicalID = getToolById(id)?.id ?? id;
   return nativeByID.get(canonicalID);
 }
+assert.equal(
+  canonicalNativeTarget("camera-studio"),
+  undefined,
+  "Web-only Camera Studio must not be fabricated as an Android/iOS related destination.",
+);
 function webRelated(tool, limit = 6) {
   const canonical = getToolById(tool.id) ?? tool;
   return getRelatedTools(canonical, limit);
