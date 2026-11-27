@@ -283,7 +283,7 @@ internal class NativeCatalogSearchIndex(tools: List<ToolRecord>) {
         return round(score * 1_000_000.0) / 1_000_000.0
     }
     private fun buildDoc(tool: ToolRecord): Doc {
-        val indexedTool = indexedTool.searchPresentationForDiscovery()
+        val indexedTool = tool.searchPresentationForDiscovery()
         val stems = LinkedHashMap<String, StemInfo>()
         val surfaces = LinkedHashSet<String>()
         fun add(value: String, field: Field) {
