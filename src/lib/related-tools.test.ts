@@ -1,7 +1,7 @@
 // @ts-nocheck
 import assert from "node:assert/strict";
 import test from "node:test";
-import { relatedToolsFor } from "./related-tools.ts";
+import { relatedSearchTerms, relatedToolsBySearch, relatedToolsFor } from "./related-tools.ts";
 import { getAllTools, getRelatedTools, getSearchableTools, getToolById } from "./registry.ts";
 
 const t = (id, extra = {}) => ({ id, name: id, status: "active", related: [], ...extra });
@@ -116,4 +116,69 @@ test("Scene Studio exposes its reviewed, searchable adjacent video workflows fir
     getRelatedTools(sceneStudio, 3).map((item) => item.id),
     ["video-trimmer", "video-compressor", "video-poster-generator"],
   );
+});
+
+test("semantic related ranking rewards agreement across multiple task terms and excludes self/planned/curated IDs", () => {
+  const source = t("file-search", {
+    name: "File Search",
+    category: "files",
+    subcategory: "File workspace",
+    keywords: ["search files", "folders", "documents", "find"],
+    tags: ["file-workspace"],
+  });
+  const close = t("file-compare", {
+    name: "File & Folder Compare",
+    category: "files",
+    subcategory: "File workspace",
+    keywords: ["compare files", "folders", "documents"],
+  });
+  const weaker = t("text-counter", { name: "Text Counter", category: "text", keywords: ["documents"] });
+  const planned = t("planned-search", { name: "Planned Search", status: "planned", keywords: ["search", "files", "folders"] });
+  const curated = t("curated", { name: "Curated", keywords: ["search", "files"] });
+  const result = relatedToolsBySearch(
+    source,
+    (query) => {
+      if (query === "file") return [source, close, planned, weaker];
+      if (query === "search") return [source, planned, curated];
+      if (query === "folder") return [close, planned];
+      if (query === "documents") return [close, weaker];
+      return [];
+    },
+    4,
+    new Set(["curated"]),
+  );
+  assert.deepEqual(result.map((item) => item.id), ["file-compare", "text-counter"]);
+});
+
+test("task signatures are bounded, deterministic and use tool-specific metadata", () => {
+  const image = t("image-compressor", {
+    name: "Image Compressor",
+    category: "image",
+    subcategory: "Image optimization",
+    keywords: ["compress images", "reduce image size", "photo"],
+    tags: ["image", "compression"],
+  });
+  const pdf = t("pdf-merger", {
+    name: "PDF Merger",
+    category: "pdf",
+    subcategory: "PDF editing",
+    keywords: ["merge documents", "combine PDF files"],
+    tags: ["pdf", "documents"],
+  });
+  assert.ok(relatedSearchTerms(image).some((term) => term.value === "compress"));
+  assert.ok(relatedSearchTerms(pdf).some((term) => term.value === "merge"));
+  assert.notDeepEqual(relatedSearchTerms(image), relatedSearchTerms(pdf));
+  assert.ok(relatedSearchTerms(image).length <= 8);
+});
+
+test("the full resolver produces different task-neighbour recommendations for different tools", () => {
+  const fileSearch = getToolById("file-search");
+  const fileCompare = getToolById("file-compare");
+  const imageCompressor = getToolById("image-compressor");
+  assert.ok(fileSearch && fileCompare && imageCompressor);
+  const searchIds = getRelatedTools(fileSearch, 6).map((item) => item.id);
+  const compareIds = getRelatedTools(fileCompare, 6).map((item) => item.id);
+  const imageIds = getRelatedTools(imageCompressor, 6).map((item) => item.id);
+  assert.notDeepEqual(searchIds, compareIds);
+  assert.notDeepEqual(searchIds, imageIds);
 });
