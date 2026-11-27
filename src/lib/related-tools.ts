@@ -46,7 +46,7 @@ const RELATED_STOP_WORDS = new Set([
 function relatedTokens(value: string): string[] {
   return value
     .normalize("NFKD")
-    .replace(/[\\u0300-\\u036f]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .match(/[a-z0-9]+/g) ?? [];
 }
@@ -74,7 +74,7 @@ export function relatedSearchTerms(tool: RelatedSearchSource): RelatedSearchTerm
 export function relatedSortKey(value: string): string {
   return value
     .normalize("NFKD")
-    .replace(/[\\u0300-\\u036f]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
