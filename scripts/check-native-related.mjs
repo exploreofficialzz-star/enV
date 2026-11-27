@@ -134,7 +134,13 @@ function nativeRelated(tool, limit = 6) {
   if (limit <= 0) return [];
   const canonical = getToolById(tool.id) ?? tool;
   if (canonical.category === "accessibility") {
-    return getToolsByCategory("accessibility").filter((item) => item.id !== canonical.id).slice(0, limit);
+    // Native Catalog.accessibilityDiscoveryTools() appends the Accessibility Studio
+    // projection in its source-spec order. getToolsByCategory() alphabetically sorts
+    // presentation results, so using it here would simulate a different resolver than
+    // Android/iOS actually ship and report false parity mismatches.
+    return makeAccessibilityStudioTools(getAllTools())
+      .filter((item) => item.id !== canonical.id)
+      .slice(0, limit);
   }
   const seen = new Set([canonical.id]);
   const related = [];
