@@ -143,6 +143,9 @@ jobs:
       - name: Run discovery, guide and SEO regression tests
         run: npm run test:discovery
 
+      - name: Verify Web, Android and iOS related recommendation parity
+        run: npm run check:native-related
+
       - name: Run related-link metadata audit and refresh its report
         run: npm run discovery:related-audit -- --write
 
