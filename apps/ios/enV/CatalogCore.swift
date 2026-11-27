@@ -1228,7 +1228,7 @@ extension Catalog {
         guard limit > 0 else { return [] }
         var scores: [String: RelatedSearchScore] = [:]
         for term in relatedSearchTerms(tool) {
-            for (index, result) in webSearch(term.value, limit: 48, includeRelatedReferences: false).enumerated() {
+            for (index, result) in webSearch(term.value, limit: 48, includeRelatedReferences: true).enumerated() {
                 guard
                     let candidate = candidatesByID[result.id],
                     candidate.id != tool.id,
