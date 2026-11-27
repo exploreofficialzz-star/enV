@@ -7,7 +7,8 @@ import { makeAccessibilityStudioTools, studioToolForLegacy } from "@/lib/accessi
 import { makeDeveloperStudioTools } from "@/lib/developer-studios-catalog";
 import { presentGeneratedCalculator } from "@/lib/calc/generated-calculator-presentation";
 import { DATETIME_TOOL_EXTENSIONS } from "@/lib/datetime/catalog-tools";
-import { relatedToolsFor } from "@/lib/related-tools";
+import { relatedToolsBySearch, relatedToolsFor } from "@/lib/related-tools";
+import { searchToolResults } from "@/lib/search";
 
 // Apply reviewed, task-specific descriptions to legacy generated catalogue rows
 // before they reach category pages, search, tool details or SEO metadata.
@@ -489,6 +490,7 @@ export function getNewTools(limit = 8): ToolMeta[] {
 }
 
 const relatedFallbackByCategory = new Map<CategoryId, ToolMeta[]>();
+const relatedSearchPool = getSearchableTools();
 
 function relatedFallbackForCategory(category: CategoryId): ToolMeta[] {
   const cached = relatedFallbackByCategory.get(category);
@@ -499,7 +501,8 @@ function relatedFallbackForCategory(category: CategoryId): ToolMeta[] {
 }
 
 export function getRelatedTools(tool: ToolMeta, limit = 6): ToolMeta[] {
-  if (limit <= 0) return [];
+  if (!Number.isFinite(limit) || limit <= 0) return [];
+  limit = Math.floor(limit);
   if (tool.category === "accessibility") {
     return accessibilityStudios.filter((item) => item.id !== tool.id).slice(0, limit);
   }
@@ -509,13 +512,24 @@ export function getRelatedTools(tool: ToolMeta, limit = 6): ToolMeta[] {
   const related = relatedToolsFor(tool, getToolById, isDiscoverable, limit);
   if (related.length >= limit) return related.slice(0, limit);
 
-  // Preserve the existing category-level fallback when a tool has fewer declared
-  // suggestions, without reintroducing any ID already shown above.
+  // Fill gaps with task-neighbouring tools ranked by the same lexical search engine
+  // used by the discovery UI. Category order is only a final safety fallback.
   const seen = new Set([tool.id, ...related.map((t) => t.id)]);
+  const semantic = relatedToolsBySearch(
+    tool,
+    (query, searchLimit) => searchToolResults(relatedSearchPool, query, searchLimit, { includePlanned: false }).tools,
+    limit - related.length,
+    seen,
+    (candidate) => tool.category !== "developer" || candidate.category === "developer",
+  );
+  const withSemantic = [...related, ...semantic];
+  if (withSemantic.length >= limit) return withSemantic.slice(0, limit);
+  for (const item of semantic) seen.add(item.id);
+
   const rest = relatedFallbackForCategory(tool.category).filter(
     (t) => !seen.has(t.id) && t.status !== "planned",
   );
-  return [...related, ...rest].slice(0, limit);
+  return [...withSemantic, ...rest].slice(0, limit);
 }
 
 export function activeCount(): number {
