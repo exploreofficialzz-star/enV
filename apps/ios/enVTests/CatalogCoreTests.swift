@@ -450,7 +450,7 @@ final class CatalogCoreTests: XCTestCase {
             relatedReferenceTools: nil
         )
 
-        let recommendations = sut.relatedTools(for: source, limit: 2).map(\\.id)
+        let recommendations = sut.relatedTools(for: source, limit: 2).map(\.id)
         XCTAssertEqual(Set(recommendations), Set(["file-compare", "file-organizer"]))
     }
 
