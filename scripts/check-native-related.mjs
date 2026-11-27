@@ -5,7 +5,9 @@ import { dirname, resolve } from "node:path";
 import { tools as baseWebTools } from "../src/data/catalog.ts";
 import { applyGenericWorkflowPolicy } from "../src/lib/generic-workflow-policy.mjs";
 import { DATETIME_TOOL_EXTENSIONS } from "../src/lib/datetime/catalog-tools.ts";
-import { getAllTools, getRelatedTools, getToolById, getToolsByCategory } from "../src/lib/registry.ts";
+import { getAllTools, getRelatedTools, getSearchableTools, getToolById, getToolsByCategory } from "../src/lib/registry.ts";
+import { relatedToolsBySearch } from "../src/lib/related-tools.ts";
+import { searchToolResults } from "../src/lib/search.ts";
 import { makeAccessibilityStudioTools } from "../src/lib/accessibility-studios.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -80,6 +82,7 @@ const nativeCandidates = [
   return true;
 });
 const nativeByID = new Map(nativeCandidates.map((tool) => [tool.id, tool]));
+const relatedSearchPool = getSearchableTools();
 
 function nativeAlphabeticalKey(value) {
   return value
@@ -112,6 +115,16 @@ function nativeRelated(tool, limit = 6) {
     if (related.length >= limit) break;
   }
   if (related.length >= limit) return related.slice(0, limit);
+  const semantic = relatedToolsBySearch(
+    canonical,
+    (query, searchLimit) => searchToolResults(relatedSearchPool, query, searchLimit, { includePlanned: false }).tools,
+    limit - related.length,
+    seen,
+    (candidate) => canonical.category !== "developer" || candidate.category === "developer",
+  );
+  semantic.forEach((item) => seen.add(item.id));
+  const withSemantic = [...related, ...semantic];
+  if (withSemantic.length >= limit) return withSemantic.slice(0, limit);
   const fallbackCandidates = canonical.category === "developer"
     ? getToolsByCategory("developer")
     : nativeCandidates;
@@ -123,7 +136,7 @@ function nativeRelated(tool, limit = 6) {
       : (codeUnitCompare(nativeAlphabeticalKey(left.name), nativeAlphabeticalKey(right.name)) ||
         codeUnitCompare(left.id, right.id))
     );
-  return [...related, ...rest].slice(0, limit);
+  return [...withSemantic, ...rest].slice(0, limit);
 }
 
 const liveVideo = getToolById("music-live-video-studio");
@@ -140,6 +153,11 @@ assert.match(androidResolver, /fun Catalog\.relatedTools[\s\S]*?if \(limit <= 0\
   "Android related resolver must guard limits and deduplicate canonical targets.");
 assert.match(iosResolver, /func relatedTools\(for tool: Tool, limit: Int = 6\)[\s\S]*?guard limit > 0[\s\S]*?candidateIDs\.insert\(\$0\.id\)\.inserted[\s\S]*?accessibilityStudio\(for: id\)[\s\S]*?seen\.insert\(target\.id\)\.inserted/,
   "iOS related resolver must guard limits, deduplicate candidates and canonicalize Accessibility aliases.");
+
+assert.match(androidResolver, /private fun relatedSearchTerms[\\s\\S]*?webSearch\\(term\\.value, 48, includeRelatedReferences = false\\)/,
+  "Android related recommendations must use metadata-derived terms and its canonical search index.");
+assert.match(iosResolver, /private func relatedSearchTerms[\\s\\S]*?webSearch\\(term\\.value, limit: 48, includeRelatedReferences: false\\)/,
+  "iOS related recommendations must use metadata-derived terms and its canonical search index.");
 
 const [currentWebIDs, currentNativeIDs] = [webRelated, nativeRelated];
 
