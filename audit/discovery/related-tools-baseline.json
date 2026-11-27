@@ -1,11 +1,16 @@
 {
-  "note": "Registered legacy link defects. Counts may shrink, never grow. Explicit noRelatedExceptions document intentional isolated tools and are validated against the live registry.",
-  "counts": {
-    "dangling": 5,
-    "self": 4,
-    "toPlanned": 106,
-    "toUndiscoverable": 287,
-    "noRelated": 495
-  },
-  "noRelatedExceptions": []
+ "note": "Reviewed upper bounds for canonical rendered related-link integrity after destination resolution and category fallback. Counts may shrink, never grow. Empty-render exceptions document only active tools for which no usable native-compatible same-category fallback exists; do not recommend tools that are absent from either shipped native platform.",
+ "counts": {
+  "dangling": 0,
+  "self": 0,
+  "toPlanned": 0,
+  "toUndiscoverable": 0,
+  "noRelated": 0
+ },
+ "noRelatedExceptions": [
+  {
+   "id": "camera-studio",
+   "reason": "Camera Studio is the only active photography-category tool. The current Android and iOS tool-coverage manifests do not include standalone native image crop, resize, compression, sharpening or watermark tools. Linking those Web-only destinations from the native camera would advertise unsupported cross-platform actions; keep this single empty-render exception until compatible native image workflows ship."
+  }
+ ]
 }

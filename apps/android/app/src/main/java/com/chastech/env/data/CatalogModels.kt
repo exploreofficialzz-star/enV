@@ -41,6 +41,16 @@ data class Catalog(
     val browserActiveToolCount: Int
         get() = (tools + relatedReferenceTools).count { it.status == "active" || it.status == "beta" }
 
+    private val mainWebSearchIndex by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        NativeCatalogSearchIndex(searchableToolsForSearch(includeRelatedReferences = false))
+    }
+    private val completeWebSearchIndex by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        NativeCatalogSearchIndex(searchableToolsForSearch(includeRelatedReferences = true))
+    }
+
+    internal fun webSearchIndex(includeRelatedReferences: Boolean): NativeCatalogSearchIndex =
+        if (includeRelatedReferences) completeWebSearchIndex else mainWebSearchIndex
+
     companion object {}
 }
 
@@ -234,7 +244,10 @@ fun Catalog.withABook(): Catalog {
 
 /** Registers the local ZIP64 archive tool without changing the shared web catalogue. */
 fun Catalog.withZipArchive(): Catalog {
-    if (tools.any { it.id == "zip-any-file" }) return this
+    // ZIP's related destinations belong to the same native runtime surface.
+    // Register them before publishing the archive so every declared link resolves.
+    val withWorkspace = withFileWorkspaceTools()
+    if (withWorkspace.tools.any { it.id == "zip-any-file" }) return withWorkspace
     val tool = ToolRecord(
         id = "zip-any-file",
         name = "Zip any file",
@@ -250,13 +263,13 @@ fun Catalog.withZipArchive(): Catalog {
         requiresBackend = false,
         requiresAuth = false,
         status = "active",
-        related = listOf("file-converter", "pdf-merger", "document-editor"),
+        related = listOf("file-to-txt", "file-organizer", "file-compare"),
         engine = EngineInfo("custom", "zip-any-file"),
         subcategory = "Archives & extraction",
     )
-    val updated = tools + tool
-    return copy(
-        counts = counts.copy(total = updated.size, active = updated.count { it.status == "active" || it.status == "beta" }),
+    val updated = withWorkspace.tools + tool
+    return withWorkspace.copy(
+        counts = withWorkspace.counts.copy(total = updated.size, active = updated.count { it.status == "active" || it.status == "beta" }),
         tools = updated.sortedWith(compareBy<ToolRecord> { it.category }.thenBy { it.name.lowercase(Locale.ROOT) }.thenBy { it.id }),
     )
 }
@@ -265,12 +278,13 @@ fun Catalog.withZipArchive(): Catalog {
 /** Registers the native local File workspace tools without changing the generated base catalogue. */
 fun Catalog.withFileWorkspaceTools(): Catalog {
     val definitions = listOf(
-        Triple("file-organizer", "File Organizer", "Sort selected files into type-based folders and copy them into a destination you choose. Original files are never deleted."),
-        Triple("batch-file-renamer", "Batch File Renamer", "Preview consistent filename prefixes, suffixes, numbering and replacements before exporting renamed copies."),
-        Triple("duplicate-file-finder", "Duplicate File Finder", "Find identical files using size filtering and streaming SHA-256 verification."),
-        Triple("folder-size-analyzer", "Folder Size Analyzer", "Review folder size, file-type breakdowns and the largest files on this device."),
-        Triple("file-search", "File Search", "Search filenames and supported text file contents without a terminal."),
-        Triple("file-compare", "File & Folder Compare", "Compare two folders and verify identical files using SHA-256 checksums."),
+        Triple("file-to-txt", "File to TXT Converter", "Type or paste plain text, or extract readable text from supported files and save it as a TXT file."),
+        Triple("file-organizer", "File Organizer", "Sort selected files into clear folders by type and export an organized copy without moving or deleting originals."),
+        Triple("batch-file-renamer", "Batch File Renamer", "Preview and apply consistent prefixes, suffixes, numbering and literal replacements to many filenames in one operation."),
+        Triple("duplicate-file-finder", "Duplicate File Finder", "Find identical files using SHA-256 content verification after size filtering; filenames alone are never treated as proof."),
+        Triple("folder-size-analyzer", "Folder Size Analyzer", "Inspect folder contents, total storage, file-type breakdowns and the largest files without opening a terminal."),
+        Triple("file-search", "File Search", "Find files by name and search inside supported text files with clear file and line references."),
+        Triple("file-compare", "File & Folder Compare", "Compare two selected file sets to identify added, missing, changed and SHA-256-verified identical files."),
     )
     val existing = tools.mapTo(mutableSetOf()) { it.id }
     val additions = definitions.filterNot { it.first in existing }.mapIndexed { index, item ->
@@ -281,9 +295,28 @@ fun Catalog.withFileWorkspaceTools(): Catalog {
             slug = id,
             description = description,
             category = "files",
-            keywords = listOf("files", "folder", "local", "mobile", "offline", "storage", "organize", "search", "compare", "rename", "checksum"),
-            tags = listOf("files", "local", "mobile", "offline", "file-workspace"),
+            keywords = when (id) {
+                "file-to-txt" -> listOf("file to txt", "convert to text", "extract text", "docx to txt", "pdf to txt", "plain text", "text extractor")
+                "file-organizer" -> listOf("organize files", "sort files", "file manager", "file organizer", "folders", "move files", "documents", "phone storage")
+                "batch-file-renamer" -> listOf("batch rename", "bulk rename", "rename files", "filename pattern", "number files", "prefix", "suffix")
+                "duplicate-file-finder" -> listOf("duplicate finder", "find duplicates", "identical files", "same files", "free storage", "checksum")
+                "folder-size-analyzer" -> listOf("folder size", "storage analyzer", "disk usage", "du", "largest files", "folder inventory", "storage usage")
+                "file-search" -> listOf("find files", "search files", "grep", "search in files", "file finder", "text search", "folder search")
+                "file-compare" -> listOf("compare folders", "compare files", "directory diff", "diff", "file comparison", "backup compare", "rsync dry run")
+                else -> emptyList()
+            },
+            tags = when (id) {
+                "file-to-txt" -> listOf("files", "text", "extract", "converter", "local")
+                "file-organizer" -> listOf("files", "organize", "folders", "local", "mobile")
+                "batch-file-renamer" -> listOf("files", "rename", "batch", "local", "mobile")
+                "duplicate-file-finder" -> listOf("files", "duplicates", "sha256", "verify", "local")
+                "folder-size-analyzer" -> listOf("files", "storage", "folder", "analysis", "local", "mobile")
+                "file-search" -> listOf("files", "search", "find", "grep", "local", "mobile")
+                "file-compare" -> listOf("files", "compare", "diff", "backup", "sha256", "local")
+                else -> emptyList()
+            },
             icon = when (id) {
+                "file-to-txt" -> "FileText"
                 "file-organizer" -> "FolderTree"
                 "batch-file-renamer" -> "FilePenLine"
                 "duplicate-file-finder" -> "Files"
@@ -291,15 +324,25 @@ fun Catalog.withFileWorkspaceTools(): Catalog {
                 "file-search" -> "FileSearch"
                 else -> "GitCompareArrows"
             },
-            popularity = 1120 - index * 10,
+            popularity = when (id) {
+                "file-organizer" -> 1120
+                "duplicate-file-finder" -> 1100
+                "file-search" -> 1090
+                "file-to-txt" -> 1080
+                "folder-size-analyzer" -> 1060
+                "batch-file-renamer" -> 1050
+                "file-compare" -> 1030
+                else -> 0
+            },
             featured = true,
             clientSide = true,
             requiresBackend = false,
             requiresAuth = false,
             status = "active",
             related = emptyList(),
-            engine = EngineInfo("custom", id),
+            engine = if (id == "file-to-txt") EngineInfo("file-converter", id) else EngineInfo("custom", id),
             subcategory = when (id) {
+                "file-to-txt" -> "Text extraction"
                 "file-organizer", "batch-file-renamer" -> "Organization"
                 "duplicate-file-finder", "file-compare" -> "Verification"
                 "folder-size-analyzer" -> "Analysis"
@@ -348,42 +391,14 @@ fun Catalog.withCameraStudio(): Catalog {
     )
 }
 
-private val webSearchSynonyms = mapOf(
-    "photo" to listOf("image", "picture", "pic"), "picture" to listOf("image", "photo"), "pic" to listOf("image", "photo"),
-    "img" to listOf("image"), "compress" to listOf("minify", "shrink", "optimize", "size"), "resize" to listOf("scale", "dimensions", "size"),
-    "json" to listOf("javascript object"), "pwd" to listOf("password"), "pass" to listOf("password"), "bmi" to listOf("body mass", "weight"),
-    "percent" to listOf("percentage", "%"), "qr" to listOf("qrcode", "barcode"), "uuid" to listOf("guid"),
-    "hash" to listOf("checksum", "digest", "sha", "md5"), "color" to listOf("colour", "hex", "rgb"),
-    "mockup" to listOf("fake", "demo", "chat", "screenshot"), "invoice" to listOf("bill", "receipt"), "pdf" to listOf("document"),
-    "encode" to listOf("encoding", "base64"), "decode" to listOf("decoding"),
-    "a11y" to listOf("accessibility"), "contrast" to listOf("color contrast", "wcag"),
-    "alt" to listOf("alt-text", "image description"), "focus" to listOf("focus ring", "focus state"),
-    "aria" to listOf("accessible name", "accessibility tree"), "tab" to listOf("keyboard navigation", "tab order"),
-    "animation" to listOf("motion", "reduced motion"), "readability" to listOf("plain language", "text spacing"),
-)
-
 fun Catalog.webSearch(query: String, limit: Int = Int.MAX_VALUE, includeRelatedReferences: Boolean = false): List<ToolRecord> {
-    val q = query.trim().lowercase()
-    val sourceCandidates = if (includeRelatedReferences) tools + relatedReferenceTools else tools
-    val candidates = sourceCandidates.filter { it.category != "accessibility" && it.tags.none { tag -> tag == "developer-studio" } } + accessibilityDiscoveryTools().filter { it.category == "accessibility" } + developerStudioTools()
-    if (q.isEmpty()) return candidates.sortedByDescending { it.popularity }.take(limit)
-    val tokens = q.split(Regex("[^a-z0-9%+]+" )).filter { it.length > 1 || it == "%" }
-    val expanded = (tokens + tokens.flatMap { webSearchSynonyms[it].orEmpty() }).toSet()
-    fun score(tool: ToolRecord): Int {
-        val name = tool.name.lowercase()
-        if (name == q || tool.id == q) return 2000 + tool.popularity
-        if (name.startsWith(q)) return 1400 + tool.popularity
-        if (tool.id.contains(q) || name.contains(q)) return 1000 + tool.popularity
-        val hay = listOf(tool.name, tool.description, tool.category, tool.subcategory.orEmpty(), tool.id).plus(tool.keywords).plus(tool.tags).joinToString(" ").lowercase()
-        var hits = 0
-        expanded.forEach { token ->
-            if (name.contains(token)) hits += 8
-            else if (tool.keywords.any { it.lowercase().contains(token) }) hits += 5
-            else if (hay.contains(token)) hits += 2
-        }
-        return if (hits == 0) 0 else hits * 40 + tool.popularity
-    }
-    return candidates.map { it to score(it) }.filter { it.second > 0 }.sortedByDescending { it.second }.take(limit).map { it.first }
+    if (limit <= 0) return emptyList()
+    val expandedLimit = if (limit > Int.MAX_VALUE - webOnlySearchReferenceIds.size) Int.MAX_VALUE else limit + webOnlySearchReferenceIds.size
+    return webSearchIndex(includeRelatedReferences).search(query, expandedLimit)
+        .asSequence()
+        .filterNot { it.id in webOnlySearchReferenceIds }
+        .take(limit)
+        .toList()
 }
 
 fun Catalog.search(query: String, categoryId: String? = null): List<ToolRecord> {
@@ -397,18 +412,118 @@ private fun relatedAlphabeticalKey(value: String): String =
         .replace(Regex("[^a-z0-9]+"), " ")
         .trim()
 
-/** Mirrors the web registry: preserve declared related IDs, then fill from the same category alphabetically. */
+private data class RelatedSearchTerm(val value: String, val weight: Double, val order: Int)
+private data class RelatedSearchScore(val tool: ToolRecord, var matches: Int = 0, var score: Double = 0.0)
+
+private val relatedSearchStopWords = setOf(
+    "a", "an", "and", "are", "as", "at", "by", "for", "from", "in", "into", "is", "it", "of", "on", "or", "the", "to", "with",
+    "app", "apps", "best", "create", "created", "creating", "free", "generate", "generated", "generating", "generator", "online",
+    "simple", "studio", "tool", "tools", "utility", "utilities", "use", "using", "web", "env", "calculator", "converter",
+)
+
+private fun relatedSearchTerms(tool: ToolRecord): List<RelatedSearchTerm> {
+    val weights = linkedMapOf<String, Double>()
+    fun add(value: String, weight: Double) {
+        Normalizer.normalize(value, Normalizer.Form.NFKD)
+            .replace(Regex("\\p{M}+"), "")
+            .lowercase(Locale.ROOT)
+            .split(Regex("[^a-z0-9]+"))
+            .filter { it.length >= 2 && it !in relatedSearchStopWords }
+            .forEach { token -> weights[token] = maxOf(weights[token] ?: 0.0, weight) }
+    }
+    add(tool.name, 2.0)
+    add(tool.subcategory.orEmpty(), 1.35)
+    tool.keywords.forEach { add(it, 1.15) }
+    tool.tags.forEach { add(it, 0.8) }
+    return weights.entries.mapIndexed { order, entry -> RelatedSearchTerm(entry.key, entry.value, order) }
+        .sortedWith(compareByDescending<RelatedSearchTerm> { it.weight }.thenBy { it.order })
+        .take(8)
+}
+
+/** Mirrors Web's search-backed task-neighbour ranking before any category-only fallback. */
+private fun Catalog.relatedSearchTools(
+    tool: ToolRecord,
+    candidatesById: Map<String, ToolRecord>,
+    excludedIds: Set<String>,
+    limit: Int,
+): List<ToolRecord> {
+    if (limit <= 0) return emptyList()
+    val scores = linkedMapOf<String, RelatedSearchScore>()
+    for (term in relatedSearchTerms(tool)) {
+        webSearch(term.value, 48, includeRelatedReferences = true).forEachIndexed { index, result ->
+            val candidate = candidatesById[result.id] ?: return@forEachIndexed
+            if (
+                candidate.id == tool.id || candidate.id in excludedIds || candidate.status == "planned" ||
+                (tool.category == "developer" && candidate.category != "developer")
+            ) return@forEachIndexed
+            val current = scores.getOrPut(candidate.id) { RelatedSearchScore(candidate) }
+            current.matches += 1
+            current.score += term.weight / (12 + index)
+        }
+    }
+    val sourceSubcategory = relatedAlphabeticalKey(tool.subcategory.orEmpty())
+    return scores.values.sortedWith(
+        compareByDescending<RelatedSearchScore> { it.matches }
+            .thenByDescending { it.score }
+            .thenByDescending {
+                sourceSubcategory.isNotEmpty() && relatedAlphabeticalKey(it.tool.subcategory.orEmpty()) == sourceSubcategory
+            }
+            .thenByDescending { it.tool.category == tool.category }
+            .thenBy { relatedAlphabeticalKey(it.tool.name) }
+            .thenBy { it.tool.id }
+    ).take(limit).map { it.tool }
+}
+
+/** Preserve declared links, then use the canonical search ranking before the category fallback. */
 fun Catalog.relatedTools(tool: ToolRecord, limit: Int = 6): List<ToolRecord> {
-    val relatedCandidates = accessibilityDiscoveryTools() + developerStudioTools()
+    if (limit <= 0) return emptyList()
+    if (tool.category == "accessibility") {
+        return accessibilityDiscoveryTools().filter { it.id != tool.id }.take(limit)
+    }
+
+    // Resolve ordinary catalogue destinations as well as Studio projections. Web-only
+    // references are stored separately for native catalogues and must remain resolvable here.
+    // Legacy Accessibility variants are represented by their canonical Studio projection;
+    // the retired audio alias resolves to the canonical Song Metadata Analyzer below.
+    val catalogueCandidates = (tools + relatedReferenceTools).filter {
+        it.category != "accessibility" && it.id != "audio-analyze-studio"
+    }
+    val relatedCandidates = (
+        catalogueCandidates + accessibilityDiscoveryTools() + developerStudioTools()
+    ).distinctBy { it.id }
     val byId = relatedCandidates.associateBy { it.id }
-    val related = tool.related.mapNotNull { accessibilityStudioForId(it) ?: byId[it] }.filter { it.status != "planned" }
+    val seen = mutableSetOf(tool.id)
+    val related = buildList {
+        for (id in tool.related) {
+            val target = if (id == "audio-analyze-studio") {
+                byId["song-metadata-analyzer"]
+            } else {
+                accessibilityStudioForId(id) ?: byId[id]
+            } ?: continue
+            if (target.status == "planned" || !seen.add(target.id)) continue
+            add(target)
+            if (size >= limit) break
+        }
+    }
     if (related.size >= limit) return related.take(limit)
-    val seen = (setOf(tool.id) + related.map { it.id })
-    val rest = relatedCandidates.asSequence()
+
+    val semantic = relatedSearchTools(tool, byId, seen, limit - related.size)
+    semantic.forEach { seen.add(it.id) }
+    val withSemantic = related + semantic
+    if (withSemantic.size >= limit) return withSemantic.take(limit)
+
+    // Web exposes only Studio workspaces in the Developer category. Category ordering
+    // is retained only as a final fallback when task search has too few candidates.
+    val fallbackCandidates = if (tool.category == "developer") developerStudioTools() else relatedCandidates
+    val rest = fallbackCandidates.asSequence()
         .filter { it.category == tool.category && it.id !in seen && it.status != "planned" }
-        .sortedWith(compareBy<ToolRecord>({ relatedAlphabeticalKey(it.name) }, { it.id }))
+        .distinctBy { it.id }
+        .sortedWith(
+            if (tool.category == "developer") compareByDescending<ToolRecord> { it.popularity }.thenBy { it.id }
+            else compareBy<ToolRecord>({ relatedAlphabeticalKey(it.name) }, { it.id })
+        )
         .toList()
-    return (related + rest).take(limit)
+    return (withSemantic + rest).take(limit)
 }
 
 fun ToolRecord.nativeDisclaimerText(): String? = when (disclaimer) {

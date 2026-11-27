@@ -5,37 +5,60 @@ import { dirname, resolve } from "node:path";
 import { tools as baseWebTools } from "../src/data/catalog.ts";
 import { applyGenericWorkflowPolicy } from "../src/lib/generic-workflow-policy.mjs";
 import { DATETIME_TOOL_EXTENSIONS } from "../src/lib/datetime/catalog-tools.ts";
-import { getAllTools } from "../src/lib/registry.ts";
+import { getAllTools, getRelatedTools, getSearchableTools, getToolById, getToolsByCategory } from "../src/lib/registry.ts";
+import { relatedToolsBySearch } from "../src/lib/related-tools.ts";
+import { searchToolResults } from "../src/lib/search.ts";
+import { makeAccessibilityStudioTools } from "../src/lib/accessibility-studios.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (path) => readFileSync(resolve(root, path), "utf8");
 
-// Match the exporter's canonical runtime override before comparing generated Web/native catalogues.
-// The source catalogue retains a legacy file-converter-shaped record under this stable ID;
-// the runtime resolver deliberately presents it as Advanced CSS Minifier in Developer Studio.
+// Compare the same canonical runtime projection that Web exposes. The raw source catalogue
+// retains legacy generated-calculator labels and route metadata; the runtime applies the
+// presentation and generic-workflow transforms before native export parity is evaluated.
 const canonicalRuntimeById = new Map(getAllTools().map((tool) => [tool.id, tool]));
-const canonicalCssMinifier = canonicalRuntimeById.get("css-minifier-advanced");
-assert.ok(canonicalCssMinifier, "Canonical runtime record is missing for css-minifier-advanced.");
 const webTools = [
-  ...applyGenericWorkflowPolicy(baseWebTools).map((tool) =>
-    tool.id === "css-minifier-advanced" ? canonicalCssMinifier : tool
-  ),
+  ...applyGenericWorkflowPolicy(baseWebTools).map((tool) => canonicalRuntimeById.get(tool.id) ?? tool),
   ...DATETIME_TOOL_EXTENSIONS.filter((extension) => !baseWebTools.some((tool) => tool.id === extension.id)),
 ];
+
 const sharedBaseTools = JSON.parse(read("apps/shared/catalog.json")).tools;
+// Native and Web discovery both project the eight legacy Accessibility IDs to the
+// canonical Studio records. Apply that same projection to the shared source rows
+// before parity assertions; comparing canonical Web labels to raw legacy names
+// would report intentional presentation changes as source-catalogue drift.
+const sharedAccessibilityById = new Map(
+  makeAccessibilityStudioTools(sharedBaseTools).map((tool) => [tool.id, tool]),
+);
 const sharedTools = [
-  ...sharedBaseTools,
+  ...sharedBaseTools.map((tool) => sharedAccessibilityById.get(tool.id) ?? tool),
   ...DATETIME_TOOL_EXTENSIONS.filter((extension) => !sharedBaseTools.some((tool) => tool.id === extension.id)),
 ];
 assert.equal(webTools.length, sharedTools.length, "Web and shared catalog tool counts differ.");
+// These are explicit runtime presentation transforms, not source-ID changes:
+// - Song Metadata Analyzer is branded AI Music Data Sandbox.
+// - QR Payload Inspector is presented as QR & Barcode Reader.
+// - The legacy Audio Analyze Studio route is canonicalized to the same Music Data Sandbox.
+// Keep only these exact, source-verified display aliases exempt; IDs, categories and
+// related-link arrays remain compared strictly for every catalogue row.
+const approvedRuntimeDisplayNames = new Map([
+  ["song-metadata-analyzer", "AI Music Data Sandbox"],
+  ["qr-payload-inspector", "QR & Barcode Reader"],
+  ["audio-analyze-studio", "AI Music Data Sandbox"],
+]);
 for (let index = 0; index < webTools.length; index += 1) {
   const web = webTools[index];
   const shared = sharedTools[index];
   assert.equal(web.id, shared.id, `Catalog order/ID drift at row ${index}.`);
-  assert.equal(web.name, shared.name, `Catalog name drift for ${web.id}.`);
+  const expectedName = approvedRuntimeDisplayNames.get(shared.id) ?? shared.name;
+  assert.equal(web.name, expectedName, `Catalog name drift for ${web.id}.`);
+  if (approvedRuntimeDisplayNames.has(shared.id)) {
+    assert.equal(expectedName, web.name, `Unexpected presentation override for ${shared.id}.`);
+  }
   assert.equal(web.category, shared.category, `Catalog category drift for ${web.id}.`);
   assert.deepEqual(web.related, shared.related, `Related IDs drift for ${web.id}.`);
 }
+
 
 function quotedIDs(source, expression, label) {
   const match = source.match(expression);
@@ -57,18 +80,64 @@ const excluded = new Set(androidExcluded);
 const nativeTools = webTools.filter((tool) => !excluded.has(tool.id));
 const relatedReferences = webTools.filter((tool) => excluded.has(tool.id));
 assert.equal(nativeTools.length + relatedReferences.length, webTools.length);
-const nativeCandidates = [...nativeTools, ...relatedReferences];
-const webByID = new Map(webTools.map((tool) => [tool.id, tool]));
-const nativeByID = new Map(nativeCandidates.map((tool) => [tool.id, tool]));
 
-function webAlphabeticalKey(value) {
-  return value
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLocaleLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+// The native catalogue starts with apps/shared/catalog.json, then both platforms
+// register the same local runtime extensions in their Catalog loader. The parity
+// simulator must use that exact candidate surface rather than every Web runtime row:
+// Web-only registry extensions are not resolvable by the native related-tools resolver.
+const nativeRuntimeExtensionIDs = new Set([
+  "music-downloader",
+  "song-metadata-analyzer",
+  "a-book",
+  "zip-any-file",
+  "file-to-txt",
+  "file-organizer",
+  "batch-file-renamer",
+  "duplicate-file-finder",
+  "folder-size-analyzer",
+  "file-search",
+  "file-compare",
+  "camera-studio",
+  ...DATETIME_TOOL_EXTENSIONS.map((tool) => tool.id),
+]);
+const nativeBaseIDs = new Set(sharedBaseTools.map((tool) => tool.id));
+const nativeCandidateIDs = new Set([...nativeBaseIDs, ...nativeRuntimeExtensionIDs]);
+const candidateIDs = new Set();
+const nativeCandidates = [
+  ...webTools.filter((tool) =>
+    nativeBaseIDs.has(tool.id) &&
+    tool.category !== "accessibility" &&
+    tool.id !== "audio-analyze-studio"
+  ),
+  ...[...nativeRuntimeExtensionIDs]
+    .map((id) => canonicalRuntimeById.get(id))
+    .filter(Boolean),
+  ...getToolsByCategory("accessibility"),
+  ...getToolsByCategory("developer"),
+].filter((tool) => {
+  if (candidateIDs.has(tool.id)) return false;
+  candidateIDs.add(tool.id);
+  return true;
+});
+const nativeByID = new Map(nativeCandidates.map((tool) => [tool.id, tool]));
+for (const id of nativeRuntimeExtensionIDs) {
+  assert.ok(nativeByID.has(id), `Native runtime extension ${id} must be present in the related-target map.`);
 }
+const relatedSearchPool = getSearchableTools();
+const androidSearchReferenceIDs = quotedIDs(
+  read("apps/android/app/src/main/java/com/chastech/env/data/NativeCatalogSearch.kt"),
+  /webOnlySearchReferenceIds\s*=\s*setOf\(([\s\S]*?)\)/,
+  "Android native-search parity references",
+);
+const iosSearchReferenceIDs = quotedIDs(
+  read("apps/ios/enV/CatalogCore.swift"),
+  /webOnlyNativeSearchReferenceIDs:\s*Set<String>\s*=\s*\[([\s\S]*?)\]/,
+  "iOS native-search parity references",
+);
+assert.deepEqual([...androidSearchReferenceIDs].sort(), [...iosSearchReferenceIDs].sort(),
+  "Android and iOS Web-only search-parity reference sets differ.");
+const nativeSearchReferenceIDs = new Set(androidSearchReferenceIDs);
+
 function nativeAlphabeticalKey(value) {
   return value
     .normalize("NFKD")
@@ -78,34 +147,112 @@ function nativeAlphabeticalKey(value) {
     .trim();
 }
 const codeUnitCompare = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
+
+function canonicalNativeTarget(id) {
+  if (id === "audio-analyze-studio") return nativeByID.get("song-metadata-analyzer");
+  // The native resolver can only resolve records in its actual catalogue/projection map.
+  // getToolById() alone is the Web registry and also returns Web-only virtual workspaces
+  // (for example Camera Studio) which Android/iOS cannot navigate to.
+  const canonicalID = getToolById(id)?.id ?? id;
+  return nativeByID.get(canonicalID);
+}
+assert.ok(
+  canonicalNativeTarget("camera-studio"),
+  "Camera Studio is registered by the Android/iOS native catalog loaders and must remain a valid native destination.",
+);
+assert.ok(
+  canonicalNativeTarget("music-downloader"),
+  "Music Downloader is registered by the Android/iOS native catalog loaders and must remain a valid native destination.",
+);
 function webRelated(tool, limit = 6) {
-  const related = tool.related.map((id) => webByID.get(id)).filter((item) => item && item.status !== "planned");
-  if (related.length >= limit) return related.slice(0, limit);
-  const seen = new Set([tool.id, ...related.map((item) => item.id)]);
-  const rest = webTools
-    .filter((item) => item.category === tool.category && !seen.has(item.id) && item.status !== "planned")
-    .slice()
-    .sort((left, right) => webAlphabeticalKey(left.name).localeCompare(webAlphabeticalKey(right.name)) || left.id.localeCompare(right.id));
-  return [...related, ...rest].slice(0, limit);
+  const canonical = getToolById(tool.id) ?? tool;
+  return getRelatedTools(canonical, limit);
 }
 function nativeRelated(tool, limit = 6) {
-  const related = tool.related.map((id) => nativeByID.get(id)).filter((item) => item && item.status !== "planned");
+  if (limit <= 0) return [];
+  const canonical = getToolById(tool.id) ?? tool;
+  if (canonical.category === "accessibility") {
+    // Native Catalog.accessibilityDiscoveryTools() appends the Accessibility Studio
+    // projection in its source-spec order. getToolsByCategory() alphabetically sorts
+    // presentation results, so using it here would simulate a different resolver than
+    // Android/iOS actually ship and report false parity mismatches.
+    return makeAccessibilityStudioTools(getAllTools())
+      .filter((item) => item.id !== canonical.id)
+      .slice(0, limit);
+  }
+  const seen = new Set([canonical.id]);
+  const related = [];
+  for (const id of canonical.related ?? []) {
+    const target = canonicalNativeTarget(id);
+    if (!target || target.status === "planned" || seen.has(target.id)) continue;
+    seen.add(target.id);
+    related.push(target);
+    if (related.length >= limit) break;
+  }
   if (related.length >= limit) return related.slice(0, limit);
-  const seen = new Set([tool.id, ...related.map((item) => item.id)]);
-  const rest = nativeCandidates
-    .filter((item) => item.category === tool.category && !seen.has(item.id) && item.status !== "planned")
+  const semantic = relatedToolsBySearch(
+    canonical,
+    (query, searchLimit) => searchToolResults(
+      relatedSearchPool,
+      query,
+      searchLimit + nativeSearchReferenceIDs.size,
+      { includePlanned: false },
+    ).tools
+      .filter((item) => !nativeSearchReferenceIDs.has(item.id))
+      .map((item) => canonicalNativeTarget(item.id))
+      .filter(Boolean)
+      .slice(0, searchLimit),
+    limit - related.length,
+    seen,
+    (candidate) => canonical.category !== "developer" || candidate.category === "developer",
+  );
+  semantic.forEach((item) => seen.add(item.id));
+  const withSemantic = [...related, ...semantic];
+  if (withSemantic.length >= limit) return withSemantic.slice(0, limit);
+  const fallbackCandidates = canonical.category === "developer"
+    ? getToolsByCategory("developer")
+    : nativeCandidates;
+  const rest = fallbackCandidates
+    .filter((item) => item.category === canonical.category && !seen.has(item.id) && item.status !== "planned")
     .slice()
-    .sort((left, right) => codeUnitCompare(nativeAlphabeticalKey(left.name), nativeAlphabeticalKey(right.name)) || codeUnitCompare(left.id, right.id));
-  return [...related, ...rest].slice(0, limit);
+    .sort((left, right) => canonical.category === "developer"
+      ? (right.popularity - left.popularity || codeUnitCompare(left.id, right.id))
+      : (codeUnitCompare(nativeAlphabeticalKey(left.name), nativeAlphabeticalKey(right.name)) ||
+        codeUnitCompare(left.id, right.id))
+    );
+  return [...withSemantic, ...rest].slice(0, limit);
 }
+
+const liveVideo = getToolById("music-live-video-studio");
+assert.ok(liveVideo, "Live Video Singing Studio must remain in the runtime catalogue.");
+assert.deepEqual(
+  liveVideo.related,
+  ["video-compressor", "video-trimmer"],
+  "Live Video Singing Studio must point to canonical active video tool IDs.",
+);
+
+const androidResolver = read("apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt");
+const iosResolver = read("apps/ios/enV/CatalogCore.swift");
+assert.match(androidResolver, /fun Catalog\.relatedTools[\s\S]*?if \(limit <= 0\) return emptyList\(\)[\s\S]*?distinctBy \{ it\.id \}[\s\S]*?mutableSetOf\(tool\.id\)[\s\S]*?!seen\.add\(target\.id\)/,
+  "Android related resolver must guard limits and deduplicate canonical targets.");
+assert.match(iosResolver, /func relatedTools\(for tool: Tool, limit: Int = 6\)[\s\S]*?guard limit > 0[\s\S]*?candidateIDs\.insert\(\$0\.id\)\.inserted[\s\S]*?accessibilityStudio\(for: id\)[\s\S]*?seen\.insert\(target\.id\)\.inserted/,
+  "iOS related resolver must guard limits, deduplicate candidates and canonicalize Accessibility aliases.");
+
+assert.match(androidResolver, /private fun relatedSearchTerms[\s\S]*?webSearch\(term\.value, 48, includeRelatedReferences = true\)/,
+  "Android related recommendations must use metadata-derived terms and its canonical search index.");
+assert.match(iosResolver, /private func relatedSearchTerms[\s\S]*?webSearch\(term\.value, limit: 48, includeRelatedReferences: true\)/,
+  "iOS related recommendations must use metadata-derived terms and its canonical search index.");
+
+const [currentWebIDs, currentNativeIDs] = [webRelated, nativeRelated];
 
 let fallbackCases = 0;
 let mismatches = 0;
 const examples = [];
 for (const tool of webTools) {
-  if (tool.related.map((id) => webByID.get(id)).filter((item) => item && item.status !== "planned").length < 6) fallbackCases += 1;
-  const webIDs = webRelated(tool).map((item) => item.id);
-  const nativeIDs = nativeRelated(tool).map((item) => item.id);
+  const canonical = getToolById(tool.id) ?? tool;
+  if (canonical.related.map(canonicalNativeTarget).filter((item) => item && item.status !== "planned").length < 6) fallbackCases += 1;
+  const webIDs = currentWebIDs(tool).map((item) => item.id);
+  const nativeIDs = currentNativeIDs(tool).map((item) => item.id);
   if (JSON.stringify(webIDs) !== JSON.stringify(nativeIDs)) {
     mismatches += 1;
     if (examples.length < 5) examples.push({ tool: tool.id, web: webIDs, native: nativeIDs });

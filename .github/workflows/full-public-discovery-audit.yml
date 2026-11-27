@@ -12,6 +12,37 @@ on:
       - "scripts/full-public-discovery-audit-core.mjs"
       - "scripts/full-public-discovery-audit-core.test.mjs"
       - "scripts/generate-seo-artifacts.mjs"
+      - "scripts/evaluate-search-quality.mjs"
+      - "scripts/evaluate-phrasing-hypotheses.mjs"
+      - "scripts/generate-search-golden.mjs"
+      - "scripts/audit-related-tools.mjs"
+      - "scripts/related-tools-baseline.mjs"
+      - "scripts/export-native-catalog.mjs"
+      - "scripts/export-discovery-availability.mjs"
+      - "src/data/discovery-availability.json"
+      - "src/lib/discovery-availability.ts"
+      - "src/lib/discovery-filters.ts"
+      - "src/lib/discovery-filters.test.ts"
+      - "scripts/check-native-related.mjs"
+      - "src/lib/related-tools.ts"
+      - "src/lib/related-tools.test.ts"
+      - "apps/shared/catalog.json"
+      - "apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt"
+      - "apps/android/app/src/main/java/com/chastech/env/data/NativeCatalogSearch.kt"
+      - "apps/android/app/src/main/java/com/chastech/env/AssistantScreen.kt"
+      - "apps/android/app/src/test/java/com/chastech/env/data/CatalogModelsTest.kt"
+      - "apps/android/app/src/test/java/com/chastech/env/data/NativeCatalogSearchTest.kt"
+      - "apps/ios/enV/CatalogCore.swift"
+      - "apps/ios/enV/AssistantChat.swift"
+      - "apps/ios/enVTests/CatalogCoreTests.swift"
+      - "audit/discovery/RELATED-TOOLS-AUDIT.md"
+      - "audit/discovery/related-tools-baseline.json"
+      - "audit/discovery/DISCOVERY-GAP-REGISTER.md"
+      - "src/lib/search.ts"
+      - "src/lib/search.test.ts"
+      - "src/data/search-aliases.ts"
+      - "audit/discovery/search-eval/**"
+      - "audit/discovery/demand/phrasing-hypotheses.v1.json"
       - "src/lib/seo-metadata.ts"
       - "src/lib/registry.ts"
       - "src/lib/tool-documentation.ts"
@@ -26,6 +57,44 @@ on:
       - "scripts/full-public-discovery-audit-core.mjs"
       - "scripts/full-public-discovery-audit-core.test.mjs"
       - "scripts/generate-seo-artifacts.mjs"
+      - "scripts/evaluate-search-quality.mjs"
+      - "scripts/evaluate-phrasing-hypotheses.mjs"
+      - "scripts/generate-search-golden.mjs"
+      - "scripts/audit-related-tools.mjs"
+      - "scripts/related-tools-baseline.mjs"
+      - "scripts/export-native-catalog.mjs"
+      - "scripts/export-discovery-availability.mjs"
+      - "src/data/discovery-availability.json"
+      - "src/lib/discovery-availability.ts"
+      - "src/lib/discovery-filters.ts"
+      - "src/lib/discovery-filters.test.ts"
+      - "scripts/check-native-related.mjs"
+      - "scripts/export-native-catalog.mjs"
+      - "scripts/export-discovery-availability.mjs"
+      - "src/data/discovery-availability.json"
+      - "src/lib/discovery-availability.ts"
+      - "src/lib/discovery-filters.ts"
+      - "src/lib/discovery-filters.test.ts"
+      - "src/lib/related-tools.ts"
+      - "src/lib/related-tools.test.ts"
+      - "apps/shared/catalog.json"
+      - "apps/android/app/src/main/java/com/chastech/env/data/CatalogModels.kt"
+      - "apps/android/app/src/main/java/com/chastech/env/data/NativeCatalogSearch.kt"
+      - "apps/android/app/src/main/java/com/chastech/env/AssistantScreen.kt"
+      - "apps/android/app/src/test/java/com/chastech/env/data/CatalogModelsTest.kt"
+      - "apps/android/app/src/test/java/com/chastech/env/data/NativeCatalogSearchTest.kt"
+      - "apps/ios/enV/CatalogCore.swift"
+      - "apps/ios/enV/AssistantChat.swift"
+      - "apps/ios/enVTests/CatalogCoreTests.swift"
+      - "audit/discovery/RELATED-TOOLS-AUDIT.md"
+      - "audit/discovery/related-tools-baseline.json"
+      - "audit/discovery/DISCOVERY-GAP-REGISTER.md"
+      - "audit/discovery/SEARCH-ALGORITHM-SPEC.md"
+      - "src/lib/search.ts"
+      - "src/lib/search.test.ts"
+      - "src/data/search-aliases.ts"
+      - "audit/discovery/search-eval/**"
+      - "audit/discovery/demand/phrasing-hypotheses.v1.json"
       - "src/lib/seo-metadata.ts"
       - "src/lib/registry.ts"
       - "src/lib/tool-documentation.ts"
@@ -65,19 +134,27 @@ jobs:
           npm run generate:billing-profiles
           npm run check:native-discovery
           npm run export:native-execution-matrix
+          npm run export:discovery-availability
           npm run generate:seo
+          npm run discovery:inventory
+          npm run discovery:knowledge-index
           npm run discovery:seo-offline
 
       - name: Run discovery, guide and SEO regression tests
         run: npm run test:discovery
 
+      - name: Verify Web, Android and iOS related recommendation parity
+        run: npm run check:native-related
+
+      - name: Run related-link metadata audit and refresh its report
+        run: npm run discovery:related-audit -- --write
+
       - name: Run discovery relevance, phrasing and cross-link gates
         run: npm run discovery:check
 
-      - name: Typecheck the application
-        run: npm run typecheck
-
-      - name: Start local SSR server
+      # TanStack Start generates the ignored routeTree.gen.ts when Vite starts.
+      # Generate that source before tsc so file-route types are available in CI.
+      - name: Start local SSR server and generate route types
         shell: bash
         run: |
           set -euo pipefail
@@ -85,7 +162,7 @@ jobs:
           echo $! > /tmp/env-full-discovery-audit.pid
           for attempt in {1..120}; do
             if curl --fail --silent --show-error http://127.0.0.1:8080/ >/dev/null; then
-              echo "Local SSR server is ready."
+              echo "Local SSR server and generated route tree are ready."
               exit 0
             fi
             sleep 1
@@ -100,6 +177,11 @@ jobs:
           DISCOVERY_AUDIT_REQUEST_TIMEOUT_MS: "20000"
         run: npm run audit:discovery:full -- --report=artifacts/full-discovery-audit/report.json
 
+      # Keep strict app typechecking, but run it after the independent rendered-route
+      # audit so a compile error in an unrelated Studio does not suppress route evidence.
+      - name: Typecheck the application
+        run: npm run typecheck
+
       - name: Upload full discovery audit report
         if: always()
         uses: actions/upload-artifact@v4
@@ -108,9 +190,20 @@ jobs:
           path: |
             artifacts/full-discovery-audit/report.json
             audit/discovery/SEO-OFFLINE-VALIDATION.md
+            audit/discovery/discovery-inventory.json
+            audit/discovery/DISCOVERY-RECONCILIATION-REPORT.md
+            audit/discovery/tool-knowledge-index.json
+            audit/discovery/RELATED-TOOLS-AUDIT.md
+            audit/discovery/related-tools-baseline.json
           if-no-files-found: warn
           retention-days: 30
 
       - name: Show local SSR diagnostics on failure
         if: failure()
-        run: cat /tmp/env-full-discovery-audit.log
+        shell: bash
+        run: |
+          if [ -f /tmp/env-full-discovery-audit.log ]; then
+            cat /tmp/env-full-discovery-audit.log
+          else
+            echo "The failure occurred before the local SSR server was started; no SSR log exists."
+          fi

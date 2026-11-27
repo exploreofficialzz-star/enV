@@ -4,6 +4,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { refineGeneratedToolDescription } from "../src/lib/generated-tool-copy.mjs";
 import { applyGenericWorkflowPolicy } from "../src/lib/generic-workflow-policy.mjs";
+import { presentGeneratedCalculator } from "../src/lib/calc/generated-calculator-presentation.ts";
 
 const root = new URL("../", import.meta.url);
 const catalogSource = readFileSync(new URL("../src/data/catalog.ts", import.meta.url), "utf8");
@@ -18,9 +19,14 @@ const [{ tools }, { CATEGORIES: categories }, { DATETIME_TOOL_EXTENSIONS }, { ge
 // The shipped native catalog remains separately assembled below with its intentional extensions.
 const canonicalRuntimeTools = getAllTools();
 
-const publishedCatalogTools = applyGenericWorkflowPolicy(tools);
+const publishedCatalogTools = applyGenericWorkflowPolicy(tools).map(presentGeneratedCalculator);
 const canonicalRuntimeById = new Map(canonicalRuntimeTools.map((tool) => [tool.id, tool]));
 const refinedCatalogTools = publishedCatalogTools.map((tool) => {
+  if (tool.id === "music-live-video-studio") {
+    const runtimeTool = canonicalRuntimeById.get(tool.id);
+    if (!runtimeTool) throw new Error("Canonical runtime record is missing for music-live-video-studio.");
+    return { ...tool, related: runtimeTool.related };
+  }
   if (tool.id === "css-minifier-advanced") {
     const runtimeTool = canonicalRuntimeById.get(tool.id);
     if (!runtimeTool) throw new Error("Canonical runtime record is missing for css-minifier-advanced.");
@@ -42,6 +48,12 @@ const refinedCatalogTools = publishedCatalogTools.map((tool) => {
   }
   const description = refineGeneratedToolDescription(tool);
   return description === tool.description ? tool : { ...tool, description };
+}).map((tool) => {
+  const runtimeTool = canonicalRuntimeById.get(tool.id);
+  if (!runtimeTool) return tool;
+  const related = runtimeTool.related ?? [];
+  if (related.length === (tool.related ?? []).length && related.every((id, index) => id === tool.related?.[index])) return tool;
+  return { ...tool, related };
 });
 
 const exportedCssMinifier = refinedCatalogTools.find((tool) => tool.id === "css-minifier-advanced");
@@ -96,7 +108,7 @@ const runtimeCatalogExtensions = [
     requiresBackend: false,
     requiresAuth: false,
     status: "active",
-    related: ["file-converter", "pdf-merger", "document-editor"],
+    related: ["file-to-txt", "file-organizer", "file-compare"],
     engine: { type: "custom", id: "zip-any-file" },
     platformRuntimeExtension: true,
   },

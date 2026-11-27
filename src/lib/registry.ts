@@ -7,6 +7,8 @@ import { makeAccessibilityStudioTools, studioToolForLegacy } from "@/lib/accessi
 import { makeDeveloperStudioTools } from "@/lib/developer-studios-catalog";
 import { presentGeneratedCalculator } from "@/lib/calc/generated-calculator-presentation";
 import { DATETIME_TOOL_EXTENSIONS } from "@/lib/datetime/catalog-tools";
+import { relatedToolsBySearch, relatedToolsFor } from "@/lib/related-tools";
+import { searchToolResults } from "@/lib/search";
 
 // Apply reviewed, task-specific descriptions to legacy generated catalogue rows
 // before they reach category pages, search, tool details or SEO metadata.
@@ -97,7 +99,7 @@ const aBookTool: ToolMeta = {
   requiresBackend: false,
   requiresAuth: false,
   status: "active",
-  related: ["pdf-merger", "pdf-splitter", "document-editor"],
+  related: ["pdf-merger", "pdf-splitter", "pdf-text-extractor"],
   engine: { type: "custom", id: "a-book" },
   isNew: true,
 };
@@ -118,7 +120,7 @@ const zipAnyFileTool: ToolMeta = {
   requiresBackend: false,
   requiresAuth: false,
   status: "active",
-  related: ["file-converter", "pdf-merger", "document-editor"],
+  related: ["file-to-txt", "file-organizer", "file-compare"],
   engine: { type: "custom", id: "zip-any-file" },
   isNew: true,
 };
@@ -223,7 +225,8 @@ const sceneStudioTool: ToolMeta = {
   requiresBackend: false,
   requiresAuth: false,
   status: "active",
-  related: [],
+  // Adjacent output workflows: trim the exported clip, reduce its file size, or create a poster frame.
+  related: ["video-trimmer", "video-compressor", "video-poster-generator"],
   engine: { type: "custom", id: "scene-studio" },
   isNew: true,
 };
@@ -305,6 +308,9 @@ const catalogRuntimeTools: ToolMeta[] = [
       ? { ...presentedTool, status: "active" }
       : presentedTool;
     if (webTool.id === "scene-studio") return sceneStudioTool;
+    if (webTool.id === "music-live-video-studio") {
+      return { ...webTool, related: ["video-compressor", "video-trimmer"] };
+    }
     if (webTool.id === "css-minifier-advanced") {
       return {
         ...webTool,
@@ -354,10 +360,39 @@ const catalogRuntimeTools: ToolMeta[] = [
 // its single canonical discovery destination is the Accessibility Studio.
 const accessibilityStudios = makeAccessibilityStudioTools(catalogRuntimeTools);
 const accessibilityStudioById = new Map(accessibilityStudios.map((tool) => [tool.id, tool] as const));
-const allTools: ToolMeta[] = catalogRuntimeTools.map((tool) => accessibilityStudioById.get(tool.id) ?? tool);
-const byId = new Map(allTools.map((t) => [t.id, t]));
-const developerStudios = makeDeveloperStudioTools(allTools);
+const canonicalRuntimeTools = catalogRuntimeTools.map((tool) => accessibilityStudioById.get(tool.id) ?? tool);
+const developerStudios = makeDeveloperStudioTools(canonicalRuntimeTools);
 const virtualStudios = [...accessibilityStudios, ...developerStudios];
+
+// Normalize declared related IDs once for every Web runtime tool. A related link is
+// retained only when its destination resolves to a unique, active, searchable canonical
+// record. Legacy Accessibility IDs and the retired audio-analyze-studio alias are
+// translated before validation so native exports can consume the same destinations.
+const canonicalRelatedTargets = new Map<string, ToolMeta>();
+for (const tool of catalogRuntimeTools) {
+  const canonical = tool.category === "accessibility"
+    ? studioToolForLegacy(tool, catalogRuntimeTools)
+    : tool;
+  canonicalRelatedTargets.set(tool.id, canonical);
+  canonicalRelatedTargets.set(canonical.id, canonical);
+}
+for (const tool of virtualStudios) canonicalRelatedTargets.set(tool.id, tool);
+canonicalRelatedTargets.set("audio-analyze-studio", songMetadataAnalyzerTool);
+
+const allTools: ToolMeta[] = canonicalRuntimeTools.map((tool) => {
+  const canonicalToolId = canonicalRelatedTargets.get(tool.id)?.id ?? tool.id;
+  const seen = new Set<string>([tool.id, canonicalToolId]);
+  const related: string[] = [];
+  for (const relatedId of tool.related ?? []) {
+    const target = canonicalRelatedTargets.get(relatedId);
+    if (!target || target.status === "planned" || target.id === "audio-analyze-studio" || seen.has(target.id)) continue;
+    seen.add(target.id);
+    related.push(target.id);
+  }
+  if (related.length === (tool.related ?? []).length && related.every((id, index) => id === tool.related?.[index])) return tool;
+  return { ...tool, related };
+});
+const byId = new Map(allTools.map((t) => [t.id, t]));
 // Keep every former category/slug URL as an alias to the one canonical Studio
 // record. Aliases are routes, not additional tool identities or search records.
 const legacyAccessibilityRoutes = catalogRuntimeTools.filter((tool) => accessibilityStudioById.has(tool.id));
@@ -454,19 +489,47 @@ export function getNewTools(limit = 8): ToolMeta[] {
     .slice(0, limit);
 }
 
+const relatedFallbackByCategory = new Map<CategoryId, ToolMeta[]>();
+const relatedSearchPool = getSearchableTools();
+
+function relatedFallbackForCategory(category: CategoryId): ToolMeta[] {
+  const cached = relatedFallbackByCategory.get(category);
+  if (cached) return cached;
+  const tools = getToolsByCategory(category);
+  relatedFallbackByCategory.set(category, tools);
+  return tools;
+}
+
 export function getRelatedTools(tool: ToolMeta, limit = 6): ToolMeta[] {
+  if (!Number.isFinite(limit) || limit <= 0) return [];
+  limit = Math.floor(limit);
   if (tool.category === "accessibility") {
     return accessibilityStudios.filter((item) => item.id !== tool.id).slice(0, limit);
   }
-  const related = tool.related
-    .map((id) => byId.get(id))
-    .filter((t): t is ToolMeta => Boolean(t && isDiscoverable(t) && t.status !== "planned"));
+
+  // Resolve legacy IDs to their canonical Studio/tool record, and discard stale,
+  // hidden, planned, self and duplicate references before rendering any links.
+  const related = relatedToolsFor(tool, getToolById, isDiscoverable, limit);
   if (related.length >= limit) return related.slice(0, limit);
+
+  // Fill gaps with task-neighbouring tools ranked by the same lexical search engine
+  // used by the discovery UI. Category order is only a final safety fallback.
   const seen = new Set([tool.id, ...related.map((t) => t.id)]);
-  const rest = getToolsByCategory(tool.category).filter(
+  const semantic = relatedToolsBySearch(
+    tool,
+    (query, searchLimit) => searchToolResults(relatedSearchPool, query, searchLimit, { includePlanned: false }).tools,
+    limit - related.length,
+    seen,
+    (candidate) => tool.category !== "developer" || candidate.category === "developer",
+  );
+  const withSemantic = [...related, ...semantic];
+  if (withSemantic.length >= limit) return withSemantic.slice(0, limit);
+  for (const item of semantic) seen.add(item.id);
+
+  const rest = relatedFallbackForCategory(tool.category).filter(
     (t) => !seen.has(t.id) && t.status !== "planned",
   );
-  return [...related, ...rest].slice(0, limit);
+  return [...withSemantic, ...rest].slice(0, limit);
 }
 
 export function activeCount(): number {

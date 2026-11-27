@@ -333,6 +333,7 @@ export function toolGuideSeoTitle(tool: ToolMeta, peers: readonly ToolMeta[] = [
 }
 
 export function canonicalToolPath(tool: ToolMeta): string {
+  if (tool.id === "break-even-calculator") return "/tools/business/finance-studio";
   const accessibilityStudio = ACCESSIBILITY_STUDIOS.find((studio) => studio.id === tool.id);
   if (accessibilityStudio && (tool.category !== "accessibility" || tool.slug !== accessibilityStudio.slug)) {
     return "/tools/accessibility/" + accessibilityStudio.slug;
@@ -345,6 +346,7 @@ export function canonicalToolPath(tool: ToolMeta): string {
 }
 
 export function canonicalToolName(tool: ToolMeta): string {
+  if (tool.id === "break-even-calculator") return "Finance Metrics Studio";
   const accessibilityStudio = ACCESSIBILITY_STUDIOS.find((studio) => studio.id === tool.id);
   if (accessibilityStudio && (tool.category !== "accessibility" || tool.slug !== accessibilityStudio.slug)) {
     return accessibilityStudio.name;

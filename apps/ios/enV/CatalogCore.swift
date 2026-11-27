@@ -396,7 +396,10 @@ extension Catalog {
 
     /// Registers local ZIP64 compression and extraction as a native tool.
     func includingZipArchive() -> Catalog {
-        guard !tools.contains(where: { $0.id == "zip-any-file" }) else { return self }
+        // ZIP declares File Workspace destinations; register them first so this extension
+        // is self-contained and every published related ID resolves immediately.
+        let withWorkspace = includingFileWorkspaceTools()
+        guard !withWorkspace.tools.contains(where: { $0.id == "zip-any-file" }) else { return withWorkspace }
         let tool = Tool(
             id: "zip-any-file",
             name: "Zip any file",
@@ -414,15 +417,15 @@ extension Catalog {
             requiresAuth: false,
             status: "active",
             disclaimer: nil,
-            related: ["file-converter", "pdf-merger", "document-editor"],
+            related: ["file-to-txt", "file-organizer", "file-compare"],
             engine: ToolEngine(type: "custom", id: "zip-any-file", op: "zip-any-file", configuration: [:])
         )
-        let updated = tools + [tool]
+        let updated = withWorkspace.tools + [tool]
         return Catalog(
-            schemaVersion: schemaVersion,
-            catalogVersion: catalogVersion,
-            counts: CatalogCounts(total: updated.count, active: updated.filter { $0.status == "active" || $0.status == "beta" }.count, planned: counts.planned, categories: counts.categories),
-            categories: categories,
+            schemaVersion: withWorkspace.schemaVersion,
+            catalogVersion: withWorkspace.catalogVersion,
+            counts: CatalogCounts(total: updated.count, active: updated.filter { $0.status == "active" || $0.status == "beta" }.count, planned: withWorkspace.counts.planned, categories: withWorkspace.counts.categories),
+            categories: withWorkspace.categories,
             tools: updated.sorted {
                 let leftCategory = $0.category.lowercased()
                 let rightCategory = $1.category.lowercased()
@@ -430,35 +433,49 @@ extension Catalog {
                     ? ($0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending)
                     : leftCategory < rightCategory
             },
-            relatedReferenceTools: relatedReferenceTools
+            relatedReferenceTools: withWorkspace.relatedReferenceTools
         )
     }
 
 
     /// Registers the native local File workspace tools alongside the shared catalogue.
     func includingFileWorkspaceTools() -> Catalog {
+        let searchTags: [String: [String]] = [
+            "file-to-txt": ["files", "text", "extract", "converter", "local"],
+            "file-organizer": ["files", "organize", "folders", "local", "mobile"],
+            "batch-file-renamer": ["files", "rename", "batch", "local", "mobile"],
+            "duplicate-file-finder": ["files", "duplicates", "sha256", "verify", "local"],
+            "folder-size-analyzer": ["files", "storage", "folder", "analysis", "local", "mobile"],
+            "file-search": ["files", "search", "find", "grep", "local", "mobile"],
+            "file-compare": ["files", "compare", "diff", "backup", "sha256", "local"]
+        ]
+        let searchPopularity: [String: Int] = [
+            "file-to-txt": 1080, "file-organizer": 1120, "batch-file-renamer": 1050,
+            "duplicate-file-finder": 1100, "folder-size-analyzer": 1060,
+            "file-search": 1090, "file-compare": 1030
+        ]
         let definitions: [(String, String, String, String, [String], String)] = [
             ("file-to-txt", "File to TXT Converter", "Text extraction",
-             "Extract readable text locally from supported text files, DOCX documents and selectable-text PDFs.",
-             ["file to txt", "extract text", "docx to txt", "pdf to txt", "plain text"], "file-converter"),
+             "Type or paste plain text, or extract readable text from supported files and save it as a TXT file.",
+             ["file to txt", "convert to text", "extract text", "docx to txt", "pdf to txt", "plain text", "text extractor"], "file-converter"),
             ("file-organizer", "File Organizer", "Organization",
-             "Copy selected files into clearly named type folders without moving or deleting originals.",
-             ["organize files", "sort files", "folders", "file manager", "phone storage"], "custom"),
+             "Sort selected files into clear folders by type and export an organized copy without moving or deleting originals.",
+             ["organize files", "sort files", "file manager", "file organizer", "folders", "move files", "documents", "phone storage"], "custom"),
             ("batch-file-renamer", "Batch File Renamer", "Organization",
-             "Preview filename numbering, prefixes, suffixes and replacements before exporting renamed copies.",
-             ["batch rename", "bulk rename", "filename pattern", "prefix", "suffix"], "custom"),
+             "Preview and apply consistent prefixes, suffixes, numbering and literal replacements to many filenames in one operation.",
+             ["batch rename", "bulk rename", "rename files", "filename pattern", "number files", "prefix", "suffix"], "custom"),
             ("duplicate-file-finder", "Duplicate File Finder", "Verification",
-             "Find identical files using streaming SHA-256 verification after a file-size prefilter.",
-             ["duplicate finder", "identical files", "sha256", "checksum", "free storage"], "custom"),
+             "Find identical files using SHA-256 content verification after size filtering; filenames alone are never treated as proof.",
+             ["duplicate finder", "find duplicates", "identical files", "same files", "free storage", "checksum"], "custom"),
             ("folder-size-analyzer", "Folder Size Analyzer", "Analysis",
-             "Inspect folder totals, file-type breakdowns and the largest files on this device.",
-             ["folder size", "disk usage", "du", "largest files", "storage analyzer"], "custom"),
+             "Inspect folder contents, total storage, file-type breakdowns and the largest files without opening a terminal.",
+             ["folder size", "storage analyzer", "disk usage", "du", "largest files", "folder inventory", "storage usage"], "custom"),
             ("file-search", "File Search", "Search",
-             "Search filenames and supported text file contents without typing terminal commands.",
-             ["find files", "grep", "search in files", "file finder", "text search"], "custom"),
+             "Find files by name and search inside supported text files with clear file and line references.",
+             ["find files", "search files", "grep", "search in files", "file finder", "text search", "folder search"], "custom"),
             ("file-compare", "File & Folder Compare", "Verification",
-             "Compare two folder selections and verify same-size files with SHA-256 checksums.",
-             ["compare folders", "directory diff", "rsync", "file comparison", "backup compare"], "custom")
+             "Compare two selected file sets to identify added, missing, changed and SHA-256-verified identical files.",
+             ["compare folders", "compare files", "directory diff", "diff", "file comparison", "backup compare", "rsync dry run"], "custom")
         ]
         let existing = Set(tools.map(\.id))
         let additions = definitions.filter { !existing.contains($0.0) }.map { definition -> Tool in
@@ -470,15 +487,15 @@ extension Catalog {
                 description: description,
                 category: "files",
                 subcategory: subcategory,
-                keywords: keywords + ["files", "local", "mobile", "offline"],
-                tags: ["files", "local", "mobile", "offline", "file-workspace"],
+                keywords: keywords,
+                tags: searchTags[id] ?? [],
                 icon: id == "file-organizer" ? "FolderTree" :
                     id == "batch-file-renamer" ? "FilePenLine" :
                     id == "duplicate-file-finder" ? "Files" :
                     id == "folder-size-analyzer" ? "HardDrive" :
                     id == "file-search" ? "FileSearch" :
                     id == "file-compare" ? "GitCompareArrows" : "FileText",
-                popularity: id == "file-organizer" ? 1120 : 1040,
+                popularity: searchPopularity[id] ?? 0,
                 featured: true,
                 clientSide: true,
                 requiresBackend: false,
@@ -519,56 +536,677 @@ extension Catalog {
 
 }
 
+private enum NativeSearchField {
+    case name, id, keyword, alias, tag, subcategory, category, description
+
+    var weight: Int {
+        switch self {
+        case .name: return 10
+        case .id: return 7
+        case .keyword: return 6
+        case .alias: return 5
+        case .tag, .subcategory: return 4
+        case .category: return 3
+        case .description: return 2
+        }
+    }
+}
+
+private enum NativeSearchMatchKind {
+    case exact, synonym, fuzzy, prefix
+}
+
+private struct NativeSearchStemInfo {
+    let weight: Int
+    let field: NativeSearchField
+    let surface: String
+}
+
+private struct NativeSearchVariant {
+    let stems: [String]
+    let weight: Double
+    let kind: NativeSearchMatchKind
+}
+
+private struct NativeSearchTerm {
+    let surface: String
+    let stem: String
+    let variants: [NativeSearchVariant]
+    let idfValue: Double
+}
+
+private struct NativeSearchDocument {
+    let tool: Tool
+    let stems: [String: NativeSearchStemInfo]
+    let surfaces: Set<String>
+    let surfaceOrder: [String]
+    let normalizedName: String
+    let normalizedID: String
+    let nameTokenCount: Int
+    let aliasPhrases: Set<String>
+    let stemmedName: String
+}
+
+private struct NativeSearchRanked {
+    let document: NativeSearchDocument
+    let score: Double
+}
+
+/**
+ * Deterministic native port of src/lib/search.ts.
+ *
+ * The same catalogue metadata, field weighting, IDF, synonym/alias handling,
+ * typo/prefix expansion, coverage gate and stable tie-breaks are used by Home,
+ * Search and assistant recommendations. Search ranks metadata only.
+ */
+private final class NativeCatalogSearchIndex {
+    private let documents: [NativeSearchDocument]
+    private let postings: [String: [Int]]
+    private let vocabulary: [String: Int]
+    private let surfaceVocabulary: [(surface: String, stem: String)]
+
+    init(tools: [Tool]) {
+        let builtDocuments = tools.map(Self.buildDocument)
+
+        var postingLists: [String: [Int]] = [:]
+        for (index, document) in builtDocuments.enumerated() {
+            for key in document.stems.keys {
+                postingLists[key, default: []].append(index)
+            }
+        }
+        let builtVocabulary = postingLists.mapValues(\.count)
+
+        var seenSurfaces = Set<String>()
+        var orderedSurfaces: [(surface: String, stem: String)] = []
+        for document in builtDocuments {
+            for surface in document.surfaceOrder where seenSurfaces.insert(surface).inserted {
+                orderedSurfaces.append((surface, Self.stem(surface)))
+            }
+        }
+
+        documents = builtDocuments
+        postings = postingLists
+        vocabulary = builtVocabulary
+        surfaceVocabulary = orderedSurfaces
+    }
+
+    func search(_ query: String, limit: Int) -> [Tool] {
+        guard limit > 0 else { return [] }
+        let normalized = Self.normalizeText(query)
+        if normalized.isEmpty {
+            return documents.sorted {
+                let leftTier = $0.tool.isPlanned ? 1 : 0
+                let rightTier = $1.tool.isPlanned ? 1 : 0
+                if leftTier != rightTier { return leftTier < rightTier }
+                if $0.tool.popularity != $1.tool.popularity { return $0.tool.popularity > $1.tool.popularity }
+                let leftName = Self.normalizeText($0.tool.name)
+                let rightName = Self.normalizeText($1.tool.name)
+                if leftName != rightName { return leftName < rightName }
+                return $0.tool.id < $1.tool.id
+            }.prefix(limit).map(\.tool)
+        }
+
+        let interpreted = interpret(normalized)
+        guard !interpreted.terms.isEmpty else { return [] }
+        var candidateIndices = Set<Int>()
+        for term in interpreted.terms {
+            for variant in term.variants {
+                for key in variant.stems {
+                    for index in postings[key] ?? [] { candidateIndices.insert(index) }
+                }
+            }
+        }
+
+        let ranked = candidateIndices.compactMap { index -> NativeSearchRanked? in
+            let document = documents[index]
+            guard let score = score(
+                document,
+                terms: interpreted.terms,
+                phrase: interpreted.phrase,
+                fullPhrase: interpreted.fullPhrase
+            ) else { return nil }
+            return NativeSearchRanked(document: document, score: score)
+        }
+        return ranked.sorted {
+            let leftTier = $0.document.tool.isPlanned ? 1 : 0
+            let rightTier = $1.document.tool.isPlanned ? 1 : 0
+            if leftTier != rightTier { return leftTier < rightTier }
+            if $0.score != $1.score { return $0.score > $1.score }
+            if $0.document.tool.popularity != $1.document.tool.popularity {
+                return $0.document.tool.popularity > $1.document.tool.popularity
+            }
+            let leftName = Self.normalizeText($0.document.tool.name)
+            let rightName = Self.normalizeText($1.document.tool.name)
+            if leftName != rightName { return leftName < rightName }
+            return $0.document.tool.id < $1.document.tool.id
+        }.prefix(limit).map { $0.document.tool }
+    }
+
+    private struct InterpretedQuery {
+        let terms: [NativeSearchTerm]
+        let phrase: String
+        let fullPhrase: String
+    }
+
+    private func interpret(_ normalized: String) -> InterpretedQuery {
+        let all = normalized.split(separator: " ").map(String.init).filter { $0.count > 1 || $0 == "%" }
+        let content = all.filter { !Self.stopWords.contains($0) }
+        let surfaces = content.isEmpty ? all : content
+        let terms = surfaces.enumerated().map { index, surface -> NativeSearchTerm in
+            let key = Self.stem(surface)
+            let documentFrequency = vocabulary[key] ?? 0
+            var variants = [NativeSearchVariant(stems: [key], weight: 1.0, kind: .exact)]
+
+            for synonym in Self.synonyms[surface] ?? [] {
+                let synonymStems = Self.tokenize(synonym).map(Self.stem)
+                if !synonymStems.isEmpty {
+                    variants.append(NativeSearchVariant(stems: synonymStems, weight: 0.7, kind: .synonym))
+                }
+            }
+
+            if documentFrequency == 0 && key.count >= 3 {
+                let editLimit = Self.maxEdits(key.count)
+                if editLimit > 0 {
+                    var best: [String: (distance: Int, documentFrequency: Int)] = [:]
+                    var bestOrder: [String] = []
+                    for entry in surfaceVocabulary {
+                        if abs(entry.surface.count - surface.count) > editLimit &&
+                            abs(entry.stem.count - key.count) > editLimit { continue }
+                        if entry.surface.first != surface.first && entry.stem.first != key.first { continue }
+                        let distance = min(
+                            Self.boundedDistance(surface, entry.surface, maximum: editLimit),
+                            Self.boundedDistance(key, entry.stem, maximum: editLimit)
+                        )
+                        if distance > editLimit { continue }
+                        let existing = best[entry.stem]
+                        if existing == nil {
+                            bestOrder.append(entry.stem)
+                            best[entry.stem] = (distance, vocabulary[entry.stem] ?? 0)
+                        } else if distance < existing!.distance {
+                            best[entry.stem] = (distance, vocabulary[entry.stem] ?? 0)
+                        }
+                    }
+                    let orderedCandidates = bestOrder.sorted {
+                        guard let left = best[$0], let right = best[$1] else { return $0 < $1 }
+                        if left.distance != right.distance { return left.distance < right.distance }
+                        if left.documentFrequency != right.documentFrequency { return left.documentFrequency > right.documentFrequency }
+                        return $0 < $1
+                    }
+                    for candidate in orderedCandidates.prefix(3) {
+                        guard let item = best[candidate] else { continue }
+                        variants.append(NativeSearchVariant(
+                            stems: [candidate],
+                            weight: item.distance == 1 ? 0.55 : 0.4,
+                            kind: .fuzzy
+                        ))
+                    }
+                }
+
+                if index == surfaces.count - 1 && surfaces.count <= 2 {
+                    let prefixes = vocabulary
+                        .filter { $0.key.count > key.count && $0.key.hasPrefix(key) }
+                        .sorted {
+                            if $0.value != $1.value { return $0.value > $1.value }
+                            return $0.key < $1.key
+                        }
+                    for item in prefixes.prefix(8) {
+                        variants.append(NativeSearchVariant(stems: [item.key], weight: 0.65, kind: .prefix))
+                    }
+                }
+            }
+
+            let idfSource: Int
+            if documentFrequency > 0 {
+                idfSource = documentFrequency
+            } else {
+                idfSource = variants.dropFirst()
+                    .compactMap { $0.stems.first.flatMap { vocabulary[$0] } }
+                    .first(where: { $0 > 0 }) ?? 0
+            }
+            return NativeSearchTerm(
+                surface: surface,
+                stem: key,
+                variants: variants,
+                idfValue: idf(idfSource)
+            )
+        }
+        return InterpretedQuery(
+            terms: terms,
+            phrase: surfaces.joined(separator: " "),
+            fullPhrase: all.joined(separator: " ")
+        )
+    }
+
+    private func score(
+        _ document: NativeSearchDocument,
+        terms: [NativeSearchTerm],
+        phrase: String,
+        fullPhrase: String
+    ) -> Double? {
+        var base = 0.0
+        var matchedIDF = 0.0
+        let idfTotal = terms.reduce(0.0) { $0 + $1.idfValue }
+        let totalIDF = idfTotal > 0 ? idfTotal : 1.0
+        var strongMatch = false
+        var namedTerms = 0
+
+        for term in terms {
+            var best = 0.0
+            var bestField = NativeSearchField.description
+            var bestStrong = false
+            for variant in term.variants {
+                var weakestWeight = Int.max
+                var weakestField = NativeSearchField.description
+                var matchedAll = true
+                for key in variant.stems {
+                    guard let info = document.stems[key] else {
+                        matchedAll = false
+                        break
+                    }
+                    if info.weight < weakestWeight {
+                        weakestWeight = info.weight
+                        weakestField = info.field
+                    }
+                }
+                guard matchedAll else { continue }
+                let surfaceBonus = variant.kind == .exact
+                    ? (document.surfaces.contains(term.surface) ? 1.0 : 0.92)
+                    : 1.0
+                let df = vocabulary[variant.stems[0]] ?? 0
+                let variantIDF = variant.kind == .exact ? term.idfValue : idf(df)
+                let value = variant.weight * surfaceBonus * Double(weakestWeight) * variantIDF
+                if value > best {
+                    best = value
+                    bestField = weakestField
+                    bestStrong = weakestWeight >= NativeSearchField.tag.weight
+                }
+            }
+            if best > 0 {
+                base += best
+                matchedIDF += term.idfValue
+                if bestStrong { strongMatch = true }
+                if bestField == .name || bestField == .id { namedTerms += 1 }
+            }
+        }
+
+        guard base > 0 else { return nil }
+        let coverage = matchedIDF / totalIDF
+        if terms.count >= 2 {
+            let threshold = terms.count == 2 ? 0.75 : 0.6
+            if coverage < threshold || !strongMatch { return nil }
+        }
+
+        var result = base * (0.4 + 0.6 * coverage)
+        if !terms.isEmpty && namedTerms == terms.count { result += 30 }
+        if !phrase.isEmpty && " \(document.normalizedName) ".contains(" \(phrase) ") { result += 40 }
+        if !phrase.isEmpty && document.normalizedName.hasPrefix(phrase) { result += 20 }
+        if document.aliasPhrases.contains(fullPhrase) || document.aliasPhrases.contains(phrase) { result += 250 }
+
+        let conversionInput = fullPhrase.replacingOccurrences(
+            of: "^(convert|change|turn|transform|save)\\s+",
+            with: "",
+            options: .regularExpression
+        )
+        if let match = conversionInput.range(of: "^(\\S+) to (\\S+)$", options: .regularExpression) {
+            let pieces = String(conversionInput[match]).components(separatedBy: " to ")
+            if pieces.count == 2 {
+                let padded = " \(document.stemmedName) "
+                if padded.contains(" \(Self.stemPhrase("\(pieces[0]) to \(pieces[1])")) ") {
+                    result += 60
+                } else if padded.contains(" \(Self.stemPhrase("\(pieces[1]) to \(pieces[0])")) ") {
+                    result -= 15
+                }
+            }
+        }
+
+        let normalizedFullID = fullPhrase.replacingOccurrences(of: " ", with: "-")
+        let normalizedPhraseID = phrase.replacingOccurrences(of: " ", with: "-")
+        if document.normalizedName == fullPhrase || document.normalizedName == phrase ||
+            document.normalizedID == normalizedFullID || document.normalizedID == normalizedPhraseID {
+            result += 400
+        }
+        result -= 0.6 * Double(min(4, max(0, document.nameTokenCount - namedTerms)))
+        return (result * 1_000_000).rounded() / 1_000_000
+    }
+
+    /// Mirrors Web's generated expansion-calculator presentation before indexing search fields.
+    private static func searchPresentation(for tool: Tool) -> Tool {
+        guard tool.engine.type == "calculator",
+              let formulaValue = tool.engine.configuration["formula"],
+              case let .string(formula) = formulaValue else { return tool }
+
+        let parts = formula.split(separator: "-").map(String.init)
+        guard parts.count >= 4, parts[0] == "exp",
+              ["product", "sum", "ratio"].contains(parts[1]),
+              let target = parts.last, ["a", "b", "c"].contains(target) else { return tool }
+        let key = parts[2..<(parts.count - 1)].joined(separator: "-")
+        guard !key.isEmpty else { return tool }
+
+        let prefix = "Formula exercise calculator: "
+        let marker = ". Solve for "
+        guard tool.description.hasPrefix(prefix),
+              let solveRange = tool.description.range(of: marker),
+              tool.description.hasSuffix(").") else { return tool }
+        let relation = String(tool.description[prefix.endIndex..<solveRange.lowerBound])
+        let afterSolve = tool.description[solveRange.upperBound...]
+        guard let open = afterSolve.firstIndex(of: "("),
+              let close = afterSolve.lastIndex(of: ")"), open < close,
+              String(afterSolve[..<open]).trimmingCharacters(in: .whitespaces) == target else { return tool }
+        let targetLabel = String(afterSolve[afterSolve.index(after: open)..<close]).trimmingCharacters(in: .whitespaces)
+        guard !targetLabel.isEmpty else { return tool }
+
+        let oldHeading = tool.name.components(separatedBy: " — Solve for ").first ?? tool.name
+        let titleRange = oldHeading.range(of: ": ")
+        let title = titleRange.map { String(oldHeading[..<$0.lowerBound]) }
+        let displayName = "\(title.map { "\($0): " } ?? "")\(relation) — Solve for \(targetLabel)"
+        let displayDescription = "Formula exercise calculator: \(relation). Solve for \(targetLabel). Enter the other two values to calculate the missing value."
+        let labelWords = targetLabel.lowercased().split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        let titleWords = title?.lowercased().split(whereSeparator: { $0.isWhitespace }).map(String.init) ?? []
+        let generatedKeywords = ["math", "exercise", "formula", parts[1], key] + labelWords + titleWords
+        let keywords = Array(NSOrderedSet(array: tool.keywords + generatedKeywords)) as? [String] ?? tool.keywords
+
+        return Tool(
+            id: tool.id, name: displayName, slug: tool.slug, description: displayDescription,
+            category: tool.category, subcategory: tool.subcategory, keywords: keywords, tags: tool.tags,
+            icon: tool.icon, popularity: tool.popularity, featured: tool.featured, clientSide: tool.clientSide,
+            requiresBackend: tool.requiresBackend, requiresAuth: tool.requiresAuth, status: tool.status,
+            disclaimer: tool.disclaimer, related: tool.related, engine: tool.engine
+        )
+    }
+    private static func buildDocument(_ tool: Tool) -> NativeSearchDocument {
+        let indexedTool = searchPresentation(for: tool)
+        var stems: [String: NativeSearchStemInfo] = [:]
+        var surfaces = Set<String>()
+        var surfaceOrder: [String] = []
+        func add(_ value: String, field: NativeSearchField) {
+            for surface in tokenize(value) {
+                if surfaces.insert(surface).inserted { surfaceOrder.append(surface) }
+                let key = stem(surface)
+                if stems[key] == nil || stems[key]!.weight < field.weight {
+                    stems[key] = NativeSearchStemInfo(weight: field.weight, field: field, surface: surface)
+                }
+            }
+        }
+
+        add(indexedTool.name, field: .name)
+        let aliases = searchAliases[indexedTool.id] ?? []
+        var aliasPhrases = Set<String>()
+        for alias in aliases {
+            aliasPhrases.insert(normalizeText(alias))
+            add(alias, field: .alias)
+        }
+        add(indexedTool.id, field: .id)
+        for item in indexedTool.keywords { add(item, field: .keyword) }
+        for item in indexedTool.tags { add(item, field: .tag) }
+        add(indexedTool.subcategory ?? "", field: .subcategory)
+        add(indexedTool.category, field: .category)
+        add(indexedTool.description, field: .description)
+
+        return NativeSearchDocument(
+            tool: indexedTool,
+            stems: stems,
+            surfaces: surfaces,
+            surfaceOrder: surfaceOrder,
+            normalizedName: normalizeText(indexedTool.name),
+            normalizedID: indexedTool.id.lowercased(),
+            nameTokenCount: tokenize(indexedTool.name).count,
+            aliasPhrases: aliasPhrases,
+            stemmedName: stemPhrase(indexedTool.name)
+        )
+    }
+
+    private func idf(_ documentFrequency: Int) -> Double {
+        log(1 + Double(documents.count) / (1 + Double(documentFrequency)))
+    }
+
+    private static func normalizeText(_ value: String) -> String {
+        let decomposed = value.decomposedStringWithCompatibilityMapping
+        let filteredScalars = decomposed.unicodeScalars.filter { scalar in
+            let kind = scalar.properties.generalCategory
+            return kind != .nonspacingMark && kind != .spacingMark && kind != .enclosingMark
+        }
+        let filtered = String(String.UnicodeScalarView(filteredScalars))
+        return filtered.lowercased()
+            .replacingOccurrences(of: "&", with: " and ")
+            .replacingOccurrences(of: "[^a-z0-9%+#\\s]+", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func tokenize(_ value: String) -> [String] {
+        normalizeText(value).split(separator: " ").map(String.init).filter { $0.count > 1 || $0 == "%" }
+    }
+
+    private static func stemPhrase(_ value: String) -> String {
+        tokenize(formatNormalize(normalizeText(value))).map(stem).joined(separator: " ")
+    }
+
+    private static func formatNormalize(_ value: String) -> String {
+        value.replacingOccurrences(of: "\\bjpeg\\b", with: "jpg", options: .regularExpression)
+            .replacingOccurrences(of: "\\btif\\b", with: "tiff", options: .regularExpression)
+    }
+
+    private static func stem(_ token: String) -> String {
+        if token.count <= 3 || token.contains(where: { $0.isNumber }) { return token }
+        var result = token
+        if ["ses", "xes", "zes", "ches", "shes"].contains(where: { result.hasSuffix($0) }) {
+            result = String(result.dropLast(2))
+        } else if result.count > 4 && result.hasSuffix("ies") {
+            result = String(result.dropLast(3)) + "y"
+        } else if result.hasSuffix("s") && !result.hasSuffix("ss") && !result.hasSuffix("us") && !result.hasSuffix("is") {
+            result = String(result.dropLast())
+        }
+        for suffix in ["ion", "ing", "ers", "er", "or", "ed", "e"] {
+            if result.hasSuffix(suffix) && result.count - suffix.count >= 4 {
+                result = String(result.dropLast(suffix.count))
+                break
+            }
+        }
+        return result
+    }
+
+    private static func maxEdits(_ length: Int) -> Int {
+        if length >= 9 { return 2 }
+        if length >= 4 { return 1 }
+        return 0
+    }
+
+    private static func boundedDistance(_ lhs: String, _ rhs: String, maximum: Int) -> Int {
+        let a = Array(lhs)
+        let b = Array(rhs)
+        if a == b { return 0 }
+        if abs(a.count - b.count) > maximum { return maximum + 1 }
+        var rows = Array(repeating: Array(repeating: 0, count: b.count + 1), count: a.count + 1)
+        for i in 0...a.count { rows[i][0] = i }
+        for j in 0...b.count { rows[0][j] = j }
+        if !a.isEmpty {
+            for i in 1...a.count {
+                var best = maximum + 1
+                if !b.isEmpty {
+                    for j in 1...b.count {
+                        let cost = a[i - 1] == b[j - 1] ? 0 : 1
+                        var value = min(
+                            min(rows[i - 1][j] + 1, rows[i][j - 1] + 1),
+                            rows[i - 1][j - 1] + cost
+                        )
+                        if i > 1 && j > 1 && a[i - 1] == b[j - 2] && a[i - 2] == b[j - 1] {
+                            value = min(value, rows[i - 2][j - 2] + 1)
+                        }
+                        rows[i][j] = value
+                        best = min(best, value)
+                    }
+                }
+                if best > maximum { return maximum + 1 }
+            }
+        }
+        return rows[a.count][b.count]
+    }
+
+    private static let stopWords: Set<String> = [
+        "a", "an", "the", "to", "of", "for", "my", "me", "i", "do", "how", "can", "you", "what", "is", "are", "make",
+        "online", "free", "tool", "tools", "with", "from", "into", "in", "on", "and", "or", "it", "this", "that", "using",
+        "use", "want", "need", "please", "best", "app", "something", "some", "get", "be"
+    ]
+
+    private static let synonyms: [String: [String]] = [
+        "photo": ["image", "picture", "pic"], "picture": ["image", "photo"], "pic": ["image", "photo"],
+        "img": ["image"], "compress": ["minify", "shrink", "optimize", "size"], "smaller": ["compress", "shrink", "reduce"],
+        "shrink": ["compress", "reduce"], "reduce": ["compress", "shrink"], "resize": ["scale", "dimensions", "size"],
+        "json": ["javascript object"], "pwd": ["password"], "pass": ["password"], "bmi": ["body mass", "weight"],
+        "percent": ["percentage", "%"], "qr": ["qrcode", "barcode"], "regexp": ["regex"], "regular": ["regex"],
+        "uuid": ["guid"], "hash": ["checksum", "digest", "sha", "md5"], "color": ["colour", "hex", "rgb"],
+        "colour": ["color"], "mockup": ["fake", "demo", "chat", "screenshot"], "invoice": ["bill", "receipt"],
+        "pdf": ["document"], "encode": ["encoding", "base64"], "decode": ["decoding"],
+        "a11y": ["accessibility"], "contrast": ["color contrast", "wcag"], "alt": ["alt-text", "image description"],
+        "focus": ["focus ring", "focus state"], "aria": ["accessible name", "accessibility tree"],
+        "tab": ["keyboard navigation", "tab order"], "animation": ["motion", "reduced motion"],
+        "readability": ["plain language", "text spacing"], "merge": ["combine", "join"], "combine": ["merge", "join"],
+        "join": ["merge", "combine"], "split": ["separate", "divide"], "change": ["convert"], "transform": ["convert"],
+        "create": ["generate"], "scan": ["read", "reader"], "scanner": ["reader", "scan"], "calc": ["calculator"],
+        "jpeg": ["jpg"], "jpg": ["jpeg"], "tiff": ["tif"], "tif": ["tiff"]
+    ]
+
+    private static let searchAliases: [String: [String]] = [
+        "pdf-merger": ["pdf joiner"],
+        "image-compressor": ["image size reducer", "reduce image size"],
+        "image-resizer": ["change image size"],
+        "profile-picture-maker": ["picture resize", "profile picture resize", "avatar resize"],
+        "qr-generator": ["qr maker", "qr code maker"],
+        "json-formatter": ["json viewer", "format json online"],
+        "video-to-mp3": ["mp4 to mp3", "convert mp4 to mp3"],
+        "video-trimmer": ["trim mp4", "cut video", "video cutter"],
+        "video-to-gif": ["mp4 to gif"],
+        "exif-remover": ["strip exif", "remove metadata from photo"],
+        "heic-converter": ["iphone photo to jpg", "heic to jpg"],
+        "file-png-to-jpg-converter": ["png to jpeg"],
+        "lorem-ipsum-generator": ["dummy text", "placeholder text"],
+        "regex-studio": ["test regular expression", "regexp tester"]
+    ]
+}
+
+let webOnlyNativeSearchReferenceIDs: Set<String> = ["scene-studio", "smartphone-prototype-lab"]
+
+private let webOnlyNativeSearchReferences: [Tool] = [
+    Tool(
+        id: "scene-studio",
+        name: "Scene Studio",
+        slug: "scene-studio",
+        description: "Create local 2D and 3D animated scenes with structured scene data, validation, preview, captions, audio layers, project-bundle saving and MP4 export where browser support allows.",
+        category: "video",
+        subcategory: "Scene editing",
+        keywords: ["scene studio", "3d", "2d", "animation", "video maker", "scene", "ai video", "chatbot", "json scene", "captions", "subtitles", "mp4", "render", "export video", "cinematic", "no code", "motion graphics", "babylon"],
+        tags: ["3d", "2d", "animation", "video", "captions", "ai", "creator", "no code"],
+        icon: "Clapperboard",
+        popularity: 1250,
+        featured: false,
+        clientSide: true,
+        requiresBackend: false,
+        requiresAuth: false,
+        status: "active",
+        disclaimer: nil,
+        related: ["video-trimmer", "video-compressor", "video-poster-generator"],
+        engine: ToolEngine(type: "custom", id: "scene-studio", op: nil)
+    ),
+    Tool(
+        id: "smartphone-prototype-lab",
+        name: "Smartphone Prototype Lab",
+        slug: "smartphone-prototype-lab",
+        description: "Explore a generic smartphone as an interactive 3D production model. Inspect the display stack, motherboard packages, cameras, power systems, materials and factory assembly sequence.",
+        category: "design",
+        subcategory: "Product engineering",
+        keywords: ["smartphone", "phone", "prototype", "3d", "3d model", "product engineering", "manufacturing", "production", "hardware", "electronics", "motherboard", "pcb", "soc", "cpu", "gpu", "npu", "ram", "storage", "display", "oled", "lcd", "camera", "battery", "assembly"],
+        tags: ["smartphone", "3d", "engineering", "manufacturing", "hardware", "electronics", "product design"],
+        icon: "Smartphone",
+        popularity: 1350,
+        featured: false,
+        clientSide: true,
+        requiresBackend: false,
+        requiresAuth: false,
+        status: "active",
+        disclaimer: nil,
+        related: [],
+        engine: ToolEngine(type: "custom", id: "smartphone-prototype-lab", op: nil)
+    )
+]
+
+private final class NativeCatalogSearchCache: @unchecked Sendable {
+    static let shared = NativeCatalogSearchCache()
+
+    private let lock = NSLock()
+    private var indexes: [String: NativeCatalogSearchIndex] = [:]
+
+    func search(catalog: Catalog, query: String, limit: Int, includeRelatedReferences: Bool) -> [Tool] {
+        let source = includeRelatedReferences ? catalog.tools + (catalog.relatedReferenceTools ?? []) : catalog.tools
+        let accessibility = catalog.accessibilityDiscoveryTools().filter { $0.category == "accessibility" }
+        let accessibilityIDs = Set(accessibility.map(\.id))
+        // The raw catalogue keeps these Studio IDs under legacy categories. Exclude
+        // those rows so the canonical Accessibility projection wins before deduplication.
+        let general = source.filter {
+            $0.category != "accessibility" &&
+                !accessibilityIDs.contains($0.id) &&
+                !$0.tags.contains("developer-studio") &&
+                $0.id != "audio-analyze-studio"
+        }
+        // These Web-only records participate in corpus IDF/ranking but are never returned
+        // to native callers and are not registered in either native tool catalogue.
+        let all = general + accessibility + catalog.developerStudioTools() + webOnlyNativeSearchReferences
+        var seen = Set<String>()
+        let candidates = all.filter { seen.insert($0.id).inserted }
+
+        // A catalogue version and boundary IDs are not sufficient cache identity:
+        // native extensions and generated search metadata can change while those values stay
+        // the same. Include every field consumed by buildDocument and ranking.
+        var candidateHasher = Hasher()
+        for tool in candidates {
+            candidateHasher.combine(tool.id)
+            candidateHasher.combine(tool.name)
+            candidateHasher.combine(tool.description)
+            candidateHasher.combine(tool.category)
+            candidateHasher.combine(tool.subcategory ?? "")
+            candidateHasher.combine(tool.popularity)
+            candidateHasher.combine(tool.status)
+            for keyword in tool.keywords { candidateHasher.combine(keyword) }
+            candidateHasher.combine("tool-keywords-end")
+            for tag in tool.tags { candidateHasher.combine(tag) }
+            candidateHasher.combine("tool-tags-end")
+        }
+        let fingerprint = [
+            catalog.catalogVersion,
+            String(catalog.schemaVersion),
+            String(includeRelatedReferences),
+            String(candidates.count),
+            String(candidateHasher.finalize())
+        ].joined(separator: "|")
+
+        lock.lock()
+        let index: NativeCatalogSearchIndex
+        if let existing = indexes[fingerprint] {
+            index = existing
+        } else {
+            index = NativeCatalogSearchIndex(tools: candidates)
+            if indexes.count >= 6 { indexes.removeAll(keepingCapacity: true) }
+            indexes[fingerprint] = index
+        }
+        lock.unlock()
+        guard limit > 0 else { return [] }
+        let expandedLimit = limit > Int.max - webOnlyNativeSearchReferenceIDs.count
+            ? Int.max
+            : limit + webOnlyNativeSearchReferenceIDs.count
+        return index.search(query, limit: expandedLimit)
+            .filter { !webOnlyNativeSearchReferenceIDs.contains($0.id) }
+            .prefix(limit)
+            .map { $0 }
+    }
+}
+
 extension Catalog {
     func webSearch(_ query: String, limit: Int = Int.max, includeRelatedReferences: Bool = false) -> [Tool] {
-        let q = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let sourceCandidates = includeRelatedReferences ? tools + (relatedReferenceTools ?? []) : tools
-        let candidates = sourceCandidates.filter { $0.category != "accessibility" && !$0.tags.contains("developer-studio") } + accessibilityDiscoveryTools().filter { $0.category == "accessibility" } + developerStudioTools()
-        if q.isEmpty {
-            return Array(candidates.enumerated().sorted {
-                $0.element.popularity == $1.element.popularity ? $0.offset < $1.offset : $0.element.popularity > $1.element.popularity
-            }.prefix(limit).map { $0.element })
-        }
-        let synonyms: [String: [String]] = [
-            "photo": ["image", "picture", "pic"], "picture": ["image", "photo"], "pic": ["image", "photo"],
-            "img": ["image"], "compress": ["minify", "shrink", "optimize", "size"], "resize": ["scale", "dimensions", "size"],
-            "json": ["javascript object"], "pwd": ["password"], "pass": ["password"], "bmi": ["body mass", "weight"],
-            "percent": ["percentage", "%"], "qr": ["qrcode", "barcode"], "uuid": ["guid"],
-            "hash": ["checksum", "digest", "sha", "md5"], "color": ["colour", "hex", "rgb"],
-            "mockup": ["fake", "demo", "chat", "screenshot"], "invoice": ["bill", "receipt"], "pdf": ["document"],
-            "encode": ["encoding", "base64"], "decode": ["decoding"],
-            "a11y": ["accessibility"], "contrast": ["color contrast", "wcag"],
-            "alt": ["alt-text", "image description"], "focus": ["focus ring", "focus state"],
-            "aria": ["accessible name", "accessibility tree"], "tab": ["keyboard navigation", "tab order"],
-            "animation": ["motion", "reduced motion"], "readability": ["plain language", "text spacing"],
-        ]
-        let tokens = q.unicodeScalars.split { scalar in
-            !((scalar.value >= 97 && scalar.value <= 122) || (scalar.value >= 48 && scalar.value <= 57) || scalar.value == 37 || scalar.value == 43)
-        }.map { String($0) }.filter { $0.count > 1 || $0 == "%" }
-        let expanded = Set(tokens + tokens.flatMap { synonyms[$0] ?? [] })
-        func score(_ tool: Tool) -> Int {
-            let name = tool.name.lowercased()
-            if name == q || tool.id == q { return 2000 + tool.popularity }
-            if name.hasPrefix(q) { return 1400 + tool.popularity }
-            if tool.id.contains(q) || name.contains(q) { return 1000 + tool.popularity }
-            let haystack = ([tool.name, tool.description, tool.category, tool.subcategory ?? "", tool.id] + tool.keywords + tool.tags).joined(separator: " ").lowercased()
-            var hits = 0
-            for token in expanded {
-                if name.contains(token) { hits += 8 }
-                else if tool.keywords.contains(where: { $0.lowercased().contains(token) }) { hits += 5 }
-                else if haystack.contains(token) { hits += 2 }
-            }
-            return hits == 0 ? 0 : hits * 40 + tool.popularity
-        }
-        let scoredTools: [(offset: Int, tool: Tool, score: Int)] = candidates.enumerated().map { entry in
-            (offset: entry.offset, tool: entry.element, score: score(entry.element))
-        }
-        let matchingTools = scoredTools.filter { $0.score > 0 }
-        let rankedTools = matchingTools.sorted { left, right in
-            if left.score == right.score { return left.offset < right.offset }
-            return left.score > right.score
-        }
-        return rankedTools.prefix(limit).map { $0.tool }
+        NativeCatalogSearchCache.shared.search(
+            catalog: self,
+            query: query,
+            limit: limit,
+            includeRelatedReferences: includeRelatedReferences
+        )
     }
 }
 
@@ -580,22 +1218,146 @@ private func relatedAlphabeticalKey(_ value: String) -> String {
         .trimmingCharacters(in: .whitespacesAndNewlines)
 }
 
+private struct RelatedSearchTerm {
+    let value: String
+    let weight: Double
+    let order: Int
+}
+
+private struct RelatedSearchScore {
+    let tool: Tool
+    var matches = 0
+    var score = 0.0
+}
+
+private let relatedSearchStopWords: Set<String> = [
+    "a", "an", "and", "are", "as", "at", "by", "for", "from", "in", "into", "is", "it", "of", "on", "or", "the", "to", "with",
+    "app", "apps", "best", "create", "created", "creating", "free", "generate", "generated", "generating", "generator", "online",
+    "simple", "studio", "tool", "tools", "utility", "utilities", "use", "using", "web", "env", "calculator", "converter"
+]
+
+private func relatedSearchTerms(_ tool: Tool) -> [RelatedSearchTerm] {
+    var weights: [String: Double] = [:]
+    var order: [String] = []
+    func add(_ value: String, weight: Double) {
+        let normalized = value.decomposedStringWithCompatibilityMapping
+            .replacingOccurrences(of: "\\p{M}+", with: "", options: .regularExpression)
+            .lowercased()
+        let tokens = normalized.components(separatedBy: CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789").inverted)
+        for token in tokens where token.count >= 2 && !relatedSearchStopWords.contains(token) {
+            if weights[token] == nil { order.append(token) }
+            weights[token] = max(weights[token] ?? 0, weight)
+        }
+    }
+    add(tool.name, weight: 2.0)
+    add(tool.subcategory ?? "", weight: 1.35)
+    tool.keywords.forEach { add($0, weight: 1.15) }
+    tool.tags.forEach { add($0, weight: 0.8) }
+    return order.enumerated()
+        .map { RelatedSearchTerm(value: $0.element, weight: weights[$0.element] ?? 0, order: $0.offset) }
+        .sorted {
+            if $0.weight != $1.weight { return $0.weight > $1.weight }
+            return $0.order < $1.order
+        }
+        .prefix(8)
+        .map { $0 }
+}
+
 extension Catalog {
-    /// Mirrors the web registry: preserve declared related IDs, then fill from the same category alphabetically.
+    private func relatedSearchTools(
+        for tool: Tool,
+        candidatesByID: [String: Tool],
+        excludedIDs: Set<String>,
+        limit: Int
+    ) -> [Tool] {
+        guard limit > 0 else { return [] }
+        var scores: [String: RelatedSearchScore] = [:]
+        for term in relatedSearchTerms(tool) {
+            for (index, result) in webSearch(term.value, limit: 48, includeRelatedReferences: true).enumerated() {
+                guard
+                    let candidate = candidatesByID[result.id],
+                    candidate.id != tool.id,
+                    !excludedIDs.contains(candidate.id),
+                    !candidate.isPlanned,
+                    tool.category != "developer" || candidate.category == "developer"
+                else { continue }
+                var current = scores[candidate.id] ?? RelatedSearchScore(tool: candidate)
+                current.matches += 1
+                current.score += term.weight / Double(12 + index)
+                scores[candidate.id] = current
+            }
+        }
+        let sourceSubcategory = relatedAlphabeticalKey(tool.subcategory ?? "")
+        return scores.values.sorted {
+            if $0.matches != $1.matches { return $0.matches > $1.matches }
+            if $0.score != $1.score { return $0.score > $1.score }
+            let leftSubcategory = !sourceSubcategory.isEmpty && relatedAlphabeticalKey($0.tool.subcategory ?? "") == sourceSubcategory
+            let rightSubcategory = !sourceSubcategory.isEmpty && relatedAlphabeticalKey($1.tool.subcategory ?? "") == sourceSubcategory
+            if leftSubcategory != rightSubcategory { return leftSubcategory }
+            let leftCategory = $0.tool.category == tool.category
+            let rightCategory = $1.tool.category == tool.category
+            if leftCategory != rightCategory { return leftCategory }
+            let leftName = relatedAlphabeticalKey($0.tool.name)
+            let rightName = relatedAlphabeticalKey($1.tool.name)
+            return leftName == rightName ? $0.tool.id < $1.tool.id : leftName < rightName
+        }.prefix(limit).map { $0.tool }
+    }
+
+    /// Preserve declared links, then task-ranked search matches, then same-category fallback.
     func relatedTools(for tool: Tool, limit: Int = 6) -> [Tool] {
-        let candidates = accessibilityDiscoveryTools() + developerStudioTools()
+        guard limit > 0 else { return [] }
+        if tool.category == "accessibility" {
+            return Array(accessibilityDiscoveryTools().filter { $0.id != tool.id }.prefix(limit))
+        }
+
+        // Resolve ordinary catalogue destinations as well as Studio projections. Web-only
+        // references are stored separately for native catalogues and must remain resolvable here.
+        // Legacy Accessibility variants are represented by their canonical Studio projection;
+        // the retired audio alias resolves to the canonical Song Metadata Analyzer below.
+        let catalogueCandidates = (tools + (relatedReferenceTools ?? [])).filter {
+            $0.category != "accessibility" && $0.id != "audio-analyze-studio"
+        }
+        var candidateIDs = Set<String>()
+        let candidates = (catalogueCandidates + accessibilityDiscoveryTools() + developerStudioTools())
+            .filter { candidateIDs.insert($0.id).inserted }
         let byID = Dictionary(uniqueKeysWithValues: candidates.map { ($0.id, $0) })
-        let related = tool.related.compactMap { byID[$0] }.filter { !$0.isPlanned }
+        var seen = Set([tool.id])
+        var related: [Tool] = []
+        for id in tool.related {
+            let target = id == "audio-analyze-studio"
+                ? byID["song-metadata-analyzer"]
+                : (accessibilityStudio(for: id) ?? byID[id])
+            guard let target, !target.isPlanned, seen.insert(target.id).inserted else { continue }
+            related.append(target)
+            if related.count >= limit { break }
+        }
         if related.count >= limit { return Array(related.prefix(limit)) }
-        let seen = Set([tool.id] + related.map(\.id))
-        let rest = candidates
-            .filter { $0.category == tool.category && !seen.contains($0.id) && !$0.isPlanned }
+
+        let semantic = relatedSearchTools(
+            for: tool,
+            candidatesByID: byID,
+            excludedIDs: seen,
+            limit: limit - related.count
+        )
+        semantic.forEach { seen.insert($0.id) }
+        let withSemantic = related + semantic
+        if withSemantic.count >= limit { return Array(withSemantic.prefix(limit)) }
+
+        // Category ordering is retained only as the final fallback if task search
+        // cannot supply enough distinct, active destinations.
+        let fallbackCandidates = tool.category == "developer" ? developerStudioTools() : candidates
+        var fallbackIDs = Set<String>()
+        let rest = fallbackCandidates
+            .filter { $0.category == tool.category && !seen.contains($0.id) && !$0.isPlanned && fallbackIDs.insert($0.id).inserted }
             .sorted {
+                if tool.category == "developer" {
+                    return $0.popularity == $1.popularity ? $0.id < $1.id : $0.popularity > $1.popularity
+                }
                 let left = relatedAlphabeticalKey($0.name)
                 let right = relatedAlphabeticalKey($1.name)
                 return left == right ? $0.id < $1.id : left < right
             }
-        return Array((related + rest).prefix(limit))
+        return Array((withSemantic + rest).prefix(limit))
     }
 }
 
@@ -686,15 +1448,8 @@ final class CatalogStore: ObservableObject {
     var popularTools: [Tool] { (catalog.accessibilityDiscoveryTools() + catalog.developerStudioTools()).sorted { $0.popularity == $1.popularity ? $0.name < $1.name : $0.popularity > $1.popularity } }
 
     func tools(matching query: String = "", category: String? = nil) -> [Tool] {
-        if category == nil || category == "accessibility" {
-            return catalog.webSearch(query, limit: Int.max, includeRelatedReferences: true).filter { category == nil || $0.category == category }
-        }
-        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let originals = catalog.tools + (catalog.relatedReferenceTools ?? [])
-        let source = originals + (category == "developer" ? catalog.developerStudioTools() : [])
-        return source.filter { tool in
-            (category == nil || tool.category == category) && (needle.isEmpty || tool.searchText.contains(needle))
-        }.sorted { $0.popularity == $1.popularity ? $0.name < $1.name : $0.popularity > $1.popularity }
+        catalog.webSearch(query, limit: Int.max, includeRelatedReferences: true)
+            .filter { category == nil || $0.category == category }
     }
 
     func toggleFavorite(_ tool: Tool) {
@@ -728,14 +1483,14 @@ private struct AccessibilityStudioSpec {
 }
 
 private let accessibilityStudioSpecs: [AccessibilityStudioSpec] = [
-    .init(id: "contrast-checker", sourceID: "contrast-checker", slug: "color-contrast-studio", name: "Color Contrast Studio", description: "Evaluate WCAG 2.2 contrast, correct color pairs, preview color-vision differences, and export tokens locally.", aliases: ["contrast", "accessible-color", "color-blindness"], keywords: ["wcag", "wcag 2.2", "apca", "contrast ratio", "alpha", "transparency", "protanopia", "deuteranopia", "tritanopia", "achromatopsia", "tailwind", "css variables", "color blindness"]),
-    .init(id: "alt-text-checker", sourceID: "alt-text-checker", slug: "alt-text-studio", name: "Alt Text Studio", description: "Review image alternatives, draft concise descriptions, preview announcements, and triage batches on-device.", aliases: ["alt-text"], keywords: ["image description", "alternative text", "screen reader", "decorative image", "bulk images"]),
-    .init(id: "focus-state-checker", sourceID: "focus-state-checker", slug: "focus-state-studio", name: "Focus State Studio", description: "Build and test visible keyboard focus styles, dark themes, and forced-colors behavior.", aliases: ["focus-state"], keywords: ["focus visible", "focus ring", "keyboard focus", "forced colors", "dark mode"]),
-    .init(id: "text-readability-checker", sourceID: "text-readability-checker", slug: "text-readability-studio", name: "Text & Readability Studio", description: "Estimate reading difficulty, create reviewable plain-language drafts, and test type scale and spacing.", aliases: ["text-readability", "font-size", "line-height"], keywords: ["plain language", "simplify", "flesch", "gunning fog", "font size", "line height", "text spacing", "zoom"]),
-    .init(id: "aria-checker", sourceID: "aria-checker", slug: "aria-studio", name: "ARIA Studio", description: "Inspect ARIA names and states, generate common patterns, and preview a local approximation of the accessibility tree.", aliases: ["aria"], keywords: ["accessible name", "role", "state", "aria-label", "aria-labelledby", "accessibility tree", "dialog", "tabs"]),
-    .init(id: "motion-checker", sourceID: "motion-checker", slug: "motion-reduced-motion-studio", name: "Motion & Reduced Motion Studio", description: "Review motion CSS and exercise reduced-motion alternatives without leaving your device.", aliases: ["motion"], keywords: ["animation", "transition", "prefers-reduced-motion", "vestibular", "flash"]),
-    .init(id: "keyboard-navigation-checker", sourceID: "keyboard-navigation-checker", slug: "keyboard-navigation-studio", name: "Keyboard Navigation Studio", description: "Find keyboard-operability risks and practice logical, visible, trap-free navigation.", aliases: ["keyboard-navigation"], keywords: ["tab order", "keyboard only", "tabindex", "keyboard trap", "enter", "space", "escape"]),
-    .init(id: "form-checker", sourceID: "form-checker", slug: "form-accessibility-studio", name: "Form Accessibility Studio", description: "Review field labels and error descriptions, then practice an accessible local validation flow.", aliases: ["form"], keywords: ["form labels", "validation", "error message", "aria-invalid", "aria-describedby", "input"]),
+    .init(id: "contrast-checker", sourceID: "contrast-checker", slug: "color-contrast-studio", name: "Color Contrast Studio", description: "WCAG 2.2 + APCA side-by-side, one-click color fixes, full color-vision simulation, multi-surface preview, and CSS/Tailwind export — all local, no upload.", aliases: ["contrast", "accessible-color", "color-blindness"], keywords: ["wcag", "wcag 2.2", "apca", "contrast ratio", "colour", "color", "alpha", "transparency", "protanopia", "deuteranopia", "tritanopia", "achromatopsia", "tailwind", "css variables", "fix color", "color blindness", "local", "privacy"]),
+    .init(id: "alt-text-checker", sourceID: "alt-text-checker", slug: "alt-text-studio", name: "Alt Text Studio", description: "Review image alternatives, draft concise descriptions, preview announcements, and triage batches on-device.", aliases: ["alt-text"], keywords: ["image description", "alternative text", "screen reader", "decorative image", "bulk images", "decorative", "alt attribute", "CSV export", "JSON report", "local"]),
+    .init(id: "focus-state-checker", sourceID: "focus-state-checker", slug: "focus-state-studio", name: "Focus State Studio", description: "Generate modern :focus-visible CSS, live keyboard playground, dark and forced-colors previews — free features others often lock behind paywalls.", aliases: ["focus-state"], keywords: ["focus visible", "focus ring", "keyboard focus", "high contrast", "forced colors", "tab playground", "CSV export", "JSON report", "local"]),
+    .init(id: "text-readability-checker", sourceID: "text-readability-checker", slug: "text-readability-studio", name: "Text & Readability Studio", description: "Estimate reading difficulty, create reviewable plain-language drafts, and test type scale and spacing.", aliases: ["text-readability", "font-size", "line-height"], keywords: ["plain language", "simplify", "flesch", "gunning fog", "font size", "line height", "text spacing", "zoom", "readability", "local"]),
+    .init(id: "aria-checker", sourceID: "aria-checker", slug: "aria-studio", name: "ARIA Studio", description: "Inspect ARIA names and states, generate common patterns, and preview a local approximation of the accessibility tree.", aliases: ["aria"], keywords: ["accessible name", "role", "state", "aria-label", "aria-labelledby", "accessibility tree", "dialog", "tabs", "button name", "link purpose", "custom control name", "disclosure", "CSV export", "JSON report"]),
+    .init(id: "motion-checker", sourceID: "motion-checker", slug: "motion-reduced-motion-studio", name: "Motion & Reduced Motion Studio", description: "Review motion CSS and exercise reduced-motion alternatives without leaving your device.", aliases: ["motion"], keywords: ["animation", "transition", "prefers-reduced-motion", "vestibular", "flash", "CSV export", "JSON report", "local"]),
+    .init(id: "keyboard-navigation-checker", sourceID: "keyboard-navigation-checker", slug: "keyboard-navigation-studio", name: "Keyboard Navigation Studio", description: "Keyboard-operability risks, logical focus order practice, and trap detection with copyable source-evidence reports.", aliases: ["keyboard-navigation"], keywords: ["tab order", "keyboard only", "tabindex", "keyboard trap", "focus ring", "enter", "space", "escape", "CSV export", "JSON report"]),
+    .init(id: "form-checker", sourceID: "form-checker", slug: "form-accessibility-studio", name: "Form Accessibility Studio", description: "Review field labels and error descriptions, then practice an accessible local validation flow.", aliases: ["form"], keywords: ["form labels", "validation", "error message", "aria-invalid", "aria-describedby", "input", "CSV export", "JSON report"]),
 ]
 
 private func accessibilityBaseKind(_ id: String) -> String {
@@ -803,10 +1558,10 @@ let nativeDeveloperStudioSpecs: [NativeDeveloperStudioSpec] = [
           description:"Native 3D inspection and bounded offline scientific reference experiments.",
           icon:"Orbit",keywords:["world lab","science","materials","physics","3d"],
           modes:[.init("workspace","Workspace","the-world-lab")]),
-    .init(id: "json-studio", sourceID: "json-formatter", slug: "json-studio", name: "JSON Studio", description: "Format, validate, compare, inspect, and query JSON locally while preserving large integer tokens and explaining parser caveats.", icon: "Braces", keywords: ["json", "format", "minify", "validate", "diff", "path", "tree", "large integer", "privacy"], modes: [.init("format", "Format", "json-formatter"), .init("minify", "Minify", "json-minifier"), .init("validate", "Validate", "json-validator"), .init("diff", "Diff", "json-diff"), .init("path", "Path / Search", "json-path-query"), .init("tree", "Tree / Inspect", "json-inspector"), .init("schema", "Schema", "developer-json-schema-generator"), .init("convert", "Convert to CSV", "json-to-csv"), .init("csv", "CSV tools", "csv-formatter")]),
+    .init(id: "json-studio", sourceID: "json-formatter", slug: "json-studio", name: "JSON Studio", description: "Format, validate, compare, inspect, query, and convert structured data locally while preserving large integer tokens and explaining parser caveats.", icon: "Braces", keywords: ["json","format","minify","validate","diff","path","tree","csv","schema","large integer","duplicate key","offline","privacy"], modes: [.init("format", "Format", "json-formatter"), .init("minify", "Minify", "json-minifier"), .init("validate", "Validate", "json-validator"), .init("diff", "Diff", "json-diff"), .init("path", "Path / Search", "json-path-query"), .init("tree", "Tree / Inspect", "json-inspector"), .init("schema", "Schema", "developer-json-schema-generator"), .init("convert", "Convert to CSV", "json-to-csv"), .init("csv", "CSV tools", "csv-formatter")]),
     .init(id: "jwt-studio", sourceID: "jwt-decoder", slug: "jwt-studio", name: "JWT Studio", description: "Decode tokens and inspect registered claims locally. Decoding never proves trust or signature validity.", icon: "ShieldCheck", keywords: ["jwt", "token", "claims", "expiration", "privacy"], modes: [.init("decode", "Decode", "jwt-decoder"), .init("expiration", "Expiration", "jwt-expiration-checker"), .init("claims", "Claims inspector", "jwt-inspector"), .init("payload", "Payload builder", "developer-jwt-payload-generator")]),
-    .init(id: "regex-studio", sourceID: "regex-tester", slug: "regex-studio", name: "Regex Studio", description: "Test and replace regular expressions, review captures and portability, and see engine-specific limitations.", icon: "Regex", keywords: ["regex", "match", "replace", "capture", "flags"], modes: [.init("match", "Match / Test", "regex-tester"), .init("replace", "Replace", "regex-replace"), .init("explain", "Explain", "developer-regex-explainer")]),
-    .init(id: "hash-studio", sourceID: "sha256-hash", slug: "hash-studio", name: "Hash Studio", description: "Calculate digest values, compare them, or hash local files without uploading their bytes. Hashes are not encryption.", icon: "Fingerprint", keywords: ["hash", "sha256", "md5", "sha1", "sha384", "sha512", "file hash"], modes: [.init("hash", "Multi-hash", "hash-generator"), .init("compare", "Compare", "hash-compare"), .init("file", "File hash", "file-hash-calculator")]),
+    .init(id: "regex-studio", sourceID: "regex-tester", slug: "regex-studio", name: "Regex Studio", description: "Test JavaScript regular expressions against multiple cases, inspect numbered and named captures, preview replacements, and review portability and backtracking risks.", icon: "Regex", keywords: ["regex","regular expression","replace","capture group","match","flags","benchmark","pipeline","JavaScript RegExp"], modes: [.init("match", "Match / Test", "regex-tester"), .init("replace", "Replace", "regex-replace"), .init("explain", "Explain", "developer-regex-explainer")]),
+    .init(id: "hash-studio", sourceID: "sha256-hash", slug: "hash-studio", name: "Hash Studio", description: "Calculate MD5 and SHA-family digests side by side, compare digest strings, or hash a local file without uploading its bytes. Hashes are not encryption.", icon: "Fingerprint", keywords: ["hash","sha256","sha-256","md5","sha-1","sha-384","sha-512","file hash","digest","checksum"], modes: [.init("hash", "Multi-hash", "hash-generator"), .init("compare", "Compare", "hash-compare"), .init("file", "File hash", "file-hash-calculator")]),
     .init(id: "encoding-studio", sourceID: "base64-encoder", slug: "encoding-studio", name: "Encoding Studio", description: "Encode and decode UTF-8 data across common web, text, and binary representations entirely on-device.", icon: "ArrowLeftRight", keywords: ["encoding", "decoding", "base64", "url", "html", "hex", "binary", "unicode"], modes: [.init("base64", "Base64", "base64-encoder", "base64-decoder"), .init("url", "URL", "url-encoder", "url-decoder"), .init("html", "HTML entities", "html-encoder", "html-decoder"), .init("hex", "Hex", "hex-encoder", "hex-decoder"), .init("binary", "Binary", "binary-encoder", "binary-decoder"), .init("ascii", "ASCII", "ascii-encoder", "ascii-decoder"), .init("unicode", "Unicode", "unicode-encoder", "unicode-decoder"), .init("data-uri", "Data URI", "data-uri-generator", "developer-data-uri-decoder")]),
     .init(id: "time-cron-studio", sourceID: "cron-parser", slug: "time-cron-studio", name: "Time & Cron Studio", description: "Convert Unix timestamps and explain five-field cron schedules with upcoming times without contacting a scheduler.", icon: "Clock", keywords: ["cron", "timestamp", "unix", "UTC", "schedule"], modes: [.init("timestamp", "Timestamp", "unix-timestamp-converter"), .init("explain", "Cron explain", "cron-explainer"), .init("next-runs", "Next runs", "cron-parser"), .init("presets", "Presets", "cron-generator")]),
     .init(id: "uuid-studio", sourceID: "uuid-generator", slug: "uuid-studio", name: "UUID Studio", description: "Generate UUID v4 batches and validate UUID shape, variant, and version bits locally.", icon: "Fingerprint", keywords: ["uuid", "guid", "v4", "batch", "validate"], modes: [.init("generate", "Generate batch", "uuid-generator"), .init("validate", "Validate", "uuid-validator")]),

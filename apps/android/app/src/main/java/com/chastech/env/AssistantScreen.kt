@@ -1,5 +1,6 @@
 package com.chastech.env
 
+import com.chastech.env.data.webSearch
 import com.chastech.env.ui.CharacterSpacedText as Text
 
 import androidx.compose.foundation.BorderStroke
@@ -75,59 +76,20 @@ private data class PendingAssistantRequest(
     val candidates: List<ToolRecord>,
 )
 
-private data class ScoredTool(val tool: ToolRecord, val score: Int)
 private const val ASSISTANT_MESSAGE_MAX = 3_000
 private const val ASSISTANT_HISTORY_MAX = 12_000
 private const val ASSISTANT_MESSAGE_COUNT_MAX = 12
 private const val ASSISTANT_CANDIDATE_COUNT_MAX = 8
 
-private val assistantSynonyms = mapOf(
-    "photo" to listOf("image", "picture", "pic"), "picture" to listOf("image", "photo"), "pic" to listOf("image", "photo"),
-    "img" to listOf("image"), "compress" to listOf("minify", "shrink", "optimize", "size"),
-    "resize" to listOf("scale", "dimensions", "size"), "json" to listOf("javascript object"),
-    "pwd" to listOf("password"), "pass" to listOf("password"), "bmi" to listOf("body mass", "weight"),
-    "percent" to listOf("percentage", "%"), "qr" to listOf("qrcode", "barcode"), "uuid" to listOf("guid"),
-    "hash" to listOf("checksum", "digest", "sha", "md5"), "color" to listOf("colour", "hex", "rgb"),
-    "mockup" to listOf("fake", "demo", "chat", "screenshot"), "invoice" to listOf("bill", "receipt"),
-    "pdf" to listOf("document"), "encode" to listOf("encoding", "base64"), "decode" to listOf("decoding"),
-)
-
+/** Assistant suggestions use the same IDF/coverage-ranked native catalog search as Home and Search. */
 private fun assistantCandidates(catalog: Catalog, conversation: List<AssistantChatMessage>): List<ToolRecord> {
-    val query = conversation.filter { it.role == "user" }.takeLast(3).joinToString(" ") { it.content }.trim().lowercase()
+    val query = conversation.filter { it.role == "user" }.takeLast(3).joinToString(" ") { it.content }.trim()
     if (query.isBlank()) return emptyList()
-    val baseTokens = Regex("[^a-z0-9%+]+").split(query).filter { it.length > 1 || it == "%" }
-    val tokens = (baseTokens + baseTokens.flatMap { assistantSynonyms[it].orEmpty() }).distinct()
-    val ranked = catalog.tools.asSequence()
+    return catalog.webSearch(query, limit = Int.MAX_VALUE, includeRelatedReferences = true)
+        .asSequence()
         .filter { it.status == "active" || it.status == "beta" }
-        .mapNotNull { tool ->
-            val name = tool.name.lowercase()
-            val id = tool.id.lowercase()
-            val score = when {
-                name == query || id == query -> 2_000 + tool.popularity
-                name.startsWith(query) -> 1_400 + tool.popularity
-                name.contains(query) || id.contains(query) -> 1_000 + tool.popularity
-                else -> {
-                    val haystack = sequenceOf(tool.name, tool.description, tool.category, id).plus(tool.keywords.asSequence()).plus(tool.tags.asSequence()).joinToString(" ").lowercase()
-                    var hits = 0
-                    tokens.forEach { token ->
-                        hits += when {
-                            name.contains(token) -> 8
-                            tool.keywords.any { it.lowercase().contains(token) } -> 5
-                            haystack.contains(token) -> 2
-                            else -> 0
-                        }
-                    }
-                    if (hits == 0) return@mapNotNull null
-                    hits * 40 + tool.popularity
-                }
-            }
-            ScoredTool(tool, score)
-        }
-        .sortedWith(compareByDescending<ScoredTool> { it.score }.thenByDescending { it.tool.popularity }.thenBy { it.tool.name })
         .take(ASSISTANT_CANDIDATE_COUNT_MAX)
-        .map { it.tool }
         .toList()
-    return ranked
 }
 
 @Composable

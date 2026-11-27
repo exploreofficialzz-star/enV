@@ -118,6 +118,22 @@ test("a single generic word does not satisfy a multi-word query", () => {
   assert.ok(!ids.includes("tip-split-calculator"));
 });
 
+test("task-level regex aliases route to Regex Studio while exact legacy intent remains available", async () => {
+  const { getSearchableTools } = await import("./registry.ts");
+  const pool = getSearchableTools();
+
+  assert.equal(searchTools(pool, "regexp tester", 5)[0]?.id, "regex-studio");
+  assert.equal(searchTools(pool, "test regular expression", 5)[0]?.id, "regex-studio");
+  assert.equal(searchTools(pool, "regex tester", 5)[0]?.id, "regex-tester");
+});
+
+test("the picture-resize phrase ranks Profile Picture Maker first in the real registry", async () => {
+  const { getSearchableTools } = await import("./registry.ts");
+  const pool = getSearchableTools();
+
+  assert.equal(searchTools(pool, "picture resize", 5)[0]?.id, "profile-picture-maker");
+});
+
 test("unsupported tasks return an honest empty result rather than forced recommendations", () => {
   const results = searchToolResults(corpus, "zzzzqx", 10);
   assert.equal(results.matchCount, 0);
@@ -190,11 +206,22 @@ test("alias phrases reach their tool, rank below an exact name match, and are ex
 
 test("alias table: normalized phrases are unique, non-empty, and never hijack another tool's exact name", async () => {
   const { getAllTools, getSearchableTools } = await import("./registry.ts");
-  const names = new Map(getSearchableTools().map((t) => [normalizeText(t.name), t.id]));
+  const searchableTools = getSearchableTools();
+  const names = new Map(searchableTools.map((t) => [normalizeText(t.name), t.id]));
+  const searchableById = new Map(searchableTools.map((tool) => [tool.id, tool]));
+  const activeRuntimeIds = new Set(
+    getAllTools()
+      .filter((tool) => tool.status === "active" || tool.status === "beta")
+      .map((tool) => tool.id),
+  );
   const owner = new Map();
   const problems = [];
   for (const [id, entry] of Object.entries(SEARCH_ALIASES)) {
-    if (!getAllTools().some((t) => t.id === id && t.status !== "planned")) problems.push(`${id} is not an active tool`);
+    const searchableTool = searchableById.get(id);
+    const isActiveRuntime = activeRuntimeIds.has(id);
+    const isActiveVirtualStudio = searchableTool?.status !== "planned"
+      && searchableTool?.tags?.includes("developer-studio") === true;
+    if (!isActiveRuntime && !isActiveVirtualStudio) problems.push(`${id} is not an active searchable tool`);
     if (!entry.phrases.length) problems.push(`${id} has no phrases`);
     for (const phrase of entry.phrases) {
       const key = normalizeText(phrase);

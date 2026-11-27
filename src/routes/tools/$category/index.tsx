@@ -3,7 +3,7 @@ import { ArrowRight, Folder } from "lucide-react";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { AppShell } from "@/components/layout/app-shell";
 import { ToolCard } from "@/components/tools/tool-card";
-import { getToolsByCategory } from "@/lib/registry";
+import { getSearchableTools, getToolsByCategory } from "@/lib/registry";
 import { groupToolsBySubcategory } from "@/lib/category-tool-groups";
 import { CATEGORY_MAP } from "@/data/categories";
 import { toolIcon } from "@/lib/icons";
@@ -12,6 +12,19 @@ import { CreatorCategoryLauncher } from "@/components/tools/creator-category-lau
 import type { CategoryId } from "@/types/tool";
 import { isIndexableTool, seoPageHead, categorySchema, categorySeoTitle, canonicalSeoTools, canonicalToolPath } from "@/lib/seo-metadata";
 import { categorySocialCard } from "@/lib/seo-social-cards";
+
+// Legacy Developer utility URLs now open a matching Studio mode. Their task-specific
+// guides remain indexable, so expose a crawlable directory here instead of sending
+// visitors and crawlers through 427 client-side compatibility redirects.
+const developerGuideCandidates = new Map(getSearchableTools().map((tool) => [tool.id, tool]));
+for (const tool of getToolsByCategory("accessibility")) developerGuideCandidates.set(tool.id, tool);
+const indexableDeveloperCandidates = [...developerGuideCandidates.values()].filter(isIndexableTool);
+const DEVELOPER_LEGACY_TOOLS = indexableDeveloperCandidates
+  .filter((tool) => tool.category === "developer" && !tool.tags.includes("developer-studio"))
+  .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true }) || a.id.localeCompare(b.id));
+const DEVELOPER_GUIDE_TOOLS = canonicalSeoTools(indexableDeveloperCandidates)
+  .filter((tool) => tool.category === "developer" && !tool.tags.includes("developer-studio"))
+  .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true }) || a.id.localeCompare(b.id));
 
 export const Route = createFileRoute("/tools/$category/")({
   loader: ({ params }) => {
@@ -72,6 +85,48 @@ function Category() {
               <div className="rounded-xl border bg-surface p-4 transition hover:bg-surface-2"><a href="/tools/business/ops-studio?mode=meeting-agenda" className="block"><h3 className="font-semibold">Ops Studio</h3><p className="mt-1 text-sm text-muted">Agendas, minutes, signatures and clearly marked payslip demos.</p></a><div className="mt-3 flex flex-wrap gap-x-3 gap-y-2 text-xs">{[["Agenda", "meeting-agenda"], ["Minutes", "meeting-minutes"], ["Signature", "email-signature"], ["Payslip demo", "payslip"]].map(([label, mode]) => <a key={mode} className="min-h-10 inline-flex items-center underline underline-offset-2" href={`/tools/business/ops-studio?mode=${mode}`}>{label}</a>)}</div></div>
             </div><div className="mb-3 mt-8"><h2 className="text-xl font-semibold">All business tools</h2><p className="mt-1 text-sm text-muted">Legacy slugs are preserved for direct links and bookmarks.</p></div></div> : null}
             {category === "developer" ? <div className="mt-7"><div className="mb-3"><h2 className="text-xl font-semibold">Developer Studios</h2><p className="mt-1 text-sm text-muted">Focused studios for related developer tasks. Search still finds individual tools and opens the matching mode here.</p></div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{developerStudios.map((tool) => <ToolCard key={tool.id} tool={tool} />)}</div></div> : null}
+            {category === "developer" && DEVELOPER_LEGACY_TOOLS.length > 0 ? (
+              <details className="mt-8 rounded-xl border border-border bg-surface p-4">
+                <summary className="cursor-pointer text-sm font-semibold text-accent">
+                  Browse all legacy developer tools ({DEVELOPER_LEGACY_TOOLS.length})
+                </summary>
+                <p className="mt-3 text-sm leading-6 text-muted">
+                  These task-specific links are preserved for bookmarks and open the corresponding Developer Studio mode.
+                </p>
+                <nav aria-label="All legacy developer tools" className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {DEVELOPER_LEGACY_TOOLS.map((tool) => (
+                    <a
+                      key={tool.id}
+                      href={"/tools/developer/" + tool.slug}
+                      className="min-w-0 rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm font-medium text-accent transition-colors hover:border-accent/40"
+                    >
+                      {tool.name}
+                    </a>
+                  ))}
+                </nav>
+              </details>
+            ) : null}
+            {category === "developer" && DEVELOPER_GUIDE_TOOLS.length > 0 ? (
+              <details className="mt-6 rounded-xl border border-border bg-surface p-4">
+                <summary className="cursor-pointer text-sm font-semibold text-accent">
+                  Browse all legacy developer usage guides ({DEVELOPER_GUIDE_TOOLS.length})
+                </summary>
+                <p className="mt-3 text-sm leading-6 text-muted">
+                  These guides preserve individual task instructions for legacy tool links that now open the matching Developer Studio mode.
+                </p>
+                <nav aria-label="All legacy developer usage guides" className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {DEVELOPER_GUIDE_TOOLS.map((tool) => (
+                    <a
+                      key={tool.id}
+                      href={"/blog/tool-" + tool.id}
+                      className="min-w-0 rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm font-medium text-accent transition-colors hover:border-accent/40"
+                    >
+                      {tool.name} guide
+                    </a>
+                  ))}
+                </nav>
+              </details>
+            ) : null}
             {category === "design" ? (
               <DesignCategoryExplorer tools={tools} />
             ) : (

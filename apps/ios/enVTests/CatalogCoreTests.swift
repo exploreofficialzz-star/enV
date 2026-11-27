@@ -68,6 +68,41 @@ final class CatalogCoreTests: XCTestCase {
         XCTAssertEqual(native.counts.planned, 1)
     }
 
+    func testNativeSearchMatchesTheCommittedWebGoldenQueries() throws {
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let sharedCatalogURL = repositoryRoot.appendingPathComponent("apps/shared/catalog.json")
+        let goldenURL = repositoryRoot.appendingPathComponent("audit/discovery/search-eval/native-golden.v1.json")
+        let sharedData = try Data(contentsOf: sharedCatalogURL)
+        var nativeCatalog = try JSONDecoder().decode(Catalog.self, from: sharedData).nativeFacing()
+        nativeCatalog = nativeCatalog.includingMusicDownloader()
+            .includingSongMetadataAnalyzer()
+            .includingABook()
+            .includingZipArchive()
+            .includingFileWorkspaceTools()
+            .includingCameraStudio()
+            .includingDateTimeExtensions()
+
+        let fixtureData = try Data(contentsOf: goldenURL)
+        let fixture = try XCTUnwrap(JSONSerialization.jsonObject(with: fixtureData) as? [String: Any])
+        let expectedPoolSize = try XCTUnwrap(fixture["poolSize"] as? Int)
+        let actualPoolSize = nativeCatalog.webSearch("", limit: Int.max, includeRelatedReferences: true).count
+        XCTAssertEqual(actualPoolSize, expectedPoolSize - 2, "iOS excludes Web-only Scene Studio and Smartphone Prototype Lab from native search.")
+
+        let cases = try XCTUnwrap(fixture["cases"] as? [[String: Any]])
+        for testCase in cases {
+            let query = try XCTUnwrap(testCase["query"] as? String)
+            let expected = try XCTUnwrap(testCase["top10"] as? [String])
+                .filter { !webOnlyNativeSearchReferenceIDs.contains($0) }
+            let actual = nativeCatalog.webSearch(query, limit: 10, includeRelatedReferences: true).map(\.id)
+            XCTAssertEqual(Array(actual.prefix(expected.count)), expected, "Native/Web search mismatch for query: '\(query)'")
+            XCTAssertFalse(actual.contains(where: { webOnlyNativeSearchReferenceIDs.contains($0) }), "Native search must not return Web-only tools for query: '\(query)'")
+        }
+    }
+
     func testSearchIncludesDescriptionKeywordsAndTags() {
         let store = CatalogStore(catalog: catalog)
         XCTAssertEqual(store.tools(matching: "characters").first?.id, "word-count")
@@ -79,7 +114,7 @@ final class CatalogCoreTests: XCTestCase {
     func testWebSearchUsesExactAndSynonymRankedMatches() {
         XCTAssertEqual(catalog.webSearch("case-converter").first?.id, "case-converter")
         XCTAssertEqual(catalog.webSearch("words").first?.id, "word-count")
-        XCTAssertEqual(catalog.webSearch("").map(\.id), ["future-tool", "case-converter", "word-count"])
+        XCTAssertEqual(catalog.webSearch("").map(\.id), ["case-converter", "word-count", "future-tool"])
     }
 
     func testAccessibilityDiscoveryUsesEightStudiosAndPreservesLegacyIDs() {
@@ -139,8 +174,25 @@ final class CatalogCoreTests: XCTestCase {
         XCTAssertEqual(catalog.counts.active, 1)
         XCTAssertEqual(catalog.tools.first?.category, "productivity")
         XCTAssertEqual(catalog.tools.first?.engine.id, "a-book")
+        XCTAssertEqual(catalog.tools.first?.related, ["pdf-merger", "pdf-splitter", "pdf-text-extractor"])
         XCTAssertEqual(catalog.includingABook().tools.filter { $0.id == "a-book" }.count, 1)
         XCTAssertEqual(catalog.webSearch("A book").first?.id, "a-book")
+    }
+
+    func testZipArchiveRuntimeExtensionUsesOnlyResolvableRelatedTools() {
+        let base = Catalog(
+            schemaVersion: 1,
+            catalogVersion: "test",
+            counts: CatalogCounts(total: 0, active: 0, planned: 0, categories: 1),
+            categories: [],
+            tools: [],
+            relatedReferenceTools: nil
+        )
+        let catalog = base.includingZipArchive()
+        let zip = try! XCTUnwrap(catalog.tools.first { $0.id == "zip-any-file" })
+        XCTAssertEqual(zip.related, ["file-to-txt", "file-organizer", "file-compare"])
+        XCTAssertTrue(zip.related.allSatisfy { id in catalog.displayTool(for: id) != nil })
+        XCTAssertEqual(catalog.includingZipArchive().tools.filter { $0.id == "zip-any-file" }.count, 1)
     }
 
     func testCameraStudioRuntimeExtensionIsUniqueAndSearchable() {
@@ -169,6 +221,68 @@ final class CatalogCoreTests: XCTestCase {
         XCTAssertEqual(testCatalog.relatedTools(for: current).map(\.id), ["word-count", "case-converter"])
     }
 
+
+    func testRelatedToolsResolveOrdinaryAndWebOnlyCatalogDestinations() {
+        func makeTool(_ id: String, _ category: String, related: [String] = []) -> Tool {
+            Tool(
+                id: id, name: id, slug: id, description: "", category: category,
+                subcategory: nil, keywords: [], tags: [], icon: "Network", popularity: 10,
+                featured: false, clientSide: true, requiresBackend: false, requiresAuth: false,
+                status: "active", disclaimer: nil, related: related,
+                engine: ToolEngine(type: "custom", id: id, op: nil)
+            )
+        }
+        let current = makeTool("current", "network", related: ["connection-info", "word-count"])
+        let connectionInfo = makeTool("connection-info", "network")
+        let wordCount = makeTool("word-count", "network")
+        let source = Catalog(
+            schemaVersion: 1, catalogVersion: "test",
+            counts: CatalogCounts(total: 3, active: 3, planned: 0, categories: 1),
+            categories: [],
+            tools: [current, connectionInfo, wordCount],
+            relatedReferenceTools: nil
+        )
+        let native = source.nativeFacing()
+        let nativeCurrent = try! XCTUnwrap(native.tools.first { $0.id == "current" })
+
+        XCTAssertFalse(native.tools.contains { $0.id == "connection-info" })
+        XCTAssertTrue((native.relatedReferenceTools ?? []).contains { $0.id == "connection-info" })
+        XCTAssertEqual(
+            native.relatedTools(for: nativeCurrent, limit: 2).map(\.id),
+            ["connection-info", "word-count"]
+        )
+    }
+
+    func testRelatedToolsRemoveSelfAndDuplicatesAndCanonicalizeAccessibilityAliases() {
+        let source = Tool(
+            id: "contrast-checker", name: "Contrast Checker", slug: "contrast-checker",
+            description: "", category: "accessibility", subcategory: nil, keywords: [], tags: [],
+            icon: "Accessibility", popularity: 0, featured: false, clientSide: true,
+            requiresBackend: false, requiresAuth: false, status: "active", disclaimer: nil,
+            related: [], engine: ToolEngine(type: "custom", id: "contrast-checker", op: nil)
+        )
+        let current = Tool(
+            id: "current", name: "Current", slug: "current", description: "", category: "text",
+            subcategory: nil, keywords: [], tags: [], icon: "Type", popularity: 0, featured: false,
+            clientSide: true, requiresBackend: false, requiresAuth: false, status: "active",
+            disclaimer: nil,
+            related: ["current", "word-count", "word-count", "contrast-checker", "case-converter", "future-tool"],
+            engine: ToolEngine(type: "text", id: "current", op: nil)
+        )
+        let testCatalog = Catalog(
+            schemaVersion: 1, catalogVersion: "test", counts: catalog.counts,
+            categories: catalog.categories, tools: catalog.tools + [source, current],
+            relatedReferenceTools: nil
+        )
+
+        XCTAssertEqual(
+            testCatalog.relatedTools(for: current, limit: 10).map(\.id),
+            ["word-count", "contrast-checker", "case-converter"]
+        )
+        XCTAssertEqual(testCatalog.relatedTools(for: current, limit: 0), [])
+        XCTAssertEqual(testCatalog.relatedTools(for: current, limit: -1), [])
+    }
+
     func testToolEnginePreservesUnknownConfigurationValues() throws {
         let data = Data(#"{"type":"calculator","formula":"body-mass-index","precision":2,"options":["metric"]}"#.utf8)
         let engine = try JSONDecoder().decode(ToolEngine.self, from: data)
@@ -185,7 +299,7 @@ final class CatalogCoreTests: XCTestCase {
 
     func testCategoryFilterAndPopularityOrdering() {
         let store = CatalogStore(catalog: catalog)
-        XCTAssertEqual(store.tools(category: "text").map(\.id), ["future-tool", "case-converter", "word-count"])
+        XCTAssertEqual(store.tools(category: "text").map(\.id), ["case-converter", "word-count", "future-tool"])
         XCTAssertTrue(store.tools(category: "missing").isEmpty)
     }
 
@@ -307,6 +421,37 @@ final class CatalogCoreTests: XCTestCase {
             "duration": "45"
         ])
         XCTAssertTrue(ics.contains("UID:8734b83babcc1f0d@envtools.store"))
+    }
+
+
+    func testRelatedToolsPreferTaskMatchesAcrossNameKeywordsAndSubcategory() {
+        func tool(_ id: String, _ name: String, _ category: String, _ subcategory: String, _ keywords: [String], _ tags: [String]) -> Tool {
+            Tool(
+                id: id, name: name, slug: id, description: name, category: category, subcategory: subcategory,
+                keywords: keywords, tags: tags, icon: "Folder", popularity: 10, featured: false,
+                clientSide: true, requiresBackend: false, requiresAuth: false, status: "active",
+                disclaimer: nil, related: [], engine: ToolEngine(type: "custom", id: id, op: nil)
+            )
+        }
+        let source = tool("file-search", "File Search", "files", "File workspace",
+                          ["search files", "find folders", "documents"], ["search", "files", "local"])
+        let compare = tool("file-compare", "File & Folder Compare", "files", "File workspace",
+                           ["compare files", "folders", "documents"], ["files", "folders", "compare"])
+        let organize = tool("file-organizer", "File Organizer", "files", "File workspace",
+                            ["organize files", "folders", "documents"], ["files", "folders", "organize"])
+        let unrelated = tool("text-counter", "Text Counter", "text", "Text analysis",
+                             ["documents"], ["text"])
+        let sut = Catalog(
+            schemaVersion: 1,
+            catalogVersion: "related-semantic-test",
+            counts: CatalogCounts(total: 4, active: 4, planned: 0, categories: 2),
+            categories: [],
+            tools: [source, compare, organize, unrelated],
+            relatedReferenceTools: nil
+        )
+
+        let recommendations = sut.relatedTools(for: source, limit: 2).map(\.id)
+        XCTAssertEqual(Set(recommendations), Set(["file-compare", "file-organizer"]))
     }
 
 }

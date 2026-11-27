@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { buildEligibility, decodeDiscoveryState, encodeDiscoveryState, isIndexableDiscoveryState, sortMatches } from "./discovery-filters.ts";
 import { searchToolResults } from "./search.ts";
+import { discoveryAvailability } from "./discovery-availability.ts";
 
 const t = (id, extra = {}) => ({ id, name: id, slug: id, description: id, category: "image", keywords: [], tags: [], icon: "x", popularity: 1, featured: false, clientSide: true, requiresBackend: false, requiresAuth: false, status: "active", related: [], engine: { type: "custom", id }, ...extra });
 const avail = (id, platform) => ({ local: platform === "web" ? "web" : "native-device", svc: platform === "web" ? "web" : "native-with-enV-service", webonly: platform === "web" ? "web" : "web-only-browser-handoff" }[id] ?? null);
@@ -24,6 +25,16 @@ test("processing, sign-in, category and status filters use declared flags only",
   assert.deepEqual(run({ signIn: "required" }), ["c"]);
   assert.deepEqual(run({ category: "pdf" }), ["c"]);
   assert.deepEqual(run({ status: "beta" }), ["d"]);
+  assert.deepEqual(run({ status: "planned" }), []);
+});
+
+test("platform availability uses matrix classifications and explicit native Studio projections", () => {
+  assert.equal(discoveryAvailability("scene-studio", "web"), "web");
+  assert.equal(discoveryAvailability("scene-studio", "android"), "web-only-browser-handoff");
+  assert.equal(discoveryAvailability("scene-studio", "ios"), "web-only-browser-handoff");
+  assert.equal(discoveryAvailability("regex-studio", "android"), "native-device");
+  assert.equal(discoveryAvailability("regex-studio", "ios"), "native-device");
+  assert.equal(discoveryAvailability("not-a-real-tool", "android"), null);
 });
 
 test("URL state round-trips and drops unknown or malformed values", () => {
@@ -33,6 +44,22 @@ test("URL state round-trips and drops unknown or malformed values", () => {
   assert.equal(hostile.q.length, 200);
   assert.deepEqual(hostile.filters, {});
   assert.equal(hostile.sort, "best-match");
+  assert.equal(decodeDiscoveryState({ status: "planned" }).filters.status, "planned");
+  assert.deepEqual(
+    decodeDiscoveryState({ platform: "web", execution: "native" }).filters,
+    { platform: "web" },
+    "browser execution cannot be filtered as native-app execution",
+  );
+  assert.deepEqual(
+    decodeDiscoveryState({ execution: "handoff" }).filters,
+    {},
+    "execution path requires an explicit Android or iOS platform",
+  );
+  assert.deepEqual(
+    encodeDiscoveryState({ filters: { platform: "web", execution: "native" } }),
+    { platform: "web" },
+    "serialization drops execution filters that do not apply to Web",
+  );
   assert.deepEqual(encodeDiscoveryState({ q: "  ", filters: {}, sort: "best-match" }), {});
 });
 

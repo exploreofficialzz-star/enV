@@ -2,6 +2,45 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const root = process.cwd();
+
+const webAccessibilitySource = readFileSync(resolve(root, 'src/lib/accessibility-studios.ts'), 'utf8');
+const androidAccessibilitySource = readFileSync(resolve(root, 'apps/android/app/src/main/java/com/chastech/env/data/AccessibilityStudios.kt'), 'utf8');
+const iosCatalogSource = readFileSync(resolve(root, 'apps/ios/enV/CatalogCore.swift'), 'utf8');
+const accessibilityStudioIds = [
+  'contrast-checker', 'alt-text-checker', 'focus-state-checker', 'text-readability-checker',
+  'aria-checker', 'motion-checker', 'keyboard-navigation-checker', 'form-checker',
+];
+const quotedStrings = (value) => [...value.matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+const webStudioLines = webAccessibilitySource.split(/\r?\n/);
+const androidStudioLines = androidAccessibilitySource.split(/\r?\n/);
+const iosStudioLines = iosCatalogSource.split(/\r?\n/);
+const keywordParityFailures = [];
+for (const id of accessibilityStudioIds) {
+  const webLine = webStudioLines.find((line) => line.includes('id: "' + id + '"'));
+  const androidLine = androidStudioLines.find((line) => line.includes('AccessibilityStudioSpec("' + id + '"'));
+  const iosLine = iosStudioLines.find((line) => line.includes('.init(id: "' + id + '"'));
+  const webKeywordsMatch = webLine?.match(/keywords:\s*\[([^\]]*)\]/);
+  const androidKeywordLists = androidLine ? [...androidLine.matchAll(/listOf\(([^)]*)\)/g)] : [];
+  const iosKeywordsMatch = iosLine?.match(/keywords:\s*\[([^\]]*)\]/);
+  if (!webKeywordsMatch || !androidKeywordLists.length || !iosKeywordsMatch) {
+    keywordParityFailures.push(id + ': a canonical Web, Android, or iOS keyword definition is missing');
+    continue;
+  }
+  const expected = quotedStrings(webKeywordsMatch[1]);
+  const androidKeywords = new Set(quotedStrings(androidKeywordLists[androidKeywordLists.length - 1][1]));
+  const iosKeywords = new Set(quotedStrings(iosKeywordsMatch[1]));
+  for (const keyword of expected) {
+    if (!androidKeywords.has(keyword)) keywordParityFailures.push(id + ': Android is missing discovery keyword "' + keyword + '"');
+    if (!iosKeywords.has(keyword)) keywordParityFailures.push(id + ': iOS is missing discovery keyword "' + keyword + '"');
+  }
+}
+if (keywordParityFailures.length) {
+  console.error('Accessibility Studio discovery keyword parity FAIL (' + keywordParityFailures.length + ')');
+  for (const failure of keywordParityFailures) console.error('- ' + failure);
+  process.exitCode = 1;
+} else {
+  console.log('Accessibility Studio discovery keyword parity PASS: all ' + accessibilityStudioIds.length + ' native Studios include every canonical Web discovery keyword.');
+}
 const engines = {
   typescript: [
     'src/lib/engines/accessibility-audit.ts',

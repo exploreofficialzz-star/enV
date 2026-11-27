@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { parseFinalCatalog } from "./catalog-reader.mjs";
+import { isOfflineLocalToolRecord } from "../src/lib/offline/local-operation-policy.mjs";
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 const migration = await read("migrations/0002_billing.sql");
@@ -203,6 +204,29 @@ const sceneStudioBillingProfile = runtimeExtensionProfileIndex.profiles.find((pr
 assert.ok(sceneStudioBillingProfile, "Scene Studio must have a runtime-extension billing profile");
 assert.equal(sceneStudioBillingProfile.toolStatus, "active");
 assert.equal(sceneStudioBillingProfile.category, "video");
+assert.ok(isOfflineLocalToolRecord({
+  id: "scene-studio",
+  category: "video",
+  status: "active",
+  clientSide: true,
+  requiresBackend: false,
+  requiresAuth: false,
+  engine: { type: "custom", id: "scene-studio" },
+}), "Scene Studio's browser editor runs locally; its native Web-only status is a separate platform classification.");
+assert.equal(
+  isOfflineLocalToolRecord({
+    id: "video-to-mp4",
+    category: "video",
+    status: "active",
+    clientSide: true,
+    requiresBackend: false,
+    requiresAuth: false,
+    engine: { type: "video", op: "video-to-mp4" },
+  }),
+  false,
+  "Server-backed video conversion must remain online-only.",
+);
+assert.ok(!nativeInventory.androidToolIds.includes("scene-studio") && !nativeInventory.iosToolIds.includes("scene-studio"), "Scene Studio must remain explicitly Web-only on native platforms.");
 assert.equal(sceneStudioBillingProfile.executionMode, "web-local", "Scene Studio's browser-local editor must not be mislabeled as a shared native/offline execution path.");
 assert.equal(sceneStudioBillingProfile.billingKey, "local.general");
 assert.equal(offlineEligibleToolIds.has("scene-studio"), false, "Web-only Scene Studio must not enter the cross-platform offline wallet cohort.");

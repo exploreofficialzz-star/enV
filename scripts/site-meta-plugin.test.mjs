@@ -48,13 +48,21 @@ test("browser chrome metadata follows the active light or dark theme", () => {
   assert.match(theme, /dark \? "#000000" : "#ffffff"/);
 });
 
-test("All Tools groups results by category and progressively expands without global filters or counts", () => {
+test("All Tools preserves discovery URL state, filters results, and progressively expands category sections", () => {
   const tools = readFileSync(join(PROJECT_ROOT, "src/routes/tools/index.tsx"), "utf8");
   assert.match(tools, /flex items-center gap-4/);
   assert.match(tools, /w-\[52vw\] shrink-0 max-w-\[18rem\]/);
   assert.match(tools, /<SearchBox value=\{query\} onValueChange=/);
-  assert.match(tools, /validateSearch: \(search: Record<string, unknown>\).*q:/s);
-  assert.match(tools, /const \{ q \} = Route\.useSearch\(\)/);
+  assert.match(tools, /validateSearch: \(search: Record<string, unknown>\) => encodeDiscoveryState\(decodeDiscoveryState\(search\)\)/);
+  assert.match(tools, /const search = Route\.useSearch\(\)/);
+  assert.match(tools, /const state = decodeDiscoveryState\(search\)/);
+  assert.match(tools, /const \{ q: query, filters, sort \} = state/);
+  assert.match(tools, /search: encodeDiscoveryState\(\{/);
+  assert.match(tools, /q: next\.q \?\? query/);
+  assert.match(tools, /filters: next\.filters \?\? filters/);
+  assert.match(tools, /sort: next\.sort \?\? sort/);
+  assert.match(tools, /buildEligibility\(filters, discoveryAvailability\)/);
+  assert.match(tools, /availableCategories = useMemo/);
   assert.match(tools, /CATEGORIES\.map/);
   assert.match(tools, /INITIAL_TOOLS_PER_CATEGORY = 3/);
   assert.match(tools, /MORE_TOOLS_PER_CLICK = 6/);
@@ -63,7 +71,7 @@ test("All Tools groups results by category and progressively expands without glo
   assert.match(tools, /text-lg font-bold text-accent/);
   assert.match(tools, /flex justify-end/);
   assert.match(tools, /text-accent/);
-  assert.doesNotMatch(tools, /Tool availability filter|Coming Soon \(|PAGE_SIZE|Showing \d+–|Page \{safePage\}/);
+  assert.doesNotMatch(tools, /PAGE_SIZE|Showing \\d+–|Page \\{safePage\\}/);
 });
 
 test("tool detail Save action stays in the title row and the description wraps below it on compact screens", () => {

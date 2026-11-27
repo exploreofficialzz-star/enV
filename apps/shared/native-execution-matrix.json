@@ -2,14 +2,14 @@
   "schemaVersion": 4,
   "generatedBy": "scripts/export-native-execution-matrix.mjs",
   "stats": {
-    "total": 10015,
-    "active": 9755,
+    "total": 10014,
+    "active": 9754,
     "planned": 260,
-    "offlineNative": 7910,
+    "offlineNative": 7909,
     "backendNative": 1566,
     "webOnly": 279,
     "divergentActive": 0,
-    "fullyExecutable": 9476
+    "fullyExecutable": 9475
   },
   "tools": [
     {
@@ -90590,15 +90590,6 @@
       "name": "Camera Studio",
       "status": "active",
       "category": "photography",
-      "engine": "custom",
-      "android": "offline-native",
-      "ios": "offline-native"
-    },
-    {
-      "id": "video-link-screen-recording",
-      "name": "Video Link Screen Recording",
-      "status": "active",
-      "category": "video",
       "engine": "custom",
       "android": "offline-native",
       "ios": "offline-native"

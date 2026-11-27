@@ -62,6 +62,8 @@ export const SYNONYMS: Record<string, string[]> = {
   bmi: ["body mass", "weight"],
   percent: ["percentage", "%"],
   qr: ["qrcode", "barcode"],
+  regexp: ["regex"],
+  regular: ["regex"],
   uuid: ["guid"],
   hash: ["checksum", "digest", "sha", "md5"],
   color: ["colour", "hex", "rgb"],
@@ -299,7 +301,9 @@ function interpret(pool: PoolIndex, query: string) {
           if (candidateSurface[0] !== surface[0] && candidateStem[0] !== key[0]) continue;
           consider(candidateStem, Math.min(boundedDistance(surface, candidateSurface, limit), boundedDistance(key, candidateStem, limit)));
         }
-        const near = [...best.entries()].map(([candidate, value]) => ({ candidate, distance: value.distance, df: value.df }));
+        const near = [...best.entries()]
+          .map(([candidate, value]) => ({ candidate, distance: value.distance, df: value.df }))
+          .sort((a, b) => a.distance - b.distance || b.df - a.df || a.candidate.localeCompare(b.candidate));
         for (const item of near.slice(0, 3)) {
           variants.push({ stems: [item.candidate], weight: item.distance === 1 ? 0.55 : 0.4, kind: "fuzzy", label: item.candidate });
           corrections.push(item.candidate);
@@ -330,8 +334,6 @@ function interpret(pool: PoolIndex, query: string) {
 // Scoring
 // ---------------------------------------------------------------------------------------------
 
-const popularityBonus = (popularity: number) => 3 * Math.min(1, Math.log10(1 + Math.max(0, Math.min(popularity, 10000))) / 4);
-
 function variantStrength(doc: ToolDoc, variant: Variant): { weight: number; field: SearchField; matched: string } | null {
   let weight = Infinity;
   let field: SearchField = "description";
@@ -355,6 +357,7 @@ function scoreDoc(pool: PoolIndex, doc: ToolDoc, terms: Term[], phrase: string, 
     let best = 0;
     let bestReason: MatchReason | null = null;
     let bestStrong = false;
+    let bestField: SearchField = "description";
     for (const variant of term.variants) {
       const strength = variantStrength(doc, variant);
       if (!strength) continue;
@@ -364,6 +367,7 @@ function scoreDoc(pool: PoolIndex, doc: ToolDoc, terms: Term[], phrase: string, 
       if (value > best) {
         best = value;
         bestStrong = strength.weight >= FIELD_WEIGHT.tag;
+        bestField = strength.field;
         if (wantReasons) {
           const kind: MatchKind = variant.kind === "exact" && !doc.surfaces.has(term.surface) ? "stem" : variant.kind;
           bestReason = { field: strength.field, term: term.surface, matched: strength.matched, kind };
@@ -375,7 +379,8 @@ function scoreDoc(pool: PoolIndex, doc: ToolDoc, terms: Term[], phrase: string, 
       matchedIdf += term.idfValue;
       if (bestStrong) strongMatch = true;
       if (bestReason) reasons.push(bestReason);
-      if (bestReason?.field === "name" || bestReason?.field === "id") namedTerms += 1;
+      // Ranking boosts name/ID matches regardless of whether explanations were requested.
+      if (bestField === "name" || bestField === "id") namedTerms += 1;
     }
   }
   if (base === 0) return null;
@@ -398,7 +403,6 @@ function scoreDoc(pool: PoolIndex, doc: ToolDoc, terms: Term[], phrase: string, 
   }
   if (doc.normalizedName === fullPhrase || doc.normalizedName === phrase || doc.normalizedId === fullPhrase.replace(/ /g, "-") || doc.normalizedId === phrase.replace(/ /g, "-")) score += 400;
   score -= 0.6 * Math.min(4, Math.max(0, doc.nameTokenCount - namedTerms));
-  score += popularityBonus(doc.tool.popularity ?? 0);
   return { score: Math.round(score * 1e6) / 1e6, reasons };
 }
 
@@ -439,7 +443,9 @@ export function searchToolResults(tools: ToolMeta[], query: string, limit = 40, 
     }
   }
   const tier = (doc: ToolDoc) => (doc.tool.status === "planned" ? 1 : 0);
-  ranked.sort((a, b) => tier(a.doc) - tier(b.doc) || b.score - a.score || nameKey(a.doc.tool.name).localeCompare(nameKey(b.doc.tool.name)) || a.doc.tool.id.localeCompare(b.doc.tool.id));
+  ranked.sort((a, b) => tier(a.doc) - tier(b.doc) || b.score - a.score ||
+    (b.doc.tool.popularity ?? 0) - (a.doc.tool.popularity ?? 0) ||
+    nameKey(a.doc.tool.name).localeCompare(nameKey(b.doc.tool.name)) || a.doc.tool.id.localeCompare(b.doc.tool.id));
 
   const top = ranked.slice(0, Math.max(0, limit));
   const matches: SearchMatch[] = top.map(({ doc, score }) => {

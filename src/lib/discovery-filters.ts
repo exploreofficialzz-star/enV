@@ -25,14 +25,14 @@ export type DiscoveryFilters = {
   execution?: "native" | "handoff";
   processing?: "declared-client-side" | "declared-backend";
   signIn?: "required" | "not-required";
-  status?: "active" | "beta";
+  status?: "active" | "beta" | "planned";
 };
 
 const PLATFORMS: readonly string[] = ["web", "android", "ios"];
 const EXECUTIONS: readonly string[] = ["native", "handoff"];
 const PROCESSING: readonly string[] = ["declared-client-side", "declared-backend"];
 const SIGN_IN: readonly string[] = ["required", "not-required"];
-const STATUSES: readonly string[] = ["active", "beta"];
+const STATUSES: readonly string[] = ["active", "beta", "planned"];
 const CATEGORY_PATTERN = /^[a-z0-9-]{1,40}$/;
 
 /** Build an eligibility predicate. Applied BEFORE ranking so filters never reorder, only remove. */
@@ -63,7 +63,10 @@ export function decodeDiscoveryState(params: Record<string, unknown>): { q: stri
   const category = one("category");
   if (CATEGORY_PATTERN.test(category)) filters.category = category;
   if (PLATFORMS.includes(one("platform"))) filters.platform = one("platform") as PlatformId;
-  if (EXECUTIONS.includes(one("execution"))) filters.execution = one("execution") as DiscoveryFilters["execution"];
+  if (
+    EXECUTIONS.includes(one("execution"))
+    && (filters.platform === "android" || filters.platform === "ios")
+  ) filters.execution = one("execution") as DiscoveryFilters["execution"];
   if (PROCESSING.includes(one("processing"))) filters.processing = one("processing") as DiscoveryFilters["processing"];
   if (SIGN_IN.includes(one("signIn"))) filters.signIn = one("signIn") as DiscoveryFilters["signIn"];
   if (STATUSES.includes(one("status"))) filters.status = one("status") as DiscoveryFilters["status"];
@@ -75,7 +78,9 @@ export function decodeDiscoveryState(params: Record<string, unknown>): { q: stri
 export function encodeDiscoveryState(state: { q?: string; filters?: DiscoveryFilters; sort?: SortMode }): Record<string, string> {
   const out: Record<string, string> = {};
   if (state.q?.trim()) out.q = state.q.trim().slice(0, 200);
-  for (const [key, value] of Object.entries(state.filters ?? {})) if (value) out[key] = value;
+  const filters = { ...(state.filters ?? {}) };
+  if (filters.platform !== "android" && filters.platform !== "ios") delete filters.execution;
+  for (const [key, value] of Object.entries(filters)) if (value) out[key] = value;
   if (state.sort && state.sort !== "best-match") out.sort = state.sort;
   return out;
 }

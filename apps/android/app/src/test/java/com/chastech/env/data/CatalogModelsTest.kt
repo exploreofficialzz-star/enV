@@ -26,7 +26,17 @@ class CatalogModelsTest {
         assertEquals("productivity", catalog.tools.single().category)
         assertEquals("custom", catalog.tools.single().engine.type)
         assertEquals("a-book", catalog.tools.single().engine.id)
+        assertEquals(listOf("pdf-merger", "pdf-splitter", "pdf-text-extractor"), catalog.tools.single().related)
         assertEquals(catalog, catalog.withABook())
+    }
+
+    @Test fun runtimeZipArchiveUsesOnlyResolvableRelatedTools() {
+        val base = Catalog(1, "test", CatalogCounts(0, 0, 0, 1), emptyList(), emptyList())
+        val catalog = base.withZipArchive()
+        val zip = catalog.tools.single { it.id == "zip-any-file" }
+        assertEquals(listOf("file-to-txt", "file-organizer", "file-compare"), zip.related)
+        assertTrue(zip.related.all { id -> catalog.displayTool(id) != null })
+        assertEquals(catalog, catalog.withZipArchive())
     }
 
     @Test fun runtimeCameraStudioAdditionIsUniqueAndSearchable() {
@@ -157,4 +167,55 @@ class CatalogModelsTest {
 
         assertEquals(listOf("zeta", "alpha", "bravo"), catalog.relatedTools(catalog.tools.first()).map { it.id })
     }
+ 
+    @Test fun relatedToolsResolveOrdinaryAndWebOnlyCatalogDestinations() {
+        val catalog = Catalog.fromJson("""
+            {"counts":{},"categories":[],"tools":[
+              {"id":"current","name":"Current","category":"network","related":["connection-info","word-count"],"status":"active"},
+              {"id":"connection-info","name":"Connection Info","category":"network","status":"active"},
+              {"id":"word-count","name":"Word Count","category":"network","status":"active"}
+            ]}
+        """.trimIndent())
+        val current = catalog.tools.single { it.id == "current" }
+
+        assertTrue(catalog.relatedReferenceTools.any { it.id == "connection-info" })
+        assertEquals(
+            listOf("connection-info", "word-count"),
+            catalog.relatedTools(current, 2).map { it.id },
+        )
+    }
+
+    @Test fun relatedToolsRemoveSelfAndDuplicateLinksAndCanonicalizeAccessibilityAliases() {
+        val catalog = Catalog.fromJson("""
+            {"counts":{},"categories":[],"tools":[
+              {"id":"current","name":"Current","category":"text","related":["current","word-count","word-count","contrast-checker","case-converter","future-tool"],"status":"active"},
+              {"id":"word-count","name":"Word Count","category":"text","status":"active"},
+              {"id":"case-converter","name":"Case Converter","category":"text","status":"active"},
+              {"id":"contrast-checker","name":"Contrast Checker","category":"accessibility","status":"active"},
+              {"id":"future-tool","name":"Future Tool","category":"text","status":"planned"}]}
+        """.trimIndent())
+        val current = catalog.tools.first { it.id == "current" }
+
+        assertEquals(
+            listOf("word-count", "contrast-checker", "case-converter"),
+            catalog.relatedTools(current, 10).map { it.id },
+        )
+        assertEquals(emptyList<ToolRecord>(), catalog.relatedTools(current, 0))
+        assertEquals(emptyList<ToolRecord>(), catalog.relatedTools(current, -1))
+    }
+
+    @Test fun relatedToolsPreferTaskMatchesAcrossNameKeywordsAndSubcategory() {
+        val catalog = Catalog.fromJson("""
+            {"counts":{"total":4,"active":4,"planned":0,"categories":1},"categories":[],"tools":[
+              {"id":"file-search","name":"File Search","slug":"file-search","description":"Find files and search supported text content.","category":"files","subcategory":"File workspace","keywords":["search files","find folders","documents"],"tags":["search","files","local"],"status":"active","related":[],"engine":{"type":"custom","id":"file-search"}},
+              {"id":"file-compare","name":"File & Folder Compare","slug":"file-compare","description":"Compare files and folders.","category":"files","subcategory":"File workspace","keywords":["compare files","folders","documents"],"tags":["files","folders","compare"],"status":"active","related":[],"engine":{"type":"custom","id":"file-compare"}},
+              {"id":"file-organizer","name":"File Organizer","slug":"file-organizer","description":"Organize files into folders.","category":"files","subcategory":"File workspace","keywords":["organize files","folders","documents"],"tags":["files","folders","organize"],"status":"active","related":[],"engine":{"type":"custom","id":"file-organizer"}},
+              {"id":"text-counter","name":"Text Counter","slug":"text-counter","description":"Count words and characters.","category":"text","subcategory":"Text analysis","keywords":["documents"],"tags":["text"],"status":"active","related":[],"engine":{"type":"custom","id":"text-counter"}}
+            ]}
+        """.trimIndent())
+        val source = catalog.tools.single { it.id == "file-search" }
+        val recommendations = catalog.relatedTools(source, 2).map { it.id }.toSet()
+        assertEquals(setOf("file-compare", "file-organizer"), recommendations)
+    }
+
 }
