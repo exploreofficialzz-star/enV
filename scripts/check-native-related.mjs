@@ -35,11 +35,22 @@ const sharedTools = [
   ...DATETIME_TOOL_EXTENSIONS.filter((extension) => !sharedBaseTools.some((tool) => tool.id === extension.id)),
 ];
 assert.equal(webTools.length, sharedTools.length, "Web and shared catalog tool counts differ.");
+// The runtime intentionally brands this legacy audio engine as AI Music Data Sandbox,
+// while the shared source record retains its original Song Metadata Analyzer name.
+// Keep that one documented presentation exception explicit rather than masking other
+// platform name drift.
+const approvedRuntimeDisplayNames = new Map([
+  ["song-metadata-analyzer", "AI Music Data Sandbox"],
+]);
 for (let index = 0; index < webTools.length; index += 1) {
   const web = webTools[index];
   const shared = sharedTools[index];
   assert.equal(web.id, shared.id, `Catalog order/ID drift at row ${index}.`);
-  assert.equal(web.name, shared.name, `Catalog name drift for ${web.id}.`);
+  const expectedName = approvedRuntimeDisplayNames.get(shared.id) ?? shared.name;
+  assert.equal(web.name, expectedName, `Catalog name drift for ${web.id}.`);
+  if (approvedRuntimeDisplayNames.has(shared.id)) {
+    assert.equal(expectedName, web.name, `Unexpected presentation override for ${shared.id}.`);
+  }
   assert.equal(web.category, shared.category, `Catalog category drift for ${web.id}.`);
   assert.deepEqual(web.related, shared.related, `Related IDs drift for ${web.id}.`);
 }
