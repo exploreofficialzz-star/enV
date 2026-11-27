@@ -143,7 +143,7 @@ export function UrlMediaEngine({ provider }: { provider: UrlMediaProvider | "gen
   return <div className="space-y-5">
     <div className="rounded-xl border border-border bg-surface-2 p-4 text-sm">
       <div className="font-medium">{labels[provider]} downloader</div>
-      <p className="mt-1 text-muted">Paste a public URL. The download is processed by the configured enV media service.</p>
+      <p className="mt-1 text-muted">Paste a public link to inspect or download media you have permission to use.</p>
     </div>
     <div className="space-y-2">
       <label className="text-sm font-medium" htmlFor="url-media-url">Media URL</label>
