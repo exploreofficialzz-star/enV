@@ -81,22 +81,45 @@ const nativeTools = webTools.filter((tool) => !excluded.has(tool.id));
 const relatedReferences = webTools.filter((tool) => excluded.has(tool.id));
 assert.equal(nativeTools.length + relatedReferences.length, webTools.length);
 
-// Native Catalog.relatedTools() receives the full catalogue split across tools and
-// relatedReferenceTools, then adds the canonical Accessibility and Developer Studio
-// projections. The audit constructs that same complete candidate surface; it does not
-// substitute a hand-written Studio-only candidate list.
+// The native catalogue starts with apps/shared/catalog.json, then both platforms
+// register the same local runtime extensions in their Catalog loader. The parity
+// simulator must use that exact candidate surface rather than every Web runtime row:
+// Web-only registry extensions are not resolvable by the native related-tools resolver.
+const nativeRuntimeExtensionIDs = new Set([
+  "music-downloader",
+  "song-metadata-analyzer",
+  "a-book",
+  "zip-any-file",
+  "file-to-txt",
+  "file-organizer",
+  "batch-file-renamer",
+  "duplicate-file-finder",
+  "folder-size-analyzer",
+  "file-search",
+  "file-compare",
+  "camera-studio",
+  ...DATETIME_TOOL_EXTENSIONS.map((tool) => tool.id),
+]);
+const nativeBaseIDs = new Set(sharedBaseTools.map((tool) => tool.id));
+const nativeCandidateIDs = new Set([...nativeBaseIDs, ...nativeRuntimeExtensionIDs]);
 const candidateIDs = new Set();
 const nativeCandidates = [
-  ...webTools.filter((tool) => tool.category !== "accessibility" && tool.id !== "audio-analyze-studio"),
+  ...webTools.filter((tool) =>
+    nativeCandidateIDs.has(tool.id) &&
+    tool.category !== "accessibility" &&
+    tool.id !== "audio-analyze-studio"
+  ),
   ...getToolsByCategory("accessibility"),
   ...getToolsByCategory("developer"),
-  ...getAllTools().filter((tool) => tool.id === "song-metadata-analyzer"),
 ].filter((tool) => {
   if (candidateIDs.has(tool.id)) return false;
   candidateIDs.add(tool.id);
   return true;
 });
 const nativeByID = new Map(nativeCandidates.map((tool) => [tool.id, tool]));
+for (const id of nativeRuntimeExtensionIDs) {
+  assert.ok(nativeByID.has(id), `Native runtime extension ${id} must be present in the related-target map.`);
+}
 const relatedSearchPool = getSearchableTools();
 const androidSearchReferenceIDs = quotedIDs(
   read("apps/android/app/src/main/java/com/chastech/env/data/NativeCatalogSearch.kt"),
@@ -130,10 +153,13 @@ function canonicalNativeTarget(id) {
   const canonicalID = getToolById(id)?.id ?? id;
   return nativeByID.get(canonicalID);
 }
-assert.equal(
+assert.ok(
   canonicalNativeTarget("camera-studio"),
-  undefined,
-  "Web-only Camera Studio must not be fabricated as an Android/iOS related destination.",
+  "Camera Studio is registered by the Android/iOS native catalog loaders and must remain a valid native destination.",
+);
+assert.ok(
+  canonicalNativeTarget("music-downloader"),
+  "Music Downloader is registered by the Android/iOS native catalog loaders and must remain a valid native destination.",
 );
 function webRelated(tool, limit = 6) {
   const canonical = getToolById(tool.id) ?? tool;
