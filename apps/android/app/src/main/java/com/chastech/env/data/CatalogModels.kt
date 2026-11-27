@@ -477,6 +477,9 @@ private fun Catalog.relatedSearchTools(
 /** Preserve declared links, then use the canonical search ranking before the category fallback. */
 fun Catalog.relatedTools(tool: ToolRecord, limit: Int = 6): List<ToolRecord> {
     if (limit <= 0) return emptyList()
+    if (tool.category == "accessibility") {
+        return accessibilityDiscoveryTools().filter { it.id != tool.id }.take(limit)
+    }
 
     // Resolve ordinary catalogue destinations as well as Studio projections. Web-only
     // references are stored separately for native catalogues and must remain resolvable here.
