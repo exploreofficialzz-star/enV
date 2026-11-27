@@ -423,4 +423,35 @@ final class CatalogCoreTests: XCTestCase {
         XCTAssertTrue(ics.contains("UID:8734b83babcc1f0d@envtools.store"))
     }
 
+
+    func testRelatedToolsPreferTaskMatchesAcrossNameKeywordsAndSubcategory() {
+        func tool(_ id: String, _ name: String, _ category: String, _ subcategory: String, _ keywords: [String], _ tags: [String]) -> Tool {
+            Tool(
+                id: id, name: name, slug: id, description: name, category: category, subcategory: subcategory,
+                keywords: keywords, tags: tags, icon: "Folder", popularity: 10, featured: false,
+                clientSide: true, requiresBackend: false, requiresAuth: false, status: "active",
+                disclaimer: nil, related: [], engine: ToolEngine(type: "custom", id: id, op: nil)
+            )
+        }
+        let source = tool("file-search", "File Search", "files", "File workspace",
+                          ["search files", "find folders", "documents"], ["search", "files", "local"])
+        let compare = tool("file-compare", "File & Folder Compare", "files", "File workspace",
+                           ["compare files", "folders", "documents"], ["files", "folders", "compare"])
+        let organize = tool("file-organizer", "File Organizer", "files", "File workspace",
+                            ["organize files", "folders", "documents"], ["files", "folders", "organize"])
+        let unrelated = tool("text-counter", "Text Counter", "text", "Text analysis",
+                             ["documents"], ["text"])
+        let sut = Catalog(
+            schemaVersion: 1,
+            catalogVersion: "related-semantic-test",
+            counts: CatalogCounts(total: 4, active: 4, planned: 0, categories: 2),
+            categories: [],
+            tools: [source, compare, organize, unrelated],
+            relatedReferenceTools: nil
+        )
+
+        let recommendations = sut.relatedTools(for: source, limit: 2).map(\\.id)
+        XCTAssertEqual(Set(recommendations), Set(["file-compare", "file-organizer"]))
+    }
+
 }
