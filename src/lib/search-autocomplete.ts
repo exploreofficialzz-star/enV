@@ -7,7 +7,7 @@ const MAX_PREFIX_LENGTH = 12;
 const MAX_NAME_CANDIDATES_PER_TERM = 160;
 const MAX_FIELD_CANDIDATES_PER_TERM = 240;
 const SUGGESTION_CACHE_SIZE = 100;
-const SEARCH_CACHE_SIZE = 32;
+const SEARCH_CACHE_SIZE = 12;
 
 const SUGGESTION_STOP_WORDS = new Set([
   "a", "an", "the", "to", "of", "for", "my", "me", "i", "do", "how", "can", "you", "what", "is", "are",
