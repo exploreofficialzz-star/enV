@@ -1,0 +1,190 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import {
+  calculateProposedToolUnits,
+  deriveLocalToolPriceProfile,
+  proposedProviderPriceUsdMicros,
+  proposedSubunitsFromProviderCostUsdMicros,
+  TOOL_PRICE_PROPOSAL_VERSION,
+} from "./proposed-pricing.mjs";
+
+const tool = (overrides = {}) => ({
+  id: "ordinary-calculator",
+  name: "Ordinary Calculator",
+  description: "Calculate a straightforward numeric result.",
+  category: "calculators",
+  engine: { type: "calculator" },
+  tags: [],
+  keywords: [],
+  ...overrides,
+});
+
+test("the pricing proposal has an explicit version", () => {
+  assert.equal(TOOL_PRICE_PROPOSAL_VERSION, "env-per-tool-rate-proposal-2026-11-25-v1");
+});
+
+test("simple calculations use the lightweight calculation unit", () => {
+  const price = deriveLocalToolPriceProfile(tool(), "local.calculator", "local-device");
+  assert.equal(price?.unitLabel, "calculation");
+  assert.equal(price?.subunitsPerUnit, 100);
+  assert.equal(price?.usdMicrosPerUnit, 1_000);
+});
+
+test("business and engineering calculators are priced by their operation complexity", () => {
+  const business = deriveLocalToolPriceProfile(tool({ id: "compound-interest-calculator", name: "Compound Interest Calculator" }), "local.calculator", "local-device");
+  const engineering = deriveLocalToolPriceProfile(tool({ id: "matrix-calculator", name: "Matrix Calculator" }), "local.calculator", "local-device");
+  assert.equal(business?.subunitsPerUnit, 175);
+  assert.equal(engineering?.subunitsPerUnit, 250);
+  assert.ok(engineering.subunitsPerUnit > business.subunitsPerUnit);
+});
+
+test("image prices scale by image workload and intensive operations", () => {
+  const basic = deriveLocalToolPriceProfile(tool({ id: "image-resizer", name: "Image Resizer", category: "image" }), "local.image_basic", "local-device");
+  const heavy = deriveLocalToolPriceProfile(tool({ id: "image-upscaler", name: "Image Upscaler", category: "image" }), "local.image_intensive", "local-device");
+  assert.equal(basic?.unitLabel, "megapixel-operation");
+  assert.equal(basic?.subunitsPerUnit, 250);
+  assert.equal(heavy?.subunitsPerUnit, 800);
+});
+
+test("audio and video processing use duration-sensitive units", () => {
+  const audio = deriveLocalToolPriceProfile(tool({ id: "audio-denoiser", name: "Audio Noise Removal", category: "audio", engine: { type: "audio" } }), "local.audio_processing", "local-device");
+  const video = deriveLocalToolPriceProfile(tool({ id: "video-transcoder", name: "Video Transcoder", category: "video", engine: { type: "video" } }), "local.video_processing", "local-device");
+  assert.equal(audio?.unitLabel, "audio-minute");
+  assert.equal(audio?.subunitsPerUnit, 1_000);
+  assert.equal(video?.unitLabel, "video-minute-720p");
+  assert.equal(video?.subunitsPerUnit, 2_500);
+});
+
+test("PDF and archive tools use pages and byte-size units", () => {
+  const pdf = deriveLocalToolPriceProfile(tool({ id: "pdf-merger", name: "PDF Merger", category: "pdf" }), "local.general", "local-device");
+  const zip = deriveLocalToolPriceProfile(tool({ id: "zip-any-file", name: "ZIP Any File", category: "files" }), "local.general", "local-device");
+  assert.equal(pdf?.unitLabel, "10-pages");
+  assert.equal(pdf?.subunitsPerUnit, 200);
+  assert.equal(zip?.unitLabel, "100-MiB-archive-input");
+  assert.equal(zip?.subunitsPerUnit, 450);
+});
+
+test("Scene Studio is priced by rendered time, not as a generic operation", () => {
+  const studio = deriveLocalToolPriceProfile(tool({ id: "scene-studio", name: "Scene Studio", category: "video" }), "local.general", "web-local");
+  assert.equal(studio?.unitLabel, "render-minute");
+  assert.equal(studio?.subunitsPerUnit, 1_500);
+  assert.equal(studio?.workloadTier, "studio");
+});
+
+test("remote work does not receive a guessed local flat tariff", () => {
+  assert.equal(deriveLocalToolPriceProfile(tool(), "ai.standard", "cloud-or-remote"), null);
+});
+
+test("provider cost uses an explicit gross-margin formula and rounds upward", () => {
+  // $0.001050 provider estimate / (1 - 60% margin) = $0.002625 sell estimate.
+  assert.equal(proposedProviderPriceUsdMicros(1_050, 6_000), 2_625);
+  assert.equal(proposedSubunitsFromProviderCostUsdMicros(1_050, 6_000), 263);
+  assert.equal(proposedSubunitsFromProviderCostUsdMicros(0, 6_000), 0);
+});
+
+test("provider cost and margin inputs fail closed when invalid", () => {
+  assert.throws(() => proposedProviderPriceUsdMicros(-1, 6_000), RangeError);
+  assert.throws(() => proposedProviderPriceUsdMicros(1_000, 10_000), RangeError);
+  assert.throws(() => proposedProviderPriceUsdMicros(1.5, 6_000), RangeError);
+  assert.throws(() => proposedProviderPriceUsdMicros(Number.MAX_SAFE_INTEGER, 6_000), RangeError);
+});
+
+test("developer tools scale by input text and parser complexity", () => {
+  const formatter = deriveLocalToolPriceProfile(tool({ id: "json-formatter", name: "JSON Formatter", category: "developer" }), "local.general", "local-device");
+  const regex = deriveLocalToolPriceProfile(tool({ id: "regex-studio", name: "Regular Expression Tester", category: "developer" }), "local.general", "local-device");
+  assert.equal(formatter?.unitLabel, "10k-characters");
+  assert.equal(formatter?.subunitsPerUnit, 125);
+  assert.equal(regex?.subunitsPerUnit, 250);
+});
+
+test("security tools distinguish credential tasks from cryptographic data processing", () => {
+  const password = deriveLocalToolPriceProfile(tool({ id: "password-generator", name: "Password Generator", category: "security" }), "local.general", "local-device");
+  const hmac = deriveLocalToolPriceProfile(tool({ id: "hmac-generator", name: "HMAC Signature Generator", category: "security" }), "local.general", "local-device");
+  assert.equal(password?.unitLabel, "security-operation");
+  assert.equal(password?.subunitsPerUnit, 100);
+  assert.equal(hmac?.unitLabel, "MiB-input");
+  assert.equal(hmac?.subunitsPerUnit, 300);
+});
+
+test("QR generation and image scanning use different workload units", () => {
+  const qr = deriveLocalToolPriceProfile(tool({ id: "qr-code-generator", name: "QR Code Generator", category: "qr" }), "local.general", "local-device");
+  const reader = deriveLocalToolPriceProfile(tool({ id: "qr-code-reader", name: "QR Code Reader", category: "qr" }), "local.general", "local-device");
+  assert.equal(qr?.unitLabel, "code-generated");
+  assert.equal(qr?.subunitsPerUnit, 100);
+  assert.equal(reader?.unitLabel, "megapixel-scan");
+  assert.equal(reader?.subunitsPerUnit, 250);
+});
+
+test("mockup, design and content tools have their own output-based units", () => {
+  const mockup = deriveLocalToolPriceProfile(tool({ id: "device-mockup-generator", name: "Device Frame Mockup Generator", category: "mockups" }), "local.general", "local-device");
+  const design = deriveLocalToolPriceProfile(tool({ id: "responsive-layout-builder", name: "Responsive Layout Builder", category: "webdesign" }), "local.general", "local-device");
+  const planner = deriveLocalToolPriceProfile(tool({ id: "travel-itinerary-planner", name: "Travel Itinerary Planner", category: "travel" }), "local.general", "local-device");
+  assert.equal(mockup?.unitLabel, "rendered-asset");
+  assert.equal(mockup?.subunitsPerUnit, 400);
+  assert.equal(design?.unitLabel, "design-operation");
+  assert.equal(design?.subunitsPerUnit, 200);
+  assert.equal(planner?.unitLabel, "10k-output-characters");
+  assert.equal(planner?.subunitsPerUnit, 175);
+});
+
+test("local AI-category templates, business operations and video settings have distinct tariffs", () => {
+  const aiTemplate = deriveLocalToolPriceProfile(tool({ id: "caption-generator", name: "Caption Generator", category: "ai" }), "local.general", "local-device");
+  const business = deriveLocalToolPriceProfile(tool({ id: "invoice-generator", name: "Invoice Generator", category: "business" }), "local.general", "local-device");
+  const videoSettings = deriveLocalToolPriceProfile(tool({ id: "video-codec-lookup", name: "Video Codec Lookup", category: "video" }), "local.general", "local-device");
+  assert.equal(aiTemplate?.unitLabel, "1k-generated-characters");
+  assert.equal(aiTemplate?.subunitsPerUnit, 150);
+  assert.equal(business?.unitLabel, "business-operation");
+  assert.equal(business?.subunitsPerUnit, 225);
+  assert.equal(videoSettings?.unitLabel, "video-configuration");
+  assert.equal(videoSettings?.subunitsPerUnit, 200);
+});
+
+test("fitness, date-time, network and streaming tools have dedicated workload units", () => {
+  const fitness = deriveLocalToolPriceProfile(tool({ id: "workout-planner", name: "Workout Plan", category: "fitness", engine: { type: "custom" } }), "local.general", "local-device");
+  const dateTime = deriveLocalToolPriceProfile(tool({ id: "date-difference", name: "Date Difference", category: "datetime", engine: { type: "datetime" } }), "local.general", "local-device");
+  const network = deriveLocalToolPriceProfile(tool({ id: "subnet-range", name: "Subnet Range Calculator", category: "network", engine: { type: "network" } }), "local.general", "local-device");
+  const streaming = deriveLocalToolPriceProfile(tool({ id: "stream-profile-calculator", name: "Stream Profile Calculator", category: "streaming", engine: { type: "custom" } }), "local.general", "local-device");
+  assert.equal(fitness?.unitLabel, "fitness-calculation");
+  assert.equal(fitness?.subunitsPerUnit, 200);
+  assert.equal(dateTime?.unitLabel, "date-time-operation");
+  assert.equal(dateTime?.subunitsPerUnit, 75);
+  assert.equal(network?.unitLabel, "network-operation");
+  assert.equal(network?.subunitsPerUnit, 100);
+  assert.equal(streaming?.unitLabel, "stream-profile-operation");
+  assert.equal(streaming?.subunitsPerUnit, 125);
+});
+
+test("local media tools use duration and file-size workload units", () => {
+  const editor = deriveLocalToolPriceProfile(tool({ id: "media-converter", name: "Media Converter", category: "media" }), "local.general", "local-device");
+  const transcoder = deriveLocalToolPriceProfile(tool({ id: "media-transcoder", name: "Media Transcoder", category: "media" }), "local.general", "local-device");
+  assert.equal(editor?.unitLabel, "media-operation");
+  assert.equal(editor?.subunitsPerUnit, 250);
+  assert.equal(transcoder?.unitLabel, "media-minute");
+  assert.equal(transcoder?.subunitsPerUnit, 1_250);
+});
+
+test("measured preview units scale with characters, pixels, duration, pages and bytes", () => {
+  assert.equal(calculateProposedToolUnits("10k-characters", { inputCharacters: 12_500 }), 1.25);
+  assert.equal(calculateProposedToolUnits("10-pages", { pageCount: 15 }), 1.5);
+  assert.equal(calculateProposedToolUnits("100-MiB-archive-input", { inputBytes: 50 * 1_048_576 }), 0.5);
+  assert.equal(calculateProposedToolUnits("render-minute", { renderSeconds: 90 }), 1.5);
+  assert.equal(calculateProposedToolUnits("audio-minute", { audioSeconds: 90 }), 1.5);
+  assert.equal(calculateProposedToolUnits("megapixel-operation", { width: 1_280, height: 720 }), 0.9216);
+});
+
+test("video usage scales by duration, output resolution and frame rate", () => {
+  assert.equal(calculateProposedToolUnits("video-minute-720p", { videoSeconds: 60, width: 1_920, height: 1_080, framesPerSecond: 30 }), 2.25);
+  assert.equal(calculateProposedToolUnits("video-minute-720p", { videoSeconds: 30, width: 1_280, height: 720, framesPerSecond: 60 }), 1);
+});
+
+test("audio workload scales for sample rate and channel count", () => {
+  assert.equal(calculateProposedToolUnits("audio-minute", { audioSeconds: 60, sampleRate: 96_000, channels: 2 }), 2);
+  assert.equal(calculateProposedToolUnits("audio-minute", { audioSeconds: 60, sampleRate: 48_000, channels: 4 }), 2);
+});
+
+test("preview measurements reject unknown, invalid and oversized inputs", () => {
+  assert.throws(() => calculateProposedToolUnits("10-pages", { pageCount: -1 }), RangeError);
+  assert.throws(() => calculateProposedToolUnits("10-pages", { pageCount: "10" }), RangeError);
+  assert.throws(() => calculateProposedToolUnits("10-pages", { fileCount: 10 }), RangeError);
+  assert.throws(() => calculateProposedToolUnits("10-pages", { pageCount: 1_000_000_000_001 }), RangeError);
+});

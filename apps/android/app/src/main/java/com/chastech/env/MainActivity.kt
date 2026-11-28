@@ -454,6 +454,13 @@ private fun EnVApp(
                             showExchange = false
                             showInformation = true
                         },
+                        onOpenTokenDetails = { toolId ->
+                            informationReturnTab = tab
+                            informationPage = "token-tool:$toolId"
+                            tab = AppTab.Account.name
+                            showExchange = false
+                            showInformation = true
+                        },
                         isFullscreen = isToolFullscreen || isWorldLabTool,
                         onToggleFullscreen = { isToolFullscreen = !isToolFullscreen },
                     )
@@ -1167,6 +1174,7 @@ private fun ToolDetail(
     onRelatedTool: (String) -> Unit,
     onToggleFavorite: () -> Unit,
     onOpenWallet: () -> Unit,
+    onOpenTokenDetails: (String) -> Unit,
     isFullscreen: Boolean,
     onToggleFullscreen: () -> Unit,
 ) {
@@ -1335,6 +1343,9 @@ private fun ToolDetail(
                 },
                 modifier = Modifier.padding(top = 2.dp),
             ) { Text("Read the full guide") }
+            TextButton(onClick = { onOpenTokenDetails(tool.id) }, modifier = Modifier.padding(top = 2.dp)) {
+                Text("Token details")
+            }
             if (related.isNotEmpty()) {
                 Spacer(Modifier.height(40.dp))
                 Text("Related tools", style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp), fontWeight = FontWeight.Normal, color = MaterialTheme.colorScheme.primary)

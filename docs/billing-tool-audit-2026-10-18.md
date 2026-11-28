@@ -1,54 +1,55 @@
-# enV tool-by-tool monetization profile audit — 2026-10-18
+# enV catalogue-wide per-tool billing audit — 2026-11-25
 
-## Scope
+Generated from the authoritative Web catalogue and native runtime-extension registry. Every tool ID receives an individually addressable profile. Local workload rates are draft value/usage estimates, not measured handset CPU costs. Variable AI/provider and remote infrastructure work remain usage/invoice-driven. No profile in this report is approved for live token deductions.
 
-Generated from the authoritative Web catalogue metadata. This is a first-pass classification, not a claim that each operation's real compute cost has been measured. Every profile is marked provisional and requires a manual cost/pricing audit before live charging.
+- Base catalogue tools: 10,001
+- Runtime extension tools: 13
+- Total profiles: 10,014
+- Local/web-local profiles with numeric workload tariffs: 9,780
+- Direct AI profiles with model-rate metering: 28
+- Remote profiles awaiting provider/infrastructure allocation: 206
+- Android native inventory IDs covered: 7,909
+- iOS native inventory IDs covered: 7,909
 
-- Catalogue tools profiled: **10,001**
-- Local-device profiles: **9800**
-- Cloud/remote profiles: **201**
-- Profiles requiring manual audit: **10,001**
-- Android native tool IDs covered by this registry: **7,758 / 7,758**
-- iOS native tool IDs covered by this registry: **7,758 / 7,758**
-- Advertising eligible in this monetization plan: **0**
+## Execution distribution
 
-## Count by billing rule
-
-| Billing rule | Tools |
+| Execution mode | Tools |
 |---|---:|
-| `cloud.audio_processing` | 7 |
-| `cloud.document_processing` | 82 |
-| `cloud.generic_processing` | 3 |
-| `cloud.transcription` | 3 |
-| `cloud.video_processing` | 106 |
-| `local.audio_processing` | 107 |
-| `local.calculator` | 6516 |
-| `local.converter` | 145 |
-| `local.general` | 2608 |
-| `local.image_basic` | 235 |
-| `local.image_intensive` | 148 |
-| `local.text` | 38 |
-| `local.video_processing` | 3 |
+| cloud-or-remote | 234 |
+| local-device | 9779 |
+| web-local | 1 |
 
-## Count by catalogue status
+## Billing classification distribution
 
-| Status | Tools |
+| Billing key | Tools |
 |---|---:|
-| active | 10001 |
+| ai.standard | 28 |
+| cloud.audio_processing | 8 |
+| cloud.document_processing | 75 |
+| cloud.generic_processing | 13 |
+| cloud.transcription | 3 |
+| cloud.video_processing | 107 |
+| local.audio_processing | 104 |
+| local.calculator | 6549 |
+| local.converter | 146 |
+| local.general | 2556 |
+| local.image_basic | 236 |
+| local.image_intensive | 148 |
+| local.text | 38 |
+| local.video_processing | 3 |
 
-## Reading these profiles
+## Pricing interpretation
 
-- `local.*` rules are pricing hypotheses for small, standard or intensive local work. They are not evidence of direct server cost, and should be validated with user research and value/effort tests.
-- `cloud.*` rules require measured provider/infrastructure cost, retry/fallback accounting and margin calculations before a quote can be charged.
-- Tools whose `engineType` is `ai` may expose an optional AI-assist path; their normal deterministic/local path must not automatically be charged as an AI request. The AI operation should be metered separately when invoked.
-- Usage-sensitive tools require their handler to supply measurements (for example audio duration, image pixel count, document pages, video duration/resolution). The registry lists the dimensions that must be captured. Do not bill them with a guessed number of units.
-- `src/data/billing-profiles.json` is generated; change `scripts/generate-billing-profiles.mjs` then re-run generation rather than editing profile rows by hand.
+- Local/web-local tools receive an individual numeric draft rate, tool-specific unit, workload tier, formula, factors and metering dimensions. The selected unit must be calculated from the operation actually completed.
+- Direct AI tools are priced from the selected provider/model's input/output tokens, audio seconds or compute seconds. Returned usage is recorded with model-registry estimated cost, retries/fallback indicators and a provisional margin. This is not a final provider invoice.
+- Other cloud/remote tools remain unpriced until per-tool provider invoices and infrastructure allocations can be recorded. Do not divide Render service-wide graphs across tools as though they were tool-level invoices.
+- The separate 267-tool ad-free access/session rate is not an operation price and does not replace the per-tool workload schedule.
+- Ad eligibility is determined by the separate Adsterra policy; a billing profile never grants ad eligibility.
+- Every row remains manual-audit-required and non-billable until benchmarks, exact measurement wiring, finance approval, reservations, settlement and production tests are complete.
 
-## Required next audit actions
+## Generated source of truth
 
-1. Sample each billing rule and verify the actual entry point and whether it runs locally, remotely or through an optional remote assist.
-2. Instrument input/output dimensions and measure representative light, normal and heavy workloads.
-3. Capture provider invoices/rates, retries, cache hits, failed jobs, storage and bandwidth costs.
-4. Calculate margins after provider fees, app-store fees, refunds and promotional credits.
-5. Remove pricing for any tool that cannot show a credible estimate before execution; ship it as free or premium capability until measured.
-6. Turn on billing only after entitlement enforcement, ledger settlement and production tests are complete.
+- `src/data/billing-profiles.json`: full profile for each base catalogue tool.
+- `src/data/billing-profile-runtime-extensions.json`: additional native/runtime tools.
+- `src/lib/billing/proposed-pricing.mjs`: deterministic draft workload calculator.
+- `docs/billing-proposed-prices-2026-11-25.md`: local rate distribution and per-tool pricing policy.

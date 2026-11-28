@@ -1612,6 +1612,7 @@ struct NativeInformationPageView: View {
 
     private var pageTitle: String {
         switch pageID {
+        case let id where id.hasPrefix("token-tool:"): return "Token details"
         case "about": return "About enV"
         case "pricing": return "Pricing"
         case "contact": return "Contact"
@@ -1696,6 +1697,11 @@ struct NativeInformationPageView: View {
         case "report-bugs": NativeFeedbackRequestView(isBugReport: true)
         case "suggest-tool": NativeFeedbackRequestView(isBugReport: false)
         case "help": NativeInfoSectionView(title: "enV Help Center", paragraphs: ["Browse the tool catalog or use Search tools to find an action by name or task.", "Open a tool to see its inputs, permissions, and available outputs. Some tools run on-device; AI and hosted processors require a configured connection.", "For account, access, or product questions, use Contact from More options."])
+        case let id where id.hasPrefix("token-tool:"):
+            NativeTokenGuideView(
+                tools: store.catalog.tools + (store.catalog.relatedReferenceTools ?? []),
+                initialToolID: String(id.dropFirst("token-tool:".count))
+            )
         case "token-guide": NativeTokenGuideView(tools: store.catalog.tools + (store.catalog.relatedReferenceTools ?? []))
         case "token-dashboard": NativeTokenDashboardView()
         case "account": VStack(alignment: .leading, spacing: 14) {
@@ -1725,10 +1731,15 @@ private struct NativeTokenGuideView: View {
     @State private var isLoadingProfile = false
     @State private var profileError: String?
 
-    init(tools: [Tool]) {
+    init(tools: [Tool], initialToolID: String? = nil) {
         var unique: [String: Tool] = [:]
         for tool in tools where unique[tool.id] == nil { unique[tool.id] = tool }
-        self.tools = unique.values.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        let sortedTools = unique.values.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        self.tools = sortedTools
+        let initialToolName = initialToolID.flatMap { id in sortedTools.first(where: { $0.id == id })?.name } ?? ""
+        _query = State(initialValue: initialToolName)
+        _selectedToolID = State(initialValue: initialToolID)
+        _visibleCount = State(initialValue: initialToolID == nil ? 36 : 1)
     }
 
     private var categories: [String] {
@@ -1859,9 +1870,24 @@ private struct NativeTokenProfileDetails: View {
                 Text("Numeric estimate: not available until the applicable cost can be measured").font(.subheadline.weight(.semibold)).foregroundStyle(Color.envInk)
             }
             detailRow("Pricing method", value: (profile["pricingMode"] as? String ?? "not specified").replacingOccurrences(of: "-", with: " "))
+            detailRow("Pricing basis", value: (profile["pricingBasis"] as? String ?? "measured-cost-required").replacingOccurrences(of: "-", with: " "))
+            detailRow("Workload tier", value: profile["workloadTier"] as? String ?? "provider-metered")
+            if let usdMicros = profile["proposedUsdMicrosPerUnit"] as? NSNumber, usdMicros.intValue > 0 {
+                Text("USD reference: $\(String(format: "%.6f", usdMicros.doubleValue / 1_000_000.0)) per unit").font(.footnote).foregroundStyle(Color.envMuted)
+            }
+            if let formula = profile["pricingFormula"] as? String {
+                Text(formula).font(.footnote).foregroundStyle(Color.envMuted).fixedSize(horizontal: false, vertical: true)
+            }
+            if let factors = profile["pricingFactors"] as? [String], !factors.isEmpty {
+                detailRow("Cost factors", value: factors.joined(separator: ", "))
+            }
+            if let access = profile["adFreeAccessPrice"] as? [String: Any],
+               let accessSubunits = access["subunitsPerSession"] as? NSNumber {
+                Text("Separate ad-free access fee: \(String(format: "%.3f", accessSubunits.doubleValue / 1000.0)) tokens per session. This is not the operation price.").font(.footnote).foregroundStyle(Color.envMuted)
+            }
             detailRow("Execution model", value: (profile["executionMode"] as? String ?? "tool-dependent").replacingOccurrences(of: "-", with: " "))
             detailRow("Measurement dimensions", value: (profile["meteringDimensions"] as? [String] ?? [unitLabel]).joined(separator: ", "))
-            detailRow("Pricing version", value: profile["pricingVersion"] as? String ?? "not specified")
+            detailRow("Pricing version", value: profile["toolPriceVersion"] as? String ?? profile["pricingVersion"] as? String ?? "not specified")
             if let reason = profile["classificationReason"] as? String {
                 Text(reason).font(.footnote).foregroundStyle(Color.envMuted).fixedSize(horizontal: false, vertical: true)
             }

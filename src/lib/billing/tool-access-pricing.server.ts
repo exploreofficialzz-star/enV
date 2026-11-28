@@ -55,3 +55,19 @@ export function getToolAccessPricingSummary() {
     approvedToolCount: approvedByToolId.size,
   };
 }
+
+
+/** New token reservations fail closed unless all billing release controls are explicitly approved. */
+export type ToolAccessBillingEnvironment = {
+  BILLING_LAUNCH_ENABLED?: string;
+  BILLING_ENFORCEMENT_ENABLED?: string;
+  BILLING_REFUND_DISPUTE_HANDLING_APPROVED?: string;
+};
+
+export function isToolAccessBillingEnabled(
+  env: ToolAccessBillingEnvironment = process.env,
+): boolean {
+  return env.BILLING_LAUNCH_ENABLED === "true" &&
+    env.BILLING_ENFORCEMENT_ENABLED === "true" &&
+    env.BILLING_REFUND_DISPUTE_HANDLING_APPROVED === "true";
+}

@@ -160,15 +160,16 @@ private fun NativeTokenGuideSection(heading: String, paragraphs: List<String>) {
 }
 
 @Composable
-private fun NativeTokenGuide(catalog: com.chastech.env.data.Catalog) {
+private fun NativeTokenGuide(catalog: com.chastech.env.data.Catalog, initialToolId: String? = null) {
     val allTools = remember(catalog) {
         (catalog.tools + catalog.relatedReferenceTools).distinctBy { it.id }.sortedBy { it.name.lowercase(Locale.ROOT) }
     }
     val categories = remember(allTools) { listOf("all") + allTools.map { it.category }.distinct().sorted() }
-    var query by remember { mutableStateOf("") }
+    val initialToolName = remember(allTools, initialToolId) { allTools.firstOrNull { it.id == initialToolId }?.name.orEmpty() }
+    var query by remember(initialToolId) { mutableStateOf(initialToolName) }
     var category by remember { mutableStateOf("all") }
-    var visibleCount by remember { mutableStateOf(36) }
-    var selectedToolId by remember { mutableStateOf<String?>(null) }
+    var visibleCount by remember(initialToolId) { mutableStateOf(if (initialToolId == null) 36 else 1) }
+    var selectedToolId by remember(initialToolId) { mutableStateOf(initialToolId) }
     var profile by remember { mutableStateOf<JSONObject?>(null) }
     var profileError by remember { mutableStateOf<String?>(null) }
     var loadingProfile by remember { mutableStateOf(false) }
@@ -254,12 +255,26 @@ private fun NativeTokenGuide(catalog: com.chastech.env.data.Catalog) {
                                 val subunits = details.optDouble("provisionalSubunitsPerUnit", Double.NaN)
                                 Text("Pricing status: ${details.optString("priceStatus", "provisional")}", style = MaterialTheme.typography.labelMedium)
                                 if (!details.isNull("provisionalSubunitsPerUnit") && subunits.isFinite()) {
+                                    val usdMicros = details.optLong("proposedUsdMicrosPerUnit", 0L)
                                     Text("Provisional rate: ${"%.3f".format(Locale.US, subunits / 1000.0)} tokens per $unit", style = MaterialTheme.typography.titleSmall)
+                                    if (usdMicros > 0L) Text("USD reference: ${"%.6f".format(Locale.US, usdMicros / 1_000_000.0)} per unit", style = MaterialTheme.typography.bodySmall)
                                 } else Text("Numeric estimate: not available until the applicable cost can be measured", style = MaterialTheme.typography.titleSmall)
                                 Text("Pricing method: ${details.optString("pricingMode", "not specified").replace('-', ' ')}", style = MaterialTheme.typography.bodySmall)
+                                Text("Pricing basis: ${details.optString("pricingBasis", "measured-cost-required").replace('-', ' ')} · ${details.optString("workloadTier", "provider-metered").replace('-', ' ')}", style = MaterialTheme.typography.bodySmall)
+                                val pricingFormula = details.optString("pricingFormula", "")
+                                if (pricingFormula.isNotBlank()) Text(pricingFormula, style = MaterialTheme.typography.bodySmall)
+                                val pricingFactors = details.optJSONArray("pricingFactors")
+                                if (pricingFactors != null && pricingFactors.length() > 0) {
+                                    Text("Cost factors: ${(0 until pricingFactors.length()).joinToString(", ") { pricingFactors.optString(it) }}", style = MaterialTheme.typography.bodySmall)
+                                }
+                                val adFreeAccessPrice = details.optJSONObject("adFreeAccessPrice")
+                                if (adFreeAccessPrice != null) {
+                                    val accessSubunits = adFreeAccessPrice.optInt("subunitsPerSession", 0)
+                                    if (accessSubunits > 0) Text("Separate ad-free access fee: ${"%.3f".format(Locale.US, accessSubunits / 1000.0)} tokens per session. This is not the operation price.", style = MaterialTheme.typography.bodySmall)
+                                }
                                 Text("Execution model: ${details.optString("executionMode", "tool-dependent").replace('-', ' ')}", style = MaterialTheme.typography.bodySmall)
                                 Text("Measurement dimensions: ${details.optJSONArray("meteringDimensions")?.let { array -> (0 until array.length()).joinToString(", ") { array.optString(it) } } ?: unit}", style = MaterialTheme.typography.bodySmall)
-                                Text("Pricing version: ${details.optString("pricingVersion", "not specified")}", style = MaterialTheme.typography.bodySmall)
+                                Text("Pricing version: ${details.optString("toolPriceVersion", details.optString("pricingVersion", "not specified"))}", style = MaterialTheme.typography.bodySmall)
                                 Text(details.optString("classificationReason", "Generated from catalogue metadata; actual costs have not necessarily been measured."), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 if (details.optBoolean("premiumRequired")) Text("Catalogued premium flag: enabled", style = MaterialTheme.typography.labelSmall)
                                 val aiProfile = details.optString("optionalAiAssistProfile", "")
@@ -278,23 +293,26 @@ private fun NativeTokenGuide(catalog: com.chastech.env.data.Catalog) {
 @Composable
 fun NativeInformationScreen(pageId: String, catalog: com.chastech.env.data.Catalog, onBack: () -> Unit, onOpenWallet: () -> Unit, onOpenHistory: () -> Unit) {
     val context = LocalContext.current
-    val title = when (pageId) {
-        "about" -> "About enV"
-        "help" -> "Help center"
-        "token-guide" -> "Token guide"
-        "token-dashboard" -> "Token dashboard"
-        "wallet" -> "Wallet"
-        "pricing" -> "Pricing"
-        "contact" -> "Contact"
-        "report-bugs" -> "Report bugs"
-        "suggest-tool" -> "Suggest a tool"
-        "account" -> "Account"
-        "history" -> "History"
-        "privacy" -> "Privacy"
-        "terms" -> "Terms of Use"
-        "disclaimer" -> "Disclaimer"
-        "responsible-use" -> "Responsible Use"
-        else -> "About enV"
+    val title = when {
+        pageId.startsWith("token-tool:") -> "Token details"
+        else -> when (pageId) {
+            "about" -> "About enV"
+            "help" -> "Help center"
+            "token-guide" -> "Token guide"
+            "token-dashboard" -> "Token dashboard"
+            "wallet" -> "Wallet"
+            "pricing" -> "Pricing"
+            "contact" -> "Contact"
+            "report-bugs" -> "Report bugs"
+            "suggest-tool" -> "Suggest a tool"
+            "account" -> "Account"
+            "history" -> "History"
+            "privacy" -> "Privacy"
+            "terms" -> "Terms of Use"
+            "disclaimer" -> "Disclaimer"
+            "responsible-use" -> "Responsible Use"
+            else -> "About enV"
+        }
     }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 40.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -326,30 +344,33 @@ fun NativeInformationScreen(pageId: String, catalog: com.chastech.env.data.Catal
                 }
             }
 
-            when (pageId) {
-                "about" -> AboutInformation()
-                "help" -> InformationSection("enV Help Center", listOf("Browse the tool catalog or use Search tools to find an action by name or task.", "Open a tool to see its required inputs, permissions, and available outputs. Some tools work entirely on-device; AI and hosted processors require a configured connection.", "For account, access, or product questions, use Contact from More options."))
-                "token-guide" -> NativeTokenGuide(catalog)
-                "token-dashboard" -> NativeTokenDashboard(onOpenWallet)
-                "pricing" -> PricingInformation(onOpenWallet)
-                "contact" -> ContactInformation()
-                "report-bugs" -> NativeFeedbackRequestPage(isBugReport = true)
-                "suggest-tool" -> NativeFeedbackRequestPage(isBugReport = false)
-                "account" -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    InformationSection("Welcome back to enV", listOf("Sign in or create an account from the enV sign-in page."))
-                    Button(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/account"))) }, modifier = Modifier.fillMaxWidth()) { Text("Continue to sign in") }
+            when {
+                pageId.startsWith("token-tool:") -> NativeTokenGuide(catalog, pageId.removePrefix("token-tool:"))
+                else -> when (pageId) {
+                    "about" -> AboutInformation()
+                    "help" -> InformationSection("enV Help Center", listOf("Browse the tool catalog or use Search tools to find an action by name or task.", "Open a tool to see its required inputs, permissions, and available outputs. Some tools work entirely on-device; AI and hosted processors require a configured connection.", "For account, access, or product questions, use Contact from More options."))
+                    "token-guide" -> NativeTokenGuide(catalog)
+                    "token-dashboard" -> NativeTokenDashboard(onOpenWallet)
+                    "pricing" -> PricingInformation(onOpenWallet)
+                    "contact" -> ContactInformation()
+                    "report-bugs" -> NativeFeedbackRequestPage(isBugReport = true)
+                    "suggest-tool" -> NativeFeedbackRequestPage(isBugReport = false)
+                    "account" -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        InformationSection("Welcome back to enV", listOf("Sign in or create an account from the enV sign-in page."))
+                        Button(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://envtools.store/account"))) }, modifier = Modifier.fillMaxWidth()) { Text("Continue to sign in") }
+                    }
+                    "wallet" -> NativeWalletDashboard(onOpenHistory)
+                    "history" -> NativeWalletHistory()
+                    "privacy" -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        PrivacyInformation()
+                        NativeAdsPrivacyDisclosure()
+                        NativeAdsPrivacyOptionsButton()
+                    }
+                    "terms" -> TermsInformation()
+                    "disclaimer" -> DisclaimerInformation()
+                    "responsible-use" -> ResponsibleUseInformation()
+                    else -> AboutInformation()
                 }
-                "wallet" -> NativeWalletDashboard(onOpenHistory)
-                "history" -> NativeWalletHistory()
-                "privacy" -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    PrivacyInformation()
-                    NativeAdsPrivacyDisclosure()
-                    NativeAdsPrivacyOptionsButton()
-                }
-                "terms" -> TermsInformation()
-                "disclaimer" -> DisclaimerInformation()
-                "responsible-use" -> ResponsibleUseInformation()
-                else -> AboutInformation()
             }
             Spacer(Modifier.height(8.dp))
         }

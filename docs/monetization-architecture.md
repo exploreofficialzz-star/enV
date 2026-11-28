@@ -2,16 +2,16 @@
 
 **Status:** foundation implemented; live purchases and token enforcement remain disabled.  
 **Pricing version:** `env-metering-preview-2026-10-18-v1`  
-**Catalogue coverage:** 10,025 Web catalogue tool entries at the time of profile generation. All 7,782 Android and 7,782 iOS native-engine inventory IDs also resolve to the shared profile registry.
+**Catalogue coverage:** Generated from the current canonical Web catalogue and native runtime-extension inventory. The current exact counts are emitted by the billing profile generator and its generated catalogue-wide audit report.
 
 ## Decisions locked for this release
 
-1. No advertising in this monetization plan. The policy sets `adsEligible: false` for every catalogue profile. Tool screens remain focused; revenue comes from token usage and optional premium capability access.
+1. Advertising eligibility is governed separately from billing profiles. Adsterra may be shown only on approved standard tools; Studios, Labs, Sandbox, AI, high-end, premium/frontier and restricted topics are excluded. A tool's ad eligibility never determines its token price or premium entitlement.
 2. A shared enV token wallet meters tool work and AI-agent workflows. The visible enV Token is a prepaid accounting unit, not an AI model token.
 3. The global reference value is fixed at 1 enV Token = USD $0.01 (100 enV Tokens = USD $1.00). This is a non-cash accounting reference, not withdrawable or transferable value. Paystack and Flutterwave local settlement amounts are derived server-side from a dated USD FX snapshot; local token-price overrides are not used.
 4. The ledger stores integer milli-tokens: 1 visible token = 1,000 subunits. This permits very small usage prices without floating-point arithmetic.
 5. The initial calculator hypothesis is 100 subunits per simple calculation: ten basic calculations = one token. This is illustrative and must be tested for usability before production.
-6. Local operations use provisional intensity classes. Cloud, AI and agent work require defensible all-in variable-cost measurements and a configured margin before the quote can return a numeric price. The code has a provisional 60% gross-margin target as a default, not an approved business setting; provider, gateway/store, infrastructure and other variable fees must be included in the cost model before production pricing is approved.
+6. Local tools have individual workload-based draft tariffs keyed by tool ID, with tool-specific units such as calculations, file conversions, characters, megapixels, audio/video minutes, document pages, archive bytes, render minutes, design operations or business operations. These are proposed value/workload rates, not measured device CPU costs; benchmarks and finance approval are still required. Cloud/media/document tools require measured provider/infrastructure cost. Direct AI tools use the selected model rate card and returned input/output/audio/compute usage, with retries and fallbacks recorded. A provisional 60% gross-margin target exists in the code but is not an approved business setting.
 7. Premium is an entitlement for access to frontier models and genuinely advanced workflows; it is not unlimited computation. Metered work still consumes tokens.
 8. Purchased tokens are intended not to expire. Purchased and promotional tokens should be kept separately if promotions are later added. Store and jurisdictional terms apply.
 9. No real payment, top-up, voucher redemption, carrier-billing charge or token deduction is activated by these changes.
@@ -21,8 +21,8 @@
 - `src/lib/billing/catalog.ts`: central operation rules, reference-value conversions, quote logic and the public billing status.
 - `scripts/generate-billing-profiles.mjs`: classifies each tool from the authoritative catalogue fields. Re-run with `npm run generate:billing-profiles` when the catalogue changes.
 - `src/data/billing-profiles.json`: full generated profile and audit reason for each tool.
-- `src/data/billing-profile-index.json`: compact runtime lookup by tool ID.
-- `docs/billing-tool-audit-2026-10-18.md`: profile counts, assumptions and required audit steps.
+- `src/data/billing-profile-index.json`: compact catalogue lookup by tool ID. The server-side profile API reads the full generated `billing-profiles.json` rows so each tool's execution mode and operation cost-driver dimensions are preserved.
+- `docs/billing-tool-audit-2026-10-18.md`: original whole-catalogue profile coverage audit; `docs/billing-proposed-prices-2026-11-25.md`: current per-tool workload schedule summary.
 - `migrations/0002_billing.sql`: wallet accounts, append-only token ledger, reservations, purchase intents, shared premium entitlement state, idempotent event records and per-operation usage events.
 - `src/lib/billing/ledger.server.ts`: server-only wallet mutations with transactions, locking, idempotency and budget reservation/settlement/release primitives.
 - `server/routes/api/billing/catalog.get.ts`: public policy and supported-operation preview.
@@ -30,32 +30,20 @@
 - `server/routes/api/billing/wallet.get.ts`: authenticated wallet and ledger activity endpoint; requires configured account auth.
 - `server/routes/api/billing/purchases.post.ts`: server-side dispatch to Paystack only for customers in the configured Paystack merchant country, independently selected Flutterwave V4 methods only for non-Nigerian enabled country/currency profiles, or the existing Cryptomus adapter. Flutterwave is never a Paystack fallback. All routes remain fail-closed behind merchant approval, pricing and refund/dispute gates. See `docs/payment-provider-routing.md`.
 - `src/components/billing/tool-token-estimate.tsx`: Web tool-detail estimate, explicitly marked provisional and non-billable in this release.
-- Android/iOS/Web pricing and legal copy: aligned on token reference value, no disruptive ads, premium-vs-usage distinction and inactive purchases.
+- Android/iOS/Web pricing and legal copy: aligned on token reference value, eligible-only advertising, premium-vs-usage distinction and inactive purchases.
 
 ## Per-tool profile rules
 
-The generator uses catalogue execution metadata, category, engine type and descriptive signals to assign a draft billing key, and it fails if any native Android/iOS tool ID is missing from the shared registry. It creates a profile for every catalogue tool and marks every row `manualAuditRequired: true`. This is a classification and pricing hypothesis, **not a measurement of each tool's real compute cost**.
+The generator reads the authoritative catalogue and runtime-extension records, and fails if any native Android/iOS tool ID is missing from the shared registry. Every tool receives a record keyed by its tool ID, containing its execution classification, workload unit, proposed rate where locally measurable, USD reference equivalent, workload tier, pricing formula, factors, metering dimensions and manual-audit status.
 
-Current generated distribution:
+- `scripts/generate-billing-profiles.mjs` creates the per-tool records.
+- `src/lib/billing/proposed-pricing.mjs` calculates distinct local workload rates from the tool's engine, name, description, category and workload signals.
+- `src/data/billing-profiles.json` is the full per-tool schedule consumed by the server-side profile and quote APIs.
+- `docs/billing-proposed-prices-2026-11-25.md` is the generated rate distribution and pricing-method summary.
 
-| Draft billing class | Tools |
-|---|---:|
-| Local calculator | 6,546 |
-| Local general utility | 2,603 |
-| Local audio processing | 106 |
-| Local basic image | 235 |
-| Local intensive image | 148 |
-| Local converter | 145 |
-| Local text | 38 |
-| Local video | 3 |
-| Cloud audio | 7 |
-| Cloud documents | 82 |
-| Cloud generic | 3 |
-| Cloud transcription | 3 |
-| Cloud video | 106 |
-| **Total** | **10,025** |
+The local rates are provisional workload/value proposals, not measured handset CPU costs. AI estimates use the active model-registry rates and returned usage; they remain model-cost estimates until reconciled with provider invoices. Remote media/document/processor jobs stay `requires-cost-measurement` until provider invoices and infrastructure allocations can be tied to their tool IDs. Every record remains `manualAuditRequired: true`; all live charging stays disabled.
 
-Use these groupings to prioritize the audit. Do not treat them as final prices, verified runtime classifications, or proof that the work runs on a particular device or server. Verify actual execution paths and instrument dimensions at the handler that does the work.
+Every local tool has a numeric proposed rate with a tool-specific unit and formula. This is not permission to deduct tokens: handlers must capture actual units and settle them through the server ledger before any production charge can be enabled.
 
 ## Quote and charge contract
 
@@ -69,7 +57,7 @@ Before live billing is enabled, each chargeable handler must:
 6. Settle using recorded actual cost and the published margin rule, releasing unused reservation. Pause for explicit approval if work would exceed the authorized reservation.
 7. Refund or release tokens under explicit failed-job and cancellation rules; reconcile ledger totals against provider and store reports.
 
-The quote endpoint deliberately accepts `toolId` or `operationId` and not a client-provided provider cost. Premium access is derived from server-side entitlement state when auth is configured; a client-supplied premium flag is never trusted. The current response always marks `billingActive: false`.
+The quote endpoint deliberately accepts `toolId` or `operationId` and not a client-provided provider cost. For local tools it returns the selected tool ID’s own proposed unit/rate and a provisional estimate; variable remote/AI work is never given a guessed generic category amount. It may accept numeric input measurements for a preview, but these are explicitly marked client-supplied and must never be used as settlement evidence. The actual execution handler must capture the completed workload and pass trusted measurements to the server ledger. Premium access is derived from server-side entitlement state when auth is configured; a client-supplied premium flag is never trusted. The current response always marks `billingActive: false`.
 
 ## Security and accounting requirements
 

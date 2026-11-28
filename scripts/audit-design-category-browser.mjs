@@ -49,7 +49,7 @@ for (const [browserName, browserType] of browserEntries) {
   // Wait for the client-side explorer to hydrate before exercising controlled React inputs.
   await page.waitForLoadState("networkidle", { timeout: 30000 });
 
-  const cards = page.locator('a[href^="/tools/design/"]');
+  const cards = page.locator('section[aria-label="Design tools"] a[href^="/tools/design/"]');
   const cardCount = await cards.count();
   const badge = await page.getByText(/^\d+\s+tools?\s+in this workspace$/).first().textContent();
   const advertisedCount = Number(badge?.match(/\d+/)?.[0]);

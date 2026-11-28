@@ -599,6 +599,18 @@ export function ToolShell({
       ) : null}
         </>
       ) : null}
+      {!isFullscreen ? (
+        <div className="mt-5">
+          <Link
+            to="/tokens/$toolId"
+            params={{ toolId: tool.id }}
+            className="text-sm font-semibold text-muted underline underline-offset-4 hover:text-fg"
+          >
+            Token details
+          </Link>
+        </div>
+      ) : null}
+
       <AdFreeAfterThreeVisitsDialog
         open={showAdFreeOffer}
         signedIn={Boolean(accessUser)}
