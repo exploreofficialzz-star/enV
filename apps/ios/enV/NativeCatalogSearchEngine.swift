@@ -253,9 +253,8 @@ final class NativeCatalogSearchEngine {
 
     private func tokenize(_ value: String) -> [String] {
         let accepted = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "%+"))
-        return value.lowercased().unicodeScalars
-            .split { !accepted.contains($0) }
-            .map { String(String.UnicodeScalarView($0)) }
+        return value.lowercased()
+            .components(separatedBy: accepted.inverted)
             .filter { $0.count >= minimumPrefixLength || $0 == "%" }
     }
 
