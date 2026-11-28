@@ -1320,7 +1320,12 @@ struct SearchResultsView: View {
                         .focused($isSearchFocused)
                         .submitLabel(.search)
                         .onSubmit {
-                            text = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
+                            if let first = suggestions.first {
+                                searchNavigationTool = first
+                                showSearchNavigation = true
+                            } else {
+                                text = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
+                            }
                             isSearchFocused = false
                         }
                     Button {
