@@ -230,7 +230,8 @@ export function suggestTools(tools: ToolMeta[], query: string, limit = 8): ToolM
   }
 
   ranked.sort((a, b) =>
-    b.score - a.score
+    Number(a.doc.tool.status === "planned") - Number(b.doc.tool.status === "planned")
+    || b.score - a.score
     || a.doc.normalizedName.localeCompare(b.doc.normalizedName)
     || a.doc.tool.id.localeCompare(b.doc.tool.id),
   );
