@@ -82,6 +82,16 @@ final class CatalogCoreTests: XCTestCase {
         XCTAssertEqual(catalog.webSearch("").map(\.id), ["future-tool", "case-converter", "word-count"])
     }
 
+    func testNativeAutocompleteUsesNameAndKeywordPrefixesWithoutSearchingDescriptions() {
+        let store = CatalogStore(catalog: catalog)
+        store.prepareSearchIndex()
+
+        XCTAssertEqual(store.webSuggestions("case conv", limit: 8, includeRelatedReferences: true).first?.id, "case-converter")
+        XCTAssertEqual(store.webSuggestions("uppercase", limit: 8, includeRelatedReferences: true).first?.id, "case-converter")
+        XCTAssertTrue(store.webSuggestions("private phrase", limit: 8, includeRelatedReferences: true).isEmpty)
+        XCTAssertEqual(store.webSearch("case-converter", limit: Int.max, includeRelatedReferences: true).first?.id, "case-converter")
+    }
+
     func testAccessibilityDiscoveryUsesEightStudiosAndPreservesLegacyIDs() {
         let ids = ["contrast-checker", "alt-text-checker", "focus-state-checker", "text-readability-checker", "aria-checker", "motion-checker", "keyboard-navigation-checker", "form-checker"]
         let sources = ids.map { id in
