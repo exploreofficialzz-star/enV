@@ -137,7 +137,6 @@ import com.chastech.env.data.displayTool
 import com.chastech.env.data.FavoritesStore
 import com.chastech.env.data.NativeCopy
 import com.chastech.env.data.webSearch
-import com.chastech.env.data.webSearchSuggestions
 import com.chastech.env.data.ToolRecord
 import com.chastech.env.data.featuredOrPopular
 import com.chastech.env.data.nativeDisclaimerText
