@@ -1,12 +1,18 @@
 import { useNavigate } from "@tanstack/react-router";
 import { ArrowRight, Search } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { getAllTools, getSearchableTools, toolPath } from "@/lib/registry";
-import { searchToolResults } from "@/lib/search";
+import { normalizeText } from "@/lib/search";
+import { prepareToolSuggestions, suggestTools } from "@/lib/search-autocomplete";
 import { cn } from "@/lib/utils";
 import type { ToolMeta } from "@/types/tool";
 import { isToolUnderProduction } from "@/lib/production-notice";
 import { UnderProductionDialog } from "@/components/tools/under-production";
+
+type IdleWindow = Window & {
+  requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
+  cancelIdleCallback?: (handle: number) => void;
+};
 
 export function SearchBox({
   large = false,
@@ -16,7 +22,7 @@ export function SearchBox({
   value,
   onValueChange,
   onEnter,
-  placeholder = `Search ${getAllTools().length.toLocaleString()} tools…`,
+  placeholder = \`Search \${getAllTools().length.toLocaleString()} tools…\`,
   leading,
   trailing,
   showSearchIcon = true,
@@ -44,13 +50,45 @@ export function SearchBox({
   const setQ = onValueChange ?? setInner;
   const [open, setOpen] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [suggestions, setSuggestions] = useState<ToolMeta[]>([]);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const [productionTool, setProductionTool] = useState<ToolMeta | null>(null);
   const nav = useNavigate();
   const boxRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const inputId = useId();
+  const listboxId = useId();
+  const searchable = useMemo(() => getSearchableTools(), []);
+  const normalizedQuery = normalizeText(q);
 
-  const searchable = getSearchableTools();
-  const results = useMemo(() => (q.trim() ? searchToolResults(searchable, q, 8).matches : []), [q, searchable]);
+  useEffect(() => {
+    const idleWindow = window as IdleWindow;
+    if (idleWindow.requestIdleCallback) {
+      const handle = idleWindow.requestIdleCallback(
+        () => prepareToolSuggestions(searchable),
+        { timeout: 1600 },
+      );
+      return () => idleWindow.cancelIdleCallback?.(handle);
+    }
+
+    const handle = window.setTimeout(() => prepareToolSuggestions(searchable), 500);
+    return () => window.clearTimeout(handle);
+  }, [searchable]);
+
+  useEffect(() => {
+    if (!open || normalizedQuery.length < 2) {
+      setSuggestions([]);
+      setActiveIndex(-1);
+      return;
+    }
+
+    // Debounce only the lightweight prefix lookup, never the full ranked catalogue search.
+    const handle = window.setTimeout(() => {
+      setSuggestions(suggestTools(searchable, q, 8));
+      setActiveIndex(-1);
+    }, 120);
+    return () => window.clearTimeout(handle);
+  }, [open, normalizedQuery, q, searchable]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -64,24 +102,50 @@ export function SearchBox({
   }, []);
 
   useEffect(() => {
-    const onDoc = (e: MouseEvent) => {
+    const onDoc = (e: PointerEvent) => {
       if (!boxRef.current?.contains(e.target as Node)) setOpen(false);
     };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    document.addEventListener("pointerdown", onDoc);
+    return () => document.removeEventListener("pointerdown", onDoc);
   }, []);
+
+  const selectTool = (tool: ToolMeta) => {
+    setQ(tool.name);
+    setOpen(false);
+    setActiveIndex(-1);
+    if (isToolUnderProduction(tool)) setProductionTool(tool);
+    else nav({ to: toolPath(tool) });
+  };
+
+  const submitSearch = (query = q) => {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    setOpen(false);
+    setActiveIndex(-1);
+    if (onEnter) onEnter(trimmed);
+    else nav({ to: "/search", search: { q: trimmed } });
+  };
 
   const renderInput = (baseClassName: string) => (
     <input
-      id="env-search"
+      id={inputId}
       ref={inputRef}
       type={variant === "inline" ? "search" : "text"}
+      role="combobox"
+      aria-label="Search tools"
+      aria-autocomplete="list"
+      aria-expanded={open && Boolean(q.trim())}
+      aria-controls={listboxId}
+      aria-activedescendant={activeIndex >= 0 && suggestions[activeIndex] ? \`\${listboxId}-option-\${activeIndex}\` : undefined}
       value={q}
       autoFocus={autoFocus}
       autoComplete="off"
+      spellCheck={false}
       placeholder={hidePlaceholderOnFocus && focused ? "" : placeholder}
       onChange={(e) => {
         setQ(e.target.value);
+        setSuggestions([]);
+        setActiveIndex(-1);
         setOpen(true);
       }}
       onFocus={() => {
@@ -90,16 +154,21 @@ export function SearchBox({
       }}
       onBlur={() => setFocused(false)}
       onKeyDown={(e) => {
-        if (e.key === "Enter") {
+        if (e.key === "ArrowDown") {
           e.preventDefault();
-          if (onEnter) onEnter(q);
-          else if (results[0]?.tool) {
-            const firstTool = results[0].tool;
-            if (isToolUnderProduction(firstTool)) setProductionTool(firstTool);
-            else nav({ to: toolPath(firstTool) });
-          }
-          else nav({ to: "/search", search: { q } });
+          setOpen(true);
+          setActiveIndex((current) => Math.min(suggestions.length - 1, current + 1));
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault();
+          setActiveIndex((current) => current <= 0 ? suggestions.length - 1 : current - 1);
+        } else if (e.key === "Escape") {
           setOpen(false);
+          setActiveIndex(-1);
+        } else if (e.key === "Enter") {
+          e.preventDefault();
+          const active = activeIndex >= 0 ? suggestions[activeIndex] : undefined;
+          if (active) selectTool(active);
+          else submitSearch();
         }
       }}
       className={cn(baseClassName, inputClassName)}
@@ -112,9 +181,6 @@ export function SearchBox({
       role={variant === "inline" ? "search" : undefined}
       className={cn("relative w-full", large ? "max-w-2xl" : "max-w-xl", className)}
     >
-      <label className="sr-only" htmlFor="env-search">
-        Search tools
-      </label>
       {variant === "inline" ? (
         <div className={containerClassName}>
           {leading}
@@ -134,52 +200,50 @@ export function SearchBox({
           {trailing ? <span className="absolute top-1/2 right-2 z-10 -translate-y-1/2">{trailing}</span> : null}
         </>
       )}
-      {open && q.trim() && (
-        <ul
-          className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl bg-surface py-1 shadow-[var(--shadow-border)]"
-          role="listbox"
-        >
-          {results.length === 0 ? (
-            <li className="px-4 py-3 text-sm text-muted">No matching tools. Try “json”, “bmi”, or “qr”.</li>
-          ) : (
-            results.map((match) => {
-              const tool = match.tool;
-              return (
+      {open && q.trim() ? (
+        <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl bg-surface shadow-[var(--shadow-border)]">
+          {suggestions.length > 0 ? (
+            <ul id={listboxId} className="py-1" role="listbox" aria-label="Tool suggestions">
+              {suggestions.map((tool, index) => (
                 <li key={tool.id}>
                   <button
+                    id={\`\${listboxId}-option-\${index}\`}
                     type="button"
-                    className="flex w-full items-end gap-3 px-4 py-2.5 text-left hover:bg-surface-2"
-                    onClick={() => {
-                      if (isToolUnderProduction(tool)) setProductionTool(tool);
-                      else nav({ to: toolPath(tool) });
-                      setOpen(false);
-                    }}
+                    role="option"
+                    aria-selected={activeIndex === index}
+                    className={cn(
+                      "flex w-full items-center gap-3 px-4 py-2.5 text-left",
+                      activeIndex === index ? "bg-surface-2" : "hover:bg-surface-2",
+                    )}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    onClick={() => selectTool(tool)}
                   >
+                    <Search className="size-4 shrink-0 text-subtle" aria-hidden="true" />
                     <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-2 text-sm font-medium">{tool.name}{isToolUnderProduction(tool) ? <span className="text-[10px] font-semibold uppercase tracking-wide text-subtle">Under production</span> : tool.status === "planned" ? <span className="text-[10px] font-semibold uppercase tracking-wide text-subtle">Coming soon</span> : null}</span>
-                      <span className="line-clamp-1 text-xs text-muted">{tool.description}</span>
-                      <span className="mt-0.5 block line-clamp-1 text-[11px] leading-4 text-subtle" aria-label={"Why " + tool.name + " matched"}>{match.explanation}</span>
+                      <span className="block truncate text-sm font-medium text-fg">{tool.name}{tool.status === "planned" ? <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-subtle">Coming soon</span> : null}</span>
+                      <span className="block truncate text-xs capitalize text-muted">{tool.subcategory ? \`\${tool.category} · \${tool.subcategory}\` : tool.category}</span>
                     </span>
-                    <ArrowRight className="size-4 shrink-0" aria-hidden="true" />
+                    <ArrowRight className="size-4 shrink-0 text-subtle" aria-hidden="true" />
                   </button>
                 </li>
-              );
-            })
+              ))}
+            </ul>
+          ) : (
+            <p className="px-4 py-3 text-sm text-muted" aria-live="polite">
+              {normalizedQuery.length < 2 ? "Type at least 2 characters for suggestions." : "No quick matches yet. Search the full tool catalogue."}
+            </p>
           )}
-          <li>
+          <div className="border-t border-border px-2 py-1">
             <button
               type="button"
-              className="w-full px-4 py-2 text-left text-xs font-medium text-accent hover:bg-surface-2"
-              onClick={() => {
-                nav({ to: "/search", search: { q } });
-                setOpen(false);
-              }}
+              className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-accent hover:bg-surface-2"
+              onClick={() => submitSearch()}
             >
-              See more results
+              Search all tools for “{q.trim()}”
             </button>
-          </li>
-        </ul>
-      )}
+          </div>
+        </div>
+      ) : null}
       <UnderProductionDialog
         open={productionTool !== null}
         toolName={productionTool?.name ?? "This tool"}
