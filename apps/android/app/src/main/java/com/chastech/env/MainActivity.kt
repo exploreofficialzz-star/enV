@@ -311,6 +311,9 @@ private fun EnVApp(
     onUseSystemTheme: () -> Unit,
 ) {
     val context = LocalContext.current
+    LaunchedEffect(catalog) {
+        withContext(Dispatchers.Default) { catalog.prepareSearchIndex() }
+    }
     var tab by rememberSaveable { mutableStateOf(AppTab.Home.name) }
     var query by rememberSaveable { mutableStateOf("") }
     var homeQuery by rememberSaveable { mutableStateOf("") }
@@ -458,7 +461,7 @@ private fun EnVApp(
                     when (currentTab) {
                         AppTab.Home -> HomeScreen(catalog, favoriteIds, mostUsedIds, homeQuery, { homeQuery = it }, { submitted -> query = submitted; category = null; tab = AppTab.Search.name }, { tab = AppTab.Tools.name }, { page -> informationReturnTab = tab; informationPage = page; tab = AppTab.Account.name; showInformation = true }, darkMode, openTool, { favoriteIds = favorites.toggle(it) }, { detailStack = emptyList(); category = null; tab = AppTab.Assistant.name })
                         AppTab.Assistant -> AssistantScreen(catalog, assistantMessages, { assistantMessages = it }, openTool, assistantDraft, { assistantDraft = it })
-                        AppTab.Tools -> ToolsScreen(catalog, category, query, { query = it }, { category = it }, openTool, { tab = AppTab.Search.name })
+                        AppTab.Tools -> ToolsScreen(catalog, category, query, { query = it }, { category = it }, openTool, { submitted -> query = submitted; tab = AppTab.Search.name })
                         AppTab.Search -> SearchScreen(catalog, query, { query = it }, openTool)
                         AppTab.Saved -> SavedScreen(catalog, favoriteIds, openTool, { favoriteIds = favorites.toggle(it) })
                         AppTab.Account -> when {
@@ -558,7 +561,17 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
         mostUsedIds.mapNotNull { catalog.displayTool(it) }.distinctBy { it.id }.take(10)
     }
     val homeSurface2 = if (darkMode) Color(0xFF1E2327) else Color(0xFFEFECE6)
-    val suggestions = remember(catalog, homeQuery) { if (homeQuery.isBlank()) emptyList() else catalog.webSearch(homeQuery, limit = 8, includeRelatedReferences = true) }
+    var suggestions by remember(catalog) { mutableStateOf(emptyList<ToolRecord>()) }
+    LaunchedEffect(catalog, homeQuery) {
+        if (homeQuery.isBlank()) {
+            suggestions = emptyList()
+        } else {
+            kotlinx.coroutines.delay(120)
+            suggestions = withContext(Dispatchers.Default) {
+                catalog.webSearchSuggestions(homeQuery, limit = 8, includeRelatedReferences = true)
+            }
+        }
+    }
     var homeSearchFocused by remember { mutableStateOf(false) }
     val openHomeSearch = { val query = homeQuery.trim(); suggestions.firstOrNull()?.let { onTool(it.id) } ?: onSearch(query) }
     LazyColumn(contentPadding = PaddingValues(top = 4.dp, bottom = 0.dp), verticalArrangement = Arrangement.spacedBy(40.dp)) {
@@ -808,18 +821,27 @@ private fun FooterLegalLinks(onInformation: (String) -> Unit, footerSubtle: Colo
 }
 
 @Composable
-private fun ToolsScreen(catalog: Catalog, category: String?, query: String, onQuery: (String) -> Unit, onCategory: (String?) -> Unit, onTool: (String) -> Unit, onSearch: () -> Unit) {
+private fun ToolsScreen(catalog: Catalog, category: String?, query: String, onQuery: (String) -> Unit, onCategory: (String?) -> Unit, onTool: (String) -> Unit, onSearch: (String) -> Unit) {
     if (category != null) {
         CategoryScreen(catalog, category, { onCategory(null) }, onTool)
         return
     }
     val visibleCounts = remember { mutableStateMapOf<String, Int>() }
-    LaunchedEffect(query) { visibleCounts.clear() }
+    var draftQuery by rememberSaveable { mutableStateOf(query) }
+    LaunchedEffect(query) {
+        draftQuery = query
+        visibleCounts.clear()
+    }
     val screenWidth = LocalConfiguration.current.screenWidthDp
     val columns = when { screenWidth >= 1024 -> 3; screenWidth >= 640 -> 2; else -> 1 }
-    val groupedTools = remember(catalog, query) {
-        val byCategory = catalog.webSearch(query, includeRelatedReferences = true).groupBy { it.category }
-        catalog.categories.mapNotNull { item -> byCategory[item.id]?.let { item to it } }
+    var groupedTools by remember(catalog) {
+        mutableStateOf(emptyList<Pair<com.chastech.env.data.Category, List<ToolRecord>>>())
+    }
+    LaunchedEffect(catalog, query) {
+        groupedTools = withContext(Dispatchers.Default) {
+            val byCategory = catalog.webSearch(query, includeRelatedReferences = true).groupBy { it.category }
+            catalog.categories.mapNotNull { item -> byCategory[item.id]?.let { item to it } }
+        }
     }
     LazyColumn(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 40.dp),
@@ -832,15 +854,18 @@ private fun ToolsScreen(catalog: Catalog, category: String?, query: String, onQu
                     Text("All tools", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Normal, maxLines = 1, modifier = Modifier.weight(1f))
                     WebToolsSearchField(
                         catalog = catalog,
-                        query = query,
-                        onQuery = onQuery,
+                        query = draftQuery,
+                        onQuery = { draftQuery = it },
                         modifier = Modifier.width(if (screenWidth >= 640) 288.dp else (screenWidth * 0.52f).dp),
                         onTool = onTool,
                         onSubmit = {
-                            val first = catalog.webSearch(query, limit = 8, includeRelatedReferences = true).firstOrNull()
-                            if (query.isNotBlank() && first != null) onTool(first.id) else onSearch()
+                            val submitted = draftQuery.trim()
+                            if (submitted.isNotBlank()) onSearch(submitted)
                         },
-                        onSeeMore = onSearch,
+                        onSeeMore = {
+                            onQuery(draftQuery)
+                            onSearch(draftQuery)
+                        },
                     )
                 }
                 Text("Find a tool by name or browse the categories below.", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -962,14 +987,24 @@ private fun WebToolsSearchField(
     onSeeMore: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val suggestions = remember(catalog, query) { if (query.isBlank()) emptyList() else catalog.webSearch(query, limit = 8, includeRelatedReferences = true) }
+    var suggestions by remember(catalog) { mutableStateOf(emptyList<ToolRecord>()) }
+    LaunchedEffect(catalog, query) {
+        if (query.isBlank()) {
+            suggestions = emptyList()
+        } else {
+            kotlinx.coroutines.delay(120)
+            suggestions = withContext(Dispatchers.Default) {
+                catalog.webSearchSuggestions(query, limit = 8, includeRelatedReferences = true)
+            }
+        }
+    }
     Column(modifier) {
         Surface(Modifier.fillMaxWidth().height(44.dp), color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(22.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline), shadowElevation = 1.dp) {
             Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 EnVIcon("Search", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                     if (query.isEmpty()) Text("Search tools", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    BasicTextField(value = query, onValueChange = onQuery, modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused }.semantics { contentDescription = "Search tools" }, textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface), singleLine = true, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), keyboardActions = KeyboardActions(onSearch = { onSubmit() }))
+                    BasicTextField(value = query, onValueChange = onQuery, modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused }.semantics { contentDescription = "Search tools" }, textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface), singleLine = true, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), keyboardActions = KeyboardActions(onSearch = { suggestions.firstOrNull()?.let { onTool(it.id) } ?: onSubmit() }))
                 }
             }
         }
@@ -1013,8 +1048,14 @@ private fun WebSeeMoreToolsButton(onClick: () -> Unit) {
 private fun SearchScreen(catalog: Catalog, query: String, onQuery: (String) -> Unit, onTool: (String) -> Unit) {
     var visibleCount by rememberSaveable { mutableIntStateOf(24) }
     var searchFocused by remember { mutableStateOf(false) }
-    LaunchedEffect(query) { visibleCount = 24 }
-    val results = remember(catalog, query) { if (query.trim().isEmpty()) emptyList() else catalog.webSearch(query, includeRelatedReferences = true) }
+    var draftQuery by rememberSaveable { mutableStateOf(query) }
+    LaunchedEffect(query) { draftQuery = query; visibleCount = 24 }
+    var results by remember(catalog) { mutableStateOf(emptyList<ToolRecord>()) }
+    LaunchedEffect(catalog, query) {
+        results = if (query.trim().isEmpty()) emptyList() else withContext(Dispatchers.Default) {
+            catalog.webSearch(query, includeRelatedReferences = true)
+        }
+    }
     val screenWidth = LocalConfiguration.current.screenWidthDp
     val columns = when { screenWidth >= 1024 -> 3; screenWidth >= 640 -> 2; else -> 1 }
     LazyColumn(
@@ -1027,7 +1068,7 @@ private fun SearchScreen(catalog: Catalog, query: String, onQuery: (String) -> U
                 Column(Modifier.fillMaxWidth()) {
                     Text("Search tools", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Normal)
                     Text("Find a tool by name, category, or keyword.", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
-                    SearchBox(catalog, query, onQuery, onTool) { searchFocused = it }
+                    SearchBox(catalog, draftQuery, { draftQuery = it }, onTool, { searchFocused = it }, onSubmit = { onQuery(draftQuery.trim()) })
                 }
             }
         }
@@ -3339,9 +3380,19 @@ private fun CategoryCard(category: com.chastech.env.data.Category, onClick: () -
 }
 
 @Composable
-private fun SearchBox(catalog: Catalog, value: String, onValueChange: (String) -> Unit, onTool: (String) -> Unit, onFocusChange: (Boolean) -> Unit = {}) {
+private fun SearchBox(catalog: Catalog, value: String, onValueChange: (String) -> Unit, onTool: (String) -> Unit, onFocusChange: (Boolean) -> Unit = {}, onSubmit: (() -> Unit)? = null) {
     var focused by remember { mutableStateOf(false) }
-    val suggestions = remember(catalog, value) { if (value.isBlank()) emptyList() else catalog.webSearch(value, limit = 8, includeRelatedReferences = true) }
+    var suggestions by remember(catalog) { mutableStateOf(emptyList<ToolRecord>()) }
+    LaunchedEffect(catalog, value) {
+        if (value.isBlank()) {
+            suggestions = emptyList()
+        } else {
+            kotlinx.coroutines.delay(120)
+            suggestions = withContext(Dispatchers.Default) {
+                catalog.webSearchSuggestions(value, limit = 8, includeRelatedReferences = true)
+            }
+        }
+    }
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).semantics { contentDescription = "Search tools"; isTraversalGroup = true }) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val suggestionWidth = maxWidth
@@ -3354,7 +3405,7 @@ private fun SearchBox(catalog: Catalog, value: String, onValueChange: (String) -
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { suggestions.firstOrNull()?.let { onTool(it.id) } }),
+            keyboardActions = KeyboardActions(onSearch = { suggestions.firstOrNull()?.let { onTool(it.id) } ?: onSubmit?.invoke() }),
         )
         if (focused && value.isNotBlank()) {
             Popup(alignment = Alignment.TopStart, offset = IntOffset(0, with(LocalDensity.current) { 64.dp.roundToPx() }), onDismissRequest = { focused = false; onFocusChange(false) }) {
@@ -3365,7 +3416,7 @@ private fun SearchBox(catalog: Catalog, value: String, onValueChange: (String) -
                     } else {
                         suggestions.forEach { WebHomeSearchSuggestion(it, onTool) }
                     }
-                    TextButton(onClick = { focused = false; onFocusChange(false) }, modifier = Modifier.align(Alignment.End)) { Text("See more results") }
+                    TextButton(onClick = { focused = false; onFocusChange(false); onSubmit?.invoke() }, modifier = Modifier.align(Alignment.End)) { Text("See more results") }
                 }
             }
             }

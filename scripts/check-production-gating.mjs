@@ -55,7 +55,7 @@ const restricted = tools.filter((tool) => !expectedWebExempt.includes(tool.categ
 assert.ok(restricted.length > 0, "catalog has tools outside the web-ready categories");
 assert.ok(webCard.includes("isToolUnderProduction(tool)"), "Web cards apply production policy");
 assert.ok(webSearch.includes("isToolUnderProduction(tool)"), "Web search suggestions apply production policy");
-assert.ok(webSearch.includes("match.explanation"), "Web search suggestions explain the individual result match");
+assert.ok(webSearch.includes("suggestions.map((tool, index)") && webSearch.includes('role="option"'), "Web search suggestions expose accessible lightweight tool suggestions");
 assert.ok(webHome.includes("isToolUnderProduction(tool)") && webHome.includes("UnderProductionDialog"), "Web most-used shortcuts label and intercept restricted tools");
 assert.ok(webToolShell.includes("isToolUnderProduction(r)") && webToolShell.includes("UnderProductionDialog"), "Web related-tool links label and intercept restricted tools");
 assert.ok(webRoute.includes("if (isToolUnderProduction(tool))"), "Web direct tool URLs cannot enter restricted engines");

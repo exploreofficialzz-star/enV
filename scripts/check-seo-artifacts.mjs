@@ -99,10 +99,13 @@ assert.ok(discoverySearchRouteSource.includes("results.matches"), "Search UI mus
 assert.ok(discoverySearchRouteSource.includes("results.matchCount === 0"), "Search UI must preserve the empty state when no tools match.");
 assert.ok(discoverySearchRouteSource.includes("Math.min(count + PAGE_SIZE, results.matchCount)"), "Search UI must preserve pagination using the structured match count.");
 assert.ok(discoverySearchRouteSource.includes("{ tool, explanation }"), "Every discovery card must expose its own why-this-matched explanation.");
-assert.ok(sharedSearchBoxSource.includes("searchToolResults(searchable, q, 8).matches"), "The shared search dropdown must retain each ranked match record.");
-assert.ok(sharedSearchBoxSource.includes("match.explanation"), "The shared search dropdown must explain why each individual tool matched.");
-assert.ok(sharedSearchBoxSource.includes("aria-label=") && sharedSearchBoxSource.includes("Why "), "The shared search dropdown must expose an accessible per-tool match label.");
-assert.ok(allToolsDirectorySource.includes("searchToolResults(all, query, all.length).matches"), "The All tools directory must preserve individual ranked match records.");
+assert.ok(sharedSearchBoxSource.includes("suggestTools(searchable, q, 8)"), "The shared search dropdown must use bounded lightweight autocomplete rather than full-catalogue ranking.");
+assert.ok(sharedSearchBoxSource.includes("prepareToolSuggestions(searchable)") && sharedSearchBoxSource.includes("suggestionsReady"), "The autocomplete index must be prepared during idle time before typing triggers lookups.");
+assert.ok(sharedSearchBoxSource.includes("suggestions.map((tool, index)") && sharedSearchBoxSource.includes('role="combobox"') && sharedSearchBoxSource.includes('role="listbox"') && sharedSearchBoxSource.includes('role="option"'), "The shared autocomplete dropdown must preserve accessible combobox and listbox interaction.");
+assert.ok(sharedSearchBoxSource.includes("Search all tools for"), "The shared autocomplete dropdown must offer an explicit full-search action.");
+assert.ok(!sharedSearchBoxSource.includes("searchToolResults(") && !sharedSearchBoxSource.includes("searchTools("), "The shared search dropdown must not execute full-catalogue ranking on every keystroke.");
+assert.ok(allToolsDirectorySource.includes("searchToolResultsCached(all, query, all.length).matches"), "The All tools directory must use cached ranked matches after explicit query submission.");
+assert.ok(allToolsDirectorySource.includes("onValueChange={setDraft}") && allToolsDirectorySource.includes("onEnter="), "The All tools search input must keep typing local and submit explicitly.");
 assert.ok(allToolsDirectorySource.includes("{ tool, explanation }"), "The All tools directory must show an explanation next to every queried tool result.");
 const renderedAuditWorkflowSource = readFileSync(new URL("../.github/workflows/accessibility-phase8.yml", import.meta.url), "utf8");
 const seoHeadSource = seoMetadataSource.slice(seoMetadataSource.indexOf("export function seoPageHead"), seoMetadataSource.indexOf("export function organizationSchema"));

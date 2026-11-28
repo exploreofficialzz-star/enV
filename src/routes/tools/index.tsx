@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ChevronDown } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
@@ -6,7 +6,7 @@ import { ToolCard } from "@/components/tools/tool-card";
 import { SearchBox } from "@/components/tools/search-box";
 import { CATEGORIES } from "@/data/categories";
 import { getSearchableTools, getToolsByCategory } from "@/lib/registry";
-import { searchToolResults } from "@/lib/search";
+import { searchToolResultsCached } from "@/lib/search-autocomplete";
 import { toolIcon } from "@/lib/icons";
 import { isIndexableTool, seoPageHead, categorySchema, canonicalSeoTools } from "@/lib/seo-metadata";
 import { toolsIndexSocialCard } from "@/lib/seo-social-cards";
@@ -32,12 +32,20 @@ const INITIAL_TOOLS_PER_CATEGORY = 3;
 const MORE_TOOLS_PER_CLICK = 6;
 
 function Tools() {
-  const all = getSearchableTools();
+  const all = useMemo(() => getSearchableTools(), []);
   const navigate = useNavigate();
   const { q } = Route.useSearch();
   const query = q;
+  const [draft, setDraft] = useState(query);
   const [visibleByCategory, setVisibleByCategory] = useState<Record<string, number>>({});
-  const matchingResults = useMemo(() => searchToolResults(all, query, all.length).matches, [all, query]);
+
+  useEffect(() => {
+    setDraft(query);
+    setVisibleByCategory({});
+  }, [query]);
+
+  // Keep typing local; full ranking only runs after the user submits the query.
+  const matchingResults = useMemo(() => searchToolResultsCached(all, query, all.length).matches, [all, query]);
   const sections = useMemo(
     () => CATEGORIES.map((category) => ({
       category,
@@ -52,7 +60,14 @@ function Tools() {
         <div className="flex items-center gap-4">
           <h1 className="shrink-0 text-2xl font-semibold sm:text-3xl">All tools</h1>
           <div className="ml-auto min-w-0 w-[52vw] shrink-0 max-w-[18rem]">
-            <SearchBox value={query} onValueChange={(value) => { setVisibleByCategory({}); void navigate({ to: "/tools", search: { q: value }, replace: true }); }} />
+            <SearchBox
+              value={draft}
+              onValueChange={setDraft}
+              onEnter={(value) => {
+                setVisibleByCategory({});
+                void navigate({ to: "/tools", search: { q: value }, replace: true });
+              }}
+            />
           </div>
         </div>
         <p className="mt-2 text-muted">Find a tool by name or browse the categories below.</p>
