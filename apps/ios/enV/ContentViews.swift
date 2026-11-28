@@ -537,7 +537,7 @@ struct HomeView: View {
     @State private var homePath = NavigationPath()
     @FocusState private var isHomeSearchFocused: Bool
     private var hasSearchText: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-    private var searchSuggestions: [Tool] { hasSearchText ? store.catalog.webSearch(searchText, limit: 8, includeRelatedReferences: true) : [] }
+    private var searchSuggestions: [Tool] { hasSearchText ? store.webSuggestions(searchText, limit: 8, includeRelatedReferences: true) : [] }
     private func openHomeSearch() {
         if let first = searchSuggestions.first { homePath.append(first) }
         else { onSearch(searchText.trimmingCharacters(in: .whitespacesAndNewlines)) }
@@ -1008,13 +1008,14 @@ struct ToolsView: View {
     @Binding var toolsQuery: String
     let onSearchNoMatch: () -> Void
     @State private var visibleByCategory: [String: Int] = [:]
+    @State private var searchDraft = ""
     @State private var searchNavigationTool: Tool?
     @State private var showSearchNavigation = false
     @FocusState private var isToolsSearchFocused: Bool
 
     // Source guard contract: store.tools(matching: toolsQuery) is represented by the web-equivalent ranked search below.
-    private var matchingTools: [Tool] { store.catalog.webSearch(toolsQuery, includeRelatedReferences: true) }
-    private var searchSuggestions: [Tool] { toolsQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? [] : store.catalog.webSearch(toolsQuery, limit: 8, includeRelatedReferences: true) }
+    private var matchingTools: [Tool] { store.webSearch(toolsQuery, includeRelatedReferences: true) }
+    private var searchSuggestions: [Tool] { searchDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? [] : store.webSuggestions(searchDraft, limit: 8, includeRelatedReferences: true) }
     private var searchFieldWidth: CGFloat { horizontalSizeClass == .regular ? 288 : min(288, max(160, UIScreen.main.bounds.width * 0.52)) }
     private var categoryGroups: [ToolCategoryGroup] {
         let toolsByCategory = Dictionary(grouping: matchingTools, by: \.category)
@@ -1039,7 +1040,7 @@ struct ToolsView: View {
                             Spacer(minLength: 4)
                             HStack(spacing: 10) {
                                 EnVIcon(name: "Search", size: 20, tint: .envMuted)
-                                TextField("Search tools", text: $toolsQuery)
+                                TextField("Search tools", text: $searchDraft)
                                     .font(.envScaled(size: 14, weight: .regular))
                                     .textInputAutocapitalization(.never)
                                     .autocorrectionDisabled()
@@ -1047,7 +1048,9 @@ struct ToolsView: View {
                                     .focused($isToolsSearchFocused)
                                     .submitLabel(.search)
                                     .onSubmit {
-                                        guard !toolsQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let first = matchingTools.first else {
+                                        let submitted = searchDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                                        guard !submitted.isEmpty, let first = store.webSuggestions(submitted, limit: 8, includeRelatedReferences: true).first else {
+                                            toolsQuery = submitted
                                             isToolsSearchFocused = false
                                             onSearchNoMatch()
                                             return
@@ -1056,7 +1059,6 @@ struct ToolsView: View {
                                         isToolsSearchFocused = false
                                         showSearchNavigation = true
                                     }
-                                    .onChange(of: toolsQuery) { _ in visibleByCategory.removeAll() }
                             }
                             .padding(.horizontal, 16)
                             .frame(width: searchFieldWidth, height: 44)
@@ -1064,7 +1066,7 @@ struct ToolsView: View {
                             .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.envBorderStrong, lineWidth: 1))
                             .shadow(color: Color.black.opacity(0.05), radius: 2, y: 1)
                         }
-                        if isToolsSearchFocused && !toolsQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        if isToolsSearchFocused && !searchDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                             HStack {
                                 Spacer(minLength: 0)
                                 VStack(alignment: .leading, spacing: 4) {
@@ -1097,7 +1099,11 @@ struct ToolsView: View {
                                     }
                                     HStack {
                                         Spacer()
-                                        Button("See more results") { isToolsSearchFocused = false; onSearchNoMatch() }
+                                        Button("See more results") {
+                                            toolsQuery = searchDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                                            isToolsSearchFocused = false
+                                            onSearchNoMatch()
+                                        }
                                             .font(.envScaled(size: 14, weight: .semibold))
                                             .foregroundStyle(Color.envAccent)
                                     }
@@ -1180,6 +1186,11 @@ struct ToolsView: View {
             .navigationDestination(for: String.self) { CategoryView(categoryID: $0) }
             .navigationDestination(for: Tool.self) { NativeArchiveToolDestinationView(tool: $0) }
             .modifier(EnVBrandNavigationStyle())
+        }
+        .onAppear { searchDraft = toolsQuery }
+        .onChange(of: toolsQuery) { newValue in
+            searchDraft = newValue
+            visibleByCategory.removeAll()
         }
         .id(toolsNavigationReset)
         .navigationDestination(isPresented: $showSearchNavigation) {
@@ -1280,12 +1291,13 @@ struct SearchResultsView: View {
     @EnvironmentObject private var store: CatalogStore
     @Binding var text: String
     @State private var visibleCount = 24
+    @State private var draftText = ""
     @State private var searchNavigationTool: Tool?
     @State private var showSearchNavigation = false
     @FocusState private var isSearchFocused: Bool
 
-    private var results: [Tool] { store.catalog.webSearch(text, limit: Int.max, includeRelatedReferences: true) }
-    private var suggestions: [Tool] { text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? [] : store.catalog.webSearch(text, limit: 8, includeRelatedReferences: true) }
+    private var results: [Tool] { store.webSearch(text, limit: Int.max, includeRelatedReferences: true) }
+    private var suggestions: [Tool] { draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? [] : store.webSuggestions(draftText, limit: 8, includeRelatedReferences: true) }
 
     var body: some View {
         ScrollView {
@@ -1300,7 +1312,7 @@ struct SearchResultsView: View {
                 }
                 HStack(spacing: 10) {
                     EnVIcon(name: "Search", size: 20, tint: .envMuted)
-                    TextField("Search tools", text: $text, prompt: Text("Search tools").foregroundColor(Color.envInk))
+                    TextField("Search tools", text: $draftText, prompt: Text("Search tools").foregroundColor(Color.envInk))
                         .font(.envScaled(size: 16, weight: .regular))
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
@@ -1308,10 +1320,8 @@ struct SearchResultsView: View {
                         .focused($isSearchFocused)
                         .submitLabel(.search)
                         .onSubmit {
-                            if let first = suggestions.first {
-                                searchNavigationTool = first
-                                showSearchNavigation = true
-                            }
+                            text = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
+                            isSearchFocused = false
                         }
                     Button {
                         if let first = suggestions.first {
@@ -1327,7 +1337,7 @@ struct SearchResultsView: View {
                 .background(Color.envCard, in: RoundedRectangle(cornerRadius: 16))
                 .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.envBorderStrong, lineWidth: 1))
                 .overlay(alignment: .top) {
-                    if isSearchFocused && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    if isSearchFocused && !draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
                         if suggestions.isEmpty {
                             enVCharacterSpacedText("No matching tools. Try “json”, “bmi”, or “qr”.")
@@ -1339,7 +1349,10 @@ struct SearchResultsView: View {
                         }
                         HStack {
                             Spacer()
-                            Button("See more results") { isSearchFocused = false }
+                            Button("Search all tools") {
+                                text = draftText.trimmingCharacters(in: .whitespacesAndNewlines)
+                                isSearchFocused = false
+                            }
                                 .font(.envScaled(size: 14, weight: .semibold))
                                 .foregroundStyle(Color.envAccent)
                         }
@@ -1355,7 +1368,7 @@ struct SearchResultsView: View {
                     .accessibilityLabel("Search suggestions")
                     }
                 }
-                .zIndex(isSearchFocused && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 1 : 0)
+                .zIndex(isSearchFocused && !draftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 1 : 0)
                 if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     enVCharacterSpacedText("Start typing to see matching tools.")
                         .font(.envScaled(size: 14, weight: .regular))
@@ -1408,7 +1421,11 @@ struct SearchResultsView: View {
         }
         .navigationDestination(for: String.self) { CategoryView(categoryID: $0) }
         .navigationDestination(for: Tool.self) { NativeArchiveToolDestinationView(tool: $0) }
-        .onChange(of: text) { _ in visibleCount = 24 }
+        .onAppear { draftText = text }
+        .onChange(of: text) { newValue in
+            draftText = newValue
+            visibleCount = 24
+        }
     }
 }
 
