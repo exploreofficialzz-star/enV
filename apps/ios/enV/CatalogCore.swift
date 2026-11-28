@@ -631,10 +631,13 @@ final class CatalogStore: ObservableObject {
     private let usageKey = "env.toolUseCounts"
 
     private let bundle: Bundle
+    private var searchEngine: NativeCatalogSearchEngine
 
     init(catalog: Catalog? = nil, bundle: Bundle = .main) {
         self.bundle = bundle
-        self.catalog = catalog ?? Catalog(schemaVersion: 1, catalogVersion: "loading", counts: CatalogCounts(total: 0, active: 0, planned: 0, categories: 0), categories: [], tools: [], relatedReferenceTools: nil)
+        let initialCatalog = catalog ?? Catalog(schemaVersion: 1, catalogVersion: "loading", counts: CatalogCounts(total: 0, active: 0, planned: 0, categories: 0), categories: [], tools: [], relatedReferenceTools: nil)
+        self.catalog = initialCatalog
+        self.searchEngine = NativeCatalogSearchEngine(catalog: initialCatalog)
         self.loadState = catalog == nil ? .loading : .ready
         let canonical: (String) -> String = { $0 == "audio-analyze-studio" ? "song-metadata-analyzer" : $0 }
         self.favoriteIDs = Set((UserDefaults.standard.stringArray(forKey: favoritesKey) ?? []).map(canonical))
@@ -645,6 +648,8 @@ final class CatalogStore: ObservableObject {
         UserDefaults.standard.set(Array(favoriteIDs).sorted(), forKey: favoritesKey)
         UserDefaults.standard.set(recentIDs, forKey: recentKey)
         UserDefaults.standard.set(usageCounts, forKey: usageKey)
+        let initialSearchEngine = self.searchEngine
+        DispatchQueue.global(qos: .utility).async { initialSearchEngine.prepare() }
         if catalog == nil { reloadCatalog() }
     }
 
@@ -657,6 +662,9 @@ final class CatalogStore: ObservableObject {
                 switch result {
                 case .success(let loaded):
                     self.catalog = loaded
+                    let searchEngine = NativeCatalogSearchEngine(catalog: loaded)
+                    self.searchEngine = searchEngine
+                    DispatchQueue.global(qos: .utility).async { searchEngine.prepare() }
                     self.loadState = .ready
                 case .failure:
                     self.loadState = .failed
@@ -685,9 +693,19 @@ final class CatalogStore: ObservableObject {
     var featuredTools: [Tool] { ((catalog.tools + (catalog.relatedReferenceTools ?? [])) + catalog.developerStudioTools()).filter(\.featured).sorted { $0.popularity > $1.popularity } }
     var popularTools: [Tool] { (catalog.accessibilityDiscoveryTools() + catalog.developerStudioTools()).sorted { $0.popularity == $1.popularity ? $0.name < $1.name : $0.popularity > $1.popularity } }
 
+    func prepareSearchIndex() { searchEngine.prepare() }
+
+    func webSearch(_ query: String, limit: Int = Int.max, includeRelatedReferences: Bool = false) -> [Tool] {
+        searchEngine.search(query, limit: limit, includeRelatedReferences: includeRelatedReferences)
+    }
+
+    func webSuggestions(_ query: String, limit: Int = 8, includeRelatedReferences: Bool = false) -> [Tool] {
+        searchEngine.suggestions(query, limit: limit, includeRelatedReferences: includeRelatedReferences)
+    }
+
     func tools(matching query: String = "", category: String? = nil) -> [Tool] {
         if category == nil || category == "accessibility" {
-            return catalog.webSearch(query, limit: Int.max, includeRelatedReferences: true).filter { category == nil || $0.category == category }
+            return webSearch(query, limit: Int.max, includeRelatedReferences: true).filter { category == nil || $0.category == category }
         }
         let needle = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let originals = catalog.tools + (catalog.relatedReferenceTools ?? [])
