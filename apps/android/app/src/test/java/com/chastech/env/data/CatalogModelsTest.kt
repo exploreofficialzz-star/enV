@@ -27,6 +27,7 @@ class CatalogModelsTest {
             counts = CatalogCounts(total = 2, active = 2, planned = 0, categories = 2),
             categories = emptyList(), tools = listOf(photo, pdf), relatedReferenceTools = emptyList(),
         )
+        catalog.prepareSearchIndex()
 
         val firstSuggestions = catalog.webSearchSuggestions("photo", limit = 4, includeRelatedReferences = true)
         assertEquals("photo-editor", firstSuggestions.firstOrNull()?.id)
