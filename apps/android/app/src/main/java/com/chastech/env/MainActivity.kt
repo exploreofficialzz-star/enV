@@ -860,8 +860,7 @@ private fun ToolsScreen(catalog: Catalog, category: String?, query: String, onQu
                         onTool = onTool,
                         onSubmit = {
                             val submitted = draftQuery.trim()
-                            val first = catalog.webSearchSuggestions(submitted, limit = 8, includeRelatedReferences = true).firstOrNull()
-                            if (submitted.isNotBlank() && first != null) onTool(first.id) else onSearch(submitted)
+                            if (submitted.isNotBlank()) onSearch(submitted)
                         },
                         onSeeMore = {
                             onQuery(draftQuery)
@@ -1005,7 +1004,7 @@ private fun WebToolsSearchField(
                 EnVIcon("Search", Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                     if (query.isEmpty()) Text("Search tools", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    BasicTextField(value = query, onValueChange = onQuery, modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused }.semantics { contentDescription = "Search tools" }, textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface), singleLine = true, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), keyboardActions = KeyboardActions(onSearch = { onSubmit() }))
+                    BasicTextField(value = query, onValueChange = onQuery, modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused }.semantics { contentDescription = "Search tools" }, textStyle = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.onSurface), singleLine = true, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), keyboardActions = KeyboardActions(onSearch = { suggestions.firstOrNull()?.let { onTool(it.id) } ?: onSubmit() }))
                 }
             }
         }
@@ -3406,7 +3405,7 @@ private fun SearchBox(catalog: Catalog, value: String, onValueChange: (String) -
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { if (onSubmit != null) onSubmit() else suggestions.firstOrNull()?.let { onTool(it.id) } }),
+            keyboardActions = KeyboardActions(onSearch = { suggestions.firstOrNull()?.let { onTool(it.id) } ?: onSubmit?.invoke() }),
         )
         if (focused && value.isNotBlank()) {
             Popup(alignment = Alignment.TopStart, offset = IntOffset(0, with(LocalDensity.current) { 64.dp.roundToPx() }), onDismissRequest = { focused = false; onFocusChange(false) }) {
