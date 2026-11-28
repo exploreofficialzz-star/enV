@@ -144,6 +144,9 @@ final class NativeCatalogSearchEngine {
                 - plannedPenalty
             return (document, score)
         }.sorted {
+            let leftPlanned = $0.0.tool.status == "planned"
+            let rightPlanned = $1.0.tool.status == "planned"
+            if leftPlanned != rightPlanned { return !leftPlanned }
             if $0.1 == $1.1 {
                 let left = $0.0.normalizedName
                 let right = $1.0.normalizedName
