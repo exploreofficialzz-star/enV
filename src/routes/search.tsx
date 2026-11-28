@@ -27,7 +27,12 @@ function Search() {
   }, [q]);
 
   // Full-catalog ranking happens only for a submitted URL query, not for each input change.
-  const results = useMemo(() => searchToolResultsCached(searchable, q, searchable.length), [q, searchable]);
+  const results = useMemo(
+    () => q.trim()
+      ? searchToolResultsCached(searchable, q, searchable.length)
+      : { matches: [], matchCount: 0 },
+    [q, searchable],
+  );
   const visible = results.matches.slice(0, visibleCount);
 
   const submit = (query: string) => {
