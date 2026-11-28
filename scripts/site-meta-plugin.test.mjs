@@ -88,7 +88,7 @@ test("tool cards use distinct app-icon tiles while category cards retain theme-a
   assert.match(categoryCard, /text-black dark:text-white/);
 });
 
-test("Home search shows live matches and opens full results only on explicit action", () => {
+test("Home search shows fast indexed suggestions and opens full results only on explicit action", () => {
   const home = readFileSync(join(PROJECT_ROOT, "src/routes/index.tsx"), "utf8");
   const searchBox = readFileSync(join(PROJECT_ROOT, "src/components/tools/search-box.tsx"), "utf8");
   const brand = readFileSync(join(PROJECT_ROOT, "src/components/brand/logo.tsx"), "utf8");
@@ -100,11 +100,16 @@ test("Home search shows live matches and opens full results only on explicit act
   assert.doesNotMatch(home, /hidden md:flex/);
   assert.match(home, /leading=\{<Logo size="search"/);
   assert.match(brand, /search: "h-9 w-14"/);
-  assert.match(searchBox, /onChange=\{\(e\) => \{\s*setQ\(e\.target\.value\);\s*setOpen\(true\);/);
-  assert.match(searchBox, /const searchable = getSearchableTools\(\)/);
-  assert.match(searchBox, /searchToolResults\(searchable, q, 8\)\.matches/);
-  assert.match(searchBox, /match\.explanation/);
-  assert.match(searchBox, /Why .*matched/);
+  assert.match(searchBox, /onChange=\{\(e\) => \{\s*setQ\(e\.target\.value\);\s*setSuggestions\(\[\]\);\s*setActiveIndex\(-1\);\s*setOpen\(true\);/);
+  assert.match(searchBox, /const searchable = useMemo\(\(\) => getSearchableTools\(\), \[\]\)/);
+  assert.match(searchBox, /prepareToolSuggestions\(searchable\)/);
+  assert.match(searchBox, /suggestTools\(searchable, q, 8\)/);
+  assert.match(searchBox, /suggestions\.map\(\(tool, index\)/);
+  assert.match(searchBox, /role="combobox"/);
+  assert.match(searchBox, /role="listbox"/);
+  assert.match(searchBox, /role="option"/);
+  assert.match(searchBox, /Search all tools for/);
+  assert.doesNotMatch(searchBox, /searchToolResults\s*\(|searchTools\s*\(/);
   assert.match(searchBox, /placeholder=\{hidePlaceholderOnFocus && focused \? "" : placeholder\}/);
   assert.match(searchBox, /setFocused\(true\);\s*setOpen\(true\);/);
   assert.match(searchBox, /See more results/);
