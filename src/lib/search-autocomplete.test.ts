@@ -9,7 +9,7 @@ function tool(id: string, name: string, extra: Partial<ToolMeta> = {}): ToolMeta
     id,
     name,
     slug: id,
-    description: \`\${name} utility\`,
+    description: `${name} utility`,
     category: "utilities",
     subcategory: "",
     keywords: [],
