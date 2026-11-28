@@ -53,6 +53,11 @@ const tools = [
     status: "planned",
     popularity: 10000,
   }),
+  tool("active-photo-keyword", "Visual Retoucher", {
+    category: "image",
+    keywords: ["photo"],
+    popularity: 1,
+  }),
   tool("quantum-rabbit", "Rabbit Counter", {
     category: "utilities",
     description: "A quantum rabbit reference hidden in the long description.",
@@ -80,10 +85,12 @@ test("autocomplete is based on short searchable fields, not full descriptions", 
   assert.deepEqual(suggestTools(tools, "quantum rabbit", 5), []);
 });
 
-test("planned tools are ranked after active suggestions", () => {
-  const results = suggestTools(tools, "photo", 5);
-  assert.notEqual(results[0]?.id, "planned-photo-studio");
-  assert.equal(results.at(-1)?.id, "planned-photo-studio");
+test("planned tools stay after active keyword matches even when their names have a prefix", () => {
+  const results = suggestTools(tools, "photo", 8);
+  const activeIndex = results.findIndex((item) => item.id === "active-photo-keyword");
+  const plannedIndex = results.findIndex((item) => item.id === "planned-photo-studio");
+  assert.ok(activeIndex >= 0);
+  assert.ok(plannedIndex > activeIndex);
 });
 
 test("suggestion results are cached by normalized query and limit", () => {
