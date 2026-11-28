@@ -103,9 +103,8 @@ internal class CatalogSearchEngine(private val catalog: Catalog) {
         val terms = suggestionTerms(normalizedQuery)
         if (terms.isEmpty()) return emptyList<ToolRecord>().also { suggestionResults[cacheKey] = it }
 
-        // The catalogue prefix index is warmed off the UI thread when the native catalogue loads.
-        val index = suggestionIndexes[includeRelatedReferences]
-            ?: return emptyList<ToolRecord>().also { suggestionResults[cacheKey] = it }
+        // Suggestions are invoked from a debounced background task; this builds only the prefix index once.
+        val index = indexFor(includeRelatedReferences)
         val variantsByTerm = terms.map { term ->
             val related = webSearchSynonyms[term].orEmpty().flatMap(::tokenize)
             (listOf(term) + related).filter { it.length >= MIN_PREFIX_LENGTH }.distinct()
