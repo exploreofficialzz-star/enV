@@ -1,10 +1,43 @@
 package com.chastech.env.data
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CatalogModelsTest {
+    @Test fun autocompleteUsesPrefixIndexAndReusesCachedQueries() {
+        val photo = ToolRecord(
+            id = "photo-editor", name = "Photo Editor", slug = "photo-editor",
+            description = "An editor with a private phrase used only in long descriptions.",
+            category = "image", keywords = listOf("crop", "retouch"), tags = listOf("photo", "picture"),
+            icon = "Image", popularity = 50, featured = false, clientSide = true,
+            requiresBackend = false, requiresAuth = false, status = "active", related = emptyList(),
+            engine = EngineInfo("custom", "photo-editor"),
+        )
+        val pdf = ToolRecord(
+            id = "pdf-merger", name = "PDF Merger", slug = "pdf-merger",
+            description = "Join PDF documents", category = "pdf", keywords = listOf("combine", "join"),
+            tags = listOf("document"), icon = "File", popularity = 40, featured = false,
+            clientSide = true, requiresBackend = false, requiresAuth = false, status = "active",
+            related = emptyList(), engine = EngineInfo("custom", "pdf-merger"),
+        )
+        val catalog = Catalog(
+            schemaVersion = 1, catalogVersion = "autocomplete-test",
+            counts = CatalogCounts(total = 2, active = 2, planned = 0, categories = 2),
+            categories = emptyList(), tools = listOf(photo, pdf), relatedReferenceTools = emptyList(),
+        )
+
+        val firstSuggestions = catalog.webSearchSuggestions("photo", limit = 4, includeRelatedReferences = true)
+        assertEquals("photo-editor", firstSuggestions.firstOrNull()?.id)
+        assertSame(firstSuggestions, catalog.webSearchSuggestions(" PHOTO ", limit = 4, includeRelatedReferences = true))
+        assertTrue(catalog.webSearchSuggestions("private phrase", limit = 4, includeRelatedReferences = true).isEmpty())
+
+        val firstSearch = catalog.webSearch("photo", limit = 4, includeRelatedReferences = true)
+        assertEquals("photo-editor", firstSearch.firstOrNull()?.id)
+        assertSame(firstSearch, catalog.webSearch(" PHOTO ", limit = 4, includeRelatedReferences = true))
+    }
+
     @Test fun retiredDesignBuildSolveForToolsAreExcludedWithoutHidingRealMathTools() {
         val catalog = Catalog.fromJson("""
             {"schemaVersion":1,"catalogVersion":"test","counts":{"total":2,"active":2,"planned":0,"categories":1},
