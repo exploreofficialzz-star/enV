@@ -103,7 +103,7 @@ assert.ok(sharedSearchBoxSource.includes("suggestTools(searchable, q, 8)"), "The
 assert.ok(sharedSearchBoxSource.includes("prepareToolSuggestions(searchable)") && sharedSearchBoxSource.includes("suggestionsReady"), "The autocomplete index must be prepared during idle time before typing triggers lookups.");
 assert.ok(sharedSearchBoxSource.includes("suggestions.map((tool, index)") && sharedSearchBoxSource.includes('role="combobox"') && sharedSearchBoxSource.includes('role="listbox"') && sharedSearchBoxSource.includes('role="option"'), "The shared autocomplete dropdown must preserve accessible combobox and listbox interaction.");
 assert.ok(sharedSearchBoxSource.includes("Search all tools for"), "The shared autocomplete dropdown must offer an explicit full-search action.");
-assert.doesNotMatch(sharedSearchBoxSource, /searchToolResults\\s*\\(|searchTools\\s*\\(/, "The shared search dropdown must not execute full-catalogue ranking on every keystroke.");
+assert.ok(!sharedSearchBoxSource.includes("searchToolResults(") && !sharedSearchBoxSource.includes("searchTools("), "The shared search dropdown must not execute full-catalogue ranking on every keystroke.");
 assert.ok(allToolsDirectorySource.includes("searchToolResults(all, query, all.length).matches"), "The All tools directory must preserve individual ranked match records.");
 assert.ok(allToolsDirectorySource.includes("{ tool, explanation }"), "The All tools directory must show an explanation next to every queried tool result.");
 const renderedAuditWorkflowSource = readFileSync(new URL("../.github/workflows/accessibility-phase8.yml", import.meta.url), "utf8");
