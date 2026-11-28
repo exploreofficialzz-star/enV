@@ -649,16 +649,20 @@ final class CatalogStore: ObservableObject {
         UserDefaults.standard.set(Array(favoriteIDs).sorted(), forKey: favoritesKey)
         UserDefaults.standard.set(recentIDs, forKey: recentKey)
         UserDefaults.standard.set(usageCounts, forKey: usageKey)
-        let initialSearchEngine = self.searchEngine
-        DispatchQueue.global(qos: .utility).async {
-            initialSearchEngine.prepare()
-            DispatchQueue.main.async { self.searchIndexReady = true }
+        if catalog == nil {
+            reloadCatalog()
+        } else {
+            let initialSearchEngine = self.searchEngine
+            DispatchQueue.global(qos: .utility).async {
+                initialSearchEngine.prepare()
+                DispatchQueue.main.async { self.searchIndexReady = true }
+            }
         }
-        if catalog == nil { reloadCatalog() }
     }
 
     func reloadCatalog() {
         loadState = .loading
+        searchIndexReady = false
         let sourceBundle = bundle
         DispatchQueue.global(qos: .userInitiated).async {
             let result = Result { try CatalogLoader.load(from: sourceBundle) }
