@@ -9,8 +9,10 @@ import type { ToolMeta } from "@/types/tool";
 import { isToolUnderProduction } from "@/lib/production-notice";
 import { UnderProductionDialog } from "@/components/tools/under-production";
 
+type IdleDeadlineLike = { didTimeout: boolean; timeRemaining: () => number };
+
 type IdleWindow = Window & {
-  requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
+  requestIdleCallback?: (callback: (deadline: IdleDeadlineLike) => void, options?: { timeout?: number }) => number;
   cancelIdleCallback?: (handle: number) => void;
 };
 
@@ -22,7 +24,7 @@ export function SearchBox({
   value,
   onValueChange,
   onEnter,
-  placeholder = \`Search \${getAllTools().length.toLocaleString()} tools…\`,
+  placeholder = `Search ${getAllTools().length.toLocaleString()} tools…`,
   leading,
   trailing,
   showSearchIcon = true,
@@ -136,7 +138,7 @@ export function SearchBox({
       aria-autocomplete="list"
       aria-expanded={open && Boolean(q.trim())}
       aria-controls={listboxId}
-      aria-activedescendant={activeIndex >= 0 && suggestions[activeIndex] ? \`\${listboxId}-option-\${activeIndex}\` : undefined}
+      aria-activedescendant={activeIndex >= 0 && suggestions[activeIndex] ? `${listboxId}-option-${activeIndex}` : undefined}
       value={q}
       autoFocus={autoFocus}
       autoComplete="off"
@@ -207,7 +209,7 @@ export function SearchBox({
               {suggestions.map((tool, index) => (
                 <li key={tool.id}>
                   <button
-                    id={\`\${listboxId}-option-\${index}\`}
+                    id={`${listboxId}-option-${index}`}
                     type="button"
                     role="option"
                     aria-selected={activeIndex === index}
@@ -221,7 +223,7 @@ export function SearchBox({
                     <Search className="size-4 shrink-0 text-subtle" aria-hidden="true" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium text-fg">{tool.name}{tool.status === "planned" ? <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-subtle">Coming soon</span> : null}</span>
-                      <span className="block truncate text-xs capitalize text-muted">{tool.subcategory ? \`\${tool.category} · \${tool.subcategory}\` : tool.category}</span>
+                      <span className="block truncate text-xs capitalize text-muted">{tool.subcategory ? `${tool.category} · ${tool.subcategory}` : tool.category}</span>
                     </span>
                     <ArrowRight className="size-4 shrink-0 text-subtle" aria-hidden="true" />
                   </button>
