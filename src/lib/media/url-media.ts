@@ -29,6 +29,19 @@ function urlMediaFailure(payload: unknown, status: number): Error {
   return error;
 }
 
+const URL_MEDIA_UNAVAILABLE_CODES = new Set([
+  "NETWORK_UNAVAILABLE",
+  "PROCESSOR_UPSTREAM_UNAVAILABLE",
+  "APPLICATION_API_UNAVAILABLE",
+]);
+
+/** Distinguish service outages from a link or provider-specific failure. */
+export function isUrlMediaServiceUnavailable(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const code = (error as { code?: unknown }).code;
+  return typeof code === "string" && URL_MEDIA_UNAVAILABLE_CODES.has(code);
+}
+
 async function mediaRequest(endpoint: string, action: "info" | "download", payload: unknown, signal?: AbortSignal) {
   try {
     return await fetch(endpoint + "/" + action, {
@@ -40,7 +53,10 @@ async function mediaRequest(endpoint: string, action: "info" | "download", paylo
     });
   } catch (cause) {
     if (signal?.aborted || (cause instanceof Error && cause.name === "AbortError")) throw cause;
-    throw new Error("The enV media API could not be reached from this deployment. Check its API connection and try again.");
+    const error = new Error("We couldn't process this link right now. Check your connection and try again.") as Error & { code?: string; retryable?: boolean };
+    error.code = "NETWORK_UNAVAILABLE";
+    error.retryable = true;
+    throw error;
   }
 }
 

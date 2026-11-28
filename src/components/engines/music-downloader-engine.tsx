@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { FileDropzone } from "@/components/tools/file-dropzone";
 import { downloadBlob, formatFileSize, slugify } from "@/lib/utils";
 import { extractMusicMetadata, type MusicMetadata } from "@/lib/media/music-metadata";
-import { downloadUrlMedia, inspectUrlMedia, type UrlMediaInfo, type UrlMediaPlaylistEntry } from "@/lib/media/url-media";
+import { downloadUrlMedia, inspectUrlMedia, isUrlMediaServiceUnavailable, type UrlMediaInfo, type UrlMediaPlaylistEntry } from "@/lib/media/url-media";
 import { downloadMusicWithSingleRetry } from "@/lib/media/music-download-retry";
 import { summarizeMusicDownloadFailures, type MusicDownloadFailure, type MusicFailureSummary } from "@/lib/media/music-failure-summary";
 import {
@@ -263,6 +263,7 @@ export function MusicDownloaderEngine() {
             info = await inspectUrlMedia(entry.url, undefined, controller.signal, { includePlaylist: isLikelyMusicCollectionUrl(entry.url) });
           } catch (cause) {
             if ((cause as Error)?.name === "AbortError") throw cause;
+            if (isUrlMediaServiceUnavailable(cause)) throw cause;
             if (isLikelyMusicCollectionUrl(entry.url)) throw cause;
             // A failed single-song metadata lookup need not block a later authorized download.
             warnings.push((entry.title || entry.url) + ": metadata could not be previewed; download availability is unverified.");
@@ -294,6 +295,7 @@ export function MusicDownloaderEngine() {
           }
         } catch (cause) {
           if ((cause as Error)?.name === "AbortError") throw cause;
+          if (isUrlMediaServiceUnavailable(cause)) throw cause;
           warnings.push((entry.title || entry.url) + ": " + (cause instanceof Error ? cause.message : "Could not inspect this link."));
         }
       }
@@ -357,6 +359,7 @@ export function MusicDownloaderEngine() {
           }
         } catch (cause) {
           if ((cause as Error)?.name === "AbortError") throw cause;
+          if (isUrlMediaServiceUnavailable(cause)) throw cause;
           const message = cause instanceof Error ? cause.message : "Download failed.";
           setTrackStates((previous) => ({ ...previous, [index]: "Unavailable" }));
           previousFailures.set(index, { title: item.title, message });

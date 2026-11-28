@@ -9,7 +9,7 @@ import {
   validateMusicSourceUrl,
 } from "./music-downloader-policy.ts";
 import { extractMusicMetadata } from "./music-metadata.ts";
-import { getUrlMediaConfig, inspectUrlMedia, downloadUrlMedia } from "./url-media.ts";
+import { getUrlMediaConfig, inspectUrlMedia, downloadUrlMedia, isUrlMediaServiceUnavailable } from "./url-media.ts";
 import { downloadMusicWithSingleRetry, shouldRetryMusicDownload } from "./music-download-retry.ts";
 
 test("accepts direct HTTPS audio files and preserves query strings", () => {
@@ -183,11 +183,40 @@ test("Vercel preview music requests use the active origin rather than browser-to
   }
 });
 
-test("unreachable preview media API shows an actionable error instead of Failed to fetch", async () => {
+test("unreachable preview media API returns a user-focused retryable error", async () => {
   const previous = globalThis.fetch;
   globalThis.fetch = async () => { throw new TypeError("Failed to fetch"); };
   try {
-    await assert.rejects(inspectUrlMedia("https://audiomack.com/artist/song/test"), /media API could not be reached from this deployment/);
+    await assert.rejects(
+      inspectUrlMedia("https://audiomack.com/artist/song/test"),
+      (error: unknown) => error instanceof Error
+        && error.message === "We couldn't process this link right now. Check your connection and try again."
+        && (error as Error & { code?: string }).code === "NETWORK_UNAVAILABLE"
+        && (error as Error & { retryable?: boolean }).retryable === true,
+    );
+  } finally {
+    globalThis.fetch = previous;
+  }
+});
+
+test("service outages are distinct from individual source failures", () => {
+  assert.equal(isUrlMediaServiceUnavailable(Object.assign(new Error("offline"), { code: "NETWORK_UNAVAILABLE" })), true);
+  assert.equal(isUrlMediaServiceUnavailable(Object.assign(new Error("upstream down"), { code: "PROCESSOR_UPSTREAM_UNAVAILABLE" })), true);
+  assert.equal(isUrlMediaServiceUnavailable(Object.assign(new Error("source missing"), { code: "SOURCE_UNAVAILABLE" })), false);
+  assert.equal(isUrlMediaServiceUnavailable(new Error("ordinary validation error")), false);
+});
+
+test("aborted media requests remain cancellations, not connectivity failures", async () => {
+  const previous = globalThis.fetch;
+  const controller = new AbortController();
+  const abortError = Object.assign(new Error("The operation was aborted."), { name: "AbortError" });
+  controller.abort();
+  globalThis.fetch = async () => { throw abortError; };
+  try {
+    await assert.rejects(
+      inspectUrlMedia("https://audiomack.com/artist/song/test", undefined, controller.signal),
+      (error: unknown) => error === abortError,
+    );
   } finally {
     globalThis.fetch = previous;
   }
