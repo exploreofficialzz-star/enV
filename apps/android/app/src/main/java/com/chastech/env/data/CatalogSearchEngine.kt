@@ -60,45 +60,39 @@ internal class CatalogSearchEngine(private val catalog: Catalog) {
 
     @Synchronized
     fun search(query: String, limit: Int, includeRelatedReferences: Boolean): List<ToolRecord> {
-        val normalizedQuery = query.trim().lowercase(Locale.ROOT)
-        val key = normalizedQuery + "\u0000" + limit + "\u0000" + if (includeRelatedReferences) "1" else "0"
+        val q = query.trim().lowercase()
+        val key = q + "\u0000" + limit + "\u0000" + if (includeRelatedReferences) "1" else "0"
         fullSearchResults[key]?.let { return it }
 
         val candidates = if (includeRelatedReferences) candidatesWithRelated else candidatesWithoutRelated
-        if (normalizedQuery.isEmpty()) {
+        if (q.isEmpty()) {
             return candidates.sortedByDescending { it.popularity }.take(limit).also { fullSearchResults[key] = it }
         }
-
-        val tokens = tokenize(normalizedQuery)
+        val tokens = q.split(Regex("[^a-z0-9%+]+")).filter { it.length > 1 || it == "%" }
         val expanded = (tokens + tokens.flatMap { webSearchSynonyms[it].orEmpty() }).toSet()
         fun score(tool: ToolRecord): Int {
-            val name = tool.name.lowercase(Locale.ROOT)
-            if (name == normalizedQuery || tool.id == normalizedQuery) return 2000 + tool.popularity
-            if (name.startsWith(normalizedQuery)) return 1400 + tool.popularity
-            if (tool.id.contains(normalizedQuery) || name.contains(normalizedQuery)) return 1000 + tool.popularity
-
-            val haystack = listOf(tool.name, tool.description, tool.category, tool.subcategory.orEmpty(), tool.id)
-                .plus(tool.keywords).plus(tool.tags).joinToString(" ").lowercase(Locale.ROOT)
+            val name = tool.name.lowercase()
+            if (name == q || tool.id == q) return 2000 + tool.popularity
+            if (name.startsWith(q)) return 1400 + tool.popularity
+            if (tool.id.contains(q) || name.contains(q)) return 1000 + tool.popularity
+            val hay = listOf(tool.name, tool.description, tool.category, tool.subcategory.orEmpty(), tool.id)
+                .plus(tool.keywords).plus(tool.tags).joinToString(" ").lowercase()
             var hits = 0
             expanded.forEach { token ->
-                when {
-                    name.contains(token) -> hits += 8
-                    tool.keywords.any { it.lowercase(Locale.ROOT).contains(token) } -> hits += 5
-                    haystack.contains(token) -> hits += 2
-                }
+                if (name.contains(token)) hits += 8
+                else if (tool.keywords.any { it.lowercase().contains(token) }) hits += 5
+                else if (hay.contains(token)) hits += 2
             }
             return if (hits == 0) 0 else hits * 40 + tool.popularity
         }
-
-        val results = candidates.mapIndexed { index, tool -> Triple(index, tool, score(tool)) }
-            .filter { it.third > 0 }
-            .sortedWith(compareByDescending<Triple<Int, ToolRecord, Int>> { it.third }.thenBy { it.first })
+        val results = candidates.map { it to score(it) }
+            .filter { it.second > 0 }
+            .sortedByDescending { it.second }
             .take(limit)
-            .map { it.second }
+            .map { it.first }
         fullSearchResults[key] = results
         return results
     }
-
     @Synchronized
     fun suggestions(query: String, limit: Int, includeRelatedReferences: Boolean): List<ToolRecord> {
         val normalizedQuery = query.trim().lowercase(Locale.ROOT)
