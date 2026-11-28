@@ -561,7 +561,17 @@ private fun HomeScreen(catalog: Catalog, favorites: Set<String>, mostUsedIds: Li
         mostUsedIds.mapNotNull { catalog.displayTool(it) }.distinctBy { it.id }.take(10)
     }
     val homeSurface2 = if (darkMode) Color(0xFF1E2327) else Color(0xFFEFECE6)
-    val suggestions = remember(catalog, homeQuery) { if (homeQuery.isBlank()) emptyList() else catalog.webSearchSuggestions(homeQuery, limit = 8, includeRelatedReferences = true) }
+    var suggestions by remember(catalog) { mutableStateOf(emptyList<ToolRecord>()) }
+    LaunchedEffect(catalog, homeQuery) {
+        if (homeQuery.isBlank()) {
+            suggestions = emptyList()
+        } else {
+            kotlinx.coroutines.delay(120)
+            suggestions = withContext(Dispatchers.Default) {
+                catalog.webSearchSuggestions(homeQuery, limit = 8, includeRelatedReferences = true)
+            }
+        }
+    }
     var homeSearchFocused by remember { mutableStateOf(false) }
     val openHomeSearch = { val query = homeQuery.trim(); suggestions.firstOrNull()?.let { onTool(it.id) } ?: onSearch(query) }
     LazyColumn(contentPadding = PaddingValues(top = 4.dp, bottom = 0.dp), verticalArrangement = Arrangement.spacedBy(40.dp)) {
@@ -824,9 +834,14 @@ private fun ToolsScreen(catalog: Catalog, category: String?, query: String, onQu
     }
     val screenWidth = LocalConfiguration.current.screenWidthDp
     val columns = when { screenWidth >= 1024 -> 3; screenWidth >= 640 -> 2; else -> 1 }
-    val groupedTools = remember(catalog, query) {
-        val byCategory = catalog.webSearch(query, includeRelatedReferences = true).groupBy { it.category }
-        catalog.categories.mapNotNull { item -> byCategory[item.id]?.let { item to it } }
+    var groupedTools by remember(catalog) {
+        mutableStateOf(emptyList<Pair<com.chastech.env.data.Category, List<ToolRecord>>>())
+    }
+    LaunchedEffect(catalog, query) {
+        groupedTools = withContext(Dispatchers.Default) {
+            val byCategory = catalog.webSearch(query, includeRelatedReferences = true).groupBy { it.category }
+            catalog.categories.mapNotNull { item -> byCategory[item.id]?.let { item to it } }
+        }
     }
     LazyColumn(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 40.dp),
@@ -973,7 +988,17 @@ private fun WebToolsSearchField(
     onSeeMore: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val suggestions = remember(catalog, query) { if (query.isBlank()) emptyList() else catalog.webSearchSuggestions(query, limit = 8, includeRelatedReferences = true) }
+    var suggestions by remember(catalog) { mutableStateOf(emptyList<ToolRecord>()) }
+    LaunchedEffect(catalog, query) {
+        if (query.isBlank()) {
+            suggestions = emptyList()
+        } else {
+            kotlinx.coroutines.delay(120)
+            suggestions = withContext(Dispatchers.Default) {
+                catalog.webSearchSuggestions(query, limit = 8, includeRelatedReferences = true)
+            }
+        }
+    }
     Column(modifier) {
         Surface(Modifier.fillMaxWidth().height(44.dp), color = MaterialTheme.colorScheme.surface, shape = RoundedCornerShape(22.dp), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline), shadowElevation = 1.dp) {
             Row(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1026,7 +1051,12 @@ private fun SearchScreen(catalog: Catalog, query: String, onQuery: (String) -> U
     var searchFocused by remember { mutableStateOf(false) }
     var draftQuery by rememberSaveable { mutableStateOf(query) }
     LaunchedEffect(query) { draftQuery = query; visibleCount = 24 }
-    val results = remember(catalog, query) { if (query.trim().isEmpty()) emptyList() else catalog.webSearch(query, includeRelatedReferences = true) }
+    var results by remember(catalog) { mutableStateOf(emptyList<ToolRecord>()) }
+    LaunchedEffect(catalog, query) {
+        results = if (query.trim().isEmpty()) emptyList() else withContext(Dispatchers.Default) {
+            catalog.webSearch(query, includeRelatedReferences = true)
+        }
+    }
     val screenWidth = LocalConfiguration.current.screenWidthDp
     val columns = when { screenWidth >= 1024 -> 3; screenWidth >= 640 -> 2; else -> 1 }
     LazyColumn(
@@ -3353,7 +3383,17 @@ private fun CategoryCard(category: com.chastech.env.data.Category, onClick: () -
 @Composable
 private fun SearchBox(catalog: Catalog, value: String, onValueChange: (String) -> Unit, onTool: (String) -> Unit, onFocusChange: (Boolean) -> Unit = {}, onSubmit: (() -> Unit)? = null) {
     var focused by remember { mutableStateOf(false) }
-    val suggestions = remember(catalog, value) { if (value.isBlank()) emptyList() else catalog.webSearchSuggestions(value, limit = 8, includeRelatedReferences = true) }
+    var suggestions by remember(catalog) { mutableStateOf(emptyList<ToolRecord>()) }
+    LaunchedEffect(catalog, value) {
+        if (value.isBlank()) {
+            suggestions = emptyList()
+        } else {
+            kotlinx.coroutines.delay(120)
+            suggestions = withContext(Dispatchers.Default) {
+                catalog.webSearchSuggestions(value, limit = 8, includeRelatedReferences = true)
+            }
+        }
+    }
     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).semantics { contentDescription = "Search tools"; isTraversalGroup = true }) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val suggestionWidth = maxWidth
