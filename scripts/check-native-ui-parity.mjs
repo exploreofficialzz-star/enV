@@ -137,7 +137,7 @@ assert.match(androidInfo, /pushStringAnnotation\(tag = "mailto"/);
 assert.match(androidInfo, /No email app is available/);
 assert.match(android, /Year\.now\(\)\.value/);
 assert.match(iosContent, /Calendar\.current\.component\(\.year, from: \.now\)/);
-assert.match(android, /SearchBox\(catalog, query, onQuery, onTool\) \{ searchFocused = it \}/);
+assert.match(android, /SearchBox\\(catalog, draftQuery, \\{ draftQuery = it \\}, onTool, \\{ searchFocused = it \\}, onSubmit = \\{ onQuery\\(draftQuery.trim\\(\\)\\) \\}\\)/);
 assert.match(android, /contentDescription = "Search tools"/);
 assert.match(iosContent, /enVCharacterSpacedText\("Search tools"\)/);
 assert.match(iosContent, /TextField\(isHomeSearchFocused \? "" : "Search for a tool", text: \$searchText/);
@@ -334,13 +334,13 @@ assert.match(iosContent, /WebHomeFooter\(activeCount: store\.catalog\.browserAct
 
 // All advertised catalog records remain discoverable; general browser-runtime references stay labeled and do not receive a WebView execution fallback.
 assert.match(android, /catalog\.webSearch\(query, includeRelatedReferences = true\)/);
-assert.match(android, /catalog\.webSearch\(value, limit = 8, includeRelatedReferences = true\)/);
+assert.match(android, /catalog\\.webSearchSuggestions\\(value, limit = 8, includeRelatedReferences = true\\)/);
 assert.match(android, /\(catalog\.tools \+ catalog\.relatedReferenceTools\)\.filter \{ it\.id in favorites \}/);
 assert.match(androidCatalog, /\(tools \+ relatedReferenceTools\)\.asSequence\(\)/);
 assert.ok(android.includes("NativeCopy.isWebRuntimeOnly(tool.id)") && android.includes('Text("Web only"'), "Android discovery labels retained browser-only tools");
 assert.match(android, /authority\("android.envtools\.store"\)[\s\S]*?appendPath\("tools"\)[\s\S]*?Intent\(Intent\.ACTION_VIEW/);
-assert.match(iosContent, /webSearch\(toolsQuery, includeRelatedReferences: true\)/);
-assert.match(iosContent, /webSearch\(text, limit: Int\.max, includeRelatedReferences: true\)/);
+assert.match(iosContent, /webSearch\\(toolsQuery, includeRelatedReferences: true\\)/);
+assert.match(iosContent, /webSearch\\(text, limit: Int\\.max, includeRelatedReferences: true\\)/);
 assert.match(iosCatalog, /\(catalog\.tools \+ \(catalog\.relatedReferenceTools \?\? \[\]\)(?: \+ catalog\.developerStudioTools\(\))?\)\.filter \{ favoriteIDs\.contains/);
 assert.match(iosCatalog, /catalog\.tools \+ \(catalog\.relatedReferenceTools \?\? \[\]\)/);
 assert.ok(iosTools.includes("https://ios.envtools.store/tools/\\(tool.category)/\\(tool.slug)"), "iOS opens the canonical Web-only tool route");
