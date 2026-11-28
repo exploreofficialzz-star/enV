@@ -140,7 +140,7 @@ export function SearchBox({
       aria-label="Search tools"
       aria-autocomplete="list"
       aria-expanded={open && Boolean(q.trim())}
-      aria-controls={listboxId}
+      aria-controls={open && Boolean(q.trim()) ? listboxId : undefined}
       aria-activedescendant={activeIndex >= 0 && suggestions[activeIndex] ? `${listboxId}-option-${activeIndex}` : undefined}
       value={q}
       autoFocus={autoFocus}
@@ -207,37 +207,37 @@ export function SearchBox({
       )}
       {open && q.trim() ? (
         <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl bg-surface shadow-[var(--shadow-border)]">
-          {suggestions.length > 0 ? (
-            <ul id={listboxId} className="py-1" role="listbox" aria-label="Tool suggestions">
-              {suggestions.map((tool, index) => (
-                <li key={tool.id}>
-                  <button
-                    id={`${listboxId}-option-${index}`}
-                    type="button"
-                    role="option"
-                    aria-selected={activeIndex === index}
-                    className={cn(
-                      "flex w-full items-center gap-3 px-4 py-2.5 text-left",
-                      activeIndex === index ? "bg-surface-2" : "hover:bg-surface-2",
-                    )}
-                    onMouseEnter={() => setActiveIndex(index)}
-                    onClick={() => selectTool(tool)}
-                  >
-                    <Search className="size-4 shrink-0 text-subtle" aria-hidden="true" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-fg">{tool.name}{tool.status === "planned" ? <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-subtle">Coming soon</span> : null}</span>
-                      <span className="block truncate text-xs capitalize text-muted">{tool.subcategory ? `${tool.category} · ${tool.subcategory}` : tool.category}</span>
-                    </span>
-                    <ArrowRight className="size-4 shrink-0 text-subtle" aria-hidden="true" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="px-4 py-3 text-sm text-muted" aria-live="polite">
-              {normalizedQuery.length < 2 ? "Type at least 2 characters for suggestions." : !suggestionsReady ? "Preparing quick suggestions…" : "No quick matches yet. Search the full tool catalogue."}
-            </p>
-          )}
+          <ul id={listboxId} className="py-1" role="listbox" aria-label="Tool suggestions">
+            {suggestions.length > 0 ? suggestions.map((tool, index) => (
+              <li key={tool.id}>
+                <button
+                  id={`${listboxId}-option-${index}`}
+                  type="button"
+                  role="option"
+                  aria-selected={activeIndex === index}
+                  className={cn(
+                    "flex w-full items-center gap-3 px-4 py-2.5 text-left",
+                    activeIndex === index ? "bg-surface-2" : "hover:bg-surface-2",
+                  )}
+                  onMouseEnter={() => setActiveIndex(index)}
+                  onClick={() => selectTool(tool)}
+                >
+                  <Search className="size-4 shrink-0 text-subtle" aria-hidden="true" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-fg">{tool.name}{tool.status === "planned" ? <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-subtle">Coming soon</span> : null}</span>
+                    <span className="block truncate text-xs capitalize text-muted">{tool.subcategory ? `${tool.category} · ${tool.subcategory}` : tool.category}</span>
+                  </span>
+                  <ArrowRight className="size-4 shrink-0 text-subtle" aria-hidden="true" />
+                </button>
+              </li>
+            )) : (
+              <li role="presentation">
+                <p className="px-4 py-3 text-sm text-muted" aria-live="polite">
+                  {normalizedQuery.length < 2 ? "Type at least 2 characters for suggestions." : !suggestionsReady ? "Preparing quick suggestions…" : "No quick matches yet. Search the full tool catalogue."}
+                </p>
+              </li>
+            )}
+          </ul>
           <div className="border-t border-border px-2 py-1">
             <button
               type="button"
