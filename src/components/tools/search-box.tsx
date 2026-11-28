@@ -53,6 +53,7 @@ export function SearchBox({
   const [open, setOpen] = useState(false);
   const [focused, setFocused] = useState(false);
   const [suggestions, setSuggestions] = useState<ToolMeta[]>([]);
+  const [suggestionsReady, setSuggestionsReady] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [productionTool, setProductionTool] = useState<ToolMeta | null>(null);
   const nav = useNavigate();
@@ -65,20 +66,22 @@ export function SearchBox({
 
   useEffect(() => {
     const idleWindow = window as IdleWindow;
+    const prepare = () => {
+      prepareToolSuggestions(searchable);
+      setSuggestionsReady(true);
+    };
+
     if (idleWindow.requestIdleCallback) {
-      const handle = idleWindow.requestIdleCallback(
-        () => prepareToolSuggestions(searchable),
-        { timeout: 1600 },
-      );
+      const handle = idleWindow.requestIdleCallback(prepare, { timeout: 1600 });
       return () => idleWindow.cancelIdleCallback?.(handle);
     }
 
-    const handle = window.setTimeout(() => prepareToolSuggestions(searchable), 500);
+    const handle = window.setTimeout(prepare, 500);
     return () => window.clearTimeout(handle);
   }, [searchable]);
 
   useEffect(() => {
-    if (!open || normalizedQuery.length < 2) {
+    if (!open || normalizedQuery.length < 2 || !suggestionsReady) {
       setSuggestions([]);
       setActiveIndex(-1);
       return;
@@ -90,7 +93,7 @@ export function SearchBox({
       setActiveIndex(-1);
     }, 120);
     return () => window.clearTimeout(handle);
-  }, [open, normalizedQuery, q, searchable]);
+  }, [open, normalizedQuery, q, searchable, suggestionsReady]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -232,7 +235,7 @@ export function SearchBox({
             </ul>
           ) : (
             <p className="px-4 py-3 text-sm text-muted" aria-live="polite">
-              {normalizedQuery.length < 2 ? "Type at least 2 characters for suggestions." : "No quick matches yet. Search the full tool catalogue."}
+              {normalizedQuery.length < 2 ? "Type at least 2 characters for suggestions." : !suggestionsReady ? "Preparing quick suggestions…" : "No quick matches yet. Search the full tool catalogue."}
             </p>
           )}
           <div className="border-t border-border px-2 py-1">
