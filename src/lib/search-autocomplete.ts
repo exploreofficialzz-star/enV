@@ -122,7 +122,7 @@ function suggestionTerms(query: string): string[] {
   return useful.length ? useful : all;
 }
 
-function termVariants(term: string): string[] {
+function variantsForTerm(term: string): string[] {
   const related = (SYNONYMS[term] ?? []).flatMap((value) => normalizeText(value).split(" "));
   return [...new Set([term, ...related].filter((value) => value.length >= MIN_PREFIX_LENGTH))];
 }
@@ -184,9 +184,9 @@ export function suggestTools(tools: ToolMeta[], query: string, limit = 8): ToolM
   const terms = suggestionTerms(query);
   if (!terms.length || limit <= 0) return rememberSuggestions(index.queryCache, cacheKey, []);
 
-  const termVariants = terms.map(termVariants);
+  const variantsByTerm = terms.map(variantsForTerm);
   const candidateIndexes = new Set<number>();
-  for (const variants of termVariants) {
+  for (const variants of variantsByTerm) {
     for (const variant of variants) {
       readCandidates(index.namePrefixes, variant, MAX_NAME_CANDIDATES_PER_TERM, index.docs, candidateIndexes);
       readCandidates(index.fieldPrefixes, variant, MAX_FIELD_CANDIDATES_PER_TERM, index.docs, candidateIndexes);
@@ -202,7 +202,7 @@ export function suggestTools(tools: ToolMeta[], query: string, limit = 8): ToolM
     let matchedNameTerms = 0;
 
     for (let termIndex = 0; termIndex < terms.length; termIndex += 1) {
-      const variants = termVariants[termIndex];
+      const variants = variantsByTerm[termIndex];
       const nameMatch = hasPrefix(doc.nameTokens, variants);
       const fieldMatch = hasPrefix(doc.fieldTokens, variants);
       if (nameMatch || fieldMatch) matchedTerms += 1;
