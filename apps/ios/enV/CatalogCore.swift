@@ -620,6 +620,7 @@ enum CatalogLoader {
 final class CatalogStore: ObservableObject {
     @Published private(set) var catalog: Catalog
     @Published private(set) var loadState: CatalogLoadState
+    @Published private(set) var searchIndexReady = false
     @Published var query = ""
     @Published var selectedCategory: String?
     @Published private(set) var favoriteIDs: Set<String>
@@ -649,7 +650,10 @@ final class CatalogStore: ObservableObject {
         UserDefaults.standard.set(recentIDs, forKey: recentKey)
         UserDefaults.standard.set(usageCounts, forKey: usageKey)
         let initialSearchEngine = self.searchEngine
-        DispatchQueue.global(qos: .utility).async { initialSearchEngine.prepare() }
+        DispatchQueue.global(qos: .utility).async {
+            initialSearchEngine.prepare()
+            DispatchQueue.main.async { self.searchIndexReady = true }
+        }
         if catalog == nil { reloadCatalog() }
     }
 
@@ -664,7 +668,11 @@ final class CatalogStore: ObservableObject {
                     self.catalog = loaded
                     let searchEngine = NativeCatalogSearchEngine(catalog: loaded)
                     self.searchEngine = searchEngine
-                    DispatchQueue.global(qos: .utility).async { searchEngine.prepare() }
+                    self.searchIndexReady = false
+                    DispatchQueue.global(qos: .utility).async {
+                        searchEngine.prepare()
+                        DispatchQueue.main.async { self.searchIndexReady = true }
+                    }
                     self.loadState = .ready
                 case .failure:
                     self.loadState = .failed
