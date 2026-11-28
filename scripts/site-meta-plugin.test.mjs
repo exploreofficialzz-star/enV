@@ -52,7 +52,9 @@ test("All Tools groups results by category and progressively expands without glo
   const tools = readFileSync(join(PROJECT_ROOT, "src/routes/tools/index.tsx"), "utf8");
   assert.match(tools, /flex items-center gap-4/);
   assert.match(tools, /w-\[52vw\] shrink-0 max-w-\[18rem\]/);
-  assert.match(tools, /<SearchBox value=\{query\} onValueChange=/);
+  assert.match(tools, /const \[draft, setDraft\] = useState\(query\)/);
+  assert.match(tools, /<SearchBox[\s\S]*?value=\{draft\}[\s\S]*?onValueChange=\{setDraft\}[\s\S]*?onEnter=/);
+  assert.match(tools, /searchToolResultsCached\(all, query, all\.length\)\.matches/);
   assert.match(tools, /validateSearch: \(search: Record<string, unknown>\).*q:/s);
   assert.match(tools, /const \{ q \} = Route\.useSearch\(\)/);
   assert.match(tools, /CATEGORIES\.map/);
