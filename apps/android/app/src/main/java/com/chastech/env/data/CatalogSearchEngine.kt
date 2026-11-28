@@ -149,7 +149,8 @@ internal class CatalogSearchEngine(private val catalog: Catalog) {
                 plannedPenalty
             document to score
         }.sortedWith(
-            compareByDescending<Pair<SearchSuggestionDocument, Int>> { it.second }
+            compareBy<Pair<SearchSuggestionDocument, Int>> { it.first.tool.status == "planned" }
+                .thenByDescending { it.second }
                 .thenBy { it.first.normalizedName }
                 .thenBy { it.first.tool.id },
         ).take(limit).map { it.first.tool }
