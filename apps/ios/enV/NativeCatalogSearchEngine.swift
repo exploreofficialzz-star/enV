@@ -72,30 +72,15 @@ final class NativeCatalogSearchEngine {
             return cached
         }
 
-        let candidates = candidateTools(includeRelatedReferences: includeRelatedReferences)
-        let results: [Tool]
-        if normalizedQuery.isEmpty {
-            results = candidates.enumerated().sorted {
-                $0.element.popularity == $1.element.popularity
-                    ? $0.offset < $1.offset
-                    : $0.element.popularity > $1.element.popularity
-            }.prefix(max(0, limit)).map { $0.element }
-        } else {
-            let tokens = tokenize(normalizedQuery)
-            let expanded = Set(tokens + tokens.flatMap { nativeSearchSynonyms[$0] ?? [] })
-            let scored = candidates.enumerated().map { entry -> (Int, Tool, Int) in
-                (entry.offset, entry.element, score(entry.element, query: normalizedQuery, expanded: expanded))
-            }
-            results = scored.filter { $0.2 > 0 }.sorted {
-                if $0.2 == $1.2 { return $0.0 < $1.0 }
-                return $0.2 > $1.2
-            }.prefix(max(0, limit)).map { $0.1 }
-        }
-
+        // Keep the established Catalog.webSearch ranking exactly; this layer only caches it.
+        let results = catalog.webSearch(
+            normalizedQuery,
+            limit: limit,
+            includeRelatedReferences: includeRelatedReferences
+        )
         remember(results, key: key, cache: &fullSearchCache, order: &fullSearchOrder, maximum: maximumSearchCacheEntries)
         return results
     }
-
     func suggestions(_ query: String, limit: Int = 8, includeRelatedReferences: Bool = false) -> [Tool] {
         lock.lock()
         defer { lock.unlock() }
