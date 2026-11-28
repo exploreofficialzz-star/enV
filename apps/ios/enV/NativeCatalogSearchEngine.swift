@@ -102,7 +102,11 @@ final class NativeCatalogSearchEngine {
             return []
         }
 
-        let searchIndex = index(includeRelatedReferences: includeRelatedReferences)
+        // The catalogue prefix index is warmed off the main thread when the native catalogue loads.
+        guard let searchIndex = indexes[includeRelatedReferences] else {
+            remember([], key: key, cache: &suggestionCache, order: &suggestionOrder, maximum: maximumSuggestionCacheEntries)
+            return []
+        }
         let variantsByTerm = terms.map { term -> [String] in
             let related = (nativeSearchSynonyms[term] ?? []).flatMap { tokenize($0) }
             return Array(Set([term] + related)).filter { $0.count >= minimumPrefixLength }.sorted()
